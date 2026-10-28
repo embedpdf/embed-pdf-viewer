@@ -11,21 +11,9 @@ export namespace TokensIssueRequest {
         docId: string;
         layerName?: string | undefined;
         scope: string[];
-        identity?: TokensIssueRequestDoc.Identity | undefined;
+        identity?: CloudPDF.Identity | undefined;
         origins?: string[] | undefined;
         expiresIn: number;
-    }
-
-    export namespace TokensIssueRequestDoc {
-        export interface Identity {
-            userId?: string | undefined;
-            displayName?: string | undefined;
-            email?: string | undefined;
-            title?: string | undefined;
-            organization?: string | undefined;
-            organizationalUnit?: string | undefined;
-            groupId?: string | undefined;
-        }
     }
 
     export interface Tenant {

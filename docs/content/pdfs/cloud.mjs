@@ -1,15 +1,23 @@
 /**
  * Puts the docs' demo PDFs on CloudPDF, so cloudpdf.com's examples open the same documents as
  * embedpdf.com's. For each document `build.mjs` makes, it uploads
- * `website/public/pdfs/embedpdf-<folder>.pdf` and creates a share grant for it, then records both
+ * `website/public/pdfs/embedpdf-<folder>.pdf` and creates a share link for it, then records both
  * in `cloud.json`, which `documents.mjs` reads. Run
  * `CLOUDPDF_API_TOKEN=… CLOUDPDF_TENANT_ID=… pnpm --filter @embedpdf/docs-content pdfs:cloud`;
  * `--dry-run` only says what it would do. `CLOUDPDF_BASE_URL` names another engine than
  * engine.cloudpdf.com.
  *
- * A document already in `cloud.json` is left alone. One whose PDF changed since is reported, not
- * replaced: a grant can't point at a new document yet, and a new grant means a new token in every
- * cloud copy.
+ * Every link gives each visit its own copy of the document, as embedpdf.com's examples do in
+ * memory: a reader's changes are theirs, nobody sees anyone else's, and a reload starts clean.
+ * A copy nobody has looked at for an hour is deleted. Each link may do what its document's
+ * examples do, from any origin, since copied code runs on the reader's own machine. It takes a
+ * name if the page gives one, never asking for it: an example's `identity` names what it adds,
+ * as on embedpdf.com.
+ *
+ * A document already in `cloud.json` keeps its link, and the link is set to these settings again,
+ * so editing them here and running again updates every link. One whose PDF changed since is
+ * reported, not replaced: a link can't point at a new document yet, and a new link means a new
+ * token in every cloud copy.
  */
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
@@ -23,9 +31,8 @@ const here = dirname(fileURLToPath(import.meta.url));
 const pdfs = resolve(here, '../../../website/public/pdfs');
 const record = join(here, 'cloud.json');
 
-// What a docs reader may do: everything that reads. Nothing writes, so every reader can share one
-// copy of each document.
-const READ_SCOPE = [
+/** What every reader may do with any document: everything that reads. */
+const READ = [
   'doc.open',
   'doc.render',
   'doc.text.select',
@@ -39,6 +46,64 @@ const READ_SCOPE = [
   'doc.print',
   'doc.print.high',
 ];
+const ANNOTATE = ['doc.annotate.modify'];
+const FILL = ['doc.forms.fill'];
+
+/**
+ * What each document's examples change, on top of reading. Never signing: completing a signature
+ * publishes a new version of the document itself, for every reader, so no docs link may sign.
+ */
+const CHANGES = {
+  // The getting-started document: annotations, forms, pages, redaction, attachments, outline,
+  // metadata.
+  welcome: [
+    ...ANNOTATE,
+    ...FILL,
+    'doc.forms.modify',
+    'doc.attachments.modify',
+    'doc.metadata.modify',
+    'doc.outline.modify',
+    'doc.pages.modify',
+    'doc.pages.assemble',
+    'doc.redact',
+  ],
+  // Signatures: filling the agreement and drawing a signature (a stamp) in its field.
+  agreement: [...ANNOTATE, ...FILL],
+  // Stamps.
+  approvals: ANNOTATE,
+  // Drawing and marking up text; documents in panes and tabs.
+  article: ANNOTATE,
+  // Filling, checking and restyling the fields; reading and restoring the form's data.
+  forms: [...FILL, 'doc.forms.modify', 'doc.forms.import'],
+  // The form's calculation and format scripts.
+  invoice: [...FILL, 'doc.forms.script'],
+  // Moving, resizing, ordering and styling annotations.
+  layout: ANNOTATE,
+  // Links and their actions, JavaScript included.
+  links: [...ANNOTATE, 'doc.forms.script'],
+  // Rich text boxes.
+  notice: ANNOTATE,
+  // Comments and review.
+  proposal: ANNOTATE,
+  // Designing a form: adding and setting up fields.
+  registration: [...FILL, 'doc.forms.modify'],
+  // Creating, exporting and importing annotations.
+  report: [...ANNOTATE, 'doc.annotate.import'],
+  // Drawing tools and measurements.
+  sketch: ANNOTATE,
+};
+
+/**
+ * Every link's settings: a copy per visit, deleted after an hour unseen, from any origin, and the
+ * example's name on what the reader adds (optional, so nobody is asked).
+ */
+const linkSettings = (name) => ({
+  layerMode: 'per-visitor',
+  keepVisitorLayers: false,
+  visitorIdleSeconds: 60 * 60,
+  visitorIdentity: { fields: { displayName: 'optional' }, ask: 'before-first-change' },
+  scope: [...READ, ...CHANGES[name]],
+});
 
 const dryRun = process.argv.includes('--dry-run');
 const baseUrl = process.env.CLOUDPDF_BASE_URL ?? 'https://engine.cloudpdf.com';
@@ -52,20 +117,31 @@ const documents = (await readdir(here, { withFileTypes: true }))
   .filter((entry) => entry.isDirectory() && existsSync(join(here, entry.name, 'bake.mjs')))
   .map((entry) => entry.name)
   .sort();
-const grants = existsSync(record) ? JSON.parse(await readFile(record, 'utf8')) : {};
+const unscoped = documents.filter((name) => !CHANGES[name]);
+if (unscoped.length > 0) {
+  throw new Error(`Say what the examples of ${unscoped.join(', ')} change, in CHANGES`);
+}
+const links = existsSync(record) ? JSON.parse(await readFile(record, 'utf8')) : {};
 const client = dryRun ? null : new CloudPDFClient({ baseUrl, token });
 
 const changed = [];
 for (const name of documents) {
   const bytes = new Uint8Array(await readFile(join(pdfs, `embedpdf-${name}.pdf`)));
   const sha256 = createHash('sha256').update(bytes).digest('hex');
-  const known = grants[name];
+  const settings = linkSettings(name);
+  const known = links[name];
   if (known) {
     if (known.sha256 !== sha256) changed.push(name);
+    if (dryRun) {
+      console.log(`${name}: would set link ${known.shareToken} to its settings`);
+      continue;
+    }
+    await client.shares.update({ tenantId, shareId: known.shareToken, ...settings, origins: null });
+    console.log(`${name}: link ${known.shareToken} set`);
     continue;
   }
   if (dryRun) {
-    console.log(`${name}: would upload ${bytes.length} bytes and create a read grant`);
+    console.log(`${name}: would upload ${bytes.length} bytes and create a link per visit`);
     continue;
   }
   const { document } = await client.uploads.create({
@@ -73,13 +149,15 @@ for (const name of documents) {
     source: bytes,
     metadata: { name: `embedpdf-${name}.pdf` },
   });
-  const { share } = await client.shares.create({ tenantId, docId: document.id, scope: READ_SCOPE });
-  grants[name] = { docId: document.id, shareToken: share.id, sha256 };
+  const { share } = await client.shares.create({ tenantId, docId: document.id, ...settings });
+  links[name] = { docId: document.id, shareToken: share.id, sha256 };
   // Written after every document: a failure halfway keeps what's already on CloudPDF.
-  await writeFile(record, `${JSON.stringify(grants, null, 2)}\n`);
-  console.log(`${name}: ${document.id}, grant ${share.id}`);
+  await writeFile(record, `${JSON.stringify(links, null, 2)}\n`);
+  console.log(`${name}: ${document.id}, link ${share.id}`);
 }
 
 for (const name of changed) {
-  console.log(`${name}: the PDF changed since it went to CloudPDF; its grant still opens the old one`);
+  console.log(
+    `${name}: the PDF changed since it went to CloudPDF; its link still opens the old one`,
+  );
 }

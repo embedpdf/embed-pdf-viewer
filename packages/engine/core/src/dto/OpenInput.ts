@@ -1,4 +1,3 @@
-import type { VisitorAnswers } from './ShareVisitor';
 import type { Identity } from '../auth/scope';
 
 /**
@@ -132,13 +131,6 @@ export interface OpenInputShare {
    * applies). Elsewhere it changes nothing.
    */
   restart?: boolean;
-  /**
-   * The visitor's answers to what the link asks (its `visitorIdentity`),
-   * sent with the first exchange. The same as the visitor typing them: a
-   * site that knows its users for certain issues them tokens instead. Only
-   * fields the link asks and the visitor hasn't answered count.
-   */
-  visitor?: VisitorAnswers;
 }
 
 export type OpenInputLayerFileSource =
@@ -196,22 +188,29 @@ export interface OpenOptions {
    * console warning. Set explicitly to test realistic permissions
    * locally before pointing the same SDK code at the cloud.
    *
-   * Cloud engines read scope from the JWT and ignore this option.
+   * The cloud engine takes what the session may do from the document's
+   * token, so it doesn't use this option, and says so in development.
    */
   scope?: ReadonlyArray<string>;
 
   /**
-   * Engine-local only. Who the session acts for: collab filters
-   * (`:self`, `:group=X`) are evaluated against it, and annotations it
-   * writes are attributed to it. The cloud engine takes the same object
-   * from the document token's `identity` claim.
+   * Who your page knows the user is. Who the session acts for, read back as
+   * `doc.security.identity`, is decided by whoever stands behind the session:
    *
-   * Required when `scope` contains collab scopes (`annotations:*:self`
-   * etc.) — opening without it fails with `InvalidArg` so the config
-   * mistake surfaces immediately instead of producing silent denies
-   * at every mutation.
+   * - The local engine has no server, so this is the session's identity:
+   *   collab filters (`:self`, `:group=X`) are evaluated against it, and
+   *   what it writes is attributed to it. Required when `scope` contains
+   *   collab scopes (`annotations:*:self` etc.): opening without it fails
+   *   with `InvalidArg` instead of producing silent denies at every
+   *   mutation.
+   * - The cloud engine with a document token: the token's `identity` claim
+   *   decides.
+   * - The cloud engine with a share link: it goes with the first exchange as
+   *   the visitor's answers, the same as the visitor typing them. Only the
+   *   fields the link asks count (never `userId` or `groupId`), an answer
+   *   once given stays, and a link that says who its visitors are prevails.
    *
-   * Cloud engines read identity from the JWT and ignore this option.
+   * In development the cloud engine says which fields it didn't use.
    */
   identity?: Identity;
 }

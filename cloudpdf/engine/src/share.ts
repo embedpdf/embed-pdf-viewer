@@ -4,6 +4,7 @@ import {
   EngineError,
   EngineErrorCode,
   type DocumentShare,
+  type Identity,
   type ShareOpenRequest,
   shareOpenRequestOf,
   type VisitorAnswers,
@@ -224,8 +225,8 @@ export interface ShareSessionOptions {
   password?: string;
   /** Start over: the first exchange deletes the kept visitor's layer (see `OpenInputShare.restart`). */
   restart?: boolean;
-  /** The visitor's answers, sent with the first exchange (see `OpenInputShare.visitor`). */
-  visitor?: VisitorAnswers;
+  /** The visitor's answers, sent with the first exchange: what the page knows (`OpenOptions.identity`). */
+  identity?: VisitorAnswers;
   /** Where a kept visitor waits for the next visit; none keeps the visitor for this session only. */
   visitorStore?: VisitorStore | null;
   fetch?: typeof globalThis.fetch;
@@ -285,7 +286,7 @@ export class ShareSessionSource {
     private readonly opts: ShareSessionOptions = {},
   ) {
     this.restart = opts.restart === true;
-    this.answers = opts.visitor;
+    this.answers = opts.identity;
     this.password = opts.password;
   }
 
@@ -398,14 +399,14 @@ export class ShareSessionSource {
    * the refusal says) and rejects.
    */
   async resume(
-    given: { readonly sharePassword?: string; readonly visitor?: VisitorAnswers },
+    given: { readonly sharePassword?: string; readonly identity?: VisitorAnswers },
     signal?: AbortSignal,
   ): Promise<void> {
     const asked = this.asked;
     if (!asked) return;
     await this.inflight?.catch(() => undefined);
     if (given.sharePassword !== undefined) this.password = given.sharePassword;
-    const exchanged = this.exchange(given.visitor, signal).finally(() => {
+    const exchanged = this.exchange(given.identity, signal).finally(() => {
       this.inflight = null;
     });
     this.inflight = exchanged;
@@ -589,10 +590,34 @@ class SessionShare implements DocumentShare {
 
   resume(given: {
     readonly sharePassword?: string;
-    readonly visitor?: VisitorAnswers;
+    readonly identity?: VisitorAnswers;
   }): AbortablePromise<void> {
     return AbortablePromise.run((signal) => this.source.resume(given, signal));
   }
+}
+
+/** The fields a share link can ask its visitors. */
+const VISITOR_FIELDS = [
+  'displayName',
+  'email',
+  'title',
+  'organization',
+  'organizationalUnit',
+] as const satisfies readonly (keyof VisitorAnswers)[];
+
+/**
+ * What a page's `identity` answers on a share link: the fields a link can ask,
+ * never `userId` or `groupId` (the server gives a visitor theirs). `undefined`
+ * when it answers nothing.
+ */
+export function visitorAnswersOf(identity: Identity | undefined): VisitorAnswers | undefined {
+  if (!identity) return undefined;
+  const answers: Partial<Record<keyof VisitorAnswers, string>> = {};
+  for (const field of VISITOR_FIELDS) {
+    const value = identity[field];
+    if (value !== undefined) answers[field] = value;
+  }
+  return Object.keys(answers).length > 0 ? answers : undefined;
 }
 
 function identityRequired(request: VisitorIdentityRequest): EngineError {

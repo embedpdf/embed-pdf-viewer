@@ -340,6 +340,11 @@ export interface ShareGrantsTable {
    * `{ fields, ask, purpose?, privacyUrl? }`; NULL asks nothing.
    */
   visitor_identity_json: string | null;
+  /**
+   * Who the link's visitors are, when the link says so (migration 043): JSON
+   * `Identity`, the shape of `tokens.issue`'s. NULL: whoever they answer.
+   */
+  identity_json: string | null;
   /** Doc capability scopes the exchanged session carries (JSON array). */
   scope_json: string;
   /** Origin allowlist (JSON array); NULL = any origin. */

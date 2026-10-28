@@ -6,7 +6,7 @@ import {
   adminOperations,
   type AdminOperation,
 } from '@cloudpdf/contract';
-import { validateScopeArray } from '@embedpdf/engine-core/runtime';
+import { validateScopeArray, type Identity } from '@embedpdf/engine-core/runtime';
 import { DEFAULT_LAYER_NAME } from '@embedpdf/engine-core/wire';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
@@ -138,6 +138,7 @@ export async function registerAdminSharesRoutes(
         ? { visitorIdleSeconds: body.visitorIdleSeconds }
         : {}),
       ...(body.visitorIdentity !== undefined ? { visitorIdentity: body.visitorIdentity } : {}),
+      ...(body.identity !== undefined ? { identity: body.identity } : {}),
       scope: body.scope,
       ...(body.origins !== undefined ? { origins: body.origins } : {}),
       ...(body.password !== undefined ? { passwordHash: hashSharePassword(body.password) } : {}),
@@ -218,10 +219,6 @@ export async function registerAdminSharesRoutes(
           .send({ error: { code: 'InvalidArg', message: (err as Error).message } });
       }
     }
-    const settingsRefusal = refuseLinkSettings(body);
-    if (settingsRefusal) {
-      return reply.code(400).send({ error: { code: 'InvalidArg', message: settingsRefusal } });
-    }
     const existing = await grants.findById(shareId);
     if (!existing || existing.tenantId !== tenantId) {
       return reply
@@ -229,6 +226,15 @@ export async function registerAdminSharesRoutes(
         .send({ error: { code: 'NotFound', message: `share does not exist: ${shareId}` } });
     }
     if (existing.archivedAt !== null) return archivedConflict(reply, shareId);
+    // The link as it will be: what it asks and what it says are checked together.
+    const settingsRefusal = refuseLinkSettings({
+      visitorIdentity:
+        body.visitorIdentity !== undefined ? body.visitorIdentity : existing.visitorIdentity,
+      identity: body.identity !== undefined ? body.identity : existing.identity,
+    });
+    if (settingsRefusal) {
+      return reply.code(400).send({ error: { code: 'InvalidArg', message: settingsRefusal } });
+    }
     const layerMode = body.layerMode ?? existing.layerMode;
     const layerChanges = body.layerMode !== undefined || body.layerName !== undefined;
     if (layerChanges) {
@@ -256,6 +262,7 @@ export async function registerAdminSharesRoutes(
         ? { visitorIdleSeconds: body.visitorIdleSeconds }
         : {}),
       ...(body.visitorIdentity !== undefined ? { visitorIdentity: body.visitorIdentity } : {}),
+      ...(body.identity !== undefined ? { identity: body.identity } : {}),
       ...(body.scope !== undefined ? { scope: body.scope } : {}),
       ...(body.origins !== undefined ? { origins: body.origins } : {}),
       ...(body.password !== undefined
@@ -409,18 +416,32 @@ export async function registerAdminSharesRoutes(
 
 /**
  * Why a link's settings can't be taken, or `null`: a link that asks its
- * visitors asks at least one field, and links its privacy page over the web.
+ * visitors asks at least one field, and links its privacy page over the web;
+ * a link that says who its visitors are says something, and never also asks
+ * a field it sets (the answer would be ignored).
  */
 function refuseLinkSettings(body: {
   visitorIdentity?: { fields: Record<string, unknown>; privacyUrl?: string } | null;
+  identity?: Identity | null;
 }): string | null {
-  const identity = body.visitorIdentity;
-  if (identity) {
-    if (Object.values(identity.fields).every((asked) => asked === undefined)) {
+  const asks = body.visitorIdentity;
+  if (asks) {
+    if (Object.values(asks.fields).every((asked) => asked === undefined)) {
       return 'visitorIdentity.fields: ask at least one field, or set visitorIdentity to null';
     }
-    if (identity.privacyUrl !== undefined && !/^https?:\/\//.test(identity.privacyUrl)) {
+    if (asks.privacyUrl !== undefined && !/^https?:\/\//.test(asks.privacyUrl)) {
       return 'visitorIdentity.privacyUrl: must be an http or https URL';
+    }
+  }
+  const says = body.identity;
+  if (says) {
+    const set = Object.entries(says)
+      .filter(([, value]) => value !== undefined)
+      .map(([field]) => field);
+    if (set.length === 0) return 'identity: set at least one field, or set identity to null';
+    const both = asks ? set.filter((field) => asks.fields[field] !== undefined) : [];
+    if (both.length > 0) {
+      return `visitorIdentity.fields: the link's identity sets ${both.join(', ')}, so it can't ask for it`;
     }
   }
   return null;
@@ -462,6 +483,7 @@ function sharePublic(g: ShareGrantRow): Record<string, unknown> {
     keepVisitorLayers: g.keepVisitorLayers,
     visitorIdleSeconds: g.visitorIdleSeconds,
     visitorIdentity: g.visitorIdentity,
+    identity: g.identity,
     scope: [...g.scope],
     origins: g.origins ? [...g.origins] : null,
     passwordProtected: g.passwordHash !== null,

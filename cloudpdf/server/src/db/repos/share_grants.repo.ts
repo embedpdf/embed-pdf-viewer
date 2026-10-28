@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
 
+import type { Identity } from '@embedpdf/engine-core/runtime';
 import { DEFAULT_LAYER_NAME } from '@embedpdf/engine-core/wire';
 import type { Kysely } from 'kysely';
 import { sql } from 'kysely';
@@ -21,6 +22,8 @@ export interface ShareGrantRow {
   visitorIdleSeconds: number | null;
   /** What the link asks its visitors; null asks nothing. */
   visitorIdentity: VisitorIdentityConfig | null;
+  /** Who the link's visitors are, when the link says so: it prevails over their answers. */
+  identity: Identity | null;
   scope: ReadonlyArray<string>;
   /** Origin allowlist; null = any origin. */
   origins: ReadonlyArray<string> | null;
@@ -51,6 +54,7 @@ export interface ShareGrantCreateInput {
   /** Omitted or null: visitors stay until deleted on purpose. */
   visitorIdleSeconds?: number | null;
   visitorIdentity?: VisitorIdentityConfig | null;
+  identity?: Identity | null;
   scope: ReadonlyArray<string>;
   origins?: ReadonlyArray<string>;
   passwordHash?: string;
@@ -67,6 +71,8 @@ export interface ShareGrantUpdateInput {
   visitorIdleSeconds?: number | null;
   /** null stops asking visitors who they are. */
   visitorIdentity?: VisitorIdentityConfig | null;
+  /** null: the visitors are whoever they answer. */
+  identity?: Identity | null;
   scope?: ReadonlyArray<string>;
   /** null clears the allowlist (any origin). */
   origins?: ReadonlyArray<string> | null;
@@ -127,6 +133,7 @@ export class ShareGrantsRepo {
         keep_visitor_layers: input.keepVisitorLayers === false ? 0 : 1,
         visitor_idle_seconds: input.visitorIdleSeconds ?? null,
         visitor_identity_json: input.visitorIdentity ? JSON.stringify(input.visitorIdentity) : null,
+        identity_json: input.identity ? JSON.stringify(input.identity) : null,
         scope_json: JSON.stringify(input.scope),
         origins_json: input.origins ? JSON.stringify(input.origins) : null,
         password_hash: input.passwordHash ?? null,
@@ -162,6 +169,9 @@ export class ShareGrantsRepo {
     if (input.visitorIdentity !== undefined) {
       patch['visitor_identity_json'] =
         input.visitorIdentity === null ? null : JSON.stringify(input.visitorIdentity);
+    }
+    if (input.identity !== undefined) {
+      patch['identity_json'] = input.identity === null ? null : JSON.stringify(input.identity);
     }
     if (input.visitorIdleSeconds !== undefined) {
       patch['visitor_idle_seconds'] = input.visitorIdleSeconds;
@@ -287,6 +297,7 @@ function mapRow(r: {
   keep_visitor_layers: number;
   visitor_idle_seconds: number | null;
   visitor_identity_json: string | null;
+  identity_json: string | null;
   scope_json: string;
   origins_json: string | null;
   password_hash: string | null;
@@ -311,6 +322,7 @@ function mapRow(r: {
     visitorIdentity: r.visitor_identity_json
       ? (JSON.parse(r.visitor_identity_json) as VisitorIdentityConfig)
       : null,
+    identity: r.identity_json ? (JSON.parse(r.identity_json) as Identity) : null,
     scope: JSON.parse(r.scope_json) as string[],
     origins: r.origins_json ? (JSON.parse(r.origins_json) as string[]) : null,
     passwordHash: r.password_hash,

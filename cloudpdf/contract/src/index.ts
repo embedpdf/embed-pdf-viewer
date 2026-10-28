@@ -793,6 +793,11 @@ export const ShareGrantRecordSchema = z.object({
   visitorIdleSeconds: z.number().nullable(),
   /** What the link asks its visitors; null asks nothing. */
   visitorIdentity: ShareVisitorIdentitySchema.nullable(),
+  /**
+   * Who the link's visitors are, for a link made for one person; null when
+   * they are whoever they answer. It prevails over their answers.
+   */
+  identity: IdentitySchema.nullable(),
   /** Doc capabilities the exchanged session carries. */
   scope: z.array(z.string()),
   /** Origin allowlist; null means any origin. */
@@ -839,6 +844,15 @@ export const ShareGrantCreateRequestSchema = z.object({
   /** Ask visitors who they are; omit or null to ask nothing. */
   visitorIdentity: ShareVisitorIdentitySchema.nullable().optional(),
   /**
+   * Who the link's visitors are, for a link made for one person: the same
+   * `Identity` as `tokens.issue`'s. Every session the link gives carries it,
+   * whoever opens the link: a field it sets is never asked, and a visitor's
+   * answer for it is ignored, so `visitorIdentity` can't ask it too. `userId`
+   * replaces the visitor's own (`visitor_<id>`). Omit or null for visitors
+   * who are whoever they answer.
+   */
+  identity: IdentitySchema.nullable().optional(),
+  /**
    * Doc capability scopes the exchanged session will carry. Validated
    * server-side against the engine's scope vocabulary, same as
    * `tokens.issue`.
@@ -881,6 +895,8 @@ export const ShareGrantUpdateRequestSchema = z.object({
   visitorIdleSeconds: visitorIdleSecondsSchema.nullable().optional(),
   /** null stops asking; a change applies at each visitor's next exchange. */
   visitorIdentity: ShareVisitorIdentitySchema.nullable().optional(),
+  /** Replaces the link's identity; null clears it. Applies at each visitor's next exchange. */
+  identity: IdentitySchema.nullable().optional(),
   scope: z.array(z.string().min(1).max(128)).min(1).max(64).optional(),
   origins: originPatternArray.nullable().optional(),
   password: z.string().min(1).max(1024).nullable().optional(),
@@ -1000,7 +1016,8 @@ export const ShareExchangeRequestSchema = z.object({
   restart: z.boolean().optional(),
   /**
    * The visitor's answers to what the link asks (`visitorIdentity`). Only
-   * the fields they haven't answered count: an answer once given stays.
+   * the fields the link asks and they haven't answered count: an answer once
+   * given stays.
    */
   visitorIdentity: ShareVisitorAnswersSchema.optional(),
 });
