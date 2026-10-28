@@ -11,6 +11,7 @@ export * from './shared';
 export { AbortablePromise } from './promise/AbortablePromise';
 export type { AbortableExecutor } from './promise/AbortablePromise';
 export { AbortError, isAbortError } from './promise/AbortError';
+export { devWarn, isDev, resetDevWarnings } from './dev';
 
 export type { Engine, EngineFactory } from './engine/Engine';
 export { isLocalEngine } from './engine/LocalEngine';

@@ -17,7 +17,12 @@ import {
 } from '@cloudpdf/server';
 import { buildAppForTesting } from '../../server/src/app/buildApp';
 import { createValidTestLicenseGate } from '../../server/src/licensing/testing';
-import { EngineError, EngineErrorCode, type DocumentHandle } from '@embedpdf/engine-core/runtime';
+import {
+  EngineError,
+  EngineErrorCode,
+  resetDevWarnings,
+  type DocumentHandle,
+} from '@embedpdf/engine-core/runtime';
 import { browserVisitorStore, cloudEngine, type VisitorStore } from '../src/index';
 
 /**
@@ -477,13 +482,21 @@ describe('a link that asks who the visitor is', () => {
         purpose: 'We follow up on every quote.',
       });
 
-      const doc = await engine.open({
-        kind: 'share',
-        shareToken: link,
-        visitor: { displayName: 'Ada' },
-      });
+      // What the page knows about the user answers for them; the server gives the userId.
+      resetDevWarnings();
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const doc = await engine.open(
+        { kind: 'share', shareToken: link },
+        { identity: { userId: 'u_381', displayName: 'Ada' } },
+      );
       expect(doc.share?.identityRequest).toBeNull();
       expect(exchanges[0]!.sent.visitorIdentity).toEqual({ displayName: 'Ada' });
+      expect(doc.security.identity).toMatchObject({ displayName: 'Ada' });
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0]![0])).toMatch(
+        /doesn't act for the `identity` you passed \(userId\)/,
+      );
+      warn.mockRestore();
       expect(identityOf(exchanges[0]!.answered.token)).toMatchObject({ displayName: 'Ada' });
       await doc.close();
     } finally {
@@ -688,7 +701,7 @@ describe('a link that asks again while a document is open', () => {
       expect(tries.count - before).toBe(1);
       expect(reads).toHaveLength(5);
 
-      await share.resume({ visitor: { displayName: 'Ada' } });
+      await share.resume({ identity: { displayName: 'Ada' } });
       await reading;
       expect(reads).toEqual([200, 200, 200, 200, 200, 200]);
       expect(share.openRequest).toBeNull();

@@ -642,8 +642,11 @@ export interface UnlockOptions extends OperationOptions {
 export interface RetryOptions extends OperationOptions {
   /** The share link's passphrase. */
   readonly sharePassword?: string;
-  /** The visitor's answers to what the link asks; ones given before stay. */
-  readonly visitor?: VisitorAnswers;
+  /**
+   * The visitor's answers to what the link asks, added to who the page said the user is
+   * (`identity`); ones given before stay.
+   */
+  readonly identity?: VisitorAnswers;
 }
 
 /** Options for `download()`. */
@@ -830,7 +833,7 @@ export interface DocumentsCapability {
    * Open a failed document (`status: 'error'`) again, with the same source and options, in its
    * own tab: it keeps its id and its place, and the active document stays the active one. A
    * document from a share link that waited for its passphrase or the visitor's answers
-   * (`shareRequest`) opens with `sharePassword` or `visitor`; a ready one the link asks again
+   * (`shareRequest`) opens with `sharePassword` or `identity`; a ready one the link asks again
    * (`shareRequest`) goes on with them, as the same visitor. Resolves like `open()`. Rejects
    * `invalid-input` for a document that didn't fail and isn't asked, or answers for one not from
    * a share link; `permission-denied` while the link still asks, and `shareRequest` says what.

@@ -230,6 +230,7 @@ export * from "./FormFieldUnknownValueEntry.js";
 export * from "./FormFieldValue.js";
 export * from "./FormMutationMeta.js";
 export * from "./FormWidget.js";
+export * from "./Identity.js";
 export * from "./MetadataPatch.js";
 export * from "./MutationMeta.js";
 export * from "./OutlineItem.js";

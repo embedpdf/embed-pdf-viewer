@@ -8,6 +8,7 @@ import {
   type DocumentShare,
   type Engine,
   type OpenInput,
+  type OpenOptions,
   type ShareOpenRequest,
   type VisitorIdentityRequest,
 } from '@embedpdf/engine-core/runtime';
@@ -29,17 +30,17 @@ const ASKED: VisitorIdentityRequest = {
 
 describe('documents · share links', () => {
   it('a failed open says what the link waits for, and retry() opens it with the answers', async () => {
-    const opened: OpenInput[] = [];
+    const opened: { input: OpenInput; options: OpenOptions | undefined }[] = [];
     const engine = {
-      open: (input: OpenInput) => {
-        opened.push(input);
+      open: (input: OpenInput, options?: OpenOptions) => {
+        opened.push({ input, options });
         if (input.kind !== 'share') return Promise.reject(new Error('network down'));
         if (input.sharePassword !== 'open sesame') {
           return Promise.reject(
             new EngineError(EngineErrorCode.SharePasswordRequired, 'share exchange failed'),
           );
         }
-        if (!input.visitor?.displayName) {
+        if (!options?.identity?.displayName) {
           return Promise.reject(
             new EngineError(EngineErrorCode.VisitorIdentityRequired, 'answer first', {
               details: { ...ASKED, shareCode: 'VisitorIdentityRequired', status: 422 },
@@ -50,7 +51,12 @@ describe('documents · share links', () => {
       },
       destroy: () => Promise.resolve(),
     } as unknown as Engine;
-    const kernel = createKernel({ engine, plugins: [] });
+    // Who the page knows the user is: the visitor's answers add to it.
+    const kernel = createKernel({
+      engine,
+      plugins: [],
+      settings: { identity: { userId: 'u_381', organization: 'Acme' } },
+    });
     await kernel.start();
     const { documents } = kernel;
 
@@ -73,15 +79,20 @@ describe('documents · share links', () => {
     await expect(documents.retry(id, { sharePassword: 'open sesame' })).rejects.toBeDefined();
     expect(documents.get(id)?.shareRequest).toEqual({ kind: 'identity', request: ASKED });
 
-    // The passphrase given before stays; the answers add to the source.
+    // The passphrase given before stays; the answers add to who the page said the user is.
     await expect(
-      documents.retry(id, { visitor: { displayName: 'Ada', email: 'ada@example.com' } }),
+      documents.retry(id, { identity: { displayName: 'Ada', email: 'ada@example.com' } }),
     ).resolves.toMatchObject({ document: { id: 'shared-doc', status: 'ready' } });
     expect(opened.at(-1)).toEqual({
-      kind: 'share',
-      shareToken: 'shr_x',
-      sharePassword: 'open sesame',
-      visitor: { displayName: 'Ada', email: 'ada@example.com' },
+      input: { kind: 'share', shareToken: 'shr_x', sharePassword: 'open sesame' },
+      options: expect.objectContaining({
+        identity: {
+          userId: 'u_381',
+          organization: 'Acme',
+          displayName: 'Ada',
+          email: 'ada@example.com',
+        },
+      }),
     });
     expect(documents.get('shared-doc')?.shareRequest).toBeUndefined();
 

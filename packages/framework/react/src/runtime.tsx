@@ -406,8 +406,9 @@ export interface ViewerProps {
   /**
    * Who the user is, for every document opened without an `identity` of its
    * own (which replaces this one). Documents opened after a change use the new
-   * value; open ones keep theirs. The local engine only: the cloud engine reads
-   * it from the document's token.
+   * value; open ones keep theirs. With the cloud engine the document's token
+   * decides, and a share link takes it as the visitor's answers to what the
+   * link asks.
    */
   identity?: Identity;
   /**

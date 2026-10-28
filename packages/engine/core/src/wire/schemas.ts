@@ -1084,6 +1084,7 @@ export const DocumentWireComponents = {
   MutationMeta: MutationMetaSchema,
   DocumentMetadata: DocumentMetadataSchema,
   MetadataPatch: MetadataPatchSchema,
+  Identity: IdentitySchema,
 } as const satisfies Record<string, z.ZodTypeAny>;
 
 /** Per-page side-effect envelope every annotation mutation returns. Mirrors `AnnotationListMutationMeta`. */

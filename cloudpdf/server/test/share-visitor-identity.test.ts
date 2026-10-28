@@ -349,6 +349,79 @@ describe('a link that asks before the first change', () => {
   });
 });
 
+describe('a link that says who its visitors are', () => {
+  const DANA = { displayName: 'Dana Smith', email: 'dana@client.example' };
+
+  test('carries its identity, which can be replaced and cleared', async () => {
+    const link = await createLink({ identity: DANA });
+    expect(link.status).toBe(200);
+    expect(link.body.share.identity).toEqual(DANA);
+    expect((await createLink({})).body.share.identity).toBeNull();
+
+    const replaced = await updateLink(link.body.share.id, { identity: { displayName: 'Dana S.' } });
+    expect(replaced.body.share.identity).toEqual({ displayName: 'Dana S.' });
+    const cleared = await updateLink(link.body.share.id, { identity: null });
+    expect(cleared.status).toBe(200);
+    expect(cleared.body.share.identity).toBeNull();
+  });
+
+  test('refuses saying nothing, and asking what it says', async () => {
+    const nothing = await createLink({ identity: {} });
+    expect(nothing.status).toBe(400);
+    expect(nothing.body.error.message).toMatch(/identity: set at least one field/);
+    const both = await createLink({ identity: DANA, visitorIdentity: REVIEW });
+    expect(both.status).toBe(400);
+    expect(both.body.error.message).toMatch(/sets displayName, so it can't ask for it/);
+
+    // An update is checked against the link as it will be.
+    const asking = (await createLink({ visitorIdentity: REVIEW })).body.share;
+    const added = await updateLink(asking.id, { identity: DANA });
+    expect(added.status).toBe(400);
+    const swapped = await updateLink(asking.id, { identity: DANA, visitorIdentity: null });
+    expect(swapped.status).toBe(200);
+    expect((await updateLink(asking.id, { visitorIdentity: REVIEW })).status).toBe(400);
+  });
+
+  test('puts it in every token, over the answers, and asks only the rest', async () => {
+    const link = (
+      await createLink({
+        layerMode: 'per-visitor',
+        identity: { displayName: 'Dana Smith' },
+        visitorIdentity: { fields: { email: 'required' }, ask: 'on-open' },
+      })
+    ).body.share;
+    const asked = await exchange({ shareToken: link.id });
+    expect(asked.status).toBe(422);
+    expect(asked.body.error.details).toMatchObject({ missing: ['email'] });
+
+    // A name of their own isn't asked, so it's ignored; the email is theirs.
+    const dana = await visit(link.id, {
+      visitorIdentity: { displayName: 'Someone Else', email: 'dana@client.example' },
+    });
+    expect(claimsOf(dana.token).identity).toEqual({
+      displayName: 'Dana Smith',
+      email: 'dana@client.example',
+      userId: expect.stringMatching(/^visitor_[0-9a-f]{24}$/),
+    });
+    expect(await visitorRow(dana)).toMatchObject({
+      display_name: null,
+      email: 'dana@client.example',
+    });
+    expect((await annotate(dana, 'from Dana')).status).toBe(200);
+  });
+
+  test('a userId it sets replaces the visitor’s own; each visit still has its own layer', async () => {
+    const link = (
+      await createLink({ layerMode: 'per-visitor', identity: { userId: 'crm_42', ...DANA } })
+    ).body.share;
+    const first = await visit(link.id);
+    const second = await visit(link.id);
+    expect(claimsOf(first.token).identity).toEqual({ userId: 'crm_42', ...DANA });
+    expect(claimsOf(second.token).identity).toEqual({ userId: 'crm_42', ...DANA });
+    expect(first.layerName).not.toBe(second.layerName);
+  });
+});
+
 describe("a link's visitors", () => {
   test('lists who answered or wrote, newest first, a page at a time, with their layer', async () => {
     const link = (

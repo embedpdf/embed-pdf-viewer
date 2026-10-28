@@ -108,13 +108,29 @@ try {
 } catch (error) {
   if (!EngineError.is(error, EngineErrorCode.VisitorIdentityRequired)) throw error;
   const answers = await askTheVisitor(error.details); // your form
-  doc = await engine.open({ kind: 'share', shareToken, visitor: answers });
+  doc = await engine.open({ kind: 'share', shareToken }, { identity: answers });
 }
 ```
 
-When your page already knows who the visitor is, pass `visitor` on the first open. It counts the
-same as the visitor typing it: a site that knows its users for certain gives them tokens from its
-backend instead.
+When your page already knows who the visitor is, pass it as `identity`, as you would to the
+local engine. It counts the same as the visitor typing it: the link takes only the fields it asks
+(never `userId` or `groupId`, which the server gives each visitor), and an answer once given
+stays. A site that knows its users for certain gives them tokens from its backend instead.
+
+```ts
+const doc = await engine.open(
+  { kind: 'share', shareToken },
+  { identity: { displayName: 'Dana Smith' } },
+);
+doc.security.identity; // { userId: 'visitor_…', displayName: 'Dana Smith' }, if the link asks for a name
+```
+
+`doc.security.identity` says who the session acts for. In development the engine warns when that
+isn't the `identity` you passed, and says why.
+
+A link made for one person can say who that is: its own `identity`, set when the link is made.
+Every session it gives acts for that person, whoever opens it. The link doesn't ask what it
+says, and no answer changes it, so anyone with the link acts as that person.
 
 A link that asks before the first change opens at once, and the visitor reads freely.
 `doc.share.identityRequest` says what it asks. Their changes wait for the answers: listen for a
@@ -141,7 +157,7 @@ it, ask, and go on with `resume()` as the same visitor, or close the document:
 
 ```ts
 doc.share?.onOpenRequest(async (request) => {
-  const given = await askTheVisitor(request); // { sharePassword } or { visitor }
+  const given = await askTheVisitor(request); // { sharePassword } or { identity }
   if (given) await doc.share!.resume(given);
   else await doc.close();
 });
@@ -170,8 +186,10 @@ A token carries the user's **permissions** (for example `doc.render`, `doc.text.
 server enforces the permissions on every request; the identity becomes the author of the
 annotations the user creates.
 
-Both come from the token, so the engine has no options for them. Read what the user was given
-from `doc.security`:
+Both come from the token: the `scope` and `identity` you pass to `open()` don't change them, and in
+development the engine warns when you pass `scope`, or an `identity` the session doesn't act for.
+(On a share link, `identity` is what your page knows about the visitor: see
+[Who the visitor is](#who-the-visitor-is).) Read what the user was given from `doc.security`:
 
 ```ts
 doc.security.allows('doc.download'); // may this user download the file?

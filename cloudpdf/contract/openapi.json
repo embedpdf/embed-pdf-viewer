@@ -7727,6 +7727,47 @@
         },
         "additionalProperties": false
       },
+      "Identity": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "email": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "organization": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "organizationalUnit": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "groupId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "additionalProperties": false
+      },
       "PdfActionTargetRef": {
         "anyOf": [
           {
@@ -24600,45 +24641,7 @@
                 "maxItems": 64
               },
               "identity": {
-                "type": "object",
-                "properties": {
-                  "userId": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 256
-                  },
-                  "displayName": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 256
-                  },
-                  "email": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 256
-                  },
-                  "title": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 256
-                  },
-                  "organization": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 256
-                  },
-                  "organizationalUnit": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 256
-                  },
-                  "groupId": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 256
-                  }
-                },
-                "additionalProperties": false
+                "$ref": "#/components/schemas/Identity"
               },
               "origins": {
                 "type": "array",
@@ -24872,6 +24875,14 @@
             "additionalProperties": false,
             "nullable": true
           },
+          "identity": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Identity"
+              }
+            ],
+            "nullable": true
+          },
           "scope": {
             "type": "array",
             "items": {
@@ -24985,6 +24996,14 @@
                 "additionalProperties": false,
                 "nullable": true
               },
+              "identity": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Identity"
+                  }
+                ],
+                "nullable": true
+              },
               "scope": {
                 "type": "array",
                 "items": {
@@ -25041,6 +25060,7 @@
               "keepVisitorLayers",
               "visitorIdleSeconds",
               "visitorIdentity",
+              "identity",
               "scope",
               "origins",
               "passwordProtected",
@@ -25145,6 +25165,14 @@
                   "additionalProperties": false,
                   "nullable": true
                 },
+                "identity": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Identity"
+                    }
+                  ],
+                  "nullable": true
+                },
                 "scope": {
                   "type": "array",
                   "items": {
@@ -25201,6 +25229,7 @@
                 "keepVisitorLayers",
                 "visitorIdleSeconds",
                 "visitorIdentity",
+                "identity",
                 "scope",
                 "origins",
                 "passwordProtected",
@@ -25302,6 +25331,14 @@
                 "additionalProperties": false,
                 "nullable": true
               },
+              "identity": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Identity"
+                  }
+                ],
+                "nullable": true
+              },
               "scope": {
                 "type": "array",
                 "items": {
@@ -25358,6 +25395,7 @@
               "keepVisitorLayers",
               "visitorIdleSeconds",
               "visitorIdentity",
+              "identity",
               "scope",
               "origins",
               "passwordProtected",
@@ -25443,6 +25481,14 @@
             },
             "required": ["fields", "ask"],
             "additionalProperties": false,
+            "nullable": true
+          },
+          "identity": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Identity"
+              }
+            ],
             "nullable": true
           },
           "scope": {
@@ -25563,6 +25609,14 @@
                 "additionalProperties": false,
                 "nullable": true
               },
+              "identity": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Identity"
+                  }
+                ],
+                "nullable": true
+              },
               "scope": {
                 "type": "array",
                 "items": {
@@ -25619,6 +25673,7 @@
               "keepVisitorLayers",
               "visitorIdleSeconds",
               "visitorIdentity",
+              "identity",
               "scope",
               "origins",
               "passwordProtected",
@@ -25721,6 +25776,14 @@
                 "additionalProperties": false,
                 "nullable": true
               },
+              "identity": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Identity"
+                  }
+                ],
+                "nullable": true
+              },
               "scope": {
                 "type": "array",
                 "items": {
@@ -25777,6 +25840,7 @@
               "keepVisitorLayers",
               "visitorIdleSeconds",
               "visitorIdentity",
+              "identity",
               "scope",
               "origins",
               "passwordProtected",

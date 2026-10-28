@@ -77,7 +77,8 @@ export interface DocumentShare {
    */
   resume(given: {
     readonly sharePassword?: string;
-    readonly visitor?: VisitorAnswers;
+    /** The visitor's answers to what the link asks on open. */
+    readonly identity?: VisitorAnswers;
   }): AbortablePromise<void>;
 }
 

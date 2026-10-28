@@ -3,7 +3,7 @@
  * visitor is.
  *
  *   an `error` tab with a `shareRequest` → <SharePrompt/>, which opens it again with the answer
- *     (`documents.retry(id, { sharePassword })` or `{ visitor }`)
+ *     (`documents.retry(id, { sharePassword })` or `{ identity }`)
  *   a ready document with a `shareRequest` (the link got it after the document opened) → the
  *     same <SharePrompt/> over it, and `retry` with the answer lets it go on
  *   a ready document with an `identityRequest` (a change waits) → <VisitorIdentityDialog/>, which
@@ -269,7 +269,7 @@ function IdentityForm({
     event.preventDefault();
     setChecked(true);
     if (!complete(request, answers) || invalidAnswers(answers).length > 0) return;
-    void retry(docId, { visitor: given(answers) }).catch(() => {});
+    void retry(docId, { identity: given(answers) }).catch(() => {});
   };
   return (
     <form onSubmit={submit} noValidate>

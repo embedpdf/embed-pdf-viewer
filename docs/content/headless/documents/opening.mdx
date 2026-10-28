@@ -165,13 +165,17 @@ then open it with the answer:
 
 ```ts
 await documents.retry(id, { sharePassword });
-await documents.retry(id, { visitor: { displayName, email } });
+await documents.retry(id, { identity: { displayName, email } });
 ```
 
 A link can also ask before the visitor's first change. The document opens at once, and when a
 change waits for the answers, the document's `identityRequest` holds the questions. Answer with
 `documents.identify(id, answers)`, and the change goes out; `documents.declineIdentity(id)` takes
 it back. See [Who the visitor is](/docs/engine/authentication#who-the-visitor-is).
+
+When your page already knows who the visitor is, give it as the viewer's `identity`, as with the
+local engine: the link takes the fields it asks, as if the visitor typed them, and nobody is
+asked them again.
 
 A passphrase or questions the link gets after the document opened ask the same way: the document
 stays `'ready'`, its `shareRequest` says what the link asks, and `retry()` with the answer lets it go
@@ -238,7 +242,7 @@ the active document are on [Several documents](tabs#methods), downloading and pr
 | `canOpenFiles()`           | Whether `open()` takes a file's bytes, such as a file the user picked, or a URL it downloads: `true` on the local engine, `false` on CloudPDF, where every document comes from your server |
 | `openAll(documents)`       | Opens several documents, as `initialDocuments` does: every tab appears at once, in order, and the one marked `active` (or the first) becomes the active one. A failure shows in that document's `status` instead of throwing. |
 | `unlock(id, { password })` | Unlocks a locked document. Rejects on a wrong password, and the document stays locked so you can ask again. [Loading, errors and passwords](#loading-errors-and-passwords) |
-| `retry(id, options?)`      | Tries a failed document again, with the same source and options. Resolves like `open()`. A document from a share link takes what it waited for: `{ sharePassword }` or `{ visitor }`. [Loading, errors and passwords](#loading-errors-and-passwords) |
+| `retry(id, options?)`      | Tries a failed document again, with the same source and options. Resolves like `open()`. A document from a share link takes what it waited for: `{ sharePassword }` or `{ identity }`. [Loading, errors and passwords](#loading-errors-and-passwords) |
 | `identify(id, answers)`    | Answers what the document's share link asks before the first change (its `identityRequest`): the change waiting goes out. Rejects while a required answer is missing or one can't be taken, and the change keeps waiting. |
 | `declineIdentity(id)`      | Takes back the change waiting for the visitor's answers; the next change asks again.                                                                                          |
 | `close(id)`, `closeAll()`  | Closes one document, or every document, and frees its memory. [Close a document](#close-a-document)                                                                        |
@@ -249,7 +253,8 @@ the active document are on [Several documents](tabs#methods), downloading and pr
 | `getRevision(id?)`         | A number that goes up each time pages are added, removed, moved or rotated; `-1` with no document                                                                          |
 
 `options` for `open()` are `name` (what its tab shows), `activate: false` (open it in the
-background), `password`, and, on the local engine, `scope` and `identity`. Without an `id`, the page
+background), `password`, `identity` (who your page knows the user is), and, on the local engine,
+`scope`. Without an `id`, the page
 methods use the document in scope: the one a [`<DocumentScope>`](tabs#talk-to-a-specific-document)
 around your component names, or else the active one. To stop an open that's still loading, close the
 document: that cancels its download too.

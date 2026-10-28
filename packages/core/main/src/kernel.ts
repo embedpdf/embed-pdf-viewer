@@ -209,17 +209,16 @@ function shareRequestOf(
 }
 
 /**
- * What `retry()` opens: the failed document's source, or, with what the visitor gave
- * (`RetryOptions`), the share link it opened with the passphrase and answers added to any given
- * before.
+ * What `retry()` opens: the failed document's source, or, with the passphrase the visitor gave
+ * (`RetryOptions`), the share link it opened with that passphrase.
  */
 function retrySourceOf(
   source: OpenSource,
   share: OpenInputShare | null,
   options: RetryOptions | undefined,
 ): OpenSource {
-  const { sharePassword, visitor } = options ?? {};
-  if (sharePassword === undefined && visitor === undefined) return source;
+  const { sharePassword, identity } = options ?? {};
+  if (sharePassword === undefined && identity === undefined) return source;
   if (!share) {
     throw new PluginError(
       'invalid-input',
@@ -227,11 +226,7 @@ function retrySourceOf(
       'only a document from a share link takes its passphrase or answers',
     );
   }
-  return {
-    ...share,
-    ...(sharePassword !== undefined ? { sharePassword } : {}),
-    ...(visitor !== undefined ? { visitor: { ...share.visitor, ...visitor } } : {}),
-  };
+  return sharePassword !== undefined ? { ...share, sharePassword } : share;
 }
 
 /** Whether an event is a change to the document, one a download would carry. */
@@ -729,11 +724,11 @@ export function createKernel(config: {
   /** Give a ready document's share link what it asks (`shareRequest`): it goes on as the same visitor. */
   async function resumeShare(session: DocumentSession, options: RetryOptions | undefined) {
     const share = session.handle!.share!;
-    const { sharePassword, visitor } = options ?? {};
+    const { sharePassword, identity } = options ?? {};
     try {
       await share.resume({
         ...(sharePassword !== undefined ? { sharePassword } : {}),
-        ...(visitor !== undefined ? { visitor } : {}),
+        ...(identity !== undefined ? { identity } : {}),
       });
     } catch (error) {
       // Still asked: the request shows what's wrong or missing.
@@ -1612,8 +1607,23 @@ export function createKernel(config: {
       // one takes its id without closing it: the tab never closes.
       const { source, shareInput, openOptions } = session;
       const given = retrySourceOf(source, shareInput, options);
+      // The visitor's answers join who the page said the user is: the document's own, else the
+      // viewer's.
+      const identity =
+        options?.identity !== undefined
+          ? { ...engineOptionsOf(openOptions).identity, ...options.identity }
+          : undefined;
       sessions.delete(id);
-      return openDocument(given, { ...openOptions, activate: false, signal: options?.signal }, id);
+      return openDocument(
+        given,
+        {
+          ...openOptions,
+          ...(identity !== undefined ? { identity } : {}),
+          activate: false,
+          signal: options?.signal,
+        },
+        id,
+      );
     },
     identify,
     declineIdentity,

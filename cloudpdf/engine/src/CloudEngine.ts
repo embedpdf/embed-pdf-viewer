@@ -24,9 +24,11 @@ import {
   ShareExchangeError,
   ShareSessionSource,
   type VisitorStore,
+  visitorAnswersOf,
 } from './share';
 import { decodeUnverifiedClaims } from './transport/decodeUnverifiedClaims';
 import { HttpClient, type HttpClientOptions } from './transport/HttpClient';
+import { warnUnusedOpenOptions } from './unusedOpenOptions';
 
 /**
  * `cloudEngine()`'s options: the HTTP client's, minus the session id, which
@@ -73,12 +75,11 @@ export class CloudEngine implements Engine {
         new EngineError(EngineErrorCode.RuntimeUnavailable, 'engine destroyed'),
       );
     }
-    // Cloud reads scope + identity from the doc-scoped JWT — `options.scope`
-    // and `options.identity` are engine-local concepts and are intentionally
-    // ignored here. Same `OpenOptions` type for both engines is what makes
-    // SDK code portable; the JWT is the authority cloud-side.
-    void options?.scope;
-    void options?.identity;
+    // What the session may do and who it acts for come from the document's
+    // token, not from `options`: the same `OpenOptions` on both engines keeps
+    // code portable, and the token is the authority here. `options.identity`
+    // is what the page knows about the user, which a share link takes as the
+    // visitor's answers (only what it asks).
 
     // The PDF's own password is an open option for every input kind, as on
     // the local engine. A share's passphrase is `input.sharePassword`.
@@ -93,10 +94,11 @@ export class CloudEngine implements Engine {
       // exchange failures surface as EngineErrors on open and on every
       // later renewal (RPCs, SSE reconnects), never as raw
       // ShareExchangeErrors.
+      const answers = visitorAnswersOf(options?.identity);
       const share = new ShareSessionSource(this.http.baseUrl, input.shareToken, {
         ...(input.sharePassword !== undefined ? { password: input.sharePassword } : {}),
         ...(input.restart ? { restart: true } : {}),
-        ...(input.visitor ? { visitor: input.visitor } : {}),
+        ...(answers ? { identity: answers } : {}),
         visitorStore: this.visitorStore,
         fetch: this.http.fetchImpl,
       });
@@ -107,11 +109,11 @@ export class CloudEngine implements Engine {
           throw error instanceof ShareExchangeError ? engineErrorFromShareExchange(error) : error;
         }
       };
-      return this.openWithToken(token, effectivePassword, share);
+      return this.openWithToken(token, effectivePassword, share, options);
     }
 
     if (input.kind === 'token') {
-      return this.openWithToken(input.token, effectivePassword, null);
+      return this.openWithToken(input.token, effectivePassword, null, options);
     }
 
     if (input.kind === 'id') {
@@ -166,11 +168,11 @@ export class CloudEngine implements Engine {
           await handle.close();
           throw error;
         }
+        warnUnusedOpenOptions(options, handle, 'token');
         return handle;
       });
     }
 
-    void options;
     return AbortablePromise.rejectReason(
       new EngineError(
         EngineErrorCode.InvalidArg,
@@ -193,6 +195,7 @@ export class CloudEngine implements Engine {
     tokenSource: TokenSource,
     password: string | null,
     share: ShareSessionSource | null,
+    options: OpenOptions | undefined,
   ): AbortablePromise<DocumentHandle> {
     return AbortablePromise.run<DocumentHandle>(async (signal) => {
       const docHttp = this.http.forDocument({ sessionId: newSessionId(), token: tokenSource });
@@ -235,6 +238,7 @@ export class CloudEngine implements Engine {
         throw error;
       }
       if (share) stopRenewing = share.keepAlive();
+      warnUnusedOpenOptions(options, handle, share ? 'share' : 'token');
       return handle;
     });
   }

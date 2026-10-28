@@ -265,7 +265,9 @@ export async function registerShareSessionRoutes(
         jti: randomUUID(),
         ttlSeconds: ttl,
         extras: {
-          identity: { ...settled.answers, userId: visitorUserId(visitorId) },
+          // The link's own identity prevails: it's what the link's owner says about whoever
+          // opens it (it never asks what it sets, so no answer is lost).
+          identity: { ...settled.answers, userId: visitorUserId(visitorId), ...grant.identity },
           ...(pending ? { identity_pending: pending } : {}),
         },
       });
