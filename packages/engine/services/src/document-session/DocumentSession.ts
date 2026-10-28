@@ -645,7 +645,7 @@ export class DocumentSession {
   /**
    * Park a disposer to run when this session closes. Used by operations
    * whose native side leaves the session document referencing another
-   * resource — e.g. `pages.insert`: `FPDF_ImportPagesByIndex` does not
+   * resource — e.g. `pages.insert`: `EPDFDoc_ImportPages` does not
    * fully detach imported objects from their source document, so the
    * source doc + its byte buffer must stay alive until the destination
    * can no longer be saved (i.e. until this session closes).
