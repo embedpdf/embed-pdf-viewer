@@ -25,6 +25,11 @@
  * replaces `name.<integration>.<ext>` on that flavor's site and is left out of the others, as a
  * `page.<flavor>.mdx` replaces `page.mdx`.
  *
+ * Files a sample fetches beside its document copy byte for byte into the site's `public/`, on the
+ * flavors that need them (`MOUNTS.public`): the cloud site opens its documents from share links,
+ * so it gets only what `pdfs:build` publishes next to the PDFs, such as the certificate the
+ * signed agreement was signed with.
+ *
  * The generator OWNS the target directories: anything there it did not emit
  * is deleted (or fails `--check`). Site-local pages don't belong in them.
  *
@@ -82,7 +87,21 @@ const MOUNTS = {
       viewer: (relative) => relative.startsWith('viewer/'),
     },
   ],
+  // What `pdfs:build` publishes beside the demo PDFs (embedpdf.com's `public/pdfs`), for the
+  // flavors that don't serve the PDFs themselves: the cloud site opens them from share links, but
+  // its samples fetch the rest at the same path.
+  public: [
+    {
+      from: '../../website/public/pdfs',
+      to: 'public/pdfs',
+      engines: ['cloud'],
+      include: (relative) => !relative.endsWith('.pdf'),
+    },
+  ],
 };
+
+/** The `public/` mounts a flavor's site gets. */
+const publicMounts = (engine) => MOUNTS.public.filter((mount) => mount.engines.includes(engine));
 
 function parseArgs(argv) {
   const args = { check: false, frameworks: ALL_FRAMEWORKS };
@@ -518,11 +537,21 @@ function buildExpected(engine, frameworks) {
     fs.readFileSync(path.join(contentRoot, 'samples/samples-env.d.ts'), 'utf8'),
   );
 
+  // Copied as bytes: a certificate isn't text.
+  for (const mount of publicMounts(engine)) {
+    const root = path.join(contentRoot, mount.from);
+    for (const relative of walk(root).map((file) => toPosix(path.relative(root, file)))) {
+      if (mount.include(relative)) {
+        expected.set(path.join(mount.to, relative), fs.readFileSync(path.join(root, relative)));
+      }
+    }
+  }
+
   return expected;
 }
 
-function ownedRoots() {
-  return [...MOUNTS.mdx, ...MOUNTS.samples].map((mount) => mount.to);
+function ownedRoots(engine) {
+  return [...MOUNTS.mdx, ...MOUNTS.samples, ...publicMounts(engine)].map((mount) => mount.to);
 }
 
 async function main() {
@@ -530,8 +559,9 @@ async function main() {
   const expected = buildExpected(args.engine, args.frameworks);
 
   const stale = [];
+  const owned = ownedRoots(args.engine);
   const onDisk = new Set(
-    ownedRoots().flatMap((root) =>
+    owned.flatMap((root) =>
       walk(path.join(args.target, root)).map((file) => path.relative(args.target, file)),
     ),
   );
@@ -540,15 +570,20 @@ async function main() {
     const absolute = path.join(args.target, relative);
     let current = null;
     try {
-      current = fs.readFileSync(absolute, 'utf8');
+      current = fs.readFileSync(absolute);
     } catch {
       /* missing */
     }
-    if (current !== contents) stale.push(relative);
+    const same =
+      current !== null &&
+      (typeof contents === 'string'
+        ? current.toString('utf8') === contents
+        : current.equals(contents));
+    if (!same) stale.push(relative);
     onDisk.delete(relative);
   }
   const orphans = [...onDisk].filter((relative) =>
-    ownedRoots().some((root) => relative.startsWith(root)),
+    owned.some((root) => relative.startsWith(root)),
   );
 
   if (args.check) {

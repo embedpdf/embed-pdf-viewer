@@ -67,8 +67,9 @@ const CHANGES = {
     'doc.pages.assemble',
     'doc.redact',
   ],
-  // Signatures: filling the agreement and drawing a signature (a stamp) in its field.
-  agreement: [...ANNOTATE, ...FILL],
+  // Signatures: filling the agreement, drawing a signature (a stamp) in its field, and the edits
+  // that keep or break EmbedPDF's signature (a comment, a new form field).
+  agreement: [...ANNOTATE, ...FILL, 'doc.forms.modify'],
   // Stamps.
   approvals: ANNOTATE,
   // Drawing and marking up text; documents in panes and tabs.
