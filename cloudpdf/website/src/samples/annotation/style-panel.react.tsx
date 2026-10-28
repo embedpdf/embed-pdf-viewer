@@ -186,14 +186,12 @@ function Control({ property }: { property: AnnotationProperty }) {
           value={value ? 'website' : 'none'}
           onChange={(event) =>
             annotation.selection.updateLink(
-              event.target.value === 'website'
-                ? { kind: 'uri', uri: 'https://www.embedpdf.com' }
-                : null,
+              event.target.value === 'website' ? { kind: 'uri', uri: 'https://example.com' } : null,
             )
           }
         >
           <option value="none">No link</option>
-          <option value="website">embedpdf.com</option>
+          <option value="website">example.com</option>
         </select>
       );
   }

@@ -21,7 +21,7 @@ const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
 const layout = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-layout.pdf');
+  const response = await fetch('/pdfs/layout.pdf');
   return { kind: 'bytes', id: 'layout', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
@@ -189,14 +189,12 @@ function Control({ property }: { property: AnnotationProperty }) {
           value={value ? 'website' : 'none'}
           onChange={(event) =>
             annotation.selection.updateLink(
-              event.target.value === 'website'
-                ? { kind: 'uri', uri: 'https://www.embedpdf.com' }
-                : null,
+              event.target.value === 'website' ? { kind: 'uri', uri: 'https://example.com' } : null,
             )
           }
         >
           <option value="none">No link</option>
-          <option value="website">embedpdf.com</option>
+          <option value="website">example.com</option>
         </select>
       );
   }

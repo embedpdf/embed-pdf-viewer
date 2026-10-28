@@ -1,13 +1,15 @@
 /**
- * The community report, as Dana Smith marked it up while reading: a highlight and an underline in
- * the text, a box around one row of the table, a loop around a number, and a typed note. No
- * comments: the examples that open this report have no way to read them.
+ * Fernquill's quarterly report, as Dana Smith marked it up while reading: a highlight and an
+ * underline in the text, a box around one row of the table, a loop around a number, and a typed
+ * note. No comments: the examples that open this report have no way to read them.
  */
-import { DANA, loopAround, markText, outset } from '../shared/annotations.mjs';
+import { DANA, FERNQUILL, loopAround, markText, outset } from '../shared/annotations.mjs';
+
+export const company = FERNQUILL;
 
 export default async function bake({ edit }) {
   await edit(DANA, async ({ doc, place }) => {
-    await markText(doc, 'EmbedPDF grew faster this quarter than in any quarter before.', {
+    await markText(doc, 'Fernquill grew faster this quarter than in any quarter before.', {
       subtype: 'highlight',
       nm: 'report-highlight',
       color: '#ffcd45',
@@ -41,7 +43,7 @@ export default async function bake({ edit }) {
       subtype: 'free-text',
       nm: 'report-text-box',
       box: textBox.rect,
-      contents: 'Downloads up 40% since June',
+      contents: 'Documents opened up 40% since June',
       fontSize: 12,
       fontColor: '#1a2748',
       interiorColor: '#fffbe6',
@@ -51,10 +53,10 @@ export default async function bake({ edit }) {
 
   await edit(async ({ doc, pages }) => {
     await doc.metadata.update({
-      title: 'Q3 2026 community report',
-      author: 'EmbedPDF maintainers',
-      subject: 'How EmbedPDF grew in the third quarter of 2026, and what ships next',
-      keywords: 'EmbedPDF, community, report, 2026',
+      title: 'Q3 2026 report',
+      author: 'Fernquill Ltd',
+      subject: 'How Fernquill grew in the third quarter of 2026, and what ships next',
+      keywords: 'Fernquill, quarterly report, 2026',
     });
     for (const [index, title] of ['Key numbers', "What's next"].entries()) {
       await doc.outline.create({

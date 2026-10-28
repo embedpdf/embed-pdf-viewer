@@ -28,7 +28,7 @@ const assetEngine = engine; // a person's marks are stamps, kept as PDFs; they o
 const signer = createTestSigner({ commonName: 'Ada Lovelace' });
 
 const agreement = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-agreement.pdf');
+  const response = await fetch('/pdfs/agreement.pdf');
   return { kind: 'bytes', id: 'agreement', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
@@ -114,7 +114,7 @@ export class App {
   private readonly error = signal<string | null>(null);
 
   protected readonly status = computed(() => {
-    // Ada's signature, once she signs: the agreement already carries EmbedPDF's.
+    // Ada's signature, once she signs: the agreement already carries Lanternfield's.
     const signed = this.signature.signatures().find((each) => each.fieldName === 'approval');
     const error = this.error();
     if (!this.person() || !this.field()) return 'Getting ready…';

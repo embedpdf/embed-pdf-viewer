@@ -26,14 +26,20 @@ const plugins = [
 
 // [!doc-source links]
 const links = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-links.pdf');
+  const response = await fetch('/pdfs/links.pdf');
   return { kind: 'bytes', id: 'links', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
 // A link to a website, as a PDF carries it: what getActionTree() reads from a link.
 const websiteLink: PdfActionTree = {
-  root: { type: 'uri', subtype: 'URI', uri: 'https://www.embedpdf.com', isMap: false, next: [] },
+  root: {
+    type: 'uri',
+    subtype: 'URI',
+    uri: 'https://www.w3.org/TR/WCAG22/',
+    isMap: false,
+    next: [],
+  },
   incomplete: false,
   warningFlags: 0,
   warnings: [],

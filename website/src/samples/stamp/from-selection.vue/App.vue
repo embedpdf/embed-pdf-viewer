@@ -25,7 +25,7 @@ const plugins = [
 ];
 
 const approvals = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-approvals.pdf');
+  const response = await fetch('/pdfs/approvals.pdf');
   return { kind: 'bytes', id: 'approvals', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 </script>

@@ -8,7 +8,7 @@ import type { OutlineItem } from '@embedpdf/angular/outline';
 import { localEngine } from '@embedpdf/engine';
 
 const welcome = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-welcome.pdf');
+  const response = await fetch('/pdfs/welcome.pdf');
   return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 

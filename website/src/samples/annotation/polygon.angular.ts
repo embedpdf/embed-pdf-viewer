@@ -13,7 +13,7 @@ import {
 import { localEngine } from '@embedpdf/engine';
 
 const layout = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-layout.pdf');
+  const response = await fetch('/pdfs/layout.pdf');
   return { kind: 'bytes', id: 'layout', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 

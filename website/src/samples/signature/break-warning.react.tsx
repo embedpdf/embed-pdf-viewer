@@ -18,10 +18,10 @@ import './break-warning.css';
 
 const engine = localEngine();
 
-// The certificate EmbedPDF signed the agreement with, published next to it. Trusting it is what
+// The certificate Lanternfield signed the agreement with, published next to it. Trusting it is what
 // makes the signature read 'valid'; your app trusts its own certificates the same way.
-const embedpdfCertificate = async () => {
-  const response = await fetch('/pdfs/embedpdf-agreement.cer');
+const lanternfieldCertificate = async () => {
+  const response = await fetch('/pdfs/agreement.cer');
   return new Uint8Array(await response.arrayBuffer());
 };
 
@@ -31,16 +31,16 @@ const plugins = [
   interactionPlugin(),
   annotationPlugin(),
   formPlugin(),
-  signaturePlugin({ trust: { anchors: async () => [await embedpdfCertificate()] } }),
+  signaturePlugin({ trust: { anchors: async () => [await lanternfieldCertificate()] } }),
 ];
 
 const agreement = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-agreement.pdf');
+  const response = await fetch('/pdfs/agreement.pdf');
   return { kind: 'bytes', id: 'agreement', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
-// EmbedPDF's signature field, signed before the agreement was sent.
-const EMBEDPDF = toFieldRef('embedpdf');
+// Lanternfield's signature field, signed before the agreement was sent.
+const PROVIDER = toFieldRef('provider');
 
 // Two edits after an approval signature: a comment keeps it valid, a new form field breaks it.
 function WarningBar() {
@@ -53,7 +53,7 @@ function WarningBar() {
   const [made, setMade] = useState({ comment: false, field: false });
   const signed = signatures.find((each) => each.signed);
   // Where the signature is: the edits go next to it.
-  const widget = form.getWidgets(EMBEDPDF)[0];
+  const widget = form.getWidgets(PROVIDER)[0];
   const revealed = useRef(false);
 
   // On load: the signatures, in view. Nothing is changed until a button is pressed.

@@ -44,7 +44,7 @@ const { signatures } = useSignatureState();
 const mark = computed(() => rows.value[0]?.signatures[0]);
 
 const hint = computed(() => {
-  // Ada's signature, once she signs: the agreement already carries EmbedPDF's.
+  // Ada's signature, once she signs: the agreement already carries Lanternfield's.
   const signed = signatures.value.find((each) => each.fieldName === 'approval');
   if (signed) return `The field is signed by ${signed.signer.name}`;
   if (armedAsset.value) return 'Click the empty field to sign it, or anywhere else to place it';

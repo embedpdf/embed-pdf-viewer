@@ -5,17 +5,17 @@
 <title>How the first page of a large PDF got three times faster</title>
 <link rel="stylesheet" href="../shared/document.css">
 </head>
-<body>
+<body class="fernquill">
 <section class="page sheet">
   <div class="letterhead">
-    <img src="../shared/embedpdf-logo.svg" alt="EmbedPDF">
-    <span class="kind">Blog</span>
+    <img src="../shared/fernquill-logo.svg" alt="Fernquill">
+    <span class="kind">Engineering blog</span>
   </div>
 
   <h1 class="title">How the first page of a large PDF<br>got three times faster</h1>
   <p class="meta">Engineering · 14 October 2026 · 6 minute read</p>
 
-  <p class="lead">Open a 400-page manual in a browser and you want to read page one, not wait for page four hundred. Until this summer, EmbedPDF made you wait longer than it had to.</p>
+  <p class="lead">Open a 400-page manual in a browser and you want to read page one, not wait for page four hundred. Until this summer, the Fernquill portal made you wait longer than it had to.</p>
 
   <h2>Where the time went</h2>
   <p>Opening a document did three things before the first page appeared: it read the whole cross-reference table, it measured every page, and it built the text index for search. On a large file the second step alone took more than a second.</p>
@@ -26,13 +26,13 @@
   <p>Until a page is measured, the layout uses the size of its neighbours. Most documents use one page size throughout, so the guess is almost always right, and when it isn't, the view stays on the page the reader is looking at while the pages above it settle.</p>
   <p>The cross-reference table is still read in full, because a damaged file can only be repaired from all of it. But it's read once, and both the measuring and the drawing share it.</p>
 
-  <div class="page-footer"><span>EmbedPDF blog</span><span>1 of 2</span></div>
+  <div class="page-footer"><span>Fernquill engineering blog</span><span>1 of 2</span></div>
 </section>
 
 <section class="page sheet">
   <div class="letterhead">
-    <img src="../shared/embedpdf-logo.svg" alt="EmbedPDF">
-    <span class="kind">Blog</span>
+    <img src="../shared/fernquill-logo.svg" alt="Fernquill">
+    <span class="kind">Engineering blog</span>
   </div>
 
   <h2 style="margin-top:32px;">Search can wait</h2>
@@ -55,7 +55,7 @@
   <h2>What's next</h2>
   <p>The same idea comes to thumbnails: a sidebar with a thousand pages should only draw the ones on screen, and measure the rest as it scrolls.</p>
 
-  <div class="page-footer"><span>EmbedPDF blog</span><span>2 of 2</span></div>
+  <div class="page-footer"><span>Fernquill engineering blog</span><span>2 of 2</span></div>
 </section>
 </body>
 </html>

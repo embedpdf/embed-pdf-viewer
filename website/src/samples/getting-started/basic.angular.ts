@@ -7,7 +7,7 @@ import { localEngine } from '@embedpdf/engine';
 
 // The local engine opens bytes: fetch lazily, under the loading tab.
 const welcome = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-welcome.pdf');
+  const response = await fetch('/pdfs/welcome.pdf');
   return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 

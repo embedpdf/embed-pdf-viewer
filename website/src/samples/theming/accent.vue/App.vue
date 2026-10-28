@@ -17,7 +17,7 @@ const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), selectionPl
 const SWATCHES = ['#3858e9', '#e91e63', '#0f6e56', '#c2410c'];
 
 const welcome = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-welcome.pdf');
+  const response = await fetch('/pdfs/welcome.pdf');
   return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 

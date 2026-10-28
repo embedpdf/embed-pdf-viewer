@@ -1,10 +1,13 @@
 /**
- * The agreement as it reaches the customer: EmbedPDF has signed it, and the customer's signature
- * field is still empty. The signature examples sign or fill the empty field; the one about
- * breaking a signature edits the document EmbedPDF signed. The certificate EmbedPDF signed with
- * is published next to the PDF, so an example can trust it.
+ * Lanternfield's support agreement as it reaches Fernquill: Lanternfield has signed it, and the
+ * customer's signature field is still empty. The signature examples sign or fill the empty field;
+ * the one about breaking a signature edits the document Lanternfield signed. The certificate
+ * Lanternfield signed with is published next to the PDF, so an example can trust it.
  */
 import { createTestSigner, sign as signField } from '@embedpdf/core-signature';
+import { LANTERNFIELD, SAM } from '../shared/annotations.mjs';
+
+export const company = LANTERNFIELD;
 
 export default async function bake({ edit }) {
   await edit(async ({ doc, place }) => {
@@ -12,35 +15,35 @@ export default async function bake({ edit }) {
       family: 'signature',
       name: 'approval',
       required: true,
-      alternateName: 'Signature for Analytical Engines Ltd',
+      alternateName: 'Signature for Fernquill Ltd',
       widgets: [place('approval')],
     });
     await doc.forms.create({
       family: 'signature',
-      name: 'embedpdf',
-      alternateName: 'Signature for EmbedPDF',
-      widgets: [place('embedpdf')],
+      name: 'provider',
+      alternateName: 'Signature for Lanternfield',
+      widgets: [place('provider')],
     });
 
     await doc.metadata.update({
       title: 'Support agreement',
-      author: 'EmbedPDF',
-      subject: 'Priority support for Analytical Engines Ltd, for twelve months from November 2026',
-      keywords: 'EmbedPDF, agreement, support, signature',
+      author: 'Lanternfield',
+      subject: 'Priority support for Fernquill Ltd, for twelve months from November 2026',
+      keywords: 'Lanternfield, agreement, support, signature',
     });
   });
 }
 
-/** Dana Smith signs for EmbedPDF, after the document is saved whole, so the signature seals it. */
+/** Sam Okafor signs for Lanternfield after the document is saved whole: the signature seals it. */
 export async function sign({ engine, doc, pages, publish }) {
-  const signer = await createTestSigner({ commonName: 'Dana Smith' });
+  const signer = await createTestSigner({ commonName: SAM.displayName });
   await signField(doc, {
-    field: { kind: 'fqn', name: 'embedpdf' },
+    field: { kind: 'fqn', name: 'provider' },
     key: signer,
-    appearance: { pdf: await typedSignature(engine, doc, pages[0].ref, 'Dana Smith') },
+    appearance: { pdf: await typedSignature(engine, doc, pages[0].ref, SAM.displayName) },
     signer: {
-      name: 'Dana Smith',
-      reason: 'Agreed for EmbedPDF',
+      name: SAM.displayName,
+      reason: 'Agreed for Lanternfield',
       location: 'Amsterdam',
       signedAt: new Date('2026-10-20T10:00:00+02:00'),
     },

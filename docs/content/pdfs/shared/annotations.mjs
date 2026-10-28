@@ -1,11 +1,25 @@
 /**
- * What the documents' bakes share: the people who mark them up, and helpers that place
- * annotations the way the viewer writes them. Dana Smith has the id the docs give her
- * everywhere (`u_381`), so in an example opened as Dana her marks are her own.
+ * What the documents' bakes share: the companies they belong to, the people who mark them up, and
+ * helpers that place annotations the way the viewer writes them. Dana Smith has the id the docs
+ * give her everywhere (`u_381`), so in an example opened as Dana her marks are her own.
  */
+
+/**
+ * The companies the documents belong to. A bake exports its document's as `company`, and what its
+ * unnamed `edit()` steps add is written as the company. Fernquill and Lanternfield are made up, so
+ * nobody takes their invoices and notices for ours. Only the welcome is ours: it exports `brands`
+ * instead, and is built once as each, for the site of that brand.
+ */
+export const EMBEDPDF = { userId: 'embedpdf', displayName: 'EmbedPDF' };
+export const CLOUDPDF = { userId: 'cloudpdf', displayName: 'CloudPDF' };
+/** Fernquill Ltd builds a document portal. Ada Lovelace is its CTO; Dana Smith runs operations. */
+export const FERNQUILL = { userId: 'fernquill', displayName: 'Fernquill Ltd' };
+/** Lanternfield sells a toolkit for apps, with licences and support. Sam Okafor signs for it. */
+export const LANTERNFIELD = { userId: 'lanternfield', displayName: 'Lanternfield' };
 
 export const DANA = { userId: 'u_381', displayName: 'Dana Smith' };
 export const ADA = { userId: 'u_204', displayName: 'Ada Lovelace' };
+export const SAM = { userId: 'u_517', displayName: 'Sam Okafor' };
 
 /** Marks the one place `text` is in the document, with the lines it covers as the quads. */
 export async function markText(doc, text, data) {

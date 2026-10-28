@@ -18,7 +18,7 @@ import type { FormBundle } from '@embedpdf/angular/form';
 import { localEngine } from '@embedpdf/engine';
 
 const forms = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-forms.pdf');
+  const response = await fetch('/pdfs/forms.pdf');
   return { kind: 'bytes', id: 'forms', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 

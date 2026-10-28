@@ -10,8 +10,8 @@
     useSignatureState,
   } from '@embedpdf/svelte/signature';
 
-  // EmbedPDF's signature field, signed before the agreement was sent.
-  const EMBEDPDF = toFieldRef('embedpdf');
+  // Lanternfield's signature field, signed before the agreement was sent.
+  const PROVIDER = toFieldRef('provider');
 
   const form = useForm();
   const stage = useStage();
@@ -25,7 +25,7 @@
 
   // Where the signature is: the edits go next to it.
   function signatureWidget() {
-    return form.getWidgets(EMBEDPDF)[0];
+    return form.getWidgets(PROVIDER)[0];
   }
 
   // On load: the signatures, in view. Nothing is changed until a button is pressed.

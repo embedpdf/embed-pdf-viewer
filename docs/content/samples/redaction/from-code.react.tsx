@@ -26,7 +26,7 @@ const plugins = [
 
 // [!doc-source welcome]
 const welcome = async (): Promise<OpenInput> => {
-  const response = await fetch('/pdfs/embedpdf-welcome.pdf');
+  const response = await fetch('/pdfs/welcome.pdf');
   return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
@@ -37,14 +37,14 @@ function MarkFromCode() {
   const { hasSelection } = useSelectionState();
   const currentPage = useStageState((state) => state.currentPageIndex);
   const ready = useAnnotationState((state) => state.status === 'ready');
-  const [text, setText] = useState('EmbedPDF');
+  const [text, setText] = useState('John Warnock');
   const started = useRef(false);
 
-  // On load: every "EmbedPDF" in the document.
+  // On load: every "John Warnock" in the document.
   useEffect(() => {
     if (!ready || started.current) return;
     started.current = true;
-    void redaction.markMatches({ text: 'EmbedPDF' });
+    void redaction.markMatches({ text: 'John Warnock' });
   }, [redaction, ready]);
 
   return (
