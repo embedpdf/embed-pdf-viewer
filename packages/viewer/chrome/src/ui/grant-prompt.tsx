@@ -1,15 +1,15 @@
 /**
- * What a share link asks for before its document opens or changes: its passphrase, or who the
+ * What a grant asks for before its document opens or changes: its passphrase, or who the
  * visitor is.
  *
- *   an `error` tab with a `shareRequest` → <SharePrompt/>, which opens it again with the answer
- *     (`documents.retry(id, { sharePassword })` or `{ identity }`)
- *   a ready document with a `shareRequest` (the link got it after the document opened) → the
- *     same <SharePrompt/> over it, and `retry` with the answer lets it go on
+ *   an `error` tab with a `grantRequest` → <GrantPrompt/>, which opens it again with the answer
+ *     (`documents.retry(id, { passphrase })` or `{ identity }`)
+ *   a ready document with a `grantRequest` (the grant got it after the document opened) → the
+ *     same <GrantPrompt/> over it, and `retry` with the answer lets it go on
  *   a ready document with an `identityRequest` (a change waits) → <VisitorIdentityDialog/>, which
  *     answers for the changes waiting (`documents.identify`) or lets them go (`declineIdentity`)
  *
- * The answers are the link owner's to collect: the form shows their purpose and privacy notice,
+ * The answers are the grant owner's to collect: the form shows their purpose and privacy notice,
  * and says the answers can't be changed later (a visitor who mistyped starts over).
  */
 import { useT } from '@embedpdf/react/i18n';
@@ -84,7 +84,7 @@ const SECONDARY_CLASS =
 const PRIMARY_CLASS =
   'bg-accent text-on-accent flex-1 cursor-pointer rounded-md px-4 py-2.5 text-sm font-medium transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50';
 
-/** The link's questions: its fields, its owner's purpose and privacy notice, and what answering means. */
+/** The grant's questions: its fields, its owner's purpose and privacy notice, and what answering means. */
 function VisitorQuestions({
   request,
   answers,
@@ -103,7 +103,7 @@ function VisitorQuestions({
   const fields = asked(request);
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-fg-secondary text-sm">{t('sharePrompt.asks')}</p>
+      <p className="text-fg-secondary text-sm">{t('grantPrompt.asks')}</p>
       {request.purpose && (
         <p className="bg-surface-alt text-fg rounded-md p-3 text-sm">{request.purpose}</p>
       )}
@@ -113,9 +113,9 @@ function VisitorQuestions({
         return (
           <div key={field}>
             <label className="text-fg mb-1.5 block text-sm font-medium" htmlFor={inputId}>
-              {t(`sharePrompt.fields.${field}`)}
+              {t(`grantPrompt.fields.${field}`)}
               {request.fields[field] === 'optional' && (
-                <span className="text-fg-muted font-normal"> ({t('sharePrompt.optional')})</span>
+                <span className="text-fg-muted font-normal"> ({t('grantPrompt.optional')})</span>
               )}
             </label>
             <input
@@ -133,15 +133,15 @@ function VisitorQuestions({
             />
             {wrong && (
               <p id={`${inputId}-invalid`} className="mt-1 text-sm text-red-500">
-                {t(field === 'email' ? 'sharePrompt.invalidEmail' : 'sharePrompt.invalid')}
+                {t(field === 'email' ? 'grantPrompt.invalidEmail' : 'grantPrompt.invalid')}
               </p>
             )}
           </div>
         );
       })}
       <div className="text-fg-muted flex flex-col gap-1 text-xs">
-        {request.fields.displayName !== undefined && <p>{t('sharePrompt.shownOnChanges')}</p>}
-        <p>{t('sharePrompt.final')}</p>
+        {request.fields.displayName !== undefined && <p>{t('grantPrompt.shownOnChanges')}</p>}
+        <p>{t('grantPrompt.final')}</p>
         {request.privacyUrl && (
           <a
             href={request.privacyUrl}
@@ -149,7 +149,7 @@ function VisitorQuestions({
             rel="noopener noreferrer"
             className="text-accent self-start underline"
           >
-            {t('sharePrompt.privacy')}
+            {t('grantPrompt.privacy')}
           </a>
         )}
       </div>
@@ -158,15 +158,15 @@ function VisitorQuestions({
 }
 
 /**
- * A document from a share link that waits for the link's passphrase or the visitor's answers,
+ * A document from a grant that waits for the grant's passphrase or the visitor's answers,
  * before it opens or to go on: the pane asks, and `retry` with what's given opens it again or
  * lets it go on.
  */
-export function SharePrompt() {
+export function GrantPrompt() {
   const docId = useDocumentId();
   const docs = useDocumentsState((state) => state.documents);
   const doc = docs.find((documentInfo) => documentInfo.id === docId);
-  const request = doc?.shareRequest;
+  const request = doc?.grantRequest;
   if (!docId || !doc || !request) return null;
   return (
     <div className="bg-app flex h-full w-full items-center justify-center overflow-auto p-8">
@@ -175,7 +175,7 @@ export function SharePrompt() {
           <PassphraseForm
             docId={docId}
             name={doc.name}
-            passwordProvided={request.passwordProvided}
+            passphraseProvided={request.passphraseProvided}
           />
         ) : (
           <IdentityForm docId={docId} name={doc.name} request={request.request} />
@@ -200,11 +200,11 @@ function Heading({ title, name }: { title: string; name: string | undefined }) {
 function PassphraseForm({
   docId,
   name,
-  passwordProvided,
+  passphraseProvided,
 }: {
   docId: string;
   name: string | undefined;
-  passwordProvided: boolean;
+  passphraseProvided: boolean;
 }) {
   const { retry, close } = useDocuments();
   const t = useT();
@@ -215,19 +215,19 @@ function PassphraseForm({
     if (!passphrase) return;
     // Before it opens, the tab shows it loading at once, and this pane again if the passphrase
     // is wrong; over an open document this pane stays, so a wrong one is cleared.
-    void retry(docId, { sharePassword: passphrase }).catch(() => setPassphrase(''));
+    void retry(docId, { passphrase }).catch(() => setPassphrase(''));
   };
   return (
     <form onSubmit={submit}>
-      <Heading title={t('sharePrompt.passphraseTitle')} name={name} />
+      <Heading title={t('grantPrompt.passphraseTitle')} name={name} />
       <p className="text-fg-secondary mt-4 text-center text-sm">
-        {passwordProvided
-          ? t('sharePrompt.passphraseIncorrect')
-          : t('sharePrompt.passphraseRequired')}
+        {passphraseProvided
+          ? t('grantPrompt.passphraseIncorrect')
+          : t('grantPrompt.passphraseRequired')}
       </p>
       <div className="mt-5">
         <label className="text-fg mb-1.5 block text-sm font-medium" htmlFor={id}>
-          {t('sharePrompt.passphraseLabel')}
+          {t('grantPrompt.passphraseLabel')}
         </label>
         <input
           id={id}
@@ -241,10 +241,10 @@ function PassphraseForm({
       </div>
       <div className="mt-6 flex gap-3">
         <button type="button" onClick={() => void close(docId)} className={SECONDARY_CLASS}>
-          {t('sharePrompt.cancel')}
+          {t('grantPrompt.cancel')}
         </button>
         <button type="submit" disabled={!passphrase} className={PRIMARY_CLASS}>
-          {t('sharePrompt.open')}
+          {t('grantPrompt.open')}
         </button>
       </div>
     </form>
@@ -273,7 +273,7 @@ function IdentityForm({
   };
   return (
     <form onSubmit={submit} noValidate>
-      <Heading title={t('sharePrompt.openTitle')} name={name} />
+      <Heading title={t('grantPrompt.openTitle')} name={name} />
       <div className="mt-5">
         <VisitorQuestions
           request={request}
@@ -285,10 +285,10 @@ function IdentityForm({
       </div>
       <div className="mt-6 flex gap-3">
         <button type="button" onClick={() => void close(docId)} className={SECONDARY_CLASS}>
-          {t('sharePrompt.cancel')}
+          {t('grantPrompt.cancel')}
         </button>
         <button type="submit" disabled={!complete(request, answers)} className={PRIMARY_CLASS}>
-          {t('sharePrompt.open')}
+          {t('grantPrompt.open')}
         </button>
       </div>
     </form>
@@ -296,7 +296,7 @@ function IdentityForm({
 }
 
 /**
- * A change waits for the visitor's answers to what the share link asks before the first change:
+ * A change waits for the visitor's answers to what the grant asks before the first change:
  * answering sends it (and every change after it); Not now lets it go, and the next change asks
  * again.
  */
@@ -336,7 +336,7 @@ export function VisitorIdentityDialog() {
     >
       <form onSubmit={(event) => void submit(event)} noValidate>
         <h3 id={titleId} className="text-fg text-lg font-semibold">
-          {t('sharePrompt.changeTitle')}
+          {t('grantPrompt.changeTitle')}
         </h3>
         <div className="mt-4">
           <VisitorQuestions
@@ -349,14 +349,14 @@ export function VisitorIdentityDialog() {
         </div>
         <div className="mt-6 flex gap-3">
           <button type="button" onClick={decline} disabled={busy} className={SECONDARY_CLASS}>
-            {t('sharePrompt.notNow')}
+            {t('grantPrompt.notNow')}
           </button>
           <button
             type="submit"
             disabled={busy || !complete(request, answers)}
             className={PRIMARY_CLASS}
           >
-            {busy ? t('sharePrompt.saving') : t('sharePrompt.continue')}
+            {busy ? t('grantPrompt.saving') : t('grantPrompt.continue')}
           </button>
         </div>
       </form>

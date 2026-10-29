@@ -212,7 +212,7 @@ export const ar: Locale = {
       open: 'فتح',
       opening: 'جارٍ الفتح…',
     },
-    sharePrompt: {
+    grantPrompt: {
       passphraseTitle: 'عبارة المرور مطلوبة',
       passphraseRequired: 'هذا الرابط محمي. أدخل عبارة المرور التي حصلت عليها لفتح المستند.',
       passphraseIncorrect: 'عبارة المرور غير صحيحة. حاول مرة أخرى.',

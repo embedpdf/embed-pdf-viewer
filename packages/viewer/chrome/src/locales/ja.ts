@@ -211,7 +211,7 @@ export const ja: Locale = {
       open: '開く',
       opening: '開いています…',
     },
-    sharePrompt: {
+    grantPrompt: {
       passphraseTitle: 'パスフレーズが必要です',
       passphraseRequired:
         'このリンクは保護されています。ドキュメントを開くには、受け取ったパスフレーズを入力してください。',

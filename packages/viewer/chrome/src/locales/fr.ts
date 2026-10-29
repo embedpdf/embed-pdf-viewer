@@ -213,7 +213,7 @@ export const fr: Locale = {
       open: 'Ouvrir',
       opening: 'Ouverture…',
     },
-    sharePrompt: {
+    grantPrompt: {
       passphraseTitle: 'Phrase secrète requise',
       passphraseRequired:
         'Ce lien est protégé. Saisissez la phrase secrète qui vous a été communiquée pour ouvrir le document.',

@@ -15,7 +15,7 @@ const NO_DOCUMENT: DocumentInfo = Object.freeze({
   hasUnsavedChanges: false,
   passwordProvided: undefined,
   error: undefined,
-  shareRequest: undefined,
+  grantRequest: undefined,
   identityRequest: undefined,
 });
 

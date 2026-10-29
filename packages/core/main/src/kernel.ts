@@ -62,16 +62,16 @@ import {
   type UnlockOptions,
   type UrlSource,
   type RetryOptions,
-  type ShareOpenRequest,
+  type GrantOpenRequest,
 } from './types';
 import { VIEWER_DEFAULTS, VIEWER_WHOLE_SETTINGS, type ViewerSettings } from './viewer-settings';
 import {
   CONTINUOUS_RENDER_POLICY,
   isLocalDocument,
   pageRefsEqual,
-  shareOpenRequestOf,
+  grantOpenRequestOf,
   visitorIdentityRequestOf,
-  type OpenInputShare,
+  type OpenInputGrant,
   type VisitorAnswers,
   type VisitorIdentityRequest,
   type DocumentEvent,
@@ -180,7 +180,7 @@ const readyInfo = (meta: DocumentMeta): DocumentInfo =>
     pageCount: meta.pageCount,
     hasUnsavedChanges: meta.hasUnsavedChanges,
     ...(meta.identityRequest ? { identityRequest: meta.identityRequest } : {}),
-    ...(meta.shareRequest ? { shareRequest: meta.shareRequest } : {}),
+    ...(meta.grantRequest ? { grantRequest: meta.grantRequest } : {}),
   });
 const pendingInfo = (meta: PendingMeta): DocumentInfo =>
   Object.freeze({
@@ -193,40 +193,40 @@ const pendingInfo = (meta: PendingMeta): DocumentInfo =>
     ...(meta.status === 'error' && meta.error !== undefined
       ? { error: toPluginErrorInfo(toPluginError('documents', meta.error)) }
       : {}),
-    ...(meta.shareRequest ? { shareRequest: meta.shareRequest } : {}),
+    ...(meta.grantRequest ? { grantRequest: meta.grantRequest } : {}),
   });
 
 /**
- * What an open from a share link (`share`) that failed with `error` waits for: the link's
+ * What an open from a grant (`grant`) that failed with `error` waits for: the grant's
  * passphrase, or the visitor's answers. `share` says whether a passphrase was tried.
  */
-function shareRequestOf(
+function grantRequestOf(
   error: unknown,
-  share: OpenInputShare | null,
-): ShareOpenRequest | undefined {
-  if (!share) return undefined;
-  return shareOpenRequestOf(error, share.sharePassword !== undefined) ?? undefined;
+  grant: OpenInputGrant | null,
+): GrantOpenRequest | undefined {
+  if (!grant) return undefined;
+  return grantOpenRequestOf(error, grant.passphrase !== undefined) ?? undefined;
 }
 
 /**
  * What `retry()` opens: the failed document's source, or, with the passphrase the visitor gave
- * (`RetryOptions`), the share link it opened with that passphrase.
+ * (`RetryOptions`), the grant it opened with that passphrase.
  */
 function retrySourceOf(
   source: OpenSource,
-  share: OpenInputShare | null,
+  grant: OpenInputGrant | null,
   options: RetryOptions | undefined,
 ): OpenSource {
-  const { sharePassword, identity } = options ?? {};
-  if (sharePassword === undefined && identity === undefined) return source;
-  if (!share) {
+  const { passphrase, identity } = options ?? {};
+  if (passphrase === undefined && identity === undefined) return source;
+  if (!grant) {
     throw new PluginError(
       'invalid-input',
       'documents',
-      'only a document from a share link takes its passphrase or answers',
+      'only a document from a grant takes its passphrase or answers',
     );
   }
-  return sharePassword !== undefined ? { ...share, sharePassword } : share;
+  return passphrase !== undefined ? { ...grant, passphrase } : grant;
 }
 
 /** Whether an event is a change to the document, one a download would carry. */
@@ -330,8 +330,8 @@ interface DocumentSession extends SessionRef {
   name?: string;
   /** What `open()` was called with, so a failed tab can `retry()`. */
   source: OpenSource | null;
-  /** The share link the source opened (`{ kind: 'share' }`), once a function source gave it. */
-  shareInput: OpenInputShare | null;
+  /** The grant the source opened (`{ kind: 'grant' }`), once a function source gave it. */
+  grantInput: OpenInputGrant | null;
   openOptions: OpenDocumentOptions | undefined;
   phase: 'opening' | 'locked' | 'bringup' | 'ready' | 'error' | 'closing';
   /** In-flight open/unlock — close() cancels, then joins this before disposing,
@@ -523,7 +523,7 @@ export function createKernel(config: {
       instanceId: `${id}#${++instanceCounter}`,
       name,
       source: null,
-      shareInput: null,
+      grantInput: null,
       openOptions: undefined,
       phase: 'opening',
       handle: null,
@@ -653,7 +653,7 @@ export function createKernel(config: {
 
   function publishError(session: DocumentSession, error: unknown): void {
     const core = store.getCore();
-    const shareRequest = shareRequestOf(error, session.shareInput);
+    const grantRequest = grantRequestOf(error, session.grantInput);
     setCore({
       pending: {
         ...core.pending,
@@ -662,7 +662,7 @@ export function createKernel(config: {
           name: session.name,
           status: 'error',
           error,
-          ...(shareRequest ? { shareRequest } : {}),
+          ...(grantRequest ? { grantRequest } : {}),
         },
       },
     });
@@ -694,48 +694,48 @@ export function createKernel(config: {
     const core = store.getCore();
     const { [session.id]: _resolved, ...pending } = core.pending;
     setCore({ documents: { ...core.documents, [session.id]: meta }, pending });
-    // A share link that asks before the first change: a change waiting for the answers shows
+    // A grant that asks before the first change: a change waiting for the answers shows
     // on the document until the visitor gives them or declines.
-    // A passphrase or questions the link got after it opened show the same way, until given.
-    const share = session.handle?.share;
-    if (share) {
+    // A passphrase or questions the grant got after it opened show the same way, until given.
+    const grant = session.handle?.grant;
+    if (grant) {
       session.scope.defer(
-        share.onIdentityRequest((request) => setIdentityRequest(session, request)),
+        grant.onIdentityRequest((request) => setIdentityRequest(session, request)),
       );
-      session.scope.defer(share.onOpenRequest((request) => setShareRequest(session, request)));
+      session.scope.defer(grant.onOpenRequest((request) => setGrantRequest(session, request)));
     }
     opened.emit({ documentId: session.id, info: documentInfoOf(meta) });
   }
 
-  /** Show, or stop showing, that the share link asks before the document goes on. */
-  function setShareRequest(session: DocumentSession, request: ShareOpenRequest | null): void {
+  /** Show, or stop showing, that the grant asks before the document goes on. */
+  function setGrantRequest(session: DocumentSession, request: GrantOpenRequest | null): void {
     const core = store.getCore();
     const published = core.documents[session.id];
-    if (!published || (published.shareRequest ?? null) === request) return;
-    const { shareRequest: _shown, ...rest } = published;
+    if (!published || (published.grantRequest ?? null) === request) return;
+    const { grantRequest: _shown, ...rest } = published;
     setCore({
       documents: {
         ...core.documents,
-        [session.id]: request ? { ...rest, shareRequest: request } : rest,
+        [session.id]: request ? { ...rest, grantRequest: request } : rest,
       },
     });
   }
 
-  /** Give a ready document's share link what it asks (`shareRequest`): it goes on as the same visitor. */
-  async function resumeShare(session: DocumentSession, options: RetryOptions | undefined) {
-    const share = session.handle!.share!;
-    const { sharePassword, identity } = options ?? {};
+  /** Give a ready document's grant what it asks (`grantRequest`): it goes on as the same visitor. */
+  async function resumeGrant(session: DocumentSession, options: RetryOptions | undefined) {
+    const grant = session.handle!.grant!;
+    const { passphrase, identity } = options ?? {};
     try {
-      await share.resume({
-        ...(sharePassword !== undefined ? { sharePassword } : {}),
+      await grant.resume({
+        ...(passphrase !== undefined ? { passphrase } : {}),
         ...(identity !== undefined ? { identity } : {}),
       });
     } catch (error) {
       // Still asked: the request shows what's wrong or missing.
-      setShareRequest(session, share.openRequest);
+      setGrantRequest(session, grant.openRequest);
       throw toPluginError('documents', error);
     }
-    setShareRequest(session, share.openRequest);
+    setGrantRequest(session, grant.openRequest);
     return { document: getDocument(session.id)! };
   }
 
@@ -758,24 +758,24 @@ export function createKernel(config: {
 
   async function identify(id: string, answers: VisitorAnswers): Promise<void> {
     const session = readySession(id, 'identify');
-    const share = session.handle!.share;
-    if (!share) {
-      throw new PluginError('invalid-input', 'documents', `${id} isn't from a share link`);
+    const grant = session.handle!.grant;
+    if (!grant) {
+      throw new PluginError('invalid-input', 'documents', `${id} isn't from a grant`);
     }
     try {
-      await share.identify(answers);
+      await grant.identify(answers);
     } catch (error) {
       // Still asked: the request shows what's missing or can't be taken.
       const request = visitorIdentityRequestOf(error);
       if (request) setIdentityRequest(session, request);
       throw toPluginError('documents', error);
     }
-    setIdentityRequest(session, share.identityRequest);
+    setIdentityRequest(session, grant.identityRequest);
   }
 
   function declineIdentity(id: string): void {
     const session = readySession(id, 'decline');
-    session.handle!.share?.decline();
+    session.handle!.grant?.decline();
     setIdentityRequest(session, null);
   }
 
@@ -1451,7 +1451,7 @@ export function createKernel(config: {
           ? await engineCall(session, fetchUrlSource(given, session.cancel.signal))
           : given;
         checkpoint(session);
-        session.shareInput = source.kind === 'share' ? source : null;
+        session.grantInput = source.kind === 'grant' ? source : null;
         const sourceId = idOfInput(source);
         if (sourceId) rekeySession(session, sourceId);
 
@@ -1592,8 +1592,8 @@ export function createKernel(config: {
     canOpenFiles: () => engine.canOpenFiles,
     retry: async (id, options) => {
       const session = sessions.get(id);
-      if (session?.phase === 'ready' && session.handle?.share?.openRequest) {
-        return resumeShare(session, options);
+      if (session?.phase === 'ready' && session.handle?.grant?.openRequest) {
+        return resumeGrant(session, options);
       }
       if (!session || session.phase !== 'error' || session.source === null) {
         throw new PluginError(
@@ -1605,8 +1605,8 @@ export function createKernel(config: {
       // In its own tab, which keeps its id and place; the active document stays the active one.
       // The failed session holds nothing (its scope was released when it failed), so the new
       // one takes its id without closing it: the tab never closes.
-      const { source, shareInput, openOptions } = session;
-      const given = retrySourceOf(source, shareInput, options);
+      const { source, grantInput, openOptions } = session;
+      const given = retrySourceOf(source, grantInput, options);
       // The visitor's answers join who the page said the user is: the document's own, else the
       // viewer's.
       const identity =

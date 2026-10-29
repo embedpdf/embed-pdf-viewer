@@ -19,7 +19,7 @@ someone opens Stamps or Signatures the viewer loads the local engine
 <script type="module">
   import 'https://cdn.jsdelivr.net/npm/@cloudpdf/viewer@3/dist/cloudpdf.js';
 
-  document.getElementById('viewer').src = { shareToken: 'shr_…' };
+  document.getElementById('viewer').src = { grant: 'grt_…' };
 </script>
 ```
 
@@ -34,7 +34,7 @@ CloudPDF.init({ target: '#viewer', src: { token: '<document token>' } });
 
 `src` is the document: `{ token }` with a document token your backend creates
 for the user (a string, or a function that gives a fresh one), `{ id }` when the
-engine's own `token` already allows it, or `{ shareToken }` with a share link
+engine's own `token` already allows it, or `{ grant }` with a grant
 from the dashboard. Another `src` opens in its place. For several documents at
 once, pass `documents`: entries of `{ src, name, password, active }`.
 

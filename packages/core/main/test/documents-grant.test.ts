@@ -5,19 +5,19 @@ import {
   AbortablePromise,
   EngineError,
   EngineErrorCode,
-  type DocumentShare,
+  type DocumentGrant,
   type Engine,
   type OpenInput,
   type OpenOptions,
-  type ShareOpenRequest,
+  type GrantOpenRequest,
   type VisitorIdentityRequest,
 } from '@embedpdf/engine-core/runtime';
 
 /**
- * A document from a share link: before it opens, its tab shows what the link waits for (its
+ * A document from a grant: before it opens, its tab shows what the grant waits for (its
  * passphrase, or who the visitor is), and `retry()` opens it again with the answer; once open, a
  * change waiting for the visitor's answers shows on the document until they `identify()` or
- * `declineIdentity()`, and a passphrase or questions the link got after it opened show until
+ * `declineIdentity()`, and a passphrase or questions the grant got after it opened show until
  * `retry()` gives them.
  */
 
@@ -28,22 +28,22 @@ const ASKED: VisitorIdentityRequest = {
   purpose: 'We follow up on every quote.',
 };
 
-describe('documents · share links', () => {
-  it('a failed open says what the link waits for, and retry() opens it with the answers', async () => {
+describe('documents · grants', () => {
+  it('a failed open says what the grant waits for, and retry() opens it with the answers', async () => {
     const opened: { input: OpenInput; options: OpenOptions | undefined }[] = [];
     const engine = {
       open: (input: OpenInput, options?: OpenOptions) => {
         opened.push({ input, options });
-        if (input.kind !== 'share') return Promise.reject(new Error('network down'));
-        if (input.sharePassword !== 'open sesame') {
+        if (input.kind !== 'grant') return Promise.reject(new Error('network down'));
+        if (input.passphrase !== 'open sesame') {
           return Promise.reject(
-            new EngineError(EngineErrorCode.SharePasswordRequired, 'share exchange failed'),
+            new EngineError(EngineErrorCode.GrantPassphraseRequired, 'grant exchange failed'),
           );
         }
         if (!options?.identity?.displayName) {
           return Promise.reject(
             new EngineError(EngineErrorCode.VisitorIdentityRequired, 'answer first', {
-              details: { ...ASKED, shareCode: 'VisitorIdentityRequired', status: 422 },
+              details: { ...ASKED, grantCode: 'VisitorIdentityRequired', status: 422 },
             }),
           );
         }
@@ -62,29 +62,29 @@ describe('documents · share links', () => {
 
     // Through a function, as the viewer element opens its `src`.
     await expect(
-      documents.open(async () => ({ kind: 'share', shareToken: 'shr_x' })),
+      documents.open(async () => ({ kind: 'grant', grant: 'grt_x' })),
     ).rejects.toMatchObject({ code: 'permission-denied' });
     const id = documents.getOrder()[0]!;
     expect(documents.get(id)).toMatchObject({
       status: 'error',
-      shareRequest: { kind: 'passphrase', passwordProvided: false },
+      grantRequest: { kind: 'passphrase', passphraseProvided: false },
     });
 
-    await expect(documents.retry(id, { sharePassword: 'wrong' })).rejects.toBeDefined();
-    expect(documents.get(id)?.shareRequest).toEqual({
+    await expect(documents.retry(id, { passphrase: 'wrong' })).rejects.toBeDefined();
+    expect(documents.get(id)?.grantRequest).toEqual({
       kind: 'passphrase',
-      passwordProvided: true,
+      passphraseProvided: true,
     });
 
-    await expect(documents.retry(id, { sharePassword: 'open sesame' })).rejects.toBeDefined();
-    expect(documents.get(id)?.shareRequest).toEqual({ kind: 'identity', request: ASKED });
+    await expect(documents.retry(id, { passphrase: 'open sesame' })).rejects.toBeDefined();
+    expect(documents.get(id)?.grantRequest).toEqual({ kind: 'identity', request: ASKED });
 
     // The passphrase given before stays; the answers add to who the page said the user is.
     await expect(
       documents.retry(id, { identity: { displayName: 'Ada', email: 'ada@example.com' } }),
     ).resolves.toMatchObject({ document: { id: 'shared-doc', status: 'ready' } });
     expect(opened.at(-1)).toEqual({
-      input: { kind: 'share', shareToken: 'shr_x', sharePassword: 'open sesame' },
+      input: { kind: 'grant', grant: 'grt_x', passphrase: 'open sesame' },
       options: expect.objectContaining({
         identity: {
           userId: 'u_381',
@@ -94,12 +94,12 @@ describe('documents · share links', () => {
         },
       }),
     });
-    expect(documents.get('shared-doc')?.shareRequest).toBeUndefined();
+    expect(documents.get('shared-doc')?.grantRequest).toBeUndefined();
 
-    // Answers go only to a share link.
+    // Answers go only to a grant.
     await expect(documents.open(bytesInput('plain'))).rejects.toThrow('network down');
-    expect(documents.get('plain')?.shareRequest).toBeUndefined();
-    await expect(documents.retry('plain', { sharePassword: 'x' })).rejects.toMatchObject({
+    expect(documents.get('plain')?.grantRequest).toBeUndefined();
+    await expect(documents.retry('plain', { passphrase: 'x' })).rejects.toMatchObject({
       code: 'invalid-input',
     });
     await kernel.destroy();
@@ -109,7 +109,7 @@ describe('documents · share links', () => {
     let ask: ((request: VisitorIdentityRequest) => void) | null = null;
     let identityRequest: VisitorIdentityRequest | null = ASKED;
     const decline = vi.fn();
-    const share: DocumentShare = {
+    const grant: DocumentGrant = {
       layerMode: 'per-visitor',
       keep: true,
       get identityRequest() {
@@ -135,7 +135,7 @@ describe('documents · share links', () => {
       onOpenRequest: () => () => {},
       resume: () => AbortablePromise.run(async () => {}),
     };
-    const handle = Object.assign(makeHandle('a'), { share });
+    const handle = Object.assign(makeHandle('a'), { grant });
     const engine = {
       open: () => Promise.resolve(handle),
       destroy: () => Promise.resolve(),
@@ -143,7 +143,7 @@ describe('documents · share links', () => {
     const kernel = createKernel({ engine, plugins: [] });
     await kernel.start();
     const { documents } = kernel;
-    await documents.open({ kind: 'share', shareToken: 'shr_y' });
+    await documents.open({ kind: 'grant', grant: 'grt_y' });
     expect(documents.get('a')?.identityRequest).toBeUndefined();
 
     ask!(ASKED);
@@ -166,11 +166,11 @@ describe('documents · share links', () => {
     await kernel.destroy();
   });
 
-  it('a passphrase or questions the link got after it opened show until retry() gives them', async () => {
-    let ask: ((request: ShareOpenRequest) => void) | null = null;
-    let openRequest: ShareOpenRequest | null = null;
+  it('a passphrase or questions the grant got after it opened show until retry() gives them', async () => {
+    let ask: ((request: GrantOpenRequest) => void) | null = null;
+    let openRequest: GrantOpenRequest | null = null;
     const given: unknown[] = [];
-    const share: DocumentShare = {
+    const grant: DocumentGrant = {
       layerMode: 'shared',
       keep: true,
       identityRequest: null,
@@ -189,14 +189,14 @@ describe('documents · share links', () => {
       resume: (answer) =>
         AbortablePromise.run(async () => {
           given.push(answer);
-          if (answer.sharePassword !== 'open sesame') {
-            openRequest = { kind: 'passphrase', passwordProvided: true };
-            throw new EngineError(EngineErrorCode.SharePasswordRequired, 'share exchange failed');
+          if (answer.passphrase !== 'open sesame') {
+            openRequest = { kind: 'passphrase', passphraseProvided: true };
+            throw new EngineError(EngineErrorCode.GrantPassphraseRequired, 'grant exchange failed');
           }
           openRequest = null;
         }),
     };
-    const handle = Object.assign(makeHandle('b'), { share });
+    const handle = Object.assign(makeHandle('b'), { grant });
     const engine = {
       open: () => Promise.resolve(handle),
       destroy: () => Promise.resolve(),
@@ -204,29 +204,29 @@ describe('documents · share links', () => {
     const kernel = createKernel({ engine, plugins: [] });
     await kernel.start();
     const { documents } = kernel;
-    await documents.open({ kind: 'share', shareToken: 'shr_z' });
+    await documents.open({ kind: 'grant', grant: 'grt_z' });
     // Nothing asked: retry() is for failed documents only.
-    await expect(documents.retry('b', { sharePassword: 'x' })).rejects.toMatchObject({
+    await expect(documents.retry('b', { passphrase: 'x' })).rejects.toMatchObject({
       code: 'invalid-input',
     });
 
-    openRequest = { kind: 'passphrase', passwordProvided: false };
+    openRequest = { kind: 'passphrase', passphraseProvided: false };
     ask!(openRequest);
-    expect(documents.get('b')).toMatchObject({ status: 'ready', shareRequest: openRequest });
+    expect(documents.get('b')).toMatchObject({ status: 'ready', grantRequest: openRequest });
 
-    await expect(documents.retry('b', { sharePassword: 'wrong' })).rejects.toMatchObject({
+    await expect(documents.retry('b', { passphrase: 'wrong' })).rejects.toMatchObject({
       code: 'permission-denied',
     });
-    expect(documents.get('b')?.shareRequest).toEqual({
+    expect(documents.get('b')?.grantRequest).toEqual({
       kind: 'passphrase',
-      passwordProvided: true,
+      passphraseProvided: true,
     });
     // The same document goes on: not opened again.
-    await expect(documents.retry('b', { sharePassword: 'open sesame' })).resolves.toMatchObject({
+    await expect(documents.retry('b', { passphrase: 'open sesame' })).resolves.toMatchObject({
       document: { id: 'b', status: 'ready' },
     });
-    expect(documents.get('b')?.shareRequest).toBeUndefined();
-    expect(given).toEqual([{ sharePassword: 'wrong' }, { sharePassword: 'open sesame' }]);
+    expect(documents.get('b')?.grantRequest).toBeUndefined();
+    expect(given).toEqual([{ passphrase: 'wrong' }, { passphrase: 'open sesame' }]);
 
     await documents.close('b');
     expect(ask).toBeNull();

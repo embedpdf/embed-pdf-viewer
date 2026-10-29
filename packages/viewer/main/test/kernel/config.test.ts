@@ -225,24 +225,24 @@ describe('documents entries', () => {
 describe("a door's documents and plugin settings", () => {
   /** The cloud door's words for a document, as a door of its own would have them. */
   const sourceOf = (src: unknown) =>
-    typeof src === 'object' && src !== null && 'shareToken' in src
-      ? { kind: 'share' as const, shareToken: String(src.shareToken) }
+    typeof src === 'object' && src !== null && 'grant' in src
+      ? { kind: 'grant' as const, grant: String(src.grant) }
       : (src as string);
 
   it('open in the words of the door, which turns them into what its engine opens', () => {
     const documents = initialDocumentsOf(
-      [{ src: { shareToken: 'shr_1' }, name: 'Shared' }, { src: '/report.pdf' }],
+      [{ src: { grant: 'grt_1' }, name: 'Shared' }, { src: '/report.pdf' }],
       sourceOf,
     );
     expect(documents[0]).toEqual({
-      source: { kind: 'share', shareToken: 'shr_1' },
+      source: { kind: 'grant', grant: 'grt_1' },
       name: 'Shared',
     });
     expect(documents[1]!.name).toBe('report');
   });
 
   it("fail as invalid-input when no door said how they open, and aren't a URL, a file or bytes", async () => {
-    const { source } = documentFromSrc({ shareToken: 'shr_1' }, 'document');
+    const { source } = documentFromSrc({ grant: 'grt_1' }, 'document');
     if (typeof source !== 'function') throw new Error('expected a lazy source');
     await expect(source(new AbortController().signal)).rejects.toMatchObject({
       code: 'invalid-input',

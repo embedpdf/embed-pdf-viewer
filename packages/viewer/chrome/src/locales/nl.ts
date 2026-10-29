@@ -212,7 +212,7 @@ export const nl: Locale = {
       open: 'Openen',
       opening: 'Openen…',
     },
-    sharePrompt: {
+    grantPrompt: {
       passphraseTitle: 'Wachtwoordzin vereist',
       passphraseRequired:
         'Deze link is beveiligd. Voer de wachtwoordzin in die u hebt gekregen om het document te openen.',
