@@ -6879,8 +6879,8 @@
         "x-fern-sdk-group-name": ["folders"],
         "x-fern-sdk-method-name": "delete",
         "x-docs-title": "Delete folder",
-        "summary": "Delete an empty folder.",
-        "description": "409 Conflict with `details.reason` `not-empty` when anything is inside, counted over every level below in `details.folders` and `details.documents`.",
+        "summary": "Delete an empty folder, or with recursive=true a folder and everything in it.",
+        "description": "Without recursive, a folder with anything inside is refused: 409 Conflict with `details.reason` `not-empty` and what it holds, counted over every level below, in `details.folders` and `details.documents`. With recursive=true, the folder and every folder under it go at once, and every document in them stops opening, leaves every list and stops answering its share links at once; their stored files and links are removed in the background. Uploads into those folders that have not committed cannot commit.",
         "security": [
           {
             "apiToken": []
@@ -6907,6 +6907,15 @@
             "schema": {
               "type": "string",
               "pattern": "^fld_[0-9a-f]{24}$"
+            }
+          },
+          {
+            "name": "recursive",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "true deletes everything in the folder too. Never the default."
             }
           }
         ],

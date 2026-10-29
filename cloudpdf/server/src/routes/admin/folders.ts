@@ -1,5 +1,6 @@
 import {
   FolderCreateRequestSchema,
+  FolderDeleteQuerySchema,
   FolderListQuerySchema,
   FolderMoveIntoRequestSchema,
   FolderUpdateRequestSchema,
@@ -116,7 +117,8 @@ export async function registerAdminFoldersRoutes(
   mount(deleteOp, async (req, reply) => {
     const { tenantId, folderId } = req.params as { tenantId: string; folderId: string };
     const ctx = requireTenantAccess(req, tenantId, deleteOp.scope);
-    await folders.delete(ctx.tenantId, folderId);
+    const { recursive } = parse(FolderDeleteQuerySchema, req.query ?? {});
+    await folders.delete(ctx.tenantId, folderId, { recursive: recursive ?? false });
     return reply.code(204).send();
   });
 }

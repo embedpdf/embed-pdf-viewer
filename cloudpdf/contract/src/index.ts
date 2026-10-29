@@ -80,6 +80,12 @@ const originPatternArray = z
 /** Share tokens are the grant row id: `shr_` + 24 url-safe random chars. */
 const shareTokenPattern = /^shr_[A-Za-z0-9_-]{24}$/;
 
+/** A query-string flag, `true` or `false`. */
+const queryFlag = z.preprocess(
+  (value) => (value === 'true' ? true : value === 'false' ? false : value),
+  z.boolean(),
+);
+
 /**
  * Wire paths. The URL carries the full resource identity — tenant
  * resources live under `/v1/tenants/{tenantId}/…` — and the auth model
@@ -533,6 +539,13 @@ export const FolderListResponseSchema = z.object({
   nextCursor: z.string().nullable(),
 });
 export type FolderListResponse = z.infer<typeof FolderListResponseSchema>;
+
+export const FolderDeleteQuerySchema = z.object({
+  recursive: queryFlag
+    .describe('true deletes everything in the folder too. Never the default.')
+    .optional(),
+});
+export type FolderDeleteQuery = z.infer<typeof FolderDeleteQuerySchema>;
 
 export const FOLDER_MOVE_MAX_IDS = 1000;
 
@@ -1081,12 +1094,6 @@ export const ShareGrantResponseSchema = z.object({
   share: ShareGrantRecordSchema,
 });
 export type ShareGrantResponse = z.infer<typeof ShareGrantResponseSchema>;
-
-/** A query-string flag, `true` or `false`. */
-const queryFlag = z.preprocess(
-  (value) => (value === 'true' ? true : value === 'false' ? false : value),
-  z.boolean(),
-);
 
 export const ShareGrantListQuerySchema = z.object({
   limit: z.coerce
@@ -1701,12 +1708,13 @@ export const adminOperations = {
   'folders.delete': {
     operationId: 'folders.delete',
     title: 'Delete folder',
-    summary: 'Delete an empty folder.',
+    summary: 'Delete an empty folder, or with recursive=true a folder and everything in it.',
     method: 'DELETE',
     path: '/v1/tenants/:tenantId/folders/:folderId',
     credentials: ['api-token', 'tenant-jwt'],
     scope: ['docs.delete'],
     params: AdminTenantFolderParamsSchema,
+    query: FolderDeleteQuerySchema,
     responses: {
       204: {},
       403: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
@@ -1714,7 +1722,7 @@ export const adminOperations = {
       409: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
     },
     notes:
-      '409 Conflict with `details.reason` `not-empty` when anything is inside, counted over every level below in `details.folders` and `details.documents`.',
+      'Without recursive, a folder with anything inside is refused: 409 Conflict with `details.reason` `not-empty` and what it holds, counted over every level below, in `details.folders` and `details.documents`. With recursive=true, the folder and every folder under it go at once, and every document in them stops opening, leaves every list and stops answering its share links at once; their stored files and links are removed in the background. Uploads into those folders that have not committed cannot commit.',
   },
   'deployment.licenseStatus': {
     operationId: 'deployment.licenseStatus',

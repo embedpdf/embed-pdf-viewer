@@ -1125,6 +1125,48 @@ export class DocumentLifecycleService {
   }
 
   /**
+   * Finish deletes that were begun, such as every document of a deleted
+   * folder: the stored files, share grants, import provenance and row of
+   * each, a few at a time. Each document is attempted; the first failure
+   * is rethrown at the end, and {@link sweepDeleting} retries it later.
+   */
+  async finishDeletes(tenantId: string, docIds: ReadonlyArray<string>): Promise<void> {
+    let failure: unknown;
+    let next = 0;
+    const worker = async () => {
+      while (next < docIds.length) {
+        const docId = docIds[next++]!;
+        try {
+          await this.delete(tenantId, docId);
+        } catch (err) {
+          failure ??= err;
+        }
+      }
+    };
+    await Promise.all(Array.from({ length: FINISH_DELETES_CONCURRENCY }, worker));
+    if (failure !== undefined) throw failure;
+  }
+
+  /**
+   * Finish documents left `deleting` for longer than `olderThanMs`, up to
+   * {@link SWEEP_DELETING_BATCH} a sweep. Safe on every replica at once:
+   * finishing a delete twice leaves the same nothing behind.
+   */
+  async sweepDeleting(opts: { olderThanMs: number }): Promise<number> {
+    const stale = await this.documents.listStaleDeleting(opts.olderThanMs, SWEEP_DELETING_BATCH);
+    let failure: unknown;
+    for (const doc of stale) {
+      try {
+        await this.delete(doc.tenantId, doc.id);
+      } catch (err) {
+        failure ??= err;
+      }
+    }
+    if (failure !== undefined) throw failure;
+    return stale.length;
+  }
+
+  /**
    * Sweep stale `pending` rows + their (possibly orphaned) bytes.
    * Returns the count of swept documents. Safe to call from a
    * scheduled task in `buildApp`.
@@ -1143,6 +1185,11 @@ export class DocumentLifecycleService {
     return swept;
   }
 }
+
+/** Deletes finished at once per {@link DocumentLifecycleService.finishDeletes} call. */
+const FINISH_DELETES_CONCURRENCY = 4;
+/** Documents one sweep finishes; the next sweep takes the rest. */
+const SWEEP_DELETING_BATCH = 200;
 
 function generateDocId(): string {
   // 12 bytes -> 24 hex chars. Fits the 2-char shard naturally.

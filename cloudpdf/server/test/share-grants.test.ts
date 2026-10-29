@@ -123,7 +123,8 @@ async function createShare(
     headers: { Authorization: `Bearer ${auth}`, 'content-type': 'application/json' },
     body: JSON.stringify(body),
   });
-  const payload = res.status === 200 ? ((await res.json()) as { share: Record<string, any> }) : undefined;
+  const payload =
+    res.status === 200 ? ((await res.json()) as { share: Record<string, any> }) : undefined;
   return { status: res.status, ...(payload ? { share: payload.share } : {}) };
 }
 
@@ -165,7 +166,10 @@ describe('share grants', () => {
     await seedDocument('doc-share');
 
     // Create requires the scope.
-    const denied = await createShare({ docId: 'doc-share', scope: ['doc.open'] }, tenantToken(['docs.read']));
+    const denied = await createShare(
+      { docId: 'doc-share', scope: ['doc.open'] },
+      tenantToken(['docs.read']),
+    );
     expect(denied.status).toBe(403);
 
     const created = await createShare({
@@ -206,10 +210,7 @@ describe('share grants', () => {
     expect(await head('doc-share', ok.json.token)).toBe(200);
 
     // Unknown token: indistinguishable 404.
-    const unknown = await exchange(
-      { shareToken: `shr_${'A'.repeat(24)}` },
-      'https://acme.com',
-    );
+    const unknown = await exchange({ shareToken: `shr_${'A'.repeat(24)}` }, 'https://acme.com');
     expect(unknown.status).toBe(404);
 
     // Update: disable pauses exchange with the same 404; re-enable restores.
@@ -405,6 +406,32 @@ describe('share grants', () => {
     const kinds = trail.map((e) => e.kind);
     expect(kinds).toContain('tenant.suspended');
     expect(kinds).toContain('tenant.resumed');
+  });
+
+  test('a link to a document in a deleted folder stops at once', async () => {
+    await seedDocument('doc-in-folder');
+    const auth = { Authorization: `Bearer ${tenantToken()}`, 'content-type': 'application/json' };
+    const folder = (await (
+      await fetch(`${fx.baseUrl}/v1/tenants/${TENANT}/folders`, {
+        method: 'POST',
+        headers: auth,
+        body: JSON.stringify({ name: 'Shared' }),
+      })
+    ).json()) as { folder: { id: string } };
+    const moved = await fetch(
+      `${fx.baseUrl}/v1/tenants/${TENANT}/folders/${folder.folder.id}/move-into`,
+      { method: 'POST', headers: auth, body: JSON.stringify({ documentIds: ['doc-in-folder'] }) },
+    );
+    expect(moved.status).toBe(204);
+    const share = (await createShare({ docId: 'doc-in-folder', scope: ['doc.open'] })).share!;
+    expect((await exchange({ shareToken: share.id }, 'https://acme.com')).status).toBe(200);
+
+    const deleted = await fetch(
+      `${fx.baseUrl}/v1/tenants/${TENANT}/folders/${folder.folder.id}?recursive=true`,
+      { method: 'DELETE', headers: { Authorization: `Bearer ${tenantToken()}` } },
+    );
+    expect(deleted.status).toBe(204);
+    expect((await exchange({ shareToken: share.id }, 'https://acme.com')).status).toBe(404);
   });
 
   test('CORS preflight on the public exchange', async () => {

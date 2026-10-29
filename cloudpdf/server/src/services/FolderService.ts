@@ -19,6 +19,11 @@ export interface FolderServiceOptions {
   tenants: TenantsRepo;
   /** Provision a missing tenant on its first folder, as uploads do. */
   autoProvisionTenant?: boolean;
+  /**
+   * Finish, in the background, the deletes a recursive folder delete began.
+   * Without it the sweeper finishes them once they are stale.
+   */
+  finishDeletes?: (tenantId: string, docIds: string[]) => void;
 }
 
 export interface MoveIntoInput {
@@ -28,6 +33,9 @@ export interface MoveIntoInput {
 
 /** Ids per move, documents and folders together. */
 export const MAX_MOVE_IDS = 1000;
+
+/** Tries a recursive delete gets when uploads keep landing in its folders. */
+const RECURSIVE_DELETE_ATTEMPTS = 3;
 
 /**
  * A tenant's folder tree: create, rename, move and delete folders, and
@@ -40,12 +48,14 @@ export class FolderService {
   private readonly folders: FoldersRepo;
   private readonly tenants: TenantsRepo;
   private readonly autoProvisionTenant: boolean;
+  private readonly finishDeletes?: (tenantId: string, docIds: string[]) => void;
 
   constructor(opts: FolderServiceOptions) {
     this.db = opts.db;
     this.folders = new FoldersRepo(opts.db);
     this.tenants = opts.tenants;
     this.autoProvisionTenant = opts.autoProvisionTenant ?? false;
+    if (opts.finishDeletes) this.finishDeletes = opts.finishDeletes;
   }
 
   async create(input: {
@@ -158,8 +168,15 @@ export class FolderService {
     });
   }
 
-  /** Delete an empty folder; anything inside it is refused with what it holds. */
-  async delete(tenantId: string, folderId: string): Promise<void> {
+  /**
+   * Delete a folder. Without `recursive` only an empty one goes; anything
+   * inside it is refused with what it holds. With `recursive`, one
+   * transaction removes the folder and every folder under it and begins
+   * deleting every document in them, so all of it leaves every list and
+   * stops opening at once; their stored files go in the background.
+   */
+  async delete(tenantId: string, folderId: string, opts: { recursive: boolean }): Promise<void> {
+    if (opts.recursive) return this.deleteRecursive(tenantId, folderId);
     try {
       await this.withTreeLock(tenantId, async ({ folders }) => {
         await folders.requireOwned(folderId, tenantId);
@@ -171,6 +188,25 @@ export class FolderService {
       if (!isForeignKeyViolation(err)) throw err;
       await requireEmpty(this.folders, tenantId, folderId);
       throw err;
+    }
+  }
+
+  private async deleteRecursive(tenantId: string, folderId: string): Promise<void> {
+    for (let attempt = 1; ; attempt++) {
+      try {
+        const docIds = await this.withTreeLock(tenantId, async ({ folders, documents }) => {
+          await folders.requireOwned(folderId, tenantId);
+          const begun = await documents.beginDeleteBelow(tenantId, folderId);
+          await folders.deleteBelow(folderId);
+          return begun;
+        });
+        if (docIds.length > 0) this.finishDeletes?.(tenantId, docIds);
+        return;
+      } catch (err) {
+        // An upload filed a document in one of the folders after the
+        // documents were marked: start over, and it is marked too.
+        if (!isForeignKeyViolation(err) || attempt === RECURSIVE_DELETE_ATTEMPTS) throw err;
+      }
     }
   }
 

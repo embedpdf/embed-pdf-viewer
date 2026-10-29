@@ -8,6 +8,7 @@ import type {
   DocumentState,
 } from '../schema';
 import { nameKeyOf } from '../names';
+import { foldersBelow } from './folders.repo';
 import { isForeignKeyViolation } from '../foreignKeyViolation';
 import { isUniqueViolation } from '../uniqueViolation';
 
@@ -441,12 +442,49 @@ export class DocumentsRepo {
     return this.findById(id);
   }
 
+  /**
+   * The first phase of {@link beginDelete} for every document in the folder
+   * and the folders under it, in one statement. Returns the ids it marked;
+   * documents already being deleted are in no folder, so it never sees them.
+   */
+  async beginDeleteBelow(tenantId: string, folderId: string): Promise<string[]> {
+    const result = await sql<{ id: string }>`
+      ${foldersBelow(folderId)}
+      UPDATE documents
+         SET state = 'deleting', folder_id = NULL, updated_at = ${Date.now()}
+       WHERE tenant_id = ${tenantId}
+         AND folder_id IN (SELECT id FROM below)
+      RETURNING id
+    `.execute(this.db);
+    return result.rows.map((row) => row.id);
+  }
+
   async finalizeDelete(id: string, tenantId: string): Promise<void> {
     await this.db
       .deleteFrom('documents')
       .where('id', '=', id)
       .where('tenant_id', '=', tenantId)
       .execute();
+  }
+
+  /**
+   * Documents left `deleting` for longer than `olderThanMs`, oldest first:
+   * a delete whose second phase crashed or has not run yet.
+   */
+  async listStaleDeleting(
+    olderThanMs: number,
+    limit: number,
+    now: number = Date.now(),
+  ): Promise<DocumentRow[]> {
+    const rows = await this.db
+      .selectFrom('documents')
+      .selectAll()
+      .where('state', '=', 'deleting')
+      .where('updated_at', '<', now - olderThanMs)
+      .orderBy('updated_at', 'asc')
+      .limit(limit)
+      .execute();
+    return rows.map(mapRow);
   }
 
   /**

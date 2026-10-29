@@ -10,4 +10,6 @@
 export interface DeleteFoldersRequest {
     tenantId: string;
     folderId: string;
+    /** true deletes everything in the folder too. Never the default. */
+    recursive?: boolean;
 }

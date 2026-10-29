@@ -1,10 +1,28 @@
-import { sql, type Kysely } from 'kysely';
+import { sql, type Kysely, type RawBuilder } from 'kysely';
 
 import { nameKeyOf } from '../names';
 import type { Database as Schema } from '../schema';
 
 /** Folders nest at most this many levels; the recursive queries stop there too. */
 export const MAX_FOLDER_DEPTH = 100;
+
+/**
+ * A `WITH RECURSIVE` clause naming `below(id, depth)`: the folder and
+ * every folder under it, the folder itself at depth one. Statements that
+ * act on a whole subtree start with it, so a subtree of any size is one
+ * statement rather than a list of ids.
+ */
+export function foldersBelow(id: string): RawBuilder<unknown> {
+  return sql`
+    WITH RECURSIVE below(id, depth) AS (
+      SELECT id, 1 FROM folders WHERE id = ${id}
+      UNION ALL
+      SELECT f.id, b.depth + 1
+        FROM folders f JOIN below b ON f.parent_id = b.id
+       WHERE b.depth < ${MAX_FOLDER_DEPTH}
+    )
+  `;
+}
 
 export interface FolderRow {
   id: string;
@@ -151,6 +169,14 @@ export class FoldersRepo {
     await this.db.deleteFrom('folders').where('id', '=', id).execute();
   }
 
+  /** Delete the folder and every folder under it, in one statement. */
+  async deleteBelow(id: string): Promise<void> {
+    await sql`
+      ${foldersBelow(id)}
+      DELETE FROM folders WHERE id IN (SELECT id FROM below)
+    `.execute(this.db);
+  }
+
   /** The folder and every folder above it, nearest first; empty when it does not exist. */
   async ancestorsOf(id: string): Promise<Array<{ id: string; name: string }>> {
     const result = await sql<{ id: string; name: string; depth: number }>`
@@ -169,13 +195,7 @@ export class FoldersRepo {
   /** Levels from the folder down to its deepest folder, the folder itself counting one. */
   async heightOf(id: string): Promise<number> {
     const result = await sql<{ height: number | null }>`
-      WITH RECURSIVE below(id, depth) AS (
-        SELECT id, 1 FROM folders WHERE id = ${id}
-        UNION ALL
-        SELECT f.id, b.depth + 1
-          FROM folders f JOIN below b ON f.parent_id = b.id
-         WHERE b.depth < ${MAX_FOLDER_DEPTH}
-      )
+      ${foldersBelow(id)}
       SELECT max(depth) AS height FROM below
     `.execute(this.db);
     return Number(result.rows[0]?.height ?? 0);
@@ -184,13 +204,7 @@ export class FoldersRepo {
   /** What the folder holds at every level below it; documents being deleted are in no folder. */
   async contentsOf(tenantId: string, id: string): Promise<{ folders: number; documents: number }> {
     const result = await sql<{ folders: number; documents: number }>`
-      WITH RECURSIVE below(id, depth) AS (
-        SELECT id, 1 FROM folders WHERE id = ${id}
-        UNION ALL
-        SELECT f.id, b.depth + 1
-          FROM folders f JOIN below b ON f.parent_id = b.id
-         WHERE b.depth < ${MAX_FOLDER_DEPTH}
-      )
+      ${foldersBelow(id)}
       SELECT
         (SELECT count(*) FROM below) - 1 AS folders,
         (SELECT count(*) FROM documents

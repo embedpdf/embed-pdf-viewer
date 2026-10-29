@@ -145,8 +145,8 @@ class FoldersAdapter {
     await call(this.client.folders.moveInto({ tenantId: this.tenantId, folderId, ...input }));
   }
 
-  async delete(folderId: string): Promise<void> {
-    await call(this.client.folders.delete({ tenantId: this.tenantId, folderId }));
+  async delete(folderId: string, options: { recursive?: boolean } = {}): Promise<void> {
+    await call(this.client.folders.delete({ tenantId: this.tenantId, folderId, ...options }));
   }
 }
 

@@ -52,7 +52,7 @@ export interface AdminE2eDialectFixture {
  */
 export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
   async function buildFixture(
-    opts: { sweepIntervalMs?: number; enableRevocation?: boolean } = {},
+    opts: { sweepIntervalMs?: number; deletingGraceMs?: number; enableRevocation?: boolean } = {},
   ): Promise<Fixture> {
     const storageRoot = await mkdtemp(join(tmpdir(), 'embedpdf-admin-e2e-'));
     const db = await dialect.makeDb();
@@ -68,6 +68,7 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
       autoProvisionTenant: true,
       sweepIntervalMs: opts.sweepIntervalMs ?? 0,
       pendingTtlMs: 100,
+      ...(opts.deletingGraceMs !== undefined ? { deletingGraceMs: opts.deletingGraceMs } : {}),
       ...(opts.enableRevocation ? { enableRevocation: true } : {}),
     });
     const addr = await bundle.app.listen({ host: '127.0.0.1', port: 0 });
@@ -101,6 +102,27 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
       tenant_id: tenantId,
       scope: opts.scope ?? ['*'],
     });
+  }
+
+  async function failureOf(promise: Promise<unknown>): Promise<AdminError | undefined> {
+    try {
+      await promise;
+      return undefined;
+    } catch (e) {
+      return e as AdminError;
+    }
+  }
+
+  const detailsOf = (err: AdminError | undefined) =>
+    (err?.body as { error?: { details?: Record<string, unknown> } } | undefined)?.error?.details;
+
+  /** Poll until `check` holds; deletes finish in the background. */
+  async function eventually(check: () => Promise<boolean>, timeoutMs = 5000): Promise<void> {
+    const deadline = Date.now() + timeoutMs;
+    while (!(await check())) {
+      if (Date.now() > deadline) throw new Error('condition did not hold in time');
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
   }
 
   function fakePdf(seed: number, size: number): Uint8Array {
@@ -1144,18 +1166,6 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
       }).tenant(tenantId);
     }
 
-    async function failureOf(promise: Promise<unknown>): Promise<AdminError | undefined> {
-      try {
-        await promise;
-        return undefined;
-      } catch (e) {
-        return e as AdminError;
-      }
-    }
-
-    const detailsOf = (err: AdminError | undefined) =>
-      (err?.body as { error?: { details?: Record<string, unknown> } } | undefined)?.error?.details;
-
     test('folders are made at the top level or inside another, and listed by name', async () => {
       const admin = tenantAdmin('tenant-folders-list');
       const contracts = await admin.folders.create({ name: 'Contracts' });
@@ -1459,6 +1469,167 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
         .where('tenant_id', '=', 'tenant-folders-cascade')
         .execute();
       expect(left).toEqual([]);
+    });
+  });
+
+  describe(`Deleting folders with what they hold [${dialect.label}]`, () => {
+    let fx: Fixture;
+
+    beforeAll(async () => {
+      fx = await buildFixture();
+    });
+    afterAll(async () => {
+      await tearDown(fx);
+    });
+
+    function tenantAdmin(
+      tenantId: string,
+      scope?: NonNullable<Parameters<typeof adminToken>[1]>['scope'],
+    ) {
+      return createCloudAdmin({
+        baseUrl: fx.baseUrl,
+        tenantToken: adminToken(tenantId, scope ? { scope } : {}),
+      }).tenant(tenantId);
+    }
+
+    const gone = async (admin: ReturnType<typeof tenantAdmin>, docId: string) =>
+      (await failureOf(admin.documents.get(docId)))?.status === 404;
+
+    test('a folder goes with everything under it, at once; stored files follow', async () => {
+      const tenant = 'tenant-rdel-all';
+      const admin = tenantAdmin(tenant);
+      const a = await admin.folders.create({ name: 'A' });
+      const b = await admin.folders.create({ name: 'B', parentId: a.id });
+      const keep = await admin.folders.create({ name: 'Keep' });
+      const inA = (await admin.documents.create({ bytes: fakePdf(300, 300), folderId: a.id }))
+        .document;
+      const inB = (await admin.documents.create({ bytes: fakePdf(301, 300), folderId: b.id }))
+        .document;
+      const kept = (await admin.documents.create({ bytes: fakePdf(302, 300), folderId: keep.id }))
+        .document;
+
+      await admin.folders.delete(a.id, { recursive: true });
+
+      expect((await failureOf(admin.folders.get(a.id)))?.status).toBe(404);
+      expect((await failureOf(admin.folders.get(b.id)))?.status).toBe(404);
+      expect((await admin.documents.list()).documents.map((d: { id: string }) => d.id)).toEqual([
+        kept.id,
+      ]);
+      expect((await admin.folders.create({ name: 'a' })).name).toBe('a');
+
+      await eventually(async () => (await gone(admin, inA.id)) && (await gone(admin, inB.id)));
+      expect(await fx.store.stat(StorageKeys.basePdf(tenant, inA.id))).toBeNull();
+      expect(await fx.store.stat(StorageKeys.basePdf(tenant, inB.id))).toBeNull();
+      expect((await admin.documents.get(kept.id)).state).toBe('ready');
+    });
+
+    test('a deep tree goes in one delete', async () => {
+      const admin = tenantAdmin('tenant-rdel-deep');
+      const chain: string[] = [];
+      const docs: string[] = [];
+      for (let level = 1; level <= 30; level++) {
+        const parentId = chain[chain.length - 1];
+        const folder = await admin.folders.create({
+          name: `L${level}`,
+          ...(parentId ? { parentId } : {}),
+        });
+        chain.push(folder.id);
+        if (level % 10 === 0) {
+          docs.push(
+            (
+              await admin.documents.create({
+                bytes: fakePdf(310 + level, 300),
+                folderId: folder.id,
+              })
+            ).document.id,
+          );
+        }
+      }
+      await admin.folders.delete(chain[0]!, { recursive: true });
+      expect((await admin.folders.list()).folders).toEqual([]);
+      expect((await admin.documents.list()).documents).toEqual([]);
+      await eventually(async () => {
+        for (const id of docs) if (!(await gone(admin, id))) return false;
+        return true;
+      });
+    });
+
+    test('without recursive, a folder holding anything is still refused', async () => {
+      const admin = tenantAdmin('tenant-rdel-plain');
+      const folder = await admin.folders.create({ name: 'Full' });
+      const doc = (await admin.documents.create({ bytes: fakePdf(320, 300), folderId: folder.id }))
+        .document;
+      for (const options of [{}, { recursive: false }]) {
+        const refused = await failureOf(admin.folders.delete(folder.id, options));
+        expect(detailsOf(refused)).toEqual({ reason: 'not-empty', folders: 0, documents: 1 });
+      }
+      expect((await admin.documents.get(doc.id)).state).toBe('ready');
+    });
+
+    test('deleting a folder with what it holds needs docs.delete', async () => {
+      const owner = tenantAdmin('tenant-rdel-scope');
+      const folder = await owner.folders.create({ name: 'Scoped' });
+      await owner.documents.create({ bytes: fakePdf(330, 300), folderId: folder.id });
+      const noDelete = tenantAdmin('tenant-rdel-scope', [
+        'docs.create',
+        'docs.read',
+        'docs.update',
+      ]);
+      expect(
+        (await failureOf(noDelete.folders.delete(folder.id, { recursive: true })))?.status,
+      ).toBe(403);
+      expect((await owner.folders.get(folder.id)).folder.name).toBe('Scoped');
+    });
+
+    test('an upload into a deleted folder cannot finish, and nothing moves into it', async () => {
+      const admin = tenantAdmin('tenant-rdel-upload');
+      const folder = await admin.folders.create({ name: 'Inbox' });
+      const bytes = fakePdf(340, 300);
+      const init = await admin.documents.init({
+        contentLength: bytes.byteLength,
+        contentSha256: sha256Hex(bytes),
+        folderId: folder.id,
+      });
+      await admin.documents.uploadProxy({ docId: init.document.id, body: bytes });
+
+      await admin.folders.delete(folder.id, { recursive: true });
+
+      const commit = await failureOf(
+        admin.documents.commit({ docId: init.document.id, sha256: sha256Hex(bytes) }),
+      );
+      expect([404, 409]).toContain(commit?.status);
+      const loose = (await admin.documents.create({ bytes: fakePdf(341, 300) })).document;
+      expect(
+        (await failureOf(admin.folders.moveInto(folder.id, { documentIds: [loose.id] })))?.status,
+      ).toBe(404);
+    });
+  });
+
+  describe(`Finishing deletes left behind [${dialect.label}]`, () => {
+    let fx: Fixture;
+
+    beforeAll(async () => {
+      fx = await buildFixture({ sweepIntervalMs: 50, deletingGraceMs: 0 });
+    });
+    afterAll(async () => {
+      await tearDown(fx);
+    });
+
+    test('a document left deleting is finished by the sweeper', async () => {
+      const tenant = 'tenant-sweep-deleting';
+      const admin = createCloudAdmin({
+        baseUrl: fx.baseUrl,
+        tenantToken: adminToken(tenant),
+      }).tenant(tenant);
+      const doc = (await admin.documents.create({ bytes: fakePdf(350, 300) })).document;
+      const key = StorageKeys.basePdf(tenant, doc.id);
+      expect(await fx.store.stat(key)).not.toBeNull();
+
+      // The first phase alone, as a crash between the two would leave it.
+      await new DocumentsRepo(fx.db).beginDelete(doc.id, tenant);
+
+      await eventually(async () => (await failureOf(admin.documents.get(doc.id)))?.status === 404);
+      expect(await fx.store.stat(key)).toBeNull();
     });
   });
 }

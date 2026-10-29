@@ -281,6 +281,11 @@ export interface BuildAppOptions {
   /** Max age of a `pending` doc before it's considered abandoned. */
   pendingTtlMs?: number;
   /**
+   * How long a document may stay `deleting` before the sweeper finishes the
+   * delete itself. A live delete finishes well within it. Default 1 minute.
+   */
+  deletingGraceMs?: number;
+  /**
    * When supplied (with `db`, `objectStore`, and a worker pool),
    * enables the cloud `/v1/docs/...` routes via the
    * `DocumentService` orchestrator. The required pieces are:
@@ -1131,6 +1136,16 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         db: opts.db,
         tenants: new TenantsRepo(opts.db),
         autoProvisionTenant: opts.autoProvisionTenant ?? false,
+        finishDeletes: (tenantId, docIds) => {
+          lifecycle!
+            .finishDeletes(tenantId, docIds)
+            .catch((err) =>
+              app.log.error(
+                { err, tenantId },
+                'finishing a folder delete failed; the sweeper retries',
+              ),
+            );
+        },
       }),
     });
     const storedLayers = {
@@ -1446,11 +1461,15 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
 
     const sweepIntervalMs = opts.sweepIntervalMs ?? 60_000;
     const pendingTtlMs = opts.pendingTtlMs ?? 60 * 60 * 1000; // 1h default
+    const deletingGraceMs = opts.deletingGraceMs ?? 60_000;
     if (sweepIntervalMs > 0) {
       sweeperTimer = setInterval(() => {
         lifecycle!
           .sweepStalePending({ olderThanMs: pendingTtlMs })
           .catch((err) => app.log.error({ err }, 'sweepStalePending failed'));
+        lifecycle!
+          .sweepDeleting({ olderThanMs: deletingGraceMs })
+          .catch((err) => app.log.error({ err }, 'sweepDeleting failed'));
         layerService
           ?.expireSignings(Date.now())
           .catch((err) => app.log.error({ err }, 'expireSignings failed'));

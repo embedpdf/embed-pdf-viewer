@@ -3,15 +3,16 @@ import { createReadStream, createWriteStream } from 'node:fs';
 import {
   mkdir,
   lstat,
+  open,
   readFile,
   rename,
   rm,
   stat,
-  writeFile,
   readdir,
   unlink,
   rmdir,
 } from 'node:fs/promises';
+import type { FileHandle } from 'node:fs/promises';
 import { dirname, join, resolve, sep } from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
@@ -95,8 +96,8 @@ export class FsObjectStore implements ObjectStore {
     opts: { contentLength: number; contentType?: string },
   ): Promise<{ sha256: string }> {
     const abs = this.absolute(key);
-    await mkdir(dirname(abs), { recursive: true });
     const partial = `${abs}.partial`;
+    const file = await openCreatingDirs(partial);
 
     const hash = createHash('sha256');
     let written = 0;
@@ -104,10 +105,14 @@ export class FsObjectStore implements ObjectStore {
     if (body instanceof Uint8Array) {
       hash.update(body);
       written = body.byteLength;
-      await writeFile(partial, body);
+      try {
+        await file.writeFile(body);
+      } finally {
+        await file.close();
+      }
     } else {
       const readable = body as Readable;
-      const writer = createWriteStream(partial);
+      const writer = file.createWriteStream();
       readable.on('data', (chunk: Buffer) => {
         hash.update(chunk);
         written += chunk.byteLength;
@@ -344,6 +349,26 @@ export class FsObjectStore implements ObjectStore {
   async _wipeForTest(): Promise<void> {
     await rm(this.root, { recursive: true, force: true });
     await mkdir(this.root, { recursive: true });
+  }
+}
+
+/** Tries to make a directory that keeps being pruned before giving up. */
+const OPEN_ATTEMPTS = 5;
+
+/**
+ * Open `path` for writing, making its directories. A prefix delete elsewhere
+ * prunes empty ancestors and can remove a directory between the mkdir and
+ * the open; once the file exists its directories are not empty and stay, so
+ * a vanished directory is made again.
+ */
+async function openCreatingDirs(path: string): Promise<FileHandle> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await mkdir(dirname(path), { recursive: true });
+      return await open(path, 'w');
+    } catch (err) {
+      if (!isENOENT(err) || attempt === OPEN_ATTEMPTS) throw err;
+    }
   }
 }
 

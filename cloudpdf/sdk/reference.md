@@ -2007,7 +2007,7 @@ await client.folders.get({
 <dl>
 <dd>
 
-409 Conflict with `details.reason` `not-empty` when anything is inside, counted over every level below in `details.folders` and `details.documents`.
+Without recursive, a folder with anything inside is refused: 409 Conflict with `details.reason` `not-empty` and what it holds, counted over every level below, in `details.folders` and `details.documents`. With recursive=true, the folder and every folder under it go at once, and every document in them stops opening, leaves every list and stops answering its share links at once; their stored files and links are removed in the background. Uploads into those folders that have not committed cannot commit.
 </dd>
 </dl>
 </dd>

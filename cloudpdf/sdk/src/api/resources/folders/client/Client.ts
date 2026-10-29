@@ -270,7 +270,7 @@ export class FoldersClient {
     }
 
     /**
-     * 409 Conflict with `details.reason` `not-empty` when anything is inside, counted over every level below in `details.folders` and `details.documents`.
+     * Without recursive, a folder with anything inside is refused: 409 Conflict with `details.reason` `not-empty` and what it holds, counted over every level below, in `details.folders` and `details.documents`. With recursive=true, the folder and every folder under it go at once, and every document in them stops opening, leaves every list and stops answering its share links at once; their stored files and links are removed in the background. Uploads into those folders that have not committed cannot commit.
      *
      * @param {CloudPDF.DeleteFoldersRequest} request
      * @param {FoldersClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -298,7 +298,10 @@ export class FoldersClient {
         request: CloudPDF.DeleteFoldersRequest,
         requestOptions?: FoldersClient.RequestOptions,
     ): Promise<core.WithRawResponse<void>> {
-        const { tenantId, folderId } = request;
+        const { tenantId, folderId, recursive } = request;
+        const _queryParams: Record<string, unknown> = {
+            recursive,
+        };
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -313,7 +316,11 @@ export class FoldersClient {
             ),
             method: "DELETE",
             headers: _headers,
-            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            queryString: core.url
+                .queryBuilder()
+                .addMany(_queryParams)
+                .mergeAdditional(requestOptions?.queryParams)
+                .build(),
             timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
             maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
             abortSignal: requestOptions?.abortSignal,
