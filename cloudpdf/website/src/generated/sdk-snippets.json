@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "canonicalVersion": "3.0.0-next.18",
-  "openapiSha256": "ad2a3baa628061e7b3e8b597cfd15bcda7f103d0f829cb01388a0fed6c4f5873",
+  "openapiSha256": "b1f1d1d04a433ab79ef310b2cb537f85ff35a8beb4b88022c5202a3bec5c549f",
   "languages": {
     "typescript": {
       "label": "TypeScript",
@@ -1874,40 +1874,40 @@
         "frameLines": 7
       }
     },
-    "shares.exchange": {
+    "grants.exchange": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.shares.exchange({\n  shareToken: \"shareToken\"\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.grants.exchange({\n  grant: \"grant\"\n});",
         "frameLines": 7
       },
       "python": {
         "status": "available",
-        "source": "from cloudpdf import CloudPDFClient\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n    base_url=\"https://yourhost.com/path/to/api\",\n)\n\nclient.shares.exchange(\n    share_token=\"shareToken\",\n)",
+        "source": "from cloudpdf import CloudPDFClient\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n    base_url=\"https://yourhost.com/path/to/api\",\n)\n\nclient.grants.exchange(\n    grant=\"grant\",\n)",
         "frameLines": 7
       },
       "php": {
         "status": "available",
-        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n    options: ['baseUrl' => 'https://yourhost.com/path/to/api'],\n);\n\n$client->shares->exchange(\n    new SharesExchangeRequest([\n        'shareToken' => 'shareToken',\n    ]),\n);",
+        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n    options: ['baseUrl' => 'https://yourhost.com/path/to/api'],\n);\n\n$client->grants->exchange(\n    new GrantsExchangeRequest([\n        'grant' => 'grant',\n    ]),\n);",
         "frameLines": 7
       },
       "csharp": {
         "status": "available",
-        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\",\n    new ClientOptions { BaseUrl = \"https://yourhost.com/path/to/api\" }\n);\n\nawait client.Shares.ExchangeAsync(new SharesExchangeRequest { ShareToken = \"shareToken\" });",
+        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\",\n    new ClientOptions { BaseUrl = \"https://yourhost.com/path/to/api\" }\n);\n\nawait client.Grants.ExchangeAsync(new GrantsExchangeRequest { Grant = \"grant\" });",
         "frameLines": 7
       },
       "go": {
         "status": "available",
-        "source": "import (\n    \"context\"\n\n    cloudpdf \"github.com/embedpdf/cloudpdf-sdk-go/v3\"\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n    option.WithBaseURL(\"https://yourhost.com/path/to/api\"),\n)\n\nrequest := &cloudpdf.SharesExchangeRequest{\n    ShareToken: \"shareToken\",\n}\nclient.Shares.Exchange(\n    context.TODO(),\n    request,\n)",
+        "source": "import (\n    \"context\"\n\n    cloudpdf \"github.com/embedpdf/cloudpdf-sdk-go/v3\"\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n    option.WithBaseURL(\"https://yourhost.com/path/to/api\"),\n)\n\nrequest := &cloudpdf.GrantsExchangeRequest{\n    Grant: \"grant\",\n}\nclient.Grants.Exchange(\n    context.TODO(),\n    request,\n)",
         "frameLines": 13
       },
       "java": {
         "status": "available",
-        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .url(\"https://yourhost.com/path/to/api\")\n    .build();\n\nclient.shares().exchange(\n    SharesExchangeRequest\n        .builder()\n        .shareToken(\"shareToken\")\n        .build()\n);",
+        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .url(\"https://yourhost.com/path/to/api\")\n    .build();\n\nclient.grants().exchange(\n    GrantsExchangeRequest\n        .builder()\n        .grant(\"grant\")\n        .build()\n);",
         "frameLines": 8
       },
       "ruby": {
         "status": "available",
-        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.shares.exchange(share_token: \"shareToken\")",
+        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.grants.exchange(grant: \"grant\")",
         "frameLines": 7
       }
     },
@@ -2725,6 +2725,302 @@
         "frameLines": 7
       }
     },
+    "grants.list": {
+      "typescript": {
+        "status": "available",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.grants.list({\n  tenantId: \"tenantId\"\n});",
+        "frameLines": 7
+      },
+      "python": {
+        "status": "available",
+        "source": "from cloudpdf import CloudPDFClient\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n    base_url=\"https://yourhost.com/path/to/api\",\n)\n\nclient.grants.list(\n    tenant_id=\"tenantId\",\n)",
+        "frameLines": 7
+      },
+      "php": {
+        "status": "available",
+        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n    options: ['baseUrl' => 'https://yourhost.com/path/to/api'],\n);\n\n$client->grants->list(\n    'tenantId',\n    new ListGrantsRequest([]),\n);",
+        "frameLines": 7
+      },
+      "csharp": {
+        "status": "available",
+        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\",\n    new ClientOptions { BaseUrl = \"https://yourhost.com/path/to/api\" }\n);\n\nawait client.Grants.ListAsync(new ListGrantsRequest { TenantId = \"tenantId\" });",
+        "frameLines": 7
+      },
+      "go": {
+        "status": "available",
+        "source": "import (\n    \"context\"\n\n    cloudpdf \"github.com/embedpdf/cloudpdf-sdk-go/v3\"\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n    option.WithBaseURL(\"https://yourhost.com/path/to/api\"),\n)\n\nrequest := &cloudpdf.ListGrantsRequest{\n    TenantID: \"tenantId\",\n}\nclient.Grants.List(\n    context.TODO(),\n    request,\n)",
+        "frameLines": 13
+      },
+      "java": {
+        "status": "available",
+        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .url(\"https://yourhost.com/path/to/api\")\n    .build();\n\nclient.grants().list(\n    \"tenantId\",\n    ListGrantsRequest\n        .builder()\n        .build()\n);",
+        "frameLines": 8
+      },
+      "ruby": {
+        "status": "available",
+        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.grants.list(tenant_id: \"tenantId\")",
+        "frameLines": 7
+      }
+    },
+    "grants.create": {
+      "typescript": {
+        "status": "available",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.grants.create({\n  tenantId: \"tenantId\",\n  docId: \"docId\",\n  scope: [\"scope\"]\n});",
+        "frameLines": 7
+      },
+      "python": {
+        "status": "available",
+        "source": "from cloudpdf import CloudPDFClient\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n    base_url=\"https://yourhost.com/path/to/api\",\n)\n\nclient.grants.create(\n    tenant_id=\"tenantId\",\n    doc_id=\"docId\",\n    scope=[\n        \"scope\"\n    ],\n)",
+        "frameLines": 7
+      },
+      "php": {
+        "status": "available",
+        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n    options: ['baseUrl' => 'https://yourhost.com/path/to/api'],\n);\n\n$client->grants->create(\n    'tenantId',\n    new GrantsCreateRequest([\n        'docId' => 'docId',\n        'scope' => [\n            'scope',\n        ],\n    ]),\n);",
+        "frameLines": 7
+      },
+      "csharp": {
+        "status": "available",
+        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\",\n    new ClientOptions { BaseUrl = \"https://yourhost.com/path/to/api\" }\n);\n\nawait client.Grants.CreateAsync(\n    new GrantsCreateRequest\n    {\n        TenantId = \"tenantId\",\n        DocId = \"docId\",\n        Scope = new List<string>() { \"scope\" },\n    }\n);",
+        "frameLines": 7
+      },
+      "go": {
+        "status": "available",
+        "source": "import (\n    \"context\"\n\n    cloudpdf \"github.com/embedpdf/cloudpdf-sdk-go/v3\"\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n    option.WithBaseURL(\"https://yourhost.com/path/to/api\"),\n)\n\nrequest := &cloudpdf.GrantsCreateRequest{\n    TenantID: \"tenantId\",\n    DocID: \"docId\",\n    Scope: []string{\n        \"scope\",\n    },\n}\nclient.Grants.Create(\n    context.TODO(),\n    request,\n)",
+        "frameLines": 13
+      },
+      "java": {
+        "status": "available",
+        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .url(\"https://yourhost.com/path/to/api\")\n    .build();\n\nclient.grants().create(\n    \"tenantId\",\n    GrantsCreateRequest\n        .builder()\n        .docId(\"docId\")\n        .scope(\n            Arrays.asList(\"scope\")\n        )\n        .build()\n);",
+        "frameLines": 8
+      },
+      "ruby": {
+        "status": "available",
+        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.grants.create(\n  tenant_id: \"tenantId\",\n  doc_id: \"docId\",\n  scope: [\"scope\"]\n)",
+        "frameLines": 7
+      }
+    },
+    "grants.get": {
+      "typescript": {
+        "status": "available",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.grants.get({\n  tenantId: \"tenantId\",\n  grantId: \"grantId\"\n});",
+        "frameLines": 7
+      },
+      "python": {
+        "status": "available",
+        "source": "from cloudpdf import CloudPDFClient\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n    base_url=\"https://yourhost.com/path/to/api\",\n)\n\nclient.grants.get(\n    tenant_id=\"tenantId\",\n    grant_id=\"grantId\",\n)",
+        "frameLines": 7
+      },
+      "php": {
+        "status": "available",
+        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n    options: ['baseUrl' => 'https://yourhost.com/path/to/api'],\n);\n\n$client->grants->get(\n    'tenantId',\n    'grantId',\n);",
+        "frameLines": 7
+      },
+      "csharp": {
+        "status": "available",
+        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\",\n    new ClientOptions { BaseUrl = \"https://yourhost.com/path/to/api\" }\n);\n\nawait client.Grants.GetAsync(new GetGrantsRequest { TenantId = \"tenantId\", GrantId = \"grantId\" });",
+        "frameLines": 7
+      },
+      "go": {
+        "status": "available",
+        "source": "import (\n    \"context\"\n\n    cloudpdf \"github.com/embedpdf/cloudpdf-sdk-go/v3\"\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n    option.WithBaseURL(\"https://yourhost.com/path/to/api\"),\n)\n\nrequest := &cloudpdf.GetGrantsRequest{\n    TenantID: \"tenantId\",\n    GrantID: \"grantId\",\n}\nclient.Grants.Get(\n    context.TODO(),\n    request,\n)",
+        "frameLines": 13
+      },
+      "java": {
+        "status": "available",
+        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .url(\"https://yourhost.com/path/to/api\")\n    .build();\n\nclient.grants().get(\n    \"tenantId\",\n    \"grantId\",\n    GetGrantsRequest\n        .builder()\n        .build()\n);",
+        "frameLines": 8
+      },
+      "ruby": {
+        "status": "available",
+        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.grants.get(\n  tenant_id: \"tenantId\",\n  grant_id: \"grantId\"\n)",
+        "frameLines": 7
+      }
+    },
+    "grants.update": {
+      "typescript": {
+        "status": "available",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.grants.update({\n  tenantId: \"tenantId\",\n  grantId: \"grantId\"\n});",
+        "frameLines": 7
+      },
+      "python": {
+        "status": "available",
+        "source": "from cloudpdf import CloudPDFClient\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n    base_url=\"https://yourhost.com/path/to/api\",\n)\n\nclient.grants.update(\n    tenant_id=\"tenantId\",\n    grant_id=\"grantId\",\n)",
+        "frameLines": 7
+      },
+      "php": {
+        "status": "available",
+        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n    options: ['baseUrl' => 'https://yourhost.com/path/to/api'],\n);\n\n$client->grants->update(\n    'tenantId',\n    'grantId',\n    new GrantsUpdateRequest([]),\n);",
+        "frameLines": 7
+      },
+      "csharp": {
+        "status": "available",
+        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\",\n    new ClientOptions { BaseUrl = \"https://yourhost.com/path/to/api\" }\n);\n\nawait client.Grants.UpdateAsync(\n    new GrantsUpdateRequest { TenantId = \"tenantId\", GrantId = \"grantId\" }\n);",
+        "frameLines": 7
+      },
+      "go": {
+        "status": "available",
+        "source": "import (\n    \"context\"\n\n    cloudpdf \"github.com/embedpdf/cloudpdf-sdk-go/v3\"\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n    option.WithBaseURL(\"https://yourhost.com/path/to/api\"),\n)\n\nrequest := &cloudpdf.GrantsUpdateRequest{\n    TenantID: \"tenantId\",\n    GrantID: \"grantId\",\n}\nclient.Grants.Update(\n    context.TODO(),\n    request,\n)",
+        "frameLines": 13
+      },
+      "java": {
+        "status": "available",
+        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .url(\"https://yourhost.com/path/to/api\")\n    .build();\n\nclient.grants().update(\n    \"tenantId\",\n    \"grantId\",\n    GrantsUpdateRequest\n        .builder()\n        .build()\n);",
+        "frameLines": 8
+      },
+      "ruby": {
+        "status": "available",
+        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.grants.update(\n  tenant_id: \"tenantId\",\n  grant_id: \"grantId\"\n)",
+        "frameLines": 7
+      }
+    },
+    "grants.delete": {
+      "typescript": {
+        "status": "available",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.grants.delete({\n  tenantId: \"tenantId\",\n  grantId: \"grantId\"\n});",
+        "frameLines": 7
+      },
+      "python": {
+        "status": "available",
+        "source": "from cloudpdf import CloudPDFClient\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n    base_url=\"https://yourhost.com/path/to/api\",\n)\n\nclient.grants.delete(\n    tenant_id=\"tenantId\",\n    grant_id=\"grantId\",\n)",
+        "frameLines": 7
+      },
+      "php": {
+        "status": "available",
+        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n    options: ['baseUrl' => 'https://yourhost.com/path/to/api'],\n);\n\n$client->grants->delete(\n    'tenantId',\n    'grantId',\n);",
+        "frameLines": 7
+      },
+      "csharp": {
+        "status": "available",
+        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\",\n    new ClientOptions { BaseUrl = \"https://yourhost.com/path/to/api\" }\n);\n\nawait client.Grants.DeleteAsync(\n    new DeleteGrantsRequest { TenantId = \"tenantId\", GrantId = \"grantId\" }\n);",
+        "frameLines": 7
+      },
+      "go": {
+        "status": "available",
+        "source": "import (\n    \"context\"\n\n    cloudpdf \"github.com/embedpdf/cloudpdf-sdk-go/v3\"\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n    option.WithBaseURL(\"https://yourhost.com/path/to/api\"),\n)\n\nrequest := &cloudpdf.DeleteGrantsRequest{\n    TenantID: \"tenantId\",\n    GrantID: \"grantId\",\n}\nclient.Grants.Delete(\n    context.TODO(),\n    request,\n)",
+        "frameLines": 13
+      },
+      "java": {
+        "status": "available",
+        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .url(\"https://yourhost.com/path/to/api\")\n    .build();\n\nclient.grants().delete(\n    \"tenantId\",\n    \"grantId\",\n    DeleteGrantsRequest\n        .builder()\n        .build()\n);",
+        "frameLines": 8
+      },
+      "ruby": {
+        "status": "available",
+        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.grants.delete(\n  tenant_id: \"tenantId\",\n  grant_id: \"grantId\"\n)",
+        "frameLines": 7
+      }
+    },
+    "grants.archive": {
+      "typescript": {
+        "status": "available",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.grants.archive({\n  tenantId: \"tenantId\",\n  grantId: \"grantId\"\n});",
+        "frameLines": 7
+      },
+      "python": {
+        "status": "available",
+        "source": "from cloudpdf import CloudPDFClient\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n    base_url=\"https://yourhost.com/path/to/api\",\n)\n\nclient.grants.archive(\n    tenant_id=\"tenantId\",\n    grant_id=\"grantId\",\n)",
+        "frameLines": 7
+      },
+      "php": {
+        "status": "available",
+        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n    options: ['baseUrl' => 'https://yourhost.com/path/to/api'],\n);\n\n$client->grants->archive(\n    'tenantId',\n    'grantId',\n);",
+        "frameLines": 7
+      },
+      "csharp": {
+        "status": "available",
+        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\",\n    new ClientOptions { BaseUrl = \"https://yourhost.com/path/to/api\" }\n);\n\nawait client.Grants.ArchiveAsync(\n    new ArchiveGrantsRequest { TenantId = \"tenantId\", GrantId = \"grantId\" }\n);",
+        "frameLines": 7
+      },
+      "go": {
+        "status": "available",
+        "source": "import (\n    \"context\"\n\n    cloudpdf \"github.com/embedpdf/cloudpdf-sdk-go/v3\"\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n    option.WithBaseURL(\"https://yourhost.com/path/to/api\"),\n)\n\nrequest := &cloudpdf.ArchiveGrantsRequest{\n    TenantID: \"tenantId\",\n    GrantID: \"grantId\",\n}\nclient.Grants.Archive(\n    context.TODO(),\n    request,\n)",
+        "frameLines": 13
+      },
+      "java": {
+        "status": "available",
+        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .url(\"https://yourhost.com/path/to/api\")\n    .build();\n\nclient.grants().archive(\n    \"tenantId\",\n    \"grantId\",\n    ArchiveGrantsRequest\n        .builder()\n        .build()\n);",
+        "frameLines": 8
+      },
+      "ruby": {
+        "status": "available",
+        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.grants.archive(\n  tenant_id: \"tenantId\",\n  grant_id: \"grantId\"\n)",
+        "frameLines": 7
+      }
+    },
+    "grants.visitors.list": {
+      "typescript": {
+        "status": "available",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.grants.visitors.list({\n  tenantId: \"tenantId\",\n  grantId: \"grantId\"\n});",
+        "frameLines": 7
+      },
+      "python": {
+        "status": "available",
+        "source": "from cloudpdf import CloudPDFClient\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n    base_url=\"https://yourhost.com/path/to/api\",\n)\n\nclient.grants.visitors.list(\n    tenant_id=\"tenantId\",\n    grant_id=\"grantId\",\n)",
+        "frameLines": 7
+      },
+      "php": {
+        "status": "available",
+        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n    options: ['baseUrl' => 'https://yourhost.com/path/to/api'],\n);\n\n$client->grants->visitors->list(\n    'tenantId',\n    'grantId',\n    new ListVisitorsRequest([]),\n);",
+        "frameLines": 7
+      },
+      "csharp": {
+        "status": "available",
+        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\",\n    new ClientOptions { BaseUrl = \"https://yourhost.com/path/to/api\" }\n);\n\nawait client.Grants.Visitors.ListAsync(\n    new ListVisitorsRequest { TenantId = \"tenantId\", GrantId = \"grantId\" }\n);",
+        "frameLines": 7
+      },
+      "go": {
+        "status": "available",
+        "source": "import (\n    \"context\"\n\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n    option.WithBaseURL(\"https://yourhost.com/path/to/api\"),\n)\n\nrequest := &grants.ListVisitorsRequest{\n    TenantID: \"tenantId\",\n    GrantID: \"grantId\",\n}\nclient.Grants.Visitors.List(\n    context.TODO(),\n    request,\n)",
+        "frameLines": 12
+      },
+      "java": {
+        "status": "available",
+        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .url(\"https://yourhost.com/path/to/api\")\n    .build();\n\nclient.grants().visitors().list(\n    \"tenantId\",\n    \"grantId\",\n    ListVisitorsRequest\n        .builder()\n        .build()\n);",
+        "frameLines": 8
+      },
+      "ruby": {
+        "status": "available",
+        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.grants.visitors.list(\n  tenant_id: \"tenantId\",\n  grant_id: \"grantId\"\n)",
+        "frameLines": 7
+      }
+    },
+    "grants.visitors.delete": {
+      "typescript": {
+        "status": "available",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.grants.visitors.delete({\n  tenantId: \"tenantId\",\n  grantId: \"grantId\",\n  visitorId: \"visitorId\"\n});",
+        "frameLines": 7
+      },
+      "python": {
+        "status": "available",
+        "source": "from cloudpdf import CloudPDFClient\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n    base_url=\"https://yourhost.com/path/to/api\",\n)\n\nclient.grants.visitors.delete(\n    tenant_id=\"tenantId\",\n    grant_id=\"grantId\",\n    visitor_id=\"visitorId\",\n)",
+        "frameLines": 7
+      },
+      "php": {
+        "status": "available",
+        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n    options: ['baseUrl' => 'https://yourhost.com/path/to/api'],\n);\n\n$client->grants->visitors->delete(\n    'tenantId',\n    'grantId',\n    'visitorId',\n);",
+        "frameLines": 7
+      },
+      "csharp": {
+        "status": "available",
+        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\",\n    new ClientOptions { BaseUrl = \"https://yourhost.com/path/to/api\" }\n);\n\nawait client.Grants.Visitors.DeleteAsync(\n    new DeleteVisitorsRequest\n    {\n        TenantId = \"tenantId\",\n        GrantId = \"grantId\",\n        VisitorId = \"visitorId\",\n    }\n);",
+        "frameLines": 7
+      },
+      "go": {
+        "status": "available",
+        "source": "import (\n    \"context\"\n\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n    option.WithBaseURL(\"https://yourhost.com/path/to/api\"),\n)\n\nrequest := &grants.DeleteVisitorsRequest{\n    TenantID: \"tenantId\",\n    GrantID: \"grantId\",\n    VisitorID: \"visitorId\",\n}\nclient.Grants.Visitors.Delete(\n    context.TODO(),\n    request,\n)",
+        "frameLines": 12
+      },
+      "java": {
+        "status": "available",
+        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .url(\"https://yourhost.com/path/to/api\")\n    .build();\n\nclient.grants().visitors().delete(\n    \"tenantId\",\n    \"grantId\",\n    \"visitorId\",\n    DeleteVisitorsRequest\n        .builder()\n        .build()\n);",
+        "frameLines": 8
+      },
+      "ruby": {
+        "status": "available",
+        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.grants.visitors.delete(\n  tenant_id: \"tenantId\",\n  grant_id: \"grantId\",\n  visitor_id: \"visitorId\"\n)",
+        "frameLines": 7
+      }
+    },
     "tenants.resume": {
       "typescript": {
         "status": "available",
@@ -2759,302 +3055,6 @@
       "ruby": {
         "status": "available",
         "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.tenants.resume(tenant_id: \"tenantId\")",
-        "frameLines": 7
-      }
-    },
-    "shares.list": {
-      "typescript": {
-        "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.shares.list({\n  tenantId: \"tenantId\"\n});",
-        "frameLines": 7
-      },
-      "python": {
-        "status": "available",
-        "source": "from cloudpdf import CloudPDFClient\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n    base_url=\"https://yourhost.com/path/to/api\",\n)\n\nclient.shares.list(\n    tenant_id=\"tenantId\",\n)",
-        "frameLines": 7
-      },
-      "php": {
-        "status": "available",
-        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n    options: ['baseUrl' => 'https://yourhost.com/path/to/api'],\n);\n\n$client->shares->list(\n    'tenantId',\n    new ListSharesRequest([]),\n);",
-        "frameLines": 7
-      },
-      "csharp": {
-        "status": "available",
-        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\",\n    new ClientOptions { BaseUrl = \"https://yourhost.com/path/to/api\" }\n);\n\nawait client.Shares.ListAsync(new ListSharesRequest { TenantId = \"tenantId\" });",
-        "frameLines": 7
-      },
-      "go": {
-        "status": "available",
-        "source": "import (\n    \"context\"\n\n    cloudpdf \"github.com/embedpdf/cloudpdf-sdk-go/v3\"\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n    option.WithBaseURL(\"https://yourhost.com/path/to/api\"),\n)\n\nrequest := &cloudpdf.ListSharesRequest{\n    TenantID: \"tenantId\",\n}\nclient.Shares.List(\n    context.TODO(),\n    request,\n)",
-        "frameLines": 13
-      },
-      "java": {
-        "status": "available",
-        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .url(\"https://yourhost.com/path/to/api\")\n    .build();\n\nclient.shares().list(\n    \"tenantId\",\n    ListSharesRequest\n        .builder()\n        .build()\n);",
-        "frameLines": 8
-      },
-      "ruby": {
-        "status": "available",
-        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.shares.list(tenant_id: \"tenantId\")",
-        "frameLines": 7
-      }
-    },
-    "shares.create": {
-      "typescript": {
-        "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.shares.create({\n  tenantId: \"tenantId\",\n  docId: \"docId\",\n  scope: [\"scope\"]\n});",
-        "frameLines": 7
-      },
-      "python": {
-        "status": "available",
-        "source": "from cloudpdf import CloudPDFClient\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n    base_url=\"https://yourhost.com/path/to/api\",\n)\n\nclient.shares.create(\n    tenant_id=\"tenantId\",\n    doc_id=\"docId\",\n    scope=[\n        \"scope\"\n    ],\n)",
-        "frameLines": 7
-      },
-      "php": {
-        "status": "available",
-        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n    options: ['baseUrl' => 'https://yourhost.com/path/to/api'],\n);\n\n$client->shares->create(\n    'tenantId',\n    new SharesCreateRequest([\n        'docId' => 'docId',\n        'scope' => [\n            'scope',\n        ],\n    ]),\n);",
-        "frameLines": 7
-      },
-      "csharp": {
-        "status": "available",
-        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\",\n    new ClientOptions { BaseUrl = \"https://yourhost.com/path/to/api\" }\n);\n\nawait client.Shares.CreateAsync(\n    new SharesCreateRequest\n    {\n        TenantId = \"tenantId\",\n        DocId = \"docId\",\n        Scope = new List<string>() { \"scope\" },\n    }\n);",
-        "frameLines": 7
-      },
-      "go": {
-        "status": "available",
-        "source": "import (\n    \"context\"\n\n    cloudpdf \"github.com/embedpdf/cloudpdf-sdk-go/v3\"\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n    option.WithBaseURL(\"https://yourhost.com/path/to/api\"),\n)\n\nrequest := &cloudpdf.SharesCreateRequest{\n    TenantID: \"tenantId\",\n    DocID: \"docId\",\n    Scope: []string{\n        \"scope\",\n    },\n}\nclient.Shares.Create(\n    context.TODO(),\n    request,\n)",
-        "frameLines": 13
-      },
-      "java": {
-        "status": "available",
-        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .url(\"https://yourhost.com/path/to/api\")\n    .build();\n\nclient.shares().create(\n    \"tenantId\",\n    SharesCreateRequest\n        .builder()\n        .docId(\"docId\")\n        .scope(\n            Arrays.asList(\"scope\")\n        )\n        .build()\n);",
-        "frameLines": 8
-      },
-      "ruby": {
-        "status": "available",
-        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.shares.create(\n  tenant_id: \"tenantId\",\n  doc_id: \"docId\",\n  scope: [\"scope\"]\n)",
-        "frameLines": 7
-      }
-    },
-    "shares.get": {
-      "typescript": {
-        "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.shares.get({\n  tenantId: \"tenantId\",\n  shareId: \"shareId\"\n});",
-        "frameLines": 7
-      },
-      "python": {
-        "status": "available",
-        "source": "from cloudpdf import CloudPDFClient\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n    base_url=\"https://yourhost.com/path/to/api\",\n)\n\nclient.shares.get(\n    tenant_id=\"tenantId\",\n    share_id=\"shareId\",\n)",
-        "frameLines": 7
-      },
-      "php": {
-        "status": "available",
-        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n    options: ['baseUrl' => 'https://yourhost.com/path/to/api'],\n);\n\n$client->shares->get(\n    'tenantId',\n    'shareId',\n);",
-        "frameLines": 7
-      },
-      "csharp": {
-        "status": "available",
-        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\",\n    new ClientOptions { BaseUrl = \"https://yourhost.com/path/to/api\" }\n);\n\nawait client.Shares.GetAsync(new GetSharesRequest { TenantId = \"tenantId\", ShareId = \"shareId\" });",
-        "frameLines": 7
-      },
-      "go": {
-        "status": "available",
-        "source": "import (\n    \"context\"\n\n    cloudpdf \"github.com/embedpdf/cloudpdf-sdk-go/v3\"\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n    option.WithBaseURL(\"https://yourhost.com/path/to/api\"),\n)\n\nrequest := &cloudpdf.GetSharesRequest{\n    TenantID: \"tenantId\",\n    ShareID: \"shareId\",\n}\nclient.Shares.Get(\n    context.TODO(),\n    request,\n)",
-        "frameLines": 13
-      },
-      "java": {
-        "status": "available",
-        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .url(\"https://yourhost.com/path/to/api\")\n    .build();\n\nclient.shares().get(\n    \"tenantId\",\n    \"shareId\",\n    GetSharesRequest\n        .builder()\n        .build()\n);",
-        "frameLines": 8
-      },
-      "ruby": {
-        "status": "available",
-        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.shares.get(\n  tenant_id: \"tenantId\",\n  share_id: \"shareId\"\n)",
-        "frameLines": 7
-      }
-    },
-    "shares.update": {
-      "typescript": {
-        "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.shares.update({\n  tenantId: \"tenantId\",\n  shareId: \"shareId\"\n});",
-        "frameLines": 7
-      },
-      "python": {
-        "status": "available",
-        "source": "from cloudpdf import CloudPDFClient\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n    base_url=\"https://yourhost.com/path/to/api\",\n)\n\nclient.shares.update(\n    tenant_id=\"tenantId\",\n    share_id=\"shareId\",\n)",
-        "frameLines": 7
-      },
-      "php": {
-        "status": "available",
-        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n    options: ['baseUrl' => 'https://yourhost.com/path/to/api'],\n);\n\n$client->shares->update(\n    'tenantId',\n    'shareId',\n    new SharesUpdateRequest([]),\n);",
-        "frameLines": 7
-      },
-      "csharp": {
-        "status": "available",
-        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\",\n    new ClientOptions { BaseUrl = \"https://yourhost.com/path/to/api\" }\n);\n\nawait client.Shares.UpdateAsync(\n    new SharesUpdateRequest { TenantId = \"tenantId\", ShareId = \"shareId\" }\n);",
-        "frameLines": 7
-      },
-      "go": {
-        "status": "available",
-        "source": "import (\n    \"context\"\n\n    cloudpdf \"github.com/embedpdf/cloudpdf-sdk-go/v3\"\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n    option.WithBaseURL(\"https://yourhost.com/path/to/api\"),\n)\n\nrequest := &cloudpdf.SharesUpdateRequest{\n    TenantID: \"tenantId\",\n    ShareID: \"shareId\",\n}\nclient.Shares.Update(\n    context.TODO(),\n    request,\n)",
-        "frameLines": 13
-      },
-      "java": {
-        "status": "available",
-        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .url(\"https://yourhost.com/path/to/api\")\n    .build();\n\nclient.shares().update(\n    \"tenantId\",\n    \"shareId\",\n    SharesUpdateRequest\n        .builder()\n        .build()\n);",
-        "frameLines": 8
-      },
-      "ruby": {
-        "status": "available",
-        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.shares.update(\n  tenant_id: \"tenantId\",\n  share_id: \"shareId\"\n)",
-        "frameLines": 7
-      }
-    },
-    "shares.delete": {
-      "typescript": {
-        "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.shares.delete({\n  tenantId: \"tenantId\",\n  shareId: \"shareId\"\n});",
-        "frameLines": 7
-      },
-      "python": {
-        "status": "available",
-        "source": "from cloudpdf import CloudPDFClient\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n    base_url=\"https://yourhost.com/path/to/api\",\n)\n\nclient.shares.delete(\n    tenant_id=\"tenantId\",\n    share_id=\"shareId\",\n)",
-        "frameLines": 7
-      },
-      "php": {
-        "status": "available",
-        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n    options: ['baseUrl' => 'https://yourhost.com/path/to/api'],\n);\n\n$client->shares->delete(\n    'tenantId',\n    'shareId',\n);",
-        "frameLines": 7
-      },
-      "csharp": {
-        "status": "available",
-        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\",\n    new ClientOptions { BaseUrl = \"https://yourhost.com/path/to/api\" }\n);\n\nawait client.Shares.DeleteAsync(\n    new DeleteSharesRequest { TenantId = \"tenantId\", ShareId = \"shareId\" }\n);",
-        "frameLines": 7
-      },
-      "go": {
-        "status": "available",
-        "source": "import (\n    \"context\"\n\n    cloudpdf \"github.com/embedpdf/cloudpdf-sdk-go/v3\"\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n    option.WithBaseURL(\"https://yourhost.com/path/to/api\"),\n)\n\nrequest := &cloudpdf.DeleteSharesRequest{\n    TenantID: \"tenantId\",\n    ShareID: \"shareId\",\n}\nclient.Shares.Delete(\n    context.TODO(),\n    request,\n)",
-        "frameLines": 13
-      },
-      "java": {
-        "status": "available",
-        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .url(\"https://yourhost.com/path/to/api\")\n    .build();\n\nclient.shares().delete(\n    \"tenantId\",\n    \"shareId\",\n    DeleteSharesRequest\n        .builder()\n        .build()\n);",
-        "frameLines": 8
-      },
-      "ruby": {
-        "status": "available",
-        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.shares.delete(\n  tenant_id: \"tenantId\",\n  share_id: \"shareId\"\n)",
-        "frameLines": 7
-      }
-    },
-    "shares.archive": {
-      "typescript": {
-        "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.shares.archive({\n  tenantId: \"tenantId\",\n  shareId: \"shareId\"\n});",
-        "frameLines": 7
-      },
-      "python": {
-        "status": "available",
-        "source": "from cloudpdf import CloudPDFClient\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n    base_url=\"https://yourhost.com/path/to/api\",\n)\n\nclient.shares.archive(\n    tenant_id=\"tenantId\",\n    share_id=\"shareId\",\n)",
-        "frameLines": 7
-      },
-      "php": {
-        "status": "available",
-        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n    options: ['baseUrl' => 'https://yourhost.com/path/to/api'],\n);\n\n$client->shares->archive(\n    'tenantId',\n    'shareId',\n);",
-        "frameLines": 7
-      },
-      "csharp": {
-        "status": "available",
-        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\",\n    new ClientOptions { BaseUrl = \"https://yourhost.com/path/to/api\" }\n);\n\nawait client.Shares.ArchiveAsync(\n    new ArchiveSharesRequest { TenantId = \"tenantId\", ShareId = \"shareId\" }\n);",
-        "frameLines": 7
-      },
-      "go": {
-        "status": "available",
-        "source": "import (\n    \"context\"\n\n    cloudpdf \"github.com/embedpdf/cloudpdf-sdk-go/v3\"\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n    option.WithBaseURL(\"https://yourhost.com/path/to/api\"),\n)\n\nrequest := &cloudpdf.ArchiveSharesRequest{\n    TenantID: \"tenantId\",\n    ShareID: \"shareId\",\n}\nclient.Shares.Archive(\n    context.TODO(),\n    request,\n)",
-        "frameLines": 13
-      },
-      "java": {
-        "status": "available",
-        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .url(\"https://yourhost.com/path/to/api\")\n    .build();\n\nclient.shares().archive(\n    \"tenantId\",\n    \"shareId\",\n    ArchiveSharesRequest\n        .builder()\n        .build()\n);",
-        "frameLines": 8
-      },
-      "ruby": {
-        "status": "available",
-        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.shares.archive(\n  tenant_id: \"tenantId\",\n  share_id: \"shareId\"\n)",
-        "frameLines": 7
-      }
-    },
-    "shares.visitors.list": {
-      "typescript": {
-        "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.shares.visitors.list({\n  tenantId: \"tenantId\",\n  shareId: \"shareId\"\n});",
-        "frameLines": 7
-      },
-      "python": {
-        "status": "available",
-        "source": "from cloudpdf import CloudPDFClient\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n    base_url=\"https://yourhost.com/path/to/api\",\n)\n\nclient.shares.visitors.list(\n    tenant_id=\"tenantId\",\n    share_id=\"shareId\",\n)",
-        "frameLines": 7
-      },
-      "php": {
-        "status": "available",
-        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n    options: ['baseUrl' => 'https://yourhost.com/path/to/api'],\n);\n\n$client->shares->visitors->list(\n    'tenantId',\n    'shareId',\n    new ListVisitorsRequest([]),\n);",
-        "frameLines": 7
-      },
-      "csharp": {
-        "status": "available",
-        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\",\n    new ClientOptions { BaseUrl = \"https://yourhost.com/path/to/api\" }\n);\n\nawait client.Shares.Visitors.ListAsync(\n    new ListVisitorsRequest { TenantId = \"tenantId\", ShareId = \"shareId\" }\n);",
-        "frameLines": 7
-      },
-      "go": {
-        "status": "available",
-        "source": "import (\n    \"context\"\n\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n    option.WithBaseURL(\"https://yourhost.com/path/to/api\"),\n)\n\nrequest := &shares.ListVisitorsRequest{\n    TenantID: \"tenantId\",\n    ShareID: \"shareId\",\n}\nclient.Shares.Visitors.List(\n    context.TODO(),\n    request,\n)",
-        "frameLines": 12
-      },
-      "java": {
-        "status": "available",
-        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .url(\"https://yourhost.com/path/to/api\")\n    .build();\n\nclient.shares().visitors().list(\n    \"tenantId\",\n    \"shareId\",\n    ListVisitorsRequest\n        .builder()\n        .build()\n);",
-        "frameLines": 8
-      },
-      "ruby": {
-        "status": "available",
-        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.shares.visitors.list(\n  tenant_id: \"tenantId\",\n  share_id: \"shareId\"\n)",
-        "frameLines": 7
-      }
-    },
-    "shares.visitors.delete": {
-      "typescript": {
-        "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.shares.visitors.delete({\n  tenantId: \"tenantId\",\n  shareId: \"shareId\",\n  visitorId: \"visitorId\"\n});",
-        "frameLines": 7
-      },
-      "python": {
-        "status": "available",
-        "source": "from cloudpdf import CloudPDFClient\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n    base_url=\"https://yourhost.com/path/to/api\",\n)\n\nclient.shares.visitors.delete(\n    tenant_id=\"tenantId\",\n    share_id=\"shareId\",\n    visitor_id=\"visitorId\",\n)",
-        "frameLines": 7
-      },
-      "php": {
-        "status": "available",
-        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n    options: ['baseUrl' => 'https://yourhost.com/path/to/api'],\n);\n\n$client->shares->visitors->delete(\n    'tenantId',\n    'shareId',\n    'visitorId',\n);",
-        "frameLines": 7
-      },
-      "csharp": {
-        "status": "available",
-        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\",\n    new ClientOptions { BaseUrl = \"https://yourhost.com/path/to/api\" }\n);\n\nawait client.Shares.Visitors.DeleteAsync(\n    new DeleteVisitorsRequest\n    {\n        TenantId = \"tenantId\",\n        ShareId = \"shareId\",\n        VisitorId = \"visitorId\",\n    }\n);",
-        "frameLines": 7
-      },
-      "go": {
-        "status": "available",
-        "source": "import (\n    \"context\"\n\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n    option.WithBaseURL(\"https://yourhost.com/path/to/api\"),\n)\n\nrequest := &shares.DeleteVisitorsRequest{\n    TenantID: \"tenantId\",\n    ShareID: \"shareId\",\n    VisitorID: \"visitorId\",\n}\nclient.Shares.Visitors.Delete(\n    context.TODO(),\n    request,\n)",
-        "frameLines": 12
-      },
-      "java": {
-        "status": "available",
-        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .url(\"https://yourhost.com/path/to/api\")\n    .build();\n\nclient.shares().visitors().delete(\n    \"tenantId\",\n    \"shareId\",\n    \"visitorId\",\n    DeleteVisitorsRequest\n        .builder()\n        .build()\n);",
-        "frameLines": 8
-      },
-      "ruby": {
-        "status": "available",
-        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.shares.visitors.delete(\n  tenant_id: \"tenantId\",\n  share_id: \"shareId\",\n  visitor_id: \"visitorId\"\n)",
         "frameLines": 7
       }
     },

@@ -452,8 +452,8 @@ await client.doc.text({
 </dl>
 </details>
 
-## Shares
-<details><summary><code>client.shares.<a href="/src/api/resources/shares/client/Client.ts">exchange</a>({ ...params }) -> CloudPDF.SharesExchange200Response</code></summary>
+## Grants
+<details><summary><code>client.grants.<a href="/src/api/resources/grants/client/Client.ts">exchange</a>({ ...params }) -> CloudPDF.GrantsExchange200Response</code></summary>
 <dl>
 <dd>
 
@@ -465,7 +465,7 @@ await client.doc.text({
 <dl>
 <dd>
 
-Unauthenticated, but requires a browser Origin header, checked against the grant allowlist. Unknown, revoked, and disabled tokens are indistinguishable (404). Passphrase-protected grants return 422 SharePasswordRequired until `password` is supplied. A link that asks its visitors who they are on open returns 422 VisitorIdentityRequired until the required answers are given; `error.details` carries `fields` (what the link asks), `missing`, `invalid`, `purpose` and `privacyUrl`. A link that asks before the first change issues the session at once with `visitor.identityRequest`, and writes answer 403 VisitorIdentityRequired with the same details until the visitor exchanges again with their answers. Answers that can not be taken answer 422 on any link. Mounted only when the deployment can sign (HS256 mode).
+Unauthenticated, but requires a browser Origin header, checked against the grant allowlist. Unknown, deleted, paused and archived grants are indistinguishable (404). Passphrase-protected grants return 422 GrantPassphraseRequired until `passphrase` is supplied. A grant that asks its visitors who they are on open returns 422 VisitorIdentityRequired until the required answers are given; `error.details` carries `fields` (what the grant asks), `missing`, `invalid`, `purpose` and `privacyUrl`. A grant that asks before the first change issues the session at once with `visitor.identityRequest`, and writes answer 403 VisitorIdentityRequired with the same details until the visitor exchanges again with their answers. Answers that can not be taken answer 422 on any grant. Mounted only when the deployment can sign (HS256 mode).
 </dd>
 </dl>
 </dd>
@@ -480,8 +480,8 @@ Unauthenticated, but requires a browser Origin header, checked against the grant
 <dd>
 
 ```typescript
-await client.shares.exchange({
-    shareToken: "shareToken"
+await client.grants.exchange({
+    grant: "grant"
 });
 
 ```
@@ -498,7 +498,7 @@ await client.shares.exchange({
 <dl>
 <dd>
 
-**request:** `CloudPDF.SharesExchangeRequest` 
+**request:** `CloudPDF.GrantsExchangeRequest` 
     
 </dd>
 </dl>
@@ -506,7 +506,7 @@ await client.shares.exchange({
 <dl>
 <dd>
 
-**requestOptions:** `SharesClient.RequestOptions` 
+**requestOptions:** `GrantsClient.RequestOptions` 
     
 </dd>
 </dl>
@@ -518,7 +518,7 @@ await client.shares.exchange({
 </dl>
 </details>
 
-<details><summary><code>client.shares.<a href="/src/api/resources/shares/client/Client.ts">list</a>({ ...params }) -> CloudPDF.SharesList200Response</code></summary>
+<details><summary><code>client.grants.<a href="/src/api/resources/grants/client/Client.ts">list</a>({ ...params }) -> CloudPDF.GrantsList200Response</code></summary>
 <dl>
 <dd>
 
@@ -531,7 +531,7 @@ await client.shares.exchange({
 <dd>
 
 ```typescript
-await client.shares.list({
+await client.grants.list({
     tenantId: "tenantId"
 });
 
@@ -549,7 +549,7 @@ await client.shares.list({
 <dl>
 <dd>
 
-**request:** `CloudPDF.ListSharesRequest` 
+**request:** `CloudPDF.ListGrantsRequest` 
     
 </dd>
 </dl>
@@ -557,7 +557,7 @@ await client.shares.list({
 <dl>
 <dd>
 
-**requestOptions:** `SharesClient.RequestOptions` 
+**requestOptions:** `GrantsClient.RequestOptions` 
     
 </dd>
 </dl>
@@ -569,7 +569,7 @@ await client.shares.list({
 </dl>
 </details>
 
-<details><summary><code>client.shares.<a href="/src/api/resources/shares/client/Client.ts">create</a>({ ...params }) -> CloudPDF.SharesCreate200Response</code></summary>
+<details><summary><code>client.grants.<a href="/src/api/resources/grants/client/Client.ts">create</a>({ ...params }) -> CloudPDF.GrantsCreate200Response</code></summary>
 <dl>
 <dd>
 
@@ -581,7 +581,7 @@ await client.shares.list({
 <dl>
 <dd>
 
-The returned share id is the public share token. Mounted only when the deployment can sign (HS256 mode) — exchange mints session JWTs, so grants exist only where minting does.
+The returned id is what a link page or an embed opens. Mounted only when the deployment can sign (HS256 mode) — exchange mints session JWTs, so grants exist only where minting does.
 </dd>
 </dl>
 </dd>
@@ -596,7 +596,7 @@ The returned share id is the public share token. Mounted only when the deploymen
 <dd>
 
 ```typescript
-await client.shares.create({
+await client.grants.create({
     tenantId: "tenantId",
     docId: "docId",
     scope: ["scope"]
@@ -616,7 +616,7 @@ await client.shares.create({
 <dl>
 <dd>
 
-**request:** `CloudPDF.SharesCreateRequest` 
+**request:** `CloudPDF.GrantsCreateRequest` 
     
 </dd>
 </dl>
@@ -624,7 +624,7 @@ await client.shares.create({
 <dl>
 <dd>
 
-**requestOptions:** `SharesClient.RequestOptions` 
+**requestOptions:** `GrantsClient.RequestOptions` 
     
 </dd>
 </dl>
@@ -636,7 +636,7 @@ await client.shares.create({
 </dl>
 </details>
 
-<details><summary><code>client.shares.<a href="/src/api/resources/shares/client/Client.ts">get</a>({ ...params }) -> CloudPDF.SharesGet200Response</code></summary>
+<details><summary><code>client.grants.<a href="/src/api/resources/grants/client/Client.ts">get</a>({ ...params }) -> CloudPDF.GrantsGet200Response</code></summary>
 <dl>
 <dd>
 
@@ -649,9 +649,9 @@ await client.shares.create({
 <dd>
 
 ```typescript
-await client.shares.get({
+await client.grants.get({
     tenantId: "tenantId",
-    shareId: "shareId"
+    grantId: "grantId"
 });
 
 ```
@@ -668,7 +668,7 @@ await client.shares.get({
 <dl>
 <dd>
 
-**request:** `CloudPDF.GetSharesRequest` 
+**request:** `CloudPDF.GetGrantsRequest` 
     
 </dd>
 </dl>
@@ -676,7 +676,7 @@ await client.shares.get({
 <dl>
 <dd>
 
-**requestOptions:** `SharesClient.RequestOptions` 
+**requestOptions:** `GrantsClient.RequestOptions` 
     
 </dd>
 </dl>
@@ -688,7 +688,7 @@ await client.shares.get({
 </dl>
 </details>
 
-<details><summary><code>client.shares.<a href="/src/api/resources/shares/client/Client.ts">delete</a>({ ...params }) -> void</code></summary>
+<details><summary><code>client.grants.<a href="/src/api/resources/grants/client/Client.ts">delete</a>({ ...params }) -> void</code></summary>
 <dl>
 <dd>
 
@@ -701,9 +701,9 @@ await client.shares.get({
 <dd>
 
 ```typescript
-await client.shares.delete({
+await client.grants.delete({
     tenantId: "tenantId",
-    shareId: "shareId"
+    grantId: "grantId"
 });
 
 ```
@@ -720,7 +720,7 @@ await client.shares.delete({
 <dl>
 <dd>
 
-**request:** `CloudPDF.DeleteSharesRequest` 
+**request:** `CloudPDF.DeleteGrantsRequest` 
     
 </dd>
 </dl>
@@ -728,7 +728,7 @@ await client.shares.delete({
 <dl>
 <dd>
 
-**requestOptions:** `SharesClient.RequestOptions` 
+**requestOptions:** `GrantsClient.RequestOptions` 
     
 </dd>
 </dl>
@@ -740,7 +740,7 @@ await client.shares.delete({
 </dl>
 </details>
 
-<details><summary><code>client.shares.<a href="/src/api/resources/shares/client/Client.ts">update</a>({ ...params }) -> CloudPDF.SharesUpdate200Response</code></summary>
+<details><summary><code>client.grants.<a href="/src/api/resources/grants/client/Client.ts">update</a>({ ...params }) -> CloudPDF.GrantsUpdate200Response</code></summary>
 <dl>
 <dd>
 
@@ -753,9 +753,9 @@ await client.shares.delete({
 <dd>
 
 ```typescript
-await client.shares.update({
+await client.grants.update({
     tenantId: "tenantId",
-    shareId: "shareId"
+    grantId: "grantId"
 });
 
 ```
@@ -772,7 +772,7 @@ await client.shares.update({
 <dl>
 <dd>
 
-**request:** `CloudPDF.SharesUpdateRequest` 
+**request:** `CloudPDF.GrantsUpdateRequest` 
     
 </dd>
 </dl>
@@ -780,7 +780,7 @@ await client.shares.update({
 <dl>
 <dd>
 
-**requestOptions:** `SharesClient.RequestOptions` 
+**requestOptions:** `GrantsClient.RequestOptions` 
     
 </dd>
 </dl>
@@ -792,7 +792,7 @@ await client.shares.update({
 </dl>
 </details>
 
-<details><summary><code>client.shares.<a href="/src/api/resources/shares/client/Client.ts">archive</a>({ ...params }) -> CloudPDF.SharesArchive200Response</code></summary>
+<details><summary><code>client.grants.<a href="/src/api/resources/grants/client/Client.ts">archive</a>({ ...params }) -> CloudPDF.GrantsArchive200Response</code></summary>
 <dl>
 <dd>
 
@@ -804,7 +804,7 @@ await client.shares.update({
 <dl>
 <dd>
 
-Archiving is final: an archived link never exchanges again, and to share again you create a new link. Pausing (`disabled`) is the reversible stop. An archived link no longer counts as using its shared layer, so that layer can be deleted.
+Archiving is final: an archived grant never exchanges again, and to give access again you create a new grant. Pausing (`disabled`) is the reversible stop. An archived grant no longer counts as using its shared layer, so that layer can be deleted.
 </dd>
 </dl>
 </dd>
@@ -819,9 +819,9 @@ Archiving is final: an archived link never exchanges again, and to share again y
 <dd>
 
 ```typescript
-await client.shares.archive({
+await client.grants.archive({
     tenantId: "tenantId",
-    shareId: "shareId"
+    grantId: "grantId"
 });
 
 ```
@@ -838,7 +838,7 @@ await client.shares.archive({
 <dl>
 <dd>
 
-**request:** `CloudPDF.ArchiveSharesRequest` 
+**request:** `CloudPDF.ArchiveGrantsRequest` 
     
 </dd>
 </dl>
@@ -846,7 +846,7 @@ await client.shares.archive({
 <dl>
 <dd>
 
-**requestOptions:** `SharesClient.RequestOptions` 
+**requestOptions:** `GrantsClient.RequestOptions` 
     
 </dd>
 </dl>
@@ -1203,7 +1203,7 @@ await client.tenants.suspend({
 <dl>
 <dd>
 
-Facts only — no limits or billing state. Views count share exchanges plus authorized /v1/access grants, deduplicated across the two.
+Facts only — no limits or billing state. Views count grant exchanges plus authorized /v1/access requests, deduplicated across the two.
 </dd>
 </dl>
 </dd>
@@ -2007,7 +2007,7 @@ await client.folders.get({
 <dl>
 <dd>
 
-Without recursive, a folder with anything inside is refused: 409 Conflict with `details.reason` `not-empty` and what it holds, counted over every level below, in `details.folders` and `details.documents`. With recursive=true, the folder and every folder under it go at once, and every document in them stops opening, leaves every list and stops answering its share links at once; their stored files and links are removed in the background. Uploads into those folders that have not committed cannot commit.
+Without recursive, a folder with anything inside is refused: 409 Conflict with `details.reason` `not-empty` and what it holds, counted over every level below, in `details.folders` and `details.documents`. With recursive=true, the folder and every folder under it go at once, and every document in them stops opening, leaves every list and stops answering its grants at once; their stored files and grants are removed in the background. Uploads into those folders that have not committed cannot commit.
 </dd>
 </dl>
 </dd>
@@ -4872,8 +4872,8 @@ await client.documents.layers.delete({
 </dl>
 </details>
 
-## Shares Visitors
-<details><summary><code>client.shares.visitors.<a href="/src/api/resources/shares/resources/visitors/client/Client.ts">list</a>({ ...params }) -> CloudPDF.SharesVisitorsList200Response</code></summary>
+## Grants Visitors
+<details><summary><code>client.grants.visitors.<a href="/src/api/resources/grants/resources/visitors/client/Client.ts">list</a>({ ...params }) -> CloudPDF.GrantsVisitorsList200Response</code></summary>
 <dl>
 <dd>
 
@@ -4885,7 +4885,7 @@ await client.documents.layers.delete({
 <dl>
 <dd>
 
-An archived link's visitors are listed too.
+An archived grant's visitors are listed too.
 </dd>
 </dl>
 </dd>
@@ -4900,9 +4900,9 @@ An archived link's visitors are listed too.
 <dd>
 
 ```typescript
-await client.shares.visitors.list({
+await client.grants.visitors.list({
     tenantId: "tenantId",
-    shareId: "shareId"
+    grantId: "grantId"
 });
 
 ```
@@ -4919,7 +4919,7 @@ await client.shares.visitors.list({
 <dl>
 <dd>
 
-**request:** `CloudPDF.shares.ListVisitorsRequest` 
+**request:** `CloudPDF.grants.ListVisitorsRequest` 
     
 </dd>
 </dl>
@@ -4939,7 +4939,7 @@ await client.shares.visitors.list({
 </dl>
 </details>
 
-<details><summary><code>client.shares.visitors.<a href="/src/api/resources/shares/resources/visitors/client/Client.ts">delete</a>({ ...params }) -> void</code></summary>
+<details><summary><code>client.grants.visitors.<a href="/src/api/resources/grants/resources/visitors/client/Client.ts">delete</a>({ ...params }) -> void</code></summary>
 <dl>
 <dd>
 
@@ -4966,9 +4966,9 @@ Their handle brings them back as a new visitor, who is asked again. Deleting a v
 <dd>
 
 ```typescript
-await client.shares.visitors.delete({
+await client.grants.visitors.delete({
     tenantId: "tenantId",
-    shareId: "shareId",
+    grantId: "grantId",
     visitorId: "visitorId"
 });
 
@@ -4986,7 +4986,7 @@ await client.shares.visitors.delete({
 <dl>
 <dd>
 
-**request:** `CloudPDF.shares.DeleteVisitorsRequest` 
+**request:** `CloudPDF.grants.DeleteVisitorsRequest` 
     
 </dd>
 </dl>

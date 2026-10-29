@@ -4,7 +4,7 @@ import { DeploymentClient } from "./api/resources/deployment/client/Client.js";
 import { DocClient } from "./api/resources/doc/client/Client.js";
 import { DocumentsClient } from "./api/resources/documents/client/Client.js";
 import { FoldersClient } from "./api/resources/folders/client/Client.js";
-import { SharesClient } from "./api/resources/shares/client/Client.js";
+import { GrantsClient } from "./api/resources/grants/client/Client.js";
 import { TenantsClient } from "./api/resources/tenants/client/Client.js";
 import { TokensClient } from "./api/resources/tokens/client/Client.js";
 import type { BaseClientOptions, BaseRequestOptions } from "./BaseClient.js";
@@ -21,7 +21,7 @@ export class CloudPDFClient {
     protected readonly _options: NormalizedClientOptionsWithAuth<CloudPDFClient.Options>;
     protected _deployment: DeploymentClient | undefined;
     protected _doc: DocClient | undefined;
-    protected _shares: SharesClient | undefined;
+    protected _grants: GrantsClient | undefined;
     protected _tenants: TenantsClient | undefined;
     protected _documents: DocumentsClient | undefined;
     protected _folders: FoldersClient | undefined;
@@ -39,8 +39,8 @@ export class CloudPDFClient {
         return (this._doc ??= new DocClient(this._options));
     }
 
-    public get shares(): SharesClient {
-        return (this._shares ??= new SharesClient(this._options));
+    public get grants(): GrantsClient {
+        return (this._grants ??= new GrantsClient(this._options));
     }
 
     public get tenants(): TenantsClient {

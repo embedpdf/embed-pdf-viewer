@@ -7,6 +7,6 @@ export default {
   documents: 'Tenant documents',
   folders: 'Folders',
   tokens: 'Tokens',
-  shares: 'Shares',
+  grants: 'Grants',
   'document-operations': 'Document operations',
 };

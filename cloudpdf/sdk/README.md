@@ -45,8 +45,8 @@ Instantiate and use the client with the following:
 import { CloudPDFClient } from "@cloudpdf/sdk";
 
 const client = new CloudPDFClient({ baseUrl: "YOUR_BASE_URL", token: "YOUR_TOKEN" });
-await client.shares.exchange({
-    shareToken: "shareToken"
+await client.grants.exchange({
+    grant: "grant"
 });
 ```
 
@@ -72,7 +72,7 @@ will be thrown.
 import { CloudPDFError } from "@cloudpdf/sdk";
 
 try {
-    await client.shares.exchange(...);
+    await client.grants.exchange(...);
 } catch (err) {
     if (err instanceof CloudPDFError) {
         console.log(err.statusCode);
@@ -520,7 +520,7 @@ const client = new CloudPDFClient({
     }
 });
 
-const response = await client.shares.exchange(..., {
+const response = await client.grants.exchange(..., {
     headers: {
         'X-Custom-Header': 'custom value'
     }
@@ -532,7 +532,7 @@ const response = await client.shares.exchange(..., {
 If you would like to send additional query string parameters as part of the request, use the `queryParams` request option.
 
 ```typescript
-const response = await client.shares.exchange(..., {
+const response = await client.grants.exchange(..., {
     queryParams: {
         'customQueryParamKey': 'custom query param value'
     }
@@ -562,7 +562,7 @@ Which status codes are retried depends on the `retryStatusCodes` generator confi
 Use the `maxRetries` request option to configure this behavior.
 
 ```typescript
-const response = await client.shares.exchange(..., {
+const response = await client.grants.exchange(..., {
     maxRetries: 0 // override maxRetries at the request level
 });
 ```
@@ -572,7 +572,7 @@ const response = await client.shares.exchange(..., {
 The SDK defaults to a 60 second timeout. Use the `timeoutInSeconds` option to configure this behavior.
 
 ```typescript
-const response = await client.shares.exchange(..., {
+const response = await client.grants.exchange(..., {
     timeoutInSeconds: 30 // override timeout to 30s
 });
 ```
@@ -583,7 +583,7 @@ The SDK allows users to abort requests at any point by passing in an abort signa
 
 ```typescript
 const controller = new AbortController();
-const response = await client.shares.exchange(..., {
+const response = await client.grants.exchange(..., {
     abortSignal: controller.signal
 });
 controller.abort(); // aborts the request
@@ -595,7 +595,7 @@ The SDK provides access to raw response data, including headers, through the `.w
 The `.withRawResponse()` method returns a promise that results to an object with a `data` and a `rawResponse` property.
 
 ```typescript
-const { data, rawResponse } = await client.shares.exchange(...).withRawResponse();
+const { data, rawResponse } = await client.grants.exchange(...).withRawResponse();
 
 console.log(data);
 console.log(rawResponse.headers['X-My-Header']);

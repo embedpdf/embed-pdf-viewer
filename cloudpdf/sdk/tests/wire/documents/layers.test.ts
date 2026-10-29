@@ -14,7 +14,7 @@ describe("LayersClient", () => {
                 {
                     docId: "docId",
                     layerName: "layerName",
-                    shareId: "shareId",
+                    grantId: "grantId",
                     visitorId: "visitorId",
                     storageSizeBytes: 1.1,
                     createdAt: 1.1,

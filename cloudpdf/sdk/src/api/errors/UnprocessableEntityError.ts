@@ -5,9 +5,9 @@ import * as errors from "../../errors/index.js";
 import type * as CloudPDF from "../index.js";
 
 export class UnprocessableEntityError extends errors.CloudPDFError {
-    public declare readonly body: CloudPDF.SharesExchange422Response;
+    public declare readonly body: CloudPDF.GrantsExchange422Response;
 
-    constructor(body: CloudPDF.SharesExchange422Response, rawResponse?: core.RawResponse) {
+    constructor(body: CloudPDF.GrantsExchange422Response, rawResponse?: core.RawResponse) {
         super({
             message: "UnprocessableEntityError",
             statusCode: 422,
