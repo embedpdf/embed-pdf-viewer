@@ -7,6 +7,8 @@ import type {
   DocumentPdfOpenedAs,
   DocumentState,
 } from '../schema';
+import { nameKeyOf } from '../names';
+import { isForeignKeyViolation } from '../foreignKeyViolation';
 import { isUniqueViolation } from '../uniqueViolation';
 
 export type DocumentListSort = 'createdAt' | 'name' | 'size';
@@ -24,6 +26,8 @@ export interface DocumentListOptions {
   state?: DocumentState;
   /** Only names containing this text, compared through {@link nameKeyOf}. */
   nameContains?: string;
+  /** Only documents directly in this folder; `null` is the top level. Without it, every folder. */
+  folderId?: string | null;
   sort?: DocumentListSort;
   /** Defaults to `desc`; the route resolves the reading order per sort. */
   order?: ListOrder;
@@ -48,6 +52,8 @@ export interface DocumentRow {
   id: string;
   tenantId: string;
   name: string;
+  /** Null at the top level. */
+  folderId: string | null;
   state: DocumentState;
   baseSha: string | null;
   storageSizeBytes: number | null;
@@ -73,6 +79,8 @@ export interface CreatePendingInput {
   id: string;
   tenantId: string;
   name: string;
+  /** Null (the default) files the document at the top level. */
+  folderId?: string | null;
   metadata: Record<string, unknown> | null;
   idempotencyKey: string | null;
   createdBy: string | null;
@@ -126,6 +134,7 @@ export class DocumentsRepo {
           tenant_id: input.tenantId,
           name: input.name,
           name_key: nameKeyOf(input.name),
+          folder_id: input.folderId ?? null,
           state: 'pending',
           base_sha: null,
           storage_size_bytes: null,
@@ -155,6 +164,10 @@ export class DocumentsRepo {
       if (input.idempotencyKey && isUniqueViolation(err)) {
         const existing = await this.findByIdempotencyKey(input.tenantId, input.idempotencyKey);
         if (existing) return { row: existing, created: false };
+      }
+      // The folder was checked, then deleted before the insert landed.
+      if (input.folderId && isForeignKeyViolation(err)) {
+        throwError('NotFound', `folder not found: ${input.folderId}`);
       }
       if (isUniqueViolation(err)) {
         // The remaining unique surface is the primary key: the caller
@@ -278,6 +291,12 @@ export class DocumentsRepo {
       .orderBy(sortKey, order)
       .orderBy('id', order);
     q = opts.state ? q.where('state', '=', opts.state) : q.where('state', '!=', 'deleting');
+    if (opts.folderId !== undefined) {
+      q =
+        opts.folderId === null
+          ? q.where('folder_id', 'is', null)
+          : q.where('folder_id', '=', opts.folderId);
+    }
     if (opts.nameContains !== undefined) {
       const pattern = `%${escapeLikePattern(nameKeyOf(opts.nameContains))}%`;
       q = q.where(sql<boolean>`name_key like ${pattern} escape '\\'`);
@@ -294,6 +313,35 @@ export class DocumentsRepo {
     if (opts.limit) q = q.limit(opts.limit);
     const rows = await q.execute();
     return rows.map(mapRow);
+  }
+
+  /** Of `ids`, those that exist in the tenant and are not being deleted. */
+  async listMovableIds(tenantId: string, ids: ReadonlyArray<string>): Promise<string[]> {
+    if (ids.length === 0) return [];
+    const rows = await this.db
+      .selectFrom('documents')
+      .select('id')
+      .where('tenant_id', '=', tenantId)
+      .where('id', 'in', [...ids])
+      .where('state', '!=', 'deleting')
+      .execute();
+    return rows.map((row) => row.id);
+  }
+
+  /** File documents in a folder (`null`: the top level). The caller checks the folder. */
+  async moveToFolder(
+    tenantId: string,
+    ids: ReadonlyArray<string>,
+    folderId: string | null,
+  ): Promise<void> {
+    if (ids.length === 0) return;
+    await this.db
+      .updateTable('documents')
+      .set({ folder_id: folderId, updated_at: Date.now() })
+      .where('tenant_id', '=', tenantId)
+      .where('id', 'in', [...ids])
+      .where('state', '!=', 'deleting')
+      .execute();
   }
 
   /** Rename a document that is not being deleted. Returns `null` when no such row. */
@@ -382,7 +430,8 @@ export class DocumentsRepo {
   async beginDelete(id: string, tenantId: string): Promise<DocumentRow | null> {
     const res = await this.db
       .updateTable('documents')
-      .set({ state: 'deleting', updated_at: Date.now() })
+      // A document being deleted is in no folder, so it never keeps one from being deleted.
+      .set({ state: 'deleting', folder_id: null, updated_at: Date.now() })
       .where('id', '=', id)
       .where('tenant_id', '=', tenantId)
       .where('state', 'in', ['pending', 'ready', 'failed'])
@@ -420,6 +469,7 @@ function mapRow(r: {
   id: string;
   tenant_id: string;
   name: string;
+  folder_id?: string | null;
   state: DocumentState;
   base_sha: string | null;
   storage_size_bytes: number | null;
@@ -448,6 +498,7 @@ function mapRow(r: {
     id: r.id,
     tenantId: r.tenant_id,
     name: r.name,
+    folderId: r.folder_id ?? null,
     state: r.state,
     baseSha: r.base_sha,
     storageSizeBytes: r.storage_size_bytes,
@@ -480,15 +531,6 @@ function mapRow(r: {
     updatedAt: r.updated_at,
     createdBy: r.created_by,
   };
-}
-
-/**
- * The form of a name that search and the name sort compare: NFC, then
- * lowercased. Folding here rather than with SQL `lower()` keeps both
- * dialects in agreement, since SQLite's `lower()` folds ASCII only.
- */
-export function nameKeyOf(name: string): string {
-  return name.normalize('NFC').toLowerCase();
 }
 
 /** The value a row sorts by, matching {@link DocumentsRepo.listForTenant}'s order. */

@@ -9,6 +9,8 @@ export namespace DocumentsCommit200Response {
         id: string;
         tenantId: string;
         name: string;
+        /** The folder the document is in, or root. */
+        folderId: string;
         state: Document.State;
         baseSha: string | null;
         storageSizeBytes: number | null;

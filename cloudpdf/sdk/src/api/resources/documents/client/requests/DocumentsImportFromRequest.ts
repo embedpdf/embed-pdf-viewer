@@ -20,6 +20,8 @@ export interface DocumentsImportFromRequest {
     expected?: DocumentsImportFromRequest.Expected;
     /** What people call the document: shown in dashboards, searched and sorted by. 1 to 255 characters, no control characters, no leading or trailing whitespace. Names need not be unique. */
     name?: string;
+    /** A folder id, or root for the top level. */
+    folderId?: string;
     metadata?: Record<string, unknown>;
     /** Retrying with the same key resumes the same document rather than importing a second copy — including after a 502. */
     idempotencyKey?: string;

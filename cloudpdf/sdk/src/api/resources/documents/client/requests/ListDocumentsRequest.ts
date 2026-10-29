@@ -16,6 +16,8 @@ export interface ListDocumentsRequest {
     state?: CloudPDF.ListDocumentsRequestState;
     /** Only documents whose name contains this text, ignoring case. */
     q?: string;
+    /** Only documents directly in this folder (root: the top level). Without it, documents in every folder. */
+    folderId?: string;
     /** createdAt (default), name (ignoring case), or size (stored bytes; 0 while pending). */
     sort?: CloudPDF.ListDocumentsRequestSort;
     /** Defaults to the reading order of the sort: A to Z for name, newest and largest first otherwise. */

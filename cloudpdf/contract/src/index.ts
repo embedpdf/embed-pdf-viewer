@@ -104,6 +104,11 @@ export const adminWirePaths = {
   /** The warmed dashboard-tile artifact. Returns 404 while `pending`/`locked`. */
   documentThumbnail: (tenantId: string, docId: string) =>
     `/v1/tenants/${encodeURIComponent(tenantId)}/documents/${encodeURIComponent(docId)}/thumbnail`,
+  folders: (tenantId: string) => `/v1/tenants/${encodeURIComponent(tenantId)}/folders`,
+  folder: (tenantId: string, folderId: string) =>
+    `/v1/tenants/${encodeURIComponent(tenantId)}/folders/${encodeURIComponent(folderId)}`,
+  folderMoveInto: (tenantId: string, folderId: string) =>
+    `/v1/tenants/${encodeURIComponent(tenantId)}/folders/${encodeURIComponent(folderId)}/move-into`,
   tokenIssue: (tenantId: string) => `/v1/tenants/${encodeURIComponent(tenantId)}/tokens`,
   tokenRevoke: (tenantId: string, jti: string) =>
     `/v1/tenants/${encodeURIComponent(tenantId)}/tokens/${encodeURIComponent(jti)}/revoke`,
@@ -137,7 +142,7 @@ export const DocumentStateSchema = z.enum(['pending', 'ready', 'failed', 'deleti
 export type DocumentState = z.infer<typeof DocumentStateSchema>;
 
 /** Any text a person can read: no control characters, no leading or trailing whitespace. */
-const documentNamePattern =
+const readableNamePattern =
   // eslint-disable-next-line no-control-regex -- excluding control characters is its job
   /^[^\s\u0000-\u001F\u007F](?:[^\u0000-\u001F\u007F]*[^\s\u0000-\u001F\u007F])?$/u;
 
@@ -145,15 +150,34 @@ export const DocumentNameSchema = z
   .string()
   .min(1)
   .max(255)
-  .regex(documentNamePattern)
+  .regex(readableNamePattern)
   .describe(
     'What people call the document: shown in dashboards, searched and sorted by. 1 to 255 characters, no control characters, no leading or trailing whitespace. Names need not be unique.',
+  );
+
+const folderIdPattern = /^fld_[0-9a-f]{24}$/;
+/** A folder id, or `root` for the top level, which has no folder of its own. */
+const folderPlacePattern = /^(root|fld_[0-9a-f]{24})$/;
+
+export const FolderPlaceSchema = z
+  .string()
+  .regex(folderPlacePattern)
+  .describe('A folder id, or root for the top level.');
+
+export const FolderNameSchema = z
+  .string()
+  .min(1)
+  .max(255)
+  .regex(readableNamePattern)
+  .describe(
+    "What people call the folder: 1 to 255 characters, no control characters, no leading or trailing whitespace, and unique among the folder's siblings, ignoring case.",
   );
 
 export const AdminDocumentRecordSchema = z.object({
   id: z.string(),
   tenantId: z.string(),
   name: z.string(),
+  folderId: z.string().describe('The folder the document is in, or root.'),
   state: DocumentStateSchema,
   baseSha: z.string().nullable(),
   storageSizeBytes: z.number().nullable(),
@@ -174,6 +198,8 @@ export const AdminDocumentInitRequestSchema = z.object({
   contentSha256: z.string().regex(sha256Hex),
   /** Defaults to the document id. */
   name: DocumentNameSchema.optional(),
+  /** Defaults to root. */
+  folderId: FolderPlaceSchema.optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
   idempotencyKey: z.string().optional(),
   dedupMode: DedupModeSchema.optional(),
@@ -338,6 +364,8 @@ export const AdminDocumentImportRequestSchema = z.object({
     ),
   /** Defaults to the document id. */
   name: DocumentNameSchema.optional(),
+  /** Defaults to root. */
+  folderId: FolderPlaceSchema.optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
   idempotencyKey: z
     .string()
@@ -427,6 +455,9 @@ export const AdminDocumentListQuerySchema = z.object({
     .max(255)
     .describe('Only documents whose name contains this text, ignoring case.')
     .optional(),
+  folderId: FolderPlaceSchema.describe(
+    'Only documents directly in this folder (root: the top level). Without it, documents in every folder.',
+  ).optional(),
   sort: DocumentListSortSchema.default('createdAt'),
   order: ListOrderSchema.optional(),
 });
@@ -442,6 +473,74 @@ export const AdminDocumentListResponseSchema = z.object({
   nextCursor: z.string().nullable().optional(),
 });
 export type AdminDocumentListResponse = z.infer<typeof AdminDocumentListResponseSchema>;
+
+export const FolderRecordSchema = z.object({
+  id: z.string(),
+  tenantId: z.string(),
+  parentId: z.string().describe('The folder it is in, or root.'),
+  name: z.string(),
+  createdAt: z.number(),
+  updatedAt: z.number(),
+  createdBy: z.string().nullable(),
+});
+export type FolderRecord = z.infer<typeof FolderRecordSchema>;
+
+export const FolderResponseSchema = z.object({
+  folder: FolderRecordSchema,
+});
+export type FolderResponse = z.infer<typeof FolderResponseSchema>;
+
+export const FolderGetResponseSchema = z.object({
+  folder: FolderRecordSchema,
+  path: z
+    .array(z.object({ id: z.string(), name: z.string() }))
+    .describe(
+      'The folders above this one, from the top level down. Neither root nor the folder itself.',
+    ),
+});
+export type FolderGetResponse = z.infer<typeof FolderGetResponseSchema>;
+
+export const FolderCreateRequestSchema = z.object({
+  name: FolderNameSchema,
+  /** Defaults to root. */
+  parentId: FolderPlaceSchema.optional(),
+});
+export type FolderCreateRequest = z.infer<typeof FolderCreateRequestSchema>;
+
+export const FolderUpdateRequestSchema = z.object({
+  name: FolderNameSchema,
+});
+export type FolderUpdateRequest = z.infer<typeof FolderUpdateRequestSchema>;
+
+/** Query parameters for `folders.list`, which orders folders by name. */
+export const FolderListQuerySchema = z.object({
+  limit: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(ADMIN_DOCUMENT_LIST_MAX_LIMIT)
+    .default(ADMIN_DOCUMENT_LIST_DEFAULT_LIMIT),
+  cursor: z.string().min(1).optional(),
+  parentId: FolderPlaceSchema.describe(
+    'Only the folders directly in this folder (root: the top level). Without it, every folder.',
+  ).optional(),
+});
+export type FolderListQuery = z.infer<typeof FolderListQuerySchema>;
+
+export const FolderListResponseSchema = z.object({
+  folders: z.array(FolderRecordSchema),
+  /** Opaque cursor for the next page; `null` on the last page. */
+  nextCursor: z.string().nullable(),
+});
+export type FolderListResponse = z.infer<typeof FolderListResponseSchema>;
+
+export const FOLDER_MOVE_MAX_IDS = 1000;
+
+export const FolderMoveIntoRequestSchema = z.object({
+  documentIds: z.array(z.string().regex(docIdPattern)).max(FOLDER_MOVE_MAX_IDS).optional(),
+  folderIds: z.array(z.string().regex(folderIdPattern)).max(FOLDER_MOVE_MAX_IDS).optional(),
+});
+export type FolderMoveIntoRequest = z.infer<typeof FolderMoveIntoRequestSchema>;
 
 export const AdminUploadProxyResponseSchema = z.object({
   sha256: z.string().regex(sha256Hex),
@@ -484,6 +583,19 @@ export const AdminTenantDocParamsSchema = z.object({
   id: z.string().regex(docIdPattern),
 });
 export type AdminTenantDocParams = z.infer<typeof AdminTenantDocParamsSchema>;
+
+export const AdminTenantFolderParamsSchema = z.object({
+  tenantId: z.string().regex(tenantIdPattern),
+  folderId: z.string().regex(folderIdPattern),
+});
+export type AdminTenantFolderParams = z.infer<typeof AdminTenantFolderParamsSchema>;
+
+/** A destination: any folder, or root. */
+export const AdminTenantFolderPlaceParamsSchema = z.object({
+  tenantId: z.string().regex(tenantIdPattern),
+  folderId: FolderPlaceSchema,
+});
+export type AdminTenantFolderPlaceParams = z.infer<typeof AdminTenantFolderPlaceParamsSchema>;
 
 export const AdminTenantDocLayerParamsSchema = AdminTenantDocParamsSchema.extend({
   layerName: z.string().min(1).max(256),
@@ -1491,6 +1603,118 @@ export const adminOperations = {
       200: { contentType: ['image/webp', 'image/png'] },
       404: { contentType: 'application/json', schema: AdminThumbnailUnavailablePayloadSchema },
     },
+  },
+  'folders.create': {
+    operationId: 'folders.create',
+    title: 'Create folder',
+    summary: 'Create a folder at the top level or inside another folder.',
+    method: 'POST',
+    path: '/v1/tenants/:tenantId/folders',
+    credentials: ['api-token', 'tenant-jwt'],
+    scope: ['docs.create'],
+    params: AdminTenantParamsSchema,
+    body: { contentType: 'application/json', schema: FolderCreateRequestSchema },
+    responses: {
+      200: { contentType: 'application/json', schema: FolderResponseSchema },
+      400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      403: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      409: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+    },
+    notes:
+      '409 Conflict carries `details.reason`: `name-taken` (a sibling has the name, ignoring case; `details.name`) or `too-deep` (folders nest at most 100 levels; `details.maxDepth`). 404 when the parent folder does not exist.',
+  },
+  'folders.list': {
+    operationId: 'folders.list',
+    title: 'List folders',
+    summary:
+      'List folders by name, cursor-paginated: every folder, or those directly in one folder.',
+    method: 'GET',
+    path: '/v1/tenants/:tenantId/folders',
+    credentials: ['api-token', 'tenant-jwt'],
+    scope: ['docs.read'],
+    params: AdminTenantParamsSchema,
+    query: FolderListQuerySchema,
+    responses: {
+      200: { contentType: 'application/json', schema: FolderListResponseSchema },
+      400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      403: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+    },
+  },
+  'folders.get': {
+    operationId: 'folders.get',
+    title: 'Get folder',
+    summary: 'Fetch one folder and the folders above it.',
+    method: 'GET',
+    path: '/v1/tenants/:tenantId/folders/:folderId',
+    credentials: ['api-token', 'tenant-jwt'],
+    scope: ['docs.read'],
+    params: AdminTenantFolderParamsSchema,
+    responses: {
+      200: { contentType: 'application/json', schema: FolderGetResponseSchema },
+      403: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+    },
+  },
+  'folders.update': {
+    operationId: 'folders.update',
+    title: 'Update folder',
+    summary: 'Rename a folder.',
+    method: 'PATCH',
+    path: '/v1/tenants/:tenantId/folders/:folderId',
+    credentials: ['api-token', 'tenant-jwt'],
+    scope: ['docs.update'],
+    params: AdminTenantFolderParamsSchema,
+    body: { contentType: 'application/json', schema: FolderUpdateRequestSchema },
+    responses: {
+      200: { contentType: 'application/json', schema: FolderResponseSchema },
+      400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      403: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      409: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+    },
+    notes:
+      '409 Conflict with `details.reason` `name-taken` when a sibling has the name, ignoring case.',
+  },
+  'folders.moveInto': {
+    operationId: 'folders.moveInto',
+    title: 'Move into folder',
+    summary:
+      'Move documents and folders into a folder, or to the top level with root. All of them move, or none do.',
+    method: 'POST',
+    path: '/v1/tenants/:tenantId/folders/:folderId/move-into',
+    credentials: ['api-token', 'tenant-jwt'],
+    scope: ['docs.update'],
+    params: AdminTenantFolderPlaceParamsSchema,
+    body: { contentType: 'application/json', schema: FolderMoveIntoRequestSchema },
+    responses: {
+      204: {},
+      400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      403: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      409: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+    },
+    notes:
+      "Up to 1,000 ids in total. A folder moves with everything in it. 404 NotFound names the ids that do not exist or are being deleted in `details.documentIds` and `details.folderIds`. 409 Conflict carries `details.reason`: `cycle` (the destination is a moved folder or inside one; `details.folderId`), `too-deep` (the move would nest folders deeper than 100 levels; `details.maxDepth`) or `name-taken` (a moved folder's name is taken in the destination, ignoring case; `details.name`).",
+  },
+  'folders.delete': {
+    operationId: 'folders.delete',
+    title: 'Delete folder',
+    summary: 'Delete an empty folder.',
+    method: 'DELETE',
+    path: '/v1/tenants/:tenantId/folders/:folderId',
+    credentials: ['api-token', 'tenant-jwt'],
+    scope: ['docs.delete'],
+    params: AdminTenantFolderParamsSchema,
+    responses: {
+      204: {},
+      403: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      409: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+    },
+    notes:
+      '409 Conflict with `details.reason` `not-empty` when anything is inside, counted over every level below in `details.folders` and `details.documents`.',
   },
   'deployment.licenseStatus': {
     operationId: 'deployment.licenseStatus',
@@ -2829,6 +3053,7 @@ export const docsGroups = {
   tenants: { title: 'Tenants' },
   documents: { title: 'Tenant documents' },
   'documents.layers': { title: 'Layers' },
+  folders: { title: 'Folders' },
   tokens: { title: 'Tokens' },
   shares: { title: 'Shares' },
   'shares.visitors': { title: 'Visitors' },

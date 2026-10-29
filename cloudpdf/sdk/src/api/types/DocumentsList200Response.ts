@@ -13,6 +13,8 @@ export namespace DocumentsList200Response {
             id: string;
             tenantId: string;
             name: string;
+            /** The folder the document is in, or root. */
+            folderId: string;
             state: Item.State;
             baseSha: string | null;
             storageSizeBytes: number | null;

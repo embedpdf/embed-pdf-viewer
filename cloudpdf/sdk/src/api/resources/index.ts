@@ -4,6 +4,8 @@ export * as doc from "./doc/index.js";
 export * from "./documents/client/requests/index.js";
 export * as documents from "./documents/index.js";
 export * from "./documents/types/index.js";
+export * from "./folders/client/requests/index.js";
+export * as folders from "./folders/index.js";
 export * from "./shares/client/requests/index.js";
 export * as shares from "./shares/index.js";
 export * from "./tenants/client/requests/index.js";

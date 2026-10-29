@@ -41,6 +41,7 @@ class DocumentsAdapter {
         tenantId: this.tenantId,
         source: input.bytes,
         name: input['name'] as string | undefined,
+        folderId: input['folderId'] as string | undefined,
         metadata: input['metadata'] as Record<string, unknown> | undefined,
         idempotencyKey: input['idempotencyKey'] as string | undefined,
         dedupMode: input['dedupMode'] as 'always-create' | 'reuse-existing' | undefined,
@@ -114,6 +115,41 @@ class DocumentsAdapter {
   }
 }
 
+class FoldersAdapter {
+  constructor(
+    private readonly client: CloudPDFClient,
+    private readonly tenantId: string,
+  ) {}
+
+  async create(input: { name: string; parentId?: string }): Promise<any> {
+    return (await call(this.client.folders.create({ tenantId: this.tenantId, ...input }))).folder;
+  }
+
+  list(options: Record<string, unknown> = {}): Promise<any> {
+    return call(this.client.folders.list({ tenantId: this.tenantId, ...options } as never));
+  }
+
+  get(folderId: string): Promise<any> {
+    return call(this.client.folders.get({ tenantId: this.tenantId, folderId }));
+  }
+
+  async rename(folderId: string, name: string): Promise<any> {
+    return (await call(this.client.folders.update({ tenantId: this.tenantId, folderId, name })))
+      .folder;
+  }
+
+  async moveInto(
+    folderId: string,
+    input: { documentIds?: string[]; folderIds?: string[] },
+  ): Promise<void> {
+    await call(this.client.folders.moveInto({ tenantId: this.tenantId, folderId, ...input }));
+  }
+
+  async delete(folderId: string): Promise<void> {
+    await call(this.client.folders.delete({ tenantId: this.tenantId, folderId }));
+  }
+}
+
 class TokensAdapter {
   constructor(
     private readonly client: CloudPDFClient,
@@ -145,10 +181,12 @@ class TokensAdapter {
 
 class TenantAdapter {
   readonly documents: DocumentsAdapter;
+  readonly folders: FoldersAdapter;
   readonly tokens: TokensAdapter;
 
   constructor(client: CloudPDFClient, tenantId: string) {
     this.documents = new DocumentsAdapter(client, tenantId);
+    this.folders = new FoldersAdapter(client, tenantId);
     this.tokens = new TokensAdapter(client, tenantId);
   }
 }

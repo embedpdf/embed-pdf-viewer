@@ -52,12 +52,13 @@ export class DocumentsClient {
         request: CloudPDF.ListDocumentsRequest,
         requestOptions?: DocumentsClient.RequestOptions,
     ): Promise<core.WithRawResponse<CloudPDF.DocumentsList200Response>> {
-        const { tenantId, limit, cursor, state, q, sort, order } = request;
+        const { tenantId, limit, cursor, state, q, folderId, sort, order } = request;
         const _queryParams: Record<string, unknown> = {
             limit,
             cursor,
             state: state != null ? state : undefined,
             q,
+            folderId,
             sort: sort != null ? sort : undefined,
             order: order != null ? order : undefined,
         };

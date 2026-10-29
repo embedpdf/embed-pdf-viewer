@@ -39,6 +39,7 @@ import { BaseVersionsRepo } from '../db/repos/base_versions.repo';
 import { DocumentImportsRepo } from '../db/repos/document_imports.repo';
 import { DocumentSigningsRepo } from '../db/repos/document_signings.repo';
 import { DocumentsRepo } from '../db/repos/documents.repo';
+import { FoldersRepo } from '../db/repos/folders.repo';
 import { DocumentPagesRepo, LayerPagesRepo, LayersRepo } from '../db/repos/page_state.repo';
 import { PdfPasswordSessionsRepo } from '../db/repos/pdf_password_sessions.repo';
 import { PdfPasswordVerificationsRepo } from '../db/repos/pdf_password_verifications.repo';
@@ -61,6 +62,7 @@ import { SharpImageEncoder } from '../render/SharpImageEncoder';
 import { IMMUTABLE_CACHE_PRIVATE, IMMUTABLE_CACHE_SHARED } from '../routes/_helpers';
 import { registerAccessRoutes } from '../routes/access';
 import { registerAdminDocumentsRoutes } from '../routes/admin/documents';
+import { registerAdminFoldersRoutes } from '../routes/admin/folders';
 import { registerAdminLayersRoutes } from '../routes/admin/layers';
 import { registerAdminSharesRoutes } from '../routes/admin/shares';
 import { registerAdminTenantsRoutes } from '../routes/admin/tenants';
@@ -101,6 +103,7 @@ import {
   DocumentLifecycleService,
   type UploadProxyPolicy,
 } from '../services/DocumentLifecycleService';
+import { FolderService } from '../services/FolderService';
 import { DocumentSecurityProbe } from '../services/DocumentSecurityProbe';
 import { DocumentService } from '../services/DocumentService';
 import { EventLogService } from '../services/EventLogService';
@@ -1098,6 +1101,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
     lifecycle = new DocumentLifecycleService({
       documents: new DocumentsRepo(opts.db),
       tenants: new TenantsRepo(opts.db),
+      folders: new FoldersRepo(opts.db),
       storage: opts.objectStore,
       autoProvisionTenant: opts.autoProvisionTenant ?? false,
       uploadProxyPolicy: opts.uploadProxyPolicy ?? 'fallback-only',
@@ -1121,6 +1125,13 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
     await registerAdminDocumentsRoutes(app, {
       lifecycle,
       storage: opts.objectStore,
+    });
+    await registerAdminFoldersRoutes(app, {
+      folders: new FolderService({
+        db: opts.db,
+        tenants: new TenantsRepo(opts.db),
+        autoProvisionTenant: opts.autoProvisionTenant ?? false,
+      }),
     });
     const storedLayers = {
       db: opts.db,
@@ -1584,10 +1595,21 @@ export function handleAppError(err: unknown, req: FastifyRequest, reply: Fastify
     });
     return;
   }
-  const e = err as Error & { code?: string; status?: number; statusCode?: number };
+  const e = err as Error & {
+    code?: string;
+    status?: number;
+    statusCode?: number;
+    details?: Record<string, unknown>;
+  };
   if (e.status && typeof e.status === 'number') {
     logHandledServerError(req, e, e.status);
-    reply.code(e.status).send({ error: { code: e.code ?? 'Unknown', message: e.message } });
+    reply.code(e.status).send({
+      error: {
+        code: e.code ?? 'Unknown',
+        message: e.message,
+        ...(e.details ? { details: e.details } : {}),
+      },
+    });
     return;
   }
   // Fastify's own errors (body parsing, payload limits, validation) carry

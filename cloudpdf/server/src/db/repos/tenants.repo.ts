@@ -163,6 +163,7 @@ export class TenantsRepo {
       .execute();
     await this.db.deleteFrom('revoked_jtis').where('tenant_id', '=', tenantId).execute();
     await this.db.deleteFrom('documents').where('tenant_id', '=', tenantId).execute();
+    await this.db.deleteFrom('folders').where('tenant_id', '=', tenantId).execute();
     await this.db.deleteFrom('tenants').where('id', '=', tenantId).execute();
 
     return existing !== null;

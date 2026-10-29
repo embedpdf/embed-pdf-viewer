@@ -17,6 +17,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
 import { decodeSortedListCursor, encodeSortedListCursor } from './_cursor';
 import { formatIssues } from './_issues';
+import { folderIdOfPlace, placeOfFolderId, ROOT_PLACE } from './_place';
 import { requireTenantAccess } from '../../app/jwt-plugin';
 import { listPositionOf } from '../../db/repos/documents.repo';
 import type { DocumentLifecycleService } from '../../services/DocumentLifecycleService';
@@ -83,6 +84,7 @@ export async function registerAdminDocumentsRoutes(
       contentLength: body.contentLength,
       contentSha256: body.contentSha256,
       name: body.name,
+      folderId: folderIdOfPlace(body.folderId ?? ROOT_PLACE),
       metadata: body.metadata ?? null,
       idempotencyKey: body.idempotencyKey ?? null,
       dedupMode: body.dedupMode,
@@ -169,6 +171,7 @@ export async function registerAdminDocumentsRoutes(
       source: body.source,
       expected: body.expected ?? null,
       name: body.name,
+      folderId: folderIdOfPlace(body.folderId ?? ROOT_PLACE),
       metadata: body.metadata ?? null,
       idempotencyKey: body.idempotencyKey ?? null,
       dedupMode: body.dedupMode,
@@ -188,7 +191,7 @@ export async function registerAdminDocumentsRoutes(
     if (!parsed.success) {
       throw makeError('InvalidArg', 400, formatIssues(parsed.error.issues));
     }
-    const { limit, cursor, state, q, sort } = parsed.data;
+    const { limit, cursor, state, q, sort, folderId } = parsed.data;
     const order = parsed.data.order ?? readingOrderOf(sort);
     const after =
       cursor === undefined
@@ -204,6 +207,7 @@ export async function registerAdminDocumentsRoutes(
       limit: limit + 1,
       state,
       nameContains: q,
+      folderId: folderId === undefined ? undefined : folderIdOfPlace(folderId),
       sort,
       order,
       after,
@@ -343,6 +347,7 @@ function docPublic(d: {
   id: string;
   tenantId: string;
   name: string;
+  folderId: string | null;
   state: string;
   baseSha: string | null;
   storageSizeBytes: number | null;
@@ -359,6 +364,7 @@ function docPublic(d: {
     id: d.id,
     tenantId: d.tenantId,
     name: d.name,
+    folderId: placeOfFolderId(d.folderId),
     state: d.state,
     baseSha: d.baseSha,
     storageSizeBytes: d.storageSizeBytes,

@@ -35,6 +35,70 @@ async function sqliteHasTable(db: Kysely<Schema>, name: string): Promise<boolean
 }
 
 describe('migrateDown [sqlite]', () => {
+  test('rolling back 046 rebuilds documents with every row and index, and drops folders', async () => {
+    const db = createSqliteDb({ path: ':memory:' });
+    try {
+      const source = { kind: 'inline' as const, migrations: sqliteMigrations };
+      await migrate(db, { source });
+      expect(sqliteMigrations.at(-1)?.version).toBe('046');
+      await db.insertInto('tenants').values({ id: 'tenant-046', name: 'tenant-046' }).execute();
+      await db
+        .insertInto('folders')
+        .values({
+          id: 'fld_aaaaaaaaaaaaaaaaaaaaaaaa',
+          tenant_id: 'tenant-046',
+          parent_id: null,
+          name: 'Contracts',
+          name_key: 'contracts',
+          created_at: 1,
+          updated_at: 1,
+          created_by: null,
+        })
+        .execute();
+      await db
+        .insertInto('documents')
+        .values({
+          id: 'doc-046',
+          tenant_id: 'tenant-046',
+          state: 'ready',
+          name: 'Lease.pdf',
+          name_key: 'lease.pdf',
+          folder_id: 'fld_aaaaaaaaaaaaaaaaaaaaaaaa',
+          storage_size_bytes: 1234,
+          created_at: 1,
+          updated_at: 1,
+        } as never)
+        .execute();
+
+      const reverted = await migrateDown(db, { source, steps: 1 });
+      expect(reverted.map((m) => m.version)).toEqual(['046']);
+
+      const row = await sql<
+        Record<string, unknown>
+      >`SELECT * FROM documents WHERE id = 'doc-046'`.execute(db);
+      expect(row.rows[0]).toMatchObject({ name: 'Lease.pdf', storage_size_bytes: 1234 });
+      expect(row.rows[0]).not.toHaveProperty('folder_id');
+      expect(await sqliteHasTable(db, 'folders')).toBe(false);
+      const indexes = await sql<{ name: string }>`
+        SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'documents' AND sql IS NOT NULL
+      `.execute(db);
+      expect(indexes.rows.map((r) => r.name).sort()).toEqual([
+        'idx_documents_tenant_base_sha',
+        'idx_documents_tenant_created_id',
+        'idx_documents_tenant_name_key_id',
+        'idx_documents_tenant_size_id',
+        'idx_documents_tenant_state',
+        'uq_documents_tenant_idempotency',
+      ]);
+      expect((await sql`PRAGMA foreign_key_check`.execute(db)).rows).toEqual([]);
+
+      await migrate(db, { source });
+      expect(await sqliteHasTable(db, 'folders')).toBe(true);
+    } finally {
+      await db.destroy();
+    }
+  });
+
   test('migration 045 names existing documents from their metadata, else their id', async () => {
     const db = createSqliteDb({ path: ':memory:' });
     try {
