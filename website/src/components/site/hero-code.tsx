@@ -2,6 +2,8 @@
 
 import { useState, type ReactNode } from 'react';
 
+import { applyInstallChannel } from '@embedpdf/docs-kit/mdx/install-channel';
+
 import { AngularIcon, CheckIcon, ReactIcon, SvelteIcon, VueIcon } from './icons';
 
 /**
@@ -81,7 +83,8 @@ import { PDFViewer } from '@embedpdf/viewer-vue';
         <span className="text-[0.5em] font-extrabold leading-none">JS</span>
       </span>
     ),
-    code: `<div id="viewer" style="height: 100vh"></div>
+    // The docs' release channel stamps the CDN URL, as it does on the docs pages.
+    code: applyInstallChannel(`<div id="viewer" style="height: 100vh"></div>
 
 <script type="module">
   import EmbedPDF from 'https://cdn.jsdelivr.net/npm/@embedpdf/viewer@3/dist/embedpdf.js';
@@ -90,7 +93,7 @@ import { PDFViewer } from '@embedpdf/viewer-vue';
     target: '#viewer',
     src: '/report.pdf',
   });
-</script>`,
+</script>`),
   },
 ];
 

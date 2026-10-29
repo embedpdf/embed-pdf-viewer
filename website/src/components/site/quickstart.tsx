@@ -4,6 +4,8 @@ import { RocketIcon } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { useState, type ReactNode } from 'react';
 
+import { applyInstallChannel } from '@embedpdf/docs-kit/mdx/install-channel';
+
 import { Eyebrow } from './eyebrow';
 import { AngularIcon, CheckIcon, JsMark, ReactIcon, SvelteIcon, VueIcon } from './icons';
 
@@ -42,7 +44,11 @@ const QS_SNIPPETS: { id: string; label: string; icon: ReactNode; lines: Token[] 
       [' EmbedPDF ', 'pun'],
       ['from', 'kw'],
       [' ', 'pun'],
-      ["'https://cdn.jsdelivr.net/npm/@embedpdf/viewer@3/dist/embedpdf.js'", 'str'],
+      // The docs' release channel stamps the CDN URL, as it does on the docs pages.
+      [
+        applyInstallChannel("'https://cdn.jsdelivr.net/npm/@embedpdf/viewer@3/dist/embedpdf.js'"),
+        'str',
+      ],
       [';', 'pun'],
       ['\n', ''],
       ['\n', ''],

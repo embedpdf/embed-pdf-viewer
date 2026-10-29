@@ -10,7 +10,10 @@ import {
   withCodePanelsCache,
 } from '@embedpdf/docs-kit/mdx/code-panels';
 import { remarkFrameworkNames } from '@embedpdf/docs-kit/mdx/frameworks';
-import { remarkInstallChannel } from '@embedpdf/docs-kit/mdx/install-channel';
+import {
+  remarkInstallChannel,
+  resolveInstallChannel,
+} from '@embedpdf/docs-kit/mdx/install-channel';
 
 import { DOCS_SITE } from './src/docs-site';
 import { docsRedirects } from '../docs/content/redirects.mjs';
@@ -96,6 +99,10 @@ const withNextra = nextra({
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // The home page's code cards (site/hero-code, site/quickstart) stamp the
+  // release channel in client components, so the browser gets this build's
+  // channel too and stamps what the server rendered.
+  env: { DOCS_INSTALL_CHANNEL: resolveInstallChannel() },
   // The docs pages that moved (docs/content/redirects.mjs).
   async redirects() {
     return docsRedirects(DOCS_SITE.engine);

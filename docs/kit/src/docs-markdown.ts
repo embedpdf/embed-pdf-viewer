@@ -236,9 +236,7 @@ function createResolver(
 
       if (node.type === 'mdxJsxFlowElement' || node.type === 'mdxJsxTextElement') {
         if (node.name === 'Engine') {
-          return engineFlavors(node).includes(site.engine)
-            ? resolveNodes(node.children ?? [])
-            : [];
+          return engineFlavors(node).includes(site.engine) ? resolveNodes(node.children ?? []) : [];
         }
 
         if (node.name === 'Fw') {
@@ -434,9 +432,9 @@ function yamlValue(value: string) {
   return JSON.stringify(value);
 }
 
-/** Stamp the release channel on every fenced block, matching the pages. */
+/** Stamp the release channel on every fenced block and inline code, matching the pages. */
 function applyInstallChannelToTree(node: AstNode): void {
-  if (node.type === 'code' && typeof node.value === 'string') {
+  if ((node.type === 'code' || node.type === 'inlineCode') && typeof node.value === 'string') {
     node.value = applyInstallChannel(node.value);
   }
   for (const child of node.children ?? []) applyInstallChannelToTree(child);

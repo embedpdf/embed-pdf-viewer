@@ -13,6 +13,10 @@ const viewerQuickStart = fs.readFileSync(
   path.resolve(process.cwd(), 'src/content/docs/viewer/quick-start.mdx'),
   'utf8',
 );
+const viewerMigrate = fs.readFileSync(
+  path.resolve(process.cwd(), 'src/content/docs/viewer/migrate.mdx'),
+  'utf8',
+);
 
 describe('renderDocsMarkdown', () => {
   afterEach(() => vi.unstubAllEnvs());
@@ -70,6 +74,22 @@ describe('renderDocsMarkdown', () => {
     expect(markdown).not.toContain('@embedpdf/viewer-react');
     expect(markdown).not.toContain('@embedpdf/viewer-angular');
     expect(markdown).not.toContain('<Snippet');
+  });
+
+  it('stamps the release channel on viewer CDN URLs, in snippets and table cells', () => {
+    vi.stubEnv('DOCS_INSTALL_CHANNEL', 'next');
+    const markdown = renderDocsMarkdown({
+      sourceCode: viewerMigrate,
+      canonicalPath: '/docs/viewer/vanilla/migrate',
+      integration: 'vanilla',
+    });
+
+    const stamped = 'https://cdn.jsdelivr.net/npm/@embedpdf/viewer@next/dist/embedpdf.js';
+    expect(markdown).toContain(`| \`${stamped}\` |`);
+    expect(markdown).toContain(`import EmbedPDF from '${stamped}';`);
+    expect(markdown).not.toContain('@embedpdf/viewer@3');
+    // The 2.x snippet is not the release train and stays as written.
+    expect(markdown).toContain('https://cdn.jsdelivr.net/npm/@embedpdf/snippet@2/dist/embedpdf.js');
   });
 
   it('shows a viewer page’s <Fw> branch on its own integration, plain HTML included', () => {

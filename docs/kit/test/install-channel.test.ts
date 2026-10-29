@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  applyInstallChannel,
-  remarkInstallChannel,
-} from '../mdx/install-channel.mjs';
+import { applyInstallChannel, remarkInstallChannel } from '../mdx/install-channel.mjs';
 
 describe('install-channel stamping', () => {
   it('tags every own-scope spec on an install line', () => {
@@ -70,6 +67,74 @@ describe('install-channel stamping', () => {
     );
   });
 
+  describe('CDN URLs', () => {
+    const viewer = 'https://cdn.jsdelivr.net/npm/@embedpdf/viewer@3/dist/embedpdf.js';
+    const cloud = 'https://cdn.jsdelivr.net/npm/@cloudpdf/viewer@3/dist/cloudpdf.js';
+
+    it("replaces the train's major with the channel, on any line", () => {
+      const code = [
+        `<script type="module">`,
+        `  import EmbedPDF from '${viewer}';`,
+        `  import CloudPDF from "${cloud}";`,
+        `</script>`,
+        `<script src="https://unpkg.com/@embedpdf/viewer@3/dist/embedpdf.js"></script>`,
+      ].join('\n');
+
+      expect(applyInstallChannel(code, 'next')).toBe(
+        [
+          `<script type="module">`,
+          `  import EmbedPDF from 'https://cdn.jsdelivr.net/npm/@embedpdf/viewer@next/dist/embedpdf.js';`,
+          `  import CloudPDF from "https://cdn.jsdelivr.net/npm/@cloudpdf/viewer@next/dist/cloudpdf.js";`,
+          `</script>`,
+          `<script src="https://unpkg.com/@embedpdf/viewer@next/dist/embedpdf.js"></script>`,
+        ].join('\n'),
+      );
+    });
+
+    it('stamps a URL with no path after the version', () => {
+      expect(
+        applyInstallChannel(`import 'https://cdn.jsdelivr.net/npm/@embedpdf/viewer@3';`, 'next'),
+      ).toBe(`import 'https://cdn.jsdelivr.net/npm/@embedpdf/viewer@next';`);
+    });
+
+    it('leaves an older major as written: the 2.x snippet is not the train', () => {
+      const v2 = 'https://cdn.jsdelivr.net/npm/@embedpdf/snippet@2/dist/embedpdf.js';
+      expect(applyInstallChannel(`| \`${v2}\` | \`${viewer}\` |`, 'next')).toBe(
+        `| \`${v2}\` | \`https://cdn.jsdelivr.net/npm/@embedpdf/viewer@next/dist/embedpdf.js\` |`,
+      );
+    });
+
+    it('leaves exact versions, other majors and tags alone', () => {
+      const code = [
+        'https://cdn.jsdelivr.net/npm/@embedpdf/viewer@3.0.0/dist/embedpdf.js',
+        'https://cdn.jsdelivr.net/npm/@embedpdf/viewer@3.0.0-next.4/dist/embedpdf.js',
+        'https://cdn.jsdelivr.net/npm/@embedpdf/viewer@30/dist/embedpdf.js',
+        'https://cdn.jsdelivr.net/npm/@embedpdf/viewer@beta/dist/embedpdf.js',
+      ].join('\n');
+      expect(applyInstallChannel(code, 'next')).toBe(code);
+    });
+
+    it('never touches foreign packages or other hosts', () => {
+      const code = [
+        'https://cdn.jsdelivr.net/npm/pdfjs-dist@3/build/pdf.mjs',
+        'https://cdn.jsdelivr.net/npm/@other/viewer@3/dist/viewer.js',
+        'https://example.com/npm/@embedpdf/viewer@3/dist/embedpdf.js',
+      ].join('\n');
+      expect(applyInstallChannel(code, 'next')).toBe(code);
+    });
+
+    it("channel 'latest' is the identity — the major already resolves to the release", () => {
+      expect(applyInstallChannel(`import EmbedPDF from '${viewer}';`, 'latest')).toBe(
+        `import EmbedPDF from '${viewer}';`,
+      );
+    });
+
+    it('is idempotent: a stamped URL stays as it is', () => {
+      const once = applyInstallChannel(`import EmbedPDF from '${viewer}';`, 'next');
+      expect(applyInstallChannel(once, 'next')).toBe(once);
+    });
+  });
+
   it('stamps fenced code nodes as a remark plugin', () => {
     const tree = {
       type: 'root',
@@ -81,12 +146,28 @@ describe('install-channel stamping', () => {
 
     remarkInstallChannel({ channel: 'next' })(tree);
 
-    expect((tree.children[0] as { value: string }).value).toBe(
-      'npm install @embedpdf/react@next',
-    );
+    expect((tree.children[0] as { value: string }).value).toBe('npm install @embedpdf/react@next');
     // Prose is not code; the plugin only visits code nodes.
     expect((tree.children[1].children?.[0] as { value: string }).value).toBe(
       'npm install @embedpdf/react',
     );
+  });
+
+  it('stamps inline code as a remark plugin: a CDN URL in a table cell', () => {
+    const url = 'https://cdn.jsdelivr.net/npm/@embedpdf/viewer@3/dist/embedpdf.js';
+    const tree = {
+      type: 'root',
+      children: [
+        { type: 'paragraph', children: [{ type: 'inlineCode', value: url }] },
+        { type: 'paragraph', children: [{ type: 'text', value: url }] },
+      ],
+    };
+
+    remarkInstallChannel({ channel: 'next' })(tree);
+
+    expect(tree.children[0].children[0].value).toBe(
+      'https://cdn.jsdelivr.net/npm/@embedpdf/viewer@next/dist/embedpdf.js',
+    );
+    expect(tree.children[1].children[0].value).toBe(url);
   });
 });
