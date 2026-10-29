@@ -1,5 +1,42 @@
 # @cloudpdf/contract
 
+## 3.0.0-next.18
+
+### Minor Changes
+
+- [#917](https://github.com/embedpdf/embed-pdf-viewer/pull/917) by [@bobsingor](https://github.com/bobsingor) – Add folders: `folders.create`, `folders.list`, `folders.get` (with the path
+  above the folder), `folders.update` to rename, `folders.moveInto` to move
+  documents and folders together, and `folders.delete` for empty folders. The
+  top level is the place `root`. Document records carry `folderId`;
+  `documents.init` and `documents.importFrom` take one, and `documents.list`
+  filters by it. Folder conflicts answer 409 with `details.reason`.
+
+- [#917](https://github.com/embedpdf/embed-pdf-viewer/pull/917) by [@bobsingor](https://github.com/bobsingor) – Documents have a `name`: set it with `documents.init` or `documents.import`
+  (it defaults to the document id) and change it with the new `documents.update`
+  operation, which needs the new `docs.update` tenant scope. `documents.list`
+  gains `q` to search names ignoring case, `sort` (`createdAt`, `name` or
+  `size`) and `order`, and no longer lists documents that are being deleted
+  unless `state=deleting` asks for them.
+
+- [#917](https://github.com/embedpdf/embed-pdf-viewer/pull/917) by [@bobsingor](https://github.com/bobsingor) – `folders.delete` takes `recursive=true` to delete a folder with everything in
+  it. Without it, a folder that holds anything is still refused.
+
+- [#917](https://github.com/embedpdf/embed-pdf-viewer/pull/917) by [@bobsingor](https://github.com/bobsingor) – Document operations accept tenant JWTs, which need the operation's document
+  capabilities exactly as a document JWT does; no tenant scope reaches inside a
+  document. A tenant token's `scope` now takes document capabilities next to
+  tenant scopes, and they hold for every document of the tenant.
+  `documents.download` needs `doc.download` and `documents.thumbnail` needs
+  `doc.render` instead of `docs.read`. `docs.update` renames and moves, and never
+  changes content.
+
+### Patch Changes
+
+- [#910](https://github.com/embedpdf/embed-pdf-viewer/pull/910) by [@bobsingor](https://github.com/bobsingor) – The `doc.versions.*` operations take the layer: their paths are `/v1/docs/:docId/layers/:layerName/versions…`. `doc.versions.list` answers `LayerVersions` (`{ baseSha, versions }`): the layer's base and its versions, the upload first.
+
+- [#909](https://github.com/embedpdf/embed-pdf-viewer/pull/909) by [@bobsingor](https://github.com/bobsingor) – Share links carry `identity` (who their visitors are, for a link made for one person) on the link record, `shares.create` and `shares.update`. `Identity` is a named component, shared with `tokens.issue`, so the SDKs have one type for it.
+
+- [#910](https://github.com/embedpdf/embed-pdf-viewer/pull/910) by [@bobsingor](https://github.com/bobsingor) – The signature notes describe the new rule. A signature is made over the layer's own base, and its new version is that layer's own: the document and every other layer stay as they were. `StaleBase` is no longer an error code.
+
 ## 3.0.0-next.17
 
 ### Minor Changes

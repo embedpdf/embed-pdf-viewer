@@ -1,5 +1,17 @@
 # @embedpdf/core
 
+## 3.0.0-next.18
+
+### Minor Changes
+
+- [#907](https://github.com/embedpdf/embed-pdf-viewer/pull/907) by [@bobsingor](https://github.com/bobsingor) – A ready document whose share link asks for a passphrase or answers it got after the document opened shows them as `shareRequest`, as a document waiting to open does, and `documents.retry(id, { sharePassword })` or `retry(id, { visitor })` lets it go on as the same visitor instead of opening it again.
+
+### Patch Changes
+
+- [#909](https://github.com/embedpdf/embed-pdf-viewer/pull/909) by [@bobsingor](https://github.com/bobsingor) – `documents.retry(id, { identity })` takes the visitor's answers to what a share link asks (was `{ visitor }`). They join who the page said the user is, the document's `identity` or else the viewer's, and the document opens again with that identity.
+
+- [#910](https://github.com/embedpdf/embed-pdf-viewer/pull/910) by [@bobsingor](https://github.com/bobsingor) – The `StaleBase` engine error is gone, and with it its `conflict` mapping: a signature moves only its own layer, so every layer can sign.
+
 ## 3.0.0-next.17
 
 ### Minor Changes

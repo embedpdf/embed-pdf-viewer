@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/viewer-svelte",
-  "version": "3.0.0-next.17",
+  "version": "3.0.0-next.18",
   "private": false,
   "description": "Svelte wrapper for the full viewer: the PDFViewer component around the embedpdf-viewer custom element. Your own components (ToolbarItem, Panel, Region) are light-DOM children the viewer shows in its slots while they stay in your Svelte tree (your context, your CSS). The viewer inside is the Preact-compiled artifact.",
   "type": "module",
