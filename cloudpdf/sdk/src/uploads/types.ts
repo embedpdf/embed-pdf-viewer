@@ -21,6 +21,10 @@ export type UploadSource = Uint8Array | ArrayBuffer | Blob | { path: string } | 
 export interface UploadCreateInput {
     tenantId: string;
     source: UploadSource;
+    /** Defaults to the document id. */
+    name?: string;
+    /** A folder id, or `root` (the default) for the top level. */
+    folderId?: string;
     metadata?: Record<string, unknown>;
     idempotencyKey?: string;
     dedupMode?: DedupMode;

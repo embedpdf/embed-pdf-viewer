@@ -1,3 +1,4 @@
+import type { DocCapability } from '@embedpdf/engine-core/runtime';
 import {
   ChangeRequestSchema,
   ChangeResponseSchema,
@@ -5,7 +6,6 @@ import {
   PageScaleResultSchema,
   PageMeasurementViewportListSchema,
 } from '@embedpdf/engine-core/wire';
-import type { DocCapability } from '@embedpdf/engine-core/runtime';
 import {
   AnnotationCreateResultSchema,
   AnnotationDeleteResultSchema,
@@ -80,6 +80,12 @@ const originPatternArray = z
 /** Share tokens are the grant row id: `shr_` + 24 url-safe random chars. */
 const shareTokenPattern = /^shr_[A-Za-z0-9_-]{24}$/;
 
+/** A query-string flag, `true` or `false`. */
+const queryFlag = z.preprocess(
+  (value) => (value === 'true' ? true : value === 'false' ? false : value),
+  z.boolean(),
+);
+
 /**
  * Wire paths. The URL carries the full resource identity — tenant
  * resources live under `/v1/tenants/{tenantId}/…` — and the auth model
@@ -104,6 +110,11 @@ export const adminWirePaths = {
   /** The warmed dashboard-tile artifact. Returns 404 while `pending`/`locked`. */
   documentThumbnail: (tenantId: string, docId: string) =>
     `/v1/tenants/${encodeURIComponent(tenantId)}/documents/${encodeURIComponent(docId)}/thumbnail`,
+  folders: (tenantId: string) => `/v1/tenants/${encodeURIComponent(tenantId)}/folders`,
+  folder: (tenantId: string, folderId: string) =>
+    `/v1/tenants/${encodeURIComponent(tenantId)}/folders/${encodeURIComponent(folderId)}`,
+  folderMoveInto: (tenantId: string, folderId: string) =>
+    `/v1/tenants/${encodeURIComponent(tenantId)}/folders/${encodeURIComponent(folderId)}/move-into`,
   tokenIssue: (tenantId: string) => `/v1/tenants/${encodeURIComponent(tenantId)}/tokens`,
   tokenRevoke: (tenantId: string, jti: string) =>
     `/v1/tenants/${encodeURIComponent(tenantId)}/tokens/${encodeURIComponent(jti)}/revoke`,
@@ -136,9 +147,43 @@ export type UploadPreference = z.infer<typeof UploadPreferenceSchema>;
 export const DocumentStateSchema = z.enum(['pending', 'ready', 'failed', 'deleting']);
 export type DocumentState = z.infer<typeof DocumentStateSchema>;
 
+/** Any text a person can read: no control characters, no leading or trailing whitespace. */
+const readableNamePattern =
+  // eslint-disable-next-line no-control-regex -- excluding control characters is its job
+  /^[^\s\u0000-\u001F\u007F](?:[^\u0000-\u001F\u007F]*[^\s\u0000-\u001F\u007F])?$/u;
+
+export const DocumentNameSchema = z
+  .string()
+  .min(1)
+  .max(255)
+  .regex(readableNamePattern)
+  .describe(
+    'What people call the document: shown in dashboards, searched and sorted by. 1 to 255 characters, no control characters, no leading or trailing whitespace. Names need not be unique.',
+  );
+
+const folderIdPattern = /^fld_[0-9a-f]{24}$/;
+/** A folder id, or `root` for the top level, which has no folder of its own. */
+const folderPlacePattern = /^(root|fld_[0-9a-f]{24})$/;
+
+export const FolderPlaceSchema = z
+  .string()
+  .regex(folderPlacePattern)
+  .describe('A folder id, or root for the top level.');
+
+export const FolderNameSchema = z
+  .string()
+  .min(1)
+  .max(255)
+  .regex(readableNamePattern)
+  .describe(
+    "What people call the folder: 1 to 255 characters, no control characters, no leading or trailing whitespace, and unique among the folder's siblings, ignoring case.",
+  );
+
 export const AdminDocumentRecordSchema = z.object({
   id: z.string(),
   tenantId: z.string(),
+  name: z.string(),
+  folderId: z.string().describe('The folder the document is in, or root.'),
   state: DocumentStateSchema,
   baseSha: z.string().nullable(),
   storageSizeBytes: z.number().nullable(),
@@ -157,6 +202,10 @@ export type AdminDocumentRecord = z.infer<typeof AdminDocumentRecordSchema>;
 export const AdminDocumentInitRequestSchema = z.object({
   contentLength: z.number().finite().min(1),
   contentSha256: z.string().regex(sha256Hex),
+  /** Defaults to the document id. */
+  name: DocumentNameSchema.optional(),
+  /** Defaults to root. */
+  folderId: FolderPlaceSchema.optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
   idempotencyKey: z.string().optional(),
   dedupMode: DedupModeSchema.optional(),
@@ -319,6 +368,10 @@ export const AdminDocumentImportRequestSchema = z.object({
     .describe(
       'Integrity pins, enforced when present. When absent, the server-observed values become authoritative.',
     ),
+  /** Defaults to the document id. */
+  name: DocumentNameSchema.optional(),
+  /** Defaults to root. */
+  folderId: FolderPlaceSchema.optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
   idempotencyKey: z
     .string()
@@ -364,14 +417,32 @@ export const AdminDocumentResponseSchema = z.object({
 });
 export type AdminDocumentResponse = z.infer<typeof AdminDocumentResponseSchema>;
 
+export const AdminDocumentUpdateRequestSchema = z.object({
+  name: DocumentNameSchema,
+});
+export type AdminDocumentUpdateRequest = z.infer<typeof AdminDocumentUpdateRequestSchema>;
+
 export const ADMIN_DOCUMENT_LIST_DEFAULT_LIMIT = 100;
 export const ADMIN_DOCUMENT_LIST_MAX_LIMIT = 200;
+
+export const DocumentListSortSchema = z
+  .enum(['createdAt', 'name', 'size'])
+  .describe('createdAt (default), name (ignoring case), or size (stored bytes; 0 while pending).');
+export type DocumentListSort = z.infer<typeof DocumentListSortSchema>;
+
+export const ListOrderSchema = z
+  .enum(['asc', 'desc'])
+  .describe(
+    'Defaults to the reading order of the sort: A to Z for name, newest and largest first otherwise.',
+  );
+export type ListOrder = z.infer<typeof ListOrderSchema>;
 
 /**
  * Query parameters for `documents.list`. `limit` arrives as a string on
  * the wire, hence the coercion; values outside [1, max] are a validation
  * error, not a silent clamp. `cursor` is an opaque continuation token
- * from a previous page's `nextCursor` — clients must not parse it.
+ * from a previous page's `nextCursor` — clients must not parse it, and it
+ * only continues the `sort` and `order` it was made with.
  */
 export const AdminDocumentListQuerySchema = z.object({
   limit: z.coerce
@@ -381,7 +452,20 @@ export const AdminDocumentListQuerySchema = z.object({
     .max(ADMIN_DOCUMENT_LIST_MAX_LIMIT)
     .default(ADMIN_DOCUMENT_LIST_DEFAULT_LIMIT),
   cursor: z.string().min(1).optional(),
-  state: DocumentStateSchema.optional(),
+  state: DocumentStateSchema.describe(
+    'Only documents in this state. Without it, every state except deleting.',
+  ).optional(),
+  q: z
+    .string()
+    .min(1)
+    .max(255)
+    .describe('Only documents whose name contains this text, ignoring case.')
+    .optional(),
+  folderId: FolderPlaceSchema.describe(
+    'Only documents directly in this folder (root: the top level). Without it, documents in every folder.',
+  ).optional(),
+  sort: DocumentListSortSchema.default('createdAt'),
+  order: ListOrderSchema.optional(),
 });
 export type AdminDocumentListQuery = z.infer<typeof AdminDocumentListQuerySchema>;
 
@@ -395,6 +479,81 @@ export const AdminDocumentListResponseSchema = z.object({
   nextCursor: z.string().nullable().optional(),
 });
 export type AdminDocumentListResponse = z.infer<typeof AdminDocumentListResponseSchema>;
+
+export const FolderRecordSchema = z.object({
+  id: z.string(),
+  tenantId: z.string(),
+  parentId: z.string().describe('The folder it is in, or root.'),
+  name: z.string(),
+  createdAt: z.number(),
+  updatedAt: z.number(),
+  createdBy: z.string().nullable(),
+});
+export type FolderRecord = z.infer<typeof FolderRecordSchema>;
+
+export const FolderResponseSchema = z.object({
+  folder: FolderRecordSchema,
+});
+export type FolderResponse = z.infer<typeof FolderResponseSchema>;
+
+export const FolderGetResponseSchema = z.object({
+  folder: FolderRecordSchema,
+  path: z
+    .array(z.object({ id: z.string(), name: z.string() }))
+    .describe(
+      'The folders above this one, from the top level down. Neither root nor the folder itself.',
+    ),
+});
+export type FolderGetResponse = z.infer<typeof FolderGetResponseSchema>;
+
+export const FolderCreateRequestSchema = z.object({
+  name: FolderNameSchema,
+  /** Defaults to root. */
+  parentId: FolderPlaceSchema.optional(),
+});
+export type FolderCreateRequest = z.infer<typeof FolderCreateRequestSchema>;
+
+export const FolderUpdateRequestSchema = z.object({
+  name: FolderNameSchema,
+});
+export type FolderUpdateRequest = z.infer<typeof FolderUpdateRequestSchema>;
+
+/** Query parameters for `folders.list`, which orders folders by name. */
+export const FolderListQuerySchema = z.object({
+  limit: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(ADMIN_DOCUMENT_LIST_MAX_LIMIT)
+    .default(ADMIN_DOCUMENT_LIST_DEFAULT_LIMIT),
+  cursor: z.string().min(1).optional(),
+  parentId: FolderPlaceSchema.describe(
+    'Only the folders directly in this folder (root: the top level). Without it, every folder.',
+  ).optional(),
+});
+export type FolderListQuery = z.infer<typeof FolderListQuerySchema>;
+
+export const FolderListResponseSchema = z.object({
+  folders: z.array(FolderRecordSchema),
+  /** Opaque cursor for the next page; `null` on the last page. */
+  nextCursor: z.string().nullable(),
+});
+export type FolderListResponse = z.infer<typeof FolderListResponseSchema>;
+
+export const FolderDeleteQuerySchema = z.object({
+  recursive: queryFlag
+    .describe('true deletes everything in the folder too. Never the default.')
+    .optional(),
+});
+export type FolderDeleteQuery = z.infer<typeof FolderDeleteQuerySchema>;
+
+export const FOLDER_MOVE_MAX_IDS = 1000;
+
+export const FolderMoveIntoRequestSchema = z.object({
+  documentIds: z.array(z.string().regex(docIdPattern)).max(FOLDER_MOVE_MAX_IDS).optional(),
+  folderIds: z.array(z.string().regex(folderIdPattern)).max(FOLDER_MOVE_MAX_IDS).optional(),
+});
+export type FolderMoveIntoRequest = z.infer<typeof FolderMoveIntoRequestSchema>;
 
 export const AdminUploadProxyResponseSchema = z.object({
   sha256: z.string().regex(sha256Hex),
@@ -437,6 +596,19 @@ export const AdminTenantDocParamsSchema = z.object({
   id: z.string().regex(docIdPattern),
 });
 export type AdminTenantDocParams = z.infer<typeof AdminTenantDocParamsSchema>;
+
+export const AdminTenantFolderParamsSchema = z.object({
+  tenantId: z.string().regex(tenantIdPattern),
+  folderId: z.string().regex(folderIdPattern),
+});
+export type AdminTenantFolderParams = z.infer<typeof AdminTenantFolderParamsSchema>;
+
+/** A destination: any folder, or root. */
+export const AdminTenantFolderPlaceParamsSchema = z.object({
+  tenantId: z.string().regex(tenantIdPattern),
+  folderId: FolderPlaceSchema,
+});
+export type AdminTenantFolderPlaceParams = z.infer<typeof AdminTenantFolderPlaceParamsSchema>;
 
 export const AdminTenantDocLayerParamsSchema = AdminTenantDocParamsSchema.extend({
   layerName: z.string().min(1).max(256),
@@ -585,10 +757,27 @@ export type AdminTenantListResponse = z.infer<typeof AdminTenantListResponseSche
  * scope: a grant is a standing mint capability, so creating and
  * revoking it are the same trust decision — unlike ephemeral tokens,
  * where issue and revoke fail in different directions.
+ *
+ * The `docs.*` scopes are create, read, update and delete over the
+ * records of the tenant's documents and folders: names, folders, sizes,
+ * states. `docs.update` renames and moves; `docs.delete` stays separate
+ * because its failure direction is loss. No `docs.*` scope reaches what is
+ * inside a document.
+ *
+ * Everything inside a document, reading included, takes document
+ * permissions in the doc-token vocabulary (capabilities, collab scopes,
+ * `pdf.permissions`). A doc JWT carries them for one document; a tenant JWT
+ * may carry them next to its tenant scopes, and then they hold for every
+ * document of the tenant. That includes the two collection calls that hand
+ * out content: the original file needs `doc.download`, the thumbnail
+ * `doc.render`. `tokens.issue-doc` mints doc JWTs with any document
+ * permission, so a token holding it reaches anything inside the tenant's
+ * documents: it is the strongest content scope after `*`.
  */
 export const adminTenantScopes = [
   'docs.create',
   'docs.read',
+  'docs.update',
   'docs.delete',
   'tokens.issue-doc',
   'tokens.revoke',
@@ -634,10 +823,12 @@ export type AdminTokenIssueDocRequest = z.infer<typeof AdminTokenIssueDocRequest
 export const AdminTokenIssueTenantRequestSchema = z.object({
   kind: z.literal('tenant'),
   sub: z.string().min(1).max(256),
-  scope: z
-    .array(z.union([z.literal('*'), z.enum(adminTenantScopes)]))
-    .min(1)
-    .max(16),
+  /**
+   * Tenant scopes (`docs.read`, `tokens.issue-doc`, …, or `*`) and document
+   * permissions in the doc-token vocabulary, which hold for every document
+   * of the tenant. Validated server-side, as a doc token's scope is.
+   */
+  scope: z.array(z.string().min(1).max(128)).min(1).max(64),
   /** Token lifetime in seconds. */
   expiresIn: z
     .number()
@@ -916,12 +1107,6 @@ export const ShareGrantResponseSchema = z.object({
 });
 export type ShareGrantResponse = z.infer<typeof ShareGrantResponseSchema>;
 
-/** A query-string flag, `true` or `false`. */
-const queryFlag = z.preprocess(
-  (value) => (value === 'true' ? true : value === 'false' ? false : value),
-  z.boolean(),
-);
-
 export const ShareGrantListQuerySchema = z.object({
   limit: z.coerce
     .number()
@@ -1143,22 +1328,25 @@ export interface AdminOperation {
   path: string;
   /**
    * Credentials accepted by this operation. The API token is root and
-   * passes every scope check; a tenant JWT additionally requires the
-   * path's `tenantId` to equal the token's `tenant_id`. Doc-scoped
-   * tokens are always rejected on these surfaces.
+   * passes every scope check. A tenant JWT reaches only its own tenant:
+   * on the admin surfaces the path's `tenantId` must equal the token's
+   * `tenant_id`, and on the doc plane the document must belong to it.
+   * Doc-scoped tokens are always rejected on the admin surfaces.
    */
   credentials: ReadonlyArray<AdminCredential>;
   /**
    * Tenant scopes accepted on the tenant-jwt path — possessing any one
    * grants access (`*` always does). Empty for API-token-only
-   * operations, where no scope model applies.
+   * operations, where no scope model applies, and for operations on what
+   * is inside a document, which take `docCapabilities` instead.
    */
   scope: ReadonlyArray<AdminTenantScope>;
   /**
-   * Doc capabilities required on the doc-jwt path — typed against the
-   * engine-core vocabulary so a misspelled capability fails compile.
-   * The API token bypasses capability checks, same as it passes tenant
-   * scope checks. Present only on doc-plane operations.
+   * Document permissions the operation needs, on a doc JWT and a tenant
+   * JWT alike: doc-plane operations, and the collection operations that
+   * hand out what is inside a document. Typed against the engine-core
+   * vocabulary so a misspelled capability fails compile. The API token
+   * bypasses capability checks.
    */
   docCapabilities?: ReadonlyArray<DocCapability>;
   /** Documented request headers (beyond Authorization). */
@@ -1313,7 +1501,8 @@ export const adminOperations = {
   'documents.list': {
     operationId: 'documents.list',
     title: 'List documents',
-    summary: 'List documents in the tenant, newest first, cursor-paginated.',
+    summary:
+      'List documents in the tenant, cursor-paginated: newest first by default, or searched by name and sorted by name or size.',
     method: 'GET',
     path: '/v1/tenants/:tenantId/documents',
     credentials: ['api-token', 'tenant-jwt'],
@@ -1340,6 +1529,24 @@ export const adminOperations = {
       404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
     },
   },
+  'documents.update': {
+    operationId: 'documents.update',
+    title: 'Update document',
+    summary: 'Rename a document.',
+    method: 'PATCH',
+    path: '/v1/tenants/:tenantId/documents/:id',
+    credentials: ['api-token', 'tenant-jwt'],
+    scope: ['docs.update'],
+    params: AdminTenantDocParamsSchema,
+    body: { contentType: 'application/json', schema: AdminDocumentUpdateRequestSchema },
+    responses: {
+      200: { contentType: 'application/json', schema: AdminDocumentResponseSchema },
+      400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      403: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+    },
+    notes: 'A document that is being deleted answers 404.',
+  },
   'documents.download': {
     operationId: 'documents.download',
     title: 'Download document',
@@ -1347,7 +1554,8 @@ export const adminOperations = {
     method: 'GET',
     path: '/v1/tenants/:tenantId/documents/:id/download',
     credentials: ['api-token', 'tenant-jwt'],
-    scope: ['docs.read'],
+    scope: [],
+    docCapabilities: ['doc.download'],
     params: AdminTenantDocParamsSchema,
     responses: {
       200: { contentType: 'application/pdf' },
@@ -1412,12 +1620,126 @@ export const adminOperations = {
     method: 'GET',
     path: '/v1/tenants/:tenantId/documents/:id/thumbnail',
     credentials: ['api-token', 'tenant-jwt'],
-    scope: ['docs.read'],
+    scope: [],
+    docCapabilities: ['doc.render'],
     params: AdminTenantDocParamsSchema,
     responses: {
       200: { contentType: ['image/webp', 'image/png'] },
       404: { contentType: 'application/json', schema: AdminThumbnailUnavailablePayloadSchema },
     },
+  },
+  'folders.create': {
+    operationId: 'folders.create',
+    title: 'Create folder',
+    summary: 'Create a folder at the top level or inside another folder.',
+    method: 'POST',
+    path: '/v1/tenants/:tenantId/folders',
+    credentials: ['api-token', 'tenant-jwt'],
+    scope: ['docs.create'],
+    params: AdminTenantParamsSchema,
+    body: { contentType: 'application/json', schema: FolderCreateRequestSchema },
+    responses: {
+      200: { contentType: 'application/json', schema: FolderResponseSchema },
+      400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      403: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      409: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+    },
+    notes:
+      '409 Conflict carries `details.reason`: `name-taken` (a sibling has the name, ignoring case; `details.name`) or `too-deep` (folders nest at most 100 levels; `details.maxDepth`). 404 when the parent folder does not exist.',
+  },
+  'folders.list': {
+    operationId: 'folders.list',
+    title: 'List folders',
+    summary:
+      'List folders by name, cursor-paginated: every folder, or those directly in one folder.',
+    method: 'GET',
+    path: '/v1/tenants/:tenantId/folders',
+    credentials: ['api-token', 'tenant-jwt'],
+    scope: ['docs.read'],
+    params: AdminTenantParamsSchema,
+    query: FolderListQuerySchema,
+    responses: {
+      200: { contentType: 'application/json', schema: FolderListResponseSchema },
+      400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      403: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+    },
+  },
+  'folders.get': {
+    operationId: 'folders.get',
+    title: 'Get folder',
+    summary: 'Fetch one folder and the folders above it.',
+    method: 'GET',
+    path: '/v1/tenants/:tenantId/folders/:folderId',
+    credentials: ['api-token', 'tenant-jwt'],
+    scope: ['docs.read'],
+    params: AdminTenantFolderParamsSchema,
+    responses: {
+      200: { contentType: 'application/json', schema: FolderGetResponseSchema },
+      403: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+    },
+  },
+  'folders.update': {
+    operationId: 'folders.update',
+    title: 'Update folder',
+    summary: 'Rename a folder.',
+    method: 'PATCH',
+    path: '/v1/tenants/:tenantId/folders/:folderId',
+    credentials: ['api-token', 'tenant-jwt'],
+    scope: ['docs.update'],
+    params: AdminTenantFolderParamsSchema,
+    body: { contentType: 'application/json', schema: FolderUpdateRequestSchema },
+    responses: {
+      200: { contentType: 'application/json', schema: FolderResponseSchema },
+      400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      403: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      409: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+    },
+    notes:
+      '409 Conflict with `details.reason` `name-taken` when a sibling has the name, ignoring case.',
+  },
+  'folders.moveInto': {
+    operationId: 'folders.moveInto',
+    title: 'Move into folder',
+    summary:
+      'Move documents and folders into a folder, or to the top level with root. All of them move, or none do.',
+    method: 'POST',
+    path: '/v1/tenants/:tenantId/folders/:folderId/move-into',
+    credentials: ['api-token', 'tenant-jwt'],
+    scope: ['docs.update'],
+    params: AdminTenantFolderPlaceParamsSchema,
+    body: { contentType: 'application/json', schema: FolderMoveIntoRequestSchema },
+    responses: {
+      204: {},
+      400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      403: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      409: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+    },
+    notes:
+      "Up to 1,000 ids in total. A folder moves with everything in it. 404 NotFound names the ids that do not exist or are being deleted in `details.documentIds` and `details.folderIds`. 409 Conflict carries `details.reason`: `cycle` (the destination is a moved folder or inside one; `details.folderId`), `too-deep` (the move would nest folders deeper than 100 levels; `details.maxDepth`) or `name-taken` (a moved folder's name is taken in the destination, ignoring case; `details.name`).",
+  },
+  'folders.delete': {
+    operationId: 'folders.delete',
+    title: 'Delete folder',
+    summary: 'Delete an empty folder, or with recursive=true a folder and everything in it.',
+    method: 'DELETE',
+    path: '/v1/tenants/:tenantId/folders/:folderId',
+    credentials: ['api-token', 'tenant-jwt'],
+    scope: ['docs.delete'],
+    params: AdminTenantFolderParamsSchema,
+    query: FolderDeleteQuerySchema,
+    responses: {
+      204: {},
+      403: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      409: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+    },
+    notes:
+      'Without recursive, a folder with anything inside is refused: 409 Conflict with `details.reason` `not-empty` and what it holds, counted over every level below, in `details.folders` and `details.documents`. With recursive=true, the folder and every folder under it go at once, and every document in them stops opening, leaves every list and stops answering its share links at once; their stored files and links are removed in the background. Uploads into those folders that have not committed cannot commit.',
   },
   'deployment.licenseStatus': {
     operationId: 'deployment.licenseStatus',
@@ -1696,14 +2018,16 @@ export type AdminOperationId = keyof typeof adminOperations;
 //
 // The "API vs protocol" split: these are the document operations a backend
 // can genuinely call — plain origin paths, credentialed by the API token
-// (which the server resolves to the document's own tenant) or a doc JWT
-// carrying the listed capabilities. The viewer-session protocol — /v1/access,
-// /v1/warm, the immutable `@{version}` CDN variants, SSE, password
-// sessions — deliberately stays out of this registry: it
-// is the transport between the CloudPDF viewer SDK and the engine, free to
-// evolve behind the SDK boundary. Body/response schemas start deliberately
-// loose (documented paths, params, credentials, capabilities) and tighten
-// incrementally as the wire shapes are ported from engine-core.
+// (which the server resolves to the document's own tenant), or a tenant
+// JWT or doc JWT carrying the listed capabilities, a tenant JWT on its own
+// tenant's documents. Browsers only ever get doc JWTs. The viewer-session
+// protocol — /v1/access, /v1/warm, the immutable `@{version}` CDN
+// variants, SSE, password sessions — deliberately stays out of this
+// registry: it is the transport between the CloudPDF viewer SDK and the
+// engine, free to evolve behind the SDK boundary. Body/response schemas
+// start deliberately loose (documented paths, params, credentials,
+// capabilities) and tighten incrementally as the wire shapes are ported
+// from engine-core.
 
 export const DocIdParamsSchema = z.object({
   docId: z.string().regex(docIdPattern),
@@ -1787,7 +2111,7 @@ export const idempotencyKeyHeader: AdminOperationHeader = {
 };
 
 const looseJson = z.record(z.string(), z.unknown());
-const docCredentials = ['api-token', 'doc-jwt'] as const;
+const docCredentials = ['api-token', 'tenant-jwt', 'doc-jwt'] as const;
 
 export const DocSigningParamsSchema = DocLayerParamsSchema.extend({
   signingId: z.string().min(1),
@@ -2756,6 +3080,7 @@ export const docsGroups = {
   tenants: { title: 'Tenants' },
   documents: { title: 'Tenant documents' },
   'documents.layers': { title: 'Layers' },
+  folders: { title: 'Folders' },
   tokens: { title: 'Tokens' },
   shares: { title: 'Shares' },
   'shares.visitors': { title: 'Visitors' },

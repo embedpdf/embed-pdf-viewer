@@ -59,6 +59,9 @@
             "apiToken": []
           },
           {
+            "tenantToken": []
+          },
+          {
             "docToken": []
           }
         ],
@@ -129,6 +132,9 @@
         "security": [
           {
             "apiToken": []
+          },
+          {
+            "tenantToken": []
           },
           {
             "docToken": []
@@ -221,6 +227,9 @@
             "apiToken": []
           },
           {
+            "tenantToken": []
+          },
+          {
             "docToken": []
           }
         ],
@@ -309,6 +318,9 @@
         "security": [
           {
             "apiToken": []
+          },
+          {
+            "tenantToken": []
           },
           {
             "docToken": []
@@ -429,6 +441,9 @@
         "security": [
           {
             "apiToken": []
+          },
+          {
+            "tenantToken": []
           },
           {
             "docToken": []
@@ -560,6 +575,9 @@
             "apiToken": []
           },
           {
+            "tenantToken": []
+          },
+          {
             "docToken": []
           }
         ],
@@ -669,6 +687,9 @@
         "security": [
           {
             "apiToken": []
+          },
+          {
+            "tenantToken": []
           },
           {
             "docToken": []
@@ -783,6 +804,9 @@
         "security": [
           {
             "apiToken": []
+          },
+          {
+            "tenantToken": []
           },
           {
             "docToken": []
@@ -908,6 +932,9 @@
             "apiToken": []
           },
           {
+            "tenantToken": []
+          },
+          {
             "docToken": []
           }
         ],
@@ -1018,6 +1045,9 @@
         "security": [
           {
             "apiToken": []
+          },
+          {
+            "tenantToken": []
           },
           {
             "docToken": []
@@ -1138,6 +1168,9 @@
         "security": [
           {
             "apiToken": []
+          },
+          {
+            "tenantToken": []
           },
           {
             "docToken": []
@@ -1261,6 +1294,9 @@
             "apiToken": []
           },
           {
+            "tenantToken": []
+          },
+          {
             "docToken": []
           }
         ],
@@ -1373,6 +1409,9 @@
             "apiToken": []
           },
           {
+            "tenantToken": []
+          },
+          {
             "docToken": []
           }
         ],
@@ -1452,6 +1491,9 @@
         "security": [
           {
             "apiToken": []
+          },
+          {
+            "tenantToken": []
           },
           {
             "docToken": []
@@ -1587,6 +1629,9 @@
             "apiToken": []
           },
           {
+            "tenantToken": []
+          },
+          {
             "docToken": []
           }
         ],
@@ -1667,6 +1712,9 @@
         "security": [
           {
             "apiToken": []
+          },
+          {
+            "tenantToken": []
           },
           {
             "docToken": []
@@ -1769,6 +1817,9 @@
             "apiToken": []
           },
           {
+            "tenantToken": []
+          },
+          {
             "docToken": []
           }
         ],
@@ -1847,6 +1898,9 @@
         "security": [
           {
             "apiToken": []
+          },
+          {
+            "tenantToken": []
           },
           {
             "docToken": []
@@ -1956,6 +2010,9 @@
         "security": [
           {
             "apiToken": []
+          },
+          {
+            "tenantToken": []
           },
           {
             "docToken": []
@@ -2076,6 +2133,9 @@
             "apiToken": []
           },
           {
+            "tenantToken": []
+          },
+          {
             "docToken": []
           }
         ],
@@ -2183,6 +2243,9 @@
         "security": [
           {
             "apiToken": []
+          },
+          {
+            "tenantToken": []
           },
           {
             "docToken": []
@@ -2314,6 +2377,9 @@
             "apiToken": []
           },
           {
+            "tenantToken": []
+          },
+          {
             "docToken": []
           }
         ],
@@ -2433,6 +2499,9 @@
         "security": [
           {
             "apiToken": []
+          },
+          {
+            "tenantToken": []
           },
           {
             "docToken": []
@@ -2555,6 +2624,9 @@
             "apiToken": []
           },
           {
+            "tenantToken": []
+          },
+          {
             "docToken": []
           }
         ],
@@ -2633,6 +2705,9 @@
         "security": [
           {
             "apiToken": []
+          },
+          {
+            "tenantToken": []
           },
           {
             "docToken": []
@@ -2715,6 +2790,9 @@
             "apiToken": []
           },
           {
+            "tenantToken": []
+          },
+          {
             "docToken": []
           }
         ],
@@ -2795,6 +2873,9 @@
             "apiToken": []
           },
           {
+            "tenantToken": []
+          },
+          {
             "docToken": []
           }
         ],
@@ -2873,6 +2954,9 @@
         "security": [
           {
             "apiToken": []
+          },
+          {
+            "tenantToken": []
           },
           {
             "docToken": []
@@ -2995,6 +3079,9 @@
             "apiToken": []
           },
           {
+            "tenantToken": []
+          },
+          {
             "docToken": []
           }
         ],
@@ -3085,6 +3172,9 @@
         "security": [
           {
             "apiToken": []
+          },
+          {
+            "tenantToken": []
           },
           {
             "docToken": []
@@ -3186,6 +3276,9 @@
         "security": [
           {
             "apiToken": []
+          },
+          {
+            "tenantToken": []
           },
           {
             "docToken": []
@@ -3297,6 +3390,9 @@
             "apiToken": []
           },
           {
+            "tenantToken": []
+          },
+          {
             "docToken": []
           }
         ],
@@ -3406,6 +3502,9 @@
             "apiToken": []
           },
           {
+            "tenantToken": []
+          },
+          {
             "docToken": []
           }
         ],
@@ -3513,6 +3612,9 @@
         "security": [
           {
             "apiToken": []
+          },
+          {
+            "tenantToken": []
           },
           {
             "docToken": []
@@ -3625,6 +3727,9 @@
             "apiToken": []
           },
           {
+            "tenantToken": []
+          },
+          {
             "docToken": []
           }
         ],
@@ -3718,6 +3823,9 @@
             "apiToken": []
           },
           {
+            "tenantToken": []
+          },
+          {
             "docToken": []
           }
         ],
@@ -3796,6 +3904,9 @@
         "security": [
           {
             "apiToken": []
+          },
+          {
+            "tenantToken": []
           },
           {
             "docToken": []
@@ -3886,6 +3997,9 @@
         "security": [
           {
             "apiToken": []
+          },
+          {
+            "tenantToken": []
           },
           {
             "docToken": []
@@ -4008,6 +4122,9 @@
             "apiToken": []
           },
           {
+            "tenantToken": []
+          },
+          {
             "docToken": []
           }
         ],
@@ -4124,6 +4241,9 @@
         "security": [
           {
             "apiToken": []
+          },
+          {
+            "tenantToken": []
           },
           {
             "docToken": []
@@ -4243,6 +4363,9 @@
             "apiToken": []
           },
           {
+            "tenantToken": []
+          },
+          {
             "docToken": []
           }
         ],
@@ -4335,6 +4458,9 @@
             "apiToken": []
           },
           {
+            "tenantToken": []
+          },
+          {
             "docToken": []
           }
         ],
@@ -4414,6 +4540,9 @@
         "security": [
           {
             "apiToken": []
+          },
+          {
+            "tenantToken": []
           },
           {
             "docToken": []
@@ -4560,6 +4689,9 @@
             "apiToken": []
           },
           {
+            "tenantToken": []
+          },
+          {
             "docToken": []
           }
         ],
@@ -4648,6 +4780,9 @@
         "security": [
           {
             "apiToken": []
+          },
+          {
+            "tenantToken": []
           },
           {
             "docToken": []
@@ -4749,6 +4884,9 @@
             "apiToken": []
           },
           {
+            "tenantToken": []
+          },
+          {
             "docToken": []
           }
         ],
@@ -4837,6 +4975,9 @@
         "security": [
           {
             "apiToken": []
+          },
+          {
+            "tenantToken": []
           },
           {
             "docToken": []
@@ -4937,6 +5078,9 @@
         "security": [
           {
             "apiToken": []
+          },
+          {
+            "tenantToken": []
           },
           {
             "docToken": []
@@ -5367,7 +5511,7 @@
         "x-fern-sdk-group-name": ["documents"],
         "x-fern-sdk-method-name": "list",
         "x-docs-title": "List documents",
-        "summary": "List documents in the tenant, newest first, cursor-paginated.",
+        "summary": "List documents in the tenant, cursor-paginated: newest first by default, or searched by name and sorted by name or size.",
         "security": [
           {
             "apiToken": []
@@ -5413,7 +5557,50 @@
             "required": false,
             "schema": {
               "type": "string",
-              "enum": ["pending", "ready", "failed", "deleting"]
+              "enum": ["pending", "ready", "failed", "deleting"],
+              "description": "Only documents in this state. Without it, every state except deleting."
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255,
+              "description": "Only documents whose name contains this text, ignoring case."
+            }
+          },
+          {
+            "name": "folderId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^(root|fld_[0-9a-f]{24})$",
+              "description": "Only documents directly in this folder (root: the top level). Without it, documents in every folder."
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["createdAt", "name", "size"],
+              "description": "createdAt (default), name (ignoring case), or size (stored bytes; 0 while pending).",
+              "default": "createdAt"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["asc", "desc"],
+              "description": "Defaults to the reading order of the sort: A to Z for name, newest and largest first otherwise."
             }
           }
         ],
@@ -5514,6 +5701,105 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DocumentsGet404Response"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminErrorPayload"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "documents.update",
+        "x-fern-sdk-group-name": ["documents"],
+        "x-fern-sdk-method-name": "update",
+        "x-docs-title": "Update document",
+        "summary": "Rename a document.",
+        "description": "A document that is being deleted answers 404.",
+        "security": [
+          {
+            "apiToken": []
+          },
+          {
+            "tenantToken": []
+          }
+        ],
+        "x-required-scope": ["docs.update"],
+        "parameters": [
+          {
+            "name": "tenantId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DocumentsUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentsUpdate200Response"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentsUpdate400Response"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentsUpdate403Response"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentsUpdate404Response"
                 }
               }
             }
@@ -5707,7 +5993,8 @@
             "tenantToken": []
           }
         ],
-        "x-required-scope": ["docs.read"],
+        "x-required-scope": [],
+        "x-required-capability": ["doc.download"],
         "parameters": [
           {
             "name": "tenantId",
@@ -6000,7 +6287,8 @@
             "tenantToken": []
           }
         ],
-        "x-required-scope": ["docs.read"],
+        "x-required-scope": [],
+        "x-required-capability": ["doc.render"],
         "parameters": [
           {
             "name": "tenantId",
@@ -6316,6 +6604,602 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DocumentsInit400Response"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminErrorPayload"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/tenants/{tenantId}/folders": {
+      "post": {
+        "operationId": "folders.create",
+        "x-fern-sdk-group-name": ["folders"],
+        "x-fern-sdk-method-name": "create",
+        "x-docs-title": "Create folder",
+        "summary": "Create a folder at the top level or inside another folder.",
+        "description": "409 Conflict carries `details.reason`: `name-taken` (a sibling has the name, ignoring case; `details.name`) or `too-deep` (folders nest at most 100 levels; `details.maxDepth`). 404 when the parent folder does not exist.",
+        "security": [
+          {
+            "apiToken": []
+          },
+          {
+            "tenantToken": []
+          }
+        ],
+        "x-required-scope": ["docs.create"],
+        "parameters": [
+          {
+            "name": "tenantId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FoldersCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FoldersCreate200Response"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FoldersCreate400Response"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FoldersCreate403Response"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FoldersCreate404Response"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FoldersCreate409Response"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminErrorPayload"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "folders.list",
+        "x-fern-sdk-group-name": ["folders"],
+        "x-fern-sdk-method-name": "list",
+        "x-docs-title": "List folders",
+        "summary": "List folders by name, cursor-paginated: every folder, or those directly in one folder.",
+        "security": [
+          {
+            "apiToken": []
+          },
+          {
+            "tenantToken": []
+          }
+        ],
+        "x-required-scope": ["docs.read"],
+        "parameters": [
+          {
+            "name": "tenantId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 100
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "parentId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^(root|fld_[0-9a-f]{24})$",
+              "description": "Only the folders directly in this folder (root: the top level). Without it, every folder."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FoldersList200Response"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FoldersList400Response"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FoldersList403Response"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FoldersList404Response"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminErrorPayload"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/tenants/{tenantId}/folders/{folderId}": {
+      "get": {
+        "operationId": "folders.get",
+        "x-fern-sdk-group-name": ["folders"],
+        "x-fern-sdk-method-name": "get",
+        "x-docs-title": "Get folder",
+        "summary": "Fetch one folder and the folders above it.",
+        "security": [
+          {
+            "apiToken": []
+          },
+          {
+            "tenantToken": []
+          }
+        ],
+        "x-required-scope": ["docs.read"],
+        "parameters": [
+          {
+            "name": "tenantId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          },
+          {
+            "name": "folderId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^fld_[0-9a-f]{24}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FoldersGet200Response"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FoldersGet403Response"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FoldersGet404Response"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminErrorPayload"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "folders.update",
+        "x-fern-sdk-group-name": ["folders"],
+        "x-fern-sdk-method-name": "update",
+        "x-docs-title": "Update folder",
+        "summary": "Rename a folder.",
+        "description": "409 Conflict with `details.reason` `name-taken` when a sibling has the name, ignoring case.",
+        "security": [
+          {
+            "apiToken": []
+          },
+          {
+            "tenantToken": []
+          }
+        ],
+        "x-required-scope": ["docs.update"],
+        "parameters": [
+          {
+            "name": "tenantId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          },
+          {
+            "name": "folderId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^fld_[0-9a-f]{24}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FoldersUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FoldersUpdate200Response"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FoldersUpdate400Response"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FoldersUpdate403Response"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FoldersUpdate404Response"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FoldersUpdate409Response"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminErrorPayload"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "folders.delete",
+        "x-fern-sdk-group-name": ["folders"],
+        "x-fern-sdk-method-name": "delete",
+        "x-docs-title": "Delete folder",
+        "summary": "Delete an empty folder, or with recursive=true a folder and everything in it.",
+        "description": "Without recursive, a folder with anything inside is refused: 409 Conflict with `details.reason` `not-empty` and what it holds, counted over every level below, in `details.folders` and `details.documents`. With recursive=true, the folder and every folder under it go at once, and every document in them stops opening, leaves every list and stops answering its share links at once; their stored files and links are removed in the background. Uploads into those folders that have not committed cannot commit.",
+        "security": [
+          {
+            "apiToken": []
+          },
+          {
+            "tenantToken": []
+          }
+        ],
+        "x-required-scope": ["docs.delete"],
+        "parameters": [
+          {
+            "name": "tenantId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          },
+          {
+            "name": "folderId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^fld_[0-9a-f]{24}$"
+            }
+          },
+          {
+            "name": "recursive",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "true deletes everything in the folder too. Never the default."
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No content"
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FoldersDelete403Response"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FoldersDelete404Response"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FoldersDelete409Response"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminErrorPayload"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/tenants/{tenantId}/folders/{folderId}/move-into": {
+      "post": {
+        "operationId": "folders.moveInto",
+        "x-fern-sdk-group-name": ["folders"],
+        "x-fern-sdk-method-name": "moveInto",
+        "x-docs-title": "Move into folder",
+        "summary": "Move documents and folders into a folder, or to the top level with root. All of them move, or none do.",
+        "description": "Up to 1,000 ids in total. A folder moves with everything in it. 404 NotFound names the ids that do not exist or are being deleted in `details.documentIds` and `details.folderIds`. 409 Conflict carries `details.reason`: `cycle` (the destination is a moved folder or inside one; `details.folderId`), `too-deep` (the move would nest folders deeper than 100 levels; `details.maxDepth`) or `name-taken` (a moved folder's name is taken in the destination, ignoring case; `details.name`).",
+        "security": [
+          {
+            "apiToken": []
+          },
+          {
+            "tenantToken": []
+          }
+        ],
+        "x-required-scope": ["docs.update"],
+        "parameters": [
+          {
+            "name": "tenantId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          },
+          {
+            "name": "folderId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^(root|fld_[0-9a-f]{24})$",
+              "description": "A folder id, or root for the top level."
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FoldersMoveIntoRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "No content"
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FoldersMoveInto400Response"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FoldersMoveInto403Response"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FoldersMoveInto404Response"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FoldersMoveInto409Response"
                 }
               }
             }
@@ -7380,6 +8264,9 @@
     "documents.layers": {
       "title": "Layers"
     },
+    "folders": {
+      "title": "Folders"
+    },
     "tokens": {
       "title": "Tokens"
     },
@@ -7437,7 +8324,7 @@
         "scheme": "bearer",
         "bearerFormat": "JWT",
         "x-docs-title": "Tenant token",
-        "description": "Delegated tenant JWT, valid only under its own /v1/tenants/{tenantId}/ subtree — the path tenant must equal the token's tenant_id. Doc-scoped viewer tokens are rejected on every admin route."
+        "description": "Delegated tenant JWT, valid only for its own tenant: under /v1/tenants/{tenantId}/ the path tenant must equal the token's tenant_id, and on /v1/docs/{docId} the document must belong to that tenant and the token's scope must hold the operation's document permissions, as a document token does. For servers; browsers get document tokens. Doc-scoped viewer tokens are rejected on every admin route."
       },
       "docToken": {
         "type": "http",
@@ -23801,6 +24688,18 @@
             "type": "string",
             "pattern": "^[0-9a-f]{64}$"
           },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "pattern": "^[^\\s\\u0000-\\u001F\\u007F](?:[^\\u0000-\\u001F\\u007F]*[^\\s\\u0000-\\u001F\\u007F])?$",
+            "description": "What people call the document: shown in dashboards, searched and sorted by. 1 to 255 characters, no control characters, no leading or trailing whitespace. Names need not be unique."
+          },
+          "folderId": {
+            "type": "string",
+            "pattern": "^(root|fld_[0-9a-f]{24})$",
+            "description": "A folder id, or root for the top level."
+          },
           "metadata": {
             "type": "object",
             "additionalProperties": {}
@@ -23847,6 +24746,13 @@
                   },
                   "tenantId": {
                     "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "folderId": {
+                    "type": "string",
+                    "description": "The folder the document is in, or root."
                   },
                   "state": {
                     "type": "string",
@@ -23895,6 +24801,8 @@
                 "required": [
                   "id",
                   "tenantId",
+                  "name",
+                  "folderId",
                   "state",
                   "baseSha",
                   "storageSizeBytes",
@@ -24028,6 +24936,13 @@
               "tenantId": {
                 "type": "string"
               },
+              "name": {
+                "type": "string"
+              },
+              "folderId": {
+                "type": "string",
+                "description": "The folder the document is in, or root."
+              },
               "state": {
                 "type": "string",
                 "enum": ["pending", "ready", "failed", "deleting"]
@@ -24075,6 +24990,8 @@
             "required": [
               "id",
               "tenantId",
+              "name",
+              "folderId",
               "state",
               "baseSha",
               "storageSizeBytes",
@@ -24186,6 +25103,18 @@
             "additionalProperties": false,
             "description": "Integrity pins, enforced when present. When absent, the server-observed values become authoritative."
           },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "pattern": "^[^\\s\\u0000-\\u001F\\u007F](?:[^\\u0000-\\u001F\\u007F]*[^\\s\\u0000-\\u001F\\u007F])?$",
+            "description": "What people call the document: shown in dashboards, searched and sorted by. 1 to 255 characters, no control characters, no leading or trailing whitespace. Names need not be unique."
+          },
+          "folderId": {
+            "type": "string",
+            "pattern": "^(root|fld_[0-9a-f]{24})$",
+            "description": "A folder id, or root for the top level."
+          },
           "metadata": {
             "type": "object",
             "additionalProperties": {}
@@ -24228,6 +25157,13 @@
               "tenantId": {
                 "type": "string"
               },
+              "name": {
+                "type": "string"
+              },
+              "folderId": {
+                "type": "string",
+                "description": "The folder the document is in, or root."
+              },
               "state": {
                 "type": "string",
                 "enum": ["pending", "ready", "failed", "deleting"]
@@ -24275,6 +25211,8 @@
             "required": [
               "id",
               "tenantId",
+              "name",
+              "folderId",
               "state",
               "baseSha",
               "storageSizeBytes",
@@ -24307,6 +25245,13 @@
               "tenantId": {
                 "type": "string"
               },
+              "name": {
+                "type": "string"
+              },
+              "folderId": {
+                "type": "string",
+                "description": "The folder the document is in, or root."
+              },
               "state": {
                 "type": "string",
                 "enum": ["pending", "ready", "failed", "deleting"]
@@ -24354,6 +25299,8 @@
             "required": [
               "id",
               "tenantId",
+              "name",
+              "folderId",
               "state",
               "baseSha",
               "storageSizeBytes",
@@ -24392,6 +25339,13 @@
                 },
                 "tenantId": {
                   "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "folderId": {
+                  "type": "string",
+                  "description": "The folder the document is in, or root."
                 },
                 "state": {
                   "type": "string",
@@ -24440,6 +25394,8 @@
               "required": [
                 "id",
                 "tenantId",
+                "name",
+                "folderId",
                 "state",
                 "baseSha",
                 "storageSizeBytes",
@@ -24475,6 +25431,13 @@
               },
               "tenantId": {
                 "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "folderId": {
+                "type": "string",
+                "description": "The folder the document is in, or root."
               },
               "state": {
                 "type": "string",
@@ -24523,6 +25486,8 @@
             "required": [
               "id",
               "tenantId",
+              "name",
+              "folderId",
               "state",
               "baseSha",
               "storageSizeBytes",
@@ -24543,6 +25508,113 @@
         "$ref": "#/components/schemas/AdminErrorPayload"
       },
       "DocumentsGet404Response": {
+        "$ref": "#/components/schemas/AdminErrorPayload"
+      },
+      "DocumentsUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "pattern": "^[^\\s\\u0000-\\u001F\\u007F](?:[^\\u0000-\\u001F\\u007F]*[^\\s\\u0000-\\u001F\\u007F])?$",
+            "description": "What people call the document: shown in dashboards, searched and sorted by. 1 to 255 characters, no control characters, no leading or trailing whitespace. Names need not be unique."
+          }
+        },
+        "required": ["name"],
+        "additionalProperties": false
+      },
+      "DocumentsUpdate200Response": {
+        "type": "object",
+        "properties": {
+          "document": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "tenantId": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "folderId": {
+                "type": "string",
+                "description": "The folder the document is in, or root."
+              },
+              "state": {
+                "type": "string",
+                "enum": ["pending", "ready", "failed", "deleting"]
+              },
+              "baseSha": {
+                "type": "string",
+                "nullable": true
+              },
+              "storageSizeBytes": {
+                "type": "number",
+                "nullable": true
+              },
+              "metadata": {
+                "type": "object",
+                "additionalProperties": {},
+                "nullable": true
+              },
+              "idempotencyKey": {
+                "type": "string",
+                "nullable": true
+              },
+              "failureReason": {
+                "type": "string",
+                "nullable": true
+              },
+              "thumbnailState": {
+                "type": "string",
+                "enum": ["pending", "ready", "locked", "failed"]
+              },
+              "thumbnailUrl": {
+                "type": "string",
+                "nullable": true
+              },
+              "createdAt": {
+                "type": "number"
+              },
+              "updatedAt": {
+                "type": "number"
+              },
+              "createdBy": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "id",
+              "tenantId",
+              "name",
+              "folderId",
+              "state",
+              "baseSha",
+              "storageSizeBytes",
+              "metadata",
+              "idempotencyKey",
+              "failureReason",
+              "createdAt",
+              "updatedAt",
+              "createdBy"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": ["document"],
+        "additionalProperties": false
+      },
+      "DocumentsUpdate400Response": {
+        "$ref": "#/components/schemas/AdminErrorPayload"
+      },
+      "DocumentsUpdate403Response": {
+        "$ref": "#/components/schemas/AdminErrorPayload"
+      },
+      "DocumentsUpdate404Response": {
         "$ref": "#/components/schemas/AdminErrorPayload"
       },
       "DocumentsDownload403Response": {
@@ -24656,6 +25728,325 @@
         "required": ["error"],
         "additionalProperties": false
       },
+      "FoldersCreateRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "pattern": "^[^\\s\\u0000-\\u001F\\u007F](?:[^\\u0000-\\u001F\\u007F]*[^\\s\\u0000-\\u001F\\u007F])?$",
+            "description": "What people call the folder: 1 to 255 characters, no control characters, no leading or trailing whitespace, and unique among the folder's siblings, ignoring case."
+          },
+          "parentId": {
+            "type": "string",
+            "pattern": "^(root|fld_[0-9a-f]{24})$",
+            "description": "A folder id, or root for the top level."
+          }
+        },
+        "required": ["name"],
+        "additionalProperties": false
+      },
+      "FoldersCreate200Response": {
+        "type": "object",
+        "properties": {
+          "folder": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "tenantId": {
+                "type": "string"
+              },
+              "parentId": {
+                "type": "string",
+                "description": "The folder it is in, or root."
+              },
+              "name": {
+                "type": "string"
+              },
+              "createdAt": {
+                "type": "number"
+              },
+              "updatedAt": {
+                "type": "number"
+              },
+              "createdBy": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "id",
+              "tenantId",
+              "parentId",
+              "name",
+              "createdAt",
+              "updatedAt",
+              "createdBy"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": ["folder"],
+        "additionalProperties": false
+      },
+      "FoldersCreate400Response": {
+        "$ref": "#/components/schemas/AdminErrorPayload"
+      },
+      "FoldersCreate403Response": {
+        "$ref": "#/components/schemas/AdminErrorPayload"
+      },
+      "FoldersCreate404Response": {
+        "$ref": "#/components/schemas/AdminErrorPayload"
+      },
+      "FoldersCreate409Response": {
+        "$ref": "#/components/schemas/AdminErrorPayload"
+      },
+      "FoldersList200Response": {
+        "type": "object",
+        "properties": {
+          "folders": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "tenantId": {
+                  "type": "string"
+                },
+                "parentId": {
+                  "type": "string",
+                  "description": "The folder it is in, or root."
+                },
+                "name": {
+                  "type": "string"
+                },
+                "createdAt": {
+                  "type": "number"
+                },
+                "updatedAt": {
+                  "type": "number"
+                },
+                "createdBy": {
+                  "type": "string",
+                  "nullable": true
+                }
+              },
+              "required": [
+                "id",
+                "tenantId",
+                "parentId",
+                "name",
+                "createdAt",
+                "updatedAt",
+                "createdBy"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": ["folders", "nextCursor"],
+        "additionalProperties": false
+      },
+      "FoldersList400Response": {
+        "$ref": "#/components/schemas/AdminErrorPayload"
+      },
+      "FoldersList403Response": {
+        "$ref": "#/components/schemas/AdminErrorPayload"
+      },
+      "FoldersList404Response": {
+        "$ref": "#/components/schemas/AdminErrorPayload"
+      },
+      "FoldersGet200Response": {
+        "type": "object",
+        "properties": {
+          "folder": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "tenantId": {
+                "type": "string"
+              },
+              "parentId": {
+                "type": "string",
+                "description": "The folder it is in, or root."
+              },
+              "name": {
+                "type": "string"
+              },
+              "createdAt": {
+                "type": "number"
+              },
+              "updatedAt": {
+                "type": "number"
+              },
+              "createdBy": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "id",
+              "tenantId",
+              "parentId",
+              "name",
+              "createdAt",
+              "updatedAt",
+              "createdBy"
+            ],
+            "additionalProperties": false
+          },
+          "path": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": ["id", "name"],
+              "additionalProperties": false
+            },
+            "description": "The folders above this one, from the top level down. Neither root nor the folder itself."
+          }
+        },
+        "required": ["folder", "path"],
+        "additionalProperties": false
+      },
+      "FoldersGet403Response": {
+        "$ref": "#/components/schemas/AdminErrorPayload"
+      },
+      "FoldersGet404Response": {
+        "$ref": "#/components/schemas/AdminErrorPayload"
+      },
+      "FoldersUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "pattern": "^[^\\s\\u0000-\\u001F\\u007F](?:[^\\u0000-\\u001F\\u007F]*[^\\s\\u0000-\\u001F\\u007F])?$",
+            "description": "What people call the folder: 1 to 255 characters, no control characters, no leading or trailing whitespace, and unique among the folder's siblings, ignoring case."
+          }
+        },
+        "required": ["name"],
+        "additionalProperties": false
+      },
+      "FoldersUpdate200Response": {
+        "type": "object",
+        "properties": {
+          "folder": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "tenantId": {
+                "type": "string"
+              },
+              "parentId": {
+                "type": "string",
+                "description": "The folder it is in, or root."
+              },
+              "name": {
+                "type": "string"
+              },
+              "createdAt": {
+                "type": "number"
+              },
+              "updatedAt": {
+                "type": "number"
+              },
+              "createdBy": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "id",
+              "tenantId",
+              "parentId",
+              "name",
+              "createdAt",
+              "updatedAt",
+              "createdBy"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": ["folder"],
+        "additionalProperties": false
+      },
+      "FoldersUpdate400Response": {
+        "$ref": "#/components/schemas/AdminErrorPayload"
+      },
+      "FoldersUpdate403Response": {
+        "$ref": "#/components/schemas/AdminErrorPayload"
+      },
+      "FoldersUpdate404Response": {
+        "$ref": "#/components/schemas/AdminErrorPayload"
+      },
+      "FoldersUpdate409Response": {
+        "$ref": "#/components/schemas/AdminErrorPayload"
+      },
+      "FoldersMoveIntoRequest": {
+        "type": "object",
+        "properties": {
+          "documentIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]+$"
+            },
+            "maxItems": 1000
+          },
+          "folderIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^fld_[0-9a-f]{24}$"
+            },
+            "maxItems": 1000
+          }
+        },
+        "additionalProperties": false
+      },
+      "FoldersMoveInto400Response": {
+        "$ref": "#/components/schemas/AdminErrorPayload"
+      },
+      "FoldersMoveInto403Response": {
+        "$ref": "#/components/schemas/AdminErrorPayload"
+      },
+      "FoldersMoveInto404Response": {
+        "$ref": "#/components/schemas/AdminErrorPayload"
+      },
+      "FoldersMoveInto409Response": {
+        "$ref": "#/components/schemas/AdminErrorPayload"
+      },
+      "FoldersDelete403Response": {
+        "$ref": "#/components/schemas/AdminErrorPayload"
+      },
+      "FoldersDelete404Response": {
+        "$ref": "#/components/schemas/AdminErrorPayload"
+      },
+      "FoldersDelete409Response": {
+        "$ref": "#/components/schemas/AdminErrorPayload"
+      },
       "DeploymentLicenseStatusResponse": {
         "type": "object",
         "properties": {
@@ -24739,26 +26130,12 @@
               "scope": {
                 "type": "array",
                 "items": {
-                  "anyOf": [
-                    {
-                      "type": "string",
-                      "enum": ["*"]
-                    },
-                    {
-                      "type": "string",
-                      "enum": [
-                        "docs.create",
-                        "docs.read",
-                        "docs.delete",
-                        "tokens.issue-doc",
-                        "tokens.revoke",
-                        "shares.manage"
-                      ]
-                    }
-                  ]
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
                 },
                 "minItems": 1,
-                "maxItems": 16
+                "maxItems": 64
               },
               "expiresIn": {
                 "type": "integer",

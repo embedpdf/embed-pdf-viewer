@@ -75,11 +75,13 @@ export interface BaseClaims {
  */
 export interface TenantClaims extends BaseClaims {
   /**
-   * Operations the bearer is authorised for on the tenant. Empty
-   * array means authenticated-but-no-permissions and is rejected by
-   * every scope-checking route guard.
+   * Operations the bearer is authorised for on the tenant, and document
+   * permissions that hold for every document of the tenant (see
+   * `auth/tenant-scope.ts`). Empty array means
+   * authenticated-but-no-permissions and is rejected by every
+   * scope-checking route guard.
    */
-  scope: ReadonlyArray<TenantScope>;
+  scope: ReadonlyArray<TenantScope | DocScope>;
   doc_id?: never;
   layer_name?: never;
   origins?: never;
@@ -147,6 +149,7 @@ export type TenantScope =
   | '*'
   | 'docs.create'
   | 'docs.read'
+  | 'docs.update'
   | 'docs.delete'
   | 'tokens.issue-doc'
   | 'tokens.revoke'
@@ -677,11 +680,10 @@ function coerceClaims(payload: JWTPayload): JwtClaims {
     };
     return out;
   }
-  // Tenant token.
-  // Tenant scopes live in a separate namespace (`TenantScope`) and are
-  // not validated by engine-core's scope vocabulary, which targets the
-  // doc-scoped capability/collab grammar.
-  const tenantScope = (scope ?? []) as ReadonlyArray<TenantScope>;
+  // Tenant token. Its scope mixes tenant scopes and document permissions;
+  // `tokens.issue` validates both kinds, and the route guards ignore an
+  // entry that is neither (see `auth/tenant-scope.ts`).
+  const tenantScope = (scope ?? []) as ReadonlyArray<TenantScope | DocScope>;
   const out: TenantClaims = { ...base, scope: tenantScope };
   return out;
 }

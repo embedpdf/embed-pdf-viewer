@@ -41,13 +41,11 @@ export async function checkVersionsByLayerMigration(
 
   await db.insertInto('tenants').values({ id: TENANT, name: TENANT }).execute();
   const documents = new DocumentsRepo(db);
-  await documents.createPending({
-    id: DOC,
-    tenantId: TENANT,
-    metadata: null,
-    idempotencyKey: null,
-    createdBy: null,
-  });
+  // Inserted directly: the repo writes columns that later migrations add.
+  await db
+    .insertInto('documents')
+    .values({ id: DOC, tenant_id: TENANT, state: 'pending', created_at: 1, updated_at: 1 } as never)
+    .execute();
   await documents.commit({ id: DOC, tenantId: TENANT, baseSha: SHA1, storageSizeBytes: 1234 });
   await new DocumentPagesRepo(db).upsertForDocument(DOC, [{ pageObjectNumber: 11 }]);
   const version = (sha: string, number: number, parent: string | null, ref: string | null) => ({

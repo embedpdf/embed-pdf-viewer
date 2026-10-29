@@ -40,6 +40,20 @@ export interface TenantsTable {
   suspended_at: number | null;
 }
 
+/** A folder stores only its parent; see migration 046 for the tree model. */
+export interface FoldersTable {
+  id: string;
+  tenant_id: string;
+  /** Null at the top level. */
+  parent_id: string | null;
+  name: string;
+  /** `name` in the form sibling uniqueness and the name order compare (NFC, lowercased). */
+  name_key: string;
+  created_at: number;
+  updated_at: number;
+  created_by: string | null;
+}
+
 export interface DocumentsTable {
   id: string;
   tenant_id: string;
@@ -61,6 +75,12 @@ export interface DocumentsTable {
   pdf_permissions_all_allowed: boolean | number | null;
   pdf_opened_as: DocumentPdfOpenedAs | null;
   security_probed_at: number | null;
+  /** Always written: the document id when the caller names nothing. */
+  name: string;
+  /** `name` in the form search and the name sort compare (NFC, lowercased). */
+  name_key: string;
+  /** The folder the document is in; null at the top level. */
+  folder_id: string | null;
   doc_version: Generated<number>;
   metadata_json: string | null;
   /** Customer-supplied retry key; unique per `(tenant_id, idempotency_key)`. */
@@ -682,6 +702,7 @@ export interface Database {
     created_at: Generated<number>;
     updated_at: Generated<number>;
   };
+  folders: FoldersTable;
   document_pages: DocumentPagesTable;
   layers: LayersTable;
   layer_pages: LayerPagesTable;

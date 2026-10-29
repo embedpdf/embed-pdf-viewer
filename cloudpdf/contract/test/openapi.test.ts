@@ -41,8 +41,10 @@ describe('operation registry', () => {
         continue;
       }
       if (op.credentials.includes('tenant-jwt')) {
-        // Scope governs the tenant-jwt path, so it must exist there…
-        expect(op.scope.length).toBeGreaterThan(0);
+        // The tenant-jwt path is governed by a tenant scope, or, for a call
+        // that hands out what is inside a document, by document
+        // capabilities: exactly one of the two…
+        expect(op.scope.length > 0, op.operationId).toBe(!op.docCapabilities?.length);
         // …and tenant-jwt operations must live under a tenant subtree.
         expect(op.path.startsWith('/v1/tenants/:tenantId/')).toBe(true);
       } else {
@@ -58,12 +60,13 @@ describe('operation registry', () => {
     for (const op of entries) {
       // Doc plane lives under /v1/docs and never under the admin surfaces.
       expect(op.path.startsWith('/v1/docs/:docId'), op.path).toBe(true);
-      // Credentials: API token plus doc JWTs; never tenant JWTs (the
-      // spec documents the intended pairing, not the skeleton-key path).
-      expect([...op.credentials].sort()).toEqual(['api-token', 'doc-jwt']);
-      // No tenant scopes; capabilities carry the doc-jwt authorization.
-      expect(op.scope.length).toBe(0);
+      // Credentials: the API token, a tenant JWT on its own tenant's
+      // documents (a server's key), and doc JWTs (what browsers get).
+      expect([...op.credentials].sort()).toEqual(['api-token', 'doc-jwt', 'tenant-jwt']);
+      // A tenant JWT needs the capabilities as a doc JWT does; no tenant
+      // scope reaches inside a document.
       expect(op.docCapabilities && op.docCapabilities.length).toBeTruthy();
+      expect(op.scope, op.operationId).toEqual([]);
       // Per-request password supply is documented on every doc operation.
       expect(op.requestHeaders?.some((h) => h.name === 'X-Document-Password')).toBe(true);
       // The viewer protocol stays out: no /v1/access, no @version variants.

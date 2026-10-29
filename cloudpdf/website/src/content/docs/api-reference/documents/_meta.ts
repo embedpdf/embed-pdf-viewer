@@ -2,6 +2,7 @@
 export default {
   list: 'List',
   get: 'Get',
+  update: 'Update',
   delete: 'Delete',
   commit: 'Commit',
   download: 'Download',

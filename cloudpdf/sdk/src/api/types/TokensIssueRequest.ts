@@ -19,24 +19,7 @@ export namespace TokensIssueRequest {
     export interface Tenant {
         kind: "tenant";
         sub: string;
-        scope: TokensIssueRequestTenant.Scope.Item[];
+        scope: string[];
         expiresIn: number;
-    }
-
-    export namespace TokensIssueRequestTenant {
-        export type Scope = Scope.Item[];
-
-        export namespace Scope {
-            export type Item =
-                | "*"
-                | (
-                      | "docs.create"
-                      | "docs.read"
-                      | "docs.delete"
-                      | "tokens.issue-doc"
-                      | "tokens.revoke"
-                      | "shares.manage"
-                  );
-        }
     }
 }

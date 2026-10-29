@@ -3,6 +3,7 @@
 import { DeploymentClient } from "./api/resources/deployment/client/Client.js";
 import { DocClient } from "./api/resources/doc/client/Client.js";
 import { DocumentsClient } from "./api/resources/documents/client/Client.js";
+import { FoldersClient } from "./api/resources/folders/client/Client.js";
 import { SharesClient } from "./api/resources/shares/client/Client.js";
 import { TenantsClient } from "./api/resources/tenants/client/Client.js";
 import { TokensClient } from "./api/resources/tokens/client/Client.js";
@@ -23,6 +24,7 @@ export class CloudPDFClient {
     protected _shares: SharesClient | undefined;
     protected _tenants: TenantsClient | undefined;
     protected _documents: DocumentsClient | undefined;
+    protected _folders: FoldersClient | undefined;
     protected _tokens: TokensClient | undefined;
 
     constructor(options: CloudPDFClient.Options) {
@@ -47,6 +49,10 @@ export class CloudPDFClient {
 
     public get documents(): DocumentsClient {
         return (this._documents ??= new DocumentsClient(this._options));
+    }
+
+    public get folders(): FoldersClient {
+        return (this._folders ??= new FoldersClient(this._options));
     }
 
     public get tokens(): TokensClient {

@@ -74,6 +74,17 @@
             },
             "default": "./dist/cjs/api/resources/documents/exports.js"
         },
+        "./folders": {
+            "import": {
+                "types": "./dist/esm/api/resources/folders/exports.d.mts",
+                "default": "./dist/esm/api/resources/folders/exports.mjs"
+            },
+            "require": {
+                "types": "./dist/cjs/api/resources/folders/exports.d.ts",
+                "default": "./dist/cjs/api/resources/folders/exports.js"
+            },
+            "default": "./dist/cjs/api/resources/folders/exports.js"
+        },
         "./tokens": {
             "import": {
                 "types": "./dist/esm/api/resources/tokens/exports.d.mts",
