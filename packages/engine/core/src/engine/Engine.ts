@@ -27,7 +27,7 @@ export interface Engine {
   /**
    * Whether `open()` takes a file's own bytes (`{ kind: 'bytes' }`), such as a file someone
    * picked on their computer. The local engine does; the cloud engine opens only the documents
-   * your server holds (`'id'`, `'token'`, `'share'`).
+   * your server holds (`'id'`, `'token'`, `'grant'`).
    */
   readonly canOpenFiles: boolean;
   open(input: OpenInput, options?: OpenOptions): AbortablePromise<DocumentHandle>;

@@ -6,13 +6,13 @@ export const EngineErrorCode = {
   DocPasswordRequired: 'DocPasswordRequired',
   DocPasswordIncorrect: 'DocPasswordIncorrect',
   /**
-   * A share-token exchange (`open({ kind: 'share' })`) needs the grant's
+   * A grant exchange (`open({ kind: 'grant' })`) needs the grant's
    * passphrase: none was supplied, or the supplied one was rejected —
    * indistinguishable by design, mirroring the server. Prompt and retry
-   * with `sharePassword`. Distinct from `DocPasswordRequired`, which is
+   * with `passphrase`. Distinct from `DocPasswordRequired`, which is
    * about the PDF's own encryption password.
    */
-  SharePasswordRequired: 'SharePasswordRequired',
+  GrantPassphraseRequired: 'GrantPassphraseRequired',
   Aborted: 'Aborted',
   Network: 'Network',
   Unauthenticated: 'Unauthenticated',
@@ -127,13 +127,13 @@ export const EngineErrorCode = {
    */
   LayerDeleted: 'LayerDeleted',
   /**
-   * The share link asks its visitors who they are, and this visitor hasn't
-   * answered what it requires: opening (a link that asks on open), or a
+   * The grant asks its visitors who they are, and this visitor hasn't
+   * answered what it requires: opening (a grant that asks on open), or a
    * change (one that asks before the first change), waits for the answers.
-   * `details` is a `VisitorIdentityRequest`: `fields` (what the link asks,
+   * `details` is a `VisitorIdentityRequest`: `fields` (what the grant asks,
    * each required or optional), `missing`, `invalid`, `purpose` and
    * `privacyUrl`. Answer by opening again with `visitor`, or with
-   * `doc.share.identify()`.
+   * `doc.grant.identify()`.
    */
   VisitorIdentityRequired: 'VisitorIdentityRequired',
 } as const;

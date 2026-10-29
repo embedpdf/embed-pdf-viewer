@@ -14,19 +14,19 @@ export type {
   OpenInputLayerSource,
   OpenInputById,
   OpenInputToken,
-  OpenInputShare,
+  OpenInputGrant,
   OpenInputLayerFile,
   OpenInputLayerFileSource,
   OpenOptions,
   TokenSource,
 } from './dto/OpenInput';
 export type {
-  ShareOpenRequest,
+  GrantOpenRequest,
   VisitorAnswers,
   VisitorIdentityField,
   VisitorIdentityRequest,
-} from './dto/ShareVisitor';
-export { shareOpenRequestOf, visitorIdentityRequestOf } from './dto/ShareVisitor';
+} from './dto/GrantVisitor';
+export { grantOpenRequestOf, visitorIdentityRequestOf } from './dto/GrantVisitor';
 export type { DocumentMetadata, DocumentMetadataTrapped } from './dto/DocumentMetadata';
 export type {
   DocumentOutline,
