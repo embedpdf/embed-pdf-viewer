@@ -759,10 +759,20 @@ export type AdminTenantListResponse = z.infer<typeof AdminTenantListResponseSche
  * where issue and revoke fail in different directions.
  *
  * The `docs.*` scopes are create, read, update and delete over the
- * tenant's documents. `docs.update` changes an existing document without
- * removing it, so a leaked token alters data rather than exposing or
- * destroying it; `docs.delete` stays separate because its failure
- * direction is loss.
+ * records of the tenant's documents and folders: names, folders, sizes,
+ * states. `docs.update` renames and moves; `docs.delete` stays separate
+ * because its failure direction is loss. No `docs.*` scope reaches what is
+ * inside a document.
+ *
+ * Everything inside a document, reading included, takes document
+ * permissions in the doc-token vocabulary (capabilities, collab scopes,
+ * `pdf.permissions`). A doc JWT carries them for one document; a tenant JWT
+ * may carry them next to its tenant scopes, and then they hold for every
+ * document of the tenant. That includes the two collection calls that hand
+ * out content: the original file needs `doc.download`, the thumbnail
+ * `doc.render`. `tokens.issue-doc` mints doc JWTs with any document
+ * permission, so a token holding it reaches anything inside the tenant's
+ * documents: it is the strongest content scope after `*`.
  */
 export const adminTenantScopes = [
   'docs.create',
@@ -813,10 +823,12 @@ export type AdminTokenIssueDocRequest = z.infer<typeof AdminTokenIssueDocRequest
 export const AdminTokenIssueTenantRequestSchema = z.object({
   kind: z.literal('tenant'),
   sub: z.string().min(1).max(256),
-  scope: z
-    .array(z.union([z.literal('*'), z.enum(adminTenantScopes)]))
-    .min(1)
-    .max(16),
+  /**
+   * Tenant scopes (`docs.read`, `tokens.issue-doc`, …, or `*`) and document
+   * permissions in the doc-token vocabulary, which hold for every document
+   * of the tenant. Validated server-side, as a doc token's scope is.
+   */
+  scope: z.array(z.string().min(1).max(128)).min(1).max(64),
   /** Token lifetime in seconds. */
   expiresIn: z
     .number()
@@ -1316,22 +1328,25 @@ export interface AdminOperation {
   path: string;
   /**
    * Credentials accepted by this operation. The API token is root and
-   * passes every scope check; a tenant JWT additionally requires the
-   * path's `tenantId` to equal the token's `tenant_id`. Doc-scoped
-   * tokens are always rejected on these surfaces.
+   * passes every scope check. A tenant JWT reaches only its own tenant:
+   * on the admin surfaces the path's `tenantId` must equal the token's
+   * `tenant_id`, and on the doc plane the document must belong to it.
+   * Doc-scoped tokens are always rejected on the admin surfaces.
    */
   credentials: ReadonlyArray<AdminCredential>;
   /**
    * Tenant scopes accepted on the tenant-jwt path — possessing any one
    * grants access (`*` always does). Empty for API-token-only
-   * operations, where no scope model applies.
+   * operations, where no scope model applies, and for operations on what
+   * is inside a document, which take `docCapabilities` instead.
    */
   scope: ReadonlyArray<AdminTenantScope>;
   /**
-   * Doc capabilities required on the doc-jwt path — typed against the
-   * engine-core vocabulary so a misspelled capability fails compile.
-   * The API token bypasses capability checks, same as it passes tenant
-   * scope checks. Present only on doc-plane operations.
+   * Document permissions the operation needs, on a doc JWT and a tenant
+   * JWT alike: doc-plane operations, and the collection operations that
+   * hand out what is inside a document. Typed against the engine-core
+   * vocabulary so a misspelled capability fails compile. The API token
+   * bypasses capability checks.
    */
   docCapabilities?: ReadonlyArray<DocCapability>;
   /** Documented request headers (beyond Authorization). */
@@ -1539,7 +1554,8 @@ export const adminOperations = {
     method: 'GET',
     path: '/v1/tenants/:tenantId/documents/:id/download',
     credentials: ['api-token', 'tenant-jwt'],
-    scope: ['docs.read'],
+    scope: [],
+    docCapabilities: ['doc.download'],
     params: AdminTenantDocParamsSchema,
     responses: {
       200: { contentType: 'application/pdf' },
@@ -1604,7 +1620,8 @@ export const adminOperations = {
     method: 'GET',
     path: '/v1/tenants/:tenantId/documents/:id/thumbnail',
     credentials: ['api-token', 'tenant-jwt'],
-    scope: ['docs.read'],
+    scope: [],
+    docCapabilities: ['doc.render'],
     params: AdminTenantDocParamsSchema,
     responses: {
       200: { contentType: ['image/webp', 'image/png'] },
@@ -2001,14 +2018,16 @@ export type AdminOperationId = keyof typeof adminOperations;
 //
 // The "API vs protocol" split: these are the document operations a backend
 // can genuinely call — plain origin paths, credentialed by the API token
-// (which the server resolves to the document's own tenant) or a doc JWT
-// carrying the listed capabilities. The viewer-session protocol — /v1/access,
-// /v1/warm, the immutable `@{version}` CDN variants, SSE, password
-// sessions — deliberately stays out of this registry: it
-// is the transport between the CloudPDF viewer SDK and the engine, free to
-// evolve behind the SDK boundary. Body/response schemas start deliberately
-// loose (documented paths, params, credentials, capabilities) and tighten
-// incrementally as the wire shapes are ported from engine-core.
+// (which the server resolves to the document's own tenant), or a tenant
+// JWT or doc JWT carrying the listed capabilities, a tenant JWT on its own
+// tenant's documents. Browsers only ever get doc JWTs. The viewer-session
+// protocol — /v1/access, /v1/warm, the immutable `@{version}` CDN
+// variants, SSE, password sessions — deliberately stays out of this
+// registry: it is the transport between the CloudPDF viewer SDK and the
+// engine, free to evolve behind the SDK boundary. Body/response schemas
+// start deliberately loose (documented paths, params, credentials,
+// capabilities) and tighten incrementally as the wire shapes are ported
+// from engine-core.
 
 export const DocIdParamsSchema = z.object({
   docId: z.string().regex(docIdPattern),
@@ -2092,7 +2111,7 @@ export const idempotencyKeyHeader: AdminOperationHeader = {
 };
 
 const looseJson = z.record(z.string(), z.unknown());
-const docCredentials = ['api-token', 'doc-jwt'] as const;
+const docCredentials = ['api-token', 'tenant-jwt', 'doc-jwt'] as const;
 
 export const DocSigningParamsSchema = DocLayerParamsSchema.extend({
   signingId: z.string().min(1),

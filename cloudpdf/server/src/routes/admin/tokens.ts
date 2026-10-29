@@ -16,6 +16,7 @@ import {
 } from '../../app/jwt-plugin';
 import type { SignDevTokenInput } from '../../auth/JwtVerifier';
 import type { RevokedJtisGuard } from '../../auth/RevokedJtisGuard';
+import { validateTenantScope } from '../../auth/tenant-scope';
 import { isVisitorLayerName, VISITOR_LAYER_PREFIX } from '../../auth/visitor-handle';
 import type { DocumentsRepo } from '../../db/repos/documents.repo';
 import type { SecurityEventsRepo } from '../../db/repos/security-events.repo';
@@ -71,6 +72,16 @@ export async function registerAdminTokensRoutes(
           ctx = { tenantId, sub: 'api-token', via: 'api-token' };
         } else {
           ctx = requireTenantAccess(req, tenantId, op.scope);
+        }
+
+        if (body.kind === 'tenant') {
+          try {
+            validateTenantScope(body.scope);
+          } catch (err) {
+            return reply.code(400).send({
+              error: { code: 'InvalidArg', message: (err as Error).message },
+            });
+          }
         }
 
         if (body.kind === 'doc') {

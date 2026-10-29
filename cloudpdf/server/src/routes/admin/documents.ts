@@ -13,12 +13,13 @@ import {
   type DocumentListSort,
   type ListOrder,
 } from '@cloudpdf/contract';
+import { decodePdfBits, type PdfBits } from '@embedpdf/engine-core/runtime';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
 import { decodeSortedListCursor, encodeSortedListCursor } from './_cursor';
 import { formatIssues } from './_issues';
 import { folderIdOfPlace, placeOfFolderId, ROOT_PLACE } from './_place';
-import { requireTenantAccess } from '../../app/jwt-plugin';
+import { requireTenantAccess, requireTenantContentAccess } from '../../app/jwt-plugin';
 import { listPositionOf } from '../../db/repos/documents.repo';
 import type { DocumentLifecycleService } from '../../services/DocumentLifecycleService';
 import type { ObjectStore } from '../../storage/ObjectStore';
@@ -241,7 +242,9 @@ export async function registerAdminDocumentsRoutes(
   const downloadOp = adminOperations['documents.download'];
   mount(downloadOp, async (req, reply) => {
     const { tenantId, id } = req.params as { tenantId: string; id: string };
-    const ctx = requireTenantAccess(req, tenantId, downloadOp.scope);
+    const ctx = await requireTenantContentAccess(req, tenantId, 'doc.download', () =>
+      pdfBitsOf(lifecycle, tenantId, id),
+    );
     const bytes = await lifecycle.download(ctx.tenantId, id);
     return reply
       .type('application/pdf')
@@ -266,7 +269,9 @@ export async function registerAdminDocumentsRoutes(
   const thumbnailOp = adminOperations['documents.thumbnail'];
   mount(thumbnailOp, async (req, reply) => {
     const { tenantId, id } = req.params as { tenantId: string; id: string };
-    const ctx = requireTenantAccess(req, tenantId, thumbnailOp.scope);
+    const ctx = await requireTenantContentAccess(req, tenantId, 'doc.render', () =>
+      pdfBitsOf(lifecycle, tenantId, id),
+    );
     const doc = await lifecycle.get(ctx.tenantId, id);
     if (!storage || doc.thumbnailState !== 'ready' || !doc.thumbnailKey) {
       return reply.code(404).send({
@@ -314,6 +319,16 @@ function parseCommitBody(req: FastifyRequest): AdminDocumentCommitRequest {
     ...result.data,
     sha256: result.data.sha256.toLowerCase(),
   };
+}
+
+/** The document's PDF permission bits, which `pdf.permissions` in a scope expands against. */
+async function pdfBitsOf(
+  lifecycle: DocumentLifecycleService,
+  tenantId: string,
+  docId: string,
+): Promise<PdfBits> {
+  const doc = await lifecycle.get(tenantId, docId);
+  return decodePdfBits(doc.security.pdfPermissionsBits ?? null);
 }
 
 function parseUpdateBody(req: FastifyRequest): AdminDocumentUpdateRequest {

@@ -59,6 +59,9 @@
             "apiToken": []
           },
           {
+            "tenantToken": []
+          },
+          {
             "docToken": []
           }
         ],
@@ -129,6 +132,9 @@
         "security": [
           {
             "apiToken": []
+          },
+          {
+            "tenantToken": []
           },
           {
             "docToken": []
@@ -221,6 +227,9 @@
             "apiToken": []
           },
           {
+            "tenantToken": []
+          },
+          {
             "docToken": []
           }
         ],
@@ -309,6 +318,9 @@
         "security": [
           {
             "apiToken": []
+          },
+          {
+            "tenantToken": []
           },
           {
             "docToken": []
@@ -429,6 +441,9 @@
         "security": [
           {
             "apiToken": []
+          },
+          {
+            "tenantToken": []
           },
           {
             "docToken": []
@@ -560,6 +575,9 @@
             "apiToken": []
           },
           {
+            "tenantToken": []
+          },
+          {
             "docToken": []
           }
         ],
@@ -669,6 +687,9 @@
         "security": [
           {
             "apiToken": []
+          },
+          {
+            "tenantToken": []
           },
           {
             "docToken": []
@@ -783,6 +804,9 @@
         "security": [
           {
             "apiToken": []
+          },
+          {
+            "tenantToken": []
           },
           {
             "docToken": []
@@ -908,6 +932,9 @@
             "apiToken": []
           },
           {
+            "tenantToken": []
+          },
+          {
             "docToken": []
           }
         ],
@@ -1018,6 +1045,9 @@
         "security": [
           {
             "apiToken": []
+          },
+          {
+            "tenantToken": []
           },
           {
             "docToken": []
@@ -1138,6 +1168,9 @@
         "security": [
           {
             "apiToken": []
+          },
+          {
+            "tenantToken": []
           },
           {
             "docToken": []
@@ -1261,6 +1294,9 @@
             "apiToken": []
           },
           {
+            "tenantToken": []
+          },
+          {
             "docToken": []
           }
         ],
@@ -1373,6 +1409,9 @@
             "apiToken": []
           },
           {
+            "tenantToken": []
+          },
+          {
             "docToken": []
           }
         ],
@@ -1452,6 +1491,9 @@
         "security": [
           {
             "apiToken": []
+          },
+          {
+            "tenantToken": []
           },
           {
             "docToken": []
@@ -1587,6 +1629,9 @@
             "apiToken": []
           },
           {
+            "tenantToken": []
+          },
+          {
             "docToken": []
           }
         ],
@@ -1667,6 +1712,9 @@
         "security": [
           {
             "apiToken": []
+          },
+          {
+            "tenantToken": []
           },
           {
             "docToken": []
@@ -1769,6 +1817,9 @@
             "apiToken": []
           },
           {
+            "tenantToken": []
+          },
+          {
             "docToken": []
           }
         ],
@@ -1847,6 +1898,9 @@
         "security": [
           {
             "apiToken": []
+          },
+          {
+            "tenantToken": []
           },
           {
             "docToken": []
@@ -1956,6 +2010,9 @@
         "security": [
           {
             "apiToken": []
+          },
+          {
+            "tenantToken": []
           },
           {
             "docToken": []
@@ -2076,6 +2133,9 @@
             "apiToken": []
           },
           {
+            "tenantToken": []
+          },
+          {
             "docToken": []
           }
         ],
@@ -2183,6 +2243,9 @@
         "security": [
           {
             "apiToken": []
+          },
+          {
+            "tenantToken": []
           },
           {
             "docToken": []
@@ -2314,6 +2377,9 @@
             "apiToken": []
           },
           {
+            "tenantToken": []
+          },
+          {
             "docToken": []
           }
         ],
@@ -2433,6 +2499,9 @@
         "security": [
           {
             "apiToken": []
+          },
+          {
+            "tenantToken": []
           },
           {
             "docToken": []
@@ -2555,6 +2624,9 @@
             "apiToken": []
           },
           {
+            "tenantToken": []
+          },
+          {
             "docToken": []
           }
         ],
@@ -2633,6 +2705,9 @@
         "security": [
           {
             "apiToken": []
+          },
+          {
+            "tenantToken": []
           },
           {
             "docToken": []
@@ -2715,6 +2790,9 @@
             "apiToken": []
           },
           {
+            "tenantToken": []
+          },
+          {
             "docToken": []
           }
         ],
@@ -2795,6 +2873,9 @@
             "apiToken": []
           },
           {
+            "tenantToken": []
+          },
+          {
             "docToken": []
           }
         ],
@@ -2873,6 +2954,9 @@
         "security": [
           {
             "apiToken": []
+          },
+          {
+            "tenantToken": []
           },
           {
             "docToken": []
@@ -2995,6 +3079,9 @@
             "apiToken": []
           },
           {
+            "tenantToken": []
+          },
+          {
             "docToken": []
           }
         ],
@@ -3085,6 +3172,9 @@
         "security": [
           {
             "apiToken": []
+          },
+          {
+            "tenantToken": []
           },
           {
             "docToken": []
@@ -3186,6 +3276,9 @@
         "security": [
           {
             "apiToken": []
+          },
+          {
+            "tenantToken": []
           },
           {
             "docToken": []
@@ -3297,6 +3390,9 @@
             "apiToken": []
           },
           {
+            "tenantToken": []
+          },
+          {
             "docToken": []
           }
         ],
@@ -3406,6 +3502,9 @@
             "apiToken": []
           },
           {
+            "tenantToken": []
+          },
+          {
             "docToken": []
           }
         ],
@@ -3513,6 +3612,9 @@
         "security": [
           {
             "apiToken": []
+          },
+          {
+            "tenantToken": []
           },
           {
             "docToken": []
@@ -3625,6 +3727,9 @@
             "apiToken": []
           },
           {
+            "tenantToken": []
+          },
+          {
             "docToken": []
           }
         ],
@@ -3718,6 +3823,9 @@
             "apiToken": []
           },
           {
+            "tenantToken": []
+          },
+          {
             "docToken": []
           }
         ],
@@ -3796,6 +3904,9 @@
         "security": [
           {
             "apiToken": []
+          },
+          {
+            "tenantToken": []
           },
           {
             "docToken": []
@@ -3886,6 +3997,9 @@
         "security": [
           {
             "apiToken": []
+          },
+          {
+            "tenantToken": []
           },
           {
             "docToken": []
@@ -4008,6 +4122,9 @@
             "apiToken": []
           },
           {
+            "tenantToken": []
+          },
+          {
             "docToken": []
           }
         ],
@@ -4124,6 +4241,9 @@
         "security": [
           {
             "apiToken": []
+          },
+          {
+            "tenantToken": []
           },
           {
             "docToken": []
@@ -4243,6 +4363,9 @@
             "apiToken": []
           },
           {
+            "tenantToken": []
+          },
+          {
             "docToken": []
           }
         ],
@@ -4335,6 +4458,9 @@
             "apiToken": []
           },
           {
+            "tenantToken": []
+          },
+          {
             "docToken": []
           }
         ],
@@ -4414,6 +4540,9 @@
         "security": [
           {
             "apiToken": []
+          },
+          {
+            "tenantToken": []
           },
           {
             "docToken": []
@@ -4560,6 +4689,9 @@
             "apiToken": []
           },
           {
+            "tenantToken": []
+          },
+          {
             "docToken": []
           }
         ],
@@ -4648,6 +4780,9 @@
         "security": [
           {
             "apiToken": []
+          },
+          {
+            "tenantToken": []
           },
           {
             "docToken": []
@@ -4749,6 +4884,9 @@
             "apiToken": []
           },
           {
+            "tenantToken": []
+          },
+          {
             "docToken": []
           }
         ],
@@ -4837,6 +4975,9 @@
         "security": [
           {
             "apiToken": []
+          },
+          {
+            "tenantToken": []
           },
           {
             "docToken": []
@@ -4937,6 +5078,9 @@
         "security": [
           {
             "apiToken": []
+          },
+          {
+            "tenantToken": []
           },
           {
             "docToken": []
@@ -5849,7 +5993,8 @@
             "tenantToken": []
           }
         ],
-        "x-required-scope": ["docs.read"],
+        "x-required-scope": [],
+        "x-required-capability": ["doc.download"],
         "parameters": [
           {
             "name": "tenantId",
@@ -6142,7 +6287,8 @@
             "tenantToken": []
           }
         ],
-        "x-required-scope": ["docs.read"],
+        "x-required-scope": [],
+        "x-required-capability": ["doc.render"],
         "parameters": [
           {
             "name": "tenantId",
@@ -8178,7 +8324,7 @@
         "scheme": "bearer",
         "bearerFormat": "JWT",
         "x-docs-title": "Tenant token",
-        "description": "Delegated tenant JWT, valid only under its own /v1/tenants/{tenantId}/ subtree — the path tenant must equal the token's tenant_id. Doc-scoped viewer tokens are rejected on every admin route."
+        "description": "Delegated tenant JWT, valid only for its own tenant: under /v1/tenants/{tenantId}/ the path tenant must equal the token's tenant_id, and on /v1/docs/{docId} the document must belong to that tenant and the token's scope must hold the operation's document permissions, as a document token does. For servers; browsers get document tokens. Doc-scoped viewer tokens are rejected on every admin route."
       },
       "docToken": {
         "type": "http",
@@ -25984,27 +26130,12 @@
               "scope": {
                 "type": "array",
                 "items": {
-                  "anyOf": [
-                    {
-                      "type": "string",
-                      "enum": ["*"]
-                    },
-                    {
-                      "type": "string",
-                      "enum": [
-                        "docs.create",
-                        "docs.read",
-                        "docs.update",
-                        "docs.delete",
-                        "tokens.issue-doc",
-                        "tokens.revoke",
-                        "shares.manage"
-                      ]
-                    }
-                  ]
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
                 },
                 "minItems": 1,
-                "maxItems": 16
+                "maxItems": 64
               },
               "expiresIn": {
                 "type": "integer",

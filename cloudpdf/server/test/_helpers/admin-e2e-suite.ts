@@ -411,6 +411,31 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
       expect(withTenantJwt.status).toBe(403);
     });
 
+    test('the original file and the thumbnail need document permissions, not docs.read', async () => {
+      const tenant = 'tenant-content';
+      const owner = createCloudAdmin({
+        baseUrl: fx.baseUrl,
+        tenantToken: adminToken(tenant),
+      }).tenant(tenant);
+      const doc = (await owner.documents.create({ bytes: fakePdf(90, 256) })).document;
+      const keyWith = (scope: string[]) =>
+        signDevToken(SECRET, { sub: `key-${scope.join('+')}`, tenant_id: tenant, scope });
+      const get = (token: string, rest: string) =>
+        fetch(`${fx.baseUrl}/v1/tenants/${tenant}/documents/${doc.id}${rest}`, {
+          headers: { authorization: `Bearer ${token}` },
+        });
+
+      const records = keyWith(['docs.read']);
+      expect((await get(records, '')).status).toBe(200);
+      expect((await get(records, '/download')).status).toBe(403);
+      expect((await get(records, '/thumbnail')).status).toBe(403);
+
+      expect((await get(keyWith(['doc.download']), '/download')).status).toBe(200);
+      // Allowed in, and the tile is not warmed here (no engine), so 404.
+      expect((await get(keyWith(['doc.render']), '/thumbnail')).status).toBe(404);
+      expect((await get(keyWith(['doc.render']), '/download')).status).toBe(403);
+    });
+
     test('docs.read scope alone cannot create', async () => {
       const readOnly = signDevToken(SECRET, {
         sub: 'reader',

@@ -246,11 +246,11 @@ describe('requireDocAccess — Layer 3 (doc route guard, legacy helper)', () => 
     expect(requireDocAccess(fakeReq(claims), 'doc-1', ['doc.annotate.modify']).mode).toBe('doc');
   });
 
-  test('accepts a tenant token with docs.read on any doc (Model B)', async () => {
+  test('accepts a tenant token with the needed document permission on any doc', async () => {
     const tok = signDevToken(SECRET, {
       sub: 'u',
       tenant_id: 't',
-      scope: ['docs.read'],
+      scope: ['docs.read', 'doc.open'],
     });
     const claims = await verify(tok);
     const ctx = requireDocAccess(fakeReq(claims), 'any-doc', ['doc.open']);
@@ -268,7 +268,7 @@ describe('requireDocAccess — Layer 3 (doc route guard, legacy helper)', () => 
     expect(requireDocAccess(fakeReq(claims), 'doc-x', ['doc.annotate']).mode).toBe('tenant');
   });
 
-  test('rejects a tenant token without docs.read or *', async () => {
+  test('rejects a tenant token whose scope grants nothing inside documents', async () => {
     const tok = signDevToken(SECRET, {
       sub: 'u',
       tenant_id: 't',
@@ -276,7 +276,7 @@ describe('requireDocAccess — Layer 3 (doc route guard, legacy helper)', () => 
     });
     const claims = await verify(tok);
     expect(() => requireDocAccess(fakeReq(claims), 'doc-1', ['doc.open'])).toThrow(
-      /tenant scope required/,
+      /document permission required/,
     );
   });
 
@@ -284,7 +284,32 @@ describe('requireDocAccess — Layer 3 (doc route guard, legacy helper)', () => 
     const tok = signDevToken(SECRET, { sub: 'u', tenant_id: 't' });
     const claims = await verify(tok);
     expect(() => requireDocAccess(fakeReq(claims), 'doc-1', ['doc.open'])).toThrow(
-      /tenant scope required/,
+      /document permission required/,
+    );
+  });
+
+  test('docs.read grants a tenant token nothing inside documents', async () => {
+    const tok = signDevToken(SECRET, { sub: 'u', tenant_id: 't', scope: ['docs.read'] });
+    const claims = await verify(tok);
+    for (const needed of ['doc.open', 'doc.forms.read', 'doc.annotate.modify']) {
+      expect(() => requireDocAccess(fakeReq(claims), 'doc-1', [needed])).toThrow(
+        /document permission required/,
+      );
+    }
+  });
+
+  test('a document permission in a tenant scope holds for every document of the tenant', async () => {
+    const tok = signDevToken(SECRET, {
+      sub: 'u',
+      tenant_id: 't',
+      scope: ['doc.annotate.modify'],
+    });
+    const claims = await verify(tok);
+    for (const docId of ['doc-1', 'doc-2']) {
+      expect(requireDocAccess(fakeReq(claims), docId, ['doc.annotate.modify']).mode).toBe('tenant');
+    }
+    expect(() => requireDocAccess(fakeReq(claims), 'doc-1', ['doc.forms.fill'])).toThrow(
+      /document permission required/,
     );
   });
 });
