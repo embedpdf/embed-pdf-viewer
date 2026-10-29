@@ -25,17 +25,17 @@ describe('operation registry', () => {
         op.path === '/v1/tenants' ||
           op.path.startsWith('/v1/tenants/') ||
           op.path.startsWith('/v1/deployment/') ||
-          op.path === adminWirePaths.shareSessions,
+          op.path === adminWirePaths.grantSessions,
         op.path,
       ).toBe(true);
       if (op.credentials.length === 0) {
-        // The public surface is exactly the share-session exchange: the
+        // The public surface is exactly the grant-session exchange: the
         // grant row is the authorization, so no bearer credential
         // exists. Any new unauthenticated operation must be added here
         // deliberately — an empty credential list anywhere else is a
         // registry mistake, not a new feature.
         expect(op.path, `${op.operationId} must not be unauthenticated`).toBe(
-          adminWirePaths.shareSessions,
+          adminWirePaths.grantSessions,
         );
         expect(op.scope.length).toBe(0);
         continue;

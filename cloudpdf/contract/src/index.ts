@@ -77,8 +77,14 @@ const originPatternArray = z
   )
   .min(1)
   .max(32);
-/** Share tokens are the grant row id: `shr_` + 24 url-safe random chars. */
-const shareTokenPattern = /^shr_[A-Za-z0-9_-]{24}$/;
+/**
+ * A grant's id: `grt_` + 24 url-safe random chars. Grants made before the rename are `shr_…`
+ * and keep working.
+ */
+const grantIdPattern = /^(grt|shr)_[A-Za-z0-9_-]{24}$/;
+
+/** What a grant is called in the dashboard, for example "Website" or "Sent to Acme". */
+const grantNameSchema = z.string().trim().min(1).max(100);
 
 /** A query-string flag, `true` or `false`. */
 const queryFlag = z.preprocess(
@@ -118,18 +124,18 @@ export const adminWirePaths = {
   tokenIssue: (tenantId: string) => `/v1/tenants/${encodeURIComponent(tenantId)}/tokens`,
   tokenRevoke: (tenantId: string, jti: string) =>
     `/v1/tenants/${encodeURIComponent(tenantId)}/tokens/${encodeURIComponent(jti)}/revoke`,
-  shares: (tenantId: string) => `/v1/tenants/${encodeURIComponent(tenantId)}/shares`,
-  share: (tenantId: string, shareId: string) =>
-    `/v1/tenants/${encodeURIComponent(tenantId)}/shares/${encodeURIComponent(shareId)}`,
+  grants: (tenantId: string) => `/v1/tenants/${encodeURIComponent(tenantId)}/grants`,
+  grant: (tenantId: string, grantId: string) =>
+    `/v1/tenants/${encodeURIComponent(tenantId)}/grants/${encodeURIComponent(grantId)}`,
   tenantUsage: (tenantId: string) => `/v1/tenants/${encodeURIComponent(tenantId)}/usage`,
   tenantSuspend: (tenantId: string) => `/v1/tenants/${encodeURIComponent(tenantId)}/suspend`,
   tenantResume: (tenantId: string) => `/v1/tenants/${encodeURIComponent(tenantId)}/resume`,
   /**
-   * The public share-session exchange. Deliberately outside any tenant
-   * subtree: the caller holds only a share token and does not know the
+   * The public grant-session exchange. Deliberately outside any tenant
+   * subtree: the caller holds only a grant's id and does not know the
    * tenant — the grant row resolves it server-side.
    */
-  shareSessions: '/v1/share-sessions',
+  grantSessions: '/v1/grant-sessions',
   /** Deployment-global singletons: API-token only, no tenant context. */
   deploymentLicenseStatus: '/v1/deployment/license/status',
 } as const;
@@ -616,17 +622,17 @@ export const AdminTenantDocLayerParamsSchema = AdminTenantDocParamsSchema.extend
 export type AdminTenantDocLayerParams = z.infer<typeof AdminTenantDocLayerParamsSchema>;
 
 /**
- * A layer that holds changes: one a link or your tokens name, or a
- * share-link visitor's own. A layer appears at its first change, and a
+ * A layer that holds changes: one a grant or your tokens name, or a
+ * grant visitor's own. A layer appears at its first change, and a
  * deleted one is no longer listed. Read and download it with the API token
  * through `/v1/docs/{docId}/layers/{layerName}`.
  */
 export const AdminLayerRecordSchema = z.object({
   docId: z.string(),
   layerName: z.string(),
-  /** The share link whose visitor made it (the link may since be deleted); null otherwise. */
-  shareId: z.string().nullable(),
-  /** That visitor; null for a layer a link or token names. */
+  /** The grant whose visitor made it (the grant may since be deleted); null otherwise. */
+  grantId: z.string().nullable(),
+  /** That visitor; null for a layer a grant or token names. */
   visitorId: z.string().nullable(),
   /** Bytes the layer stores: its changes over the document, not the whole PDF. */
   storageSizeBytes: z.number().nullable(),
@@ -648,8 +654,8 @@ export const AdminDocumentLayerListQuerySchema = z.object({
     .max(ADMIN_DOCUMENT_LIST_MAX_LIMIT)
     .default(ADMIN_DOCUMENT_LIST_DEFAULT_LIMIT),
   cursor: z.string().min(1).optional(),
-  /** Only the layers this share link's visitors made, a deleted link's too. */
-  shareId: z.string().regex(shareTokenPattern).optional(),
+  /** Only the layers this grant's visitors made, a deleted grant's too. */
+  grantId: z.string().regex(grantIdPattern).optional(),
 });
 export type AdminDocumentLayerListQuery = z.infer<typeof AdminDocumentLayerListQuerySchema>;
 
@@ -697,7 +703,7 @@ export const AdminTenantRecordSchema = z.object({
   autoProvisioned: z.boolean(),
   /**
    * `suspended` tenants fail closed: every tenant JWT, doc JWT, and
-   * share exchange is refused until resume. The API token is exempt —
+   * grant exchange is refused until resume. The API token is exempt —
    * the operator must be able to inspect, resume, or delete a
    * suspended tenant. Optional because older servers omit it.
    */
@@ -753,7 +759,7 @@ export type AdminTenantListResponse = z.infer<typeof AdminTenantListResponseSche
  * creation), revocation leaking is an availability risk (mass session
  * kill). Different failure directions, different scopes.
  *
- * `shares.manage` covers the whole share-grant lifecycle with one
+ * `grants.manage` covers the whole grant lifecycle with one
  * scope: a grant is a standing mint capability, so creating and
  * revoking it are the same trust decision — unlike ephemeral tokens,
  * where issue and revoke fail in different directions.
@@ -781,7 +787,7 @@ export const adminTenantScopes = [
   'docs.delete',
   'tokens.issue-doc',
   'tokens.revoke',
-  'shares.manage',
+  'grants.manage',
 ] as const;
 export type AdminTenantScope = (typeof adminTenantScopes)[number];
 
@@ -871,25 +877,25 @@ export type AdminTokenIssueResponse = z.infer<typeof AdminTokenIssueResponseSche
  * the capability scopes it carries.
  */
 // ---------------------------------------------------------------------------
-// Share grants
+// Grants
 // ---------------------------------------------------------------------------
 //
-// A share grant is a standing, revocable authorization decision stored
+// A grant is a standing, revocable authorization decision stored
 // with the documents: "anyone presenting this reference, from these
 // origins, gets exactly these capabilities on this document". The grant
-// id doubles as the public share token — it is a reference whose power
+// id is what a page holds to open the document — it is a reference whose power
 // is evaluated at exchange time, never a bearer credential, which is
 // what lets it live in public HTML while staying editable and
 // revocable. The only credential it ever produces is an ordinary
-// short-lived doc JWT, minted downward at `shares.exchange`.
+// short-lived doc JWT, minted downward at `grants.exchange`.
 
 /**
- * Whose layer a link's visitors write into: `'shared'`, one layer everyone
+ * Whose layer a grant's visitors write into: `'shared'`, one layer everyone
  * reads and writes (`layerName`), or `'per-visitor'`, a layer of each
  * visitor's own (`visitor-<id>`), made at their first change.
  */
-export const ShareLayerModeSchema = z.enum(['shared', 'per-visitor']);
-export type ShareLayerMode = z.infer<typeof ShareLayerModeSchema>;
+export const GrantLayerModeSchema = z.enum(['shared', 'per-visitor']);
+export type GrantLayerMode = z.infer<typeof GrantLayerModeSchema>;
 
 /** Delete a visitor after this long unseen: an hour to 30 days. */
 const visitorIdleSecondsSchema = z
@@ -901,13 +907,13 @@ const visitorIdleSecondsSchema = z
 const visitorQuestionSchema = z.enum(['required', 'optional']);
 
 /**
- * What a link asks its visitors, so what they add carries their name and
+ * What a grant asks its visitors, so what they add carries their name and
  * the owner learns who they are. The answers are stored once per visitor
  * and go into every session token issued for them; a visitor can't change
  * an answer they gave (they start over instead). `userId` is never asked: a
  * visitor's is `visitor_<id>`.
  */
-export const ShareVisitorIdentitySchema = z.object({
+export const GrantVisitorIdentitySchema = z.object({
   /** The identity fields to ask, each required or optional; at least one. */
   fields: z.object({
     /** Their name: the author of what they add. */
@@ -919,7 +925,7 @@ export const ShareVisitorIdentitySchema = z.object({
   }),
   /**
    * `'on-open'`: before the document opens (a lead gate). `'before-first-change'`:
-   * reading is free, and the first change asks (a review link).
+   * reading is free, and the first change asks (a review grant).
    */
   ask: z.enum(['on-open', 'before-first-change']),
   /** Shown with the questions: why they're asked. */
@@ -927,17 +933,17 @@ export const ShareVisitorIdentitySchema = z.object({
   /** The link owner's privacy notice, linked from the questions. */
   privacyUrl: z.string().url().max(2048).optional(),
 });
-export type ShareVisitorIdentity = z.infer<typeof ShareVisitorIdentitySchema>;
+export type GrantVisitorIdentity = z.infer<typeof GrantVisitorIdentitySchema>;
 
-/** A visitor's answers, the identity fields a link asks. */
-export const ShareVisitorAnswersSchema = z.object({
+/** A visitor's answers, the identity fields a grant asks. */
+export const GrantVisitorAnswersSchema = z.object({
   displayName: z.string().max(4096).optional(),
   email: z.string().max(4096).optional(),
   title: z.string().max(4096).optional(),
   organization: z.string().max(4096).optional(),
   organizationalUnit: z.string().max(4096).optional(),
 });
-export type ShareVisitorAnswers = z.infer<typeof ShareVisitorAnswersSchema>;
+export type GrantVisitorAnswers = z.infer<typeof GrantVisitorAnswersSchema>;
 
 const visitorFieldSchema = z.enum([
   'displayName',
@@ -949,12 +955,12 @@ const visitorFieldSchema = z.enum([
 
 /**
  * What a visitor is still asked: the details of `VisitorIdentityRequired`,
- * and the exchange's `visitor.identityRequest` on a link that asks before
+ * and the exchange's `visitor.identityRequest` on a grant that asks before
  * the first change.
  */
-export const ShareVisitorIdentityRequestSchema = z.object({
-  /** What the link asks, each required or optional. */
-  fields: ShareVisitorIdentitySchema.shape.fields,
+export const GrantVisitorIdentityRequestSchema = z.object({
+  /** What the grant asks, each required or optional. */
+  fields: GrantVisitorIdentitySchema.shape.fields,
   /** Required fields not answered yet. */
   missing: z.array(visitorFieldSchema),
   /** Answers given this time that can't be taken (an email that isn't one, too long). */
@@ -962,18 +968,20 @@ export const ShareVisitorIdentityRequestSchema = z.object({
   purpose: z.string().optional(),
   privacyUrl: z.string().optional(),
 });
-export type ShareVisitorIdentityRequest = z.infer<typeof ShareVisitorIdentityRequestSchema>;
+export type GrantVisitorIdentityRequest = z.infer<typeof GrantVisitorIdentityRequestSchema>;
 
-export const ShareGrantRecordSchema = z.object({
-  /** Grant id; doubles as the public share token (`shr_…`). */
+export const GrantRecordSchema = z.object({
+  /** The grant's id (`grt_…`; older grants `shr_…`): what a link page or an embed opens. */
   id: z.string(),
   tenantId: z.string(),
   docId: z.string(),
-  layerMode: ShareLayerModeSchema,
-  /** The layer every visitor shares; null for a per-visitor link. */
+  /** What it's called, for example "Website" or "Sent to Acme"; null when unnamed. */
+  name: z.string().nullable(),
+  layerMode: GrantLayerModeSchema,
+  /** The layer every visitor shares; null for a per-visitor grant. */
   layerName: z.string().nullable(),
   /**
-   * Per-visitor links: a visitor's browser comes back to their layer on the next visit; false
+   * Per-visitor grants: a visitor's browser comes back to their layer on the next visit; false
    * gives every visit a new visitor and a new layer.
    */
   keepVisitorLayers: z.boolean(),
@@ -982,10 +990,10 @@ export const ShareGrantRecordSchema = z.object({
    * unseen; null keeps them until they are deleted on purpose.
    */
   visitorIdleSeconds: z.number().nullable(),
-  /** What the link asks its visitors; null asks nothing. */
-  visitorIdentity: ShareVisitorIdentitySchema.nullable(),
+  /** What the grant asks its visitors; null asks nothing. */
+  visitorIdentity: GrantVisitorIdentitySchema.nullable(),
   /**
-   * Who the link's visitors are, for a link made for one person; null when
+   * Who the grant's visitors are, for a grant made for one person; null when
    * they are whoever they answer. It prevails over their answers.
    */
   identity: IdentitySchema.nullable(),
@@ -994,13 +1002,13 @@ export const ShareGrantRecordSchema = z.object({
   /** Origin allowlist; null means any origin. */
   origins: z.array(z.string()).nullable(),
   /** True when a passphrase is required at exchange. The passphrase itself is never returned. */
-  passwordProtected: z.boolean(),
+  passphraseProtected: z.boolean(),
   /** Lifetime of each exchanged session token, in seconds. */
   sessionTtlSeconds: z.number(),
   /** Paused grants refuse exchange (404) but keep their configuration. */
   disabled: z.boolean(),
   /**
-   * Unix epoch ms the link was archived: it refuses exchange for good and
+   * Unix epoch ms the grant was archived: it refuses exchange for good and
    * keeps what its visitors made. Null while it works.
    */
   archivedAt: z.number().nullable(),
@@ -1013,31 +1021,33 @@ export const ShareGrantRecordSchema = z.object({
   createdAt: z.number(),
   updatedAt: z.number(),
 });
-export type ShareGrantRecord = z.infer<typeof ShareGrantRecordSchema>;
+export type GrantRecord = z.infer<typeof GrantRecordSchema>;
 
-export const ShareGrantCreateRequestSchema = z.object({
+export const GrantCreateRequestSchema = z.object({
   docId: z.string().regex(docIdPattern),
+  /** What to call it, 1 to 100 characters after trimming. Omit or null for none. */
+  name: grantNameSchema.nullable().optional(),
   /** Default `'shared'`. */
-  layerMode: ShareLayerModeSchema.optional(),
-  /** The shared layer, default `default`. Not for a per-visitor link, and never `visitor-…`. */
+  layerMode: GrantLayerModeSchema.optional(),
+  /** The shared layer, default `default`. Not for a per-visitor grant, and never `visitor-…`. */
   layerName: z.string().min(1).max(256).optional(),
   /**
-   * Per-visitor links: a visitor's browser comes back to their layer on the next visit; false
+   * Per-visitor grants: a visitor's browser comes back to their layer on the next visit; false
    * gives every visit a new visitor and a new layer. Default true.
    */
   keepVisitorLayers: z.boolean().optional(),
   /**
    * Delete a visitor (their answers and their layer) after this long unseen,
-   * for links whose visitors' work is throwaway (examples, demos). Omit or
+   * for grants whose visitors' work is throwaway (examples, demos). Omit or
    * null to keep visitors until they are deleted on purpose (the default).
    */
   visitorIdleSeconds: visitorIdleSecondsSchema.nullable().optional(),
   /** Ask visitors who they are; omit or null to ask nothing. */
-  visitorIdentity: ShareVisitorIdentitySchema.nullable().optional(),
+  visitorIdentity: GrantVisitorIdentitySchema.nullable().optional(),
   /**
-   * Who the link's visitors are, for a link made for one person: the same
-   * `Identity` as `tokens.issue`'s. Every session the link gives carries it,
-   * whoever opens the link: a field it sets is never asked, and a visitor's
+   * Who the grant's visitors are, for a grant made for one person: the same
+   * `Identity` as `tokens.issue`'s. Every session the grant gives carries it,
+   * whoever opens the grant: a field it sets is never asked, and a visitor's
    * answer for it is ignored, so `visitorIdentity` can't ask it too. `userId`
    * replaces the visitor's own (`visitor_<id>`). Omit or null for visitors
    * who are whoever they answer.
@@ -1052,7 +1062,7 @@ export const ShareGrantCreateRequestSchema = z.object({
   /** Origin allowlist; omit to allow any origin. */
   origins: originPatternArray.optional(),
   /** Optional passphrase gate, checked at exchange. Stored as a hash; never returned. */
-  password: z.string().min(1).max(1024).optional(),
+  passphrase: z.string().min(1).max(1024).optional(),
   /** Lifetime of exchanged session tokens. Default 600. */
   sessionTtlSeconds: z
     .number()
@@ -1063,34 +1073,36 @@ export const ShareGrantCreateRequestSchema = z.object({
   /** Unix epoch ms after which the grant stops exchanging; omit for no expiry. */
   expiresAt: z.number().int().positive().optional(),
 });
-export type ShareGrantCreateRequest = z.infer<typeof ShareGrantCreateRequestSchema>;
+export type GrantCreateRequest = z.infer<typeof GrantCreateRequestSchema>;
 
 /**
  * Partial update. `origins: null` clears the allowlist (any origin),
- * `password: null` removes the passphrase, `expiresAt: null` removes
+ * `passphrase: null` removes the passphrase, `name: null` the name, `expiresAt: null` removes
  * the expiry. Absent fields stay untouched. The exchanged capabilities
  * and origin lock of every embedded snippet follow the row — editing a
  * grant retargets the copies already pasted into pages.
  */
-export const ShareGrantUpdateRequestSchema = z.object({
+export const GrantUpdateRequestSchema = z.object({
+  /** Renames it; null removes the name. */
+  name: grantNameSchema.nullable().optional(),
   /**
    * Switching to `'per-visitor'` stops visitors writing into the shared
    * layer (it stays); switching to `'shared'` takes `layerName`, default
-   * `default`. The token stays the same either way.
+   * `default`. The id stays the same either way.
    */
-  layerMode: ShareLayerModeSchema.optional(),
-  /** A shared link's layer. Not for a per-visitor link, and never `visitor-…`. */
+  layerMode: GrantLayerModeSchema.optional(),
+  /** A shared grant's layer. Not for a per-visitor grant, and never `visitor-…`. */
   layerName: z.string().min(1).max(256).optional(),
   keepVisitorLayers: z.boolean().optional(),
   /** null stops deleting visitors who go unseen. */
   visitorIdleSeconds: visitorIdleSecondsSchema.nullable().optional(),
   /** null stops asking; a change applies at each visitor's next exchange. */
-  visitorIdentity: ShareVisitorIdentitySchema.nullable().optional(),
-  /** Replaces the link's identity; null clears it. Applies at each visitor's next exchange. */
+  visitorIdentity: GrantVisitorIdentitySchema.nullable().optional(),
+  /** Replaces the grant's identity; null clears it. Applies at each visitor's next exchange. */
   identity: IdentitySchema.nullable().optional(),
   scope: z.array(z.string().min(1).max(128)).min(1).max(64).optional(),
   origins: originPatternArray.nullable().optional(),
-  password: z.string().min(1).max(1024).nullable().optional(),
+  passphrase: z.string().min(1).max(1024).nullable().optional(),
   sessionTtlSeconds: z
     .number()
     .int()
@@ -1100,14 +1112,14 @@ export const ShareGrantUpdateRequestSchema = z.object({
   disabled: z.boolean().optional(),
   expiresAt: z.number().int().positive().nullable().optional(),
 });
-export type ShareGrantUpdateRequest = z.infer<typeof ShareGrantUpdateRequestSchema>;
+export type GrantUpdateRequest = z.infer<typeof GrantUpdateRequestSchema>;
 
-export const ShareGrantResponseSchema = z.object({
-  share: ShareGrantRecordSchema,
+export const GrantResponseSchema = z.object({
+  grant: GrantRecordSchema,
 });
-export type ShareGrantResponse = z.infer<typeof ShareGrantResponseSchema>;
+export type GrantResponse = z.infer<typeof GrantResponseSchema>;
 
-export const ShareGrantListQuerySchema = z.object({
+export const GrantListQuerySchema = z.object({
   limit: z.coerce
     .number()
     .int()
@@ -1117,44 +1129,44 @@ export const ShareGrantListQuerySchema = z.object({
   cursor: z.string().min(1).optional(),
   /** Filter to one document's grants. */
   docId: z.string().regex(docIdPattern).optional(),
-  /** `true` lists the archived links instead of the ones that still work. */
+  /** `true` lists the archived grants instead of the ones that still work. */
   archived: queryFlag.optional(),
 });
-export type ShareGrantListQuery = z.infer<typeof ShareGrantListQuerySchema>;
+export type GrantListQuery = z.infer<typeof GrantListQuerySchema>;
 
-export const ShareGrantListResponseSchema = z.object({
-  shares: z.array(ShareGrantRecordSchema),
+export const GrantListResponseSchema = z.object({
+  grants: z.array(GrantRecordSchema),
   /** Opaque cursor for the next page; `null` on the last page. */
   nextCursor: z.string().nullable().optional(),
 });
-export type ShareGrantListResponse = z.infer<typeof ShareGrantListResponseSchema>;
+export type GrantListResponse = z.infer<typeof GrantListResponseSchema>;
 
-export const AdminTenantShareParamsSchema = z.object({
+export const AdminTenantGrantParamsSchema = z.object({
   tenantId: z.string().regex(tenantIdPattern),
-  shareId: z.string().regex(shareTokenPattern),
+  grantId: z.string().regex(grantIdPattern),
 });
-export type AdminTenantShareParams = z.infer<typeof AdminTenantShareParamsSchema>;
+export type AdminTenantGrantParams = z.infer<typeof AdminTenantGrantParamsSchema>;
 
-export const AdminTenantShareVisitorParamsSchema = AdminTenantShareParamsSchema.extend({
+export const AdminTenantGrantVisitorParamsSchema = AdminTenantGrantParamsSchema.extend({
   visitorId: z.string().regex(/^[0-9a-f]{24}$/),
 });
-export type AdminTenantShareVisitorParams = z.infer<typeof AdminTenantShareVisitorParamsSchema>;
+export type AdminTenantGrantVisitorParams = z.infer<typeof AdminTenantGrantVisitorParamsSchema>;
 
 /**
- * A share link's visitor who answered its questions or made a change: their
+ * A grant's visitor who answered its questions or made a change: their
  * answers, when they agreed and were last seen, and their own layer.
  */
-export const ShareVisitorRecordSchema = z.object({
+export const GrantVisitorRecordSchema = z.object({
   visitorId: z.string(),
-  /** Their answers to what the link asked; empty for a visitor who was asked nothing. */
-  answers: ShareVisitorAnswersSchema,
+  /** Their answers to what the grant asked; empty for a visitor who was asked nothing. */
+  answers: GrantVisitorAnswersSchema,
   /** Whether their email was verified (not yet offered: always false). */
   emailVerified: z.boolean(),
   /** Unix epoch ms they gave their answers; null for one who was asked nothing. */
   consentedAt: z.number().nullable(),
   firstSeenAt: z.number(),
   lastSeenAt: z.number(),
-  /** Their own layer, when it holds changes (per-visitor links). */
+  /** Their own layer, when it holds changes (per-visitor grants). */
   layer: z
     .object({
       layerName: z.string(),
@@ -1162,10 +1174,10 @@ export const ShareVisitorRecordSchema = z.object({
     })
     .nullable(),
 });
-export type ShareVisitorRecord = z.infer<typeof ShareVisitorRecordSchema>;
+export type GrantVisitorRecord = z.infer<typeof GrantVisitorRecordSchema>;
 
-/** Query parameters for `shares.visitors.list`, as for the other lists. */
-export const ShareVisitorListQuerySchema = z.object({
+/** Query parameters for `grants.visitors.list`, as for the other lists. */
+export const GrantVisitorListQuerySchema = z.object({
   limit: z.coerce
     .number()
     .int()
@@ -1174,69 +1186,69 @@ export const ShareVisitorListQuerySchema = z.object({
     .default(ADMIN_DOCUMENT_LIST_DEFAULT_LIMIT),
   cursor: z.string().min(1).optional(),
 });
-export type ShareVisitorListQuery = z.infer<typeof ShareVisitorListQuerySchema>;
+export type GrantVisitorListQuery = z.infer<typeof GrantVisitorListQuerySchema>;
 
-export const ShareVisitorListResponseSchema = z.object({
-  visitors: z.array(ShareVisitorRecordSchema),
+export const GrantVisitorListResponseSchema = z.object({
+  visitors: z.array(GrantVisitorRecordSchema),
   /** Opaque cursor for the next page; `null` on the last page. */
   nextCursor: z.string().nullable().optional(),
 });
-export type ShareVisitorListResponse = z.infer<typeof ShareVisitorListResponseSchema>;
+export type GrantVisitorListResponse = z.infer<typeof GrantVisitorListResponseSchema>;
 
 /**
- * The share token travels in the body, never the path — URLs land in
- * access logs and proxy logs, and the token is the whole credential.
+ * The grant travels in the body, never the path — URLs land in
+ * access logs and proxy logs.
  */
-export const ShareExchangeRequestSchema = z.object({
-  shareToken: z.string().regex(shareTokenPattern),
+export const GrantExchangeRequestSchema = z.object({
+  grant: z.string().regex(grantIdPattern),
   /** Required when the grant is passphrase-protected (422 otherwise). */
-  password: z.string().min(1).max(1024).optional(),
+  passphrase: z.string().min(1).max(1024).optional(),
   /**
    * The `visitor.handle` an earlier exchange answered: the same visitor, and
-   * on a per-visitor link the same layer. One the link didn't issue, or
+   * on a per-visitor grant the same layer. One the grant didn't issue, or
    * whose layer was deleted, gets a new visitor.
    */
   visitorHandle: z.string().min(1).max(256).optional(),
-  /** With `visitorHandle` on a per-visitor link: delete that visitor's layer and start a new visitor. */
+  /** With `visitorHandle` on a per-visitor grant: delete that visitor's layer and start a new visitor. */
   restart: z.boolean().optional(),
   /**
-   * The visitor's answers to what the link asks (`visitorIdentity`). Only
-   * the fields the link asks and they haven't answered count: an answer once
+   * The visitor's answers to what the grant asks (`visitorIdentity`). Only
+   * the fields the grant asks and they haven't answered count: an answer once
    * given stays.
    */
-  visitorIdentity: ShareVisitorAnswersSchema.optional(),
+  visitorIdentity: GrantVisitorAnswersSchema.optional(),
 });
-export type ShareExchangeRequest = z.infer<typeof ShareExchangeRequestSchema>;
+export type GrantExchangeRequest = z.infer<typeof GrantExchangeRequestSchema>;
 
-export const ShareSessionResponseSchema = z.object({
+export const GrantSessionResponseSchema = z.object({
   /** A doc-scoped session JWT carrying the grant's capabilities and origin lock. */
   token: z.string(),
   docId: z.string(),
   /** The layer the session reads and writes: the shared one, or this visitor's own. */
   layerName: z.string(),
-  layerMode: ShareLayerModeSchema,
+  layerMode: GrantLayerModeSchema,
   /** Who the session acts as: the session token names them as the author of what they add. */
   visitor: z.object({
     /** Send it back with the next exchange: renewals keep the same visitor. */
     handle: z.string(),
     /**
      * Keep the handle for the next visit too: the browser comes back as this visitor, with their
-     * answers and, on a per-visitor link, their layer. False only on a per-visitor link that
+     * answers and, on a per-visitor grant, their layer. False only on a per-visitor grant that
      * doesn't keep visitors' layers, where every visit is a new visitor.
      */
     keep: z.boolean(),
     /**
-     * What the link asks before this visitor's first change, when they
+     * What the grant asks before this visitor's first change, when they
      * haven't answered it: their writes are refused (403
      * `VisitorIdentityRequired`) until they exchange again with their
      * answers. `null` when nothing is asked.
      */
-    identityRequest: ShareVisitorIdentityRequestSchema.nullable(),
+    identityRequest: GrantVisitorIdentityRequestSchema.nullable(),
   }),
   /** Unix seconds when the session token expires; exchange again for a fresh one. */
   expiresAt: z.number(),
 });
-export type ShareSessionResponse = z.infer<typeof ShareSessionResponseSchema>;
+export type GrantSessionResponse = z.infer<typeof GrantSessionResponseSchema>;
 
 // ---------------------------------------------------------------------------
 // Tenant usage + suspension
@@ -1254,8 +1266,8 @@ export type TenantUsageQuery = z.infer<typeof TenantUsageQuerySchema>;
 /**
  * Per-tenant usage facts for one UTC month. Deliberately opinion-free:
  * no limits, no plans, no billing state — those belong to whoever
- * operates the deployment. `pdf.views` counts share exchanges plus
- * authorized `/v1/access` grants, deduplicated (a share session that
+ * operates the deployment. `pdf.views` counts grant exchanges plus
+ * authorized `/v1/access` requests, deduplicated (a grant session that
  * later establishes access is not counted twice).
  */
 export const TenantUsageResponseSchema = z.object({
@@ -1582,7 +1594,7 @@ export const adminOperations = {
     operationId: 'documents.layers.list',
     title: 'List layers',
     summary:
-      "A document's layers that hold changes, newest first, cursor-paginated: the ones links and your tokens name, and each share-link visitor's own.",
+      "A document's layers that hold changes, newest first, cursor-paginated: the ones grants and your tokens name, and each grant visitor's own.",
     method: 'GET',
     path: '/v1/tenants/:tenantId/documents/:id/layers',
     credentials: ['api-token', 'tenant-jwt'],
@@ -1739,7 +1751,7 @@ export const adminOperations = {
       409: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
     },
     notes:
-      'Without recursive, a folder with anything inside is refused: 409 Conflict with `details.reason` `not-empty` and what it holds, counted over every level below, in `details.folders` and `details.documents`. With recursive=true, the folder and every folder under it go at once, and every document in them stops opening, leaves every list and stops answering its share links at once; their stored files and links are removed in the background. Uploads into those folders that have not committed cannot commit.',
+      'Without recursive, a folder with anything inside is refused: 409 Conflict with `details.reason` `not-empty` and what it holds, counted over every level below, in `details.folders` and `details.documents`. With recursive=true, the folder and every folder under it go at once, and every document in them stops opening, leaves every list and stops answering its grants at once; their stored files and grants are removed in the background. Uploads into those folders that have not committed cannot commit.',
   },
   'deployment.licenseStatus': {
     operationId: 'deployment.licenseStatus',
@@ -1808,13 +1820,13 @@ export const adminOperations = {
       404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
     },
     notes:
-      'Facts only — no limits or billing state. Views count share exchanges plus authorized ' +
-      '/v1/access grants, deduplicated across the two.',
+      'Facts only — no limits or billing state. Views count grant exchanges plus authorized ' +
+      '/v1/access requests, deduplicated across the two.',
   },
   'tenants.suspend': {
     operationId: 'tenants.suspend',
     title: 'Suspend tenant',
-    summary: 'Fail the tenant closed: refuse every tenant JWT, doc JWT, and share exchange.',
+    summary: 'Fail the tenant closed: refuse every tenant JWT, doc JWT, and grant exchange.',
     method: 'POST',
     path: '/v1/tenants/:tenantId/suspend',
     credentials: ['api-token'],
@@ -1847,116 +1859,116 @@ export const adminOperations = {
       404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
     },
   },
-  'shares.create': {
-    operationId: 'shares.create',
-    title: 'Create share',
-    summary: 'Create a standing share grant for one document — the no-backend embed credential.',
+  'grants.create': {
+    operationId: 'grants.create',
+    title: 'Create grant',
+    summary: 'Create a standing grant for one document — the no-backend embed credential.',
     method: 'POST',
-    path: '/v1/tenants/:tenantId/shares',
+    path: '/v1/tenants/:tenantId/grants',
     credentials: ['api-token', 'tenant-jwt'],
-    scope: ['shares.manage'],
+    scope: ['grants.manage'],
     params: AdminTenantParamsSchema,
-    body: { contentType: 'application/json', schema: ShareGrantCreateRequestSchema },
+    body: { contentType: 'application/json', schema: GrantCreateRequestSchema },
     responses: {
-      200: { contentType: 'application/json', schema: ShareGrantResponseSchema },
+      200: { contentType: 'application/json', schema: GrantResponseSchema },
       400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
       403: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
       404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
     },
     notes:
-      'The returned share id is the public share token. Mounted only when the deployment can ' +
+      'The returned id is what a link page or an embed opens. Mounted only when the deployment can ' +
       'sign (HS256 mode) — exchange mints session JWTs, so grants exist only where minting does.',
   },
-  'shares.list': {
-    operationId: 'shares.list',
-    title: 'List shares',
-    summary: 'List share grants in the tenant, newest first, cursor-paginated.',
+  'grants.list': {
+    operationId: 'grants.list',
+    title: 'List grants',
+    summary: 'List grants in the tenant, newest first, cursor-paginated.',
     method: 'GET',
-    path: '/v1/tenants/:tenantId/shares',
+    path: '/v1/tenants/:tenantId/grants',
     credentials: ['api-token', 'tenant-jwt'],
-    scope: ['shares.manage'],
+    scope: ['grants.manage'],
     params: AdminTenantParamsSchema,
-    query: ShareGrantListQuerySchema,
+    query: GrantListQuerySchema,
     responses: {
-      200: { contentType: 'application/json', schema: ShareGrantListResponseSchema },
+      200: { contentType: 'application/json', schema: GrantListResponseSchema },
       400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
     },
   },
-  'shares.get': {
-    operationId: 'shares.get',
-    title: 'Get share',
-    summary: 'Fetch one share grant.',
+  'grants.get': {
+    operationId: 'grants.get',
+    title: 'Get grant',
+    summary: 'Fetch one grant.',
     method: 'GET',
-    path: '/v1/tenants/:tenantId/shares/:shareId',
+    path: '/v1/tenants/:tenantId/grants/:grantId',
     credentials: ['api-token', 'tenant-jwt'],
-    scope: ['shares.manage'],
-    params: AdminTenantShareParamsSchema,
+    scope: ['grants.manage'],
+    params: AdminTenantGrantParamsSchema,
     responses: {
-      200: { contentType: 'application/json', schema: ShareGrantResponseSchema },
+      200: { contentType: 'application/json', schema: GrantResponseSchema },
       404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
     },
   },
-  'shares.update': {
-    operationId: 'shares.update',
-    title: 'Update share',
-    summary: 'Edit a grant in place — every embedded copy of the token follows the row.',
+  'grants.update': {
+    operationId: 'grants.update',
+    title: 'Update grant',
+    summary: 'Edit a grant in place — every link and embed of it follows.',
     method: 'PATCH',
-    path: '/v1/tenants/:tenantId/shares/:shareId',
+    path: '/v1/tenants/:tenantId/grants/:grantId',
     credentials: ['api-token', 'tenant-jwt'],
-    scope: ['shares.manage'],
-    params: AdminTenantShareParamsSchema,
-    body: { contentType: 'application/json', schema: ShareGrantUpdateRequestSchema },
+    scope: ['grants.manage'],
+    params: AdminTenantGrantParamsSchema,
+    body: { contentType: 'application/json', schema: GrantUpdateRequestSchema },
     responses: {
-      200: { contentType: 'application/json', schema: ShareGrantResponseSchema },
+      200: { contentType: 'application/json', schema: GrantResponseSchema },
       400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
       404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
       409: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
     },
   },
-  'shares.archive': {
-    operationId: 'shares.archive',
-    title: 'Archive share',
+  'grants.archive': {
+    operationId: 'grants.archive',
+    title: 'Archive grant',
     summary:
-      "End a link for good and keep what its visitors made: exchange stops immediately, live sessions lapse at their exp, and its visitors' layers stay listed.",
+      "End a grant for good and keep what its visitors made: exchange stops immediately, live sessions lapse at their exp, and its visitors' layers stay listed.",
     method: 'POST',
-    path: '/v1/tenants/:tenantId/shares/:shareId/archive',
+    path: '/v1/tenants/:tenantId/grants/:grantId/archive',
     credentials: ['api-token', 'tenant-jwt'],
-    scope: ['shares.manage'],
-    params: AdminTenantShareParamsSchema,
+    scope: ['grants.manage'],
+    params: AdminTenantGrantParamsSchema,
     responses: {
-      200: { contentType: 'application/json', schema: ShareGrantResponseSchema },
+      200: { contentType: 'application/json', schema: GrantResponseSchema },
       404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
     },
     notes:
-      'Archiving is final: an archived link never exchanges again, and to share again you create a new link. Pausing (`disabled`) is the reversible stop. An archived link no longer counts as using its shared layer, so that layer can be deleted.',
+      'Archiving is final: an archived grant never exchanges again, and to give access again you create a new grant. Pausing (`disabled`) is the reversible stop. An archived grant no longer counts as using its shared layer, so that layer can be deleted.',
   },
-  'shares.visitors.list': {
-    operationId: 'shares.visitors.list',
+  'grants.visitors.list': {
+    operationId: 'grants.visitors.list',
     title: 'List visitors',
     summary:
-      "A share link's visitors who answered its questions or made a change, newest first, cursor-paginated: their answers and their layer.",
+      "A grant's visitors who answered its questions or made a change, newest first, cursor-paginated: their answers and their layer.",
     method: 'GET',
-    path: '/v1/tenants/:tenantId/shares/:shareId/visitors',
+    path: '/v1/tenants/:tenantId/grants/:grantId/visitors',
     credentials: ['api-token', 'tenant-jwt'],
-    scope: ['shares.manage'],
-    params: AdminTenantShareParamsSchema,
-    query: ShareVisitorListQuerySchema,
+    scope: ['grants.manage'],
+    params: AdminTenantGrantParamsSchema,
+    query: GrantVisitorListQuerySchema,
     responses: {
-      200: { contentType: 'application/json', schema: ShareVisitorListResponseSchema },
+      200: { contentType: 'application/json', schema: GrantVisitorListResponseSchema },
       400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
       404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
     },
-    notes: "An archived link's visitors are listed too.",
+    notes: "An archived grant's visitors are listed too.",
   },
-  'shares.visitors.delete': {
-    operationId: 'shares.visitors.delete',
+  'grants.visitors.delete': {
+    operationId: 'grants.visitors.delete',
     title: 'Delete visitor',
-    summary: "Erase a share link's visitor: their answers and their own layer.",
+    summary: "Erase a grant's visitor: their answers and their own layer.",
     method: 'DELETE',
-    path: '/v1/tenants/:tenantId/shares/:shareId/visitors/:visitorId',
+    path: '/v1/tenants/:tenantId/grants/:grantId/visitors/:visitorId',
     credentials: ['api-token', 'tenant-jwt'],
-    scope: ['shares.manage'],
-    params: AdminTenantShareVisitorParamsSchema,
+    scope: ['grants.manage'],
+    params: AdminTenantGrantVisitorParamsSchema,
     responses: {
       204: {},
       404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
@@ -1964,33 +1976,33 @@ export const adminOperations = {
     notes:
       'Their handle brings them back as a new visitor, who is asked again. Deleting a visitor already deleted changes nothing.',
   },
-  'shares.delete': {
-    operationId: 'shares.delete',
-    title: 'Delete share',
+  'grants.delete': {
+    operationId: 'grants.delete',
+    title: 'Delete grant',
     summary:
-      'Delete a link that has no visitors; exchange stops immediately, live sessions lapse at their exp. A link whose visitors answered its questions or have layers is archived instead (409).',
+      'Delete a grant that has no visitors; exchange stops immediately, live sessions lapse at their exp. A grant whose visitors answered its questions or have layers is archived instead (409).',
     method: 'DELETE',
-    path: '/v1/tenants/:tenantId/shares/:shareId',
+    path: '/v1/tenants/:tenantId/grants/:grantId',
     credentials: ['api-token', 'tenant-jwt'],
-    scope: ['shares.manage'],
-    params: AdminTenantShareParamsSchema,
+    scope: ['grants.manage'],
+    params: AdminTenantGrantParamsSchema,
     responses: {
       204: {},
       404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
       409: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
     },
   },
-  'shares.exchange': {
-    operationId: 'shares.exchange',
-    title: 'Exchange share token',
-    summary: 'Trade a public share token for a short-lived document session JWT.',
+  'grants.exchange': {
+    operationId: 'grants.exchange',
+    title: 'Exchange grant',
+    summary: 'Trade a grant for a short-lived document session JWT.',
     method: 'POST',
-    path: adminWirePaths.shareSessions,
+    path: adminWirePaths.grantSessions,
     credentials: [],
     scope: [],
-    body: { contentType: 'application/json', schema: ShareExchangeRequestSchema },
+    body: { contentType: 'application/json', schema: GrantExchangeRequestSchema },
     responses: {
-      200: { contentType: 'application/json', schema: ShareSessionResponseSchema },
+      200: { contentType: 'application/json', schema: GrantSessionResponseSchema },
       400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
       403: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
       404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
@@ -1999,15 +2011,15 @@ export const adminOperations = {
     },
     notes:
       'Unauthenticated, but requires a browser Origin header, checked against the grant ' +
-      'allowlist. Unknown, revoked, and disabled tokens are indistinguishable (404). ' +
-      'Passphrase-protected grants return 422 SharePasswordRequired until `password` is ' +
-      'supplied. A link that asks its visitors who they are on open returns 422 ' +
+      'allowlist. Unknown, deleted, paused and archived grants are indistinguishable (404). ' +
+      'Passphrase-protected grants return 422 GrantPassphraseRequired until `passphrase` is ' +
+      'supplied. A grant that asks its visitors who they are on open returns 422 ' +
       'VisitorIdentityRequired until the required answers are given; `error.details` carries ' +
-      '`fields` (what the link asks), `missing`, `invalid`, `purpose` and `privacyUrl`. A link ' +
+      '`fields` (what the grant asks), `missing`, `invalid`, `purpose` and `privacyUrl`. A grant ' +
       'that asks before the first change issues the session at once with ' +
       '`visitor.identityRequest`, and writes answer 403 VisitorIdentityRequired with the same ' +
       'details until the visitor exchanges again with their answers. Answers that can not be ' +
-      'taken answer 422 on any link. Mounted only when the deployment can sign (HS256 mode).',
+      'taken answer 422 on any grant. Mounted only when the deployment can sign (HS256 mode).',
   },
 } as const satisfies Record<string, AdminOperation>;
 export type AdminOperationId = keyof typeof adminOperations;
@@ -3082,8 +3094,8 @@ export const docsGroups = {
   'documents.layers': { title: 'Layers' },
   folders: { title: 'Folders' },
   tokens: { title: 'Tokens' },
-  shares: { title: 'Shares' },
-  'shares.visitors': { title: 'Visitors' },
+  grants: { title: 'Grants' },
+  'grants.visitors': { title: 'Visitors' },
   doc: { title: 'Document operations', slug: 'document-operations' },
   'doc.annotations': { title: 'Annotations' },
   'doc.attachments': { title: 'Attachments' },

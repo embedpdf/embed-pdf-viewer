@@ -5179,14 +5179,14 @@
         }
       }
     },
-    "/v1/share-sessions": {
+    "/v1/grant-sessions": {
       "post": {
-        "operationId": "shares.exchange",
-        "x-fern-sdk-group-name": ["shares"],
+        "operationId": "grants.exchange",
+        "x-fern-sdk-group-name": ["grants"],
         "x-fern-sdk-method-name": "exchange",
-        "x-docs-title": "Exchange share token",
-        "summary": "Trade a public share token for a short-lived document session JWT.",
-        "description": "Unauthenticated, but requires a browser Origin header, checked against the grant allowlist. Unknown, revoked, and disabled tokens are indistinguishable (404). Passphrase-protected grants return 422 SharePasswordRequired until `password` is supplied. A link that asks its visitors who they are on open returns 422 VisitorIdentityRequired until the required answers are given; `error.details` carries `fields` (what the link asks), `missing`, `invalid`, `purpose` and `privacyUrl`. A link that asks before the first change issues the session at once with `visitor.identityRequest`, and writes answer 403 VisitorIdentityRequired with the same details until the visitor exchanges again with their answers. Answers that can not be taken answer 422 on any link. Mounted only when the deployment can sign (HS256 mode).",
+        "x-docs-title": "Exchange grant",
+        "summary": "Trade a grant for a short-lived document session JWT.",
+        "description": "Unauthenticated, but requires a browser Origin header, checked against the grant allowlist. Unknown, deleted, paused and archived grants are indistinguishable (404). Passphrase-protected grants return 422 GrantPassphraseRequired until `passphrase` is supplied. A grant that asks its visitors who they are on open returns 422 VisitorIdentityRequired until the required answers are given; `error.details` carries `fields` (what the grant asks), `missing`, `invalid`, `purpose` and `privacyUrl`. A grant that asks before the first change issues the session at once with `visitor.identityRequest`, and writes answer 403 VisitorIdentityRequired with the same details until the visitor exchanges again with their answers. Answers that can not be taken answer 422 on any grant. Mounted only when the deployment can sign (HS256 mode).",
         "security": [],
         "x-required-scope": [],
         "requestBody": {
@@ -5194,7 +5194,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SharesExchangeRequest"
+                "$ref": "#/components/schemas/GrantsExchangeRequest"
               }
             }
           }
@@ -5205,7 +5205,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SharesExchange200Response"
+                  "$ref": "#/components/schemas/GrantsExchange200Response"
                 }
               }
             }
@@ -5215,7 +5215,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SharesExchange400Response"
+                  "$ref": "#/components/schemas/GrantsExchange400Response"
                 }
               }
             }
@@ -5225,7 +5225,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SharesExchange403Response"
+                  "$ref": "#/components/schemas/GrantsExchange403Response"
                 }
               }
             }
@@ -5235,7 +5235,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SharesExchange404Response"
+                  "$ref": "#/components/schemas/GrantsExchange404Response"
                 }
               }
             }
@@ -5245,7 +5245,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SharesExchange410Response"
+                  "$ref": "#/components/schemas/GrantsExchange410Response"
                 }
               }
             }
@@ -5255,7 +5255,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SharesExchange422Response"
+                  "$ref": "#/components/schemas/GrantsExchange422Response"
                 }
               }
             }
@@ -6066,7 +6066,7 @@
         "x-fern-sdk-group-name": ["documents", "layers"],
         "x-fern-sdk-method-name": "list",
         "x-docs-title": "List layers",
-        "summary": "A document's layers that hold changes, newest first, cursor-paginated: the ones links and your tokens name, and each share-link visitor's own.",
+        "summary": "A document's layers that hold changes, newest first, cursor-paginated: the ones grants and your tokens name, and each grant visitor's own.",
         "security": [
           {
             "apiToken": []
@@ -6116,12 +6116,12 @@
             }
           },
           {
-            "name": "shareId",
+            "name": "grantId",
             "in": "query",
             "required": false,
             "schema": {
               "type": "string",
-              "pattern": "^shr_[A-Za-z0-9_-]{24}$"
+              "pattern": "^(grt|shr)_[A-Za-z0-9_-]{24}$"
             }
           }
         ],
@@ -7026,7 +7026,7 @@
         "x-fern-sdk-method-name": "delete",
         "x-docs-title": "Delete folder",
         "summary": "Delete an empty folder, or with recursive=true a folder and everything in it.",
-        "description": "Without recursive, a folder with anything inside is refused: 409 Conflict with `details.reason` `not-empty` and what it holds, counted over every level below, in `details.folders` and `details.documents`. With recursive=true, the folder and every folder under it go at once, and every document in them stops opening, leaves every list and stops answering its share links at once; their stored files and links are removed in the background. Uploads into those folders that have not committed cannot commit.",
+        "description": "Without recursive, a folder with anything inside is refused: 409 Conflict with `details.reason` `not-empty` and what it holds, counted over every level below, in `details.folders` and `details.documents`. With recursive=true, the folder and every folder under it go at once, and every document in them stops opening, leaves every list and stops answering its grants at once; their stored files and grants are removed in the background. Uploads into those folders that have not committed cannot commit.",
         "security": [
           {
             "apiToken": []
@@ -7217,65 +7217,14 @@
         }
       }
     },
-    "/v1/tenants/{tenantId}/resume": {
+    "/v1/tenants/{tenantId}/grants": {
       "post": {
-        "operationId": "tenants.resume",
-        "x-fern-sdk-group-name": ["tenants"],
-        "x-fern-sdk-method-name": "resume",
-        "x-docs-title": "Resume tenant",
-        "summary": "Lift a suspension; credentials for the tenant verify again.",
-        "security": [
-          {
-            "apiToken": []
-          }
-        ],
-        "x-required-scope": [],
-        "parameters": [
-          {
-            "name": "tenantId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "pattern": "^[A-Za-z0-9_-]+$"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "No content"
-          },
-          "404": {
-            "description": "Not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TenantsResumeResponse"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AdminErrorPayload"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v1/tenants/{tenantId}/shares": {
-      "post": {
-        "operationId": "shares.create",
-        "x-fern-sdk-group-name": ["shares"],
+        "operationId": "grants.create",
+        "x-fern-sdk-group-name": ["grants"],
         "x-fern-sdk-method-name": "create",
-        "x-docs-title": "Create share",
-        "summary": "Create a standing share grant for one document — the no-backend embed credential.",
-        "description": "The returned share id is the public share token. Mounted only when the deployment can sign (HS256 mode) — exchange mints session JWTs, so grants exist only where minting does.",
+        "x-docs-title": "Create grant",
+        "summary": "Create a standing grant for one document — the no-backend embed credential.",
+        "description": "The returned id is what a link page or an embed opens. Mounted only when the deployment can sign (HS256 mode) — exchange mints session JWTs, so grants exist only where minting does.",
         "security": [
           {
             "apiToken": []
@@ -7284,7 +7233,7 @@
             "tenantToken": []
           }
         ],
-        "x-required-scope": ["shares.manage"],
+        "x-required-scope": ["grants.manage"],
         "parameters": [
           {
             "name": "tenantId",
@@ -7301,7 +7250,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SharesCreateRequest"
+                "$ref": "#/components/schemas/GrantsCreateRequest"
               }
             }
           }
@@ -7312,7 +7261,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SharesCreate200Response"
+                  "$ref": "#/components/schemas/GrantsCreate200Response"
                 }
               }
             }
@@ -7322,7 +7271,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SharesCreate400Response"
+                  "$ref": "#/components/schemas/GrantsCreate400Response"
                 }
               }
             }
@@ -7332,7 +7281,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SharesCreate403Response"
+                  "$ref": "#/components/schemas/GrantsCreate403Response"
                 }
               }
             }
@@ -7342,7 +7291,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SharesCreate404Response"
+                  "$ref": "#/components/schemas/GrantsCreate404Response"
                 }
               }
             }
@@ -7360,11 +7309,11 @@
         }
       },
       "get": {
-        "operationId": "shares.list",
-        "x-fern-sdk-group-name": ["shares"],
+        "operationId": "grants.list",
+        "x-fern-sdk-group-name": ["grants"],
         "x-fern-sdk-method-name": "list",
-        "x-docs-title": "List shares",
-        "summary": "List share grants in the tenant, newest first, cursor-paginated.",
+        "x-docs-title": "List grants",
+        "summary": "List grants in the tenant, newest first, cursor-paginated.",
         "security": [
           {
             "apiToken": []
@@ -7373,7 +7322,7 @@
             "tenantToken": []
           }
         ],
-        "x-required-scope": ["shares.manage"],
+        "x-required-scope": ["grants.manage"],
         "parameters": [
           {
             "name": "tenantId",
@@ -7428,7 +7377,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SharesList200Response"
+                  "$ref": "#/components/schemas/GrantsList200Response"
                 }
               }
             }
@@ -7438,7 +7387,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SharesList400Response"
+                  "$ref": "#/components/schemas/GrantsList400Response"
                 }
               }
             }
@@ -7456,13 +7405,13 @@
         }
       }
     },
-    "/v1/tenants/{tenantId}/shares/{shareId}": {
+    "/v1/tenants/{tenantId}/grants/{grantId}": {
       "get": {
-        "operationId": "shares.get",
-        "x-fern-sdk-group-name": ["shares"],
+        "operationId": "grants.get",
+        "x-fern-sdk-group-name": ["grants"],
         "x-fern-sdk-method-name": "get",
-        "x-docs-title": "Get share",
-        "summary": "Fetch one share grant.",
+        "x-docs-title": "Get grant",
+        "summary": "Fetch one grant.",
         "security": [
           {
             "apiToken": []
@@ -7471,7 +7420,7 @@
             "tenantToken": []
           }
         ],
-        "x-required-scope": ["shares.manage"],
+        "x-required-scope": ["grants.manage"],
         "parameters": [
           {
             "name": "tenantId",
@@ -7483,12 +7432,12 @@
             }
           },
           {
-            "name": "shareId",
+            "name": "grantId",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "pattern": "^shr_[A-Za-z0-9_-]{24}$"
+              "pattern": "^(grt|shr)_[A-Za-z0-9_-]{24}$"
             }
           }
         ],
@@ -7498,7 +7447,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SharesGet200Response"
+                  "$ref": "#/components/schemas/GrantsGet200Response"
                 }
               }
             }
@@ -7508,7 +7457,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SharesGet404Response"
+                  "$ref": "#/components/schemas/GrantsGet404Response"
                 }
               }
             }
@@ -7526,11 +7475,11 @@
         }
       },
       "patch": {
-        "operationId": "shares.update",
-        "x-fern-sdk-group-name": ["shares"],
+        "operationId": "grants.update",
+        "x-fern-sdk-group-name": ["grants"],
         "x-fern-sdk-method-name": "update",
-        "x-docs-title": "Update share",
-        "summary": "Edit a grant in place — every embedded copy of the token follows the row.",
+        "x-docs-title": "Update grant",
+        "summary": "Edit a grant in place — every link and embed of it follows.",
         "security": [
           {
             "apiToken": []
@@ -7539,7 +7488,7 @@
             "tenantToken": []
           }
         ],
-        "x-required-scope": ["shares.manage"],
+        "x-required-scope": ["grants.manage"],
         "parameters": [
           {
             "name": "tenantId",
@@ -7551,12 +7500,12 @@
             }
           },
           {
-            "name": "shareId",
+            "name": "grantId",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "pattern": "^shr_[A-Za-z0-9_-]{24}$"
+              "pattern": "^(grt|shr)_[A-Za-z0-9_-]{24}$"
             }
           }
         ],
@@ -7565,7 +7514,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SharesUpdateRequest"
+                "$ref": "#/components/schemas/GrantsUpdateRequest"
               }
             }
           }
@@ -7576,7 +7525,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SharesUpdate200Response"
+                  "$ref": "#/components/schemas/GrantsUpdate200Response"
                 }
               }
             }
@@ -7586,7 +7535,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SharesUpdate400Response"
+                  "$ref": "#/components/schemas/GrantsUpdate400Response"
                 }
               }
             }
@@ -7596,7 +7545,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SharesUpdate404Response"
+                  "$ref": "#/components/schemas/GrantsUpdate404Response"
                 }
               }
             }
@@ -7606,7 +7555,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SharesUpdate409Response"
+                  "$ref": "#/components/schemas/GrantsUpdate409Response"
                 }
               }
             }
@@ -7624,11 +7573,11 @@
         }
       },
       "delete": {
-        "operationId": "shares.delete",
-        "x-fern-sdk-group-name": ["shares"],
+        "operationId": "grants.delete",
+        "x-fern-sdk-group-name": ["grants"],
         "x-fern-sdk-method-name": "delete",
-        "x-docs-title": "Delete share",
-        "summary": "Delete a link that has no visitors; exchange stops immediately, live sessions lapse at their exp. A link whose visitors answered its questions or have layers is archived instead (409).",
+        "x-docs-title": "Delete grant",
+        "summary": "Delete a grant that has no visitors; exchange stops immediately, live sessions lapse at their exp. A grant whose visitors answered its questions or have layers is archived instead (409).",
         "security": [
           {
             "apiToken": []
@@ -7637,7 +7586,7 @@
             "tenantToken": []
           }
         ],
-        "x-required-scope": ["shares.manage"],
+        "x-required-scope": ["grants.manage"],
         "parameters": [
           {
             "name": "tenantId",
@@ -7649,12 +7598,12 @@
             }
           },
           {
-            "name": "shareId",
+            "name": "grantId",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "pattern": "^shr_[A-Za-z0-9_-]{24}$"
+              "pattern": "^(grt|shr)_[A-Za-z0-9_-]{24}$"
             }
           }
         ],
@@ -7667,7 +7616,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SharesDelete404Response"
+                  "$ref": "#/components/schemas/GrantsDelete404Response"
                 }
               }
             }
@@ -7677,7 +7626,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SharesDelete409Response"
+                  "$ref": "#/components/schemas/GrantsDelete409Response"
                 }
               }
             }
@@ -7695,14 +7644,14 @@
         }
       }
     },
-    "/v1/tenants/{tenantId}/shares/{shareId}/archive": {
+    "/v1/tenants/{tenantId}/grants/{grantId}/archive": {
       "post": {
-        "operationId": "shares.archive",
-        "x-fern-sdk-group-name": ["shares"],
+        "operationId": "grants.archive",
+        "x-fern-sdk-group-name": ["grants"],
         "x-fern-sdk-method-name": "archive",
-        "x-docs-title": "Archive share",
-        "summary": "End a link for good and keep what its visitors made: exchange stops immediately, live sessions lapse at their exp, and its visitors' layers stay listed.",
-        "description": "Archiving is final: an archived link never exchanges again, and to share again you create a new link. Pausing (`disabled`) is the reversible stop. An archived link no longer counts as using its shared layer, so that layer can be deleted.",
+        "x-docs-title": "Archive grant",
+        "summary": "End a grant for good and keep what its visitors made: exchange stops immediately, live sessions lapse at their exp, and its visitors' layers stay listed.",
+        "description": "Archiving is final: an archived grant never exchanges again, and to give access again you create a new grant. Pausing (`disabled`) is the reversible stop. An archived grant no longer counts as using its shared layer, so that layer can be deleted.",
         "security": [
           {
             "apiToken": []
@@ -7711,7 +7660,7 @@
             "tenantToken": []
           }
         ],
-        "x-required-scope": ["shares.manage"],
+        "x-required-scope": ["grants.manage"],
         "parameters": [
           {
             "name": "tenantId",
@@ -7723,12 +7672,12 @@
             }
           },
           {
-            "name": "shareId",
+            "name": "grantId",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "pattern": "^shr_[A-Za-z0-9_-]{24}$"
+              "pattern": "^(grt|shr)_[A-Za-z0-9_-]{24}$"
             }
           }
         ],
@@ -7738,7 +7687,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SharesArchive200Response"
+                  "$ref": "#/components/schemas/GrantsArchive200Response"
                 }
               }
             }
@@ -7748,7 +7697,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SharesArchive404Response"
+                  "$ref": "#/components/schemas/GrantsArchive404Response"
                 }
               }
             }
@@ -7766,14 +7715,14 @@
         }
       }
     },
-    "/v1/tenants/{tenantId}/shares/{shareId}/visitors": {
+    "/v1/tenants/{tenantId}/grants/{grantId}/visitors": {
       "get": {
-        "operationId": "shares.visitors.list",
-        "x-fern-sdk-group-name": ["shares", "visitors"],
+        "operationId": "grants.visitors.list",
+        "x-fern-sdk-group-name": ["grants", "visitors"],
         "x-fern-sdk-method-name": "list",
         "x-docs-title": "List visitors",
-        "summary": "A share link's visitors who answered its questions or made a change, newest first, cursor-paginated: their answers and their layer.",
-        "description": "An archived link's visitors are listed too.",
+        "summary": "A grant's visitors who answered its questions or made a change, newest first, cursor-paginated: their answers and their layer.",
+        "description": "An archived grant's visitors are listed too.",
         "security": [
           {
             "apiToken": []
@@ -7782,7 +7731,7 @@
             "tenantToken": []
           }
         ],
-        "x-required-scope": ["shares.manage"],
+        "x-required-scope": ["grants.manage"],
         "parameters": [
           {
             "name": "tenantId",
@@ -7794,12 +7743,12 @@
             }
           },
           {
-            "name": "shareId",
+            "name": "grantId",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "pattern": "^shr_[A-Za-z0-9_-]{24}$"
+              "pattern": "^(grt|shr)_[A-Za-z0-9_-]{24}$"
             }
           },
           {
@@ -7829,7 +7778,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SharesVisitorsList200Response"
+                  "$ref": "#/components/schemas/GrantsVisitorsList200Response"
                 }
               }
             }
@@ -7839,7 +7788,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SharesVisitorsList400Response"
+                  "$ref": "#/components/schemas/GrantsVisitorsList400Response"
                 }
               }
             }
@@ -7849,7 +7798,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SharesVisitorsList404Response"
+                  "$ref": "#/components/schemas/GrantsVisitorsList404Response"
                 }
               }
             }
@@ -7867,13 +7816,13 @@
         }
       }
     },
-    "/v1/tenants/{tenantId}/shares/{shareId}/visitors/{visitorId}": {
+    "/v1/tenants/{tenantId}/grants/{grantId}/visitors/{visitorId}": {
       "delete": {
-        "operationId": "shares.visitors.delete",
-        "x-fern-sdk-group-name": ["shares", "visitors"],
+        "operationId": "grants.visitors.delete",
+        "x-fern-sdk-group-name": ["grants", "visitors"],
         "x-fern-sdk-method-name": "delete",
         "x-docs-title": "Delete visitor",
-        "summary": "Erase a share link's visitor: their answers and their own layer.",
+        "summary": "Erase a grant's visitor: their answers and their own layer.",
         "description": "Their handle brings them back as a new visitor, who is asked again. Deleting a visitor already deleted changes nothing.",
         "security": [
           {
@@ -7883,7 +7832,7 @@
             "tenantToken": []
           }
         ],
-        "x-required-scope": ["shares.manage"],
+        "x-required-scope": ["grants.manage"],
         "parameters": [
           {
             "name": "tenantId",
@@ -7895,12 +7844,12 @@
             }
           },
           {
-            "name": "shareId",
+            "name": "grantId",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "pattern": "^shr_[A-Za-z0-9_-]{24}$"
+              "pattern": "^(grt|shr)_[A-Za-z0-9_-]{24}$"
             }
           },
           {
@@ -7922,7 +7871,58 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SharesVisitorsDeleteResponse"
+                  "$ref": "#/components/schemas/GrantsVisitorsDeleteResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminErrorPayload"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/tenants/{tenantId}/resume": {
+      "post": {
+        "operationId": "tenants.resume",
+        "x-fern-sdk-group-name": ["tenants"],
+        "x-fern-sdk-method-name": "resume",
+        "x-docs-title": "Resume tenant",
+        "summary": "Lift a suspension; credentials for the tenant verify again.",
+        "security": [
+          {
+            "apiToken": []
+          }
+        ],
+        "x-required-scope": [],
+        "parameters": [
+          {
+            "name": "tenantId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No content"
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantsResumeResponse"
                 }
               }
             }
@@ -7946,7 +7946,7 @@
         "x-fern-sdk-group-name": ["tenants"],
         "x-fern-sdk-method-name": "suspend",
         "x-docs-title": "Suspend tenant",
-        "summary": "Fail the tenant closed: refuse every tenant JWT, doc JWT, and share exchange.",
+        "summary": "Fail the tenant closed: refuse every tenant JWT, doc JWT, and grant exchange.",
         "description": "Instantly reversible with resume. The API token is exempt, so a suspended tenant can still be inspected, exported, resumed, or deleted.",
         "security": [
           {
@@ -8176,7 +8176,7 @@
         "x-fern-sdk-method-name": "usage",
         "x-docs-title": "Tenant usage",
         "summary": "Per-tenant usage facts (views, uploads, stored bytes) for one UTC month.",
-        "description": "Facts only — no limits or billing state. Views count share exchanges plus authorized /v1/access grants, deduplicated across the two.",
+        "description": "Facts only — no limits or billing state. Views count grant exchanges plus authorized /v1/access requests, deduplicated across the two.",
         "security": [
           {
             "apiToken": []
@@ -8270,10 +8270,10 @@
     "tokens": {
       "title": "Tokens"
     },
-    "shares": {
-      "title": "Shares"
+    "grants": {
+      "title": "Grants"
     },
-    "shares.visitors": {
+    "grants.visitors": {
       "title": "Visitors"
     },
     "doc": {
@@ -8375,7 +8375,7 @@
               "DocOpenFailed",
               "DocPasswordRequired",
               "DocPasswordIncorrect",
-              "SharePasswordRequired",
+              "GrantPassphraseRequired",
               "Aborted",
               "Network",
               "Unauthenticated",
@@ -25643,7 +25643,7 @@
                 "layerName": {
                   "type": "string"
                 },
-                "shareId": {
+                "grantId": {
                   "type": "string",
                   "nullable": true
                 },
@@ -25669,7 +25669,7 @@
               "required": [
                 "docId",
                 "layerName",
-                "shareId",
+                "grantId",
                 "visitorId",
                 "storageSizeBytes",
                 "createdAt",
@@ -26245,12 +26245,18 @@
       "TenantsResumeResponse": {
         "$ref": "#/components/schemas/AdminErrorPayload"
       },
-      "SharesCreateRequest": {
+      "GrantsCreateRequest": {
         "type": "object",
         "properties": {
           "docId": {
             "type": "string",
             "pattern": "^[A-Za-z0-9_-]+$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "nullable": true
           },
           "layerMode": {
             "type": "string",
@@ -26281,16 +26287,16 @@
                     "enum": ["required", "optional"]
                   },
                   "email": {
-                    "$ref": "#/components/schemas/SharesCreateRequest/properties/visitorIdentity/properties/fields/properties/displayName"
+                    "$ref": "#/components/schemas/GrantsCreateRequest/properties/visitorIdentity/properties/fields/properties/displayName"
                   },
                   "title": {
-                    "$ref": "#/components/schemas/SharesCreateRequest/properties/visitorIdentity/properties/fields/properties/displayName"
+                    "$ref": "#/components/schemas/GrantsCreateRequest/properties/visitorIdentity/properties/fields/properties/displayName"
                   },
                   "organization": {
-                    "$ref": "#/components/schemas/SharesCreateRequest/properties/visitorIdentity/properties/fields/properties/displayName"
+                    "$ref": "#/components/schemas/GrantsCreateRequest/properties/visitorIdentity/properties/fields/properties/displayName"
                   },
                   "organizationalUnit": {
-                    "$ref": "#/components/schemas/SharesCreateRequest/properties/visitorIdentity/properties/fields/properties/displayName"
+                    "$ref": "#/components/schemas/GrantsCreateRequest/properties/visitorIdentity/properties/fields/properties/displayName"
                   }
                 },
                 "additionalProperties": false
@@ -26342,7 +26348,7 @@
             "minItems": 1,
             "maxItems": 32
           },
-          "password": {
+          "passphrase": {
             "type": "string",
             "minLength": 1,
             "maxLength": 1024
@@ -26361,10 +26367,10 @@
         "required": ["docId", "scope"],
         "additionalProperties": false
       },
-      "SharesCreate200Response": {
+      "GrantsCreate200Response": {
         "type": "object",
         "properties": {
-          "share": {
+          "grant": {
             "type": "object",
             "properties": {
               "id": {
@@ -26375,6 +26381,10 @@
               },
               "docId": {
                 "type": "string"
+              },
+              "name": {
+                "type": "string",
+                "nullable": true
               },
               "layerMode": {
                 "type": "string",
@@ -26402,16 +26412,16 @@
                         "enum": ["required", "optional"]
                       },
                       "email": {
-                        "$ref": "#/components/schemas/SharesCreate200Response/properties/share/properties/visitorIdentity/properties/fields/properties/displayName"
+                        "$ref": "#/components/schemas/GrantsCreate200Response/properties/grant/properties/visitorIdentity/properties/fields/properties/displayName"
                       },
                       "title": {
-                        "$ref": "#/components/schemas/SharesCreate200Response/properties/share/properties/visitorIdentity/properties/fields/properties/displayName"
+                        "$ref": "#/components/schemas/GrantsCreate200Response/properties/grant/properties/visitorIdentity/properties/fields/properties/displayName"
                       },
                       "organization": {
-                        "$ref": "#/components/schemas/SharesCreate200Response/properties/share/properties/visitorIdentity/properties/fields/properties/displayName"
+                        "$ref": "#/components/schemas/GrantsCreate200Response/properties/grant/properties/visitorIdentity/properties/fields/properties/displayName"
                       },
                       "organizationalUnit": {
-                        "$ref": "#/components/schemas/SharesCreate200Response/properties/share/properties/visitorIdentity/properties/fields/properties/displayName"
+                        "$ref": "#/components/schemas/GrantsCreate200Response/properties/grant/properties/visitorIdentity/properties/fields/properties/displayName"
                       }
                     },
                     "additionalProperties": false
@@ -26456,7 +26466,7 @@
                 },
                 "nullable": true
               },
-              "passwordProtected": {
+              "passphraseProtected": {
                 "type": "boolean"
               },
               "sessionTtlSeconds": {
@@ -26494,6 +26504,7 @@
               "id",
               "tenantId",
               "docId",
+              "name",
               "layerMode",
               "layerName",
               "keepVisitorLayers",
@@ -26502,7 +26513,7 @@
               "identity",
               "scope",
               "origins",
-              "passwordProtected",
+              "passphraseProtected",
               "sessionTtlSeconds",
               "disabled",
               "archivedAt",
@@ -26516,22 +26527,22 @@
             "additionalProperties": false
           }
         },
-        "required": ["share"],
+        "required": ["grant"],
         "additionalProperties": false
       },
-      "SharesCreate400Response": {
+      "GrantsCreate400Response": {
         "$ref": "#/components/schemas/AdminErrorPayload"
       },
-      "SharesCreate403Response": {
+      "GrantsCreate403Response": {
         "$ref": "#/components/schemas/AdminErrorPayload"
       },
-      "SharesCreate404Response": {
+      "GrantsCreate404Response": {
         "$ref": "#/components/schemas/AdminErrorPayload"
       },
-      "SharesList200Response": {
+      "GrantsList200Response": {
         "type": "object",
         "properties": {
-          "shares": {
+          "grants": {
             "type": "array",
             "items": {
               "type": "object",
@@ -26544,6 +26555,10 @@
                 },
                 "docId": {
                   "type": "string"
+                },
+                "name": {
+                  "type": "string",
+                  "nullable": true
                 },
                 "layerMode": {
                   "type": "string",
@@ -26571,16 +26586,16 @@
                           "enum": ["required", "optional"]
                         },
                         "email": {
-                          "$ref": "#/components/schemas/SharesList200Response/properties/shares/items/properties/visitorIdentity/properties/fields/properties/displayName"
+                          "$ref": "#/components/schemas/GrantsList200Response/properties/grants/items/properties/visitorIdentity/properties/fields/properties/displayName"
                         },
                         "title": {
-                          "$ref": "#/components/schemas/SharesList200Response/properties/shares/items/properties/visitorIdentity/properties/fields/properties/displayName"
+                          "$ref": "#/components/schemas/GrantsList200Response/properties/grants/items/properties/visitorIdentity/properties/fields/properties/displayName"
                         },
                         "organization": {
-                          "$ref": "#/components/schemas/SharesList200Response/properties/shares/items/properties/visitorIdentity/properties/fields/properties/displayName"
+                          "$ref": "#/components/schemas/GrantsList200Response/properties/grants/items/properties/visitorIdentity/properties/fields/properties/displayName"
                         },
                         "organizationalUnit": {
-                          "$ref": "#/components/schemas/SharesList200Response/properties/shares/items/properties/visitorIdentity/properties/fields/properties/displayName"
+                          "$ref": "#/components/schemas/GrantsList200Response/properties/grants/items/properties/visitorIdentity/properties/fields/properties/displayName"
                         }
                       },
                       "additionalProperties": false
@@ -26625,7 +26640,7 @@
                   },
                   "nullable": true
                 },
-                "passwordProtected": {
+                "passphraseProtected": {
                   "type": "boolean"
                 },
                 "sessionTtlSeconds": {
@@ -26663,6 +26678,7 @@
                 "id",
                 "tenantId",
                 "docId",
+                "name",
                 "layerMode",
                 "layerName",
                 "keepVisitorLayers",
@@ -26671,7 +26687,7 @@
                 "identity",
                 "scope",
                 "origins",
-                "passwordProtected",
+                "passphraseProtected",
                 "sessionTtlSeconds",
                 "disabled",
                 "archivedAt",
@@ -26690,16 +26706,16 @@
             "nullable": true
           }
         },
-        "required": ["shares"],
+        "required": ["grants"],
         "additionalProperties": false
       },
-      "SharesList400Response": {
+      "GrantsList400Response": {
         "$ref": "#/components/schemas/AdminErrorPayload"
       },
-      "SharesGet200Response": {
+      "GrantsGet200Response": {
         "type": "object",
         "properties": {
-          "share": {
+          "grant": {
             "type": "object",
             "properties": {
               "id": {
@@ -26710,6 +26726,10 @@
               },
               "docId": {
                 "type": "string"
+              },
+              "name": {
+                "type": "string",
+                "nullable": true
               },
               "layerMode": {
                 "type": "string",
@@ -26737,16 +26757,16 @@
                         "enum": ["required", "optional"]
                       },
                       "email": {
-                        "$ref": "#/components/schemas/SharesGet200Response/properties/share/properties/visitorIdentity/properties/fields/properties/displayName"
+                        "$ref": "#/components/schemas/GrantsGet200Response/properties/grant/properties/visitorIdentity/properties/fields/properties/displayName"
                       },
                       "title": {
-                        "$ref": "#/components/schemas/SharesGet200Response/properties/share/properties/visitorIdentity/properties/fields/properties/displayName"
+                        "$ref": "#/components/schemas/GrantsGet200Response/properties/grant/properties/visitorIdentity/properties/fields/properties/displayName"
                       },
                       "organization": {
-                        "$ref": "#/components/schemas/SharesGet200Response/properties/share/properties/visitorIdentity/properties/fields/properties/displayName"
+                        "$ref": "#/components/schemas/GrantsGet200Response/properties/grant/properties/visitorIdentity/properties/fields/properties/displayName"
                       },
                       "organizationalUnit": {
-                        "$ref": "#/components/schemas/SharesGet200Response/properties/share/properties/visitorIdentity/properties/fields/properties/displayName"
+                        "$ref": "#/components/schemas/GrantsGet200Response/properties/grant/properties/visitorIdentity/properties/fields/properties/displayName"
                       }
                     },
                     "additionalProperties": false
@@ -26791,7 +26811,7 @@
                 },
                 "nullable": true
               },
-              "passwordProtected": {
+              "passphraseProtected": {
                 "type": "boolean"
               },
               "sessionTtlSeconds": {
@@ -26829,6 +26849,7 @@
               "id",
               "tenantId",
               "docId",
+              "name",
               "layerMode",
               "layerName",
               "keepVisitorLayers",
@@ -26837,7 +26858,7 @@
               "identity",
               "scope",
               "origins",
-              "passwordProtected",
+              "passphraseProtected",
               "sessionTtlSeconds",
               "disabled",
               "archivedAt",
@@ -26851,15 +26872,21 @@
             "additionalProperties": false
           }
         },
-        "required": ["share"],
+        "required": ["grant"],
         "additionalProperties": false
       },
-      "SharesGet404Response": {
+      "GrantsGet404Response": {
         "$ref": "#/components/schemas/AdminErrorPayload"
       },
-      "SharesUpdateRequest": {
+      "GrantsUpdateRequest": {
         "type": "object",
         "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "nullable": true
+          },
           "layerMode": {
             "type": "string",
             "enum": ["shared", "per-visitor"]
@@ -26889,16 +26916,16 @@
                     "enum": ["required", "optional"]
                   },
                   "email": {
-                    "$ref": "#/components/schemas/SharesUpdateRequest/properties/visitorIdentity/properties/fields/properties/displayName"
+                    "$ref": "#/components/schemas/GrantsUpdateRequest/properties/visitorIdentity/properties/fields/properties/displayName"
                   },
                   "title": {
-                    "$ref": "#/components/schemas/SharesUpdateRequest/properties/visitorIdentity/properties/fields/properties/displayName"
+                    "$ref": "#/components/schemas/GrantsUpdateRequest/properties/visitorIdentity/properties/fields/properties/displayName"
                   },
                   "organization": {
-                    "$ref": "#/components/schemas/SharesUpdateRequest/properties/visitorIdentity/properties/fields/properties/displayName"
+                    "$ref": "#/components/schemas/GrantsUpdateRequest/properties/visitorIdentity/properties/fields/properties/displayName"
                   },
                   "organizationalUnit": {
-                    "$ref": "#/components/schemas/SharesUpdateRequest/properties/visitorIdentity/properties/fields/properties/displayName"
+                    "$ref": "#/components/schemas/GrantsUpdateRequest/properties/visitorIdentity/properties/fields/properties/displayName"
                   }
                 },
                 "additionalProperties": false
@@ -26951,7 +26978,7 @@
             "maxItems": 32,
             "nullable": true
           },
-          "password": {
+          "passphrase": {
             "type": "string",
             "minLength": 1,
             "maxLength": 1024,
@@ -26974,10 +27001,10 @@
         },
         "additionalProperties": false
       },
-      "SharesUpdate200Response": {
+      "GrantsUpdate200Response": {
         "type": "object",
         "properties": {
-          "share": {
+          "grant": {
             "type": "object",
             "properties": {
               "id": {
@@ -26988,6 +27015,10 @@
               },
               "docId": {
                 "type": "string"
+              },
+              "name": {
+                "type": "string",
+                "nullable": true
               },
               "layerMode": {
                 "type": "string",
@@ -27015,16 +27046,16 @@
                         "enum": ["required", "optional"]
                       },
                       "email": {
-                        "$ref": "#/components/schemas/SharesUpdate200Response/properties/share/properties/visitorIdentity/properties/fields/properties/displayName"
+                        "$ref": "#/components/schemas/GrantsUpdate200Response/properties/grant/properties/visitorIdentity/properties/fields/properties/displayName"
                       },
                       "title": {
-                        "$ref": "#/components/schemas/SharesUpdate200Response/properties/share/properties/visitorIdentity/properties/fields/properties/displayName"
+                        "$ref": "#/components/schemas/GrantsUpdate200Response/properties/grant/properties/visitorIdentity/properties/fields/properties/displayName"
                       },
                       "organization": {
-                        "$ref": "#/components/schemas/SharesUpdate200Response/properties/share/properties/visitorIdentity/properties/fields/properties/displayName"
+                        "$ref": "#/components/schemas/GrantsUpdate200Response/properties/grant/properties/visitorIdentity/properties/fields/properties/displayName"
                       },
                       "organizationalUnit": {
-                        "$ref": "#/components/schemas/SharesUpdate200Response/properties/share/properties/visitorIdentity/properties/fields/properties/displayName"
+                        "$ref": "#/components/schemas/GrantsUpdate200Response/properties/grant/properties/visitorIdentity/properties/fields/properties/displayName"
                       }
                     },
                     "additionalProperties": false
@@ -27069,7 +27100,7 @@
                 },
                 "nullable": true
               },
-              "passwordProtected": {
+              "passphraseProtected": {
                 "type": "boolean"
               },
               "sessionTtlSeconds": {
@@ -27107,6 +27138,7 @@
               "id",
               "tenantId",
               "docId",
+              "name",
               "layerMode",
               "layerName",
               "keepVisitorLayers",
@@ -27115,7 +27147,7 @@
               "identity",
               "scope",
               "origins",
-              "passwordProtected",
+              "passphraseProtected",
               "sessionTtlSeconds",
               "disabled",
               "archivedAt",
@@ -27129,22 +27161,22 @@
             "additionalProperties": false
           }
         },
-        "required": ["share"],
+        "required": ["grant"],
         "additionalProperties": false
       },
-      "SharesUpdate400Response": {
+      "GrantsUpdate400Response": {
         "$ref": "#/components/schemas/AdminErrorPayload"
       },
-      "SharesUpdate404Response": {
+      "GrantsUpdate404Response": {
         "$ref": "#/components/schemas/AdminErrorPayload"
       },
-      "SharesUpdate409Response": {
+      "GrantsUpdate409Response": {
         "$ref": "#/components/schemas/AdminErrorPayload"
       },
-      "SharesArchive200Response": {
+      "GrantsArchive200Response": {
         "type": "object",
         "properties": {
-          "share": {
+          "grant": {
             "type": "object",
             "properties": {
               "id": {
@@ -27155,6 +27187,10 @@
               },
               "docId": {
                 "type": "string"
+              },
+              "name": {
+                "type": "string",
+                "nullable": true
               },
               "layerMode": {
                 "type": "string",
@@ -27182,16 +27218,16 @@
                         "enum": ["required", "optional"]
                       },
                       "email": {
-                        "$ref": "#/components/schemas/SharesArchive200Response/properties/share/properties/visitorIdentity/properties/fields/properties/displayName"
+                        "$ref": "#/components/schemas/GrantsArchive200Response/properties/grant/properties/visitorIdentity/properties/fields/properties/displayName"
                       },
                       "title": {
-                        "$ref": "#/components/schemas/SharesArchive200Response/properties/share/properties/visitorIdentity/properties/fields/properties/displayName"
+                        "$ref": "#/components/schemas/GrantsArchive200Response/properties/grant/properties/visitorIdentity/properties/fields/properties/displayName"
                       },
                       "organization": {
-                        "$ref": "#/components/schemas/SharesArchive200Response/properties/share/properties/visitorIdentity/properties/fields/properties/displayName"
+                        "$ref": "#/components/schemas/GrantsArchive200Response/properties/grant/properties/visitorIdentity/properties/fields/properties/displayName"
                       },
                       "organizationalUnit": {
-                        "$ref": "#/components/schemas/SharesArchive200Response/properties/share/properties/visitorIdentity/properties/fields/properties/displayName"
+                        "$ref": "#/components/schemas/GrantsArchive200Response/properties/grant/properties/visitorIdentity/properties/fields/properties/displayName"
                       }
                     },
                     "additionalProperties": false
@@ -27236,7 +27272,7 @@
                 },
                 "nullable": true
               },
-              "passwordProtected": {
+              "passphraseProtected": {
                 "type": "boolean"
               },
               "sessionTtlSeconds": {
@@ -27274,6 +27310,7 @@
               "id",
               "tenantId",
               "docId",
+              "name",
               "layerMode",
               "layerName",
               "keepVisitorLayers",
@@ -27282,7 +27319,7 @@
               "identity",
               "scope",
               "origins",
-              "passwordProtected",
+              "passphraseProtected",
               "sessionTtlSeconds",
               "disabled",
               "archivedAt",
@@ -27296,13 +27333,13 @@
             "additionalProperties": false
           }
         },
-        "required": ["share"],
+        "required": ["grant"],
         "additionalProperties": false
       },
-      "SharesArchive404Response": {
+      "GrantsArchive404Response": {
         "$ref": "#/components/schemas/AdminErrorPayload"
       },
-      "SharesVisitorsList200Response": {
+      "GrantsVisitorsList200Response": {
         "type": "object",
         "properties": {
           "visitors": {
@@ -27388,29 +27425,29 @@
         "required": ["visitors"],
         "additionalProperties": false
       },
-      "SharesVisitorsList400Response": {
+      "GrantsVisitorsList400Response": {
         "$ref": "#/components/schemas/AdminErrorPayload"
       },
-      "SharesVisitorsList404Response": {
+      "GrantsVisitorsList404Response": {
         "$ref": "#/components/schemas/AdminErrorPayload"
       },
-      "SharesVisitorsDeleteResponse": {
+      "GrantsVisitorsDeleteResponse": {
         "$ref": "#/components/schemas/AdminErrorPayload"
       },
-      "SharesDelete404Response": {
+      "GrantsDelete404Response": {
         "$ref": "#/components/schemas/AdminErrorPayload"
       },
-      "SharesDelete409Response": {
+      "GrantsDelete409Response": {
         "$ref": "#/components/schemas/AdminErrorPayload"
       },
-      "SharesExchangeRequest": {
+      "GrantsExchangeRequest": {
         "type": "object",
         "properties": {
-          "shareToken": {
+          "grant": {
             "type": "string",
-            "pattern": "^shr_[A-Za-z0-9_-]{24}$"
+            "pattern": "^(grt|shr)_[A-Za-z0-9_-]{24}$"
           },
-          "password": {
+          "passphrase": {
             "type": "string",
             "minLength": 1,
             "maxLength": 1024
@@ -27450,10 +27487,10 @@
             "additionalProperties": false
           }
         },
-        "required": ["shareToken"],
+        "required": ["grant"],
         "additionalProperties": false
       },
-      "SharesExchange200Response": {
+      "GrantsExchange200Response": {
         "type": "object",
         "properties": {
           "token": {
@@ -27489,16 +27526,16 @@
                         "enum": ["required", "optional"]
                       },
                       "email": {
-                        "$ref": "#/components/schemas/SharesExchange200Response/properties/visitor/properties/identityRequest/properties/fields/properties/displayName"
+                        "$ref": "#/components/schemas/GrantsExchange200Response/properties/visitor/properties/identityRequest/properties/fields/properties/displayName"
                       },
                       "title": {
-                        "$ref": "#/components/schemas/SharesExchange200Response/properties/visitor/properties/identityRequest/properties/fields/properties/displayName"
+                        "$ref": "#/components/schemas/GrantsExchange200Response/properties/visitor/properties/identityRequest/properties/fields/properties/displayName"
                       },
                       "organization": {
-                        "$ref": "#/components/schemas/SharesExchange200Response/properties/visitor/properties/identityRequest/properties/fields/properties/displayName"
+                        "$ref": "#/components/schemas/GrantsExchange200Response/properties/visitor/properties/identityRequest/properties/fields/properties/displayName"
                       },
                       "organizationalUnit": {
-                        "$ref": "#/components/schemas/SharesExchange200Response/properties/visitor/properties/identityRequest/properties/fields/properties/displayName"
+                        "$ref": "#/components/schemas/GrantsExchange200Response/properties/visitor/properties/identityRequest/properties/fields/properties/displayName"
                       }
                     },
                     "additionalProperties": false
@@ -27519,7 +27556,7 @@
                   "invalid": {
                     "type": "array",
                     "items": {
-                      "$ref": "#/components/schemas/SharesExchange200Response/properties/visitor/properties/identityRequest/properties/missing/items"
+                      "$ref": "#/components/schemas/GrantsExchange200Response/properties/visitor/properties/identityRequest/properties/missing/items"
                     }
                   },
                   "purpose": {
@@ -27544,19 +27581,19 @@
         "required": ["token", "docId", "layerName", "layerMode", "visitor", "expiresAt"],
         "additionalProperties": false
       },
-      "SharesExchange400Response": {
+      "GrantsExchange400Response": {
         "$ref": "#/components/schemas/AdminErrorPayload"
       },
-      "SharesExchange403Response": {
+      "GrantsExchange403Response": {
         "$ref": "#/components/schemas/AdminErrorPayload"
       },
-      "SharesExchange404Response": {
+      "GrantsExchange404Response": {
         "$ref": "#/components/schemas/AdminErrorPayload"
       },
-      "SharesExchange410Response": {
+      "GrantsExchange410Response": {
         "$ref": "#/components/schemas/AdminErrorPayload"
       },
-      "SharesExchange422Response": {
+      "GrantsExchange422Response": {
         "$ref": "#/components/schemas/AdminErrorPayload"
       },
       "DocHead200Response": {
