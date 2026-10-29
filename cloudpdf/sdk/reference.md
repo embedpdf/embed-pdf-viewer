@@ -1412,6 +1412,73 @@ await client.documents.delete({
 </dl>
 </details>
 
+<details><summary><code>client.documents.<a href="/src/api/resources/documents/client/Client.ts">update</a>({ ...params }) -> CloudPDF.DocumentsUpdate200Response</code></summary>
+<dl>
+<dd>
+
+#### 📝 Description
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+A document that is being deleted answers 404.
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.documents.update({
+    tenantId: "tenantId",
+    id: "id",
+    name: "name"
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `CloudPDF.DocumentsUpdateRequest` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `DocumentsClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
 <details><summary><code>client.documents.<a href="/src/api/resources/documents/client/Client.ts">commit</a>({ ...params }) -> CloudPDF.DocumentsCommit200Response</code></summary>
 <dl>
 <dd>

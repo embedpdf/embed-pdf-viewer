@@ -1,3 +1,4 @@
+import type { DocCapability } from '@embedpdf/engine-core/runtime';
 import {
   ChangeRequestSchema,
   ChangeResponseSchema,
@@ -5,7 +6,6 @@ import {
   PageScaleResultSchema,
   PageMeasurementViewportListSchema,
 } from '@embedpdf/engine-core/wire';
-import type { DocCapability } from '@embedpdf/engine-core/runtime';
 import {
   AnnotationCreateResultSchema,
   AnnotationDeleteResultSchema,
@@ -136,9 +136,24 @@ export type UploadPreference = z.infer<typeof UploadPreferenceSchema>;
 export const DocumentStateSchema = z.enum(['pending', 'ready', 'failed', 'deleting']);
 export type DocumentState = z.infer<typeof DocumentStateSchema>;
 
+/** Any text a person can read: no control characters, no leading or trailing whitespace. */
+const documentNamePattern =
+  // eslint-disable-next-line no-control-regex -- excluding control characters is its job
+  /^[^\s\u0000-\u001F\u007F](?:[^\u0000-\u001F\u007F]*[^\s\u0000-\u001F\u007F])?$/u;
+
+export const DocumentNameSchema = z
+  .string()
+  .min(1)
+  .max(255)
+  .regex(documentNamePattern)
+  .describe(
+    'What people call the document: shown in dashboards, searched and sorted by. 1 to 255 characters, no control characters, no leading or trailing whitespace. Names need not be unique.',
+  );
+
 export const AdminDocumentRecordSchema = z.object({
   id: z.string(),
   tenantId: z.string(),
+  name: z.string(),
   state: DocumentStateSchema,
   baseSha: z.string().nullable(),
   storageSizeBytes: z.number().nullable(),
@@ -157,6 +172,8 @@ export type AdminDocumentRecord = z.infer<typeof AdminDocumentRecordSchema>;
 export const AdminDocumentInitRequestSchema = z.object({
   contentLength: z.number().finite().min(1),
   contentSha256: z.string().regex(sha256Hex),
+  /** Defaults to the document id. */
+  name: DocumentNameSchema.optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
   idempotencyKey: z.string().optional(),
   dedupMode: DedupModeSchema.optional(),
@@ -319,6 +336,8 @@ export const AdminDocumentImportRequestSchema = z.object({
     .describe(
       'Integrity pins, enforced when present. When absent, the server-observed values become authoritative.',
     ),
+  /** Defaults to the document id. */
+  name: DocumentNameSchema.optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
   idempotencyKey: z
     .string()
@@ -364,14 +383,32 @@ export const AdminDocumentResponseSchema = z.object({
 });
 export type AdminDocumentResponse = z.infer<typeof AdminDocumentResponseSchema>;
 
+export const AdminDocumentUpdateRequestSchema = z.object({
+  name: DocumentNameSchema,
+});
+export type AdminDocumentUpdateRequest = z.infer<typeof AdminDocumentUpdateRequestSchema>;
+
 export const ADMIN_DOCUMENT_LIST_DEFAULT_LIMIT = 100;
 export const ADMIN_DOCUMENT_LIST_MAX_LIMIT = 200;
+
+export const DocumentListSortSchema = z
+  .enum(['createdAt', 'name', 'size'])
+  .describe('createdAt (default), name (ignoring case), or size (stored bytes; 0 while pending).');
+export type DocumentListSort = z.infer<typeof DocumentListSortSchema>;
+
+export const ListOrderSchema = z
+  .enum(['asc', 'desc'])
+  .describe(
+    'Defaults to the reading order of the sort: A to Z for name, newest and largest first otherwise.',
+  );
+export type ListOrder = z.infer<typeof ListOrderSchema>;
 
 /**
  * Query parameters for `documents.list`. `limit` arrives as a string on
  * the wire, hence the coercion; values outside [1, max] are a validation
  * error, not a silent clamp. `cursor` is an opaque continuation token
- * from a previous page's `nextCursor` — clients must not parse it.
+ * from a previous page's `nextCursor` — clients must not parse it, and it
+ * only continues the `sort` and `order` it was made with.
  */
 export const AdminDocumentListQuerySchema = z.object({
   limit: z.coerce
@@ -381,7 +418,17 @@ export const AdminDocumentListQuerySchema = z.object({
     .max(ADMIN_DOCUMENT_LIST_MAX_LIMIT)
     .default(ADMIN_DOCUMENT_LIST_DEFAULT_LIMIT),
   cursor: z.string().min(1).optional(),
-  state: DocumentStateSchema.optional(),
+  state: DocumentStateSchema.describe(
+    'Only documents in this state. Without it, every state except deleting.',
+  ).optional(),
+  q: z
+    .string()
+    .min(1)
+    .max(255)
+    .describe('Only documents whose name contains this text, ignoring case.')
+    .optional(),
+  sort: DocumentListSortSchema.default('createdAt'),
+  order: ListOrderSchema.optional(),
 });
 export type AdminDocumentListQuery = z.infer<typeof AdminDocumentListQuerySchema>;
 
@@ -585,10 +632,17 @@ export type AdminTenantListResponse = z.infer<typeof AdminTenantListResponseSche
  * scope: a grant is a standing mint capability, so creating and
  * revoking it are the same trust decision — unlike ephemeral tokens,
  * where issue and revoke fail in different directions.
+ *
+ * The `docs.*` scopes are create, read, update and delete over the
+ * tenant's documents. `docs.update` changes an existing document without
+ * removing it, so a leaked token alters data rather than exposing or
+ * destroying it; `docs.delete` stays separate because its failure
+ * direction is loss.
  */
 export const adminTenantScopes = [
   'docs.create',
   'docs.read',
+  'docs.update',
   'docs.delete',
   'tokens.issue-doc',
   'tokens.revoke',
@@ -1313,7 +1367,8 @@ export const adminOperations = {
   'documents.list': {
     operationId: 'documents.list',
     title: 'List documents',
-    summary: 'List documents in the tenant, newest first, cursor-paginated.',
+    summary:
+      'List documents in the tenant, cursor-paginated: newest first by default, or searched by name and sorted by name or size.',
     method: 'GET',
     path: '/v1/tenants/:tenantId/documents',
     credentials: ['api-token', 'tenant-jwt'],
@@ -1339,6 +1394,24 @@ export const adminOperations = {
       403: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
       404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
     },
+  },
+  'documents.update': {
+    operationId: 'documents.update',
+    title: 'Update document',
+    summary: 'Rename a document.',
+    method: 'PATCH',
+    path: '/v1/tenants/:tenantId/documents/:id',
+    credentials: ['api-token', 'tenant-jwt'],
+    scope: ['docs.update'],
+    params: AdminTenantDocParamsSchema,
+    body: { contentType: 'application/json', schema: AdminDocumentUpdateRequestSchema },
+    responses: {
+      200: { contentType: 'application/json', schema: AdminDocumentResponseSchema },
+      400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      403: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+    },
+    notes: 'A document that is being deleted answers 404.',
   },
   'documents.download': {
     operationId: 'documents.download',

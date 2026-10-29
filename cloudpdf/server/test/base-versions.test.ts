@@ -60,6 +60,7 @@ async function seedDocumentRow(): Promise<void> {
   const documents = new DocumentsRepo(db);
   await documents.createPending({
     id: DOC,
+    name: DOC,
     tenantId: TENANT,
     metadata: null,
     idempotencyKey: null,
@@ -135,21 +136,19 @@ describe('migration 030', () => {
     const now = 1000;
     await db.insertInto('tenants').values({ id: TENANT, name: TENANT }).execute();
     const documents = new DocumentsRepo(db);
-    await documents.createPending({
-      id: DOC,
-      tenantId: TENANT,
-      metadata: null,
-      idempotencyKey: null,
-      createdBy: null,
+    // Inserted directly: the repo writes columns that later migrations add.
+    const pendingRow = (id: string) => ({
+      id,
+      tenant_id: TENANT,
+      state: 'pending',
+      created_at: now,
+      updated_at: now,
     });
+    await db
+      .insertInto('documents')
+      .values([pendingRow(DOC), pendingRow('doc-pending')] as never)
+      .execute();
     await documents.commit({ id: DOC, tenantId: TENANT, baseSha: SHA1, storageSizeBytes: 777 });
-    await documents.createPending({
-      id: 'doc-pending',
-      tenantId: TENANT,
-      metadata: null,
-      idempotencyKey: null,
-      createdBy: null,
-    });
     await db
       .insertInto('layers')
       .values({

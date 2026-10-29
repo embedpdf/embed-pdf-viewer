@@ -32,6 +32,7 @@ export namespace TokensIssueRequest {
                 | (
                       | "docs.create"
                       | "docs.read"
+                      | "docs.update"
                       | "docs.delete"
                       | "tokens.issue-doc"
                       | "tokens.revoke"

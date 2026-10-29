@@ -61,6 +61,10 @@ export interface DocumentsTable {
   pdf_permissions_all_allowed: boolean | number | null;
   pdf_opened_as: DocumentPdfOpenedAs | null;
   security_probed_at: number | null;
+  /** Always written: the document id when the caller names nothing. */
+  name: string;
+  /** `name` in the form search and the name sort compare (NFC, lowercased). */
+  name_key: string;
   doc_version: Generated<number>;
   metadata_json: string | null;
   /** Customer-supplied retry key; unique per `(tenant_id, idempotency_key)`. */

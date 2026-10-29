@@ -88,6 +88,7 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
         | '*'
         | 'docs.create'
         | 'docs.read'
+        | 'docs.update'
         | 'docs.delete'
         | 'tokens.issue-doc'
         | 'tokens.revoke'
@@ -811,7 +812,11 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
         expect(err?.status).toBe(400);
       }
 
-      for (const cursor of ['not-a-cursor', 'v1.%%%%', `v1.${Buffer.from('[1]').toString('base64url')}`]) {
+      for (const cursor of [
+        'not-a-cursor',
+        'v1.%%%%',
+        `v1.${Buffer.from('[1]').toString('base64url')}`,
+      ]) {
         let err: AdminError | undefined;
         try {
           await admin.documents.list({ cursor });
@@ -880,6 +885,241 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
       }
       expect(ids).toHaveLength(5);
       expect(new Set(ids).size).toBe(5);
+    });
+  });
+
+  describe(`Document names, search and sort [${dialect.label}]`, () => {
+    let fx: Fixture;
+
+    beforeAll(async () => {
+      fx = await buildFixture();
+    });
+    afterAll(async () => {
+      await tearDown(fx);
+    });
+
+    function tenantAdmin(
+      tenantId: string,
+      scope?: NonNullable<Parameters<typeof adminToken>[1]>['scope'],
+    ) {
+      return createCloudAdmin({
+        baseUrl: fx.baseUrl,
+        tenantToken: adminToken(tenantId, scope ? { scope } : {}),
+      }).tenant(tenantId);
+    }
+
+    async function statusOf(promise: Promise<unknown>): Promise<number> {
+      try {
+        await promise;
+        return 200;
+      } catch (e) {
+        return (e as AdminError).status;
+      }
+    }
+
+    async function walk(
+      admin: ReturnType<typeof tenantAdmin>,
+      options: Record<string, unknown>,
+    ): Promise<string[]> {
+      const ids: string[] = [];
+      let cursor: string | undefined;
+      do {
+        const page = await admin.documents.list({ ...options, limit: 2, cursor });
+        ids.push(...page.documents.map((d: { id: string }) => d.id));
+        cursor = page.nextCursor ?? undefined;
+      } while (cursor !== undefined);
+      return ids;
+    }
+
+    test('a document is named at upload, or after its id', async () => {
+      const admin = tenantAdmin('tenant-names-upload');
+      const named = await admin.documents.create({
+        bytes: fakePdf(100, 300),
+        name: 'Quarterly report.pdf',
+      });
+      expect(named.document.name).toBe('Quarterly report.pdf');
+      const unnamed = await admin.documents.create({ bytes: fakePdf(101, 300) });
+      expect(unnamed.document.name).toBe(unnamed.document.id);
+      expect((await admin.documents.get(named.document.id)).name).toBe('Quarterly report.pdf');
+    });
+
+    test('names a person cannot read are 400s at upload and rename', async () => {
+      const admin = tenantAdmin('tenant-names-invalid');
+      const bytes = fakePdf(110, 300);
+      const doc = await admin.documents.create({ bytes, name: 'Valid.pdf' });
+      for (const name of ['', ' leading.pdf', 'trailing.pdf ', 'tab\there.pdf', 'a'.repeat(256)]) {
+        const init = admin.documents.init({
+          contentLength: bytes.byteLength,
+          contentSha256: sha256Hex(bytes),
+          name,
+        });
+        expect(await statusOf(init)).toBe(400);
+        expect(await statusOf(admin.documents.rename(doc.document.id, name))).toBe(400);
+      }
+      expect((await admin.documents.rename(doc.document.id, 'a'.repeat(255))).name).toHaveLength(
+        255,
+      );
+      expect((await admin.documents.rename(doc.document.id, 'Überweisung März.pdf')).name).toBe(
+        'Überweisung März.pdf',
+      );
+    });
+
+    test('rename changes the name; gone, deleting and foreign documents are refused', async () => {
+      const admin = tenantAdmin('tenant-names-rename');
+      const doc = await admin.documents.create({ bytes: fakePdf(120, 300), name: 'Draft.pdf' });
+      const renamed = await admin.documents.rename(doc.document.id, 'Final.pdf');
+      expect(renamed.name).toBe('Final.pdf');
+      expect((await admin.documents.get(doc.document.id)).name).toBe('Final.pdf');
+      expect(
+        (await admin.documents.list({ q: 'final' })).documents.map((d: { id: string }) => d.id),
+      ).toEqual([doc.document.id]);
+
+      expect(await statusOf(admin.documents.rename('doc_missing', 'X.pdf'))).toBe(404);
+      const other = tenantAdmin('tenant-names-rename-other');
+      expect(await statusOf(other.documents.rename(doc.document.id, 'Mine.pdf'))).toBe(403);
+
+      await fx.db
+        .updateTable('documents')
+        .set({ state: 'deleting' })
+        .where('id', '=', doc.document.id)
+        .execute();
+      expect(await statusOf(admin.documents.rename(doc.document.id, 'Again.pdf'))).toBe(404);
+    });
+
+    test('renaming needs docs.update', async () => {
+      const owner = tenantAdmin('tenant-names-scope');
+      const doc = await owner.documents.create({ bytes: fakePdf(130, 300), name: 'Before.pdf' });
+      const withoutUpdate = tenantAdmin('tenant-names-scope', [
+        'docs.create',
+        'docs.read',
+        'docs.delete',
+      ]);
+      expect(await statusOf(withoutUpdate.documents.rename(doc.document.id, 'After.pdf'))).toBe(
+        403,
+      );
+      const updateOnly = tenantAdmin('tenant-names-scope', ['docs.update']);
+      expect((await updateOnly.documents.rename(doc.document.id, 'After.pdf')).name).toBe(
+        'After.pdf',
+      );
+    });
+
+    test('search matches part of a name, ignoring case, with % and _ taken literally', async () => {
+      const admin = tenantAdmin('tenant-names-search');
+      const ids: Record<string, string> = {};
+      for (const [i, name] of [
+        'Invoice 2026.pdf',
+        'invoice_final.pdf',
+        'invoiceXfinal.pdf',
+        'Report 100%.pdf',
+        'Überweisung.pdf',
+        'Contract.pdf',
+      ].entries()) {
+        ids[name] = (
+          await admin.documents.create({ bytes: fakePdf(140 + i, 300), name })
+        ).document.id;
+      }
+      const search = async (q: string, options: Record<string, unknown> = {}) =>
+        (await admin.documents.list({ q, ...options })).documents
+          .map((d: { name: string }) => d.name)
+          .sort();
+
+      expect(await search('INVOICE')).toEqual([
+        'Invoice 2026.pdf',
+        'invoiceXfinal.pdf',
+        'invoice_final.pdf',
+      ]);
+      expect(await search('_')).toEqual(['invoice_final.pdf']);
+      expect(await search('e_f')).toEqual(['invoice_final.pdf']);
+      expect(await search('100%')).toEqual(['Report 100%.pdf']);
+      expect(await search('%')).toEqual(['Report 100%.pdf']);
+      expect(await search('ÜBER')).toEqual(['Überweisung.pdf']);
+      expect(await search('nothing like this')).toEqual([]);
+
+      // Search composes with the name sort and its cursor.
+      expect(await walk(admin, { q: 'invoice', sort: 'name' })).toEqual([
+        ids['Invoice 2026.pdf'],
+        ids['invoice_final.pdf'],
+        ids['invoiceXfinal.pdf'],
+      ]);
+    });
+
+    test('every sort and order pages through ties in a stable order', async () => {
+      const admin = tenantAdmin('tenant-names-sort');
+      const specs = [
+        { name: 'beta.pdf', size: 300, createdAt: 1_700_000_000_000 },
+        { name: 'Alpha.pdf', size: 100, createdAt: 1_700_000_000_000 },
+        { name: 'alpha.pdf', size: 300, createdAt: 1_700_000_001_000 },
+        { name: 'Gamma.pdf', size: 200, createdAt: 1_700_000_002_000 },
+        { name: 'beta.pdf', size: 100, createdAt: 1_700_000_002_000 },
+      ];
+      const docs: Array<{ id: string; name: string; size: number; createdAt: number }> = [];
+      for (const [i, spec] of specs.entries()) {
+        const { document } = await admin.documents.create({
+          bytes: fakePdf(160 + i, spec.size),
+          name: spec.name,
+        });
+        await fx.db
+          .updateTable('documents')
+          .set({ created_at: spec.createdAt })
+          .where('id', '=', document.id)
+          .execute();
+        docs.push({ id: document.id, ...spec });
+      }
+
+      const keyOf = {
+        createdAt: (d: (typeof docs)[number]) => d.createdAt,
+        name: (d: (typeof docs)[number]) => d.name.toLowerCase(),
+        size: (d: (typeof docs)[number]) => d.size,
+      } as const;
+      for (const sort of ['createdAt', 'name', 'size'] as const) {
+        for (const order of ['asc', 'desc', undefined] as const) {
+          const direction = order ?? (sort === 'name' ? 'asc' : 'desc');
+          const sign = direction === 'asc' ? 1 : -1;
+          const expected = [...docs]
+            .sort((left, right) => {
+              const leftKey = keyOf[sort](left);
+              const rightKey = keyOf[sort](right);
+              if (leftKey !== rightKey) return (leftKey < rightKey ? -1 : 1) * sign;
+              return (left.id < right.id ? -1 : 1) * sign;
+            })
+            .map((d) => d.id);
+          const options = order ? { sort, order } : { sort };
+          expect(await walk(admin, options), `${sort} ${order ?? 'default'}`).toEqual(expected);
+        }
+      }
+    });
+
+    test('a cursor only continues the sort and order it was made with', async () => {
+      const admin = tenantAdmin('tenant-names-cursor');
+      for (let i = 0; i < 3; i++) {
+        await admin.documents.create({ bytes: fakePdf(180 + i, 300), name: `File ${i}.pdf` });
+      }
+      const first = await admin.documents.list({ sort: 'name', limit: 1 });
+      const cursor = first.nextCursor!;
+      expect(cursor).toBeTruthy();
+      expect(await statusOf(admin.documents.list({ sort: 'name', order: 'asc', cursor }))).toBe(
+        200,
+      );
+      expect(await statusOf(admin.documents.list({ sort: 'size', cursor }))).toBe(400);
+      expect(await statusOf(admin.documents.list({ sort: 'name', order: 'desc', cursor }))).toBe(
+        400,
+      );
+      expect(await statusOf(admin.documents.list({ cursor }))).toBe(400);
+    });
+
+    test('documents being deleted are hidden unless asked for by state', async () => {
+      const admin = tenantAdmin('tenant-names-deleting');
+      const kept = await admin.documents.create({ bytes: fakePdf(190, 300), name: 'Kept.pdf' });
+      const going = await admin.documents.create({ bytes: fakePdf(191, 300), name: 'Going.pdf' });
+      await fx.db
+        .updateTable('documents')
+        .set({ state: 'deleting' })
+        .where('id', '=', going.document.id)
+        .execute();
+      const ids = (page: { documents: Array<{ id: string }> }) => page.documents.map((d) => d.id);
+      expect(ids(await admin.documents.list())).toEqual([kept.document.id]);
+      expect(ids(await admin.documents.list({ q: 'going' }))).toEqual([]);
+      expect(ids(await admin.documents.list({ state: 'deleting' }))).toEqual([going.document.id]);
     });
   });
 }

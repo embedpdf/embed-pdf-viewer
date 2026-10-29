@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "canonicalVersion": "3.0.0-next.17",
-  "openapiSha256": "8dd26f86f0c1ca9811b354af914f433f0ed217850fd079355229defbe1fb2966",
+  "openapiSha256": "16ff877bf37a070d1178bbb63f229dd78724c6bcb98922e690c0068c039ae439",
   "languages": {
     "typescript": {
       "label": "TypeScript",
@@ -2130,6 +2130,43 @@
       "ruby": {
         "status": "available",
         "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.documents.get(\n  tenant_id: \"tenantId\",\n  id: \"id\"\n)",
+        "frameLines": 7
+      }
+    },
+    "documents.update": {
+      "typescript": {
+        "status": "available",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.documents.update({\n  tenantId: \"tenantId\",\n  id: \"id\",\n  name: \"name\"\n});",
+        "frameLines": 7
+      },
+      "python": {
+        "status": "available",
+        "source": "from cloudpdf import CloudPDFClient\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n    base_url=\"https://yourhost.com/path/to/api\",\n)\n\nclient.documents.update(\n    tenant_id=\"tenantId\",\n    id=\"id\",\n    name=\"name\",\n)",
+        "frameLines": 7
+      },
+      "php": {
+        "status": "available",
+        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n    options: ['baseUrl' => 'https://yourhost.com/path/to/api'],\n);\n\n$client->documents->update(\n    'tenantId',\n    'id',\n    new DocumentsUpdateRequest([\n        'name' => 'name',\n    ]),\n);",
+        "frameLines": 7
+      },
+      "csharp": {
+        "status": "available",
+        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\",\n    new ClientOptions { BaseUrl = \"https://yourhost.com/path/to/api\" }\n);\n\nawait client.Documents.UpdateAsync(\n    new DocumentsUpdateRequest\n    {\n        TenantId = \"tenantId\",\n        Id = \"id\",\n        Name = \"name\",\n    }\n);",
+        "frameLines": 7
+      },
+      "go": {
+        "status": "available",
+        "source": "import (\n    \"context\"\n\n    cloudpdf \"github.com/embedpdf/cloudpdf-sdk-go/v3\"\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n    option.WithBaseURL(\"https://yourhost.com/path/to/api\"),\n)\n\nrequest := &cloudpdf.DocumentsUpdateRequest{\n    TenantID: \"tenantId\",\n    ID: \"id\",\n    Name: \"name\",\n}\nclient.Documents.Update(\n    context.TODO(),\n    request,\n)",
+        "frameLines": 13
+      },
+      "java": {
+        "status": "available",
+        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .url(\"https://yourhost.com/path/to/api\")\n    .build();\n\nclient.documents().update(\n    \"tenantId\",\n    \"id\",\n    DocumentsUpdateRequest\n        .builder()\n        .name(\"name\")\n        .build()\n);",
+        "frameLines": 8
+      },
+      "ruby": {
+        "status": "available",
+        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.documents.update(\n  tenant_id: \"tenantId\",\n  id: \"id\",\n  name: \"name\"\n)",
         "frameLines": 7
       }
     },

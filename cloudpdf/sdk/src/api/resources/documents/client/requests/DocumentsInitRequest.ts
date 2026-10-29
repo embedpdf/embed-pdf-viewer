@@ -12,6 +12,8 @@ export interface DocumentsInitRequest {
     tenantId: string;
     contentLength: number;
     contentSha256: string;
+    /** What people call the document: shown in dashboards, searched and sorted by. 1 to 255 characters, no control characters, no leading or trailing whitespace. Names need not be unique. */
+    name?: string;
     metadata?: Record<string, unknown>;
     idempotencyKey?: string;
     /** always-create (default) creates a new document every time. reuse-existing returns a document that already holds the same content instead of storing it twice. */

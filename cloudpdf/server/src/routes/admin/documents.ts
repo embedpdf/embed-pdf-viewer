@@ -2,18 +2,23 @@ import {
   AdminDocumentCommitRequestSchema,
   AdminDocumentImportRequestSchema,
   AdminDocumentInitRequestSchema,
+  AdminDocumentUpdateRequestSchema,
   adminOperations,
   adminWirePaths,
   type AdminDocumentCommitRequest,
   type AdminDocumentImportRequest,
   type AdminDocumentInitRequest,
+  type AdminDocumentUpdateRequest,
   type AdminOperation,
+  type DocumentListSort,
+  type ListOrder,
 } from '@cloudpdf/contract';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
-import { decodeListCursor, encodeListCursor } from './_cursor';
+import { decodeSortedListCursor, encodeSortedListCursor } from './_cursor';
 import { formatIssues } from './_issues';
 import { requireTenantAccess } from '../../app/jwt-plugin';
+import { listPositionOf } from '../../db/repos/documents.repo';
 import type { DocumentLifecycleService } from '../../services/DocumentLifecycleService';
 import type { ObjectStore } from '../../storage/ObjectStore';
 
@@ -28,7 +33,7 @@ export interface AdminDocumentsRouteDeps {
  *
  * The flow customers walk through:
  *   1. POST /v1/tenants/:tenantId/documents/init
- *      body: { contentLength, contentSha256, metadata?, idempotencyKey?, dedupMode?, docId? }
+ *      body: { contentLength, contentSha256, name?, metadata?, idempotencyKey?, dedupMode?, docId? }
  *      -> { id, state, tag: 'created'|'resumed'|'deduped', upload?: { ... } }
  *
  *   2. (If not deduped:) PUT the bytes to `upload.url` (presigned) or
@@ -77,6 +82,7 @@ export async function registerAdminDocumentsRoutes(
       sub: ctx.sub,
       contentLength: body.contentLength,
       contentSha256: body.contentSha256,
+      name: body.name,
       metadata: body.metadata ?? null,
       idempotencyKey: body.idempotencyKey ?? null,
       dedupMode: body.dedupMode,
@@ -162,6 +168,7 @@ export async function registerAdminDocumentsRoutes(
       via: ctx.via,
       source: body.source,
       expected: body.expected ?? null,
+      name: body.name,
       metadata: body.metadata ?? null,
       idempotencyKey: body.idempotencyKey ?? null,
       dedupMode: body.dedupMode,
@@ -181,14 +188,32 @@ export async function registerAdminDocumentsRoutes(
     if (!parsed.success) {
       throw makeError('InvalidArg', 400, formatIssues(parsed.error.issues));
     }
-    const { limit, cursor, state } = parsed.data;
-    const before = cursor === undefined ? undefined : decodeListCursor(cursor);
+    const { limit, cursor, state, q, sort } = parsed.data;
+    const order = parsed.data.order ?? readingOrderOf(sort);
+    const after =
+      cursor === undefined
+        ? undefined
+        : decodeSortedListCursor(cursor, {
+            sort,
+            order,
+            keyType: sort === 'name' ? 'string' : 'number',
+          });
 
     // limit+1 probes for a next page without a count query.
-    const rows = await lifecycle.list(ctx.tenantId, { limit: limit + 1, state, before });
+    const rows = await lifecycle.list(ctx.tenantId, {
+      limit: limit + 1,
+      state,
+      nameContains: q,
+      sort,
+      order,
+      after,
+    });
     const page = rows.slice(0, limit);
     const last = page[page.length - 1];
-    const nextCursor = rows.length > limit && last ? encodeListCursor(last) : null;
+    const nextCursor =
+      rows.length > limit && last
+        ? encodeSortedListCursor({ sort, order, ...listPositionOf(last, sort) })
+        : null;
     return reply.send({ documents: page.map(docPublic), nextCursor });
   });
 
@@ -197,6 +222,15 @@ export async function registerAdminDocumentsRoutes(
     const { tenantId, id } = req.params as { tenantId: string; id: string };
     const ctx = requireTenantAccess(req, tenantId, getOp.scope);
     const doc = await lifecycle.get(ctx.tenantId, id);
+    return reply.send({ document: docPublic(doc) });
+  });
+
+  const updateOp = adminOperations['documents.update'];
+  mount(updateOp, async (req, reply) => {
+    const { tenantId, id } = req.params as { tenantId: string; id: string };
+    const ctx = requireTenantAccess(req, tenantId, updateOp.scope);
+    const body = parseUpdateBody(req);
+    const doc = await lifecycle.rename(ctx.tenantId, id, body.name);
     return reply.send({ document: docPublic(doc) });
   });
 
@@ -278,6 +312,19 @@ function parseCommitBody(req: FastifyRequest): AdminDocumentCommitRequest {
   };
 }
 
+function parseUpdateBody(req: FastifyRequest): AdminDocumentUpdateRequest {
+  const result = AdminDocumentUpdateRequestSchema.safeParse(req.body);
+  if (!result.success) {
+    throw makeError('InvalidArg', 400, formatIssues(result.error.issues));
+  }
+  return result.data;
+}
+
+/** A to Z for names; newest and largest first for creation time and size. */
+function readingOrderOf(sort: DocumentListSort): ListOrder {
+  return sort === 'name' ? 'asc' : 'desc';
+}
+
 function parseImportBody(req: FastifyRequest): AdminDocumentImportRequest {
   const result = AdminDocumentImportRequestSchema.safeParse(req.body);
   if (!result.success) {
@@ -295,6 +342,7 @@ function parseImportBody(req: FastifyRequest): AdminDocumentImportRequest {
 function docPublic(d: {
   id: string;
   tenantId: string;
+  name: string;
   state: string;
   baseSha: string | null;
   storageSizeBytes: number | null;
@@ -310,6 +358,7 @@ function docPublic(d: {
   return {
     id: d.id,
     tenantId: d.tenantId,
+    name: d.name,
     state: d.state,
     baseSha: d.baseSha,
     storageSizeBytes: d.storageSizeBytes,

@@ -5367,7 +5367,7 @@
         "x-fern-sdk-group-name": ["documents"],
         "x-fern-sdk-method-name": "list",
         "x-docs-title": "List documents",
-        "summary": "List documents in the tenant, newest first, cursor-paginated.",
+        "summary": "List documents in the tenant, cursor-paginated: newest first by default, or searched by name and sorted by name or size.",
         "security": [
           {
             "apiToken": []
@@ -5413,7 +5413,40 @@
             "required": false,
             "schema": {
               "type": "string",
-              "enum": ["pending", "ready", "failed", "deleting"]
+              "enum": ["pending", "ready", "failed", "deleting"],
+              "description": "Only documents in this state. Without it, every state except deleting."
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255,
+              "description": "Only documents whose name contains this text, ignoring case."
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["createdAt", "name", "size"],
+              "description": "createdAt (default), name (ignoring case), or size (stored bytes; 0 while pending).",
+              "default": "createdAt"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["asc", "desc"],
+              "description": "Defaults to the reading order of the sort: A to Z for name, newest and largest first otherwise."
             }
           }
         ],
@@ -5514,6 +5547,105 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DocumentsGet404Response"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminErrorPayload"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "documents.update",
+        "x-fern-sdk-group-name": ["documents"],
+        "x-fern-sdk-method-name": "update",
+        "x-docs-title": "Update document",
+        "summary": "Rename a document.",
+        "description": "A document that is being deleted answers 404.",
+        "security": [
+          {
+            "apiToken": []
+          },
+          {
+            "tenantToken": []
+          }
+        ],
+        "x-required-scope": ["docs.update"],
+        "parameters": [
+          {
+            "name": "tenantId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DocumentsUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentsUpdate200Response"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentsUpdate400Response"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentsUpdate403Response"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentsUpdate404Response"
                 }
               }
             }
@@ -23801,6 +23933,13 @@
             "type": "string",
             "pattern": "^[0-9a-f]{64}$"
           },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "pattern": "^[^\\s\\u0000-\\u001F\\u007F](?:[^\\u0000-\\u001F\\u007F]*[^\\s\\u0000-\\u001F\\u007F])?$",
+            "description": "What people call the document: shown in dashboards, searched and sorted by. 1 to 255 characters, no control characters, no leading or trailing whitespace. Names need not be unique."
+          },
           "metadata": {
             "type": "object",
             "additionalProperties": {}
@@ -23846,6 +23985,9 @@
                     "type": "string"
                   },
                   "tenantId": {
+                    "type": "string"
+                  },
+                  "name": {
                     "type": "string"
                   },
                   "state": {
@@ -23895,6 +24037,7 @@
                 "required": [
                   "id",
                   "tenantId",
+                  "name",
                   "state",
                   "baseSha",
                   "storageSizeBytes",
@@ -24028,6 +24171,9 @@
               "tenantId": {
                 "type": "string"
               },
+              "name": {
+                "type": "string"
+              },
               "state": {
                 "type": "string",
                 "enum": ["pending", "ready", "failed", "deleting"]
@@ -24075,6 +24221,7 @@
             "required": [
               "id",
               "tenantId",
+              "name",
               "state",
               "baseSha",
               "storageSizeBytes",
@@ -24186,6 +24333,13 @@
             "additionalProperties": false,
             "description": "Integrity pins, enforced when present. When absent, the server-observed values become authoritative."
           },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "pattern": "^[^\\s\\u0000-\\u001F\\u007F](?:[^\\u0000-\\u001F\\u007F]*[^\\s\\u0000-\\u001F\\u007F])?$",
+            "description": "What people call the document: shown in dashboards, searched and sorted by. 1 to 255 characters, no control characters, no leading or trailing whitespace. Names need not be unique."
+          },
           "metadata": {
             "type": "object",
             "additionalProperties": {}
@@ -24228,6 +24382,9 @@
               "tenantId": {
                 "type": "string"
               },
+              "name": {
+                "type": "string"
+              },
               "state": {
                 "type": "string",
                 "enum": ["pending", "ready", "failed", "deleting"]
@@ -24275,6 +24432,7 @@
             "required": [
               "id",
               "tenantId",
+              "name",
               "state",
               "baseSha",
               "storageSizeBytes",
@@ -24307,6 +24465,9 @@
               "tenantId": {
                 "type": "string"
               },
+              "name": {
+                "type": "string"
+              },
               "state": {
                 "type": "string",
                 "enum": ["pending", "ready", "failed", "deleting"]
@@ -24354,6 +24515,7 @@
             "required": [
               "id",
               "tenantId",
+              "name",
               "state",
               "baseSha",
               "storageSizeBytes",
@@ -24391,6 +24553,9 @@
                   "type": "string"
                 },
                 "tenantId": {
+                  "type": "string"
+                },
+                "name": {
                   "type": "string"
                 },
                 "state": {
@@ -24440,6 +24605,7 @@
               "required": [
                 "id",
                 "tenantId",
+                "name",
                 "state",
                 "baseSha",
                 "storageSizeBytes",
@@ -24474,6 +24640,9 @@
                 "type": "string"
               },
               "tenantId": {
+                "type": "string"
+              },
+              "name": {
                 "type": "string"
               },
               "state": {
@@ -24523,6 +24692,7 @@
             "required": [
               "id",
               "tenantId",
+              "name",
               "state",
               "baseSha",
               "storageSizeBytes",
@@ -24543,6 +24713,108 @@
         "$ref": "#/components/schemas/AdminErrorPayload"
       },
       "DocumentsGet404Response": {
+        "$ref": "#/components/schemas/AdminErrorPayload"
+      },
+      "DocumentsUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "pattern": "^[^\\s\\u0000-\\u001F\\u007F](?:[^\\u0000-\\u001F\\u007F]*[^\\s\\u0000-\\u001F\\u007F])?$",
+            "description": "What people call the document: shown in dashboards, searched and sorted by. 1 to 255 characters, no control characters, no leading or trailing whitespace. Names need not be unique."
+          }
+        },
+        "required": ["name"],
+        "additionalProperties": false
+      },
+      "DocumentsUpdate200Response": {
+        "type": "object",
+        "properties": {
+          "document": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "tenantId": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string",
+                "enum": ["pending", "ready", "failed", "deleting"]
+              },
+              "baseSha": {
+                "type": "string",
+                "nullable": true
+              },
+              "storageSizeBytes": {
+                "type": "number",
+                "nullable": true
+              },
+              "metadata": {
+                "type": "object",
+                "additionalProperties": {},
+                "nullable": true
+              },
+              "idempotencyKey": {
+                "type": "string",
+                "nullable": true
+              },
+              "failureReason": {
+                "type": "string",
+                "nullable": true
+              },
+              "thumbnailState": {
+                "type": "string",
+                "enum": ["pending", "ready", "locked", "failed"]
+              },
+              "thumbnailUrl": {
+                "type": "string",
+                "nullable": true
+              },
+              "createdAt": {
+                "type": "number"
+              },
+              "updatedAt": {
+                "type": "number"
+              },
+              "createdBy": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "id",
+              "tenantId",
+              "name",
+              "state",
+              "baseSha",
+              "storageSizeBytes",
+              "metadata",
+              "idempotencyKey",
+              "failureReason",
+              "createdAt",
+              "updatedAt",
+              "createdBy"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": ["document"],
+        "additionalProperties": false
+      },
+      "DocumentsUpdate400Response": {
+        "$ref": "#/components/schemas/AdminErrorPayload"
+      },
+      "DocumentsUpdate403Response": {
+        "$ref": "#/components/schemas/AdminErrorPayload"
+      },
+      "DocumentsUpdate404Response": {
         "$ref": "#/components/schemas/AdminErrorPayload"
       },
       "DocumentsDownload403Response": {
@@ -24749,6 +25021,7 @@
                       "enum": [
                         "docs.create",
                         "docs.read",
+                        "docs.update",
                         "docs.delete",
                         "tokens.issue-doc",
                         "tokens.revoke",

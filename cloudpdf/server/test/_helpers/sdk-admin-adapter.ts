@@ -40,6 +40,7 @@ class DocumentsAdapter {
       this.client.uploads.create({
         tenantId: this.tenantId,
         source: input.bytes,
+        name: input['name'] as string | undefined,
         metadata: input['metadata'] as Record<string, unknown> | undefined,
         idempotencyKey: input['idempotencyKey'] as string | undefined,
         dedupMode: input['dedupMode'] as 'always-create' | 'reuse-existing' | undefined,
@@ -96,6 +97,11 @@ class DocumentsAdapter {
     } while (cursor !== undefined);
   }
 
+  async rename(docId: string, name: string): Promise<any> {
+    return (await call(this.client.documents.update({ tenantId: this.tenantId, id: docId, name })))
+      .document;
+  }
+
   async delete(docId: string): Promise<void> {
     await call(this.client.documents.delete({ tenantId: this.tenantId, id: docId }));
   }
@@ -133,9 +139,7 @@ class TokensAdapter {
   }
 
   async revoke(jti: string, options: Record<string, unknown> = {}): Promise<void> {
-    await call(
-      this.client.tokens.revoke({ tenantId: this.tenantId, jti, ...options } as never),
-    );
+    await call(this.client.tokens.revoke({ tenantId: this.tenantId, jti, ...options } as never));
   }
 }
 

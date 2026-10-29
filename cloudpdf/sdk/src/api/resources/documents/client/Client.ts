@@ -52,11 +52,14 @@ export class DocumentsClient {
         request: CloudPDF.ListDocumentsRequest,
         requestOptions?: DocumentsClient.RequestOptions,
     ): Promise<core.WithRawResponse<CloudPDF.DocumentsList200Response>> {
-        const { tenantId, limit, cursor, state } = request;
+        const { tenantId, limit, cursor, state, q, sort, order } = request;
         const _queryParams: Record<string, unknown> = {
             limit,
             cursor,
             state: state != null ? state : undefined,
+            q,
+            sort: sort != null ? sort : undefined,
+            order: order != null ? order : undefined,
         };
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
@@ -254,6 +257,90 @@ export class DocumentsClient {
             _response.error,
             _response.rawResponse,
             "DELETE",
+            "/v1/tenants/{tenantId}/documents/{id}",
+        );
+    }
+
+    /**
+     * A document that is being deleted answers 404.
+     *
+     * @param {CloudPDF.DocumentsUpdateRequest} request
+     * @param {DocumentsClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link CloudPDF.BadRequestError}
+     * @throws {@link CloudPDF.ForbiddenError}
+     * @throws {@link CloudPDF.NotFoundError}
+     * @throws {@link errors.CloudPDFError}
+     * @throws {@link errors.CloudPDFTimeoutError}
+     *
+     * @example
+     *     await client.documents.update({
+     *         tenantId: "tenantId",
+     *         id: "id",
+     *         name: "name"
+     *     })
+     */
+    public update(
+        request: CloudPDF.DocumentsUpdateRequest,
+        requestOptions?: DocumentsClient.RequestOptions,
+    ): core.HttpResponsePromise<CloudPDF.DocumentsUpdate200Response> {
+        return core.HttpResponsePromise.fromPromise(this.__update(request, requestOptions));
+    }
+
+    private async __update(
+        request: CloudPDF.DocumentsUpdateRequest,
+        requestOptions?: DocumentsClient.RequestOptions,
+    ): Promise<core.WithRawResponse<CloudPDF.DocumentsUpdate200Response>> {
+        const { tenantId, id, ..._body } = request;
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)),
+                `v1/tenants/${core.url.encodePathParam(tenantId)}/documents/${core.url.encodePathParam(id)}`,
+            ),
+            method: "PATCH",
+            headers: _headers,
+            contentType: "application/json",
+            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            requestType: "json",
+            body: mergeAdditionalBodyParameters(_body, requestOptions?.additionalBodyParameters),
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: _response.body as CloudPDF.DocumentsUpdate200Response, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 400:
+                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                case 403:
+                    throw new CloudPDF.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                case 404:
+                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                default:
+                    throw new errors.CloudPDFError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(
+            _response.error,
+            _response.rawResponse,
+            "PATCH",
             "/v1/tenants/{tenantId}/documents/{id}",
         );
     }

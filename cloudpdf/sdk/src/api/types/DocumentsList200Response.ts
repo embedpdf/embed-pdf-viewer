@@ -12,6 +12,7 @@ export namespace DocumentsList200Response {
         export interface Item {
             id: string;
             tenantId: string;
+            name: string;
             state: Item.State;
             baseSha: string | null;
             storageSizeBytes: number | null;

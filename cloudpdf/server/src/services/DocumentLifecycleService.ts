@@ -57,6 +57,8 @@ export interface ImportInput {
   /** Wire descriptor from the request body (v1: `{ kind: 'url' }`). */
   source: AdminImportSource;
   expected?: ImportExpected | null;
+  /** Defaults to the document id. */
+  name?: string;
   metadata?: Record<string, unknown> | null;
   idempotencyKey?: string | null;
   dedupMode?: DedupMode;
@@ -92,6 +94,8 @@ export interface InitInput {
    * bytes at commit time, so a lying customer never wins.
    */
   contentSha256: string;
+  /** Defaults to the document id. */
+  name?: string;
   metadata?: Record<string, unknown> | null;
   idempotencyKey?: string | null;
   dedupMode?: DedupMode;
@@ -303,6 +307,7 @@ export class DocumentLifecycleService {
     const created = await this.documents.createPending({
       id: docId,
       tenantId: input.tenantId,
+      name: input.name ?? docId,
       metadata: input.metadata ?? null,
       idempotencyKey: input.idempotencyKey ?? null,
       createdBy: input.sub,
@@ -481,6 +486,7 @@ export class DocumentLifecycleService {
     const created = await this.documents.createPending({
       id: docId,
       tenantId: input.tenantId,
+      name: input.name ?? docId,
       metadata: input.metadata ?? null,
       idempotencyKey: input.idempotencyKey ?? null,
       createdBy: input.sub,
@@ -585,6 +591,7 @@ export class DocumentLifecycleService {
       const created = await docs.createPending({
         id: docId,
         tenantId: input.tenantId,
+        name: input.name ?? docId,
         metadata: input.metadata ?? null,
         idempotencyKey: input.idempotencyKey ?? null,
         createdBy: input.sub,
@@ -1038,6 +1045,14 @@ export class DocumentLifecycleService {
     return this.documents.requireOwned(docId, tenantId);
   }
 
+  /** Throws `NotFound` for a document that is gone or being deleted, `Forbidden` across tenants. */
+  async rename(tenantId: string, docId: string, name: string): Promise<DocumentRow> {
+    await this.documents.requireOwned(docId, tenantId);
+    const renamed = await this.documents.rename(docId, tenantId, name);
+    if (!renamed) throw notFound(`document not found: ${docId}`);
+    return renamed;
+  }
+
   async download(tenantId: string, docId: string): Promise<Uint8Array> {
     const doc = await this.documents.requireOwned(docId, tenantId);
     if (doc.state !== 'ready') {
@@ -1172,6 +1187,13 @@ function badRequest(message: string): Error {
   const e = new Error(message) as Error & { code: string; status: number };
   e.code = 'InvalidArg';
   e.status = 400;
+  return e;
+}
+
+function notFound(message: string): Error {
+  const e = new Error(message) as Error & { code: string; status: number };
+  e.code = 'NotFound';
+  e.status = 404;
   return e;
 }
 

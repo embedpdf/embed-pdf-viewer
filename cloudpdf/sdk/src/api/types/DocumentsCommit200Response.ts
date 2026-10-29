@@ -8,6 +8,7 @@ export namespace DocumentsCommit200Response {
     export interface Document {
         id: string;
         tenantId: string;
+        name: string;
         state: Document.State;
         baseSha: string | null;
         storageSizeBytes: number | null;

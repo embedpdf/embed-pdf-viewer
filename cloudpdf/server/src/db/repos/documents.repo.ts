@@ -1,4 +1,4 @@
-import type { Kysely } from 'kysely';
+import { sql, type Kysely } from 'kysely';
 import { decodePdfBits, type PdfBits } from '@embedpdf/engine-core/runtime';
 
 import type {
@@ -9,15 +9,29 @@ import type {
 } from '../schema';
 import { isUniqueViolation } from '../uniqueViolation';
 
+export type DocumentListSort = 'createdAt' | 'name' | 'size';
+export type ListOrder = 'asc' | 'desc';
+
+/** A row's place in a sorted list: its sort value, then its id as the tiebreaker. */
+export interface DocumentListPosition {
+  key: number | string;
+  id: string;
+}
+
 export interface DocumentListOptions {
   limit?: number;
+  /** Only this state. Without it, every state except `deleting`. */
   state?: DocumentState;
+  /** Only names containing this text, compared through {@link nameKeyOf}. */
+  nameContains?: string;
+  sort?: DocumentListSort;
+  /** Defaults to `desc`; the route resolves the reading order per sort. */
+  order?: ListOrder;
   /**
-   * Keyset cursor: only rows strictly after this (created_at, id)
-   * position in `created_at DESC, id DESC` order. The id tiebreaker
-   * makes pagination stable for same-millisecond created_at values.
+   * Keyset cursor: only rows strictly after this position in the list's
+   * order. The id tiebreaker keeps pagination stable when sort values tie.
    */
-  before?: { createdAt: number; id: string };
+  after?: DocumentListPosition;
 }
 
 export interface DocumentSecurityInfo {
@@ -33,6 +47,7 @@ export interface DocumentSecurityInfo {
 export interface DocumentRow {
   id: string;
   tenantId: string;
+  name: string;
   state: DocumentState;
   baseSha: string | null;
   storageSizeBytes: number | null;
@@ -57,6 +72,7 @@ export type DocumentThumbnailState = 'pending' | 'ready' | 'locked' | 'failed';
 export interface CreatePendingInput {
   id: string;
   tenantId: string;
+  name: string;
   metadata: Record<string, unknown> | null;
   idempotencyKey: string | null;
   createdBy: string | null;
@@ -108,6 +124,8 @@ export class DocumentsRepo {
         .values({
           id: input.id,
           tenant_id: input.tenantId,
+          name: input.name,
+          name_key: nameKeyOf(input.name),
           state: 'pending',
           base_sha: null,
           storage_size_bytes: null,
@@ -251,27 +269,44 @@ export class DocumentsRepo {
   }
 
   async listForTenant(tenantId: string, opts: DocumentListOptions = {}): Promise<DocumentRow[]> {
+    const order = opts.order ?? 'desc';
+    const sortKey = sortKeyOf(opts.sort ?? 'createdAt');
     let q = this.db
       .selectFrom('documents')
       .selectAll()
       .where('tenant_id', '=', tenantId)
-      .orderBy('created_at', 'desc')
-      .orderBy('id', 'desc');
-    if (opts.state) q = q.where('state', '=', opts.state);
-    if (opts.before) {
-      const { createdAt, id } = opts.before;
+      .orderBy(sortKey, order)
+      .orderBy('id', order);
+    q = opts.state ? q.where('state', '=', opts.state) : q.where('state', '!=', 'deleting');
+    if (opts.nameContains !== undefined) {
+      const pattern = `%${escapeLikePattern(nameKeyOf(opts.nameContains))}%`;
+      q = q.where(sql<boolean>`name_key like ${pattern} escape '\\'`);
+    }
+    if (opts.after) {
+      const { key, id } = opts.after;
+      const past = order === 'desc' ? '<' : '>';
       // Spelled as or rather than a row-value comparison so both
-      // dialects plan it against idx_documents_tenant_created_id.
+      // dialects plan it against the (tenant_id, sort value, id) index.
       q = q.where((eb) =>
-        eb.or([
-          eb('created_at', '<', createdAt),
-          eb.and([eb('created_at', '=', createdAt), eb('id', '<', id)]),
-        ]),
+        eb.or([eb(sortKey, past, key), eb.and([eb(sortKey, '=', key), eb('id', past, id)])]),
       );
     }
     if (opts.limit) q = q.limit(opts.limit);
     const rows = await q.execute();
     return rows.map(mapRow);
+  }
+
+  /** Rename a document that is not being deleted. Returns `null` when no such row. */
+  async rename(id: string, tenantId: string, name: string): Promise<DocumentRow | null> {
+    const res = await this.db
+      .updateTable('documents')
+      .set({ name, name_key: nameKeyOf(name), updated_at: Date.now() })
+      .where('id', '=', id)
+      .where('tenant_id', '=', tenantId)
+      .where('state', 'in', ['pending', 'ready', 'failed'])
+      .execute();
+    if (Number(res[0]?.numUpdatedRows ?? 0) === 0) return null;
+    return this.findById(id);
   }
 
   /**
@@ -384,6 +419,7 @@ export class DocumentsRepo {
 function mapRow(r: {
   id: string;
   tenant_id: string;
+  name: string;
   state: DocumentState;
   base_sha: string | null;
   storage_size_bytes: number | null;
@@ -411,6 +447,7 @@ function mapRow(r: {
   return {
     id: r.id,
     tenantId: r.tenant_id,
+    name: r.name,
     state: r.state,
     baseSha: r.base_sha,
     storageSizeBytes: r.storage_size_bytes,
@@ -443,6 +480,34 @@ function mapRow(r: {
     updatedAt: r.updated_at,
     createdBy: r.created_by,
   };
+}
+
+/**
+ * The form of a name that search and the name sort compare: NFC, then
+ * lowercased. Folding here rather than with SQL `lower()` keeps both
+ * dialects in agreement, since SQLite's `lower()` folds ASCII only.
+ */
+export function nameKeyOf(name: string): string {
+  return name.normalize('NFC').toLowerCase();
+}
+
+/** The value a row sorts by, matching {@link DocumentsRepo.listForTenant}'s order. */
+export function listPositionOf(row: DocumentRow, sort: DocumentListSort): DocumentListPosition {
+  if (sort === 'name') return { key: nameKeyOf(row.name), id: row.id };
+  if (sort === 'size') return { key: row.storageSizeBytes ?? 0, id: row.id };
+  return { key: row.createdAt, id: row.id };
+}
+
+function sortKeyOf(sort: DocumentListSort) {
+  if (sort === 'name') return sql<string>`name_key`;
+  // Pending documents have no size yet; they sort as empty.
+  if (sort === 'size') return sql<number>`coalesce(storage_size_bytes, 0)`;
+  return sql<number>`created_at`;
+}
+
+/** Escapes `\`, `%` and `_` so user text matches literally under `escape '\'`. */
+function escapeLikePattern(text: string): string {
+  return text.replace(/[\\%_]/g, (match) => `\\${match}`);
 }
 
 function nullableBool(value: boolean | null | undefined): number | null {

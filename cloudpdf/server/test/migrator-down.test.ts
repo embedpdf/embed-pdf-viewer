@@ -7,6 +7,7 @@ import { migrate, migrateDown, status, type MigrationSource } from '../src/db/mi
 import { sqliteMigrations } from '../src/db/migrations/sqlite/index';
 import { postgresMigrations } from '../src/db/migrations/postgres/index';
 import type { Database as Schema } from '../src/db/schema';
+import { checkDocumentNamesMigration } from './_helpers/document-names-migration';
 import { checkVersionsByLayerMigration } from './_helpers/versions-by-layer-migration';
 
 /**
@@ -34,6 +35,15 @@ async function sqliteHasTable(db: Kysely<Schema>, name: string): Promise<boolean
 }
 
 describe('migrateDown [sqlite]', () => {
+  test('migration 045 names existing documents from their metadata, else their id', async () => {
+    const db = createSqliteDb({ path: ':memory:' });
+    try {
+      await checkDocumentNamesMigration(db, sqliteMigrations);
+    } finally {
+      await db.destroy();
+    }
+  });
+
   test('full round-trip: up all -> down all -> up all', async () => {
     const db = createSqliteDb({ path: ':memory:' });
     try {
@@ -283,6 +293,15 @@ describe.runIf(RUN_PG)('migrateDown [postgres]', () => {
     const db = await makeDb();
     try {
       await checkVersionsByLayerMigration(db, postgresMigrations);
+    } finally {
+      await db.destroy();
+    }
+  });
+
+  test('migration 045 names existing documents from their metadata, else their id', async () => {
+    const db = await makeDb();
+    try {
+      await checkDocumentNamesMigration(db, postgresMigrations);
     } finally {
       await db.destroy();
     }
