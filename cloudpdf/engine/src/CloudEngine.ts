@@ -20,12 +20,12 @@ import { CloudDocumentHandle } from './document/CloudDocumentHandle';
 import { CloudDocumentSecurityService } from './document/CloudDocumentSecurityService';
 import {
   browserVisitorStore,
-  engineErrorFromShareExchange,
-  ShareExchangeError,
-  ShareSessionSource,
+  engineErrorFromGrantExchange,
+  GrantExchangeError,
+  GrantSessionSource,
   type VisitorStore,
   visitorAnswersOf,
-} from './share';
+} from './grant';
 import { decodeUnverifiedClaims } from './transport/decodeUnverifiedClaims';
 import { HttpClient, type HttpClientOptions } from './transport/HttpClient';
 import { warnUnusedOpenOptions } from './unusedOpenOptions';
@@ -36,7 +36,7 @@ import { warnUnusedOpenOptions } from './unusedOpenOptions';
  */
 export interface CloudEngineOptions extends Omit<HttpClientOptions, 'sessionId'> {
   /**
-   * Where a share link's visitor waits for the next visit, when the link
+   * Where a grant's visitor waits for the next visit, when the link
    * keeps visitors' layers. Default: the browser's `localStorage`; outside
    * a browser none, since a server's engine opens links for many people.
    * `null` keeps a visitor for one open only.
@@ -78,25 +78,25 @@ export class CloudEngine implements Engine {
     // What the session may do and who it acts for come from the document's
     // token, not from `options`: the same `OpenOptions` on both engines keeps
     // code portable, and the token is the authority here. `options.identity`
-    // is what the page knows about the user, which a share link takes as the
+    // is what the page knows about the user, which a grant takes as the
     // visitor's answers (only what it asks).
 
     // The PDF's own password is an open option for every input kind, as on
-    // the local engine. A share's passphrase is `input.sharePassword`.
+    // the local engine. A grant's passphrase is `input.passphrase`.
     const effectivePassword = options?.password ?? null;
 
-    if (input.kind === 'share') {
-      // Open by public share token: exchange `shr_…` for a short-lived
+    if (input.kind === 'grant') {
+      // Open by grant: exchange its id for a short-lived
       // doc-scoped session JWT, then open as the 'token' arm does — the
       // handle binds to a self-renewing source, so revoking or editing
-      // the share retargets this open at the next renewal. The exchange
+      // the grant retargets this open at the next renewal. The exchange
       // rides the engine's own transport config (baseUrl + fetch);
       // exchange failures surface as EngineErrors on open and on every
       // later renewal (RPCs, SSE reconnects), never as raw
-      // ShareExchangeErrors.
+      // GrantExchangeErrors.
       const answers = visitorAnswersOf(options?.identity);
-      const share = new ShareSessionSource(this.http.baseUrl, input.shareToken, {
-        ...(input.sharePassword !== undefined ? { password: input.sharePassword } : {}),
+      const grantSession = new GrantSessionSource(this.http.baseUrl, input.grant, {
+        ...(input.passphrase !== undefined ? { passphrase: input.passphrase } : {}),
         ...(input.restart ? { restart: true } : {}),
         ...(answers ? { identity: answers } : {}),
         visitorStore: this.visitorStore,
@@ -104,12 +104,12 @@ export class CloudEngine implements Engine {
       });
       const token = async () => {
         try {
-          return await share.token();
+          return await grantSession.token();
         } catch (error) {
-          throw error instanceof ShareExchangeError ? engineErrorFromShareExchange(error) : error;
+          throw error instanceof GrantExchangeError ? engineErrorFromGrantExchange(error) : error;
         }
       };
-      return this.openWithToken(token, effectivePassword, share, options);
+      return this.openWithToken(token, effectivePassword, grantSession, options);
     }
 
     if (input.kind === 'token') {
@@ -176,7 +176,7 @@ export class CloudEngine implements Engine {
     return AbortablePromise.rejectReason(
       new EngineError(
         EngineErrorCode.InvalidArg,
-        `cloud engine supports OpenInput.kind === 'token', 'id', or 'share' (got '${(input as { kind?: string }).kind}')`,
+        `cloud engine supports OpenInput.kind === 'token', 'id', or 'grant' (got '${(input as { kind?: string }).kind}')`,
       ),
     );
   }
@@ -187,14 +187,14 @@ export class CloudEngine implements Engine {
    * `doc_id`, then route to /head with the per-open bearer. The resulting
    * handle owns its own scoped HttpClient — every subsequent RPC carries
    * this token, not the engine-level one, so one engine can hold many
-   * handles each with a different bearer. A share session also renews on a
+   * handles each with a different bearer. A grant session also renews on a
    * timer while the document is open, and tells the handle how it reaches
    * its layer.
    */
   private openWithToken(
     tokenSource: TokenSource,
     password: string | null,
-    share: ShareSessionSource | null,
+    grantSession: GrantSessionSource | null,
     options: OpenOptions | undefined,
   ): AbortablePromise<DocumentHandle> {
     return AbortablePromise.run<DocumentHandle>(async (signal) => {
@@ -228,7 +228,7 @@ export class CloudEngine implements Engine {
           this.handles.delete(handle);
           stopRenewing();
         },
-        share,
+        grantSession,
       );
       this.handles.add(handle);
       try {
@@ -237,8 +237,8 @@ export class CloudEngine implements Engine {
         await handle.close();
         throw error;
       }
-      if (share) stopRenewing = share.keepAlive();
-      warnUnusedOpenOptions(options, handle, share ? 'share' : 'token');
+      if (grantSession) stopRenewing = grantSession.keepAlive();
+      warnUnusedOpenOptions(options, handle, grantSession ? 'grant' : 'token');
       return handle;
     });
   }

@@ -19,7 +19,7 @@ import {
   type DocumentFormsService,
   type DocumentPagesService,
   type DocumentHandle,
-  type DocumentShare,
+  type DocumentGrant,
   type DocumentOutlineService,
   type DocumentRedactionService,
   CONTINUOUS_RENDER_POLICY,
@@ -62,9 +62,9 @@ import { CloudMetadataService } from './CloudMetadataService';
 import { CloudObjectNumberPool } from './CloudObjectNumberPool';
 import { CloudPageHandle } from './CloudPageHandle';
 import { CloudWrites } from './CloudWrites';
+import type { GrantSessionSource } from '../grant';
 import { auditRowToEvents } from '../realtime/auditRowToEvents';
 import { SseClient } from '../realtime/SseClient';
-import type { ShareSessionSource } from '../share';
 import { awaitSignal } from '../shared/awaitSignal';
 import type { HttpClient } from '../transport/HttpClient';
 
@@ -159,8 +159,8 @@ export class CloudDocumentHandle implements DocumentHandle {
     initialToken: string | null = null,
     /** Called once, when the handle closes (the engine forgets it). */
     private readonly onClose: () => void = () => {},
-    /** A share session's: the document's `share`, and the gate its writes pass. */
-    private readonly shareSession: Pick<ShareSessionSource, 'share' | 'writeGate'> | null = null,
+    /** A grant session's: the document's `grant`, and the gate its writes pass. */
+    private readonly grantSession: Pick<GrantSessionSource, 'grant' | 'writeGate'> | null = null,
   ) {
     this.id = id;
     this.pendingInitialHead = initialHead ?? null;
@@ -181,7 +181,7 @@ export class CloudDocumentHandle implements DocumentHandle {
     this.writes = new CloudWrites(
       pool,
       changeSender(http, id, layerName),
-      shareSession?.writeGate ?? null,
+      grantSession?.writeGate ?? null,
     );
     const security = new CloudDocumentSecurityService(
       http,
@@ -389,8 +389,8 @@ export class CloudDocumentHandle implements DocumentHandle {
     return this.changes.apply(change, options);
   }
 
-  get share(): DocumentShare | undefined {
-    return this.shareSession?.share;
+  get grant(): DocumentGrant | undefined {
+    return this.grantSession?.grant;
   }
 
   /** Ignored: the server learns what's needed from what is asked of it. */

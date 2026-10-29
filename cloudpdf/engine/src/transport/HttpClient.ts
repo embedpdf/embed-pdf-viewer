@@ -144,7 +144,7 @@ export class HttpClient {
   /**
    * The fetch implementation this client sends requests through (injected
    * or global). Exposed so sibling transports spawned per-open — the
-   * share-session exchange, most of all — ride the same fetch the engine
+   * grant-session exchange, most of all — ride the same fetch the engine
    * was configured with (test doubles, SSR `Origin`-attaching wrappers).
    */
   get fetchImpl(): typeof globalThis.fetch {

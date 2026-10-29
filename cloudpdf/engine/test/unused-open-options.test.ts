@@ -27,7 +27,7 @@ describe('what the page passed and the document does not use', () => {
   test('says nothing when the document acts for who the page said', () => {
     const dana = { userId: 'u_381', displayName: 'Dana Smith' };
     warnUnusedOpenOptions({ identity: dana }, actingFor(dana), 'token');
-    warnUnusedOpenOptions(undefined, actingFor(dana), 'share');
+    warnUnusedOpenOptions(undefined, actingFor(dana), 'grant');
     expect(warn).not.toHaveBeenCalled();
   });
 
@@ -48,14 +48,14 @@ describe('what the page passed and the document does not use', () => {
     ]);
   });
 
-  test('on a share link, says what a link takes', () => {
+  test('on a grant, says what a grant takes', () => {
     warnUnusedOpenOptions(
       { identity: { userId: 'u_381', displayName: 'Dana Smith' } },
       actingFor({ userId: 'visitor_1' }),
-      'share',
+      'grant',
     );
     expect(said()).toEqual([
-      expect.stringMatching(/\(userId, displayName\): a share link takes only the fields it asks/),
+      expect.stringMatching(/\(userId, displayName\): a grant takes only the fields it asks/),
     ]);
   });
 

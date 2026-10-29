@@ -26,16 +26,16 @@ import {
 import { browserVisitorStore, cloudEngine, type VisitorStore } from '../src/index';
 
 /**
- * A share link's visitor, on the client: every renewal sends the handle the
- * last exchange answered, so the visitor (and on a per-visitor link, their
- * layer) stays the same; unless the link gives a new copy every visit, the
+ * A grant's visitor, on the client: every renewal sends the handle the
+ * last exchange answered, so the visitor (and on a per-visitor grant, their
+ * layer) stays the same; unless the grant gives a new copy every visit, the
  * handle waits in the engine's visitor store for the next open; `restart`
  * starts over; an open document renews on a timer; and the document says how
- * it reaches its layer (`share`). A link that asks who the visitor is refuses
+ * it reaches its layer (`grant`). A grant that asks who the visitor is refuses
  * the open until it carries the answers, or holds the document's changes
- * until `share.identify` gives them. A passphrase or questions on open that
- * the link gets while a document is open are asked once (`share.openRequest`),
- * and the open goes on as the same visitor once `share.resume` gives them.
+ * until `grant.identify` gives them. A passphrase or questions on open that
+ * the grant gets while a document is open are asked once (`grant.openRequest`),
+ * and the open goes on as the same visitor once `grant.resume` gives them.
  */
 
 const STUB_ENTRY = fileURLToPath(
@@ -57,8 +57,8 @@ interface Fixture {
 let fx: Fixture;
 
 beforeEach(async () => {
-  const storageRoot = await mkdtemp(join(tmpdir(), 'share-visitors-store-'));
-  const cacheRoot = await mkdtemp(join(tmpdir(), 'share-visitors-cache-'));
+  const storageRoot = await mkdtemp(join(tmpdir(), 'grant-visitors-store-'));
+  const cacheRoot = await mkdtemp(join(tmpdir(), 'grant-visitors-cache-'));
   const db = createSqliteDb({ path: ':memory:' });
   await migrate(db, { source: { kind: 'inline', migrations: sqliteMigrations } });
   const bundle = await buildAppForTesting({
@@ -114,19 +114,19 @@ async function seedDocument(): Promise<void> {
     .execute();
 }
 
-async function createLink(body: Record<string, unknown>): Promise<string> {
+async function createGrant(body: Record<string, unknown>): Promise<string> {
   const token = signDevToken(SECRET, {
     sub: 'dash-1',
     tenant_id: TENANT,
-    scope: ['shares.manage'],
+    scope: ['grants.manage'],
   });
-  const res = await fetch(`${fx.baseUrl}/v1/tenants/${TENANT}/shares`, {
+  const res = await fetch(`${fx.baseUrl}/v1/tenants/${TENANT}/grants`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'content-type': 'application/json' },
     body: JSON.stringify({ docId: DOC, scope: ['*'], ...body }),
   });
   expect(res.status).toBe(200);
-  return ((await res.json()) as { share: { id: string } }).share.id;
+  return ((await res.json()) as { grant: { id: string } }).grant.id;
 }
 
 interface Exchange {
@@ -140,7 +140,7 @@ function browserFetch(exchanges: Exchange[]): typeof fetch {
     const headers = new Headers(init?.headers);
     headers.set('origin', ORIGIN);
     const res = await fetch(input, { ...init, headers });
-    if (String(input).endsWith('/v1/share-sessions') && res.ok) {
+    if (String(input).endsWith('/v1/grant-sessions') && res.ok) {
       exchanges.push({
         sent: JSON.parse(String(init?.body)) as Exchange['sent'],
         answered: (await res.clone().json()) as Exchange['answered'],
@@ -154,9 +154,9 @@ function memoryStore(): VisitorStore & { handles: Map<string, string> } {
   const handles = new Map<string, string>();
   return {
     handles,
-    get: (shareToken) => handles.get(shareToken) ?? null,
-    set: (shareToken, handle) => void handles.set(shareToken, handle),
-    delete: (shareToken) => void handles.delete(shareToken),
+    get: (grant) => handles.get(grant) ?? null,
+    set: (grant, handle) => void handles.set(grant, handle),
+    delete: (grant) => void handles.delete(grant),
   };
 }
 
@@ -197,14 +197,14 @@ const identityOf = (token: string) =>
     }
   ).identity;
 
-/** Change a link's settings, as its owner. */
-async function updateLink(shareToken: string, body: Record<string, unknown>): Promise<void> {
+/** Change a grant's settings, as its owner. */
+async function updateGrant(grant: string, body: Record<string, unknown>): Promise<void> {
   const token = signDevToken(SECRET, {
     sub: 'dash-1',
     tenant_id: TENANT,
-    scope: ['shares.manage'],
+    scope: ['grants.manage'],
   });
-  const res = await fetch(`${fx.baseUrl}/v1/tenants/${TENANT}/shares/${shareToken}`, {
+  const res = await fetch(`${fx.baseUrl}/v1/tenants/${TENANT}/grants/${grant}`, {
     method: 'PATCH',
     headers: { Authorization: `Bearer ${token}`, 'content-type': 'application/json' },
     body: JSON.stringify(body),
@@ -212,10 +212,10 @@ async function updateLink(shareToken: string, body: Record<string, unknown>): Pr
   expect(res.status).toBe(200);
 }
 
-describe('a share link visitor', () => {
+describe('a grant visitor', () => {
   test('renewals send the handle, keep the layer, and run on a timer while the document is open', async () => {
     // A 60 second session is always inside the renewal margin: the timer renews every second.
-    const link = await createLink({ layerMode: 'per-visitor', sessionTtlSeconds: 60 });
+    const grant = await createGrant({ layerMode: 'per-visitor', sessionTtlSeconds: 60 });
     const exchanges: Exchange[] = [];
     const engine = cloudEngine({
       baseUrl: fx.baseUrl,
@@ -223,8 +223,8 @@ describe('a share link visitor', () => {
       visitorStore: null,
     });
     try {
-      const doc = await engine.open({ kind: 'share', shareToken: link });
-      expect(doc.share).toMatchObject({
+      const doc = await engine.open({ kind: 'grant', grant: grant });
+      expect(doc.grant).toMatchObject({
         layerMode: 'per-visitor',
         keep: true,
         identityRequest: null,
@@ -252,10 +252,10 @@ describe('a share link visitor', () => {
     }
   });
 
-  test('the next open comes back as the same visitor, unless the link gives a new copy every visit', async () => {
-    const shared = await createLink({});
-    const kept = await createLink({ layerMode: 'per-visitor' });
-    const fresh = await createLink({ layerMode: 'per-visitor', keepVisitorLayers: false });
+  test('the next open comes back as the same visitor, unless the grant gives a new copy every visit', async () => {
+    const shared = await createGrant({});
+    const kept = await createGrant({ layerMode: 'per-visitor' });
+    const fresh = await createGrant({ layerMode: 'per-visitor', keepVisitorLayers: false });
     const store = memoryStore();
     const exchanges: Exchange[] = [];
     const engine = cloudEngine({
@@ -264,16 +264,16 @@ describe('a share link visitor', () => {
       visitorStore: store,
     });
     try {
-      const open = async (shareToken: string) => {
-        const doc = await engine.open({ kind: 'share', shareToken });
+      const open = async (grant: string) => {
+        const doc = await engine.open({ kind: 'grant', grant });
         const session = exchanges[exchanges.length - 1]!;
         await doc.close();
         return { doc, session };
       };
 
-      // A shared link keeps its visitor too: their answers and what they add stay theirs.
+      // A shared grant keeps its visitor too: their answers and what they add stay theirs.
       const reader = await open(shared);
-      expect(reader.doc.share).toMatchObject({ layerMode: 'shared', keep: true });
+      expect(reader.doc.grant).toMatchObject({ layerMode: 'shared', keep: true });
       expect(store.handles.get(shared)).toBe(reader.session.answered.visitor.handle);
       const back = await open(shared);
       expect(back.session.sent.visitorHandle).toBe(reader.session.answered.visitor.handle);
@@ -288,7 +288,7 @@ describe('a share link visitor', () => {
       expect(again.session.answered.layerName).toBe(first.session.answered.layerName);
 
       const once = await open(fresh);
-      expect(once.doc.share).toMatchObject({ layerMode: 'per-visitor', keep: false });
+      expect(once.doc.grant).toMatchObject({ layerMode: 'per-visitor', keep: false });
       expect(store.handles.has(fresh)).toBe(false);
       const next = await open(fresh);
       expect(next.session.sent.visitorHandle).toBeUndefined();
@@ -299,7 +299,7 @@ describe('a share link visitor', () => {
   });
 
   test('restart deletes the kept layer and starts a new visitor', async () => {
-    const link = await createLink({ layerMode: 'per-visitor' });
+    const grant = await createGrant({ layerMode: 'per-visitor' });
     const store = memoryStore();
     const exchanges: Exchange[] = [];
     const engine = cloudEngine({
@@ -308,15 +308,15 @@ describe('a share link visitor', () => {
       visitorStore: store,
     });
     try {
-      await (await engine.open({ kind: 'share', shareToken: link })).close();
+      await (await engine.open({ kind: 'grant', grant: grant })).close();
       const first = exchanges[0]!.answered;
       await writeAs(first);
 
-      const doc = await engine.open({ kind: 'share', shareToken: link, restart: true });
+      const doc = await engine.open({ kind: 'grant', grant: grant, restart: true });
       const restarted = exchanges[exchanges.length - 1]!;
       expect(restarted.sent).toMatchObject({ visitorHandle: first.visitor.handle, restart: true });
       expect(restarted.answered.layerName).not.toBe(first.layerName);
-      expect(store.handles.get(link)).toBe(restarted.answered.visitor.handle);
+      expect(store.handles.get(grant)).toBe(restarted.answered.visitor.handle);
       const old = await fx.db
         .selectFrom('layers')
         .select('deleted_at')
@@ -330,7 +330,7 @@ describe('a share link visitor', () => {
   });
 
   test("an open whose layer was deleted under it refuses, and leaves the other tab's visitor stored", async () => {
-    const link = await createLink({ layerMode: 'per-visitor', sessionTtlSeconds: 60 });
+    const grant = await createGrant({ layerMode: 'per-visitor', sessionTtlSeconds: 60 });
     const store = memoryStore();
     const exchanges: Exchange[] = [];
     const engine = cloudEngine({
@@ -340,11 +340,11 @@ describe('a share link visitor', () => {
     });
     let tab: DocumentHandle | undefined;
     try {
-      tab = await engine.open({ kind: 'share', shareToken: link });
+      tab = await engine.open({ kind: 'grant', grant: grant });
       await writeAs(exchanges[0]!.answered);
       // Another tab of the same browser starts over.
-      const other = await engine.open({ kind: 'share', shareToken: link, restart: true });
-      const otherHandle = store.handles.get(link);
+      const other = await engine.open({ kind: 'grant', grant: grant, restart: true });
+      const otherHandle = store.handles.get(grant);
 
       // The first tab's next renewal finds its layer gone.
       const refused = await tab.pages.list().then(
@@ -354,7 +354,7 @@ describe('a share link visitor', () => {
       expect(refused).toBeInstanceOf(EngineError);
       expect(EngineError.is(refused, EngineErrorCode.Forbidden)).toBe(true);
       expect((refused as EngineError).details).toMatchObject({ reason: 'layer-changed' });
-      expect(store.handles.get(link)).toBe(otherHandle);
+      expect(store.handles.get(grant)).toBe(otherHandle);
       await other.close();
     } finally {
       await tab?.close();
@@ -362,7 +362,7 @@ describe('a share link visitor', () => {
     }
   });
 
-  test('a document opened with a token says nothing about share links', async () => {
+  test('a document opened with a token says nothing about grants', async () => {
     const token = signDevToken(SECRET, {
       sub: 'user-1',
       tenant_id: TENANT,
@@ -372,7 +372,7 @@ describe('a share link visitor', () => {
     const engine = cloudEngine({ baseUrl: fx.baseUrl });
     try {
       const doc = await engine.open({ kind: 'token', token });
-      expect(doc.share).toBeUndefined();
+      expect(doc.grant).toBeUndefined();
     } finally {
       await engine.destroy();
     }
@@ -387,7 +387,7 @@ describe('browserVisitorStore', () => {
     else global.localStorage = saved;
   });
 
-  test('keeps handles in localStorage by share token, and is none without it', () => {
+  test('keeps handles in localStorage by grant, and is none without it', () => {
     delete global.localStorage;
     expect(browserVisitorStore()).toBeNull();
 
@@ -417,7 +417,7 @@ describe('browserVisitorStore', () => {
   });
 });
 
-describe('a link that asks who the visitor is', () => {
+describe('a grant that asks who the visitor is', () => {
   /**
    * A change, settled: the stub worker's change answers predate the client's
    * wire schema, so a change that went out settles with a parse error; what
@@ -456,7 +456,7 @@ describe('a link that asks who the visitor is', () => {
   }
 
   test('on open: the open is refused until it carries the answers', async () => {
-    const link = await createLink({
+    const grant = await createGrant({
       visitorIdentity: {
         fields: { displayName: 'required', email: 'optional' },
         ask: 'on-open',
@@ -470,7 +470,7 @@ describe('a link that asks who the visitor is', () => {
       visitorStore: null,
     });
     try {
-      const refused = await engine.open({ kind: 'share', shareToken: link }).then(
+      const refused = await engine.open({ kind: 'grant', grant: grant }).then(
         () => null,
         (error: unknown) => error,
       );
@@ -486,10 +486,10 @@ describe('a link that asks who the visitor is', () => {
       resetDevWarnings();
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
       const doc = await engine.open(
-        { kind: 'share', shareToken: link },
+        { kind: 'grant', grant: grant },
         { identity: { userId: 'u_381', displayName: 'Ada' } },
       );
-      expect(doc.share?.identityRequest).toBeNull();
+      expect(doc.grant?.identityRequest).toBeNull();
       expect(exchanges[0]!.sent.visitorIdentity).toEqual({ displayName: 'Ada' });
       expect(doc.security.identity).toMatchObject({ displayName: 'Ada' });
       expect(warn).toHaveBeenCalledTimes(1);
@@ -505,7 +505,7 @@ describe('a link that asks who the visitor is', () => {
   });
 
   test('before the first change: changes wait for the answers, then go out', async () => {
-    const link = await createLink({
+    const grant = await createGrant({
       layerMode: 'per-visitor',
       visitorIdentity: {
         fields: { displayName: 'required', email: 'optional' },
@@ -516,40 +516,40 @@ describe('a link that asks who the visitor is', () => {
     const { fetch: recordingFetch, changesSent } = recording(exchanges);
     const engine = cloudEngine({ baseUrl: fx.baseUrl, fetch: recordingFetch, visitorStore: null });
     try {
-      const doc = await engine.open({ kind: 'share', shareToken: link });
-      const share = doc.share!;
-      expect(share.identityRequest).toMatchObject({ missing: ['displayName'] });
+      const doc = await engine.open({ kind: 'grant', grant: grant });
+      const docGrant = doc.grant!;
+      expect(docGrant.identityRequest).toMatchObject({ missing: ['displayName'] });
 
       // Nobody to ask: a change fails at once, and nothing is sent.
       expect(identityRequired(await square(doc))).toBe(true);
       expect(changesSent).toEqual([]);
 
       const asked: unknown[] = [];
-      share.onIdentityRequest((request) => asked.push(request));
+      docGrant.onIdentityRequest((request) => asked.push(request));
       const waiting = square(doc);
       await pause(50);
       expect(asked).toEqual([expect.objectContaining({ missing: ['displayName'] })]);
       expect(changesSent).toEqual([]);
 
       // Answers it can't take are refused; the change keeps waiting.
-      const typo = await share.identify({ displayName: 'Ada', email: 'ada-at-example' }).then(
+      const typo = await docGrant.identify({ displayName: 'Ada', email: 'ada-at-example' }).then(
         () => null,
         (error: unknown) => error,
       );
       expect(identityRequired(typo)).toBe(true);
       expect((typo as EngineError).details).toMatchObject({ invalid: ['email'] });
       // An answer it takes, with a required one still missing: refused, still waiting.
-      const partial = await share.identify({ email: 'ada@example.com' }).then(
+      const partial = await docGrant.identify({ email: 'ada@example.com' }).then(
         () => null,
         (error: unknown) => error,
       );
       expect(identityRequired(partial)).toBe(true);
       expect((partial as EngineError).details).toMatchObject({ missing: ['displayName'] });
-      expect(share.identityRequest).toMatchObject({ missing: ['displayName'] });
+      expect(docGrant.identityRequest).toMatchObject({ missing: ['displayName'] });
       expect(changesSent).toEqual([]);
 
-      await share.identify({ displayName: 'Ada', email: 'ada@example.com' });
-      expect(share.identityRequest).toBeNull();
+      await docGrant.identify({ displayName: 'Ada', email: 'ada@example.com' });
+      expect(docGrant.identityRequest).toBeNull();
       expect(identityRequired(await waiting)).toBe(false);
       expect(changesSent).toEqual([200]);
       const last = exchanges.at(-1)!;
@@ -565,18 +565,18 @@ describe('a link that asks who the visitor is', () => {
 
   test('a change the server refuses for the answers waits for them, and goes out again', async () => {
     // A 60 second session is always inside the renewal margin: every request exchanges again.
-    const link = await createLink({ sessionTtlSeconds: 60 });
+    const grant = await createGrant({ sessionTtlSeconds: 60 });
     const exchanges: Exchange[] = [];
     const { fetch: recordingFetch, changesSent } = recording(exchanges);
     const engine = cloudEngine({ baseUrl: fx.baseUrl, fetch: recordingFetch, visitorStore: null });
     try {
-      const doc = await engine.open({ kind: 'share', shareToken: link });
-      expect(doc.share?.identityRequest).toBeNull();
+      const doc = await engine.open({ kind: 'grant', grant: grant });
+      expect(doc.grant?.identityRequest).toBeNull();
       const asked: unknown[] = [];
-      doc.share!.onIdentityRequest((request) => asked.push(request));
-      // The link starts asking while the document is open: the change's own
+      doc.grant!.onIdentityRequest((request) => asked.push(request));
+      // The grant starts asking while the document is open: the change's own
       // request renews into a session the server refuses changes from.
-      await updateLink(link, {
+      await updateGrant(grant, {
         visitorIdentity: { fields: { displayName: 'required' }, ask: 'before-first-change' },
       });
 
@@ -584,7 +584,7 @@ describe('a link that asks who the visitor is', () => {
       await pause(100);
       expect(changesSent).toEqual([403]);
       expect(asked).toEqual([expect.objectContaining({ missing: ['displayName'] })]);
-      await doc.share!.identify({ displayName: 'Late' });
+      await doc.grant!.identify({ displayName: 'Late' });
       expect(identityRequired(await waiting)).toBe(false);
       expect(changesSent).toEqual([403, 200]);
       await doc.close();
@@ -594,27 +594,27 @@ describe('a link that asks who the visitor is', () => {
   });
 
   test('declining fails the changes waiting; the next change asks again', async () => {
-    const link = await createLink({
+    const grant = await createGrant({
       visitorIdentity: { fields: { displayName: 'required' }, ask: 'before-first-change' },
     });
     const { fetch: recordingFetch, changesSent } = recording([]);
     const engine = cloudEngine({ baseUrl: fx.baseUrl, fetch: recordingFetch, visitorStore: null });
     try {
-      const doc = await engine.open({ kind: 'share', shareToken: link });
+      const doc = await engine.open({ kind: 'grant', grant: grant });
       let asked = 0;
-      doc.share!.onIdentityRequest(() => {
+      doc.grant!.onIdentityRequest(() => {
         asked += 1;
       });
       const waiting = square(doc);
       await pause(50);
-      doc.share!.decline();
+      doc.grant!.decline();
       expect(identityRequired(await waiting)).toBe(true);
 
       const again = square(doc);
       await pause(50);
       expect(asked).toBe(2);
       expect(changesSent).toEqual([]);
-      await doc.share!.identify({ displayName: 'Later' });
+      await doc.grant!.identify({ displayName: 'Later' });
       expect(identityRequired(await again)).toBe(false);
       expect(changesSent).toEqual([200]);
       await doc.close();
@@ -624,7 +624,7 @@ describe('a link that asks who the visitor is', () => {
   });
 });
 
-describe('a link that asks again while a document is open', () => {
+describe('a grant that asks again while a document is open', () => {
   /**
    * The browser's fetch, also counting every exchange (refused ones too) and
    * recording the status of every other request. The stub worker's answers
@@ -643,7 +643,7 @@ describe('a link that asks again while a document is open', () => {
       tries,
       reads,
       fetch: async (input, init) => {
-        const exchange = String(input).endsWith('/v1/share-sessions');
+        const exchange = String(input).endsWith('/v1/grant-sessions');
         if (exchange) tries.count += 1;
         const res = await inner(input, init);
         if (!exchange) reads.push(res.status);
@@ -664,16 +664,16 @@ describe('a link that asks again while a document is open', () => {
 
   test('questions on open: asked once, the session serves until it runs out, then reads wait for the answers', async () => {
     // A 60 second session is always inside the renewal margin: every request would exchange again.
-    const link = await createLink({ sessionTtlSeconds: 60 });
+    const grant = await createGrant({ sessionTtlSeconds: 60 });
     const exchanges: Exchange[] = [];
     const { fetch: countingFetch, tries, reads } = counting(exchanges);
     const engine = cloudEngine({ baseUrl: fx.baseUrl, fetch: countingFetch, visitorStore: null });
     try {
-      const doc = await engine.open({ kind: 'share', shareToken: link });
-      const share = doc.share!;
+      const doc = await engine.open({ kind: 'grant', grant: grant });
+      const docGrant = doc.grant!;
       const asked: unknown[] = [];
-      share.onOpenRequest((request) => asked.push(request));
-      await updateLink(link, {
+      docGrant.onOpenRequest((request) => asked.push(request));
+      await updateGrant(grant, {
         visitorIdentity: { fields: { displayName: 'required' }, ask: 'on-open' },
       });
 
@@ -687,7 +687,7 @@ describe('a link that asks again while a document is open', () => {
       expect(asked).toEqual([
         { kind: 'identity', request: expect.objectContaining({ missing: ['displayName'] }) },
       ]);
-      expect(share.openRequest).toEqual(asked[0]);
+      expect(docGrant.openRequest).toEqual(asked[0]);
 
       // The session runs out: a read waits for the answers, then goes on as the same visitor.
       vi.useFakeTimers({ toFake: ['Date'] });
@@ -701,10 +701,10 @@ describe('a link that asks again while a document is open', () => {
       expect(tries.count - before).toBe(1);
       expect(reads).toHaveLength(5);
 
-      await share.resume({ identity: { displayName: 'Ada' } });
+      await docGrant.resume({ identity: { displayName: 'Ada' } });
       await reading;
       expect(reads).toEqual([200, 200, 200, 200, 200, 200]);
-      expect(share.openRequest).toBeNull();
+      expect(docGrant.openRequest).toBeNull();
       const resumed = exchanges.at(-1)!;
       expect(resumed.sent.visitorHandle).toBe(exchanges.at(-2)!.answered.visitor.handle);
       expect(identityOf(resumed.answered.token)).toMatchObject({
@@ -718,28 +718,28 @@ describe('a link that asks again while a document is open', () => {
   });
 
   test('a passphrase: a wrong one is refused and still asked; the right one goes on', async () => {
-    const link = await createLink({ sessionTtlSeconds: 60 });
+    const grant = await createGrant({ sessionTtlSeconds: 60 });
     const exchanges: Exchange[] = [];
     const { fetch: countingFetch, tries, reads } = counting(exchanges);
     const engine = cloudEngine({ baseUrl: fx.baseUrl, fetch: countingFetch, visitorStore: null });
     try {
-      const doc = await engine.open({ kind: 'share', shareToken: link });
-      const share = doc.share!;
+      const doc = await engine.open({ kind: 'grant', grant: grant });
+      const docGrant = doc.grant!;
       const asked: unknown[] = [];
-      share.onOpenRequest((request) => asked.push(request));
-      await updateLink(link, { password: 'open sesame' });
+      docGrant.onOpenRequest((request) => asked.push(request));
+      await updateGrant(grant, { passphrase: 'open sesame' });
 
       await read(doc);
-      expect(asked).toEqual([{ kind: 'passphrase', passwordProvided: false }]);
-      const refused = await share.resume({ sharePassword: 'wrong' }).then(
+      expect(asked).toEqual([{ kind: 'passphrase', passphraseProvided: false }]);
+      const refused = await docGrant.resume({ passphrase: 'wrong' }).then(
         () => null,
         (error: unknown) => error,
       );
-      expect(EngineError.is(refused, EngineErrorCode.SharePasswordRequired)).toBe(true);
-      expect(share.openRequest).toEqual({ kind: 'passphrase', passwordProvided: true });
+      expect(EngineError.is(refused, EngineErrorCode.GrantPassphraseRequired)).toBe(true);
+      expect(docGrant.openRequest).toEqual({ kind: 'passphrase', passphraseProvided: true });
 
-      await share.resume({ sharePassword: 'open sesame' });
-      expect(share.openRequest).toBeNull();
+      await docGrant.resume({ passphrase: 'open sesame' });
+      expect(docGrant.openRequest).toBeNull();
       // From then on every renewal carries it, as the same visitor.
       const before = tries.count;
       reads.length = 0;
@@ -757,21 +757,21 @@ describe('a link that asks again while a document is open', () => {
   });
 
   test('nobody to ask: once the session runs out, a read fails with the refusal', async () => {
-    const link = await createLink({ sessionTtlSeconds: 60 });
+    const grant = await createGrant({ sessionTtlSeconds: 60 });
     const engine = cloudEngine({
       baseUrl: fx.baseUrl,
       fetch: browserFetch([]),
       visitorStore: null,
     });
     try {
-      const doc = await engine.open({ kind: 'share', shareToken: link });
-      await updateLink(link, { password: 'open sesame' });
+      const doc = await engine.open({ kind: 'grant', grant: grant });
+      await updateGrant(grant, { passphrase: 'open sesame' });
       await read(doc);
-      expect(doc.share!.openRequest).toEqual({ kind: 'passphrase', passwordProvided: false });
+      expect(doc.grant!.openRequest).toEqual({ kind: 'passphrase', passphraseProvided: false });
 
       vi.useFakeTimers({ toFake: ['Date'] });
       vi.setSystemTime(Date.now() + 120_000);
-      expect(EngineError.is(await read(doc), EngineErrorCode.SharePasswordRequired)).toBe(true);
+      expect(EngineError.is(await read(doc), EngineErrorCode.GrantPassphraseRequired)).toBe(true);
       await doc.close();
     } finally {
       await engine.destroy();

@@ -19,14 +19,14 @@ import { buildAppForTesting } from '../../server/src/app/buildApp';
 import { createValidTestLicenseGate } from '../../server/src/licensing/testing';
 import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 import { cloudEngine } from '../src/index';
-import { exchangeShareToken, shareSessionSource, ShareExchangeError } from '../src/share';
+import { exchangeGrant, grantSessionSource, GrantExchangeError } from '../src/grant';
 
 /**
  * SDK side of the no-backend embed flow, at both levels:
  *
- *   - the primitives: a share token exchanged into a self-renewing
+ *   - the primitives: a grant exchanged into a self-renewing
  *     token source that drives an ordinary `open({ kind: 'token' })`
- *   - the engine arm: `open({ kind: 'share' })`, which performs the
+ *   - the engine arm: `open({ kind: 'grant' })`, which performs the
  *     exchange itself on the engine's own transport (baseUrl + fetch)
  *     and surfaces exchange failures as EngineErrors
  *
@@ -38,7 +38,7 @@ import { exchangeShareToken, shareSessionSource, ShareExchangeError } from '../s
 const STUB_ENTRY = fileURLToPath(
   new URL('../../server/test/_helpers/stub-worker-entry.cjs', import.meta.url),
 );
-const SECRET = 'cloud-engine-share-secret';
+const SECRET = 'cloud-engine-grant-secret';
 const TENANT = 'acme';
 
 interface Fixture {
@@ -52,8 +52,8 @@ interface Fixture {
 let fx: Fixture;
 
 beforeEach(async () => {
-  const storageRoot = await mkdtemp(join(tmpdir(), 'share-session-store-'));
-  const cacheRoot = await mkdtemp(join(tmpdir(), 'share-session-cache-'));
+  const storageRoot = await mkdtemp(join(tmpdir(), 'grant-session-store-'));
+  const cacheRoot = await mkdtemp(join(tmpdir(), 'grant-session-cache-'));
   const db = createSqliteDb({ path: ':memory:' });
   await migrate(db, { source: { kind: 'inline', migrations: sqliteMigrations } });
   const store = new FsObjectStore({ root: storageRoot });
@@ -116,19 +116,19 @@ async function seedDocument(docId: string): Promise<void> {
     .execute();
 }
 
-async function createShare(body: Record<string, unknown>): Promise<string> {
+async function createGrant(body: Record<string, unknown>): Promise<string> {
   const token = signDevToken(SECRET, {
     sub: 'dash-1',
     tenant_id: TENANT,
-    scope: ['shares.manage'],
+    scope: ['grants.manage'],
   });
-  const res = await fetch(`${fx.baseUrl}/v1/tenants/${TENANT}/shares`, {
+  const res = await fetch(`${fx.baseUrl}/v1/tenants/${TENANT}/grants`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'content-type': 'application/json' },
     body: JSON.stringify(body),
   });
   expect(res.status).toBe(200);
-  return ((await res.json()) as { share: { id: string } }).share.id;
+  return ((await res.json()) as { grant: { id: string } }).grant.id;
 }
 
 /**
@@ -139,63 +139,63 @@ async function createShare(body: Record<string, unknown>): Promise<string> {
  */
 function browserFetch(origin: string, counter?: { exchanges: number }): typeof fetch {
   return async (input, init) => {
-    if (counter && String(input).endsWith('/v1/share-sessions')) counter.exchanges += 1;
+    if (counter && String(input).endsWith('/v1/grant-sessions')) counter.exchanges += 1;
     const headers = new Headers(init?.headers);
     headers.set('origin', origin);
     return fetch(input, { ...init, headers });
   };
 }
 
-describe('share sessions (SDK)', () => {
-  test('shareSessionSource feeds open({kind: token}) and caches the session', async () => {
-    await seedDocument('doc-sdk-share');
-    const shareId = await createShare({
-      docId: 'doc-sdk-share',
+describe('grant sessions (SDK)', () => {
+  test('grantSessionSource feeds open({kind: token}) and caches the session', async () => {
+    await seedDocument('doc-sdk-grant');
+    const grantId = await createGrant({
+      docId: 'doc-sdk-grant',
       scope: ['doc.open', 'doc.render'],
       origins: ['https://acme.com'],
     });
 
     const counter = { exchanges: 0 };
-    const source = shareSessionSource(fx.baseUrl, shareId, {
+    const source = grantSessionSource(fx.baseUrl, grantId, {
       fetch: browserFetch('https://acme.com', counter),
     });
 
     const engine = cloudEngine({ baseUrl: fx.baseUrl });
     try {
       const handle = await engine.open({ kind: 'token', token: source });
-      expect(handle.id).toBe('doc-sdk-share');
+      expect(handle.id).toBe('doc-sdk-grant');
       // A second open re-invokes the source (fresh /head with the
       // bearer), but the cached session serves it: still one exchange.
       const again = await engine.open({ kind: 'token', token: source });
-      expect(again.id).toBe('doc-sdk-share');
+      expect(again.id).toBe('doc-sdk-grant');
       expect(counter.exchanges).toBe(1);
     } finally {
       await engine.destroy();
     }
   });
 
-  test('one engine, multiple share tokens — independent sessions per tab', async () => {
+  test('one engine, multiple grant tokens — independent sessions per tab', async () => {
     await seedDocument('doc-multi-a');
     await seedDocument('doc-multi-b');
-    const shareA = await createShare({ docId: 'doc-multi-a', scope: ['doc.open'] });
-    const shareB = await createShare({ docId: 'doc-multi-b', scope: ['doc.open'] });
+    const grantA = await createGrant({ docId: 'doc-multi-a', scope: ['doc.open'] });
+    const grantB = await createGrant({ docId: 'doc-multi-b', scope: ['doc.open'] });
 
     const counterA = { exchanges: 0 };
     const counterB = { exchanges: 0 };
     const engine = cloudEngine({ baseUrl: fx.baseUrl });
     try {
-      // Exactly what the viewer's `documents: [{ source: { kind: 'share' } }]`
+      // Exactly what the viewer's `documents: [{ source: { kind: 'grant' } }]`
       // lowering produces: one exchanging source per entry, opened as a batch.
       const [a, b] = await Promise.all([
         engine.open({
           kind: 'token',
-          token: shareSessionSource(fx.baseUrl, shareA, {
+          token: grantSessionSource(fx.baseUrl, grantA, {
             fetch: browserFetch('https://acme.com', counterA),
           }),
         }),
         engine.open({
           kind: 'token',
-          token: shareSessionSource(fx.baseUrl, shareB, {
+          token: grantSessionSource(fx.baseUrl, grantB, {
             fetch: browserFetch('https://acme.com', counterB),
           }),
         }),
@@ -207,21 +207,21 @@ describe('share sessions (SDK)', () => {
       expect(counterA.exchanges).toBe(1);
       expect(counterB.exchanges).toBe(1);
 
-      // Revoking one share does not disturb the other tab's session:
+      // Ending one grant does not disturb the other tab's session:
       // B's already-minted JWT keeps serving until its own exp.
       const admin = signDevToken(SECRET, {
         sub: 'dash-1',
         tenant_id: TENANT,
-        scope: ['shares.manage'],
+        scope: ['grants.manage'],
       });
-      const del = await fetch(`${fx.baseUrl}/v1/tenants/${TENANT}/shares/${shareA}`, {
+      const del = await fetch(`${fx.baseUrl}/v1/tenants/${TENANT}/grants/${grantA}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${admin}` },
       });
       expect(del.status).toBe(204);
       const again = await engine.open({
         kind: 'token',
-        token: shareSessionSource(fx.baseUrl, shareB, {
+        token: grantSessionSource(fx.baseUrl, grantB, {
           fetch: browserFetch('https://acme.com'),
         }),
       });
@@ -231,16 +231,16 @@ describe('share sessions (SDK)', () => {
     }
   });
 
-  test("open({ kind: 'share' }) exchanges on the engine's own transport", async () => {
-    await seedDocument('doc-open-share');
-    const shareId = await createShare({
-      docId: 'doc-open-share',
+  test("open({ kind: 'grant' }) exchanges on the engine's own transport", async () => {
+    await seedDocument('doc-open-grant');
+    const grantId = await createGrant({
+      docId: 'doc-open-grant',
       scope: ['doc.open', 'doc.render'],
       origins: ['https://acme.com'],
     });
 
     // The Origin-attaching fetch is configured on the engine, not the
-    // open call — proving the share arm forwards the engine's transport
+    // open call — proving the grant arm forwards the engine's transport
     // (fetchImpl + baseUrl) into the exchange. No engine-level token:
     // the anonymous-engine embed scenario.
     const counter = { exchanges: 0 };
@@ -249,20 +249,20 @@ describe('share sessions (SDK)', () => {
       fetch: browserFetch('https://acme.com', counter),
     });
     try {
-      const handle = await engine.open({ kind: 'share', shareToken: shareId });
-      expect(handle.id).toBe('doc-open-share');
+      const handle = await engine.open({ kind: 'grant', grant: grantId });
+      expect(handle.id).toBe('doc-open-grant');
       expect(counter.exchanges).toBe(1);
     } finally {
       await engine.destroy();
     }
   });
 
-  test("open({ kind: 'share' }) with a passphrase-protected grant", async () => {
-    await seedDocument('doc-open-share-pass');
-    const shareId = await createShare({
-      docId: 'doc-open-share-pass',
+  test("open({ kind: 'grant' }) with a passphrase-protected grant", async () => {
+    await seedDocument('doc-open-grant-pass');
+    const grantId = await createGrant({
+      docId: 'doc-open-grant-pass',
       scope: ['doc.open'],
-      password: 'open-sesame',
+      passphrase: 'open-sesame',
     });
 
     const engine = cloudEngine({
@@ -271,39 +271,39 @@ describe('share sessions (SDK)', () => {
     });
     try {
       // Without the passphrase: an EngineError with the dedicated code —
-      // the prompt-and-retry signal — never a raw ShareExchangeError.
+      // the prompt-and-retry signal — never a raw GrantExchangeError.
       try {
-        await engine.open({ kind: 'share', shareToken: shareId });
-        expect.unreachable('share open without a passphrase must reject');
+        await engine.open({ kind: 'grant', grant: grantId });
+        expect.unreachable('grant open without a passphrase must reject');
       } catch (err) {
         expect(err).toBeInstanceOf(EngineError);
-        expect(EngineError.is(err, EngineErrorCode.SharePasswordRequired)).toBe(true);
+        expect(EngineError.is(err, EngineErrorCode.GrantPassphraseRequired)).toBe(true);
         expect((err as EngineError).details).toMatchObject({
-          shareCode: 'SharePasswordRequired',
+          grantCode: 'GrantPassphraseRequired',
         });
       }
 
       // With it: an ordinary handle.
       const handle = await engine.open({
-        kind: 'share',
-        shareToken: shareId,
-        sharePassword: 'open-sesame',
+        kind: 'grant',
+        grant: grantId,
+        passphrase: 'open-sesame',
       });
-      expect(handle.id).toBe('doc-open-share-pass');
+      expect(handle.id).toBe('doc-open-grant-pass');
     } finally {
       await engine.destroy();
     }
   });
 
-  test("open({ kind: 'share' }) maps unknown grants to NotFound", async () => {
+  test("open({ kind: 'grant' }) maps unknown grants to NotFound", async () => {
     const engine = cloudEngine({
       baseUrl: fx.baseUrl,
       fetch: browserFetch('https://acme.com'),
     });
     try {
       try {
-        await engine.open({ kind: 'share', shareToken: `shr_${'B'.repeat(24)}` });
-        expect.unreachable('unknown share must reject');
+        await engine.open({ kind: 'grant', grant: `shr_${'B'.repeat(24)}` });
+        expect.unreachable('unknown grant must reject');
       } catch (err) {
         expect(err).toBeInstanceOf(EngineError);
         expect(EngineError.is(err, EngineErrorCode.NotFound)).toBe(true);
@@ -315,24 +315,24 @@ describe('share sessions (SDK)', () => {
 
   test('exchange errors surface typed codes', async () => {
     await seedDocument('doc-sdk-pass');
-    const shareId = await createShare({
+    const grantId = await createGrant({
       docId: 'doc-sdk-pass',
       scope: ['doc.open'],
-      password: 'open-sesame',
+      passphrase: 'open-sesame',
     });
 
     await expect(
-      exchangeShareToken(fx.baseUrl, shareId, { fetch: browserFetch('https://x.example') }),
-    ).rejects.toMatchObject({ name: 'ShareExchangeError', code: 'SharePasswordRequired' });
+      exchangeGrant(fx.baseUrl, grantId, { fetch: browserFetch('https://x.example') }),
+    ).rejects.toMatchObject({ name: 'GrantExchangeError', code: 'GrantPassphraseRequired' });
 
     await expect(
-      exchangeShareToken(fx.baseUrl, `shr_${'B'.repeat(24)}`, {
+      exchangeGrant(fx.baseUrl, `shr_${'B'.repeat(24)}`, {
         fetch: browserFetch('https://x.example'),
       }),
     ).rejects.toMatchObject({ code: 'NotFound', status: 404 });
 
-    const session = await exchangeShareToken(fx.baseUrl, shareId, {
-      password: 'open-sesame',
+    const session = await exchangeGrant(fx.baseUrl, grantId, {
+      passphrase: 'open-sesame',
       fetch: browserFetch('https://x.example'),
     });
     expect(session.docId).toBe('doc-sdk-pass');
@@ -340,10 +340,10 @@ describe('share sessions (SDK)', () => {
 
     // The typed error is an instanceof, not just a shape.
     try {
-      await exchangeShareToken(fx.baseUrl, shareId, { fetch: browserFetch('https://x.example') });
-      expect.unreachable('exchange without password must throw');
+      await exchangeGrant(fx.baseUrl, grantId, { fetch: browserFetch('https://x.example') });
+      expect.unreachable('exchange without a passphrase must throw');
     } catch (err) {
-      expect(err).toBeInstanceOf(ShareExchangeError);
+      expect(err).toBeInstanceOf(GrantExchangeError);
     }
   });
 });

@@ -21,17 +21,17 @@ export { decodeUnverifiedClaims } from './transport/decodeUnverifiedClaims';
 export type { UnverifiedClaims } from './transport/decodeUnverifiedClaims';
 export {
   browserVisitorStore,
-  exchangeShareToken,
-  shareSessionSource,
-  ShareExchangeError,
-  engineErrorFromShareExchange,
-} from './share';
+  exchangeGrant,
+  grantSessionSource,
+  GrantExchangeError,
+  engineErrorFromGrantExchange,
+} from './grant';
 export type {
-  ShareSession,
-  ShareExchangeOptions,
-  ShareSessionOptions,
+  GrantSession,
+  GrantExchangeOptions,
+  GrantSessionOptions,
   VisitorStore,
-} from './share';
+} from './grant';
 
 import { CloudEngine, type CloudEngineOptions } from './CloudEngine';
 

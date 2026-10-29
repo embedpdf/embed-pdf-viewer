@@ -3,10 +3,10 @@ import {
   AbortError,
   EngineError,
   EngineErrorCode,
-  type DocumentShare,
+  type DocumentGrant,
   type Identity,
-  type ShareOpenRequest,
-  shareOpenRequestOf,
+  type GrantOpenRequest,
+  grantOpenRequestOf,
   type VisitorAnswers,
   type VisitorIdentityRequest,
   visitorIdentityRequestOf,
@@ -15,11 +15,11 @@ import {
 import type { WriteGate } from './document/CloudWrites';
 
 /**
- * Share-session exchange: the client half of the no-backend embed flow.
+ * Grant-session exchange: the client half of the no-backend embed flow.
  *
- * A share token (`shr_…`) is a reference to a stored grant on the
- * server, not a credential — `exchangeShareToken` trades it for an
- * ordinary short-lived doc JWT, and `shareSessionSource` wraps that in
+ * A grant (`shr_…`) is a reference to a stored grant on the
+ * server, not a credential — `exchangeGrant` trades it for an
+ * ordinary short-lived doc JWT, and `grantSessionSource` wraps that in
  * a self-renewing token source. Because the engine's transport
  * invokes its token source on every request (and SSE reconnects call
  * it again), renewal is "exchange again when the cached session is
@@ -27,15 +27,15 @@ import type { WriteGate } from './document/CloudWrites';
  * who only reads still counts as seen.
  *
  * Every exchange names a visitor and answers their handle: sent back on
- * each renewal, it keeps the same visitor (and on a per-visitor link,
- * their layer). Unless the link gives a new copy every visit
+ * each renewal, it keeps the same visitor (and on a per-visitor grant,
+ * their layer). Unless the grant gives a new copy every visit
  * (`visitor.keep`), the handle also waits in a {@link VisitorStore} for the
  * next visit.
  *
- * A link can ask its visitors who they are: on open (the exchange answers
+ * A grant can ask its visitors who they are: on open (the exchange answers
  * `VisitorIdentityRequired` until they answer), or before their first change
  * (the session reads at once, and its writes wait for the answers). A
- * passphrase or questions on open that the link gets while a document is
+ * passphrase or questions on open that the grant gets while a document is
  * open refuse its next renewal: the open asks the visitor once
  * (`openRequest`) and exchanges nothing more until they give it.
  *
@@ -44,52 +44,52 @@ import type { WriteGate } from './document/CloudWrites';
  * non-browser callers (tests, SSR) must supply a `fetch` that does.
  */
 
-export interface ShareSession {
+export interface GrantSession {
   /** Doc-scoped session JWT carrying the grant's capabilities. */
   token: string;
   docId: string;
-  /** The layer the session reads and writes: the link's shared one, or this visitor's own. */
+  /** The layer the session reads and writes: the grant's shared one, or this visitor's own. */
   layerName: string;
-  layerMode: DocumentShare['layerMode'];
+  layerMode: DocumentGrant['layerMode'];
   visitor: {
     /** Send it back with the next exchange to stay the same visitor. */
     handle: string;
     /** Keep the handle for the next visit too: false only where every visit gets a new copy. */
     keep: boolean;
-    /** What the link asks before this visitor's first change, unanswered; `null` when nothing. */
+    /** What the grant asks before this visitor's first change, unanswered; `null` when nothing. */
     identityRequest: VisitorIdentityRequest | null;
   };
   /** Unix seconds when `token` expires. */
   expiresAt: number;
 }
 
-export interface ShareExchangeOptions {
-  /** Passphrase for protected grants (`SharePasswordRequired` otherwise). */
-  password?: string;
+export interface GrantExchangeOptions {
+  /** The passphrase of a protected grant (`GrantPassphraseRequired` otherwise). */
+  passphrase?: string;
   /** The `visitor.handle` an earlier exchange answered: the same visitor, and their layer. */
   visitorHandle?: string;
-  /** With `visitorHandle` on a per-visitor link: delete that visitor's layer and start a new one. */
+  /** With `visitorHandle` on a per-visitor grant: delete that visitor's layer and start a new one. */
   restart?: boolean;
-  /** The visitor's answers to what the link asks; an answer once given stays. */
+  /** The visitor's answers to what the grant asks; an answer once given stays. */
   visitorIdentity?: VisitorAnswers;
   fetch?: typeof globalThis.fetch;
   signal?: AbortSignal;
 }
 
 /**
- * Where a share link's visitor waits for the next visit: the handle of a
- * visitor the link keeps (`visitor.keep`), by share token. Calls may be async
+ * Where a grant's visitor waits for the next visit: the handle of a
+ * visitor the grant keeps (`visitor.keep`), by grant. Calls may be async
  * (a native app's storage).
  */
 export interface VisitorStore {
-  get(shareToken: string): string | null | Promise<string | null>;
-  set(shareToken: string, handle: string): void | Promise<void>;
-  delete(shareToken: string): void | Promise<void>;
+  get(grant: string): string | null | Promise<string | null>;
+  set(grant: string, handle: string): void | Promise<void>;
+  delete(grant: string): void | Promise<void>;
 }
 
 /**
  * The browser's `localStorage` as a {@link VisitorStore} (keys
- * `cloudpdf.visitor.<shareToken>`), or `null` where there is none. A
+ * `cloudpdf.visitor.<grant>`), or `null` where there is none. A
  * browser that refuses storage (a private window, blocked site data)
  * keeps nothing: the visitor starts fresh next time.
  */
@@ -101,7 +101,7 @@ export function browserVisitorStore(): VisitorStore | null {
     return null;
   }
   if (!storage) return null;
-  const key = (shareToken: string) => `cloudpdf.visitor.${shareToken}`;
+  const key = (grant: string) => `cloudpdf.visitor.${grant}`;
   const quietly = <T>(run: () => T, fallback: T): T => {
     try {
       return run();
@@ -110,21 +110,21 @@ export function browserVisitorStore(): VisitorStore | null {
     }
   };
   return {
-    get: (shareToken) => quietly(() => storage.getItem(key(shareToken)), null),
-    set: (shareToken, handle) => quietly(() => storage.setItem(key(shareToken), handle), undefined),
-    delete: (shareToken) => quietly(() => storage.removeItem(key(shareToken)), undefined),
+    get: (grant) => quietly(() => storage.getItem(key(grant)), null),
+    set: (grant, handle) => quietly(() => storage.setItem(key(grant), handle), undefined),
+    delete: (grant) => quietly(() => storage.removeItem(key(grant)), undefined),
   };
 }
 
 /**
  * Thrown on a non-OK exchange. `code` is the server's wire code:
- * `SharePasswordRequired` (prompt and retry with a password),
- * `VisitorIdentityRequired` (ask the link's questions, `details`, and retry
- * with the answers), `OriginNotAllowed` / `OriginRequired`, `ShareExpired`,
+ * `GrantPassphraseRequired` (prompt and retry with the passphrase),
+ * `VisitorIdentityRequired` (ask the grant's questions, `details`, and retry
+ * with the answers), `OriginNotAllowed` / `OriginRequired`, `GrantExpired`,
  * `NotFound` (unknown or revoked — indistinguishable by design), or
  * `TooManyRequests`.
  */
-export class ShareExchangeError extends Error {
+export class GrantExchangeError extends Error {
   constructor(
     readonly code: string,
     message: string,
@@ -132,22 +132,22 @@ export class ShareExchangeError extends Error {
     readonly details?: Record<string, unknown>,
   ) {
     super(message);
-    this.name = 'ShareExchangeError';
+    this.name = 'GrantExchangeError';
   }
 }
 
-export async function exchangeShareToken(
+export async function exchangeGrant(
   baseUrl: string,
-  shareToken: string,
-  opts: ShareExchangeOptions = {},
-): Promise<ShareSession> {
+  grant: string,
+  opts: GrantExchangeOptions = {},
+): Promise<GrantSession> {
   const doFetch = opts.fetch ?? globalThis.fetch;
-  const res = await doFetch(`${baseUrl.replace(/\/$/, '')}/v1/share-sessions`, {
+  const res = await doFetch(`${baseUrl.replace(/\/$/, '')}/v1/grant-sessions`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
-      shareToken,
-      ...(opts.password !== undefined ? { password: opts.password } : {}),
+      grant,
+      ...(opts.passphrase !== undefined ? { passphrase: opts.passphrase } : {}),
       ...(opts.visitorHandle !== undefined ? { visitorHandle: opts.visitorHandle } : {}),
       ...(opts.restart ? { restart: true } : {}),
       ...(opts.visitorIdentity ? { visitorIdentity: opts.visitorIdentity } : {}),
@@ -156,7 +156,7 @@ export async function exchangeShareToken(
   });
   if (!res.ok) {
     let code = 'Unknown';
-    let message = `share exchange failed with status ${res.status}`;
+    let message = `grant exchange failed with status ${res.status}`;
     let details: Record<string, unknown> | undefined;
     try {
       const payload = (await res.json()) as {
@@ -168,32 +168,32 @@ export async function exchangeShareToken(
     } catch {
       // Non-JSON error body; keep the status-shaped message.
     }
-    throw new ShareExchangeError(code, message, res.status, details);
+    throw new GrantExchangeError(code, message, res.status, details);
   }
-  return (await res.json()) as ShareSession;
+  return (await res.json()) as GrantSession;
 }
 
 /**
- * Lift a {@link ShareExchangeError} into the engine's error taxonomy, so
- * `open({ kind: 'share' })` and every later renewal fail with the same
+ * Lift a {@link GrantExchangeError} into the engine's error taxonomy, so
+ * `open({ kind: 'grant' })` and every later renewal fail with the same
  * `EngineError` family as all other engine calls. The wire code and HTTP
  * status survive in `details`; the original error rides as `cause`.
  *
- * `SharePasswordRequired` and `VisitorIdentityRequired` keep their own
+ * `GrantPassphraseRequired` and `VisitorIdentityRequired` keep their own
  * engine codes — the outcomes callers branch on programmatically (prompt for
- * the passphrase or the link's questions, and retry); the latter's `details`
+ * the passphrase or the grant's questions, and retry); the latter's `details`
  * are the questions. Everything else maps by meaning, with the HTTP status as
  * the fallback discriminator.
  */
-export function engineErrorFromShareExchange(error: ShareExchangeError): EngineError {
+export function engineErrorFromGrantExchange(error: GrantExchangeError): EngineError {
   const code =
-    error.code === 'SharePasswordRequired'
-      ? EngineErrorCode.SharePasswordRequired
+    error.code === 'GrantPassphraseRequired'
+      ? EngineErrorCode.GrantPassphraseRequired
       : error.code === 'VisitorIdentityRequired'
         ? EngineErrorCode.VisitorIdentityRequired
         : error.code === 'NotFound'
           ? EngineErrorCode.NotFound
-          : error.code === 'ShareExpired' ||
+          : error.code === 'GrantExpired' ||
               error.code === 'OriginNotAllowed' ||
               error.code === 'OriginRequired'
             ? EngineErrorCode.Forbidden
@@ -202,28 +202,28 @@ export function engineErrorFromShareExchange(error: ShareExchangeError): EngineE
               : error.status === 400
                 ? EngineErrorCode.InvalidArg
                 : EngineErrorCode.Unknown;
-  return new EngineError(code, `share exchange failed: ${error.message}`, {
-    details: { ...error.details, shareCode: error.code, status: error.status },
+  return new EngineError(code, `grant exchange failed: ${error.message}`, {
+    details: { ...error.details, grantCode: error.code, status: error.status },
     cause: error,
   });
 }
 
 /** The exchange's failure as an engine error; any other error as it is. */
 function asEngineError(error: unknown): unknown {
-  return error instanceof ShareExchangeError ? engineErrorFromShareExchange(error) : error;
+  return error instanceof GrantExchangeError ? engineErrorFromGrantExchange(error) : error;
 }
 
 /** Renew this many seconds before `expiresAt` so in-flight requests never race expiry. */
 const RENEW_MARGIN_SECONDS = 60;
 /** After a renewal on the timer failed, try again this much later; a request says why meanwhile. */
 const KEEP_ALIVE_RETRY_MS = 60_000;
-/** While the link asks before an open goes on, its session serves until this close to `expiresAt`. */
+/** While the grant asks before an open goes on, its session serves until this close to `expiresAt`. */
 const LAST_USE_MARGIN_SECONDS = 5;
 
-export interface ShareSessionOptions {
-  /** Passphrase for protected grants. */
-  password?: string;
-  /** Start over: the first exchange deletes the kept visitor's layer (see `OpenInputShare.restart`). */
+export interface GrantSessionOptions {
+  /** The passphrase of a protected grant. */
+  passphrase?: string;
+  /** Start over: the first exchange deletes the kept visitor's layer (see `OpenInputGrant.restart`). */
   restart?: boolean;
   /** The visitor's answers, sent with the first exchange: what the page knows (`OpenOptions.identity`). */
   identity?: VisitorAnswers;
@@ -233,27 +233,27 @@ export interface ShareSessionOptions {
 }
 
 /**
- * One open's share session: exchanges and renews, as one visitor. The first
+ * One open's grant session: exchanges and renews, as one visitor. The first
  * exchange brings the visitor the store kept (and starts over when asked);
  * each later one sends the handle the last answered. A renewal that lands
- * on another layer (the visitor's layer was deleted, or the link changed
+ * on another layer (the visitor's layer was deleted, or the grant changed
  * whose layer it gives) can't serve this open, which was made on the first:
  * from then on it refuses, and opening again picks the new layer up.
  *
- * When the link asks before the first change and the visitor hasn't
+ * When the grant asks before the first change and the visitor hasn't
  * answered, the document's writes wait at {@link writeGate} while someone
- * listens (`share.onIdentityRequest`), until `share.identify` exchanges again
- * with the answers or `share.decline` lets them fail.
+ * listens (`grant.onIdentityRequest`), until `grant.identify` exchanges again
+ * with the answers or `grant.decline` lets them fail.
  *
- * When a renewal is refused for a passphrase or questions on open (the link
- * got them after this open), the open asks once (`share.onOpenRequest`) and
+ * When a renewal is refused for a passphrase or questions on open (the grant
+ * got them after this open), the open asks once (`grant.onOpenRequest`) and
  * exchanges nothing more: the session serves until it runs out, then
- * requests wait while someone listens, until `share.resume` exchanges again
+ * requests wait while someone listens, until `grant.resume` exchanges again
  * with what the visitor gave.
  */
-export class ShareSessionSource {
-  private session: ShareSession | null = null;
-  private inflight: Promise<ShareSession> | null = null;
+export class GrantSessionSource {
+  private session: GrantSession | null = null;
+  private inflight: Promise<GrantSession> | null = null;
   /** The visitor to send: `undefined` until the store was read. */
   private handle: string | null | undefined;
   private restart: boolean;
@@ -261,16 +261,16 @@ export class ShareSessionSource {
   private answers: VisitorAnswers | undefined;
   private lost: EngineError | null = null;
   /** The passphrase every exchange sends: the one given at open, or to `resume`. */
-  private password: string | undefined;
-  /** What the link asks before this open goes on, and the refusal that asked it; `null` while nothing is. */
+  private passphrase: string | undefined;
+  /** What the grant asks before this open goes on, and the refusal that asked it; `null` while nothing is. */
   private asked: {
-    readonly request: ShareOpenRequest;
+    readonly request: GrantOpenRequest;
     readonly refusal: EngineError;
     readonly resumed: Promise<void>;
     readonly resolve: () => void;
   } | null = null;
-  private readonly openListeners = new Set<(request: ShareOpenRequest) => void>();
-  /** What the link asks before the first change, unanswered: the gate is closed while set. */
+  private readonly openListeners = new Set<(request: GrantOpenRequest) => void>();
+  /** What the grant asks before the first change, unanswered: the gate is closed while set. */
   private request: VisitorIdentityRequest | null = null;
   private readonly listeners = new Set<(request: VisitorIdentityRequest) => void>();
   /** The writes waiting for the visitor's answers; `null` when none wait. */
@@ -282,17 +282,17 @@ export class ShareSessionSource {
 
   constructor(
     private readonly baseUrl: string,
-    private readonly shareToken: string,
-    private readonly opts: ShareSessionOptions = {},
+    private readonly grantId: string,
+    private readonly opts: GrantSessionOptions = {},
   ) {
     this.restart = opts.restart === true;
     this.answers = opts.identity;
-    this.password = opts.password;
+    this.passphrase = opts.passphrase;
   }
 
   /**
    * A session token that isn't about to expire, exchanging when it is. While
-   * the link asks before this open goes on, the session serves until it runs
+   * the grant asks before this open goes on, the session serves until it runs
    * out, then waits for the visitor.
    */
   async token(): Promise<string> {
@@ -314,10 +314,10 @@ export class ShareSessionSource {
     return this.whileAsked();
   }
 
-  /** The document's view of the session (`DocumentHandle.share`), once it has opened. */
-  readonly share: DocumentShare = new SessionShare(this);
+  /** The document's view of the session (`DocumentHandle.grant`), once it has opened. */
+  readonly grant: DocumentGrant = new SessionGrant(this);
 
-  /** The gate the document's writes pass: the visitor's answers, when the link asks for them. */
+  /** The gate the document's writes pass: the visitor's answers, when the grant asks for them. */
   readonly writeGate: WriteGate = {
     passed: (signal) => this.untilAnswered(signal),
     refused: (error) => {
@@ -342,7 +342,7 @@ export class ShareSessionSource {
       (timer as { unref?: () => void }).unref?.();
     };
     const renew = () => {
-      // Nothing renews while the link asks: the timer goes on once the visitor gives it.
+      // Nothing renews while the grant asks: the timer goes on once the visitor gives it.
       if (this.asked) {
         void this.asked.resumed.then(() => schedule(this.untilRenewalMs()));
         return;
@@ -360,14 +360,14 @@ export class ShareSessionSource {
   }
 
   /** The session as of the last exchange. */
-  opened(): ShareSession {
+  opened(): GrantSession {
     if (!this.session) {
-      throw new EngineError(EngineErrorCode.InvalidArg, 'the share session has not opened yet');
+      throw new EngineError(EngineErrorCode.InvalidArg, 'the grant session has not opened yet');
     }
     return this.session;
   }
 
-  /** What the link asks before the first change, unanswered; `null` when nothing. */
+  /** What the grant asks before the first change, unanswered; `null` when nothing. */
   get identityRequest(): VisitorIdentityRequest | null {
     return this.request;
   }
@@ -380,13 +380,13 @@ export class ShareSessionSource {
     };
   }
 
-  /** What the link asks before this open goes on; `null` while nothing is. */
-  get openRequest(): ShareOpenRequest | null {
+  /** What the grant asks before this open goes on; `null` while nothing is. */
+  get openRequest(): GrantOpenRequest | null {
     return this.asked?.request ?? null;
   }
 
-  /** Called when the link asks before this open goes on. Returns the unsubscriber. */
-  onOpenRequest(listener: (request: ShareOpenRequest) => void): () => void {
+  /** Called when the grant asks before this open goes on. Returns the unsubscriber. */
+  onOpenRequest(listener: (request: GrantOpenRequest) => void): () => void {
     this.openListeners.add(listener);
     return () => {
       this.openListeners.delete(listener);
@@ -394,18 +394,18 @@ export class ShareSessionSource {
   }
 
   /**
-   * Exchange again with what the visitor gave the link: the same visitor goes
+   * Exchange again with what the visitor gave the grant: the same visitor goes
    * on, and the requests waiting go out. Refused, it still asks (with what
    * the refusal says) and rejects.
    */
   async resume(
-    given: { readonly sharePassword?: string; readonly identity?: VisitorAnswers },
+    given: { readonly passphrase?: string; readonly identity?: VisitorAnswers },
     signal?: AbortSignal,
   ): Promise<void> {
     const asked = this.asked;
     if (!asked) return;
     await this.inflight?.catch(() => undefined);
-    if (given.sharePassword !== undefined) this.password = given.sharePassword;
+    if (given.passphrase !== undefined) this.passphrase = given.passphrase;
     const exchanged = this.exchange(given.identity, signal).finally(() => {
       this.inflight = null;
     });
@@ -414,7 +414,7 @@ export class ShareSessionSource {
       await exchanged;
     } catch (error) {
       const refusal = asEngineError(error);
-      const request = shareOpenRequestOf(refusal, given.sharePassword !== undefined);
+      const request = grantOpenRequestOf(refusal, given.passphrase !== undefined);
       if (request && refusal instanceof EngineError) this.asked = { ...asked, request, refusal };
       throw refusal;
     }
@@ -423,7 +423,7 @@ export class ShareSessionSource {
   }
 
   /**
-   * A renewal the link refused for a passphrase or questions on open: ask the
+   * A renewal the grant refused for a passphrase or questions on open: ask the
    * visitor, once. Whether it asks; any other refusal is the request's to
    * report.
    */
@@ -432,7 +432,7 @@ export class ShareSessionSource {
     if (!this.session) return false;
     const refusal = asEngineError(error);
     // A passphrase the visitor gave at open that no longer works is asked as new.
-    const request = shareOpenRequestOf(refusal, false);
+    const request = grantOpenRequestOf(refusal, false);
     if (!request || !(refusal instanceof EngineError)) return false;
     let resolve!: () => void;
     const resumed = new Promise<void>((res) => {
@@ -444,7 +444,7 @@ export class ShareSessionSource {
   }
 
   /**
-   * The token while the link asks: the session's own until it runs out, then
+   * The token while the grant asks: the session's own until it runs out, then
    * the one `resume` brings. Nobody to ask: the refusal.
    */
   private async whileAsked(): Promise<string> {
@@ -467,7 +467,7 @@ export class ShareSessionSource {
 
   /**
    * Exchange again with the visitor's answers. Writes waiting for them go
-   * out once nothing is asked any more; answers the link can't take, or a
+   * out once nothing is asked any more; answers the grant can't take, or a
    * required one still missing, reject, and the writes keep waiting.
    */
   async identify(answers: VisitorAnswers, signal?: AbortSignal): Promise<void> {
@@ -514,14 +514,14 @@ export class ShareSessionSource {
     await untilAbort(this.waiting.answered, signal);
   }
 
-  private async exchange(answers?: VisitorAnswers, signal?: AbortSignal): Promise<ShareSession> {
+  private async exchange(answers?: VisitorAnswers, signal?: AbortSignal): Promise<GrantSession> {
     const store = this.opts.visitorStore ?? null;
     if (this.handle === undefined) {
-      this.handle = store ? await store.get(this.shareToken) : null;
+      this.handle = store ? await store.get(this.grantId) : null;
     }
     const visitorIdentity = answers ?? this.answers;
-    const next = await exchangeShareToken(this.baseUrl, this.shareToken, {
-      ...(this.password !== undefined ? { password: this.password } : {}),
+    const next = await exchangeGrant(this.baseUrl, this.grantId, {
+      ...(this.passphrase !== undefined ? { passphrase: this.passphrase } : {}),
       ...(this.handle ? { visitorHandle: this.handle } : {}),
       ...(this.restart ? { restart: true } : {}),
       ...(visitorIdentity ? { visitorIdentity } : {}),
@@ -536,15 +536,15 @@ export class ShareSessionSource {
       // visitor stays the one this browser comes back as.
       this.lost = new EngineError(
         EngineErrorCode.Forbidden,
-        `the share link now opens layer ${next.layerName}, not ${opened.layerName}: open it again`,
+        `the grant now opens layer ${next.layerName}, not ${opened.layerName}: open it again`,
         { details: { reason: 'layer-changed', layerName: next.layerName } },
       );
       throw this.lost;
     }
     this.handle = next.visitor.handle;
     if (store) {
-      if (next.visitor.keep) await store.set(this.shareToken, next.visitor.handle);
-      else await store.delete(this.shareToken);
+      if (next.visitor.keep) await store.set(this.grantId, next.visitor.handle);
+      else await store.delete(this.grantId);
     }
     this.session = next;
     this.request = next.visitor.identityRequest;
@@ -552,11 +552,11 @@ export class ShareSessionSource {
   }
 }
 
-/** `DocumentHandle.share` for a share session: what the document's user may do with it. */
-class SessionShare implements DocumentShare {
-  constructor(private readonly source: ShareSessionSource) {}
+/** `DocumentHandle.grant` for a grant session: what the document's user may do with it. */
+class SessionGrant implements DocumentGrant {
+  constructor(private readonly source: GrantSessionSource) {}
 
-  get layerMode(): DocumentShare['layerMode'] {
+  get layerMode(): DocumentGrant['layerMode'] {
     return this.source.opened().layerMode;
   }
 
@@ -580,23 +580,23 @@ class SessionShare implements DocumentShare {
     this.source.decline();
   }
 
-  get openRequest(): ShareOpenRequest | null {
+  get openRequest(): GrantOpenRequest | null {
     return this.source.openRequest;
   }
 
-  onOpenRequest(listener: (request: ShareOpenRequest) => void): () => void {
+  onOpenRequest(listener: (request: GrantOpenRequest) => void): () => void {
     return this.source.onOpenRequest(listener);
   }
 
   resume(given: {
-    readonly sharePassword?: string;
+    readonly passphrase?: string;
     readonly identity?: VisitorAnswers;
   }): AbortablePromise<void> {
     return AbortablePromise.run((signal) => this.source.resume(given, signal));
   }
 }
 
-/** The fields a share link can ask its visitors. */
+/** The fields a grant can ask its visitors. */
 const VISITOR_FIELDS = [
   'displayName',
   'email',
@@ -606,7 +606,7 @@ const VISITOR_FIELDS = [
 ] as const satisfies readonly (keyof VisitorAnswers)[];
 
 /**
- * What a page's `identity` answers on a share link: the fields a link can ask,
+ * What a page's `identity` answers on a grant: the fields a grant can ask,
  * never `userId` or `groupId` (the server gives a visitor theirs). `undefined`
  * when it answers nothing.
  */
@@ -623,7 +623,7 @@ export function visitorAnswersOf(identity: Identity | undefined): VisitorAnswers
 function identityRequired(request: VisitorIdentityRequest): EngineError {
   return new EngineError(
     EngineErrorCode.VisitorIdentityRequired,
-    "answer the share link's questions before making changes",
+    "answer the grant's questions before making changes",
     { details: { ...request } },
   );
 }
@@ -651,15 +651,15 @@ function untilAbort<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
  * A caching, self-renewing token source over the exchange — the callable
  * member of the engine's `TokenSource` union, assignable wherever one is
  * taken. Renewals keep the visitor; `visitorStore` keeps them for the next
- * visit when the link says so.
+ * visit when the grant says so.
  * Concurrent callers share one in-flight exchange; a failed exchange
  * clears it so the next request retries rather than caching the error.
  */
-export function shareSessionSource(
+export function grantSessionSource(
   baseUrl: string,
-  shareToken: string,
-  opts: ShareSessionOptions = {},
+  grant: string,
+  opts: GrantSessionOptions = {},
 ): () => Promise<string> {
-  const source = new ShareSessionSource(baseUrl, shareToken, opts);
+  const source = new GrantSessionSource(baseUrl, grant, opts);
   return () => source.token();
 }

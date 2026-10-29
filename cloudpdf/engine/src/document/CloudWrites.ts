@@ -41,7 +41,7 @@ export type ChangeSender = (
 ) => Promise<readonly ChangeAnswer[]>;
 
 /**
- * What a document's writes wait for before they go out: a share visitor's
+ * What a document's writes wait for before they go out: a grant's visitor's
  * answers to what the link asks before their first change.
  */
 export interface WriteGate {
@@ -95,7 +95,7 @@ interface Batch {
  * request when their turn comes, each answered on its own.
  *
  * On its turn a write passes the document's gate first, when it has one (a
- * share visitor's answers): the line waits there.
+ * grant visitor's answers): the line waits there.
  */
 export class CloudWrites {
   /** Settles when every write so far has settled. */
