@@ -1,5 +1,13 @@
 # @embedpdf/engine-services
 
+## 3.0.0-next.18
+
+### Minor Changes
+
+- [#911](https://github.com/embedpdf/embed-pdf-viewer/pull/911) by [@bobsingor](https://github.com/bobsingor) – `pages.insert` and `pages.extract` bring the form fields of the copied pages' widgets, written into the document's `/AcroForm`, so the fields stay fillable after a save and in other PDF apps. An extract brings only the widgets on the extracted pages. An inserted top-level field whose name the document already uses comes in as `name_2` (or the next free number), with its fields under it, so two copies of a filled-in form keep their own values.
+
+- [#913](https://github.com/embedpdf/embed-pdf-viewer/pull/913) by [@bobsingor](https://github.com/bobsingor) – `metadata.update` keeps a document's XMP packet in step with its `/Info` fields: a field it sets is written to its XMP property (`dc:title`, `dc:creator`, `dc:description`, `pdf:Keywords`, `xmp:CreatorTool`, `pdf:Producer`, `xmp:CreateDate`, `xmp:ModifyDate`, `pdf:Trapped`), added when the packet doesn't have it, and a field it sets to `null` is removed from the packet too. A packet's `dc:subject` keyword list follows the keywords. `metadata.custom.update` changes or removes the `pdfx:` property Adobe apps copy a custom key to, and never adds one. Everything else in the packet stays as written; a document without XMP gets none, and XMP that isn't well-formed is left as it is.
+
 ## 3.0.0-next.17
 
 ## 3.0.0-next.16

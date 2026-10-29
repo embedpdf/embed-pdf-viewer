@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/plugin-history",
-  "version": "3.0.0-next.17",
+  "version": "3.0.0-next.18",
   "private": false,
   "description": "Undo and redo per open document, built on the document's change queue: every change the viewer's plugins stage is a step, undone by reference while still pending.",
   "type": "module",

@@ -1,5 +1,25 @@
 # @embedpdf/engine-core
 
+## 3.0.0-next.18
+
+### Minor Changes
+
+- [#911](https://github.com/embedpdf/embed-pdf-viewer/pull/911) by [@bobsingor](https://github.com/bobsingor) – New `runPageFormFieldsConformance` suite checks that `pages.insert` and `pages.extract` bring form fields, keep same-named fields apart, and survive a save in either mode.
+
+- [#907](https://github.com/embedpdf/embed-pdf-viewer/pull/907) by [@bobsingor](https://github.com/bobsingor) – `DocumentShare` gets `openRequest`, `onOpenRequest()` and `resume()`: a passphrase, or questions asked on open, that a share link gets while a document is open are asked of the visitor, and `resume({ sharePassword })` or `resume({ visitor })` lets the document go on as the same visitor. `ShareOpenRequest` and `shareOpenRequestOf()` move here from `@embedpdf/core`, which re-exports the type.
+
+### Patch Changes
+
+- [#910](https://github.com/embedpdf/embed-pdf-viewer/pull/910) by [@bobsingor](https://github.com/bobsingor) – The version wire paths and resources are the layer's: `wirePaths.layerVersions`, `layerVersionSignatures`, `layerVersionSignatureContents`, `layerVersionSignatureDigest`, `layerVersionAnalysis`, `layerVersionDownload` and `layerVersionRevision` take the layer name. The resources are now `layer-versions` and `layer-version-*`, so a layer's CDN grant covers only its own versions.
+
+  The catalog schema is `LayerVersionsSchema` (`{ baseSha, versions }`, was `DocumentVersionsSchema` with `head`).
+
+- [#909](https://github.com/embedpdf/embed-pdf-viewer/pull/909) by [@bobsingor](https://github.com/bobsingor) – `identity` is the one word for who the user is, on both engines. `OpenOptions.identity` is who your page knows the user is: the local engine's session identity, as before; on the cloud engine a document token decides, and a share link takes it as the visitor's answers to what the link asks. The share input's `visitor` is gone (pass `identity` in the options instead), and `DocumentShare.resume()` takes `{ sharePassword, identity }`. `doc.security.identity` says who a session acts for.
+
+  The runtime entry exports `devWarn`, `isDev` and `resetDevWarnings` for engines: development-only warnings, once per key.
+
+- [#910](https://github.com/embedpdf/embed-pdf-viewer/pull/910) by [@bobsingor](https://github.com/bobsingor) – `EngineErrorCode.StaleBase` is gone. A signature no longer moves the document, so no layer is ever behind it and every layer can sign over its own base.
+
 ## 3.0.0-next.17
 
 ### Minor Changes

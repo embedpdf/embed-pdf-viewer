@@ -1,5 +1,7 @@
 # @embedpdf/plugin-signature
 
+## 3.0.0-next.18
+
 ## 3.0.0-next.17
 
 ### Minor Changes
