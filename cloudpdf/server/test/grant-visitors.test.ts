@@ -1,16 +1,16 @@
 /**
- * Whose layer a share link's visitors write into. A link is `shared` (one
+ * Whose layer a grant's visitors write into. A grant is `shared` (one
  * layer everyone reads and writes) or `per-visitor` (a layer of each
  * visitor's own, `visitor-<id>`, made at their first write and stamped with
- * the link and visitor). Every exchange names a visitor, whose handle brings
- * them back: renewals keep the visitor, and on a per-visitor link their
+ * the grant and visitor). Every exchange names a visitor, whose handle brings
+ * them back: renewals keep the visitor, and on a per-visitor grant their
  * layer; each restarts the visitor's idle clock. Starting over gives a new
  * visitor (and deletes the old one's layer); a deleted layer, or a handle the
- * link didn't issue, gets a new visitor. Visitors stay until deleted on
- * purpose, unless their link sets an idle time (throwaway layers, like
+ * grant didn't issue, gets a new visitor. Visitors stay until deleted on
+ * purpose, unless their grant sets an idle time (throwaway layers, like
  * examples): then the sweep deletes the ones unseen for longer, with their
- * layers. A visit is one view however often it renews. Ending a link
- * archives it, for good and keeping what its visitors made; a link is
+ * layers. A visit is one view however often it renews. Ending a grant
+ * archives it, for good and keeping what its visitors made; a grant is
  * deleted only once it has no visitors.
  */
 import { createHash, randomBytes } from 'node:crypto';
@@ -31,12 +31,12 @@ import {
 import { buildAppForTesting } from '../src/app/buildApp';
 import { VisitorHandles } from '../src/auth/visitor-handle';
 import { createValidTestLicenseGate } from '../src/licensing/testing';
-import { sweepIdleVisitors } from '../src/services/shareVisitors';
+import { sweepIdleVisitors } from '../src/services/grantVisitors';
 import { highlightDraft } from './_helpers/two-replica-harness';
 
 const STUB_ENTRY = new URL('./_helpers/stub-worker-entry.cjs', import.meta.url);
-const SECRET = 'share-visitors-secret';
-const API_TOKEN = 'share-visitors-root-token';
+const SECRET = 'grant-visitors-secret';
+const API_TOKEN = 'grant-visitors-root-token';
 const TENANT = 'tenant-visitors';
 const DOC = 'doc-visitors';
 const ORIGIN = 'https://acme.example';
@@ -49,7 +49,7 @@ let bundle: AppBundle;
 let baseUrl: string;
 
 beforeAll(async () => {
-  dir = await mkdtemp(join(tmpdir(), 'share-visitors-'));
+  dir = await mkdtemp(join(tmpdir(), 'grant-visitors-'));
   const storageRoot = join(dir, 'objects');
   db = createSqliteDb({ path: ':memory:' });
   await migrate(db, { source: { kind: 'inline', migrations: sqliteMigrations } });
@@ -125,24 +125,24 @@ async function call(
   return { status: res.status, body: await res.json().catch(() => null) };
 }
 
-const createLink = (body: Record<string, unknown>) =>
-  call('POST', `/v1/tenants/${TENANT}/shares`, {
+const createGrant = (body: Record<string, unknown>) =>
+  call('POST', `/v1/tenants/${TENANT}/grants`, {
     token: API_TOKEN,
     body: { docId: DOC, scope: ['*'], ...body },
   });
 
-const updateLink = (id: string, body: Record<string, unknown>) =>
-  call('PATCH', `/v1/tenants/${TENANT}/shares/${id}`, { token: API_TOKEN, body });
+const updateGrant = (id: string, body: Record<string, unknown>) =>
+  call('PATCH', `/v1/tenants/${TENANT}/grants/${id}`, { token: API_TOKEN, body });
 
-const archiveLink = (id: string) =>
-  call('POST', `/v1/tenants/${TENANT}/shares/${id}/archive`, { token: API_TOKEN });
+const archiveGrant = (id: string) =>
+  call('POST', `/v1/tenants/${TENANT}/grants/${id}/archive`, { token: API_TOKEN });
 
 const exchange = (body: Record<string, unknown>) =>
-  call('POST', '/v1/share-sessions', { body, origin: ORIGIN });
+  call('POST', '/v1/grant-sessions', { body, origin: ORIGIN });
 
-/** A link's session, as its visitor: `token`, `layerName`, `visitor`. */
-async function visit(shareToken: string, extra: Record<string, unknown> = {}) {
-  const answer = await exchange({ shareToken, ...extra });
+/** A grant's session, as its visitor: `token`, `layerName`, `visitor`. */
+async function visit(grant: string, extra: Record<string, unknown> = {}) {
+  const answer = await exchange({ grant, ...extra });
   expect(answer.status).toBe(200);
   return answer.body as {
     token: string;
@@ -189,7 +189,7 @@ const visitorIdOf = (session: { token: string }) =>
 
 const visitorRow = (session: { token: string }) =>
   db
-    .selectFrom('share_visitors')
+    .selectFrom('grant_visitors')
     .selectAll()
     .where('visitor_id', '=', visitorIdOf(session))
     .executeTakeFirst();
@@ -197,35 +197,35 @@ const visitorRow = (session: { token: string }) =>
 /** Set when the session's visitor was last seen. */
 const lastSeen = (session: { token: string }, at: number) =>
   db
-    .updateTable('share_visitors')
+    .updateTable('grant_visitors')
     .set({ last_seen_at: at })
     .where('visitor_id', '=', visitorIdOf(session))
     .execute();
 
-describe("a link's layer policy", () => {
-  test('a per-visitor link names no layer and carries its settings; a shared link keeps its layer', async () => {
-    const shared = await createLink({});
+describe("a grant's layer policy", () => {
+  test('a per-visitor grant names no layer and carries its settings; a shared grant keeps its layer', async () => {
+    const shared = await createGrant({});
     expect(shared.status).toBe(200);
-    expect(shared.body.share).toMatchObject({
+    expect(shared.body.grant).toMatchObject({
       layerMode: 'shared',
       layerName: 'default',
       keepVisitorLayers: true,
       visitorIdleSeconds: null,
     });
-    // Visitors' layers stay unless the link asks for them to go.
-    const kept = await createLink({ layerMode: 'per-visitor' });
-    expect(kept.body.share).toMatchObject({
+    // Visitors' layers stay unless the grant asks for them to go.
+    const kept = await createGrant({ layerMode: 'per-visitor' });
+    expect(kept.body.grant).toMatchObject({
       layerMode: 'per-visitor',
       visitorIdleSeconds: null,
     });
 
-    const perVisitor = await createLink({
+    const perVisitor = await createGrant({
       layerMode: 'per-visitor',
       keepVisitorLayers: false,
       visitorIdleSeconds: 3600,
     });
     expect(perVisitor.status).toBe(200);
-    expect(perVisitor.body.share).toMatchObject({
+    expect(perVisitor.body.grant).toMatchObject({
       layerMode: 'per-visitor',
       layerName: null,
       keepVisitorLayers: false,
@@ -233,14 +233,14 @@ describe("a link's layer policy", () => {
     });
   });
 
-  test('refuses a layer on a per-visitor link, a visitor-… name, and an idle time out of range', async () => {
-    const named = await createLink({ layerMode: 'per-visitor', layerName: 'review' });
+  test('refuses a layer on a per-visitor grant, a visitor-… name, and an idle time out of range', async () => {
+    const named = await createGrant({ layerMode: 'per-visitor', layerName: 'review' });
     expect(named.status).toBe(400);
-    expect(named.body.error.message).toMatch(/per-visitor link names no layer/);
-    const reserved = await createLink({ layerName: 'visitor-0123' });
+    expect(named.body.error.message).toMatch(/per-visitor grant names no layer/);
+    const reserved = await createGrant({ layerName: 'visitor-0123' });
     expect(reserved.status).toBe(400);
     expect(reserved.body.error.message).toMatch(/visitor-/);
-    expect((await createLink({ layerMode: 'per-visitor', visitorIdleSeconds: 60 })).status).toBe(
+    expect((await createGrant({ layerMode: 'per-visitor', visitorIdleSeconds: 60 })).status).toBe(
       400,
     );
     const issued = await call('POST', `/v1/tenants/${TENANT}/tokens`, {
@@ -259,79 +259,79 @@ describe("a link's layer policy", () => {
   });
 
   test('switches between shared and per-visitor and keeps its token', async () => {
-    const link = (await createLink({ layerName: 'review' })).body.share;
-    const toVisitors = await updateLink(link.id, { layerMode: 'per-visitor' });
+    const grant = (await createGrant({ layerName: 'review' })).body.grant;
+    const toVisitors = await updateGrant(grant.id, { layerMode: 'per-visitor' });
     expect(toVisitors.status).toBe(200);
-    expect(toVisitors.body.share).toMatchObject({
-      id: link.id,
+    expect(toVisitors.body.grant).toMatchObject({
+      id: grant.id,
       layerMode: 'per-visitor',
       layerName: null,
     });
-    expect((await updateLink(link.id, { layerName: 'review' })).status).toBe(400);
+    expect((await updateGrant(grant.id, { layerName: 'review' })).status).toBe(400);
 
-    const back = await updateLink(link.id, { layerMode: 'shared', layerName: 'review-2' });
-    expect(back.body.share).toMatchObject({ layerMode: 'shared', layerName: 'review-2' });
-    const settings = await updateLink(link.id, {
+    const back = await updateGrant(grant.id, { layerMode: 'shared', layerName: 'review-2' });
+    expect(back.body.grant).toMatchObject({ layerMode: 'shared', layerName: 'review-2' });
+    const settings = await updateGrant(grant.id, {
       keepVisitorLayers: false,
       visitorIdleSeconds: 7200,
     });
-    expect(settings.body.share).toMatchObject({
+    expect(settings.body.grant).toMatchObject({
       keepVisitorLayers: false,
       visitorIdleSeconds: 7200,
     });
-    const keepAgain = await updateLink(link.id, { visitorIdleSeconds: null });
-    expect(keepAgain.body.share.visitorIdleSeconds).toBeNull();
+    const keepAgain = await updateGrant(grant.id, { visitorIdleSeconds: null });
+    expect(keepAgain.body.grant.visitorIdleSeconds).toBeNull();
   });
 });
 
 describe('the exchange names a visitor', () => {
   test('the token makes them the author, and a renewal with their handle keeps them', async () => {
-    const link = (await createLink({ layerName: 'together' })).body.share;
-    const first = await visit(link.id);
+    const grant = (await createGrant({ layerName: 'together' })).body.grant;
+    const first = await visit(grant.id);
     expect(first).toMatchObject({ layerName: 'together', layerMode: 'shared' });
     expect(first.visitor.handle).toMatch(/^vis_[0-9a-f]{24}\.[0-9a-z]+\.[A-Za-z0-9_-]{22}$/);
     expect(first.visitor.keep).toBe(true);
     const claims = claimsOf(first.token);
-    expect(claims).toMatchObject({ sub: `share:${link.id}`, layer_name: 'together' });
+    expect(claims).toMatchObject({ sub: `grant:${grant.id}`, layer_name: 'together' });
     expect(claims.identity?.userId).toMatch(/^visitor_[0-9a-f]{24}$/);
 
-    const renewed = await visit(link.id, { visitorHandle: first.visitor.handle });
+    const renewed = await visit(grant.id, { visitorHandle: first.visitor.handle });
     expect(claimsOf(renewed.token).identity).toEqual(claims.identity);
-    // Starting over is someone new, on any link.
-    const restarted = await visit(link.id, { visitorHandle: first.visitor.handle, restart: true });
+    // Starting over is someone new, on any grant.
+    const restarted = await visit(grant.id, { visitorHandle: first.visitor.handle, restart: true });
     expect(claimsOf(restarted.token).identity?.userId).not.toBe(claims.identity?.userId);
     expect(restarted.visitor.handle).not.toBe(first.visitor.handle);
   });
 
-  test('the browser keeps the visitor on every link but one that gives a new copy every visit', async () => {
+  test('the browser keeps the visitor on every grant but one that gives a new copy every visit', async () => {
     const keeps = async (settings: Record<string, unknown>) =>
-      (await visit((await createLink(settings)).body.share.id)).visitor.keep;
+      (await visit((await createGrant(settings)).body.grant.id)).visitor.keep;
     expect(await keeps({})).toBe(true);
-    // The setting is about visitors' own copies: a shared link keeps its visitors either way.
+    // The setting is about visitors' own copies: a shared grant keeps its visitors either way.
     expect(await keeps({ keepVisitorLayers: false })).toBe(true);
     expect(await keeps({ layerMode: 'per-visitor' })).toBe(true);
     expect(await keeps({ layerMode: 'per-visitor', keepVisitorLayers: false })).toBe(false);
   });
 
-  test('a handle another link issued, a forged one, or garbage is a new visitor', async () => {
-    const link = (await createLink({})).body.share;
-    const other = (await createLink({})).body.share;
+  test('a handle another grant issued, a forged one, or garbage is a new visitor', async () => {
+    const grant = (await createGrant({})).body.grant;
+    const other = (await createGrant({})).body.grant;
     const theirs = await visit(other.id);
     const [, issued, mac] = theirs.visitor.handle.split('.');
     const forged = `vis_${'0'.repeat(24)}.${issued}.${mac}`;
     for (const visitorHandle of [theirs.visitor.handle, forged, 'not-a-handle']) {
-      const answer = await visit(link.id, { visitorHandle });
+      const answer = await visit(grant.id, { visitorHandle });
       expect(answer.visitor.handle).not.toBe(visitorHandle);
       expect(claimsOf(answer.token).identity).not.toEqual(claimsOf(theirs.token).identity);
     }
   });
 });
 
-describe('a per-visitor link', () => {
+describe('a per-visitor grant', () => {
   test('gives each visitor a layer of their own, made and stamped at their first write', async () => {
-    const link = (await createLink({ layerMode: 'per-visitor' })).body.share;
-    const alice = await visit(link.id);
-    const bob = await visit(link.id);
+    const grant = (await createGrant({ layerMode: 'per-visitor' })).body.grant;
+    const alice = await visit(grant.id);
+    const bob = await visit(grant.id);
     expect(alice.layerMode).toBe('per-visitor');
     expect(alice.visitor.keep).toBe(true);
     expect(alice.layerName).toMatch(/^visitor-[0-9a-f]{24}$/);
@@ -343,12 +343,12 @@ describe('a per-visitor link', () => {
     expect((await annotate(alice, 'from alice')).status).toBe(200);
     const visitorId = alice.layerName.slice('visitor-'.length);
     expect(await layerRow(alice.layerName)).toMatchObject({
-      grant_id: link.id,
+      grant_id: grant.id,
       visitor_id: visitorId,
     });
-    // Their first write makes them a visitor the link keeps (asked nothing).
+    // Their first write makes them a visitor the grant keeps (asked nothing).
     expect(await visitorRow(alice)).toMatchObject({
-      grant_id: link.id,
+      grant_id: grant.id,
       visitor_id: visitorId,
       doc_id: DOC,
       consented_at: null,
@@ -362,25 +362,25 @@ describe('a per-visitor link', () => {
   });
 
   test("a renewal keeps the visitor's layer and restarts their idle clock", async () => {
-    const link = (await createLink({ layerMode: 'per-visitor', keepVisitorLayers: false })).body
-      .share;
-    const first = await visit(link.id);
+    const grant = (await createGrant({ layerMode: 'per-visitor', keepVisitorLayers: false })).body
+      .grant;
+    const first = await visit(grant.id);
     expect(first.visitor.keep).toBe(false);
     expect((await annotate(first, 'kept')).status).toBe(200);
     await lastSeen(first, 1);
 
-    const renewed = await visit(link.id, { visitorHandle: first.visitor.handle });
+    const renewed = await visit(grant.id, { visitorHandle: first.visitor.handle });
     expect(renewed.layerName).toBe(first.layerName);
     expect((await visitorRow(first))?.last_seen_at).toBeGreaterThan(Date.now() - 60_000);
     expect(await listed(renewed)).toEqual(['kept']);
   });
 
   test('starting over deletes the layer and gives a new visitor', async () => {
-    const link = (await createLink({ layerMode: 'per-visitor' })).body.share;
-    const first = await visit(link.id);
+    const grant = (await createGrant({ layerMode: 'per-visitor' })).body.grant;
+    const first = await visit(grant.id);
     expect((await annotate(first, 'half-filled')).status).toBe(200);
 
-    const fresh = await visit(link.id, { visitorHandle: first.visitor.handle, restart: true });
+    const fresh = await visit(grant.id, { visitorHandle: first.visitor.handle, restart: true });
     expect(fresh.layerName).not.toBe(first.layerName);
     expect(await listed(fresh)).toEqual([]);
     expect((await layerRow(first.layerName))?.deleted_at).not.toBeNull();
@@ -391,8 +391,8 @@ describe('a per-visitor link', () => {
   });
 
   test('a visitor whose layer was deleted comes back as a new visitor', async () => {
-    const link = (await createLink({ layerMode: 'per-visitor' })).body.share;
-    const first = await visit(link.id);
+    const grant = (await createGrant({ layerMode: 'per-visitor' })).body.grant;
+    const first = await visit(grant.id);
     expect((await annotate(first, 'gone')).status).toBe(200);
     const deleted = await call(
       'DELETE',
@@ -401,15 +401,15 @@ describe('a per-visitor link', () => {
     );
     expect(deleted.status).toBe(204);
 
-    const back = await visit(link.id, { visitorHandle: first.visitor.handle });
+    const back = await visit(grant.id, { visitorHandle: first.visitor.handle });
     expect(back.layerName).not.toBe(first.layerName);
     expect((await annotate(back, 'again')).status).toBe(200);
   });
 
   test("a visitor who never wrote keeps their (unmade) layer's name", async () => {
-    const link = (await createLink({ layerMode: 'per-visitor' })).body.share;
-    const first = await visit(link.id);
-    const renewed = await visit(link.id, { visitorHandle: first.visitor.handle });
+    const grant = (await createGrant({ layerMode: 'per-visitor' })).body.grant;
+    const first = await visit(grant.id);
+    const renewed = await visit(grant.id, { visitorHandle: first.visitor.handle });
     expect(renewed.layerName).toBe(first.layerName);
     expect(await layerRow(first.layerName)).toBeUndefined();
   });
@@ -422,11 +422,11 @@ describe('the idle sweep', () => {
       now,
     );
 
-  test("deletes visitors unseen past their link's idle time, with their layers, and only those", async () => {
-    const hourly = (await createLink({ layerMode: 'per-visitor', visitorIdleSeconds: 3600 })).body
-      .share;
-    const keeping = (await createLink({ layerMode: 'per-visitor' })).body.share;
-    const shared = (await createLink({ layerName: 'swept-never' })).body.share;
+  test("deletes visitors unseen past their grant's idle time, with their layers, and only those", async () => {
+    const hourly = (await createGrant({ layerMode: 'per-visitor', visitorIdleSeconds: 3600 })).body
+      .grant;
+    const keeping = (await createGrant({ layerMode: 'per-visitor' })).body.grant;
+    const shared = (await createGrant({ layerName: 'swept-never' })).body.grant;
     const gone = await visit(hourly.id);
     const recent = await visit(hourly.id);
     const filledIn = await visit(keeping.id);
@@ -437,7 +437,7 @@ describe('the idle sweep', () => {
     const now = Date.now();
     await lastSeen(gone, now - 2 * HOUR_MS);
     await lastSeen(recent, now - HOUR_MS / 2);
-    // A link that sets no idle time keeps what its visitors filled in, however long ago.
+    // A grant that sets no idle time keeps what its visitors filled in, however long ago.
     await lastSeen(filledIn, now - YEAR_MS);
 
     expect(await sweep(now)).toBe(1);
@@ -453,16 +453,16 @@ describe('the idle sweep', () => {
     expect(await sweep(now)).toBe(0);
   });
 
-  test("an archived link's visitors' layers keep to the link's own setting", async () => {
-    const keeping = (await createLink({ layerMode: 'per-visitor' })).body.share;
-    const hourly = (await createLink({ layerMode: 'per-visitor', visitorIdleSeconds: 3600 })).body
-      .share;
+  test("an archived grant's visitors' layers keep to the grant's own setting", async () => {
+    const keeping = (await createGrant({ layerMode: 'per-visitor' })).body.grant;
+    const hourly = (await createGrant({ layerMode: 'per-visitor', visitorIdleSeconds: 3600 })).body
+      .grant;
     const filledIn = await visit(keeping.id);
     const throwaway = await visit(hourly.id);
     expect((await annotate(filledIn, 'filled in')).status).toBe(200);
     expect((await annotate(throwaway, 'example')).status).toBe(200);
-    for (const link of [keeping, hourly]) {
-      expect((await archiveLink(link.id)).status).toBe(200);
+    for (const grant of [keeping, hourly]) {
+      expect((await archiveGrant(grant.id)).status).toBe(200);
     }
     const now = Date.now();
     await lastSeen(filledIn, now - YEAR_MS);
@@ -474,48 +474,48 @@ describe('the idle sweep', () => {
   });
 });
 
-describe('ending a link', () => {
-  const listLinks = (query = '') =>
-    call('GET', `/v1/tenants/${TENANT}/shares?docId=${DOC}${query}`, { token: API_TOKEN });
-  const deleteLink = (id: string) =>
-    call('DELETE', `/v1/tenants/${TENANT}/shares/${id}`, { token: API_TOKEN });
-  const ids = (answer: Answer) => answer.body.shares.map((share: { id: string }) => share.id);
+describe('ending a grant', () => {
+  const listGrants = (query = '') =>
+    call('GET', `/v1/tenants/${TENANT}/grants?docId=${DOC}${query}`, { token: API_TOKEN });
+  const deleteGrant = (id: string) =>
+    call('DELETE', `/v1/tenants/${TENANT}/grants/${id}`, { token: API_TOKEN });
+  const ids = (answer: Answer) => answer.body.grants.map((grant: { id: string }) => grant.id);
 
   test('archiving stops it for good and keeps it, listed apart', async () => {
-    const link = (await createLink({ layerMode: 'per-visitor' })).body.share;
-    const visitor = await visit(link.id);
+    const grant = (await createGrant({ layerMode: 'per-visitor' })).body.grant;
+    const visitor = await visit(grant.id);
     expect((await annotate(visitor, 'kept')).status).toBe(200);
 
-    const archived = await archiveLink(link.id);
+    const archived = await archiveGrant(grant.id);
     expect(archived.status).toBe(200);
-    expect(archived.body.share.archivedAt).toEqual(expect.any(Number));
+    expect(archived.body.grant.archivedAt).toEqual(expect.any(Number));
     // Final: no exchange, with or without a handle, and no more changes.
-    expect((await exchange({ shareToken: link.id })).status).toBe(404);
+    expect((await exchange({ grant: grant.id })).status).toBe(404);
     expect(
-      (await exchange({ shareToken: link.id, visitorHandle: visitor.visitor.handle })).status,
+      (await exchange({ grant: grant.id, visitorHandle: visitor.visitor.handle })).status,
     ).toBe(404);
-    const changed = await updateLink(link.id, { disabled: false });
+    const changed = await updateGrant(grant.id, { disabled: false });
     expect(changed.status).toBe(409);
     expect(changed.body.error.message).toMatch(/archived/);
     // Archiving again changes nothing.
-    const again = await archiveLink(link.id);
-    expect(again.body.share.archivedAt).toBe(archived.body.share.archivedAt);
+    const again = await archiveGrant(grant.id);
+    expect(again.body.grant.archivedAt).toBe(archived.body.grant.archivedAt);
 
-    expect(ids(await listLinks())).not.toContain(link.id);
-    expect(ids(await listLinks('&archived=false'))).not.toContain(link.id);
-    expect(ids(await listLinks('&archived=true'))).toContain(link.id);
-    expect((await listLinks('&archived=yes')).status).toBe(400);
+    expect(ids(await listGrants())).not.toContain(grant.id);
+    expect(ids(await listGrants('&archived=false'))).not.toContain(grant.id);
+    expect(ids(await listGrants('&archived=true'))).toContain(grant.id);
+    expect((await listGrants('&archived=yes')).status).toBe(400);
     // What its visitor made is still there.
     expect((await layerRow(visitor.layerName))?.deleted_at).toBeNull();
   });
 
   test("deleting is refused while it has visitors, and works once they're deleted", async () => {
-    const link = (await createLink({ layerMode: 'per-visitor' })).body.share;
-    const [alice, bob] = [await visit(link.id), await visit(link.id)];
+    const grant = (await createGrant({ layerMode: 'per-visitor' })).body.grant;
+    const [alice, bob] = [await visit(grant.id), await visit(grant.id)];
     expect((await annotate(alice, 'alice')).status).toBe(200);
     expect((await annotate(bob, 'bob')).status).toBe(200);
 
-    const refused = await deleteLink(link.id);
+    const refused = await deleteGrant(grant.id);
     expect(refused.status).toBe(409);
     expect(refused.body.error).toMatchObject({
       code: 'Conflict',
@@ -530,7 +530,7 @@ describe('ending a link', () => {
       { token: API_TOKEN },
     );
     expect(removed.status).toBe(204);
-    expect((await deleteLink(link.id)).body.error.details).toEqual({
+    expect((await deleteGrant(grant.id)).body.error.details).toEqual({
       visitors: 2,
       visitorLayers: 1,
     });
@@ -538,30 +538,30 @@ describe('ending a link', () => {
     for (const session of [alice, bob]) {
       const gone = await call(
         'DELETE',
-        `/v1/tenants/${TENANT}/shares/${link.id}/visitors/${visitorIdOf(session)}`,
+        `/v1/tenants/${TENANT}/grants/${grant.id}/visitors/${visitorIdOf(session)}`,
         { token: API_TOKEN },
       );
       expect(gone.status).toBe(204);
     }
     expect((await layerRow(bob.layerName))?.deleted_at).not.toBeNull();
-    expect((await deleteLink(link.id)).status).toBe(204);
+    expect((await deleteGrant(grant.id)).status).toBe(204);
   });
 
-  test('a link whose visitors only looked can be deleted', async () => {
-    const link = (await createLink({ layerMode: 'per-visitor' })).body.share;
-    await visit(link.id);
-    expect((await deleteLink(link.id)).status).toBe(204);
+  test('a grant whose visitors only looked can be deleted', async () => {
+    const grant = (await createGrant({ layerMode: 'per-visitor' })).body.grant;
+    await visit(grant.id);
+    expect((await deleteGrant(grant.id)).status).toBe(204);
   });
 
-  test('an archived shared link no longer keeps its layer from being deleted', async () => {
-    const link = (await createLink({ layerName: 'ended-review' })).body.share;
-    expect((await annotate(await visit(link.id), 'comment')).status).toBe(200);
+  test('an archived shared grant no longer keeps its layer from being deleted', async () => {
+    const grant = (await createGrant({ layerName: 'ended-review' })).body.grant;
+    expect((await annotate(await visit(grant.id), 'comment')).status).toBe(200);
     const deleteLayer = () =>
       call('DELETE', `/v1/tenants/${TENANT}/documents/${DOC}/layers/ended-review`, {
         token: API_TOKEN,
       });
     expect((await deleteLayer()).status).toBe(409);
-    expect((await archiveLink(link.id)).status).toBe(200);
+    expect((await archiveGrant(grant.id)).status).toBe(200);
     expect((await deleteLayer()).status).toBe(204);
   });
 });
@@ -574,35 +574,35 @@ describe('views', () => {
   };
 
   test('a visit is one view however often it renews; a new or returning visit is another', async () => {
-    const link = (await createLink({ layerMode: 'per-visitor' })).body.share;
-    const other = (await createLink({})).body.share;
+    const grant = (await createGrant({ layerMode: 'per-visitor' })).body.grant;
+    const other = (await createGrant({})).body.grant;
     const start = await views();
 
-    const first = await visit(link.id);
+    const first = await visit(grant.id);
     expect(await views()).toBe(start + 1);
-    const renewed = await visit(link.id, { visitorHandle: first.visitor.handle });
-    const again = await visit(link.id, { visitorHandle: renewed.visitor.handle });
+    const renewed = await visit(grant.id, { visitorHandle: first.visitor.handle });
+    const again = await visit(grant.id, { visitorHandle: renewed.visitor.handle });
     expect(again.layerName).toBe(first.layerName);
     expect(await views()).toBe(start + 1);
 
-    // Someone else, the other link's visitor, that visitor's handle here
-    // (another link issued it), and the first visitor coming back after
+    // Someone else, the other grant's visitor, that visitor's handle here
+    // (another grant issued it), and the first visitor coming back after
     // their session lapsed: four more visits.
-    await visit(link.id);
-    await visit(link.id, { visitorHandle: (await visit(other.id)).visitor.handle });
+    await visit(grant.id);
+    await visit(grant.id, { visitorHandle: (await visit(other.id)).visitor.handle });
     const lapsed = new VisitorHandles(SECRET).issue(
-      link.id,
+      grant.id,
       first.layerName.slice('visitor-'.length),
       Date.now() - HOUR_MS,
     );
-    const returning = await visit(link.id, { visitorHandle: lapsed });
+    const returning = await visit(grant.id, { visitorHandle: lapsed });
     expect(returning.layerName).toBe(first.layerName);
     expect(await views()).toBe(start + 5);
   });
 });
 
 describe('migration 039', () => {
-  test("links on the old 7-day default keep their visitors' layers; a chosen idle time stays", async () => {
+  test("grants on the old 7-day default keep their visitors' layers; a chosen idle time stays", async () => {
     const fresh = createSqliteDb({ path: ':memory:' });
     try {
       const upTo038 = sqliteMigrations.filter((m) => m.version < '039');
@@ -625,7 +625,7 @@ describe('migration 039', () => {
           created_by: null,
         })
         .execute();
-      const link = (id: string, idle: number) => ({
+      const grant = (id: string, idle: number) => ({
         id,
         tenant_id: TENANT,
         doc_id: DOC,
@@ -647,7 +647,7 @@ describe('migration 039', () => {
       });
       await fresh
         .insertInto('share_grants')
-        .values([link('shr_defaulted', 604800), link('shr_hourly', 3600)])
+        .values([grant('shr_defaulted', 604800), grant('shr_hourly', 3600)])
         .execute();
 
       const upTo039 = sqliteMigrations.filter((m) => m.version <= '039');
@@ -668,7 +668,7 @@ describe('migration 039', () => {
 });
 
 describe('migration 042', () => {
-  test("visitors' layers become visitors, with their idle clock; the link's idle time stays", async () => {
+  test("visitors' layers become visitors, with their idle clock; the grant's idle time stays", async () => {
     const fresh = createSqliteDb({ path: ':memory:' });
     try {
       const upTo041 = sqliteMigrations.filter((m) => m.version < '042');
@@ -743,7 +743,7 @@ describe('migration 042', () => {
 
       await migrate(fresh, { source: { kind: 'inline', migrations: sqliteMigrations } });
       const visitors = await fresh
-        .selectFrom('share_visitors')
+        .selectFrom('grant_visitors')
         .select(['visitor_id', 'first_seen_at', 'last_seen_at', 'consented_at'])
         .orderBy('visitor_id')
         .execute();
@@ -752,11 +752,11 @@ describe('migration 042', () => {
         { visitor_id: 'aaa', first_seen_at: 100, last_seen_at: 500, consented_at: null },
         { visitor_id: 'bbb', first_seen_at: 100, last_seen_at: 100, consented_at: null },
       ]);
-      const grant = await fresh
-        .selectFrom('share_grants')
+      const row = await fresh
+        .selectFrom('grants')
         .select(['visitor_idle_seconds', 'visitor_identity_json'])
         .executeTakeFirstOrThrow();
-      expect(grant).toEqual({ visitor_idle_seconds: 3600, visitor_identity_json: null });
+      expect(row).toEqual({ visitor_idle_seconds: 3600, visitor_identity_json: null });
     } finally {
       await fresh.destroy();
     }

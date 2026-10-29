@@ -40,12 +40,12 @@ import { DocumentImportsRepo } from '../db/repos/document_imports.repo';
 import { DocumentSigningsRepo } from '../db/repos/document_signings.repo';
 import { DocumentsRepo } from '../db/repos/documents.repo';
 import { FoldersRepo } from '../db/repos/folders.repo';
+import { GrantVisitorsRepo } from '../db/repos/grant_visitors.repo';
+import { GrantsRepo } from '../db/repos/grants.repo';
 import { DocumentPagesRepo, LayerPagesRepo, LayersRepo } from '../db/repos/page_state.repo';
 import { PdfPasswordSessionsRepo } from '../db/repos/pdf_password_sessions.repo';
 import { PdfPasswordVerificationsRepo } from '../db/repos/pdf_password_verifications.repo';
 import { SecurityEventsRepo } from '../db/repos/security-events.repo';
-import { ShareGrantsRepo } from '../db/repos/share_grants.repo';
-import { ShareVisitorsRepo } from '../db/repos/share_visitors.repo';
 import { TenantUsageRepo } from '../db/repos/tenant_usage.repo';
 import { TenantsRepo } from '../db/repos/tenants.repo';
 import type { Database as Schema } from '../db/schema';
@@ -63,8 +63,8 @@ import { IMMUTABLE_CACHE_PRIVATE, IMMUTABLE_CACHE_SHARED } from '../routes/_help
 import { registerAccessRoutes } from '../routes/access';
 import { registerAdminDocumentsRoutes } from '../routes/admin/documents';
 import { registerAdminFoldersRoutes } from '../routes/admin/folders';
+import { registerAdminGrantsRoutes } from '../routes/admin/grants';
 import { registerAdminLayersRoutes } from '../routes/admin/layers';
-import { registerAdminSharesRoutes } from '../routes/admin/shares';
 import { registerAdminTenantsRoutes } from '../routes/admin/tenants';
 import { registerAdminTokensRoutes } from '../routes/admin/tokens';
 import { registerAnnotationRoutes } from '../routes/annotations';
@@ -73,13 +73,13 @@ import { registerChangeRoutes } from '../routes/changes';
 import { registerDocsRoutes } from '../routes/docs';
 import { registerEventsRoutes } from '../routes/events';
 import { registerFormRoutes } from '../routes/forms';
+import { registerGrantSessionRoutes } from '../routes/grant-sessions';
 import { registerMetadataRoutes } from '../routes/metadata';
 import { registerObjectNumberRoutes } from '../routes/object-numbers';
 import { registerOutlineRoutes } from '../routes/outline';
 import { registerPageRoutes } from '../routes/pages';
 import { registerRedactionRoutes } from '../routes/redactions';
 import { registerSearchRoutes } from '../routes/search';
-import { registerShareSessionRoutes } from '../routes/share-sessions';
 import { registerSignatureRoutes } from '../routes/signatures';
 import { readCgroupMemory } from '../runtime/cgroup-memory';
 import { EngineHostClient } from '../runtime/EngineHostClient';
@@ -107,10 +107,10 @@ import { FolderService } from '../services/FolderService';
 import { DocumentSecurityProbe } from '../services/DocumentSecurityProbe';
 import { DocumentService } from '../services/DocumentService';
 import { EventLogService } from '../services/EventLogService';
+import { deleteVisitor, sweepIdleVisitors } from '../services/grantVisitors';
 import { LayerService } from '../services/LayerService';
 import { LayerStateService } from '../services/LayerStateService';
 import { ObjectNumberService } from '../services/ObjectNumberService';
-import { deleteVisitor, sweepIdleVisitors } from '../services/shareVisitors';
 import { BaseFileCache } from '../storage/BaseFileCache';
 import type { ObjectStoreWithInfo } from '../storage/ObjectStore';
 
@@ -708,19 +708,19 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
   }
 
   // Tenant suspension gate: consulted by the auth hook for every JWT
-  // and by the share exchange. API-token requests never touch it.
+  // and by the grant exchange. API-token requests never touch it.
   const suspendedTenantsGuard = opts.db ? new SuspendedTenantsGuard({ db: opts.db }) : undefined;
 
   // The deployment can sign iff it verifies with the shared secret —
   // the one condition gating every minting surface: tokens.issue, the
-  // share-grant routes, and the public exchange. Asymmetric/JWKS
+  // grant routes, and the public exchange. Asymmetric/JWKS
   // deployments verify only; their backends mint with their own keys.
   const verifierForSigning = opts.verifier;
   const signer =
     verifierForSigning.mode === 'hs256'
       ? (input: SignDevTokenInput) => signDevToken(verifierForSigning.secret, input)
       : undefined;
-  // Share-link visitors' handles are signed by the same authority.
+  // Grant visitors' handles are signed by the same authority.
   const visitorHandles =
     verifierForSigning.mode === 'hs256' ? new VisitorHandles(verifierForSigning.secret) : undefined;
 
@@ -761,7 +761,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
     // Prometheus target).
     ...((): { publicPaths?: string[] } => {
       const publicPaths = [
-        ...(signer && opts.db && opts.objectStore ? [adminWirePaths.shareSessions] : []),
+        ...(signer && opts.db && opts.objectStore ? [adminWirePaths.grantSessions] : []),
         ...(opts.metrics === true ? ['/metrics'] : []),
       ];
       return publicPaths.length > 0 ? { publicPaths } : {};
@@ -1125,7 +1125,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       ...(derivedRenders ? { derivedRenders } : {}),
       ...(usageMeters ? { usageMeters } : {}),
       tenantUsage: new TenantUsageRepo(opts.db),
-      shareGrants: new ShareGrantsRepo(opts.db),
+      grants: new GrantsRepo(opts.db),
     });
     await registerAdminDocumentsRoutes(app, {
       lifecycle,
@@ -1162,7 +1162,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       deleteLayer,
       layers: new LayersRepo(opts.db),
       documents: new DocumentsRepo(opts.db),
-      grants: new ShareGrantsRepo(opts.db),
+      grants: new GrantsRepo(opts.db),
     });
     // The async-import claim loop: in-process (like the sweeper), one
     // per replica, safe under multi-replica via fenced leased claims.
@@ -1195,25 +1195,25 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       documents: new DocumentsRepo(opts.db),
       securityEvents: new SecurityEventsRepo(opts.db),
     });
-    // The share family (grant lifecycle + public exchange) exists only
+    // The grant family (grant lifecycle + public exchange) exists only
     // where minting does — same condition as tokens.issue, because a
     // grant is a standing mint capability.
     if (signer && visitorHandles) {
-      const shareGrants = new ShareGrantsRepo(opts.db);
-      await registerAdminSharesRoutes(app, {
-        grants: shareGrants,
+      const grants = new GrantsRepo(opts.db);
+      await registerAdminGrantsRoutes(app, {
+        grants: grants,
         documents: new DocumentsRepo(opts.db),
         layers: new LayersRepo(opts.db),
-        visitors: new ShareVisitorsRepo(opts.db),
+        visitors: new GrantVisitorsRepo(opts.db),
         deleteVisitor: (visitor) => deleteVisitor({ db: opts.db!, deleteLayer }, visitor),
         securityEvents: new SecurityEventsRepo(opts.db),
       });
-      await registerShareSessionRoutes(app, {
+      await registerGrantSessionRoutes(app, {
         sign: signer,
-        grants: shareGrants,
+        grants: grants,
         documents: new DocumentsRepo(opts.db),
         layers: new LayersRepo(opts.db),
-        visitors: new ShareVisitorsRepo(opts.db),
+        visitors: new GrantVisitorsRepo(opts.db),
         handles: visitorHandles,
         deleteLayer,
         suspendedTenants: suspendedTenantsGuard!,
@@ -1339,7 +1339,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       // CDN-signaling rule for /head: non-`none` adapters need /access
       // to be called before the first cacheable read so the SDK has
       // the signed URLs/cookies. The default (`none`) keeps /head
-      // saying "no access needed" so public shares stay cheap.
+      // saying "no access needed" so public grants stay cheap.
       const cdnAccessRequired = cdnFronted;
       const passwordSessionsRepo = opts.kms
         ? new PdfPasswordSessionsRepo(opts.db, {
@@ -1711,12 +1711,12 @@ function isReadOnlyLicenseRequest(method: string, pathname: string): boolean {
 
   // These POST endpoints calculate or mint read access, but do not change the
   // customer's document contents. They remain available so an expired or
-  // suspended license can never hold existing data hostage. The share
+  // suspended license can never hold existing data hostage. The grant
   // exchange belongs here for the same reason: it mints read sessions
-  // for already-shared documents.
+  // for documents already given out.
   return (
     method === 'POST' &&
-    (pathname === '/v1/access' || pathname === '/v1/warm' || pathname === '/v1/share-sessions')
+    (pathname === '/v1/access' || pathname === '/v1/warm' || pathname === '/v1/grant-sessions')
   );
 }
 

@@ -19,8 +19,8 @@ import { buildAppForTesting } from '../src/app/buildApp';
 import { createValidTestLicenseGate } from '../src/licensing/testing';
 
 /**
- * The share family end to end: grant lifecycle under
- * /v1/tenants/:tenantId/shares, the public /v1/share-sessions
+ * The grant family end to end: grant lifecycle under
+ * /v1/tenants/:tenantId/grants, the public /v1/grant-sessions
  * exchange (origin allowlists, passphrases, disable/expiry/revoke),
  * origin-locked doc JWTs, per-tenant usage facts with the
  * exchange-vs-access dedupe, tenant suspend/resume, and CORS
@@ -28,8 +28,8 @@ import { createValidTestLicenseGate } from '../src/licensing/testing';
  */
 
 const STUB_ENTRY = new URL('./_helpers/stub-worker-entry.cjs', import.meta.url);
-const SECRET = 'share-grants-secret';
-const API_TOKEN = 'share-grants-root-token';
+const SECRET = 'grants-secret';
+const API_TOKEN = 'grants-root-token';
 const TENANT = 'acme';
 
 interface Fixture {
@@ -44,8 +44,8 @@ interface Fixture {
 let fx: Fixture;
 
 beforeAll(async () => {
-  const storageRoot = await mkdtemp(join(tmpdir(), 'share-grants-store-'));
-  const cacheRoot = await mkdtemp(join(tmpdir(), 'share-grants-cache-'));
+  const storageRoot = await mkdtemp(join(tmpdir(), 'grants-store-'));
+  const cacheRoot = await mkdtemp(join(tmpdir(), 'grants-cache-'));
   const db = createSqliteDb({ path: ':memory:' });
   await migrate(db, { source: { kind: 'inline', migrations: sqliteMigrations } });
   const store = new FsObjectStore({ root: storageRoot });
@@ -114,25 +114,25 @@ async function seedDocument(docId: string): Promise<void> {
     .execute();
 }
 
-async function createShare(
+async function createGrant(
   body: Record<string, unknown>,
-  auth: string = tenantToken(['shares.manage']),
-): Promise<{ status: number; share?: Record<string, any> }> {
-  const res = await fetch(`${fx.baseUrl}/v1/tenants/${TENANT}/shares`, {
+  auth: string = tenantToken(['grants.manage']),
+): Promise<{ status: number; grant?: Record<string, any> }> {
+  const res = await fetch(`${fx.baseUrl}/v1/tenants/${TENANT}/grants`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${auth}`, 'content-type': 'application/json' },
     body: JSON.stringify(body),
   });
   const payload =
-    res.status === 200 ? ((await res.json()) as { share: Record<string, any> }) : undefined;
-  return { status: res.status, ...(payload ? { share: payload.share } : {}) };
+    res.status === 200 ? ((await res.json()) as { grant: Record<string, any> }) : undefined;
+  return { status: res.status, ...(payload ? { grant: payload.grant } : {}) };
 }
 
 async function exchange(
   body: Record<string, unknown>,
   origin?: string,
 ): Promise<{ status: number; json: any; headers: Headers }> {
-  const res = await fetch(`${fx.baseUrl}/v1/share-sessions`, {
+  const res = await fetch(`${fx.baseUrl}/v1/grant-sessions`, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
@@ -161,90 +161,91 @@ async function head(docId: string, token: string, origin?: string): Promise<numb
   return res.status;
 }
 
-describe('share grants', () => {
+describe('grants', () => {
   test('grant lifecycle + public exchange, end to end', async () => {
-    await seedDocument('doc-share');
+    await seedDocument('doc-grant');
 
     // Create requires the scope.
-    const denied = await createShare(
-      { docId: 'doc-share', scope: ['doc.open'] },
+    const denied = await createGrant(
+      { docId: 'doc-grant', scope: ['doc.open'] },
       tenantToken(['docs.read']),
     );
     expect(denied.status).toBe(403);
 
-    const created = await createShare({
-      docId: 'doc-share',
+    const created = await createGrant({
+      docId: 'doc-grant',
       scope: ['doc.open', 'doc.render', 'doc.text.select'],
       origins: ['https://acme.com', 'https://*.acme.dev'],
     });
     expect(created.status).toBe(200);
-    const share = created.share!;
-    expect(share.id).toMatch(/^shr_[A-Za-z0-9_-]{24}$/);
-    expect(share.passwordProtected).toBe(false);
-    expect(share.origins).toEqual(['https://acme.com', 'https://*.acme.dev']);
+    const grant = created.grant!;
+    expect(grant.id).toMatch(/^grt_[A-Za-z0-9_-]{24}$/);
+    expect(grant.passphraseProtected).toBe(false);
+    expect(grant.name).toBeNull();
+    expect(grant.origins).toEqual(['https://acme.com', 'https://*.acme.dev']);
 
     // Unknown document → 404; foreign tenant doc binding is covered by
     // requireOwned tests elsewhere.
-    const missing = await createShare({ docId: 'doc-nope', scope: ['doc.open'] });
+    const missing = await createGrant({ docId: 'doc-nope', scope: ['doc.open'] });
     expect(missing.status).toBe(404);
 
     // Exchange: allowed origin → session that opens the document.
-    const ok = await exchange({ shareToken: share.id }, 'https://acme.com');
+    const ok = await exchange({ grant: grant.id }, 'https://acme.com');
     expect(ok.status).toBe(200);
-    expect(ok.json.docId).toBe('doc-share');
+    expect(ok.json.docId).toBe('doc-grant');
     expect(ok.json.layerName).toBe('default');
     expect(ok.json.expiresAt).toBeGreaterThan(Math.floor(Date.now() / 1000) + 500);
-    expect(await head('doc-share', ok.json.token, 'https://acme.com')).toBe(200);
+    expect(await head('doc-grant', ok.json.token, 'https://acme.com')).toBe(200);
 
     // Wildcard subdomain matches one-or-more labels; the bare apex does not.
-    expect((await exchange({ shareToken: share.id }, 'https://docs.acme.dev')).status).toBe(200);
-    expect((await exchange({ shareToken: share.id }, 'https://acme.dev')).status).toBe(403);
-    expect((await exchange({ shareToken: share.id }, 'https://evilacme.com')).status).toBe(403);
+    expect((await exchange({ grant: grant.id }, 'https://docs.acme.dev')).status).toBe(200);
+    expect((await exchange({ grant: grant.id }, 'https://acme.dev')).status).toBe(403);
+    expect((await exchange({ grant: grant.id }, 'https://evilacme.com')).status).toBe(403);
 
     // Origin is mandatory on the public exchange.
-    expect((await exchange({ shareToken: share.id })).status).toBe(403);
+    expect((await exchange({ grant: grant.id })).status).toBe(403);
 
     // The origin lock is stamped into the session JWT: presenting it
     // from a different browser origin fails, absent Origin (curl) passes.
-    expect(await head('doc-share', ok.json.token, 'https://evil.com')).toBe(403);
-    expect(await head('doc-share', ok.json.token)).toBe(200);
+    expect(await head('doc-grant', ok.json.token, 'https://evil.com')).toBe(403);
+    expect(await head('doc-grant', ok.json.token)).toBe(200);
 
     // Unknown token: indistinguishable 404.
-    const unknown = await exchange({ shareToken: `shr_${'A'.repeat(24)}` }, 'https://acme.com');
+    const unknown = await exchange({ grant: `shr_${'A'.repeat(24)}` }, 'https://acme.com');
     expect(unknown.status).toBe(404);
 
     // Update: disable pauses exchange with the same 404; re-enable restores.
     const patch = async (body: Record<string, unknown>) =>
-      fetch(`${fx.baseUrl}/v1/tenants/${TENANT}/shares/${share.id}`, {
+      fetch(`${fx.baseUrl}/v1/tenants/${TENANT}/grants/${grant.id}`, {
         method: 'PATCH',
         headers: {
-          Authorization: `Bearer ${tenantToken(['shares.manage'])}`,
+          Authorization: `Bearer ${tenantToken(['grants.manage'])}`,
           'content-type': 'application/json',
         },
         body: JSON.stringify(body),
       });
     expect((await patch({ disabled: true })).status).toBe(200);
-    expect((await exchange({ shareToken: share.id }, 'https://acme.com')).status).toBe(404);
+    expect((await exchange({ grant: grant.id }, 'https://acme.com')).status).toBe(404);
     expect((await patch({ disabled: false })).status).toBe(200);
-    expect((await exchange({ shareToken: share.id }, 'https://acme.com')).status).toBe(200);
+    expect((await exchange({ grant: grant.id }, 'https://acme.com')).status).toBe(200);
 
     // Expiry → 410 Gone (distinct from revocation: the embed can say "expired").
     expect((await patch({ expiresAt: Date.now() - 1_000 })).status).toBe(200);
-    expect((await exchange({ shareToken: share.id }, 'https://acme.com')).status).toBe(410);
+    expect((await exchange({ grant: grant.id }, 'https://acme.com')).status).toBe(410);
     expect((await patch({ expiresAt: null })).status).toBe(200);
 
     // Editing origins retargets already-pasted embeds at the next exchange.
     expect((await patch({ origins: ['https://other.com'] })).status).toBe(200);
-    expect((await exchange({ shareToken: share.id }, 'https://acme.com')).status).toBe(403);
-    expect((await exchange({ shareToken: share.id }, 'https://other.com')).status).toBe(200);
+    expect((await exchange({ grant: grant.id }, 'https://acme.com')).status).toBe(403);
+    expect((await exchange({ grant: grant.id }, 'https://other.com')).status).toBe(200);
 
     // Revoke: delete stops exchange immediately.
-    const del = await fetch(`${fx.baseUrl}/v1/tenants/${TENANT}/shares/${share.id}`, {
+    const del = await fetch(`${fx.baseUrl}/v1/tenants/${TENANT}/grants/${grant.id}`, {
       method: 'DELETE',
-      headers: { Authorization: `Bearer ${tenantToken(['shares.manage'])}` },
+      headers: { Authorization: `Bearer ${tenantToken(['grants.manage'])}` },
     });
     expect(del.status).toBe(204);
-    expect((await exchange({ shareToken: share.id }, 'https://other.com')).status).toBe(404);
+    expect((await exchange({ grant: grant.id }, 'https://other.com')).status).toBe(404);
 
     // The lifecycle is on the security trail; exchanges are not.
     const events = await fx.db
@@ -252,58 +253,130 @@ describe('share grants', () => {
       .select(['kind', 'jti'])
       .where('tenant_id', '=', TENANT)
       .execute();
-    const kinds = events.filter((e) => e.jti === share.id).map((e) => e.kind);
-    expect(kinds).toContain('share.created');
-    expect(kinds).toContain('share.updated');
-    expect(kinds).toContain('share.revoked');
-    expect(kinds.filter((k) => k === 'share.exchanged')).toHaveLength(0);
+    const kinds = events.filter((e) => e.jti === grant.id).map((e) => e.kind);
+    expect(kinds).toContain('grant.created');
+    expect(kinds).toContain('grant.updated');
+    expect(kinds).toContain('grant.revoked');
+    expect(kinds.filter((k) => k === 'grant.exchanged')).toHaveLength(0);
   });
 
   test('passphrase-protected grants', async () => {
     await seedDocument('doc-pass');
-    const created = await createShare({
+    const created = await createGrant({
       docId: 'doc-pass',
       scope: ['doc.open'],
-      password: 'q3-review',
+      passphrase: 'q3-review',
     });
     expect(created.status).toBe(200);
-    expect(created.share!.passwordProtected).toBe(true);
+    expect(created.grant!.passphraseProtected).toBe(true);
 
-    const noPass = await exchange({ shareToken: created.share!.id }, 'https://any.example');
+    const noPass = await exchange({ grant: created.grant!.id }, 'https://any.example');
     expect(noPass.status).toBe(422);
-    expect(noPass.json.error.code).toBe('SharePasswordRequired');
+    expect(noPass.json.error.code).toBe('GrantPassphraseRequired');
 
     const wrong = await exchange(
-      { shareToken: created.share!.id, password: 'nope' },
+      { grant: created.grant!.id, passphrase: 'nope' },
       'https://any.example',
     );
     expect(wrong.status).toBe(422);
 
     const right = await exchange(
-      { shareToken: created.share!.id, password: 'q3-review' },
+      { grant: created.grant!.id, passphrase: 'q3-review' },
       'https://any.example',
     );
     expect(right.status).toBe(200);
 
     // The envelope never leaves the row.
-    const got = await fetch(`${fx.baseUrl}/v1/tenants/${TENANT}/shares/${created.share!.id}`, {
+    const got = await fetch(`${fx.baseUrl}/v1/tenants/${TENANT}/grants/${created.grant!.id}`, {
       headers: { Authorization: `Bearer ${API_TOKEN}` },
     });
-    const body = (await got.json()) as { share: Record<string, unknown> };
-    expect(body.share['passwordProtected']).toBe(true);
+    const body = (await got.json()) as { grant: Record<string, unknown> };
+    expect(body.grant['passphraseProtected']).toBe(true);
     expect(JSON.stringify(body)).not.toContain('scrypt');
   });
 
-  test('views: exchange counts once, /v1/access dedupes share sessions', async () => {
+  test('a name: trimmed, renamed and removed', async () => {
+    await seedDocument('doc-named');
+    const created = await createGrant({
+      docId: 'doc-named',
+      scope: ['doc.open'],
+      name: '  Website  ',
+    });
+    expect(created.status).toBe(200);
+    expect(created.grant!.name).toBe('Website');
+
+    const patch = async (body: Record<string, unknown>) => {
+      const res = await fetch(`${fx.baseUrl}/v1/tenants/${TENANT}/grants/${created.grant!.id}`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${API_TOKEN}`, 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      return { status: res.status, json: (await res.json()) as any };
+    };
+    const renamed = await patch({ name: 'Sent to Acme' });
+    expect(renamed.json.grant.name).toBe('Sent to Acme');
+    // Other edits leave it alone.
+    expect((await patch({ disabled: false })).json.grant.name).toBe('Sent to Acme');
+    expect((await patch({ name: null })).json.grant.name).toBeNull();
+
+    expect((await patch({ name: '   ' })).status).toBe(400);
+    expect((await patch({ name: 'x'.repeat(101) })).status).toBe(400);
+    expect((await createGrant({ docId: 'doc-named', scope: ['doc.open'], name: '' })).status).toBe(
+      400,
+    );
+  });
+
+  test('grants made before the rename keep their shr_ id', async () => {
+    await seedDocument('doc-older');
+    const id = `shr_${'k'.repeat(24)}`;
+    await fx.db
+      .insertInto('grants')
+      .values({
+        id,
+        tenant_id: TENANT,
+        doc_id: 'doc-older',
+        name: null,
+        layer_mode: 'shared',
+        layer_name: 'default',
+        keep_visitor_layers: 1,
+        visitor_idle_seconds: null,
+        visitor_identity_json: null,
+        identity_json: null,
+        scope_json: '["doc.open"]',
+        origins_json: null,
+        passphrase_hash: null,
+        session_ttl_seconds: 600,
+        disabled: 0,
+        archived_at: null,
+        expires_at: null,
+        exchange_count: 0,
+        last_exchanged_at: null,
+        created_by: 'test',
+        created_at: 1,
+        updated_at: 1,
+      })
+      .execute();
+
+    const ok = await exchange({ grant: id }, 'https://acme.com');
+    expect(ok.status).toBe(200);
+    expect(ok.json.docId).toBe('doc-older');
+    const got = await fetch(`${fx.baseUrl}/v1/tenants/${TENANT}/grants/${id}`, {
+      headers: { Authorization: `Bearer ${API_TOKEN}` },
+    });
+    expect(got.status).toBe(200);
+    expect(((await got.json()) as { grant: { id: string } }).grant.id).toBe(id);
+  });
+
+  test('views: exchange counts once, /v1/access dedupes grant sessions', async () => {
     await seedDocument('doc-views');
     const before = (await usageSnapshot()).metrics['pdf.views']!;
 
-    const created = await createShare({ docId: 'doc-views', scope: ['doc.open', 'doc.render'] });
-    const session = await exchange({ shareToken: created.share!.id }, 'https://viewer.example');
+    const created = await createGrant({ docId: 'doc-views', scope: ['doc.open', 'doc.render'] });
+    const session = await exchange({ grant: created.grant!.id }, 'https://viewer.example');
     expect(session.status).toBe(200);
     expect((await usageSnapshot()).metrics['pdf.views']).toBe(before + 1);
 
-    // The share session establishing access is not a second view.
+    // The grant session establishing access is not a second view.
     const access = await fetch(`${fx.baseUrl}/v1/access`, {
       method: 'POST',
       headers: {
@@ -357,8 +430,8 @@ describe('share grants', () => {
 
   test('tenant suspension fails every JWT closed; the API token is exempt', async () => {
     await seedDocument('doc-suspend');
-    const created = await createShare({ docId: 'doc-suspend', scope: ['doc.open'] });
-    const session = await exchange({ shareToken: created.share!.id }, 'https://any.example');
+    const created = await createGrant({ docId: 'doc-suspend', scope: ['doc.open'] });
+    const session = await exchange({ grant: created.grant!.id }, 'https://any.example');
     expect(session.status).toBe(200);
 
     const suspend = await fetch(`${fx.baseUrl}/v1/tenants/${TENANT}/suspend`, {
@@ -378,9 +451,7 @@ describe('share grants', () => {
       headers: { Authorization: `Bearer ${tenantToken()}` },
     });
     expect(tenantList.status).toBe(403);
-    expect((await exchange({ shareToken: created.share!.id }, 'https://any.example')).status).toBe(
-      404,
-    );
+    expect((await exchange({ grant: created.grant!.id }, 'https://any.example')).status).toBe(404);
 
     // …while the operator keeps full reach.
     const inspect = await fetch(`${fx.baseUrl}/v1/tenants/${TENANT}`, {
@@ -394,9 +465,7 @@ describe('share grants', () => {
       headers: { Authorization: `Bearer ${API_TOKEN}` },
     });
     expect(resume.status).toBe(204);
-    expect((await exchange({ shareToken: created.share!.id }, 'https://any.example')).status).toBe(
-      200,
-    );
+    expect((await exchange({ grant: created.grant!.id }, 'https://any.example')).status).toBe(200);
 
     const trail = await fx.db
       .selectFrom('security_events')
@@ -408,7 +477,7 @@ describe('share grants', () => {
     expect(kinds).toContain('tenant.resumed');
   });
 
-  test('a link to a document in a deleted folder stops at once', async () => {
+  test('a grant to a document in a deleted folder stops at once', async () => {
     await seedDocument('doc-in-folder');
     const auth = { Authorization: `Bearer ${tenantToken()}`, 'content-type': 'application/json' };
     const folder = (await (
@@ -423,19 +492,19 @@ describe('share grants', () => {
       { method: 'POST', headers: auth, body: JSON.stringify({ documentIds: ['doc-in-folder'] }) },
     );
     expect(moved.status).toBe(204);
-    const share = (await createShare({ docId: 'doc-in-folder', scope: ['doc.open'] })).share!;
-    expect((await exchange({ shareToken: share.id }, 'https://acme.com')).status).toBe(200);
+    const grant = (await createGrant({ docId: 'doc-in-folder', scope: ['doc.open'] })).grant!;
+    expect((await exchange({ grant: grant.id }, 'https://acme.com')).status).toBe(200);
 
     const deleted = await fetch(
       `${fx.baseUrl}/v1/tenants/${TENANT}/folders/${folder.folder.id}?recursive=true`,
       { method: 'DELETE', headers: { Authorization: `Bearer ${tenantToken()}` } },
     );
     expect(deleted.status).toBe(204);
-    expect((await exchange({ shareToken: share.id }, 'https://acme.com')).status).toBe(404);
+    expect((await exchange({ grant: grant.id }, 'https://acme.com')).status).toBe(404);
   });
 
   test('CORS preflight on the public exchange', async () => {
-    const res = await fetch(`${fx.baseUrl}/v1/share-sessions`, {
+    const res = await fetch(`${fx.baseUrl}/v1/grant-sessions`, {
       method: 'OPTIONS',
       headers: {
         origin: 'https://anywhere.example',

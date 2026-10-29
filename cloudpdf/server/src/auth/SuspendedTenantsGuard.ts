@@ -28,7 +28,7 @@ interface CacheEntry {
  * The suspend/resume routes prime the local replica synchronously, so
  * the TTL only governs other replicas.
  *
- * The guard answers for JWT-authenticated requests and share
+ * The guard answers for JWT-authenticated requests and grant
  * exchanges. API-token requests never consult it — the operator must
  * be able to inspect, resume, or delete a suspended tenant.
  */

@@ -96,7 +96,7 @@ export async function registerAdminTokensRoutes(
             return reply.code(400).send({
               error: {
                 code: 'InvalidArg',
-                message: `layerName: names starting with "${VISITOR_LAYER_PREFIX}" are for share-link visitors' own layers`,
+                message: `layerName: names starting with "${VISITOR_LAYER_PREFIX}" are for grant visitors' own layers`,
               },
             });
           }

@@ -31,7 +31,7 @@ export interface BaseClaims {
   /** Who the token acts for; see `Identity` in `@embedpdf/engine-core`. */
   identity?: Identity;
   /**
-   * A share-link visitor who still has to answer the link's questions
+   * A grant's visitor who still has to answer the grant's questions
    * before changing anything: what they're asked. Reads work; every write
    * is refused with `VisitorIdentityRequired`, decided from the token alone.
    */
@@ -153,7 +153,7 @@ export type TenantScope =
   | 'docs.delete'
   | 'tokens.issue-doc'
   | 'tokens.revoke'
-  | 'shares.manage';
+  | 'grants.manage';
 
 /**
  * Doc-scope strings on the wire. After the scope-vocabulary migration

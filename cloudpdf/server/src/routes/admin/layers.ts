@@ -5,20 +5,20 @@ import { decodeListCursor, encodeListCursor } from './_cursor';
 import { formatIssues } from './_issues';
 import { requireTenantAccess } from '../../app/jwt-plugin';
 import type { DocumentsRepo } from '../../db/repos/documents.repo';
+import type { GrantsRepo } from '../../db/repos/grants.repo';
 import type { LayersRepo, ListedLayer } from '../../db/repos/page_state.repo';
-import type { ShareGrantsRepo } from '../../db/repos/share_grants.repo';
 
 export interface AdminLayersRoutesDeps {
   /** `LayerService.deleteLayer` where the engine runs, else `deleteStoredLayer`. */
   deleteLayer: (tenantId: string, input: { docId: string; layerName: string }) => Promise<void>;
   layers: LayersRepo;
   documents: DocumentsRepo;
-  grants: ShareGrantsRepo;
+  grants: GrantsRepo;
 }
 
 /**
  * A document's layers under `/v1/tenants/:tenantId/documents/:id/layers`,
- * for a backend with its API token: listing them finds what share-link
+ * for a backend with its API token: listing them finds what grant
  * visitors filled in, and deleting a user's layer deletes their data.
  */
 export async function registerAdminLayersRoutes(
@@ -44,13 +44,13 @@ export async function registerAdminLayersRoutes(
         .code(400)
         .send({ error: { code: 'InvalidArg', message: formatIssues(parsed.error.issues) } });
     }
-    const { limit, cursor, shareId } = parsed.data;
+    const { limit, cursor, grantId } = parsed.data;
     const before = cursor === undefined ? undefined : decodeListCursor(cursor);
     await documents.requireOwned(id, ctx.tenantId);
     // limit+1 probes for a next page without a count query.
     const rows = await layers.listForDocument(id, {
       limit: limit + 1,
-      ...(shareId !== undefined ? { grantId: shareId } : {}),
+      ...(grantId !== undefined ? { grantId: grantId } : {}),
       ...(before ? { before } : {}),
     });
     const page = rows.slice(0, limit);
@@ -67,15 +67,15 @@ export async function registerAdminLayersRoutes(
       layerName: string;
     };
     const ctx = requireTenantAccess(req, tenantId, deleteOp.scope);
-    // A link's visitors land in its layer: deleting the layer would leave
-    // them a link that refuses every request.
+    // A grant's visitors land in its layer: deleting the layer would leave
+    // them a grant that refuses every request.
     const linked = await grants.listByLayer(ctx.tenantId, id, layerName);
     if (linked.length > 0) {
       return reply.code(409).send({
         error: {
           code: 'Conflict',
-          message: `share link ${linked[0]!.id} uses this layer: delete the link first`,
-          details: { shareIds: linked.map((grant) => grant.id) },
+          message: `grant ${linked[0]!.id} uses this layer: delete the grant first`,
+          details: { grantIds: linked.map((grant) => grant.id) },
         },
       });
     }
@@ -88,7 +88,7 @@ function layerPublic(layer: ListedLayer): Record<string, unknown> {
   return {
     docId: layer.docId,
     layerName: layer.name,
-    shareId: layer.grantId,
+    grantId: layer.grantId,
     visitorId: layer.visitorId,
     storageSizeBytes: layer.storageSizeBytes,
     createdAt: layer.createdAt,

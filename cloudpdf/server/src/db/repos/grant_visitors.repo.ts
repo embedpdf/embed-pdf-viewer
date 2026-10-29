@@ -3,8 +3,8 @@ import { sql, type Kysely } from 'kysely';
 import type { VisitorAnswers } from '../../auth/visitor-identity';
 import type { Database as Schema } from '../schema';
 
-/** A share link's visitor who answered its questions or wrote (migration 042). */
-export interface ShareVisitorRow {
+/** A grant's visitor who answered its questions or wrote (migration 042). */
+export interface GrantVisitorRow {
   grantId: string;
   visitorId: string;
   docId: string;
@@ -17,18 +17,18 @@ export interface ShareVisitorRow {
 }
 
 /** A visitor as the visitors list shows it, with their own layer when it holds changes. */
-export interface ListedShareVisitor extends ShareVisitorRow {
+export interface ListedGrantVisitor extends GrantVisitorRow {
   layer: { name: string; storageSizeBytes: number | null } | null;
 }
 
-export interface ShareVisitorListOptions {
+export interface GrantVisitorListOptions {
   limit: number;
   /** Keyset cursor over `firstSeenAt`, the same shape as the other lists. */
   before?: { createdAt: number; id: string };
 }
 
-/** A visitor nobody has seen for longer than their link's idle time. */
-export interface IdleShareVisitor {
+/** A visitor nobody has seen for longer than their grant's idle time. */
+export interface IdleGrantVisitor {
   tenantId: string;
   grantId: string;
   visitorId: string;
@@ -43,12 +43,12 @@ const ANSWER_COLUMNS = {
   organizationalUnit: 'organizational_unit',
 } as const;
 
-export class ShareVisitorsRepo {
+export class GrantVisitorsRepo {
   constructor(private readonly db: Kysely<Schema>) {}
 
-  async find(grantId: string, visitorId: string): Promise<ShareVisitorRow | null> {
+  async find(grantId: string, visitorId: string): Promise<GrantVisitorRow | null> {
     const row = await this.db
-      .selectFrom('share_visitors')
+      .selectFrom('grant_visitors')
       .selectAll()
       .where('grant_id', '=', grantId)
       .where('visitor_id', '=', visitorId)
@@ -59,7 +59,7 @@ export class ShareVisitorsRepo {
   /**
    * Record the visitor: their answers (`added`, for fields they hadn't
    * answered; one already given is never replaced) or their first write.
-   * Seen now. A link deleted meanwhile records nothing.
+   * Seen now. A grant deleted meanwhile records nothing.
    */
   async record(input: {
     grantId: string;
@@ -71,14 +71,14 @@ export class ShareVisitorsRepo {
     const { grantId, visitorId, docId, now } = input;
     const added = input.added ?? {};
     const answered = Object.keys(added).length > 0;
-    const link = await this.db
-      .selectFrom('share_grants')
+    const grant = await this.db
+      .selectFrom('grants')
       .select('id')
       .where('id', '=', grantId)
       .executeTakeFirst();
-    if (!link) return;
+    if (!grant) return;
     await this.db
-      .insertInto('share_visitors')
+      .insertInto('grant_visitors')
       .values({
         grant_id: grantId,
         visitor_id: visitorId,
@@ -102,7 +102,7 @@ export class ShareVisitorsRepo {
     }
     if (answered) filled['consented_at'] = sql`coalesce(consented_at, ${now})`;
     await this.db
-      .updateTable('share_visitors')
+      .updateTable('grant_visitors')
       .set(filled)
       .where('grant_id', '=', grantId)
       .where('visitor_id', '=', visitorId)
@@ -112,17 +112,17 @@ export class ShareVisitorsRepo {
   /** The visitor came back: their idle clock restarts. Nothing to do for one without a row. */
   async see(grantId: string, visitorId: string, now: number): Promise<void> {
     await this.db
-      .updateTable('share_visitors')
+      .updateTable('grant_visitors')
       .set({ last_seen_at: now })
       .where('grant_id', '=', grantId)
       .where('visitor_id', '=', visitorId)
       .execute();
   }
 
-  /** A link's visitors newest first, with their own layer when it holds changes. */
-  async list(grantId: string, opts: ShareVisitorListOptions): Promise<ListedShareVisitor[]> {
+  /** A grant's visitors newest first, with their own layer when it holds changes. */
+  async list(grantId: string, opts: GrantVisitorListOptions): Promise<ListedGrantVisitor[]> {
     let q = this.db
-      .selectFrom('share_visitors as v')
+      .selectFrom('grant_visitors as v')
       .leftJoin('layers as l', (join) =>
         join
           .onRef('l.grant_id', '=', 'v.grant_id')
@@ -158,16 +158,16 @@ export class ShareVisitorsRepo {
 
   async delete(grantId: string, visitorId: string): Promise<void> {
     await this.db
-      .deleteFrom('share_visitors')
+      .deleteFrom('grant_visitors')
       .where('grant_id', '=', grantId)
       .where('visitor_id', '=', visitorId)
       .execute();
   }
 
-  /** How many visitors a link has: what keeps it from being deleted. */
+  /** How many visitors a grant has: what keeps it from being deleted. */
   async countForGrant(grantId: string): Promise<number> {
     const row = await this.db
-      .selectFrom('share_visitors')
+      .selectFrom('grant_visitors')
       .select((eb) => eb.fn.countAll<number>().as('count'))
       .where('grant_id', '=', grantId)
       .executeTakeFirstOrThrow();
@@ -175,13 +175,13 @@ export class ShareVisitorsRepo {
   }
 
   /**
-   * Up to `limit` visitors nobody has seen for longer than their link's idle
-   * time, the longest unseen first; only links that set one.
+   * Up to `limit` visitors nobody has seen for longer than their grant's idle
+   * time, the longest unseen first; only grants that set one.
    */
-  async idle(now: number, limit: number): Promise<IdleShareVisitor[]> {
+  async idle(now: number, limit: number): Promise<IdleGrantVisitor[]> {
     const rows = await this.db
-      .selectFrom('share_visitors as v')
-      .innerJoin('share_grants as g', 'g.id', 'v.grant_id')
+      .selectFrom('grant_visitors as v')
+      .innerJoin('grants as g', 'g.id', 'v.grant_id')
       .select(['g.tenant_id', 'v.grant_id', 'v.visitor_id', 'v.doc_id'])
       .where('g.visitor_idle_seconds', 'is not', null)
       .where(sql<number>`v.last_seen_at + g.visitor_idle_seconds * 1000`, '<', now)
@@ -210,7 +210,7 @@ function mapRow(row: {
   consented_at: number | null;
   first_seen_at: number;
   last_seen_at: number;
-}): ShareVisitorRow {
+}): GrantVisitorRow {
   const answers: VisitorAnswers = {};
   for (const [field, column] of Object.entries(ANSWER_COLUMNS)) {
     const value = row[column];

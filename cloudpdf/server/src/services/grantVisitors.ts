@@ -1,35 +1,35 @@
 import type { Kysely } from 'kysely';
 
 import { visitorLayerName } from '../auth/visitor-handle';
-import { ShareVisitorsRepo } from '../db/repos/share_visitors.repo';
+import { GrantVisitorsRepo } from '../db/repos/grant_visitors.repo';
 import type { Database as Schema } from '../db/schema';
 
-export interface ShareVisitorDeps {
+export interface GrantVisitorDeps {
   db: Kysely<Schema>;
   /** `LayerService.deleteLayer` where the engine runs, else `deleteStoredLayer`. */
   deleteLayer: (tenantId: string, input: { docId: string; layerName: string }) => Promise<void>;
 }
 
 /**
- * Delete a share link's visitor: their answers and their own layer
+ * Delete a grant's visitor: their answers and their own layer
  * (`visitor-<id>`, also its numbers when they never wrote). What the
  * visitors list, starting over and the idle sweep do. Deleting again
  * changes nothing.
  */
 export async function deleteVisitor(
-  deps: ShareVisitorDeps,
+  deps: GrantVisitorDeps,
   visitor: { tenantId: string; grantId: string; visitorId: string; docId: string },
 ): Promise<void> {
   await deps.deleteLayer(visitor.tenantId, {
     docId: visitor.docId,
     layerName: visitorLayerName(visitor.visitorId),
   });
-  await new ShareVisitorsRepo(deps.db).delete(visitor.grantId, visitor.visitorId);
+  await new GrantVisitorsRepo(deps.db).delete(visitor.grantId, visitor.visitorId);
 }
 
 /**
  * Delete up to `batch` visitors nobody has seen for longer than their
- * link's idle time, the longest unseen first, with their layers. Only links
+ * grant's idle time, the longest unseen first, with their layers. Only grants
  * that set one (`visitorIdleSeconds`, for throwaway layers like examples)
  * lose visitors; every other visitor stays until deleted on purpose. A
  * visitor with the document open renews about every 10 minutes and is seen
@@ -38,11 +38,11 @@ export async function deleteVisitor(
  * time, and the failures are thrown after the rest.
  */
 export async function sweepIdleVisitors(
-  deps: ShareVisitorDeps,
+  deps: GrantVisitorDeps,
   now: number,
   batch = 50,
 ): Promise<number> {
-  const idle = await new ShareVisitorsRepo(deps.db).idle(now, batch);
+  const idle = await new GrantVisitorsRepo(deps.db).idle(now, batch);
   const failures: unknown[] = [];
   let deleted = 0;
   for (const visitor of idle) {

@@ -1,7 +1,7 @@
 /**
  * List cursors are opaque `v1.<base64url(JSON)>` tokens over a keyset
  * position `{ s: sort, o: order, k: sort value, id }`, shared by every
- * cursor-paginated admin list (documents, tenants, shares, a document's
+ * cursor-paginated admin list (documents, tenants, grants, a document's
  * layers). A cursor continues only the sort and order it was made with.
  * Opaque by contract — the format may change, so clients round-trip
  * `nextCursor` verbatim. Anything that does not decode to a well-formed

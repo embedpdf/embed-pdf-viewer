@@ -1,10 +1,10 @@
 import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 
 /**
- * Passphrase hashing for share grants.
+ * Passphrase hashing for grants.
  *
- * A share token is machine randomness and safe to store plaintext; a
- * grant passphrase is human-chosen — people reuse passwords from their
+ * A grant's id is machine randomness and safe to store plaintext; a
+ * grant's passphrase is human-chosen — people reuse passwords from their
  * real lives — so the moment we accept one it gets password
  * discipline: scrypt with a per-grant salt, constant-time compare,
  * never logged, never returned by any read endpoint.
@@ -20,9 +20,9 @@ const SCRYPT_R = 8;
 const SCRYPT_P = 1;
 const KEY_LENGTH = 32;
 
-export function hashSharePassword(password: string): string {
+export function hashGrantPassphrase(passphrase: string): string {
   const salt = randomBytes(16);
-  const hash = scryptSync(password, salt, KEY_LENGTH, {
+  const hash = scryptSync(passphrase, salt, KEY_LENGTH, {
     N: SCRYPT_N,
     r: SCRYPT_R,
     p: SCRYPT_P,
@@ -38,7 +38,7 @@ export function hashSharePassword(password: string): string {
 }
 
 /** Constant-time verify; malformed envelopes never match — fail closed. */
-export function verifySharePassword(password: string, envelope: string): boolean {
+export function verifyGrantPassphrase(passphrase: string, envelope: string): boolean {
   const parts = envelope.split('$');
   if (parts.length !== 6 || parts[0] !== 'scrypt') return false;
   const N = Number(parts[1]);
@@ -58,7 +58,7 @@ export function verifySharePassword(password: string, envelope: string): boolean
   if (salt.length === 0 || expected.length === 0) return false;
   let actual: Buffer;
   try {
-    actual = scryptSync(password, salt, expected.length, { N, r, p, maxmem: 128 * 1024 * 1024 });
+    actual = scryptSync(passphrase, salt, expected.length, { N, r, p, maxmem: 128 * 1024 * 1024 });
   } catch {
     return false;
   }

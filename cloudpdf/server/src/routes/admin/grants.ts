@@ -1,8 +1,8 @@
 import {
-  ShareGrantCreateRequestSchema,
-  ShareGrantListQuerySchema,
-  ShareGrantUpdateRequestSchema,
-  ShareVisitorListQuerySchema,
+  GrantCreateRequestSchema,
+  GrantListQuerySchema,
+  GrantUpdateRequestSchema,
+  GrantVisitorListQuerySchema,
   adminOperations,
   type AdminOperation,
 } from '@cloudpdf/contract';
@@ -13,26 +13,22 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { decodeListCursor, encodeListCursor } from './_cursor';
 import { formatIssues } from './_issues';
 import { requireTenantAccess } from '../../app/jwt-plugin';
-import { hashSharePassword } from '../../auth/share-password';
+import { hashGrantPassphrase } from '../../auth/grant-passphrase';
 import { isVisitorLayerName, VISITOR_LAYER_PREFIX } from '../../auth/visitor-handle';
 import type { DocumentsRepo } from '../../db/repos/documents.repo';
+import type { GrantVisitorsRepo, ListedGrantVisitor } from '../../db/repos/grant_visitors.repo';
+import type { GrantLayerMode, GrantRow, GrantsRepo } from '../../db/repos/grants.repo';
 import type { LayersRepo } from '../../db/repos/page_state.repo';
-import type { ListedShareVisitor, ShareVisitorsRepo } from '../../db/repos/share_visitors.repo';
 import type { SecurityEventsRepo } from '../../db/repos/security-events.repo';
-import type {
-  ShareGrantRow,
-  ShareGrantsRepo,
-  ShareLayerMode,
-} from '../../db/repos/share_grants.repo';
 
-export interface AdminSharesRoutesDeps {
-  grants: ShareGrantsRepo;
+export interface AdminGrantsRoutesDeps {
+  grants: GrantsRepo;
   documents: DocumentsRepo;
-  /** A link can't name a deleted layer: its name is refused for good. */
+  /** A grant can't name a deleted layer: its name is refused for good. */
   layers: LayersRepo;
-  /** A link with visitors is archived, never deleted. */
-  visitors: ShareVisitorsRepo;
-  /** `deleteVisitor` from `services/shareVisitors`: their answers and their own layer. */
+  /** A grant with visitors is archived, never deleted. */
+  visitors: GrantVisitorsRepo;
+  /** `deleteVisitor` from `services/grantVisitors`: their answers and their own layer. */
   deleteVisitor: (visitor: {
     tenantId: string;
     grantId: string;
@@ -43,38 +39,38 @@ export interface AdminSharesRoutesDeps {
 }
 
 /**
- * Share-grant lifecycle under `/v1/tenants/:tenantId/shares` — the
+ * Grant lifecycle under `/v1/tenants/:tenantId/grants` — the
  * management side of the no-backend embed flow. Everything here is a
  * stored authorization decision; the public consumption side lives in
- * `routes/share-sessions.ts`. Mounted only when the deployment can
+ * `routes/grant-sessions.ts`. Mounted only when the deployment can
  * sign (alongside `tokens.issue` and the exchange route): a grant is a
  * standing mint capability, meaningless where minting is impossible.
  *
  * Create, update, and revoke write `security_events` rows — a grant is
  * durable authority, so its lifecycle belongs in the same append-only
  * trail as token issuance. The grant id rides the `jti` column: it is
- * the credential identifier of the share family.
+ * the credential identifier of the grant family.
  */
-export async function registerAdminSharesRoutes(
+export async function registerAdminGrantsRoutes(
   app: FastifyInstance,
-  deps: AdminSharesRoutesDeps,
+  deps: AdminGrantsRoutesDeps,
 ): Promise<void> {
   const { grants, documents, layers, visitors, deleteVisitor, securityEvents } = deps;
 
   /**
-   * Why a link can't take this layer, or `null`. A per-visitor link names
+   * Why a grant can't take this layer, or `null`. A per-visitor grant names
    * none (each visitor gets their own); a shared one names a layer that
    * isn't a visitor's and wasn't deleted (`LayerDeleted` throws).
    */
   const refuseLayer = async (
     docId: string,
-    layerMode: ShareLayerMode,
+    layerMode: GrantLayerMode,
     layerName: string | undefined,
   ): Promise<string | null> => {
     if (layerMode === 'per-visitor') {
       return layerName === undefined
         ? null
-        : 'layerName: a per-visitor link names no layer; each visitor gets their own';
+        : 'layerName: a per-visitor grant names no layer; each visitor gets their own';
     }
     if (layerName !== undefined && isVisitorLayerName(layerName)) {
       return `layerName: names starting with "${VISITOR_LAYER_PREFIX}" are for visitors' own layers`;
@@ -90,11 +86,11 @@ export async function registerAdminSharesRoutes(
     app.route({ method: op.method, url: op.path, handler });
   };
 
-  const createOp = adminOperations['shares.create'];
+  const createOp = adminOperations['grants.create'];
   mount(createOp, async (req, reply) => {
     const { tenantId } = req.params as { tenantId: string };
     const ctx = requireTenantAccess(req, tenantId, createOp.scope);
-    const parsed = ShareGrantCreateRequestSchema.safeParse(req.body);
+    const parsed = GrantCreateRequestSchema.safeParse(req.body);
     if (!parsed.success) {
       return reply
         .code(400)
@@ -129,6 +125,7 @@ export async function registerAdminSharesRoutes(
     const grant = await grants.create({
       tenantId,
       docId: body.docId,
+      ...(body.name !== undefined ? { name: body.name } : {}),
       layerMode,
       ...(body.layerName !== undefined ? { layerName: body.layerName } : {}),
       ...(body.keepVisitorLayers !== undefined
@@ -141,7 +138,9 @@ export async function registerAdminSharesRoutes(
       ...(body.identity !== undefined ? { identity: body.identity } : {}),
       scope: body.scope,
       ...(body.origins !== undefined ? { origins: body.origins } : {}),
-      ...(body.password !== undefined ? { passwordHash: hashSharePassword(body.password) } : {}),
+      ...(body.passphrase !== undefined
+        ? { passphraseHash: hashGrantPassphrase(body.passphrase) }
+        : {}),
       ...(body.sessionTtlSeconds !== undefined
         ? { sessionTtlSeconds: body.sessionTtlSeconds }
         : {}),
@@ -150,7 +149,7 @@ export async function registerAdminSharesRoutes(
     });
     await securityEvents.append({
       tenantId,
-      kind: 'share.created',
+      kind: 'grant.created',
       jti: grant.id,
       docId: grant.docId,
       scope: grant.scope,
@@ -158,14 +157,14 @@ export async function registerAdminSharesRoutes(
       via: ctx.via,
       ...(grant.expiresAt !== null ? { expiresAt: grant.expiresAt } : {}),
     });
-    return reply.send({ share: sharePublic(grant) });
+    return reply.send({ grant: grantPublic(grant) });
   });
 
-  const listOp = adminOperations['shares.list'];
+  const listOp = adminOperations['grants.list'];
   mount(listOp, async (req, reply) => {
     const { tenantId } = req.params as { tenantId: string };
     requireTenantAccess(req, tenantId, listOp.scope);
-    const parsed = ShareGrantListQuerySchema.safeParse(req.query ?? {});
+    const parsed = GrantListQuerySchema.safeParse(req.query ?? {});
     if (!parsed.success) {
       return reply
         .code(400)
@@ -183,27 +182,27 @@ export async function registerAdminSharesRoutes(
     const page = rows.slice(0, limit);
     const last = page[page.length - 1];
     const nextCursor = rows.length > limit && last ? encodeListCursor(last) : null;
-    return reply.send({ shares: page.map(sharePublic), nextCursor });
+    return reply.send({ grants: page.map(grantPublic), nextCursor });
   });
 
-  const getOp = adminOperations['shares.get'];
+  const getOp = adminOperations['grants.get'];
   mount(getOp, async (req, reply) => {
-    const { tenantId, shareId } = req.params as { tenantId: string; shareId: string };
+    const { tenantId, grantId } = req.params as { tenantId: string; grantId: string };
     requireTenantAccess(req, tenantId, getOp.scope);
-    const grant = await grants.findById(shareId);
+    const grant = await grants.findById(grantId);
     if (!grant || grant.tenantId !== tenantId) {
       return reply
         .code(404)
-        .send({ error: { code: 'NotFound', message: `share does not exist: ${shareId}` } });
+        .send({ error: { code: 'NotFound', message: `grant does not exist: ${grantId}` } });
     }
-    return reply.send({ share: sharePublic(grant) });
+    return reply.send({ grant: grantPublic(grant) });
   });
 
-  const updateOp = adminOperations['shares.update'];
+  const updateOp = adminOperations['grants.update'];
   mount(updateOp, async (req, reply) => {
-    const { tenantId, shareId } = req.params as { tenantId: string; shareId: string };
+    const { tenantId, grantId } = req.params as { tenantId: string; grantId: string };
     const ctx = requireTenantAccess(req, tenantId, updateOp.scope);
-    const parsed = ShareGrantUpdateRequestSchema.safeParse(req.body);
+    const parsed = GrantUpdateRequestSchema.safeParse(req.body);
     if (!parsed.success) {
       return reply
         .code(400)
@@ -219,14 +218,14 @@ export async function registerAdminSharesRoutes(
           .send({ error: { code: 'InvalidArg', message: (err as Error).message } });
       }
     }
-    const existing = await grants.findById(shareId);
+    const existing = await grants.findById(grantId);
     if (!existing || existing.tenantId !== tenantId) {
       return reply
         .code(404)
-        .send({ error: { code: 'NotFound', message: `share does not exist: ${shareId}` } });
+        .send({ error: { code: 'NotFound', message: `grant does not exist: ${grantId}` } });
     }
-    if (existing.archivedAt !== null) return archivedConflict(reply, shareId);
-    // The link as it will be: what it asks and what it says are checked together.
+    if (existing.archivedAt !== null) return archivedConflict(reply, grantId);
+    // The grant as it will be: what it asks and what it says are checked together.
     const settingsRefusal = refuseLinkSettings({
       visitorIdentity:
         body.visitorIdentity !== undefined ? body.visitorIdentity : existing.visitorIdentity,
@@ -243,7 +242,8 @@ export async function registerAdminSharesRoutes(
         return reply.code(400).send({ error: { code: 'InvalidArg', message: refusal } });
       }
     }
-    const updated = await grants.update(shareId, tenantId, {
+    const updated = await grants.update(grantId, tenantId, {
+      ...(body.name !== undefined ? { name: body.name } : {}),
       ...(layerChanges
         ? {
             layer:
@@ -265,8 +265,10 @@ export async function registerAdminSharesRoutes(
       ...(body.identity !== undefined ? { identity: body.identity } : {}),
       ...(body.scope !== undefined ? { scope: body.scope } : {}),
       ...(body.origins !== undefined ? { origins: body.origins } : {}),
-      ...(body.password !== undefined
-        ? { passwordHash: body.password === null ? null : hashSharePassword(body.password) }
+      ...(body.passphrase !== undefined
+        ? {
+            passphraseHash: body.passphrase === null ? null : hashGrantPassphrase(body.passphrase),
+          }
         : {}),
       ...(body.sessionTtlSeconds !== undefined
         ? { sessionTtlSeconds: body.sessionTtlSeconds }
@@ -277,11 +279,11 @@ export async function registerAdminSharesRoutes(
     if (!updated) {
       return reply
         .code(404)
-        .send({ error: { code: 'NotFound', message: `share does not exist: ${shareId}` } });
+        .send({ error: { code: 'NotFound', message: `grant does not exist: ${grantId}` } });
     }
     await securityEvents.append({
       tenantId,
-      kind: 'share.updated',
+      kind: 'grant.updated',
       jti: updated.id,
       docId: updated.docId,
       scope: updated.scope,
@@ -289,58 +291,58 @@ export async function registerAdminSharesRoutes(
       via: ctx.via,
       ...(updated.expiresAt !== null ? { expiresAt: updated.expiresAt } : {}),
     });
-    return reply.send({ share: sharePublic(updated) });
+    return reply.send({ grant: grantPublic(updated) });
   });
 
-  const archiveOp = adminOperations['shares.archive'];
+  const archiveOp = adminOperations['grants.archive'];
   mount(archiveOp, async (req, reply) => {
-    const { tenantId, shareId } = req.params as { tenantId: string; shareId: string };
+    const { tenantId, grantId } = req.params as { tenantId: string; grantId: string };
     const ctx = requireTenantAccess(req, tenantId, archiveOp.scope);
-    const existing = await grants.findById(shareId);
+    const existing = await grants.findById(grantId);
     if (!existing || existing.tenantId !== tenantId) {
       return reply
         .code(404)
-        .send({ error: { code: 'NotFound', message: `share does not exist: ${shareId}` } });
+        .send({ error: { code: 'NotFound', message: `grant does not exist: ${grantId}` } });
     }
-    const archived = await grants.archive(shareId, tenantId);
+    const archived = await grants.archive(grantId, tenantId);
     if (!archived) {
       return reply
         .code(404)
-        .send({ error: { code: 'NotFound', message: `share does not exist: ${shareId}` } });
+        .send({ error: { code: 'NotFound', message: `grant does not exist: ${grantId}` } });
     }
     if (existing.archivedAt === null) {
       await securityEvents.append({
         tenantId,
-        kind: 'share.archived',
-        jti: shareId,
+        kind: 'grant.archived',
+        jti: grantId,
         docId: archived.docId,
         scope: archived.scope,
         actor: ctx.sub,
         via: ctx.via,
       });
     }
-    return reply.send({ share: sharePublic(archived) });
+    return reply.send({ grant: grantPublic(archived) });
   });
 
-  const visitorsListOp = adminOperations['shares.visitors.list'];
+  const visitorsListOp = adminOperations['grants.visitors.list'];
   mount(visitorsListOp, async (req, reply) => {
-    const { tenantId, shareId } = req.params as { tenantId: string; shareId: string };
+    const { tenantId, grantId } = req.params as { tenantId: string; grantId: string };
     requireTenantAccess(req, tenantId, visitorsListOp.scope);
-    const parsed = ShareVisitorListQuerySchema.safeParse(req.query ?? {});
+    const parsed = GrantVisitorListQuerySchema.safeParse(req.query ?? {});
     if (!parsed.success) {
       return reply
         .code(400)
         .send({ error: { code: 'InvalidArg', message: formatIssues(parsed.error.issues) } });
     }
-    const grant = await grants.findById(shareId);
+    const grant = await grants.findById(grantId);
     if (!grant || grant.tenantId !== tenantId) {
       return reply
         .code(404)
-        .send({ error: { code: 'NotFound', message: `share does not exist: ${shareId}` } });
+        .send({ error: { code: 'NotFound', message: `grant does not exist: ${grantId}` } });
     }
     const { limit, cursor } = parsed.data;
     const before = cursor === undefined ? undefined : decodeListCursor(cursor);
-    const rows = await visitors.list(shareId, { limit: limit + 1, ...(before ? { before } : {}) });
+    const rows = await visitors.list(grantId, { limit: limit + 1, ...(before ? { before } : {}) });
     const page = rows.slice(0, limit);
     const last = page[page.length - 1];
     const nextCursor =
@@ -350,11 +352,11 @@ export async function registerAdminSharesRoutes(
     return reply.send({ visitors: page.map(visitorPublic), nextCursor });
   });
 
-  const visitorsDeleteOp = adminOperations['shares.visitors.delete'];
+  const visitorsDeleteOp = adminOperations['grants.visitors.delete'];
   mount(visitorsDeleteOp, async (req, reply) => {
-    const { tenantId, shareId, visitorId } = req.params as {
+    const { tenantId, grantId, visitorId } = req.params as {
       tenantId: string;
-      shareId: string;
+      grantId: string;
       visitorId: string;
     };
     requireTenantAccess(req, tenantId, visitorsDeleteOp.scope);
@@ -363,48 +365,48 @@ export async function registerAdminSharesRoutes(
         .code(400)
         .send({ error: { code: 'InvalidArg', message: `not a visitor id: ${visitorId}` } });
     }
-    // An archived link's visitors can be deleted too: erasing someone's
-    // answers never waits on the link.
-    const grant = await grants.findById(shareId);
+    // An archived grant's visitors can be deleted too: erasing someone's
+    // answers never waits on the grant.
+    const grant = await grants.findById(grantId);
     if (!grant || grant.tenantId !== tenantId) {
       return reply
         .code(404)
-        .send({ error: { code: 'NotFound', message: `share does not exist: ${shareId}` } });
+        .send({ error: { code: 'NotFound', message: `grant does not exist: ${grantId}` } });
     }
-    await deleteVisitor({ tenantId, grantId: shareId, visitorId, docId: grant.docId });
+    await deleteVisitor({ tenantId, grantId, visitorId, docId: grant.docId });
     return reply.code(204).send();
   });
 
-  const deleteOp = adminOperations['shares.delete'];
+  const deleteOp = adminOperations['grants.delete'];
   mount(deleteOp, async (req, reply) => {
-    const { tenantId, shareId } = req.params as { tenantId: string; shareId: string };
+    const { tenantId, grantId } = req.params as { tenantId: string; grantId: string };
     const ctx = requireTenantAccess(req, tenantId, deleteOp.scope);
-    const existing = await grants.findById(shareId);
+    const existing = await grants.findById(grantId);
     if (!existing || existing.tenantId !== tenantId) {
       return reply
         .code(404)
-        .send({ error: { code: 'NotFound', message: `share does not exist: ${shareId}` } });
+        .send({ error: { code: 'NotFound', message: `grant does not exist: ${grantId}` } });
     }
-    // Deleting a link never deletes its visitors (their answers, their
+    // Deleting a grant never deletes its visitors (their answers, their
     // layers): one that has any is archived instead.
     const [visitorLayers, visitorCount] = await Promise.all([
-      layers.countForGrant(shareId),
-      visitors.countForGrant(shareId),
+      layers.countForGrant(grantId),
+      visitors.countForGrant(grantId),
     ]);
     if (visitorLayers > 0 || visitorCount > 0) {
       return reply.code(409).send({
         error: {
           code: 'Conflict',
-          message: `share ${shareId} has visitors (${visitorCount}) or visitors' layers (${visitorLayers}): archive it instead, or delete them first`,
+          message: `grant ${grantId} has visitors (${visitorCount}) or visitors' layers (${visitorLayers}): archive it instead, or delete them first`,
           details: { visitors: visitorCount, visitorLayers },
         },
       });
     }
-    await grants.delete(shareId, tenantId);
+    await grants.delete(grantId, tenantId);
     await securityEvents.append({
       tenantId,
-      kind: 'share.revoked',
-      jti: shareId,
+      kind: 'grant.revoked',
+      jti: grantId,
       docId: existing.docId,
       scope: existing.scope,
       actor: ctx.sub,
@@ -415,9 +417,9 @@ export async function registerAdminSharesRoutes(
 }
 
 /**
- * Why a link's settings can't be taken, or `null`: a link that asks its
- * visitors asks at least one field, and links its privacy page over the web;
- * a link that says who its visitors are says something, and never also asks
+ * Why a grant's settings can't be taken, or `null`: a grant that asks its
+ * visitors asks at least one field, and grants its privacy page over the web;
+ * a grant that says who its visitors are says something, and never also asks
  * a field it sets (the answer would be ignored).
  */
 function refuseLinkSettings(body: {
@@ -441,7 +443,7 @@ function refuseLinkSettings(body: {
     if (set.length === 0) return 'identity: set at least one field, or set identity to null';
     const both = asks ? set.filter((field) => asks.fields[field] !== undefined) : [];
     if (both.length > 0) {
-      return `visitorIdentity.fields: the link's identity sets ${both.join(', ')}, so it can't ask for it`;
+      return `visitorIdentity.fields: the grant's identity sets ${both.join(', ')}, so it can't ask for it`;
     }
   }
   return null;
@@ -449,18 +451,18 @@ function refuseLinkSettings(body: {
 
 const VISITOR_ID = /^[0-9a-f]{24}$/;
 
-/** An archived link is final: it takes no more changes. */
-function archivedConflict(reply: FastifyReply, shareId: string): FastifyReply {
+/** An archived grant is final: it takes no more changes. */
+function archivedConflict(reply: FastifyReply, grantId: string): FastifyReply {
   return reply.code(409).send({
     error: {
       code: 'Conflict',
-      message: `share ${shareId} is archived: create a new link to share again`,
+      message: `grant ${grantId} is archived: create a new grant to give access again`,
     },
   });
 }
 
-/** Wire shape of a visitor (`ShareVisitorRecord`). */
-function visitorPublic(v: ListedShareVisitor): Record<string, unknown> {
+/** Wire shape of a visitor (`GrantVisitorRecord`). */
+function visitorPublic(v: ListedGrantVisitor): Record<string, unknown> {
   return {
     visitorId: v.visitorId,
     answers: v.answers,
@@ -473,11 +475,12 @@ function visitorPublic(v: ListedShareVisitor): Record<string, unknown> {
 }
 
 /** Wire shape: the scrypt envelope never leaves the row. */
-function sharePublic(g: ShareGrantRow): Record<string, unknown> {
+function grantPublic(g: GrantRow): Record<string, unknown> {
   return {
     id: g.id,
     tenantId: g.tenantId,
     docId: g.docId,
+    name: g.name,
     layerMode: g.layerMode,
     layerName: g.layerName,
     keepVisitorLayers: g.keepVisitorLayers,
@@ -486,7 +489,7 @@ function sharePublic(g: ShareGrantRow): Record<string, unknown> {
     identity: g.identity,
     scope: [...g.scope],
     origins: g.origins ? [...g.origins] : null,
-    passwordProtected: g.passwordHash !== null,
+    passphraseProtected: g.passphraseHash !== null,
     sessionTtlSeconds: g.sessionTtlSeconds,
     disabled: g.disabled,
     archivedAt: g.archivedAt,

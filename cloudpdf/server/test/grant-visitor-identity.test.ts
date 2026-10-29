@@ -1,11 +1,11 @@
 /**
- * Who a share link's visitors are. A link can ask (`visitorIdentity`): when
+ * Who a grant's visitors are. A grant can ask (`visitorIdentity`): when
  * they open it, or before their first change. The answers are given once,
  * stored with the visitor, and put into every token issued for them; one
  * already given is never replaced (a visitor who mistyped starts over). A
- * visitor who hasn't answered what's required can't open a link that asks
- * on open, and can't change a document whose link asks before the first
- * change. The link's visitors are listed with their answers and their layer,
+ * visitor who hasn't answered what's required can't open a grant that asks
+ * on open, and can't change a document whose grant asks before the first
+ * change. The grant's visitors are listed with their answers and their layer,
  * and deleting one erases both.
  */
 import { createHash, randomBytes } from 'node:crypto';
@@ -28,8 +28,8 @@ import { createValidTestLicenseGate } from '../src/licensing/testing';
 import { highlightDraft } from './_helpers/two-replica-harness';
 
 const STUB_ENTRY = new URL('./_helpers/stub-worker-entry.cjs', import.meta.url);
-const SECRET = 'share-identity-secret';
-const API_TOKEN = 'share-identity-root-token';
+const SECRET = 'grant-identity-secret';
+const API_TOKEN = 'grant-identity-root-token';
 const TENANT = 'tenant-identity';
 const DOC = 'doc-identity';
 const ORIGIN = 'https://acme.example';
@@ -40,7 +40,7 @@ let bundle: AppBundle;
 let baseUrl: string;
 
 beforeAll(async () => {
-  dir = await mkdtemp(join(tmpdir(), 'share-identity-'));
+  dir = await mkdtemp(join(tmpdir(), 'grant-identity-'));
   const storageRoot = join(dir, 'objects');
   db = createSqliteDb({ path: ':memory:' });
   await migrate(db, { source: { kind: 'inline', migrations: sqliteMigrations } });
@@ -128,17 +128,17 @@ const REVIEW = {
   ask: 'before-first-change',
 } as const;
 
-const createLink = (body: Record<string, unknown>) =>
-  call('POST', `/v1/tenants/${TENANT}/shares`, {
+const createGrant = (body: Record<string, unknown>) =>
+  call('POST', `/v1/tenants/${TENANT}/grants`, {
     token: API_TOKEN,
     body: { docId: DOC, scope: ['*'], ...body },
   });
 
-const updateLink = (id: string, body: Record<string, unknown>) =>
-  call('PATCH', `/v1/tenants/${TENANT}/shares/${id}`, { token: API_TOKEN, body });
+const updateGrant = (id: string, body: Record<string, unknown>) =>
+  call('PATCH', `/v1/tenants/${TENANT}/grants/${id}`, { token: API_TOKEN, body });
 
 const exchange = (body: Record<string, unknown>) =>
-  call('POST', '/v1/share-sessions', { body, origin: ORIGIN });
+  call('POST', '/v1/grant-sessions', { body, origin: ORIGIN });
 
 interface Session {
   token: string;
@@ -146,9 +146,9 @@ interface Session {
   visitor: { handle: string; identityRequest: Record<string, unknown> | null };
 }
 
-/** A link's session, as its visitor. */
-async function visit(shareToken: string, extra: Record<string, unknown> = {}): Promise<Session> {
-  const answer = await exchange({ shareToken, ...extra });
+/** A grant's session, as its visitor. */
+async function visit(grant: string, extra: Record<string, unknown> = {}): Promise<Session> {
+  const answer = await exchange({ grant, ...extra });
   expect(answer.status).toBe(200);
   return answer.body as Session;
 }
@@ -165,7 +165,7 @@ const visitorIdOf = (session: Session) =>
 
 const visitorRow = (session: Session) =>
   db
-    .selectFrom('share_visitors')
+    .selectFrom('grant_visitors')
     .selectAll()
     .where('visitor_id', '=', visitorIdOf(session))
     .executeTakeFirst();
@@ -191,34 +191,34 @@ const read = (session: Session) =>
     origin: ORIGIN,
   });
 
-const visitorsOf = (linkId: string, query = '') =>
-  call('GET', `/v1/tenants/${TENANT}/shares/${linkId}/visitors${query}`, { token: API_TOKEN });
+const visitorsOf = (grantId: string, query = '') =>
+  call('GET', `/v1/tenants/${TENANT}/grants/${grantId}/visitors${query}`, { token: API_TOKEN });
 
-const deleteVisitor = (linkId: string, visitorId: string) =>
-  call('DELETE', `/v1/tenants/${TENANT}/shares/${linkId}/visitors/${visitorId}`, {
+const deleteVisitor = (grantId: string, visitorId: string) =>
+  call('DELETE', `/v1/tenants/${TENANT}/grants/${grantId}/visitors/${visitorId}`, {
     token: API_TOKEN,
   });
 
-describe('what a link asks', () => {
+describe('what a grant asks', () => {
   test('carries its questions, and can stop asking', async () => {
-    const link = await createLink({ visitorIdentity: LEAD_GATE });
-    expect(link.status).toBe(200);
-    expect(link.body.share.visitorIdentity).toEqual(LEAD_GATE);
-    const plain = await createLink({});
-    expect(plain.body.share.visitorIdentity).toBeNull();
+    const grant = await createGrant({ visitorIdentity: LEAD_GATE });
+    expect(grant.status).toBe(200);
+    expect(grant.body.grant.visitorIdentity).toEqual(LEAD_GATE);
+    const plain = await createGrant({});
+    expect(plain.body.grant.visitorIdentity).toBeNull();
 
-    const stopped = await updateLink(link.body.share.id, { visitorIdentity: null });
+    const stopped = await updateGrant(grant.body.grant.id, { visitorIdentity: null });
     expect(stopped.status).toBe(200);
-    expect(stopped.body.share.visitorIdentity).toBeNull();
-    const again = await updateLink(link.body.share.id, { visitorIdentity: REVIEW });
-    expect(again.body.share.visitorIdentity).toEqual(REVIEW);
+    expect(stopped.body.grant.visitorIdentity).toBeNull();
+    const again = await updateGrant(grant.body.grant.id, { visitorIdentity: REVIEW });
+    expect(again.body.grant.visitorIdentity).toEqual(REVIEW);
   });
 
   test('refuses asking nothing, and a privacy page that is not a web page', async () => {
-    const nothing = await createLink({ visitorIdentity: { fields: {}, ask: 'on-open' } });
+    const nothing = await createGrant({ visitorIdentity: { fields: {}, ask: 'on-open' } });
     expect(nothing.status).toBe(400);
     expect(nothing.body.error.message).toMatch(/ask at least one field/);
-    const script = await createLink({
+    const script = await createGrant({
       visitorIdentity: { ...LEAD_GATE, privacyUrl: 'javascript:alert(1)' },
     });
     expect(script.status).toBe(400);
@@ -226,11 +226,11 @@ describe('what a link asks', () => {
   });
 });
 
-describe('a link that asks on open', () => {
+describe('a grant that asks on open', () => {
   test('waits for what it requires, then puts the answers in every token', async () => {
-    const link = (await createLink({ visitorIdentity: LEAD_GATE })).body.share;
+    const grant = (await createGrant({ visitorIdentity: LEAD_GATE })).body.grant;
 
-    const asked = await exchange({ shareToken: link.id });
+    const asked = await exchange({ grant: grant.id });
     expect(asked.status).toBe(422);
     expect(asked.body.error).toMatchObject({
       code: 'VisitorIdentityRequired',
@@ -243,14 +243,14 @@ describe('a link that asks on open', () => {
       },
     });
     const typo = await exchange({
-      shareToken: link.id,
+      grant: grant.id,
       visitorIdentity: { displayName: 'Ada', email: 'ada-at-example' },
     });
     expect(typo.status).toBe(422);
     expect(typo.body.error.details).toMatchObject({ missing: ['email'], invalid: ['email'] });
 
-    const ada = await visit(link.id, {
-      // Trimmed; a field the link doesn't ask is ignored.
+    const ada = await visit(grant.id, {
+      // Trimmed; a field the grant doesn't ask is ignored.
       visitorIdentity: { displayName: '  Ada Lovelace ', email: 'ada@example.com', title: 'CEO' },
     });
     const claims = claimsOf(ada.token);
@@ -261,7 +261,7 @@ describe('a link that asks on open', () => {
     });
     expect(claims.identity_pending).toBeUndefined();
     expect(await visitorRow(ada)).toMatchObject({
-      grant_id: link.id,
+      grant_id: grant.id,
       display_name: 'Ada Lovelace',
       email: 'ada@example.com',
       title: null,
@@ -271,9 +271,9 @@ describe('a link that asks on open', () => {
 
     // A renewal needs no answers; ones given again don't replace hers, and
     // one she hadn't given (optional) fills in.
-    const renewed = await visit(link.id, { visitorHandle: ada.visitor.handle });
+    const renewed = await visit(grant.id, { visitorHandle: ada.visitor.handle });
     expect(claimsOf(renewed.token).identity).toEqual(claims.identity);
-    const changed = await visit(link.id, {
+    const changed = await visit(grant.id, {
       visitorHandle: renewed.visitor.handle,
       visitorIdentity: { displayName: 'Someone Else', organization: 'Analytical Engines' },
     });
@@ -285,28 +285,28 @@ describe('a link that asks on open', () => {
   });
 
   test('starting over is someone new, who is asked again', async () => {
-    const link = (await createLink({ visitorIdentity: LEAD_GATE })).body.share;
+    const grant = (await createGrant({ visitorIdentity: LEAD_GATE })).body.grant;
     const answers = { displayName: 'Grace', email: 'grace@exmaple.com' };
-    const first = await visit(link.id, { visitorIdentity: answers });
+    const first = await visit(grant.id, { visitorIdentity: answers });
 
     const restarted = { visitorHandle: first.visitor.handle, restart: true };
-    expect((await exchange({ shareToken: link.id, ...restarted })).status).toBe(422);
-    const fixed = await visit(link.id, {
+    expect((await exchange({ grant: grant.id, ...restarted })).status).toBe(422);
+    const fixed = await visit(grant.id, {
       ...restarted,
       visitorIdentity: { ...answers, email: 'grace@example.com' },
     });
     expect(claimsOf(fixed.token).identity['email']).toBe('grace@example.com');
     expect(visitorIdOf(fixed)).not.toBe(visitorIdOf(first));
-    // On a shared link what the first visitor wrote stays theirs, answers and all.
+    // On a shared grant what the first visitor wrote stays theirs, answers and all.
     expect(await visitorRow(first)).toBeDefined();
   });
 });
 
-describe('a link that asks before the first change', () => {
+describe('a grant that asks before the first change', () => {
   test('lets them read, and refuses their changes until they answer', async () => {
-    const link = (await createLink({ layerMode: 'per-visitor', visitorIdentity: REVIEW })).body
-      .share;
-    const reader = await visit(link.id);
+    const grant = (await createGrant({ layerMode: 'per-visitor', visitorIdentity: REVIEW })).body
+      .grant;
+    const reader = await visit(grant.id);
     const pending = claimsOf(reader.token).identity_pending;
     expect(pending).toEqual({ fields: REVIEW.fields, missing: ['displayName'], invalid: [] });
     expect(reader.visitor.identityRequest).toEqual(pending);
@@ -322,7 +322,7 @@ describe('a link that asks before the first change', () => {
     expect(await layerRow(reader.layerName)).toBeUndefined();
     expect(await visitorRow(reader)).toBeUndefined();
 
-    const answered = await visit(link.id, {
+    const answered = await visit(grant.id, {
       visitorHandle: reader.visitor.handle,
       visitorIdentity: { displayName: 'Reviewer' },
     });
@@ -335,67 +335,69 @@ describe('a link that asks before the first change', () => {
   });
 
   test('refuses answers it can’t take at once', async () => {
-    const link = (
-      await createLink({
+    const grant = (
+      await createGrant({
         visitorIdentity: { fields: { email: 'optional' }, ask: 'before-first-change' },
       })
-    ).body.share;
-    const bad = await exchange({ shareToken: link.id, visitorIdentity: { email: 'nope' } });
+    ).body.grant;
+    const bad = await exchange({ grant: grant.id, visitorIdentity: { email: 'nope' } });
     expect(bad.status).toBe(422);
     expect(bad.body.error.details).toMatchObject({ missing: [], invalid: ['email'] });
     // Nothing required: no answers is fine, and nothing is pending.
-    const quiet = await visit(link.id);
+    const quiet = await visit(grant.id);
     expect(claimsOf(quiet.token).identity_pending).toBeUndefined();
   });
 });
 
-describe('a link that says who its visitors are', () => {
+describe('a grant that says who its visitors are', () => {
   const DANA = { displayName: 'Dana Smith', email: 'dana@client.example' };
 
   test('carries its identity, which can be replaced and cleared', async () => {
-    const link = await createLink({ identity: DANA });
-    expect(link.status).toBe(200);
-    expect(link.body.share.identity).toEqual(DANA);
-    expect((await createLink({})).body.share.identity).toBeNull();
+    const grant = await createGrant({ identity: DANA });
+    expect(grant.status).toBe(200);
+    expect(grant.body.grant.identity).toEqual(DANA);
+    expect((await createGrant({})).body.grant.identity).toBeNull();
 
-    const replaced = await updateLink(link.body.share.id, { identity: { displayName: 'Dana S.' } });
-    expect(replaced.body.share.identity).toEqual({ displayName: 'Dana S.' });
-    const cleared = await updateLink(link.body.share.id, { identity: null });
+    const replaced = await updateGrant(grant.body.grant.id, {
+      identity: { displayName: 'Dana S.' },
+    });
+    expect(replaced.body.grant.identity).toEqual({ displayName: 'Dana S.' });
+    const cleared = await updateGrant(grant.body.grant.id, { identity: null });
     expect(cleared.status).toBe(200);
-    expect(cleared.body.share.identity).toBeNull();
+    expect(cleared.body.grant.identity).toBeNull();
   });
 
   test('refuses saying nothing, and asking what it says', async () => {
-    const nothing = await createLink({ identity: {} });
+    const nothing = await createGrant({ identity: {} });
     expect(nothing.status).toBe(400);
     expect(nothing.body.error.message).toMatch(/identity: set at least one field/);
-    const both = await createLink({ identity: DANA, visitorIdentity: REVIEW });
+    const both = await createGrant({ identity: DANA, visitorIdentity: REVIEW });
     expect(both.status).toBe(400);
     expect(both.body.error.message).toMatch(/sets displayName, so it can't ask for it/);
 
-    // An update is checked against the link as it will be.
-    const asking = (await createLink({ visitorIdentity: REVIEW })).body.share;
-    const added = await updateLink(asking.id, { identity: DANA });
+    // An update is checked against the grant as it will be.
+    const asking = (await createGrant({ visitorIdentity: REVIEW })).body.grant;
+    const added = await updateGrant(asking.id, { identity: DANA });
     expect(added.status).toBe(400);
-    const swapped = await updateLink(asking.id, { identity: DANA, visitorIdentity: null });
+    const swapped = await updateGrant(asking.id, { identity: DANA, visitorIdentity: null });
     expect(swapped.status).toBe(200);
-    expect((await updateLink(asking.id, { visitorIdentity: REVIEW })).status).toBe(400);
+    expect((await updateGrant(asking.id, { visitorIdentity: REVIEW })).status).toBe(400);
   });
 
   test('puts it in every token, over the answers, and asks only the rest', async () => {
-    const link = (
-      await createLink({
+    const grant = (
+      await createGrant({
         layerMode: 'per-visitor',
         identity: { displayName: 'Dana Smith' },
         visitorIdentity: { fields: { email: 'required' }, ask: 'on-open' },
       })
-    ).body.share;
-    const asked = await exchange({ shareToken: link.id });
+    ).body.grant;
+    const asked = await exchange({ grant: grant.id });
     expect(asked.status).toBe(422);
     expect(asked.body.error.details).toMatchObject({ missing: ['email'] });
 
     // A name of their own isn't asked, so it's ignored; the email is theirs.
-    const dana = await visit(link.id, {
+    const dana = await visit(grant.id, {
       visitorIdentity: { displayName: 'Someone Else', email: 'dana@client.example' },
     });
     expect(claimsOf(dana.token).identity).toEqual({
@@ -411,37 +413,37 @@ describe('a link that says who its visitors are', () => {
   });
 
   test('a userId it sets replaces the visitor’s own; each visit still has its own layer', async () => {
-    const link = (
-      await createLink({ layerMode: 'per-visitor', identity: { userId: 'crm_42', ...DANA } })
-    ).body.share;
-    const first = await visit(link.id);
-    const second = await visit(link.id);
+    const grant = (
+      await createGrant({ layerMode: 'per-visitor', identity: { userId: 'crm_42', ...DANA } })
+    ).body.grant;
+    const first = await visit(grant.id);
+    const second = await visit(grant.id);
     expect(claimsOf(first.token).identity).toEqual({ userId: 'crm_42', ...DANA });
     expect(claimsOf(second.token).identity).toEqual({ userId: 'crm_42', ...DANA });
     expect(first.layerName).not.toBe(second.layerName);
   });
 });
 
-describe("a link's visitors", () => {
+describe("a grant's visitors", () => {
   test('lists who answered or wrote, newest first, a page at a time, with their layer', async () => {
-    const link = (
-      await createLink({
+    const grant = (
+      await createGrant({
         layerMode: 'per-visitor',
         visitorIdentity: { fields: { displayName: 'required' }, ask: 'on-open' },
       })
-    ).body.share;
-    const ann = await visit(link.id, { visitorIdentity: { displayName: 'Ann' } });
-    const ben = await visit(link.id, { visitorIdentity: { displayName: 'Ben' } });
+    ).body.grant;
+    const ann = await visit(grant.id, { visitorIdentity: { displayName: 'Ann' } });
+    const ben = await visit(grant.id, { visitorIdentity: { displayName: 'Ben' } });
     // Only looking (a 422) makes no visitor.
-    expect((await exchange({ shareToken: link.id })).status).toBe(422);
+    expect((await exchange({ grant: grant.id })).status).toBe(422);
     expect((await annotate(ann, 'from ann')).status).toBe(200);
     await db
-      .updateTable('share_visitors')
+      .updateTable('grant_visitors')
       .set({ first_seen_at: 1000 })
       .where('visitor_id', '=', visitorIdOf(ann))
       .execute();
 
-    const first = await visitorsOf(link.id, '?limit=1');
+    const first = await visitorsOf(grant.id, '?limit=1');
     expect(first.status).toBe(200);
     expect(first.body.visitors).toEqual([
       {
@@ -455,7 +457,7 @@ describe("a link's visitors", () => {
       },
     ]);
     expect(first.body.nextCursor).toEqual(expect.any(String));
-    const second = await visitorsOf(link.id, `?limit=1&cursor=${first.body.nextCursor}`);
+    const second = await visitorsOf(grant.id, `?limit=1&cursor=${first.body.nextCursor}`);
     expect(second.body.visitors).toEqual([
       expect.objectContaining({
         visitorId: visitorIdOf(ann),
@@ -467,48 +469,48 @@ describe("a link's visitors", () => {
     expect(second.body.nextCursor).toBeNull();
 
     expect((await visitorsOf('shr_doesnotexist000000000000')).status).toBe(404);
-    expect((await visitorsOf(link.id, '?limit=0')).status).toBe(400);
+    expect((await visitorsOf(grant.id, '?limit=0')).status).toBe(400);
   });
 
   test('deleting one erases their answers and layer; their handle comes back asked again', async () => {
-    const link = (await createLink({ layerMode: 'per-visitor', visitorIdentity: LEAD_GATE })).body
-      .share;
-    const ann = await visit(link.id, {
+    const grant = (await createGrant({ layerMode: 'per-visitor', visitorIdentity: LEAD_GATE })).body
+      .grant;
+    const ann = await visit(grant.id, {
       visitorIdentity: { displayName: 'Ann', email: 'ann@example.com' },
     });
     expect((await annotate(ann, 'mine')).status).toBe(200);
 
-    expect((await deleteVisitor(link.id, visitorIdOf(ann))).status).toBe(204);
+    expect((await deleteVisitor(grant.id, visitorIdOf(ann))).status).toBe(204);
     expect(await visitorRow(ann)).toBeUndefined();
     expect((await layerRow(ann.layerName))?.deleted_at).not.toBeNull();
-    expect((await visitorsOf(link.id)).body.visitors).toEqual([]);
-    const back = await exchange({ shareToken: link.id, visitorHandle: ann.visitor.handle });
+    expect((await visitorsOf(grant.id)).body.visitors).toEqual([]);
+    const back = await exchange({ grant: grant.id, visitorHandle: ann.visitor.handle });
     expect(back.status).toBe(422);
     // Again changes nothing; a malformed id is refused.
-    expect((await deleteVisitor(link.id, visitorIdOf(ann))).status).toBe(204);
-    expect((await deleteVisitor(link.id, 'not-a-visitor')).status).toBe(400);
+    expect((await deleteVisitor(grant.id, visitorIdOf(ann))).status).toBe(204);
+    expect((await deleteVisitor(grant.id, 'not-a-visitor')).status).toBe(400);
     expect((await deleteVisitor('shr_doesnotexist000000000000', visitorIdOf(ann))).status).toBe(
       404,
     );
   });
 
-  test('a link whose visitors only answered is archived, not deleted, and still lists them', async () => {
-    const link = (await createLink({ visitorIdentity: LEAD_GATE })).body.share;
-    const lead = await visit(link.id, {
+  test('a grant whose visitors only answered is archived, not deleted, and still lists them', async () => {
+    const grant = (await createGrant({ visitorIdentity: LEAD_GATE })).body.grant;
+    const lead = await visit(grant.id, {
       visitorIdentity: { displayName: 'Lead', email: 'lead@example.com' },
     });
-    const deleteLink = () =>
-      call('DELETE', `/v1/tenants/${TENANT}/shares/${link.id}`, { token: API_TOKEN });
-    const refused = await deleteLink();
+    const deleteGrant = () =>
+      call('DELETE', `/v1/tenants/${TENANT}/grants/${grant.id}`, { token: API_TOKEN });
+    const refused = await deleteGrant();
     expect(refused.status).toBe(409);
     expect(refused.body.error.details).toEqual({ visitors: 1, visitorLayers: 0 });
 
-    const archived = await call('POST', `/v1/tenants/${TENANT}/shares/${link.id}/archive`, {
+    const archived = await call('POST', `/v1/tenants/${TENANT}/grants/${grant.id}/archive`, {
       token: API_TOKEN,
     });
     expect(archived.status).toBe(200);
-    expect((await visitorsOf(link.id)).body.visitors).toHaveLength(1);
-    expect((await deleteVisitor(link.id, visitorIdOf(lead))).status).toBe(204);
-    expect((await deleteLink()).status).toBe(204);
+    expect((await visitorsOf(grant.id)).body.visitors).toHaveLength(1);
+    expect((await deleteVisitor(grant.id, visitorIdOf(lead))).status).toBe(204);
+    expect((await deleteGrant()).status).toBe(204);
   });
 });

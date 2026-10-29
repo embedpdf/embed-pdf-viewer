@@ -4,7 +4,7 @@
  * change captures, changes, audit rows, object numbers), a written
  * layer stays as a tombstone whose name every route refuses
  * (`LayerDeleted`, 410), a layer nobody wrote stays usable, and a layer a
- * share link uses is not deleted. The race with a write on another replica
+ * grant uses is not deleted. The race with a write on another replica
  * is at the end, on the stub worker.
  */
 import { createHash } from 'node:crypto';
@@ -276,10 +276,10 @@ describe('deleting a written layer', () => {
       layer,
     );
     refused(await onLayer('GET', layer, '/events'), layer);
-    // Not made again by a write, and no link can name it.
+    // Not made again by a write, and no grant can name it.
     expect((await layerRow(layer))?.deleted_at).not.toBeNull();
     refused(
-      await request('POST', `/v1/tenants/${TENANT}/shares`, API_TOKEN, {
+      await request('POST', `/v1/tenants/${TENANT}/grants`, API_TOKEN, {
         body: { docId: DOC, layerName: layer, scope: ['doc.open'] },
       }),
       layer,
@@ -315,25 +315,25 @@ describe('deleting a layer nobody wrote', () => {
 });
 
 describe('what is refused', () => {
-  test('a layer a share link uses, until the link is deleted', async () => {
+  test('a layer a grant uses, until the grant is deleted', async () => {
     const layer = 'linked';
     expect((await createSquare(layer)).status).toBe(200);
-    const link = await request('POST', `/v1/tenants/${TENANT}/shares`, API_TOKEN, {
+    const grant = await request('POST', `/v1/tenants/${TENANT}/grants`, API_TOKEN, {
       body: { docId: DOC, layerName: layer, scope: ['doc.open'] },
     });
-    expect(link.status).toBe(200);
+    expect(grant.status).toBe(200);
 
     const blocked = await deleteLayer(layer);
     expect(blocked.status).toBe(409);
     expect(blocked.body.error).toMatchObject({
       code: 'Conflict',
-      details: { shareIds: [link.body.share.id] },
+      details: { grantIds: [grant.body.grant.id] },
     });
     expect((await layerRow(layer))?.deleted_at).toBeNull();
 
     const unlinked = await request(
       'DELETE',
-      `/v1/tenants/${TENANT}/shares/${link.body.share.id}`,
+      `/v1/tenants/${TENANT}/grants/${grant.body.grant.id}`,
       API_TOKEN,
     );
     expect(unlinked.status).toBe(204);

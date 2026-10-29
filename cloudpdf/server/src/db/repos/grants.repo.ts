@@ -8,30 +8,32 @@ import { sql } from 'kysely';
 import type { VisitorIdentityConfig } from '../../auth/visitor-identity';
 import type { Database as Schema } from '../schema';
 
-export interface ShareGrantRow {
-  /** Doubles as the public share token (`shr_…`). */
+export interface GrantRow {
+  /** What a page holds to open it: `grt_…` (`shr_…` for grants made before the rename). */
   id: string;
   tenantId: string;
   docId: string;
-  layerMode: ShareLayerMode;
-  /** The layer every visitor shares; null for a per-visitor link. */
+  /** What it's called; null when unnamed. */
+  name: string | null;
+  layerMode: GrantLayerMode;
+  /** The layer every visitor shares; null for a per-visitor grant. */
   layerName: string | null;
-  /** A visitor's browser keeps its layer for the next visit (per-visitor links). */
+  /** A visitor's browser keeps its layer for the next visit (per-visitor grants). */
   keepVisitorLayers: boolean;
   /** Delete a visitor and their layer after this long unseen; null keeps them until deleted on purpose. */
   visitorIdleSeconds: number | null;
-  /** What the link asks its visitors; null asks nothing. */
+  /** What the grant asks its visitors; null asks nothing. */
   visitorIdentity: VisitorIdentityConfig | null;
-  /** Who the link's visitors are, when the link says so: it prevails over their answers. */
+  /** Who the grant's visitors are, when the grant says so: it prevails over their answers. */
   identity: Identity | null;
   scope: ReadonlyArray<string>;
   /** Origin allowlist; null = any origin. */
   origins: ReadonlyArray<string> | null;
   /** scrypt envelope; null = no passphrase. The phrase itself never leaves this shape. */
-  passwordHash: string | null;
+  passphraseHash: string | null;
   sessionTtlSeconds: number;
   disabled: boolean;
-  /** Unix epoch ms the link was archived: it exchanges no more, for good. Null while it works. */
+  /** Unix epoch ms the grant was archived: it exchanges no more, for good. Null while it works. */
   archivedAt: number | null;
   expiresAt: number | null;
   exchangeCount: number;
@@ -41,15 +43,16 @@ export interface ShareGrantRow {
   updatedAt: number;
 }
 
-/** Whose layer a link's visitors write into. */
-export type ShareLayerMode = 'shared' | 'per-visitor';
+/** Whose layer a grant's visitors write into. */
+export type GrantLayerMode = 'shared' | 'per-visitor';
 
-export interface ShareGrantCreateInput {
+export interface GrantCreateInput {
   tenantId: string;
   docId: string;
+  name?: string | null;
   /** The shared layer, when `layerMode` is `'shared'` (the default). */
   layerName?: string;
-  layerMode?: ShareLayerMode;
+  layerMode?: GrantLayerMode;
   keepVisitorLayers?: boolean;
   /** Omitted or null: visitors stay until deleted on purpose. */
   visitorIdleSeconds?: number | null;
@@ -57,14 +60,16 @@ export interface ShareGrantCreateInput {
   identity?: Identity | null;
   scope: ReadonlyArray<string>;
   origins?: ReadonlyArray<string>;
-  passwordHash?: string;
+  passphraseHash?: string;
   sessionTtlSeconds?: number;
   expiresAt?: number;
   createdBy: string;
 }
 
-export interface ShareGrantUpdateInput {
-  /** The mode and its layer move together: a shared link names its layer, a per-visitor link none. */
+export interface GrantUpdateInput {
+  /** null removes the name. */
+  name?: string | null;
+  /** The mode and its layer move together: a shared grant names its layer, a per-visitor grant none. */
   layer?: { mode: 'shared'; name: string } | { mode: 'per-visitor' };
   keepVisitorLayers?: boolean;
   /** null stops deleting visitors who go unseen. */
@@ -77,54 +82,55 @@ export interface ShareGrantUpdateInput {
   /** null clears the allowlist (any origin). */
   origins?: ReadonlyArray<string> | null;
   /** null removes the passphrase. */
-  passwordHash?: string | null;
+  passphraseHash?: string | null;
   sessionTtlSeconds?: number;
   disabled?: boolean;
   /** null removes the expiry. */
   expiresAt?: number | null;
 }
 
-export interface ShareGrantListOptions {
+export interface GrantListOptions {
   tenantId: string;
   docId?: string;
-  /** true lists the archived links only; otherwise only the ones that still work. */
+  /** true lists the archived grants only; otherwise only the ones that still work. */
   archived?: boolean;
   limit?: number;
   /** Keyset cursor, same shape as the documents/tenants lists. */
   before?: { createdAt: number; id: string };
 }
 
-/** `shr_` + 24 url-safe chars ≈ 143 bits of randomness. */
-export function newShareGrantId(): string {
-  return `shr_${randomBytes(18).toString('base64url')}`;
+/** `grt_` + 24 url-safe chars ≈ 143 bits of randomness. */
+export function newGrantId(): string {
+  return `grt_${randomBytes(18).toString('base64url')}`;
 }
 
 /**
- * Share grants: the stored decisions behind the public embed flow.
+ * Grants: the stored decisions behind the public embed flow.
  * Lookup by primary key is the token check — a row that exists and is
  * enabled authorizes exchange; deleting the row is revocation.
  */
-export class ShareGrantsRepo {
+export class GrantsRepo {
   constructor(private readonly db: Kysely<Schema>) {}
 
-  async findById(id: string): Promise<ShareGrantRow | null> {
+  async findById(id: string): Promise<GrantRow | null> {
     const r = await this.db
-      .selectFrom('share_grants')
+      .selectFrom('grants')
       .selectAll()
       .where('id', '=', id)
       .executeTakeFirst();
     return r ? mapRow(r) : null;
   }
 
-  async create(input: ShareGrantCreateInput): Promise<ShareGrantRow> {
+  async create(input: GrantCreateInput): Promise<GrantRow> {
     const now = Date.now();
-    const id = newShareGrantId();
+    const id = newGrantId();
     await this.db
-      .insertInto('share_grants')
+      .insertInto('grants')
       .values({
         id,
         tenant_id: input.tenantId,
         doc_id: input.docId,
+        name: input.name ?? null,
         layer_mode: input.layerMode ?? 'shared',
         layer_name:
           (input.layerMode ?? 'shared') === 'shared'
@@ -136,7 +142,7 @@ export class ShareGrantsRepo {
         identity_json: input.identity ? JSON.stringify(input.identity) : null,
         scope_json: JSON.stringify(input.scope),
         origins_json: input.origins ? JSON.stringify(input.origins) : null,
-        password_hash: input.passwordHash ?? null,
+        passphrase_hash: input.passphraseHash ?? null,
         session_ttl_seconds: input.sessionTtlSeconds ?? 600,
         disabled: 0,
         expires_at: input.expiresAt ?? null,
@@ -148,17 +154,14 @@ export class ShareGrantsRepo {
       })
       .execute();
     const row = await this.findById(id);
-    if (!row) throw new Error(`share_grants.create: row vanished after insert: ${id}`);
+    if (!row) throw new Error(`grants.create: row vanished after insert: ${id}`);
     return row;
   }
 
   /** Partial update; absent fields stay untouched. Returns null when the row is gone. */
-  async update(
-    id: string,
-    tenantId: string,
-    input: ShareGrantUpdateInput,
-  ): Promise<ShareGrantRow | null> {
+  async update(id: string, tenantId: string, input: GrantUpdateInput): Promise<GrantRow | null> {
     const patch: Record<string, unknown> = { updated_at: Date.now() };
+    if (input.name !== undefined) patch['name'] = input.name;
     if (input.layer !== undefined) {
       patch['layer_mode'] = input.layer.mode;
       patch['layer_name'] = input.layer.mode === 'shared' ? input.layer.name : null;
@@ -180,14 +183,14 @@ export class ShareGrantsRepo {
     if (input.origins !== undefined) {
       patch['origins_json'] = input.origins === null ? null : JSON.stringify(input.origins);
     }
-    if (input.passwordHash !== undefined) patch['password_hash'] = input.passwordHash;
+    if (input.passphraseHash !== undefined) patch['passphrase_hash'] = input.passphraseHash;
     if (input.sessionTtlSeconds !== undefined) {
       patch['session_ttl_seconds'] = input.sessionTtlSeconds;
     }
     if (input.disabled !== undefined) patch['disabled'] = input.disabled ? 1 : 0;
     if (input.expiresAt !== undefined) patch['expires_at'] = input.expiresAt;
     const res = await this.db
-      .updateTable('share_grants')
+      .updateTable('grants')
       .set(patch)
       .where('id', '=', id)
       .where('tenant_id', '=', tenantId)
@@ -197,17 +200,13 @@ export class ShareGrantsRepo {
   }
 
   /**
-   * End the link for good: it exchanges no more, and keeps its row and what
-   * its visitors made. Archiving an archived link changes nothing. Returns
+   * End the grant for good: it exchanges no more, and keeps its row and what
+   * its visitors made. Archiving an archived grant changes nothing. Returns
    * the row, or null when it is gone.
    */
-  async archive(
-    id: string,
-    tenantId: string,
-    now: number = Date.now(),
-  ): Promise<ShareGrantRow | null> {
+  async archive(id: string, tenantId: string, now: number = Date.now()): Promise<GrantRow | null> {
     await this.db
-      .updateTable('share_grants')
+      .updateTable('grants')
       .set({ archived_at: now, updated_at: now })
       .where('id', '=', id)
       .where('tenant_id', '=', tenantId)
@@ -219,16 +218,16 @@ export class ShareGrantsRepo {
 
   async delete(id: string, tenantId: string): Promise<boolean> {
     const res = await this.db
-      .deleteFrom('share_grants')
+      .deleteFrom('grants')
       .where('id', '=', id)
       .where('tenant_id', '=', tenantId)
       .execute();
     return Number(res[0]?.numDeletedRows ?? 0) > 0;
   }
 
-  async list(opts: ShareGrantListOptions): Promise<ShareGrantRow[]> {
+  async list(opts: GrantListOptions): Promise<GrantRow[]> {
     let q = this.db
-      .selectFrom('share_grants')
+      .selectFrom('grants')
       .selectAll()
       .where('tenant_id', '=', opts.tenantId)
       .orderBy('created_at', 'desc')
@@ -250,12 +249,12 @@ export class ShareGrantsRepo {
   }
 
   /**
-   * The working links whose visitors land in the layer: deleting it would
-   * leave them a dead link. An archived link gives no access any more.
+   * The working grants whose visitors land in the layer: deleting it would
+   * leave them a dead grant. An archived grant gives no access any more.
    */
-  async listByLayer(tenantId: string, docId: string, layerName: string): Promise<ShareGrantRow[]> {
+  async listByLayer(tenantId: string, docId: string, layerName: string): Promise<GrantRow[]> {
     const rows = await this.db
-      .selectFrom('share_grants')
+      .selectFrom('grants')
       .selectAll()
       .where('tenant_id', '=', tenantId)
       .where('doc_id', '=', docId)
@@ -269,7 +268,7 @@ export class ShareGrantsRepo {
   /** Bump the dashboard-convenience counters after a successful exchange. */
   async touchExchanged(id: string, now: number = Date.now()): Promise<void> {
     await this.db
-      .updateTable('share_grants')
+      .updateTable('grants')
       .set({
         exchange_count: sql`exchange_count + 1`,
         last_exchanged_at: now,
@@ -281,7 +280,7 @@ export class ShareGrantsRepo {
 
   async deleteByDoc(docId: string, tenantId: string): Promise<void> {
     await this.db
-      .deleteFrom('share_grants')
+      .deleteFrom('grants')
       .where('doc_id', '=', docId)
       .where('tenant_id', '=', tenantId)
       .execute();
@@ -292,7 +291,8 @@ function mapRow(r: {
   id: string;
   tenant_id: string;
   doc_id: string;
-  layer_mode: ShareLayerMode;
+  name: string | null;
+  layer_mode: GrantLayerMode;
   layer_name: string | null;
   keep_visitor_layers: number;
   visitor_idle_seconds: number | null;
@@ -300,7 +300,7 @@ function mapRow(r: {
   identity_json: string | null;
   scope_json: string;
   origins_json: string | null;
-  password_hash: string | null;
+  passphrase_hash: string | null;
   session_ttl_seconds: number;
   disabled: number;
   archived_at: number | null;
@@ -310,11 +310,12 @@ function mapRow(r: {
   created_by: string;
   created_at: number;
   updated_at: number;
-}): ShareGrantRow {
+}): GrantRow {
   return {
     id: r.id,
     tenantId: r.tenant_id,
     docId: r.doc_id,
+    name: r.name,
     layerMode: r.layer_mode,
     layerName: r.layer_name,
     keepVisitorLayers: Number(r.keep_visitor_layers) !== 0,
@@ -325,7 +326,7 @@ function mapRow(r: {
     identity: r.identity_json ? (JSON.parse(r.identity_json) as Identity) : null,
     scope: JSON.parse(r.scope_json) as string[],
     origins: r.origins_json ? (JSON.parse(r.origins_json) as string[]) : null,
-    passwordHash: r.password_hash,
+    passphraseHash: r.passphrase_hash,
     sessionTtlSeconds: Number(r.session_ttl_seconds),
     disabled: Number(r.disabled) !== 0,
     archivedAt: r.archived_at === null ? null : Number(r.archived_at),

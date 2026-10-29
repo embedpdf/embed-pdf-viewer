@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { ShareExchangeRequestSchema, adminOperations } from '@cloudpdf/contract';
+import { GrantExchangeRequestSchema, adminOperations } from '@cloudpdf/contract';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 
 import { setNoStore, tooManyRequests } from './_helpers';
@@ -8,7 +8,7 @@ import { AuthFailureLimiter } from '../app/auth-failure-limiter';
 import { RequestRateLimiter } from '../app/request-rate-limiter';
 import type { SignDevTokenInput } from '../auth/JwtVerifier';
 import { matchesOrigin } from '../auth/origins';
-import { verifySharePassword } from '../auth/share-password';
+import { verifyGrantPassphrase } from '../auth/grant-passphrase';
 import type { SuspendedTenantsGuard } from '../auth/SuspendedTenantsGuard';
 import {
   newVisitorId,
@@ -19,22 +19,22 @@ import {
 import { settleVisitorIdentity } from '../auth/visitor-identity';
 import type { DocumentsRepo } from '../db/repos/documents.repo';
 import type { LayersRepo } from '../db/repos/page_state.repo';
-import type { ShareGrantsRepo } from '../db/repos/share_grants.repo';
-import type { ShareVisitorsRepo } from '../db/repos/share_visitors.repo';
+import type { GrantsRepo } from '../db/repos/grants.repo';
+import type { GrantVisitorsRepo } from '../db/repos/grant_visitors.repo';
 import type { TenantUsageRepo } from '../db/repos/tenant_usage.repo';
 import type { UsageMeters } from '../licensing/UsageMeters';
 
 /** How long past a session's lifetime its renewal still continues the visit (a throttled timer, a slow network). */
 const VISIT_GRACE_SECONDS = 5 * 60;
 
-export interface ShareSessionRouteDeps {
+export interface GrantSessionRouteDeps {
   sign: (input: SignDevTokenInput) => string;
-  grants: ShareGrantsRepo;
+  grants: GrantsRepo;
   documents: DocumentsRepo;
   /** Visitors' layers: whether one was deleted. */
   layers: LayersRepo;
   /** Who the visitors are: their answers and their idle clock. */
-  visitors: ShareVisitorsRepo;
+  visitors: GrantVisitorsRepo;
   handles: VisitorHandles;
   /** Start over: a visitor's layer goes (`LayerService.deleteLayer` where the engine runs). */
   deleteLayer: (tenantId: string, input: { docId: string; layerName: string }) => Promise<void>;
@@ -43,18 +43,18 @@ export interface ShareSessionRouteDeps {
   tenantUsage: TenantUsageRepo;
   /** Test seams; production uses the defaults below. */
   ipAttemptLimit?: { maxAttempts: number; windowMs: number };
-  tokenAttemptLimit?: { maxAttempts: number; windowMs: number };
+  grantAttemptLimit?: { maxAttempts: number; windowMs: number };
   ipFailureLimit?: { maxFailures: number; windowMs: number };
 }
 
 /**
- * `POST /v1/share-sessions` — the public bottom rung of the ladder.
+ * `POST /v1/grant-sessions` — the public bottom rung of the ladder.
  *
- * Trades a share token (a stored-grant reference) for an ordinary
+ * Trades a grant's id (a reference to a stored grant) for an ordinary
  * short-lived doc JWT carrying the grant's capabilities and origin
  * lock. Unauthenticated by design: the grant row is the authorization,
  * evaluated here on every exchange, which is exactly what makes grants
- * revocable and editable after the token is pasted into public HTML.
+ * revocable and editable after its id is pasted into public HTML.
  *
  * The route lives on `publicPaths`, so the auth hook's failure limiter
  * never sees it — it carries its own three limiters, one per tier:
@@ -63,42 +63,41 @@ export interface ShareSessionRouteDeps {
  *     parsing or I/O, so no request shape can demand unbounded work
  *     from one source. Generous — a real viewer exchanges once per
  *     page load, so the budget sits far above legitimate NAT traffic.
- *   - failures per IP (probe): token spray and passphrase guessing
+ *   - failures per IP (probe): id spray and passphrase guessing
  *     accrue count and lock the source out; legitimate outcomes never
  *     count, exactly like the auth hook's limiter.
- *   - attempts per token (volume): the share token is the grant row
- *     id, so its budget is consumed before the row is fetched — a
- *     blocked token performs no DB work, and one hot link cannot melt
- *     a replica.
+ *   - attempts per grant (volume): consumed before the row is
+ *     fetched — a blocked grant performs no DB work, and one hot grant
+ *     cannot melt a replica.
  *
  * All three are in-process, per replica; cross-replica fairness
  * belongs at the edge, same doctrine as the auth-failure limiter.
  *
- * Unknown, revoked, disabled, and suspended-tenant tokens are all the
+ * Unknown, deleted, paused, archived and suspended-tenant grants are all the
  * same 404: existence of a grant is itself information. Stale-but-
  * legitimate outcomes (disabled, expired, suspended) do not count as
  * probe failures — an old embed on a real site keeps polling and must
- * not 429 its visitors' shared NAT. They do consume the token's own
- * attempt budget, which is what bounds the DB work a dead link can
- * demand while still blocking per token, never per NAT.
+ * not 429 its visitors' shared NAT. They do consume the grant's own
+ * attempt budget, which is what bounds the DB work a dead grant can
+ * demand while still blocking per grant, never per NAT.
  */
-export async function registerShareSessionRoutes(
+export async function registerGrantSessionRoutes(
   app: FastifyInstance,
-  deps: ShareSessionRouteDeps,
+  deps: GrantSessionRouteDeps,
 ): Promise<void> {
   const { sign, grants, documents, layers, visitors, handles, deleteLayer } = deps;
   const { suspendedTenants, usageMeters, tenantUsage } = deps;
   const ipAttempts = new RequestRateLimiter(
     deps.ipAttemptLimit ?? { maxAttempts: 300, windowMs: 60_000 },
   );
-  const tokenAttempts = new RequestRateLimiter(
-    deps.tokenAttemptLimit ?? { maxAttempts: 120, windowMs: 60_000 },
+  const grantAttempts = new RequestRateLimiter(
+    deps.grantAttemptLimit ?? { maxAttempts: 120, windowMs: 60_000 },
   );
   const ipFailures = new AuthFailureLimiter(
     deps.ipFailureLimit ?? { maxFailures: 30, windowMs: 60_000 },
   );
 
-  const op = adminOperations['shares.exchange'];
+  const op = adminOperations['grants.exchange'];
   app.route({
     method: op.method,
     url: op.path,
@@ -114,14 +113,14 @@ export async function registerShareSessionRoutes(
       const blockedMs = ipFailures.retryAfterMs(req.ip);
       if (blockedMs > 0) return tooManyRequests(reply, blockedMs);
 
-      const parsed = ShareExchangeRequestSchema.safeParse(req.body ?? {});
+      const parsed = GrantExchangeRequestSchema.safeParse(req.body ?? {});
       if (!parsed.success) {
         ipFailures.recordFailure(req.ip);
         return reply
           .code(400)
-          .send({ error: { code: 'InvalidArg', message: 'invalid share exchange request' } });
+          .send({ error: { code: 'InvalidArg', message: 'invalid grant exchange request' } });
       }
-      const { shareToken, password, visitorHandle, restart } = parsed.data;
+      const { grant: grantId, passphrase, visitorHandle, restart } = parsed.data;
       const answersGiven = parsed.data.visitorIdentity;
 
       // Browser-only endpoint: exchange exists to put a credential into
@@ -131,25 +130,25 @@ export async function registerShareSessionRoutes(
       if (typeof origin !== 'string' || origin.length === 0) {
         ipFailures.recordFailure(req.ip);
         return reply.code(403).send({
-          error: { code: 'OriginRequired', message: 'share exchange requires an Origin header' },
+          error: { code: 'OriginRequired', message: 'grant exchange requires an Origin header' },
         });
       }
 
-      // Volume tier, per token — consumed before the row is fetched
-      // (the token is the grant id, and the schema already bounded its
-      // shape). A blocked token never reaches the database. Attempts,
+      // Volume tier, per grant — consumed before the row is fetched
+      // (the schema already bounded the id's shape). A blocked grant
+      // never reaches the database. Attempts,
       // not successes: stale-grant outcomes and passphrase roundtrips
-      // consume too, so no single token can demand unbounded work.
-      const tokenBlockedMs = tokenAttempts.consume(shareToken);
-      if (tokenBlockedMs > 0) return tooManyRequests(reply, tokenBlockedMs);
+      // consume too, so no single grant can demand unbounded work.
+      const grantBlockedMs = grantAttempts.consume(grantId);
+      if (grantBlockedMs > 0) return tooManyRequests(reply, grantBlockedMs);
 
-      const grant = await grants.findById(shareToken);
+      const grant = await grants.findById(grantId);
       if (!grant) {
         ipFailures.recordFailure(req.ip);
         return notFound(reply);
       }
 
-      // Paused and archived links refuse alike: stale, not a probe.
+      // Paused and archived grants refuse alike: stale, not a probe.
       if (grant.disabled || grant.archivedAt !== null) return notFound(reply);
       if (await suspendedTenants.isSuspended(grant.tenantId)) return notFound(reply);
       const doc = await documents.findById(grant.docId);
@@ -157,9 +156,7 @@ export async function registerShareSessionRoutes(
         return notFound(reply);
       }
       if (grant.expiresAt !== null && grant.expiresAt <= Date.now()) {
-        return reply
-          .code(410)
-          .send({ error: { code: 'ShareExpired', message: 'share link expired' } });
+        return reply.code(410).send({ error: { code: 'GrantExpired', message: 'grant expired' } });
       }
       if (grant.origins && !matchesOrigin(origin, grant.origins)) {
         ipFailures.recordFailure(req.ip);
@@ -167,24 +164,24 @@ export async function registerShareSessionRoutes(
           .code(403)
           .send({ error: { code: 'OriginNotAllowed', message: 'origin not allowed' } });
       }
-      if (grant.passwordHash !== null) {
-        if (password === undefined) {
-          // The normal first roundtrip for a protected link — the
+      if (grant.passphraseHash !== null) {
+        if (passphrase === undefined) {
+          // The normal first roundtrip for a protected grant — the
           // viewer shows a prompt and exchanges again. Not a probe.
           return reply.code(422).send({
-            error: { code: 'SharePasswordRequired', message: 'this share requires a password' },
+            error: { code: 'GrantPassphraseRequired', message: 'this grant requires a passphrase' },
           });
         }
-        if (!verifySharePassword(password, grant.passwordHash)) {
+        if (!verifyGrantPassphrase(passphrase, grant.passphraseHash)) {
           ipFailures.recordFailure(req.ip);
           return reply.code(422).send({
-            error: { code: 'SharePasswordRequired', message: 'incorrect share password' },
+            error: { code: 'GrantPassphraseRequired', message: 'incorrect passphrase' },
           });
         }
       }
 
-      // Who this is: the visitor the handle names, when this link issued
-      // it; anyone else is a new visitor. On a per-visitor link the visitor
+      // Who this is: the visitor the handle names, when this grant issued
+      // it; anyone else is a new visitor. On a per-visitor grant the visitor
       // keeps their layer, unless they start over or it was deleted.
       const now = Date.now();
       const returning = visitorHandle ? handles.read(grant.id, visitorHandle) : null;
@@ -197,7 +194,7 @@ export async function registerShareSessionRoutes(
       let visitorId = returning?.visitorId ?? null;
       if (visitorId && restart) {
         // Starting over makes a new visitor, who is asked again. On a
-        // per-visitor link the old visitor and their layer go.
+        // per-visitor grant the old visitor and their layer go.
         if (grant.layerMode === 'per-visitor') {
           await deleteLayer(grant.tenantId, {
             docId: grant.docId,
@@ -217,8 +214,8 @@ export async function registerShareSessionRoutes(
       const layerName =
         grant.layerMode === 'per-visitor' ? visitorLayerName(visitorId) : grant.layerName!;
 
-      // Who they are: answers once given stand; new ones fill what the link
-      // asks and they haven't answered. A link that asks on open waits for
+      // Who they are: answers once given stand; new ones fill what the grant
+      // asks and they haven't answered. A grant that asks on open waits for
       // what it requires (the same roundtrip as a passphrase); one that asks
       // before the first change lets them read, and refuses their writes
       // until they answer. Answers it can't take are refused either way.
@@ -233,7 +230,7 @@ export async function registerShareSessionRoutes(
         return reply.code(422).send({
           error: {
             code: 'VisitorIdentityRequired',
-            message: "answer the share link's questions to open it",
+            message: "answer the grant's questions to open it",
             details: pending,
           },
         });
@@ -253,10 +250,10 @@ export async function registerShareSessionRoutes(
       const ttl = grant.sessionTtlSeconds;
       const token = sign({
         // The sub prefix is load-bearing: /v1/access skips view counting
-        // for `share:` subjects (counted here), the audit trail honestly
-        // labels share-session actors, and a visitor's layer is stamped
-        // with its link from it at the first write.
-        sub: `share:${grant.id}`,
+        // for `grant:` subjects (counted here), the audit trail honestly
+        // labels grant-session actors, and a visitor's layer is stamped
+        // with its grant from it at the first write.
+        sub: `grant:${grant.id}`,
         tenant_id: grant.tenantId,
         doc_id: grant.docId,
         layer_name: layerName,
@@ -265,7 +262,7 @@ export async function registerShareSessionRoutes(
         jti: randomUUID(),
         ttlSeconds: ttl,
         extras: {
-          // The link's own identity prevails: it's what the link's owner says about whoever
+          // The grant's own identity prevails: it's what the grant's owner says about whoever
           // opens it (it never asks what it sets, so no answer is lost).
           identity: { ...settled.answers, userId: visitorUserId(visitorId), ...grant.identity },
           ...(pending ? { identity_pending: pending } : {}),
@@ -273,7 +270,7 @@ export async function registerShareSessionRoutes(
       });
 
       await grants.touchExchanged(grant.id);
-      // A view = a visit through a share link (its first exchange, not its
+      // A view = a visit through a grant (its first exchange, not its
       // renewals) or an authorized /v1/access grant, deduplicated via the
       // sub prefix above. Both meters move here: the deployment-wide
       // license counter and the per-tenant fact.
@@ -291,7 +288,7 @@ export async function registerShareSessionRoutes(
         visitor: {
           handle: handles.issue(grant.id, visitorId, now),
           // The browser comes back as this visitor, with their answers and what
-          // they made, unless the link gives a new copy every visit.
+          // they made, unless the grant gives a new copy every visit.
           keep: grant.layerMode === 'shared' || grant.keepVisitorLayers,
           identityRequest: pending,
         },
@@ -302,7 +299,5 @@ export async function registerShareSessionRoutes(
 }
 
 function notFound(reply: FastifyReply): FastifyReply {
-  return reply
-    .code(404)
-    .send({ error: { code: 'NotFound', message: 'unknown or revoked share token' } });
+  return reply.code(404).send({ error: { code: 'NotFound', message: 'unknown or revoked grant' } });
 }

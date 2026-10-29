@@ -145,10 +145,10 @@ export async function registerAccessRoutes(
         : undefined;
     // A view is a successfully authorized viewer access grant. Counting at
     // this choke point avoids charging internal render/cache operations.
-    // Share sessions (`sub: share:<id>`) were already counted at exchange —
+    // Grant sessions (`sub: grant:<id>`) were already counted at exchange —
     // skipping them here is the two-choke-point dedupe, applied to both the
     // deployment-wide license meter and the per-tenant fact.
-    if (!ctx.jwt.claims.sub.startsWith('share:')) {
+    if (!ctx.jwt.claims.sub.startsWith('grant:')) {
       await usageMeters?.recordView();
       await tenantUsage?.recordView(ctx.tenantId);
     }
