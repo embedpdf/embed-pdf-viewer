@@ -112,8 +112,8 @@ On the cloud you'll also meet:
 | Code                      | What happened                                                                                                                            |
 | :------------------------ | :--------------------------------------------------------------------------------------------------------------------------------------- |
 | `Unauthenticated`         | The token is missing, invalid or expired.                                                                                                |
-| `SharePasswordRequired`   | The share link needs its passphrase, or the one you gave was wrong.                                                                      |
-| `VisitorIdentityRequired` | The share link asks who the visitor is; `error.details` says what. See [Authentication](/docs/engine/authentication#who-the-visitor-is). |
+| `GrantPassphraseRequired`   | The grant needs its passphrase, or the one you gave was wrong.                                                                      |
+| `VisitorIdentityRequired` | The grant asks who the visitor is; `error.details` says what. See [Authentication](/docs/engine/authentication#who-the-visitor-is). |
 | `Network`                 | The request didn't reach the server (offline, DNS, TLS).                                                                                 |
 | `LayerVersionConflict`    | Someone else saved at the same moment. Nothing was changed; try again.                                                                   |
 | `LayerDeleted`            | The layer was deleted, and its name can't be used again. Open another layer.                                                             |

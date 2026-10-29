@@ -7,5 +7,5 @@ function onReady(viewer: Viewer) {
 </script>
 
 <template>
-  <PDFViewer :src="{ shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' }" style="height: 100vh" @ready="onReady" />
+  <PDFViewer :src="{ grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' }" style="height: 100vh" @ready="onReady" />
 </template>

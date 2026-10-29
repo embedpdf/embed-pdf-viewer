@@ -22,7 +22,7 @@ import {
 import { EpdfRedaction, withRedaction } from '@embedpdf/angular/redaction';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 /** Next to `<epdf-stage #stage="epdfStage">`: `<div demoPendingMarks [stage]="stage"></div>`. */
 @Component({

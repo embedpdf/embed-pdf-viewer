@@ -10,7 +10,7 @@ import './download.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin()];
 
-const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 const megabytes = (bytes: Uint8Array) => `${(bytes.byteLength / 1_000_000).toFixed(2)} MB`;
 

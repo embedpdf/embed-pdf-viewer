@@ -422,18 +422,18 @@ export function transformViewerFile(source, engine, relative) {
   const swapped = swapViewerDocuments(swapViewerNames(output, engine), engine, integration);
   // A per-site file writes the demo document as its site shows it; when the grant changes in
   // documents.mjs, a copy of the old one would still open nothing.
-  for (const [, token] of swapped.matchAll(/\bshareToken:\s*['"](shr_[\w-]+)['"]/g)) {
-    if (!DEMO_SHARE_TOKENS.has(token)) {
-      throw new Error(`${relative}: ${token} isn't a demo document's share grant (documents.mjs)`);
+  for (const [, grant] of swapped.matchAll(/\bgrant:\s*['"]((?:grt|shr)_[\w-]+)['"]/g)) {
+    if (!DEMO_GRANTS.has(grant)) {
+      throw new Error(`${relative}: ${grant} isn't a demo document's grant (documents.mjs)`);
     }
   }
   return swapped;
 }
 
-/** The share grants of the demo documents, as their `viewerCloud` forms name them. */
-const DEMO_SHARE_TOKENS = new Set(
+/** The grants of the demo documents, as their `viewerCloud` forms name them. */
+const DEMO_GRANTS = new Set(
   Object.values(DEMO_DOCUMENTS).flatMap(
-    ({ viewerCloud = '' }) => viewerCloud.match(/shr_[\w-]+/g) ?? [],
+    ({ viewerCloud = '' }) => viewerCloud.match(/(?:grt|shr)_[\w-]+/g) ?? [],
   ),
 );
 

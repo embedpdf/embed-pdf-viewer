@@ -35,7 +35,7 @@ const plugins = [
   commandsPlugin({ commands: [...standardCommands, twoPages] }),
 ];
 
-const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 function CommandButton({ id }: { id: string }) {
   const command = useCommand(id);

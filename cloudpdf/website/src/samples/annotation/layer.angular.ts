@@ -14,7 +14,7 @@ import { withInteraction } from '@embedpdf/angular/interaction';
 import { EpdfAnnotation, EpdfAnnotationLayer, withAnnotation } from '@embedpdf/angular/annotation';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const report: OpenInput = { kind: 'share', shareToken: 'shr__TWhIGdJtaKlcnVgJdg--bcm' };
+const report: OpenInput = { kind: 'grant', grant: 'shr__TWhIGdJtaKlcnVgJdg--bcm' };
 
 @Component({
   selector: 'demo-status',

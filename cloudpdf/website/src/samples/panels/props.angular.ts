@@ -14,7 +14,7 @@ import type { SearchHit } from '@embedpdf/angular/search';
 import { EpdfShell, withShell } from '@embedpdf/angular/shell';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 // The panel shows the match its props name, and steps to the next one without reopening.
 @Component({

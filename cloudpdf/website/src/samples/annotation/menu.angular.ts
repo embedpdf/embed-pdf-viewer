@@ -22,7 +22,7 @@ import {
 } from '@embedpdf/angular/annotation';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const notice: OpenInput = { kind: 'share', shareToken: 'shr_LfeeUer1ogBI9mz8eYkWXa0d' };
+const notice: OpenInput = { kind: 'grant', grant: 'shr_LfeeUer1ogBI9mz8eYkWXa0d' };
 
 // What's in the menu depends on what's selected: text boxes get Bold and Edit.
 @Component({

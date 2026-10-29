@@ -4,5 +4,5 @@ import { config } from './viewer-config';
 </script>
 
 <template>
-  <PDFViewer :src="{ shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' }" v-bind="config" style="height: 100vh" />
+  <PDFViewer :src="{ grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' }" v-bind="config" style="height: 100vh" />
 </template>

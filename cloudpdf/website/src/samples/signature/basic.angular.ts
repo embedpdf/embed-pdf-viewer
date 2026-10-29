@@ -28,7 +28,7 @@ const assetEngine = localEngine();
 // service with `remoteSigner`, or a person's own with `personalSigner`.
 const signer = createTestSigner({ commonName: 'Ada Lovelace' });
 
-const agreement: OpenInput = { kind: 'share', shareToken: 'shr_G5GcxJeEBa2IiwIs0DCNruCL' };
+const agreement: OpenInput = { kind: 'grant', grant: 'shr_G5GcxJeEBa2IiwIs0DCNruCL' };
 
 // A mark's button: its picture once there is one, its label until then.
 @Component({

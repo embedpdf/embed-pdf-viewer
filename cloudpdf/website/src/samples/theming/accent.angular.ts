@@ -25,7 +25,7 @@ import { cloudEngine } from '@cloudpdf/engine';
 const TITLE = { start: 28, count: 30 };
 const SWATCHES = ['#3858e9', '#e91e63', '#0f6e56', '#c2410c'];
 
-const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 // The cover's title is selected on load, so the accent shows; drag over any text to see more.
 @Component({

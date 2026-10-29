@@ -21,7 +21,7 @@ import {
 } from '@embedpdf/angular/annotation';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const proposal: OpenInput = { kind: 'share', shareToken: 'shr_qnqHtCNRpzz-s7DPFBIbuOAF' };
+const proposal: OpenInput = { kind: 'grant', grant: 'shr_qnqHtCNRpzz-s7DPFBIbuOAF' };
 
 // A thread's verdict, its check mark, and the buttons the user may use.
 @Component({

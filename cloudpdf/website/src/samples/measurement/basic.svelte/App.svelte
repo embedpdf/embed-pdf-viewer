@@ -19,7 +19,7 @@
     measurementPlugin(),
   ];
 
-  const sketch: OpenInput = { kind: 'share', shareToken: 'shr_IyOgSdO4AmJqV4BoMv5V0nYU' };
+  const sketch: OpenInput = { kind: 'grant', grant: 'shr_IyOgSdO4AmJqV4BoMv5V0nYU' };
 </script>
 
 <Viewer {engine} {plugins} initialDocuments={[{ source: sketch }]}>

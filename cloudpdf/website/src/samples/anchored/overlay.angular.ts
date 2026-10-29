@@ -14,7 +14,7 @@ import { EpdfSearch, EpdfSearchLayer, withSearch } from '@embedpdf/angular/searc
 import { EpdfAnchored } from '@embedpdf/angular/anchored';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 // A button below the active match: it follows the match while you scroll and zoom.
 @Component({

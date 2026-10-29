@@ -7,7 +7,7 @@ export function Report({ toolbarBelow }: { toolbarBelow: boolean }) {
   return (
     <PDFViewer
       key={toolbarBelow ? 'below' : 'above'}
-      src={{ shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' }}
+      src={{ grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' }}
       layout={toolbarBelow ? toolbarAtBottom : undefined}
       style={{ height: '100vh' }}
     />

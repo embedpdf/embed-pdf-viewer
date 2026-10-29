@@ -18,7 +18,7 @@ import { EpdfSelection, EpdfSelectionLayer, withSelection } from '@embedpdf/angu
 import { EpdfAnnotation, EpdfAnnotationLayer, withAnnotation } from '@embedpdf/angular/annotation';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const article: OpenInput = { kind: 'share', shareToken: 'shr_v09cJHOmj3C8vrfUlZNTDyqX' };
+const article: OpenInput = { kind: 'grant', grant: 'shr_v09cJHOmj3C8vrfUlZNTDyqX' };
 
 // On page 1: the characters of the title's first line, and where it is.
 const SENTENCE = { start: 6, count: 33 };

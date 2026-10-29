@@ -22,7 +22,7 @@ import { localEngine } from '@embedpdf/engine';
 const engine = cloudEngine();
 const assetEngine = localEngine();
 
-const approvals: OpenInput = { kind: 'share', shareToken: 'shr_lu5Sb4r9PYjKrHS3qfNeUywM' };
+const approvals: OpenInput = { kind: 'grant', grant: 'shr_lu5Sb4r9PYjKrHS3qfNeUywM' };
 
 // The middle of a Letter page, in page coordinates.
 const MIDDLE = { x: 306, y: 396 };

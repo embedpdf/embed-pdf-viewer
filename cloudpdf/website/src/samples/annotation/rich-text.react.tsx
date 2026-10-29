@@ -25,7 +25,7 @@ const plugins = [
   annotationPlugin(),
 ];
 
-const notice: OpenInput = { kind: 'share', shareToken: 'shr_LfeeUer1ogBI9mz8eYkWXa0d' };
+const notice: OpenInput = { kind: 'grant', grant: 'shr_LfeeUer1ogBI9mz8eYkWXa0d' };
 
 // On load: the document's rich text box, selected.
 function SelectRichText() {

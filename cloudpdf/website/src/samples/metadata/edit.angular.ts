@@ -14,7 +14,7 @@ import type { DocumentMetadata, OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfMetadata, withMetadata } from '@embedpdf/angular/metadata';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 const EDITABLE = ['title', 'author', 'subject', 'keywords'] as const;
 type Draft = Record<(typeof EDITABLE)[number], string>;

@@ -128,7 +128,7 @@ const source = async (signal: AbortSignal) => {
 | Source                                   | What it is                                                         |
 | :--------------------------------------- | :----------------------------------------------------------------- |
 | `{ kind: 'token', token }`               | A document your backend gave the user a token for.                 |
-| `{ kind: 'share', shareToken }`          | A document opened with a public share link.                        |
+| `{ kind: 'grant', grant }`          | A document opened with a grant.                               |
 | `{ kind: 'id', id }`                     | A document by its id, when the engine has a token for the user.    |
 
 Pass `token` as a function, so a long session always has a fresh one. See
@@ -157,28 +157,28 @@ To show the state yourself, for example on a tab, `useDocument()` gives you the 
 
 <Engine cloud>
 
-A document from a share link can wait for something before it opens: the link's passphrase, or who
-the visitor is. Its `status` is `'error'`, and `shareRequest` says what it waits for:
-`{ kind: 'passphrase', passwordProvided }`, or `{ kind: 'identity', request }` with the link's
+A document from a grant can wait for something before it opens: the grant's passphrase, or who
+the visitor is. Its `status` is `'error'`, and `grantRequest` says what it waits for:
+`{ kind: 'passphrase', passphraseProvided }`, or `{ kind: 'identity', request }` with the grant's
 questions (`request.fields`, what's still `missing`, the owner's `purpose` and `privacyUrl`). Ask,
 then open it with the answer:
 
 ```ts
-await documents.retry(id, { sharePassword });
+await documents.retry(id, { passphrase });
 await documents.retry(id, { identity: { displayName, email } });
 ```
 
-A link can also ask before the visitor's first change. The document opens at once, and when a
+A grant can also ask before the visitor's first change. The document opens at once, and when a
 change waits for the answers, the document's `identityRequest` holds the questions. Answer with
 `documents.identify(id, answers)`, and the change goes out; `documents.declineIdentity(id)` takes
 it back. See [Who the visitor is](/docs/engine/authentication#who-the-visitor-is).
 
 When your page already knows who the visitor is, give it as the viewer's `identity`, as with the
-local engine: the link takes the fields it asks, as if the visitor typed them, and nobody is
+local engine: the grant takes the fields it asks, as if the visitor typed them, and nobody is
 asked them again.
 
-A passphrase or questions the link gets after the document opened ask the same way: the document
-stays `'ready'`, its `shareRequest` says what the link asks, and `retry()` with the answer lets it go
+A passphrase or questions the grant gets after the document opened ask the same way: the document
+stays `'ready'`, its `grantRequest` says what the grant asks, and `retry()` with the answer lets it go
 on as the same visitor. Until then it reads on until its session runs out.
 
 </Engine>
@@ -242,8 +242,8 @@ the active document are on [Several documents](tabs#methods), downloading and pr
 | `canOpenFiles()`           | Whether `open()` takes a file's bytes, such as a file the user picked, or a URL it downloads: `true` on the local engine, `false` on CloudPDF, where every document comes from your server |
 | `openAll(documents)`       | Opens several documents, as `initialDocuments` does: every tab appears at once, in order, and the one marked `active` (or the first) becomes the active one. A failure shows in that document's `status` instead of throwing. |
 | `unlock(id, { password })` | Unlocks a locked document. Rejects on a wrong password, and the document stays locked so you can ask again. [Loading, errors and passwords](#loading-errors-and-passwords) |
-| `retry(id, options?)`      | Tries a failed document again, with the same source and options. Resolves like `open()`. A document from a share link takes what it waited for: `{ sharePassword }` or `{ identity }`. [Loading, errors and passwords](#loading-errors-and-passwords) |
-| `identify(id, answers)`    | Answers what the document's share link asks before the first change (its `identityRequest`): the change waiting goes out. Rejects while a required answer is missing or one can't be taken, and the change keeps waiting. |
+| `retry(id, options?)`      | Tries a failed document again, with the same source and options. Resolves like `open()`. A document from a grant takes what it waited for: `{ passphrase }` or `{ identity }`. [Loading, errors and passwords](#loading-errors-and-passwords) |
+| `identify(id, answers)`    | Answers what the document's grant asks before the first change (its `identityRequest`): the change waiting goes out. Rejects while a required answer is missing or one can't be taken, and the change keeps waiting. |
 | `declineIdentity(id)`      | Takes back the change waiting for the visitor's answers; the next change asks again.                                                                                          |
 | `close(id)`, `closeAll()`  | Closes one document, or every document, and frees its memory. [Close a document](#close-a-document)                                                                        |
 | `get(id?)`                 | A document's fields, the ones [`useDocument()`](#state) gives you, or `null` when it isn't open. Without an `id`, the document in scope |
@@ -275,8 +275,8 @@ empty `id` and `status: 'loading'`, so a component that shows it never has to ch
 | `hasUnsavedChanges` | Whether it has changes that weren't downloaded yet. [Warn before changes are lost](saving#warn-before-changes-are-lost) |
 | `passwordProvided`  | When it's locked: whether a password was tried and was wrong                                                 |
 | `error`             | Why it couldn't be opened, when `status` is `'error'`: `{ code, message }`                                   |
-| `shareRequest`      | When it's from a share link: the passphrase or the questions it waits for, to open or to go on               |
-| `identityRequest`   | When it's ready and a change waits for the visitor's answers to the share link's questions                   |
+| `grantRequest`      | When it's from a grant: the passphrase or the questions it waits for, to open or to go on               |
+| `identityRequest`   | When it's ready and a change waits for the visitor's answers to the grant's questions                   |
 
 Every open document, with the same fields, comes from [`useDocumentsState()`](tabs#state).
 

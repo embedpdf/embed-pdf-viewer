@@ -19,7 +19,7 @@
     annotationPlugin(),
   ];
 
-  const proposal: OpenInput = { kind: 'share', shareToken: 'shr_qnqHtCNRpzz-s7DPFBIbuOAF' };
+  const proposal: OpenInput = { kind: 'grant', grant: 'shr_qnqHtCNRpzz-s7DPFBIbuOAF' };
 </script>
 
 <Viewer

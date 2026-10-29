@@ -10,7 +10,7 @@ import './nesting.css';
 const engine = cloudEngine();
 const plugins = [outlinePlugin()];
 
-const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 const same = (left: OutlineItemRef | null, right: OutlineItemRef | null) =>
   left?.objectNumber === right?.objectNumber;

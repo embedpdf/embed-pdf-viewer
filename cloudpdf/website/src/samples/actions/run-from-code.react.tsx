@@ -16,7 +16,7 @@ import './run-from-code.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin(), actionsPlugin()];
 
-const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 const VERBS: ReadonlyArray<[PdfNamedAction, string]> = [
   ['FirstPage', '⇤ First'],

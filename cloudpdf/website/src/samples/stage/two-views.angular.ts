@@ -13,7 +13,7 @@ import { cloudEngine } from '@cloudpdf/engine';
 // A second view of the same document: its own id and token, its own zoom and layout.
 const OverviewToken = createCapabilityToken<StageCapability>('stage-overview');
 
-const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 @Component({
   selector: 'demo-zoom-bar',

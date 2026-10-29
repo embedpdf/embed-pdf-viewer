@@ -16,7 +16,7 @@ import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { EpdfPageEdit, withPageEdit } from '@embedpdf/angular/page-edit';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 /** Another PDF's bytes, to insert pages from. */
 const otherPdf = async () => (await fetch('/pdfs/welcome.pdf')).arrayBuffer();

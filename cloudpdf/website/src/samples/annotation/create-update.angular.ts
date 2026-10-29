@@ -21,7 +21,7 @@ import {
 } from '@embedpdf/angular/annotation';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const report: OpenInput = { kind: 'share', shareToken: 'shr__TWhIGdJtaKlcnVgJdg--bcm' };
+const report: OpenInput = { kind: 'grant', grant: 'shr__TWhIGdJtaKlcnVgJdg--bcm' };
 
 /**
  * Create a rectangle, then change, move and delete it, all from code. Next to

@@ -21,7 +21,7 @@ const plugins = [
   formPlugin(),
 ];
 
-const registration: OpenInput = { kind: 'share', shareToken: 'shr_sjOrUrwF2Sf0X5ADfySRG58L' };
+const registration: OpenInput = { kind: 'grant', grant: 'shr_sjOrUrwF2Sf0X5ADfySRG58L' };
 </script>
 
 <template>

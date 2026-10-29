@@ -21,7 +21,7 @@ const plugins = [
   actionsPlugin({ javascript: { enabled: true } }),
 ];
 
-const invoice: OpenInput = { kind: 'share', shareToken: 'shr_NCOaGzAKFsdI2r-UaVUJG7zL' };
+const invoice: OpenInput = { kind: 'grant', grant: 'shr_NCOaGzAKFsdI2r-UaVUJG7zL' };
 </script>
 
 <template>

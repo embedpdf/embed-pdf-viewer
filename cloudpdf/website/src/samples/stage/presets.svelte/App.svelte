@@ -11,7 +11,7 @@
   // Zoomed in, so a page is wider than the view and you can see where it lands.
   const plugins = [stagePlugin({ zoom: { level: 1.6 } }), renderPlugin()];
 
-  const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
+  const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 </script>
 
 <Viewer {engine} {plugins} initialDocuments={[{ source: welcome }]}>

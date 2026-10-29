@@ -9,7 +9,7 @@
 <!-- A new key mounts a new viewer with the new config. -->
 {#key toolbarBelow}
   <PDFViewer
-    src={{ shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' }}
+    src={{ grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' }}
     layout={toolbarBelow ? toolbarAtBottom : undefined}
     style="height: 100vh"
   />

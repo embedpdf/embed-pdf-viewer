@@ -78,7 +78,7 @@ Access degrades in one direction and never explodes:
 | State | Effect |
 | --- | --- |
 | Valid | Everything works. |
-| **Restricted** (expired, grace exhausted, suspended) | **Read-only**: GET/HEAD requests, `POST /v1/access`, `/v1/warm`, and share-session exchange keep working — your users can still view every document. Writes return `403` with an explanatory code. |
+| **Restricted** (expired, grace exhausted, suspended) | **Read-only**: GET/HEAD requests, `POST /v1/access`, `/v1/warm`, and grant exchange keep working — your users can still view every document. Writes return `403` with an explanatory code. |
 | None (no key/certificate at all) | The server refuses to boot. |
 
 Operational surfaces:

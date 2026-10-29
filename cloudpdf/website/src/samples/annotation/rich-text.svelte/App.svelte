@@ -20,7 +20,7 @@
     annotationPlugin(),
   ];
 
-  const notice: OpenInput = { kind: 'share', shareToken: 'shr_LfeeUer1ogBI9mz8eYkWXa0d' };
+  const notice: OpenInput = { kind: 'grant', grant: 'shr_LfeeUer1ogBI9mz8eYkWXa0d' };
 </script>
 
 <Viewer {engine} {plugins} initialDocuments={[{ source: notice }]}>

@@ -63,7 +63,7 @@ depending on where the credential comes from:
 | :------------------------------ | :--------------------------------------------------------------- |
 | `{ kind: 'token', token }`      | Your backend created a token for this user and this document.    |
 | `{ kind: 'id', id }`            | Your app has a token for your whole account (admin tools, jobs). |
-| `{ kind: 'share', shareToken }` | A public share link from the CloudPDF dashboard.                 |
+| `{ kind: 'grant', grant }` | A grant from the CloudPDF dashboard: public access, no backend. |
 
 [Authentication](/docs/engine/authentication) shows how to create tokens and when to use each.
 

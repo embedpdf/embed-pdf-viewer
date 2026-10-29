@@ -106,19 +106,19 @@ drop the tool's own scripts and stylesheets.
 
 Each document has a key in `../documents.mjs`. A sample opens it with a
 `// [!doc-source <key>]` block that fetches `/pdfs/<key>.pdf`; the docs sync gives the cloud
-site's copy its own form of the block, which opens the document's share link.
+site's copy its own form of the block, which opens the document's grant.
 
 ## On CloudPDF
 
 cloudpdf.com's examples open the same PDFs from CloudPDF, with CloudPDF's welcome. `pdfs:cloud`
-uploads cloudpdf.com's copy of each one and creates a share link for it that gives each visit its
+uploads cloudpdf.com's copy of each one and creates a grant for it that gives each visit its
 own layer, changed only by what that document's examples do. It records the document and the
-link in `cloud.json`:
+grant in `cloud.json`:
 
 ```sh
 CLOUDPDF_API_TOKEN=… CLOUDPDF_TENANT_ID=… pnpm --filter @embedpdf/docs-content pdfs:cloud
 ```
 
-`--dry-run` only says what it would do. A document already in `cloud.json` keeps its link, which
-is set to the script's settings again; one whose PDF changed since is reported, since a link can't
+`--dry-run` only says what it would do. A document already in `cloud.json` keeps its grant, which
+is set to the script's settings again; one whose PDF changed since is reported, since a grant can't
 point at a new document yet.

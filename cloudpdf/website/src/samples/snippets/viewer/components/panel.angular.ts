@@ -6,7 +6,7 @@ import { Notes } from './notes'; // your app
   selector: 'app-review',
   imports: [EpdfPdfViewer, EpdfPanel, Notes],
   template: `
-    <epdf-pdf-viewer [src]="{ shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' }" [layout]="layout" style="height: 100vh">
+    <epdf-pdf-viewer [src]="{ grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' }" [layout]="layout" style="height: 100vh">
       <ng-template epdfPanel="notes">
         <app-notes />
       </ng-template>

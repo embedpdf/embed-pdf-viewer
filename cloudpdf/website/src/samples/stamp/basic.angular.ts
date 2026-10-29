@@ -21,7 +21,7 @@ import { localEngine } from '@embedpdf/engine';
 const engine = cloudEngine();
 const assetEngine = localEngine();
 
-const approvals: OpenInput = { kind: 'share', shareToken: 'shr_lu5Sb4r9PYjKrHS3qfNeUywM' };
+const approvals: OpenInput = { kind: 'grant', grant: 'shr_lu5Sb4r9PYjKrHS3qfNeUywM' };
 
 // A stamp's button: its picture, and pressed while it's armed.
 @Component({

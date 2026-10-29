@@ -24,7 +24,7 @@ import {
 } from '@embedpdf/angular/annotation';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const layout: OpenInput = { kind: 'share', shareToken: 'shr_d2E_LaTuddJbZR00d1CvkqLM' };
+const layout: OpenInput = { kind: 'grant', grant: 'shr_d2E_LaTuddJbZR00d1CvkqLM' };
 
 const ACCENTS = ['#054fb3', '#e91e63', '#0f6e56'];
 

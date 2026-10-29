@@ -14,7 +14,7 @@ const engine = cloudEngine();
 // The actions plugin runs a link that names a viewer command, such as the footer's Next.
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), actionsPlugin(), linkPlugin()];
 
-const links: OpenInput = { kind: 'share', shareToken: 'shr_xs-9Y5qwuYrJ2BKtWzuo_2xy' };
+const links: OpenInput = { kind: 'grant', grant: 'shr_xs-9Y5qwuYrJ2BKtWzuo_2xy' };
 
 // The browser's way to open a website, once for the viewer.
 function BrowserActions() {

@@ -31,7 +31,7 @@ const plugins = [
   measurementPlugin(),
 ];
 
-const sketch: OpenInput = { kind: 'share', shareToken: 'shr_IyOgSdO4AmJqV4BoMv5V0nYU' };
+const sketch: OpenInput = { kind: 'grant', grant: 'shr_IyOgSdO4AmJqV4BoMv5V0nYU' };
 
 // The floor plan's lower half, where the measurements go.
 const LOWER_HALF = { x: 50, y: 500, width: 512, height: 240 };

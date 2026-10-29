@@ -20,7 +20,7 @@ import { EpdfInteraction, withInteraction } from '@embedpdf/angular/interaction'
 import { EpdfAnnotationLayer, withAnnotation } from '@embedpdf/angular/annotation';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const report: OpenInput = { kind: 'share', shareToken: 'shr__TWhIGdJtaKlcnVgJdg--bcm' };
+const report: OpenInput = { kind: 'grant', grant: 'shr__TWhIGdJtaKlcnVgJdg--bcm' };
 
 // The annotations are part of the document: the downloaded PDF has every one.
 @Component({

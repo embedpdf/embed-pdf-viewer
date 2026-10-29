@@ -13,7 +13,7 @@ import './fill.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), formPlugin()];
 
-const forms: OpenInput = { kind: 'share', shareToken: 'shr_eBRW5E3MpolzD8G36Alp30EF' };
+const forms: OpenInput = { kind: 'grant', grant: 'shr_eBRW5E3MpolzD8G36Alp30EF' };
 
 /** One field of each family, with `setValue()` in the shape each one takes. */
 async function fillIn(form: FormCapability) {

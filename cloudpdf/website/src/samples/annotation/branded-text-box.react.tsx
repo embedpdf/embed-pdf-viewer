@@ -27,7 +27,7 @@ const plugins = [
   annotationPlugin(),
 ];
 
-const notice: OpenInput = { kind: 'share', shareToken: 'shr_LfeeUer1ogBI9mz8eYkWXa0d' };
+const notice: OpenInput = { kind: 'grant', grant: 'shr_LfeeUer1ogBI9mz8eYkWXa0d' };
 
 // Your own text box, in your app's look: it fills its frame, which the layer
 // places and turns like the text box. The element inside is the editor and

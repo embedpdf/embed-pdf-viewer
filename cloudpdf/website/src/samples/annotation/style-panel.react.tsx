@@ -20,7 +20,7 @@ import './style-panel.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-const layout: OpenInput = { kind: 'share', shareToken: 'shr_d2E_LaTuddJbZR00d1CvkqLM' };
+const layout: OpenInput = { kind: 'grant', grant: 'shr_d2E_LaTuddJbZR00d1CvkqLM' };
 
 // On load: the document's square, selected, so the panel shows its style.
 function SelectSquare() {

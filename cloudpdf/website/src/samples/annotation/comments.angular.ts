@@ -23,7 +23,7 @@ import {
 } from '@embedpdf/angular/annotation';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const proposal: OpenInput = { kind: 'share', shareToken: 'shr_qnqHtCNRpzz-s7DPFBIbuOAF' };
+const proposal: OpenInput = { kind: 'grant', grant: 'shr_qnqHtCNRpzz-s7DPFBIbuOAF' };
 
 // One thread: the first comment, its replies, a reply box, and a button that shows it.
 @Component({

@@ -10,7 +10,7 @@ import './buttons.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin(), commandsPlugin({ commands: standardCommands })];
 
-const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 // One button, drawn from its command: the label, the shortcut, and whether it can run now.
 function CommandButton({ id }: { id: string }) {
