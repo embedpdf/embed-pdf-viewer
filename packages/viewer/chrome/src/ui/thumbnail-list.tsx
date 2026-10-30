@@ -19,7 +19,13 @@ import { useT } from '@embedpdf/react/i18n';
 import { usePageEdit, usePageEditState } from '@embedpdf/react/page-edit';
 import { RenderLayer } from '@embedpdf/react/render';
 import { toPageRef, usePageList, type PageRef } from '@embedpdf/react/runtime';
-import { Stage, useStage, useStageState, type StageCapability } from '@embedpdf/react/stage';
+import {
+  Scrollbar,
+  Stage,
+  useStage,
+  useStageState,
+  type StageCapability,
+} from '@embedpdf/react/stage';
 import {
   useEffect,
   useId,
@@ -460,18 +466,22 @@ export function ThumbnailList() {
           className="flex-1"
           style={{ position: 'relative' }}
           overlay={
-            shownDrop ? (
-              <div
-                aria-hidden
-                className="bg-accent pointer-events-none absolute rounded-full"
-                style={{
-                  left: shownDrop.line.x,
-                  top: shownDrop.line.y,
-                  width: shownDrop.line.width,
-                  height: shownDrop.line.height,
-                }}
-              />
-            ) : null
+            <>
+              {shownDrop && (
+                <div
+                  aria-hidden
+                  className="bg-accent pointer-events-none absolute rounded-full"
+                  style={{
+                    left: shownDrop.line.x,
+                    top: shownDrop.line.y,
+                    width: shownDrop.line.width,
+                    height: shownDrop.line.height,
+                  }}
+                />
+              )}
+              {/* the main view's scrollbar, over this lens: the nearest Stage */}
+              <Scrollbar axis="y" />
+            </>
           }
           pageChrome={(page) => {
             const number = page.ref.objectNumber;

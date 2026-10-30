@@ -671,7 +671,7 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('menus', () => {
     const middle = await selectSquareAt(tab, 150);
     const below = await selectionBarOf(tab);
     expect(below?.placement).toBe('bottom');
-    expect(below!.top).toBeGreaterThanOrEqual(middle.bottom + 15);
+    expect(Math.round(below!.top - middle.bottom)).toBe(15);
     await press(tab, 'Escape');
 
     // Its bottom edge 20 px above the view's: no room below it for the bar.
