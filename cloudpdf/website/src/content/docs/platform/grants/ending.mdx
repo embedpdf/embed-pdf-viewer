@@ -1,0 +1,62 @@
+---
+title: Pausing and ending
+description: Pause a grant to stop it for a while, and end it to stop it for good. Its link and every page that embeds it follow at once.
+---
+
+import { Cards, Card } from '@/components/docs/cards';
+
+# Pausing and ending
+
+Every grant has a menu with what you can do to it:
+
+<Screenshot
+  name="grant-menu"
+  alt="A grant's menu: Settings, Visitors, Open as a visitor, Pause and End grant"
+/>
+
+| | What happens | Undo |
+| :-- | :-- | :-- |
+| **Pause** | Nobody can open it, through its link or on any website. Anyone who has it open is stopped | **Resume** |
+| **End grant** | The same, for good. It moves to the ended grants, with its visitors | None |
+| **Settings** | Change anything. Everyone who opens it next gets the new settings | Change it back |
+
+## Pause
+
+Pause a grant while you fix something in the document, or when a page that embeds it should go
+quiet for a while. The list marks it **Paused**. **Resume** brings it back, with the same link and
+the same embed code.
+
+## End
+
+<Screenshot name="grant-end" alt="The End this grant dialog" />
+
+Ending is for good: the link stops, and so does every website that embeds it. To share the
+document again, make a new grant, with a new link.
+
+A grant nobody used is deleted. One with visitors moves to **Show ended grants**, with its visitors
+and their copies, so you can still read their answers and erase them.
+
+## Deleting the document
+
+Deleting a document ends all its grants at once, along with every link and embed.
+
+## In code
+
+```ts
+await cloudpdf.grants.update({ grantId, disabled: true }); // pause
+await cloudpdf.grants.update({ grantId, disabled: false }); // resume
+await cloudpdf.grants.archive({ grantId }); // end, and keep its visitors
+```
+
+<Cards>
+  <Card
+    title="Grants"
+    description="Everything a grant settles, on one page."
+    href="/docs/platform/grants"
+  />
+  <Card
+    title="Visitors"
+    description="Who came, and erasing them."
+    href="/docs/platform/grants/visitors"
+  />
+</Cards>

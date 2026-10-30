@@ -1,0 +1,63 @@
+---
+title: Uploading
+description: Upload PDFs in the dashboard, one or many at a time, rename them, move them, and delete them.
+---
+
+import { Cards, Card } from '@/components/docs/cards';
+
+# Uploading
+
+Upload PDFs on **Documents**: click **Upload** and pick one or more, or drop them on the page. They
+go into the folder you're in.
+
+<Screenshot
+  name="documents"
+  alt="The Documents page of the Fernquill Studio workspace, with its folders and PDFs, and the Upload button"
+/>
+
+Each file uploads in turn, and the page says which one it's on. A file that isn't a PDF is skipped,
+and the page tells you which.
+
+A new document is **Pending** for a moment while CloudPDF reads it, then it's ready to open and
+share. One that can't be read, because it's damaged, say, is marked **Failed**.
+
+## A document's page
+
+Click a document for its page: its size, when it was uploaded, its **Document ID** for your code,
+and its [grants](/docs/platform/grants).
+
+<Screenshot
+  name="new-grant"
+  alt="The page of Brand guidelines.pdf: its size and ID, and a Grants card"
+/>
+
+**Open** shows it full screen in the viewer, with everything you can do.
+
+## Rename, move and delete
+
+A document's menu, on its page or in the list, has **Rename**, **Move to…** and **Delete**:
+
+- **Rename** changes the name the dashboard shows. Links and embeds keep working.
+- **Move to…** puts it in another folder. Links and embeds keep working.
+- **Delete** removes it for good, and its grants with it: every link and embed stops at once.
+
+Select several in the list to move or delete them together.
+
+## The same file twice
+
+Uploading a file you uploaded before makes a second document, with its own grants. That's on
+purpose: the two can go to different people. Your server can [reuse the existing
+one](/docs/platform/app/uploads#the-same-file-twice) instead.
+
+<Cards>
+  <Card
+    title="Folders and search"
+    description="Keep documents in folders, and find any of them by name."
+    href="/docs/platform/documents/folders"
+  />
+  <Card
+    title="Uploading from your server"
+    description="Upload where the PDFs arrive, in your app."
+    href="/docs/platform/app/uploads"
+  />
+</Cards>

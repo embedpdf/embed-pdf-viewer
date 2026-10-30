@@ -51,3 +51,5 @@ export const blockquote = (value: string): AstNode => ({
   type: 'blockquote',
   children: [paragraph([text(value)])],
 });
+
+export const image = (url: string, alt: string): AstNode => ({ type: 'image', url, alt });

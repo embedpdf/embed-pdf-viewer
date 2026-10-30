@@ -1,0 +1,92 @@
+---
+title: API keys
+description: An API key lets your server use CloudPDF for your workspace. Give it only what it needs, keep it on your server, and revoke it when it leaks.
+---
+
+import { Cards, Card } from '@/components/docs/cards';
+
+# API keys
+
+An API key lets your server use CloudPDF for your workspace: upload documents, make tokens for your
+users, and manage grants. It stays on your server. Browsers never get it: they open documents with
+a grant or a token your server makes.
+
+<Screenshot
+  name="api-keys"
+  alt="The API keys page: the Connect your server card, and the Keys card listing a key"
+/>
+
+Owners and admins make and revoke keys. Everyone in the workspace sees the list.
+
+## Make one
+
+Click **New API key**, name it after where it runs ("Production server", "Fernquill app"), and
+choose how long it lives: 30, 60 or 90 days.
+
+<Screenshot
+  name="api-key-dialog"
+  alt="The New API key dialog: named Fernquill app, Restricted, with Documents and folders on Write and Viewer tokens on"
+/>
+
+Then choose what it can do:
+
+- **Full access**: everything you can do in the dashboard. Right for your own scripts.
+- **Restricted**: only what you turn on below. Right for an app in production.
+
+| Row | Lets the key | Choices |
+| :-- | :-- | :-- |
+| **Documents and folders** | List them (Read), and upload, rename and move them, and make [upload tokens](/docs/platform/app/browser-uploads) (Write) | None, Read, Write |
+| **Delete** | Delete documents and folders | Off, On |
+| **Inside documents** | Read and change what's in a document: pages, text, annotations, forms | None, Read, Write |
+| **Viewer tokens** | Make [tokens](/docs/platform/app/tokens) for your users, and revoke them | Off, On |
+| **Grants** | Make, change and end [grants](/docs/platform/grants) | Off, On |
+
+A key that makes viewer tokens or grants can give anyone any permission inside a document, so
+turning either on sets **Inside documents** to Write. The dialog never shows a key as less than it
+is.
+
+## Copy it once
+
+The key is shown once, right after it's made:
+
+<Screenshot
+  name="api-key-created"
+  alt="The Keys card with the new key Fernquill app, its value shown once, and a button to copy it"
+/>
+
+Store it as a secret on your server, such as `CLOUDPDF_API_KEY`, and give it to the SDK:
+
+```ts
+const cloudpdf = new CloudPDFClient({ token: process.env.CLOUDPDF_API_KEY });
+```
+
+The key belongs to the workspace it was made in, so the SDK needs nothing else.
+
+## When it leaks, or expires
+
+**Revoke** stops a key within a minute, for good. If a key ends up in a repository, a log or a
+browser, revoke it and make a new one.
+
+A key also stops at its expiry date. The date turns orange a week before, so you can make the next
+key and switch your server over first. Revoked and expired keys are under **Show revoked and
+expired keys**.
+
+## Good to know
+
+- **One key per place.** A key each for production, staging and your scripts means you can revoke
+  one without stopping the others.
+- **Give a key only what it needs.** A server that only makes tokens for documents you uploaded in
+  the dashboard needs **Viewer tokens** on, and **Documents and folders** at None.
+
+<Cards>
+  <Card
+    title="Tokens for your users"
+    description="What your server does with a key that has Viewer tokens on."
+    href="/docs/platform/app/tokens"
+  />
+  <Card
+    title="Uploading from your server"
+    description="Upload PDFs with a key that has Documents and folders on Write."
+    href="/docs/platform/app/uploads"
+  />
+</Cards>

@@ -1,0 +1,186 @@
+---
+title: Put a PDF on your website
+description: Upload a PDF, make a grant, and paste two lines into your page. No server, and no code of your own.
+---
+
+import { Cards, Card } from '@/components/docs/cards';
+import { Tabs } from '@/components/docs/tabs';
+
+# Put a PDF on your website
+
+In five minutes, this is on your page: your PDF, in a viewer people can scroll, zoom, search and
+read on any device. You need a CloudPDF account and a page you can edit. No server, and no code of
+your own.
+
+<GrantPreview grant="shr_xs-9Y5qwuYrJ2BKtWzuo_2xy" />
+
+## 1. Upload a PDF
+
+Sign in to the [dashboard](https://app.cloudpdf.com), and on **Documents**, click **Upload** or drop
+the file on the page.
+
+<Screenshot
+  name="documents"
+  alt="The Documents page of the Fernquill Studio workspace, with its folders and PDFs, and the Upload button"
+/>
+
+CloudPDF keeps the file and gets its pages ready to show. A large PDF takes a few seconds.
+
+## 2. Make a grant
+
+A grant lets people open the document without an account. Open the document, then click **New
+grant**:
+
+<Screenshot
+  name="new-grant"
+  alt="The page of Brand guidelines.pdf: its size and ID, and a Grants card with the New grant button"
+/>
+
+Give the grant a name you'll recognize, such as "Website". The rest is already right for a public
+page: people can **Read** the document, and it opens **Anywhere**.
+
+<Screenshot
+  name="grant-dialog"
+  alt="The New grant dialog: named Website, people can Read, and it opens Anywhere"
+/>
+
+Click **Create grant**.
+
+## 3. Paste it into your page
+
+Choose **Embed on a website**, and copy the code:
+
+<Screenshot name="grant-embed" alt="The Grant created dialog, with the embed code for HTML" />
+
+It's two lines. Put them where the PDF should appear:
+
+```html
+<script type="module" src="https://cdn.jsdelivr.net/npm/@cloudpdf/viewer@3/dist/cloudpdf.js"></script>
+
+<embedpdf-viewer grant="grt_4n0hW2ubtHdYCRnkwu8My8Pb" style="height: 640px"></embedpdf-viewer>
+```
+
+The viewer fills the box you give it, so give it a height. Open your page, and the PDF is there.
+
+### In React, Vue, Svelte or Angular
+
+The grant opens the same way in the viewer component for your framework. Install it:
+
+<Tabs items={['React', 'Vue', 'Svelte', 'Angular']} storageKey="docs-framework">
+<Tabs.Tab>
+
+```sh
+npm install @cloudpdf/viewer-react
+```
+
+</Tabs.Tab>
+<Tabs.Tab>
+
+```sh
+npm install @cloudpdf/viewer-vue
+```
+
+</Tabs.Tab>
+<Tabs.Tab>
+
+```sh
+npm install @cloudpdf/viewer-svelte
+```
+
+</Tabs.Tab>
+<Tabs.Tab>
+
+```sh
+npm install @cloudpdf/viewer-angular
+```
+
+</Tabs.Tab>
+</Tabs>
+
+Then give it the grant. The dialog has this code too, with your grant in it:
+
+<Tabs items={['React', 'Vue', 'Svelte', 'Angular']} storageKey="docs-framework">
+<Tabs.Tab>
+
+```tsx
+import { PDFViewer } from '@cloudpdf/viewer-react';
+
+export function BrandGuidelines() {
+  return <PDFViewer src={{ grant: 'grt_4n0hW2ubtHdYCRnkwu8My8Pb' }} style={{ height: 640 }} />;
+}
+```
+
+</Tabs.Tab>
+<Tabs.Tab>
+
+```vue
+<script setup lang="ts">
+import { PDFViewer } from '@cloudpdf/viewer-vue';
+</script>
+
+<template>
+  <PDFViewer :src="{ grant: 'grt_4n0hW2ubtHdYCRnkwu8My8Pb' }" style="height: 640px" />
+</template>
+```
+
+</Tabs.Tab>
+<Tabs.Tab>
+
+```svelte
+<script lang="ts">
+  import { PDFViewer } from '@cloudpdf/viewer-svelte';
+</script>
+
+<PDFViewer src={{ grant: 'grt_4n0hW2ubtHdYCRnkwu8My8Pb' }} style="height: 640px" />
+```
+
+</Tabs.Tab>
+<Tabs.Tab>
+
+```ts
+import { Component } from '@angular/core';
+import { EpdfPdfViewer } from '@cloudpdf/viewer-angular';
+
+@Component({
+  selector: 'app-brand-guidelines',
+  imports: [EpdfPdfViewer],
+  template: `<epdf-pdf-viewer [src]="{ grant: 'grt_4n0hW2ubtHdYCRnkwu8My8Pb' }" style="height: 640px" />`,
+})
+export class BrandGuidelines {}
+```
+
+</Tabs.Tab>
+</Tabs>
+
+## 4. Or send the link
+
+A grant that opens Anywhere has a link of its own. Send it in an email or a chat, and the document
+opens full screen:
+
+<Screenshot name="grant-link" alt="The Grant created dialog, with the grant's link to copy" />
+
+## Change it whenever you like
+
+A grant keeps working until you change it. From its menu on the document's page, you can:
+
+- let people do more: **Comment**, **Download** or **Print**;
+- ask for a passphrase, or let the grant expire on a date;
+- pause it, and resume it;
+- end it, which stops its link and every page that embeds it, at once.
+
+Every page that embeds the grant follows on its next visit, so you never touch your code again.
+
+## Next steps
+
+<Cards>
+  <Card
+    title="Add PDFs to your app"
+    description="Your own signed-in users, each with a token from your server."
+    href="/docs/platform/quick-start/app"
+  />
+  <Card
+    title="Make the viewer yours"
+    description="Your colors, the features you want, and buttons of your own."
+    href="/docs/viewer/vanilla/quick-start"
+  />
+</Cards>

@@ -1,0 +1,121 @@
+---
+title: Tokens for your users
+description: Your server gives each signed-in user a token for the document they open. It says who they are, what they can do, and for how long.
+---
+
+import { Cards, Card } from '@/components/docs/cards';
+
+# Tokens for your users
+
+When your users are signed in to your app, your server gives each of them a token for the document
+they open. The token says who they are, what they can do, and for how long. The browser holds only
+that token: never your API key, and never access to any other document.
+
+```ts
+import { permissions } from '@cloudpdf/sdk';
+
+const { token } = await cloudpdf.tokens.issue({
+  docId: contract.documentId,
+  sub: user.id,
+  identity: { displayName: user.name },
+  scope: permissions.comment,
+  expiresIn: 3600,
+});
+```
+
+Your server makes tokens with an [API key](/docs/platform/app/api-keys) that has **Viewer tokens**
+on. [Add PDFs to your app](/docs/platform/quick-start/app) puts this in a route your pages call.
+
+## What a token says
+
+| Field | What it says | |
+| :-- | :-- | :-- |
+| `docId` | Which document | Required |
+| `sub` | Who the user is in your app: their id | Required |
+| `scope` | What they can do: a [level](/docs/platform/grants/permissions), plus Download, Print or Copy text | Required |
+| `expiresIn` | How long the token works, in seconds: a minute to 90 days | Required |
+| `identity` | Their name and details, below | |
+| `origins` | The websites the token works on, such as `['https://app.fernquill.example']` | |
+| `layerName` | Which copy of the document their changes go into, below | |
+
+## Who they are
+
+`identity` puts a name on what they do:
+
+| Field | What it's for |
+| :-- | :-- |
+| `displayName` | Their name, shown as the author of every comment and highlight they add |
+| `userId` | Their id, kept on what they add as its creator. Leave it out, and it's `sub` |
+| `groupId` | A group in your app, such as a team. What they add belongs to it |
+| `email`, `title`, `organization`, `organizationalUnit` | More about them. The session keeps these; they aren't written into the PDF |
+
+With **Comment**, people change and delete only what they added themselves: what has their
+`userId` on it. So one user is one `userId`, in every token you make for them.
+
+## Which copy they change
+
+By default, everyone's changes go into the document itself, and everyone who has it open sees each
+comment as it's made. That's right for a team reviewing a contract together.
+
+To give someone a copy of their own, name a layer for them. Their changes go into that layer, on
+top of the document, and nobody else sees them:
+
+```ts
+const { token } = await cloudpdf.tokens.issue({
+  docId: application.formId,
+  sub: user.id,
+  identity: { displayName: user.name },
+  scope: permissions.fillAndSign,
+  layerName: `applicant-${user.id}`,
+  expiresIn: 3600,
+});
+```
+
+Everyone given the same `layerName` shares that copy. Give one to each applicant filling in a form,
+or one to each team.
+
+## When it runs out
+
+A token works for `expiresIn` seconds. Give the viewer a function instead of a string, and it asks
+your server for a new token before the old one runs out, so nobody notices:
+
+```tsx
+<PDFViewer src={{ token: () => fetch(`/api/pdf-token?contract=${id}`).then((r) => r.text()) }} />
+```
+
+So keep tokens short: an hour is plenty, since the next one is a request away.
+
+To stop a token before then, revoke it with its `jti`, which `tokens.issue` returns with the token:
+
+```ts
+const { token, jti } = await cloudpdf.tokens.issue({ … });
+
+await cloudpdf.tokens.revoke({ jti });
+```
+
+The viewer can't open anything with it from then on. Revoking needs an API key with **Viewer
+tokens** on.
+
+## Good to know
+
+- **A token is for one document.** To show a user three documents, make three tokens. Each one is
+  a single request to CloudPDF, and fast.
+- **Check before you make one.** The token route is where your app decides who may see what. A
+  route that makes a token for any `docId` it's given lets anyone open any document.
+- **Tokens for uploads, too.** An upload token lets a user's browser upload a PDF straight to
+  CloudPDF: [Uploads from the browser](/docs/platform/app/browser-uploads).
+- **Every language.** The SDK is the same in Python, PHP, C#, Go, Java and Ruby:
+  [Issue a token](/docs/api-reference/tokens/issue).
+
+<Cards>
+  <Card
+    title="What people can do"
+    description="The levels and permissions a token's scope takes."
+    href="/docs/platform/grants/permissions"
+  />
+  <Card
+    title="What the browser holds"
+    description="Why a token in the browser is safe, and what it can't do."
+    href="/docs/platform/concepts/security"
+  />
+</Cards>

@@ -18,7 +18,41 @@ export const DOCS_LANDING = {
   frameworksLabel: 'Get started in your framework',
   frameworksLabelShort: 'Frameworks',
   deploymentLabel: 'Choose your deployment',
+  quickStartsLabel: 'Start in minutes',
 } as const;
+
+export type LandingQuickStart = {
+  id: 'website' | 'app';
+  title: string;
+  time: string;
+  desc: string;
+  href: string;
+  /** A dashboard screenshot (`<Screenshot name>`), shown on the card. */
+  screenshot: string;
+  screenshotAlt: string;
+};
+
+/** The two quick starts the landing leads with: CloudPDF SaaS, from the first PDF. */
+export const LANDING_QUICK_STARTS: readonly LandingQuickStart[] = [
+  {
+    id: 'website',
+    title: 'Put a PDF on your website',
+    time: 'About 5 minutes',
+    desc: 'Upload a PDF, make a grant, and paste two lines into your page. No server needed.',
+    href: '/docs/platform/quick-start/website',
+    screenshot: 'grant-dialog',
+    screenshotAlt: 'Making a grant in the CloudPDF dashboard',
+  },
+  {
+    id: 'app',
+    title: 'Add PDFs to your app',
+    time: 'About 15 minutes',
+    desc: 'Your server gives each signed-in user a token, and the viewer opens their document.',
+    href: '/docs/platform/quick-start/app',
+    screenshot: 'api-key-dialog',
+    screenshotAlt: 'Making an API key in the CloudPDF dashboard',
+  },
+];
 
 export type LandingProductPath = {
   id: 'viewer' | 'headless';
@@ -66,7 +100,7 @@ export const LANDING_DEPLOYMENTS: readonly LandingDeployment[] = [
   {
     id: 'saas',
     title: 'Managed SaaS',
-    href: '/docs/engine/quick-start',
+    href: '/docs/platform',
     landing: {
       lead: 'We host and manage everything.',
       sub: 'Get secure, scalable infrastructure so you can focus on your product.',

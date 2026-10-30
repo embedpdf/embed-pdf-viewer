@@ -1,0 +1,93 @@
+---
+title: Passphrase, expiry and questions
+description: Ask visitors for a passphrase, end a grant on a date, and ask who they are before they read or change anything.
+---
+
+import { Cards, Card } from '@/components/docs/cards';
+
+# Passphrase, expiry and questions
+
+Under **More options**, a grant can ask for a passphrase, end on a date, and ask visitors who they
+are. Use any of them, or all three.
+
+<Screenshot
+  name="grant-more"
+  alt="More options: a passphrase, an expiry date, and the questions visitors answer, with Name and Email required"
+/>
+
+## A passphrase
+
+Visitors type it before the document opens. Send it apart from the link, in another message or out
+loud, so the link alone isn't enough.
+
+CloudPDF keeps only a fingerprint of the passphrase, so nobody can read it back, not even you. To
+change it, type a new one; to drop it, tick **Remove the passphrase**. Guessing doesn't work:
+after too many wrong tries in a minute, CloudPDF stops answering that network for a while.
+
+In code it's `passphrase`, on the grant and in the viewer:
+
+```html
+<embedpdf-viewer grant="grt_…" passphrase="quill-review-2026"></embedpdf-viewer>
+```
+
+Leave it out, and the viewer asks for it.
+
+## An expiry date
+
+The grant works until the end of that day, in your time zone, then stops: its link, and every page
+that embeds it. The list shows it as **Expired**. Pick a later date to bring it back.
+
+## Questions
+
+Tick **Ask who they are**, and choose what to ask:
+
+| Question | Goes on |
+| :-- | :-- |
+| **Name** | Everything they add, as its author |
+| **Email**, **Company**, **Job title**, **Department** | Their row under [visitors](/docs/platform/grants/visitors) |
+
+Each is **Required**, **Optional**, or **Don't ask**. A new grant starts with Name and Email
+required.
+
+Ask **Before it opens**, or, when visitors can change the document, **Before their first change**:
+then anyone can read, and only someone who adds something answers first.
+
+Say why you ask under **Why you ask**, and link your **Privacy notice**. Both show with the
+questions.
+
+A visitor answers once in their browser, and can't change an answer later. Only their name goes
+into the document.
+
+## In code
+
+```ts
+await cloudpdf.grants.create({
+  docId: proposal.documentId,
+  name: 'Client review',
+  scope: permissions.comment,
+  passphrase: 'quill-review-2026',
+  expiresAt: Date.parse('2026-12-31T23:59:59+01:00'),
+  visitorIdentity: {
+    fields: { displayName: 'required', email: 'required', organization: 'optional' },
+    ask: 'on-open',
+    purpose: 'We reply to every comment.',
+    privacyUrl: 'https://www.fernquill.example/privacy',
+  },
+});
+```
+
+`ask` is `'on-open'` or `'before-first-change'`. `expiresAt` is a time in milliseconds, and `null`
+removes it.
+
+<Cards>
+  <Card
+    title="Visitors"
+    description="Who answered, what they changed, and erasing them."
+    href="/docs/platform/grants/visitors"
+  />
+  <Card
+    title="Pausing and ending"
+    description="Stop a grant for a while, or for good."
+    href="/docs/platform/grants/ending"
+  />
+</Cards>

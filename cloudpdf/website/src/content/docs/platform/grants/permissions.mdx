@@ -1,0 +1,140 @@
+---
+title: What people can do
+description: Pick a level (Read, Comment, Fill and sign or Edit), then whether people may download, print and copy text. The same words work for grants and tokens.
+---
+
+import { Cards, Card } from '@/components/docs/cards';
+
+# What people can do
+
+Every grant and every token says what people can do with the document. Pick a level, then what
+they may take with them: a copy of the file, a printout, or the text.
+
+## Levels
+
+Every level includes reading:
+
+| Level | People can |
+| :-- | :-- |
+| **Read** | See the pages, search and select text, see comments and form values |
+| **Comment** | Read, and add comments, highlights and drawings, then change and delete their own |
+| **Fill and sign** | Read, and fill in the form, submit it and sign it |
+| **Edit** | Everything above on anyone's work, and change pages, content and details |
+
+## Download, Print and Copy text
+
+These three are off unless you turn them on, at any level:
+
+| | People can |
+| :-- | :-- |
+| **Download** | Save the PDF, with or without its annotations and form values drawn into the pages |
+| **Print** | Print the document, at high quality too |
+| **Copy text** | Copy what they select, and see the words around each search match |
+
+Without them, the document stays in the viewer: people can read it, but not take it with them.
+
+## In the dashboard
+
+Choose the level under **People can**, and tick what else they may do:
+
+<Screenshot
+  name="grant-permissions"
+  alt="The grant dialog with Comment chosen, and Download and Print ticked"
+/>
+
+## In code
+
+A grant you make from your server, and a token for one of your users, take the same levels. Spread
+a level and the extras into `scope`:
+
+```ts
+import { permissions } from '@cloudpdf/sdk';
+
+await cloudpdf.grants.create({
+  docId: 'doc_20b05b13f613f795ffd14e57',
+  name: 'Client review',
+  scope: [...permissions.comment, ...permissions.download, ...permissions.print],
+});
+```
+
+| Constant | The dashboard's |
+| :-- | :-- |
+| `permissions.read` | Read |
+| `permissions.comment` | Comment |
+| `permissions.fillAndSign` | Fill and sign |
+| `permissions.edit` | Edit |
+| `permissions.download` | Download |
+| `permissions.print` | Print |
+| `permissions.copyText` | Copy text |
+
+## Every permission
+
+A level is a set of permissions, and you can choose them one by one. In the dashboard, click
+**Customize permissions**:
+
+<Screenshot
+  name="grant-customize"
+  alt="The grant dialog with Customize permissions open, listing every permission by group"
+/>
+
+In code, each one is a name in `scope`:
+
+| Permission | Name |
+| :-- | :-- |
+| **Viewing** | |
+| Open the document. Every grant and token needs it | `doc.open` |
+| See the pages | `doc.render` |
+| Select text | `doc.text.select` |
+| Search the text, and see where each match is | `doc.text.search` |
+| See comments and annotations | `doc.annotate.read` |
+| See form fields and their values | `doc.forms.read` |
+| **Copy, print and download** | |
+| Copy text, and see the words around search matches | `doc.text.copy` |
+| Print | `doc.print` |
+| Print at high quality: 300 DPI instead of 150 | `doc.print.high` |
+| Download the file, its attached files, exported annotations and extracted pages | `doc.download` |
+| Download a copy with annotations and form values drawn into the pages | `doc.download.flattened` |
+| **Comments and annotations** | |
+| Add their own, and change and delete them | `annotations:create:self`, `annotations:update:self`, `annotations:delete:self` |
+| Add, change and delete anyone's | `doc.annotate.modify` |
+| Import annotations with their original authors | `doc.annotate.import` |
+| **Forms** | |
+| Fill in form fields | `doc.forms.fill` |
+| Submit the form to where it goes | `doc.forms.submit` |
+| Create, change and delete form fields | `doc.forms.modify` |
+| Import form fields and values with who filled them in | `doc.forms.import` |
+| Write scripts, submit buttons and links into fields | `doc.forms.script` |
+| **Pages and document** | |
+| Rotate, move, delete, insert and name pages | `doc.pages.assemble` |
+| Change page content, such as flattening | `doc.pages.modify` |
+| Change the title, author and other details | `doc.metadata.modify` |
+| Add, change and delete bookmarks | `doc.outline.modify` |
+| Add and remove attached files | `doc.attachments.modify` |
+| Apply redactions, which remove content for good | `doc.redact` |
+| **Signatures** | |
+| Sign the document | `doc.sign` |
+| Sign as the certifying signature, which sets what later changes are allowed | `doc.sign.certify` |
+| **The PDF's own permissions** | |
+| Whatever the file's own permission flags allow, on top of the above | `pdf.permissions` |
+
+## Good to know
+
+- **"Their own" is who made it.** On a token, that's the user your server named in `sub`. On a
+  grant, it's each visitor: their browser keeps who they are between visits.
+- **Applying a redaction needs three permissions**: `doc.redact`, `doc.pages.modify`, and
+  `doc.annotate.modify`, since a redaction starts as an annotation anyone may have drawn.
+- **The viewer only shows what people can do.** Without Download, there's no download button; with
+  Read, the editing tools don't appear.
+
+<Cards>
+  <Card
+    title="Who sees changes"
+    description="One document everyone works on, or a copy for each visitor."
+    href="/docs/platform/grants/changes"
+  />
+  <Card
+    title="Tokens for your users"
+    description="The same levels, in a token your server makes."
+    href="/docs/platform/app/tokens"
+  />
+</Cards>

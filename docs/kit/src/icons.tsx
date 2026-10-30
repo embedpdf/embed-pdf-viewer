@@ -113,6 +113,14 @@ export function ServerBadgeIcon(props: IconProps) {
   );
 }
 
+export function CloudBadgeIcon(props: IconProps) {
+  return (
+    <svg width={15} height={15} viewBox="0 0 24 24" fill="currentColor" {...props}>
+      <path d="M6.5 19a4.5 4.5 0 0 1-.42-8.98 6 6 0 0 1 11.6-1.5A5.25 5.25 0 0 1 17.25 19H6.5z" />
+    </svg>
+  );
+}
+
 /* ---- Framework logos: the integration switchers on both sites pick from
    the same vocabulary, so the marks live here. ---- */
 

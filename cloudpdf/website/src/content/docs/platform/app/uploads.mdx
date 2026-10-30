@@ -1,0 +1,122 @@
+---
+title: Uploading from your server
+description: Upload PDFs where they arrive, into a folder and with a name, and keep each document's id with your own records. Or let CloudPDF fetch them from a URL.
+---
+
+import { Cards, Card } from '@/components/docs/cards';
+
+# Uploading from your server
+
+When your users send you PDFs, or your app makes them, upload them from your server. Keep each
+document's id with your own record, so you can open it later with a token or a grant.
+
+```ts
+const { document } = await cloudpdf.uploads.create({
+  source: file,
+  name: 'Support agreement.pdf',
+  folderId: clientsFolderId,
+});
+
+await db.contracts.update(contract.id, { documentId: document.id });
+```
+
+The API key needs **Documents and folders** on Write. The document shows up in the dashboard right
+away, in its folder.
+
+When your users pick the PDF in your app, let their browser
+[upload it straight to CloudPDF](/docs/platform/app/browser-uploads) instead. The file never passes
+through your server.
+
+## What you can upload
+
+`source` takes the PDF however you have it:
+
+| `source` | For example |
+| :-- | :-- |
+| A `File` or `Blob` | A file from a form, in a Next.js server action |
+| A `Uint8Array` or `ArrayBuffer` | Bytes you made or received, such as `req.body` in Express |
+| `{ path }` | A file on your server's disk, in Node |
+
+CloudPDF reads the PDF as it is: forms, signatures, attached files, bookmarks and all.
+
+## Name, folder and your own data
+
+| Field | What it does |
+| :-- | :-- |
+| `name` | What the dashboard shows, such as `Support agreement.pdf`. Without it, the document's id |
+| `folderId` | The folder it goes into. Without it, the top level |
+| `metadata` | Your own data, such as `{ contractId: 'c_381' }`, returned with the document |
+
+## The same file twice
+
+Every upload makes a new document, even of a file you uploaded before. To get the existing one
+back instead, say so:
+
+```ts
+const { tag, document } = await cloudpdf.uploads.create({
+  source: file,
+  dedupMode: 'reuse-existing',
+});
+
+tag; // 'deduped' when CloudPDF already had this file, 'created' when it's new
+```
+
+For retries, give the upload an `idempotencyKey`: the same key twice makes one document, so a
+request that timed out can safely run again.
+
+## Large files
+
+`uploads.create` sends the file from your server straight to storage, never through CloudPDF's API.
+For a large file on disk, give it `{ path }`: the file is read as it's sent, never held in memory
+whole.
+
+`onProgress` reports the bytes sent as they go, and `signal` stops the upload:
+
+```ts
+const controller = new AbortController();
+
+await cloudpdf.uploads.create({
+  source: { path: '/var/uploads/site-survey-scans.pdf' },
+  onProgress: (loaded, total) => console.log(`${Math.round((loaded / total) * 100)}%`),
+  signal: controller.signal,
+});
+```
+
+## From a URL
+
+When the PDF is somewhere CloudPDF can reach, such as a storage bucket with a presigned link, let
+CloudPDF fetch it, and skip your server's bandwidth:
+
+```ts
+const { document } = await cloudpdf.documents.importFrom({
+  source: { kind: 'url', url: presignedUrl },
+  name: 'Q3 2026 report.pdf',
+});
+```
+
+Treat that URL as a secret, since it opens the file. CloudPDF never shows it in an error or a log.
+
+## Good to know
+
+- **Uploading isn't opening.** Whoever opens the document gets a [token](/docs/platform/app/tokens)
+  or a [grant](/docs/platform/grants), and never needs to know where it came from.
+- **Every option** is in the API reference: [Initialize an upload](/docs/api-reference/documents/init)
+  and [Import from a URL](/docs/api-reference/documents/import-from).
+
+<Cards>
+  <Card
+    title="Uploads from the browser"
+    description="Let your users' browsers upload PDFs straight to CloudPDF."
+    href="/docs/platform/app/browser-uploads"
+  />
+  <Card
+    title="Tokens for your users"
+    description="Open the document you uploaded, for one signed-in user."
+    href="/docs/platform/app/tokens"
+  />
+  <Card
+    title="Uploading in the dashboard"
+    description="Drop PDFs on the page, into folders."
+    href="/docs/platform/documents/uploading"
+  />
+</Cards>

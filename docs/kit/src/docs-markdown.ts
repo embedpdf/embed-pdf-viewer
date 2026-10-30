@@ -312,6 +312,21 @@ function createResolver(
           return fileNodes(files);
         }
 
+        if (node.name === 'Tabs') {
+          // Projection: the tabs one after another, each under its label (`items`).
+          const labels = expressionStrings(getAttribute(node, 'items'));
+          const panels = (node.children ?? []).filter((child) => child.name === 'Tabs.Tab');
+          return panels.flatMap((panel, index) => [
+            {
+              type: 'paragraph',
+              children: [
+                { type: 'strong', children: [{ type: 'text', value: labels[index] ?? '' }] },
+              ],
+            },
+            ...resolveNodes(panel.children ?? []),
+          ]);
+        }
+
         if (node.name === 'Callout') {
           // Projection: a callout is a blockquote in Markdown.
           return [{ type: 'blockquote', children: resolveNodes(node.children ?? []) }];

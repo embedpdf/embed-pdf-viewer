@@ -1,0 +1,56 @@
+---
+title: Visitors
+description: Who answered a grant's questions or made changes, their answers and their copies, and erasing them.
+---
+
+import { Cards, Card } from '@/components/docs/cards';
+
+# Visitors
+
+A grant's visitors are the people who opened it and left something behind: answers to its
+questions, or changes. Open the grant's menu and choose **Visitors**:
+
+<Screenshot
+  name="grant-visitors"
+  alt="The Visitors dialog of the Client review grant, listing two visitors with their answers"
+/>
+
+Each visitor shows their answers, when they were last seen, and their own copy, if the grant gives
+them one. Someone who only read the document, and wasn't asked anything, isn't listed: CloudPDF
+remembers nothing about them.
+
+**Export CSV** downloads the list, with when each visitor answered.
+
+## Erasing a visitor
+
+**Delete** erases a visitor's answers and their copy, for good. If they come back, they're a new
+visitor, and they answer again. Do this when someone asks you to delete what you know about them.
+
+What they added to a shared document stays, with their name on it, since it's part of the
+document now.
+
+## How CloudPDF remembers them
+
+A visitor's browser keeps a key that says "this is the same visitor", so they answer once and find
+their own copy again. In another browser, or after clearing this one, they're someone new.
+
+## In code
+
+```ts
+const { visitors } = await cloudpdf.grants.visitors.list({ grantId });
+
+await cloudpdf.grants.visitors.delete({ grantId, visitorId: visitors[0].visitorId });
+```
+
+<Cards>
+  <Card
+    title="Who sees changes"
+    description="One document everyone works on, or a copy for each visitor."
+    href="/docs/platform/grants/changes"
+  />
+  <Card
+    title="Pausing and ending"
+    description="Stop a grant for a while, or for good."
+    href="/docs/platform/grants/ending"
+  />
+</Cards>

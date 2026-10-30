@@ -10,7 +10,14 @@ import {
   type FanoutDocsProduct,
 } from '@/lib/docs-integrations';
 
-import { DOCS_LANDING, LANDING_DEPLOYMENTS, LANDING_PRODUCT_PATHS } from '@/lib/docs-landing';
+import {
+  DOCS_LANDING,
+  LANDING_DEPLOYMENTS,
+  LANDING_PRODUCT_PATHS,
+  LANDING_QUICK_STARTS,
+  type LandingQuickStart,
+} from '@/lib/docs-landing';
+import { screenshotOf } from '@/lib/screenshots';
 
 import { BackendBand } from './backend-band';
 import { ArrowRight, CheckIcon, CloudIcon } from './icons';
@@ -178,6 +185,45 @@ function PathCard({
   );
 }
 
+/** A quick start: what you'll have and how long it takes, over a look at the dashboard. */
+function QuickStartCard({ quickStart }: { quickStart: LandingQuickStart }) {
+  const shot = screenshotOf(quickStart.screenshot);
+  return (
+    <Link
+      href={quickStart.href}
+      className="border-cp-border group flex flex-col overflow-hidden rounded-[18px] border bg-white no-underline shadow-[0_1px_2px_rgba(10,26,77,0.04),0_18px_40px_-32px_rgba(10,26,77,0.18)] transition-all hover:border-[#CFE0FF] hover:shadow-[0_30px_60px_-34px_rgba(22,119,255,0.3)]"
+    >
+      <div className="flex items-start gap-4 px-6 pb-5 pt-[22px]">
+        <div className="min-w-0 flex-1">
+          <div className="text-cp-blue font-sans text-[13px] font-bold">{quickStart.time}</div>
+          <div className="font-display text-cp-navy mt-1 text-[20px] font-extrabold tracking-[-0.01em]">
+            {quickStart.title}
+          </div>
+          <div className="text-cp-muted mt-1 font-sans text-[14px] leading-[1.5]">
+            {quickStart.desc}
+          </div>
+        </div>
+        <ArrowRight
+          width={22}
+          height={22}
+          strokeWidth={2.4}
+          className="text-cp-blue mt-1 flex-shrink-0 transition-transform group-hover:translate-x-1"
+        />
+      </div>
+      <div className="relative h-[200px] overflow-hidden bg-[#EEF2F8] px-6 pt-5">
+        <img
+          alt={quickStart.screenshotAlt}
+          className="mx-auto block h-auto w-full max-w-[420px] rounded-t-[10px] shadow-[0_12px_30px_-18px_rgba(10,26,77,0.4)]"
+          height={shot.height}
+          loading="lazy"
+          src={shot.src}
+          width={shot.width}
+        />
+      </div>
+    </Link>
+  );
+}
+
 function DeployCard({
   tone,
   icon,
@@ -256,6 +302,20 @@ export function DocsLanding() {
           <p className="text-cp-ink mx-auto mt-[22px] max-w-[560px] font-sans text-[19px] leading-[1.6]">
             {DOCS_LANDING.intro}
           </p>
+        </div>
+
+        {/* quick starts */}
+        <div className="mx-auto mt-[clamp(32px,4vw,48px)] max-w-[1040px]">
+          <div className="mb-4 flex justify-center">
+            <span className="border-cp-border font-display text-cp-muted inline-flex items-center rounded-full border bg-[#F1F5FC] px-3.5 py-1.5 text-[12.5px] font-bold tracking-[0.01em]">
+              {DOCS_LANDING.quickStartsLabel}
+            </span>
+          </div>
+          <div className="grid grid-cols-1 gap-3.5 min-[881px]:grid-cols-2 min-[881px]:gap-x-[clamp(18px,2.2vw,34px)]">
+            {LANDING_QUICK_STARTS.map((quickStart) => (
+              <QuickStartCard key={quickStart.id} quickStart={quickStart} />
+            ))}
+          </div>
         </div>
 
         {/* path pill */}

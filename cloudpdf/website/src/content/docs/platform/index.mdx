@@ -1,0 +1,63 @@
+---
+title: Platform
+description: Put PDFs on your website and in your app. Upload them, choose who opens them and what they can do, and CloudPDF shows them.
+---
+
+import { Cards, Card } from '@/components/docs/cards';
+
+# Put PDFs in front of people
+
+Upload a PDF to CloudPDF, choose who can open it and what they can do, and it opens in a full PDF
+viewer on your website or in your app. CloudPDF keeps the file, draws the pages, and checks every
+request against what you allowed.
+
+<Cards>
+  <Card
+    title="Put a PDF on your website"
+    description="About 5 minutes: upload, make a grant, paste two lines. No server needed."
+    href="/docs/platform/quick-start/website"
+  />
+  <Card
+    title="Add PDFs to your app"
+    description="About 15 minutes: your server gives each signed-in user a token for their document."
+    href="/docs/platform/quick-start/app"
+  />
+</Cards>
+
+## A grant or a token
+
+Who opens the document decides how they get in:
+
+| | A grant | A token |
+| :-- | :-- | :-- |
+| Who opens it | Anyone with the link, or on your website | Your own signed-in users |
+| Made in | The dashboard | Your server, with an API key |
+| Knows who they are | No: they're visitors | Yes: your user's id and name |
+| Works until | You pause or end it | It runs out, after minutes or hours |
+
+Both end the same way: the viewer gets a short-lived pass for one document, with the permissions
+you chose, and every page, search and comment is checked against it.
+
+## What people can do
+
+A grant and a token say what people can do in the same words:
+
+| Level | People can |
+| :-- | :-- |
+| **Read** | See the pages, search and select text, see comments and form values |
+| **Comment** | Read, and add comments, highlights and drawings, then change and delete their own |
+| **Fill and sign** | Read, and fill in the form, submit it and sign it |
+| **Edit** | Everything above on anyone's work, and change pages, content and details |
+
+On top of any level, they can **Download** the PDF, **Print** it, and **Copy text** from it, but
+only when you say so.
+
+## What you work with
+
+- **The dashboard**, at [app.cloudpdf.com](https://app.cloudpdf.com): your documents and folders,
+  grants, API keys, members and billing.
+- **The viewer**: two lines of HTML, or a component for React, Vue, Svelte and Angular. It brings
+  the toolbar, search, comments, forms and signatures. Or build your own interface with the
+  [headless components](/docs/headless/react).
+- **The SDK**, for your server: uploads, tokens and everything in the
+  [API reference](/docs/api-reference), in seven languages.

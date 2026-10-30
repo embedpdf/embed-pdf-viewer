@@ -1,0 +1,66 @@
+---
+title: Grants and tokens
+description: Who opens a document decides how they get in. A grant is for anyone, a token for your own signed-in users, and both end in a short pass for one document.
+---
+
+import { Cards, Card } from '@/components/docs/cards';
+
+# Grants and tokens
+
+Who opens the document decides how they get in. Ask one question: does your app know who they are?
+
+- **No: anyone may open it.** A reader of your website, a client you send a link, a visitor scanning
+  a QR code. Make a [grant](/docs/platform/grants) in the dashboard.
+- **Yes: they're signed in to your app.** Your server knows who they are and what they may see.
+  Give them a [token](/docs/platform/app/tokens).
+
+| | A grant | A token |
+| :-- | :-- | :-- |
+| Who opens it | Anyone with the link, or on your website | One of your signed-in users |
+| Made by | You, in the dashboard (or your server) | Your server, with an API key, for each user |
+| Says who they are | No: everyone is a visitor, who may answer a few questions | Yes: your user's id and name |
+| Lasts | Until you pause, change or end it | Minutes or hours, then your server makes the next |
+| You change it by | Editing it: every link and embed follows | Making the next token differently |
+| Needs a server | No | Yes: the route that makes tokens |
+
+## Both end the same way
+
+Neither a grant nor a token is what the viewer keeps. When a document opens, CloudPDF gives the
+viewer a short pass for that one document, with the permissions you chose, and checks every page,
+search and change against it:
+
+- **With a grant**, the viewer trades the grant for the pass, and trades again before the pass runs
+  out. Change the grant, and the next trade follows it.
+- **With a token**, the token is the pass. The viewer asks your server for the next one before it
+  runs out.
+
+So permissions read the same everywhere: a grant's **Comment** and a token's `permissions.comment`
+are the same thing.
+
+## One document, both ways
+
+A document can have grants and tokens at the same time. The brochure on your website opens with a
+grant, and your sales team opens the same file in your app with tokens, with their own names on
+their comments. Ending the grant doesn't touch the tokens, and the other way round.
+
+## Visitors and users
+
+A grant's visitors are people CloudPDF remembers, but doesn't know. Their browser keeps who they are
+between visits, so what they add stays theirs, and a grant can ask their name or email before they
+start. [Visitors](/docs/platform/grants/visitors) shows who came.
+
+Your app's users are people you know. The token carries their id and name, so everything they add
+says who added it, in your words.
+
+<Cards>
+  <Card
+    title="What the browser holds"
+    description="Why the pass in the browser is safe, and what it can't do."
+    href="/docs/platform/concepts/security"
+  />
+  <Card
+    title="What people can do"
+    description="The levels a grant and a token both take."
+    href="/docs/platform/grants/permissions"
+  />
+</Cards>

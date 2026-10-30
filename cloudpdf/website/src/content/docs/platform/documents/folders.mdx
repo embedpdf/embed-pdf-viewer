@@ -1,0 +1,61 @@
+---
+title: Folders and search
+description: Keep documents in folders, nested as deep as you like, and find any document by name with one search.
+---
+
+import { Cards, Card } from '@/components/docs/cards';
+
+# Folders and search
+
+Folders keep a workspace in order: one per client, per project, per year. Click **New folder**,
+name it, and drop documents in, or upload straight into it.
+
+<Screenshot
+  name="folder"
+  alt="The Clients folder, with its two documents and the path back to Documents above"
+/>
+
+The path above the list takes you back up. Folders hold folders too, as deep as you need.
+
+Two folders side by side can't have the same name, whatever the capitals. A folder's menu has
+**Rename**, **Move to…** and **Delete**. Deleting a folder with documents in it deletes them too,
+and their grants, so the dashboard asks first.
+
+## Find a document
+
+**Search all documents** looks through every folder at once, for documents whose name contains
+what you type:
+
+<Screenshot
+  name="search"
+  alt="Searching for 2026: the matching documents, from the top level and the Finance folder"
+/>
+
+## Sort and view
+
+Sort by **Newest first**, **Oldest first**, **Name, A to Z**, **Name, Z to A**, **Largest first**
+or **Smallest first**. Switch between the list and a grid of thumbnails; your browser remembers
+which.
+
+## In code
+
+```ts
+const { folder } = await cloudpdf.folders.create({ name: 'Clients', parentId: 'root' });
+
+await cloudpdf.uploads.create({ source: file, folderId: folder.id });
+
+const { documents } = await cloudpdf.documents.list({ q: 'report' });
+```
+
+<Cards>
+  <Card
+    title="Uploading"
+    description="Add PDFs, rename, move and delete them."
+    href="/docs/platform/documents/uploading"
+  />
+  <Card
+    title="Grants"
+    description="Send a document as a link, or put it on your website."
+    href="/docs/platform/grants"
+  />
+</Cards>

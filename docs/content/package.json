@@ -11,7 +11,8 @@
     "publish-gate": "node scripts/publish-gate.mjs",
     "samples": "node scripts/samples.mjs",
     "pdfs": "tsx pdfs/build.mjs",
-    "pdfs:cloud": "node pdfs/cloud.mjs"
+    "pdfs:cloud": "node pdfs/cloud.mjs",
+    "screenshots": "node screenshots/capture.mjs"
   },
   "devDependencies": {
     "@cloudpdf/sdk": "workspace:*",
