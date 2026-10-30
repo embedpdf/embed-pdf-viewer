@@ -1,5 +1,7 @@
 # @embedpdf/engine-runtime
 
+## 3.0.0-next.19
+
 ## 3.0.0-next.18
 
 ### Minor Changes

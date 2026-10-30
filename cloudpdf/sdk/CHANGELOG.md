@@ -1,5 +1,11 @@
 # @cloudpdf/sdk
 
+## 3.0.0-next.19
+
+### Minor Changes
+
+- [#918](https://github.com/embedpdf/embed-pdf-viewer/pull/918) by [@bobsingor](https://github.com/bobsingor) – `client.shares` is `client.grants`, with a grant's `name` and `passphrase`.
+
 ## 3.0.0-next.18
 
 ### Minor Changes

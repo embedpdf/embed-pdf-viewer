@@ -1,5 +1,14 @@
 # @cloudpdf/engine
 
+## 3.0.0-next.19
+
+### Minor Changes
+
+- [#918](https://github.com/embedpdf/embed-pdf-viewer/pull/918) by [@bobsingor](https://github.com/bobsingor) – Opens a grant with `open({ kind: 'grant', grant, passphrase })`, and the
+  document's grant is `doc.grant`. The client half is `exchangeGrant`,
+  `grantSessionSource`, `GrantSessionSource` and `GrantExchangeError`, and it
+  exchanges at `/v1/grant-sessions`.
+
 ## 3.0.0-next.18
 
 ### Patch Changes

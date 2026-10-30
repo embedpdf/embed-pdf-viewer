@@ -1,5 +1,15 @@
 # @embedpdf/angular
 
+## 3.0.0-next.19
+
+### Minor Changes
+
+- [#920](https://github.com/embedpdf/embed-pdf-viewer/pull/920) by [@bobsingor](https://github.com/bobsingor) – The Stage draws the `zoom` tool's box while you drag, dashed in the accent color (the stage's `zoomBox` setting, or the `--epdf-zoom-box-*` variables). With interaction on, it registers the tool's handler for its own view only.
+
+- [#923](https://github.com/embedpdf/embed-pdf-viewer/pull/923) by [@bobsingor](https://github.com/bobsingor) – `provideEmbedPdf({ fetch })`: your own `fetch` for documents at a URL, to add headers or cookies.
+
+- [#923](https://github.com/embedpdf/embed-pdf-viewer/pull/923) by [@bobsingor](https://github.com/bobsingor) – `EpdfStageRef` (and so the `<epdf-stage>` component) has `canZoomIn()` and `canZoomOut()`, whether the zoom is below the Stage's `maxZoom` or above its `minZoom`.
+
 ## 3.0.0-next.18
 
 ## 3.0.0-next.17

@@ -1,5 +1,15 @@
 # @embedpdf/core-ui
 
+## 3.0.0-next.19
+
+### Minor Changes
+
+- [#923](https://github.com/embedpdf/embed-pdf-viewer/pull/923) by [@bobsingor](https://github.com/bobsingor) – A bar can go at the top of a panel, under its title: the place `{ panel: id }`, beside an edge, `{ float }`, `{ with }` and `{ at }`. A panel's bars stack in the order they were added. `barsInPanel(data, panel)` lists them and `panelOf(place)` reads the panel a place names, and `validateLayout()` names a panel the layout doesn't have, with the closest one that exists.
+
+### Patch Changes
+
+- [#923](https://github.com/embedpdf/embed-pdf-viewer/pull/923) by [@bobsingor](https://github.com/bobsingor) – An item without its own `importance` has its group's, as the docs say, instead of `3`. `group('annotate', items, { importance: 2 })` now moves those items into the "More" menu before the rest of the bar, and every item of a group at `5` stays in the bar. An item's own `importance` still wins, and a custom item without a command is still pinned.
+
 ## 3.0.0-next.18
 
 ## 3.0.0-next.17

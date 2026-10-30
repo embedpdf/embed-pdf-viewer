@@ -1,5 +1,11 @@
 # @embedpdf/plugin-i18n
 
+## 3.0.0-next.19
+
+### Minor Changes
+
+- [#920](https://github.com/embedpdf/embed-pdf-viewer/pull/920) by [@bobsingor](https://github.com/bobsingor) – Labels for the `tool:zoom` command (`commands.tool.zoom`) in all eight languages.
+
 ## 3.0.0-next.18
 
 ## 3.0.0-next.17
