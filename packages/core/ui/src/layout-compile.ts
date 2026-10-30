@@ -91,6 +91,11 @@ export function selectionOf(place: BarPlace | undefined): SelectionTarget | null
   return typeof place === 'object' && place !== null && 'at' in place ? place.at : null;
 }
 
+/** The panel a place puts a bar at the top of, or `null`. */
+export function panelOf(place: BarPlace | undefined): string | null {
+  return typeof place === 'object' && place !== null && 'panel' in place ? place.panel : null;
+}
+
 /** Where a place floats over the pages, or `null` for a place that doesn't float. */
 export function floatOf(place: BarPlace | undefined): FloatPosition | null {
   return typeof place === 'object' &&
@@ -179,6 +184,13 @@ export function floatStackOf(data: LayoutData, position: FloatPosition): string[
 export function barsAt(data: LayoutData, target: SelectionTarget): string[] {
   return barsOf(data)
     .filter(([, bar]) => selectionOf(bar.place) === target)
+    .map(([id]) => id);
+}
+
+/** The bars at the top of a panel, in the order they were added. */
+export function barsInPanel(data: LayoutData, panel: string): string[] {
+  return barsOf(data)
+    .filter(([, bar]) => panelOf(bar.place) === panel)
     .map(([id]) => id);
 }
 

@@ -16,7 +16,8 @@ export type Variant = 'icon+label' | 'icon' | 'label';
 
 /**
  * Who yields space first. 1 = first to degrade/overflow · 3 = default ·
- * 5 = pinned: may still degrade variants, but never leaves the bar.
+ * 5 = pinned: may still degrade variants, but never leaves the bar. An item
+ * without one has its group's.
  */
 export type Importance = 1 | 2 | 3 | 4 | 5;
 
@@ -27,6 +28,7 @@ export interface BarItem {
   readonly command: string;
   /** Degradation ladder, richest first. Default: ['icon']. */
   readonly variants?: readonly Variant[];
+  /** Default: its group's. */
   readonly importance?: Importance;
 }
 
@@ -43,6 +45,7 @@ export interface CustomItem {
   readonly variants?: readonly string[];
   /** The command that stands in for this slot in menus (its last resort). */
   readonly terminal?: string;
+  /** Default: its group's. Without a `terminal`, always {@link PINNED}. */
   readonly importance?: Importance;
 }
 
@@ -70,6 +73,7 @@ export interface BarGroup {
    * nor `collapse` send children to the global overflow menu one by one.
    */
   readonly collapse?: 'menu' | 'select';
+  /** Who yields space first: the group as a whole, and each of its items without its own. Default: 3. */
   readonly importance?: Importance;
   /**
    * Shows only while something that isn't dependent shows in the same bar, like undo and redo
@@ -190,25 +194,26 @@ export const isStandaloneUnit = (unit: NormalizedUnit): boolean =>
 export const commandOfUnit = (unit: NormalizedUnit): string | null =>
   unit.kind === 'command' ? unit.command : unit.terminal;
 
-function normalizeChild(groupId: string, child: BarChild, seen: Set<string>): NormalizedUnit {
+/** A child with its defaults: `importance` is its group's when it has none of its own. */
+function normalizeChild(group: BarGroup, child: BarChild, seen: Set<string>): NormalizedUnit {
   const asItem: BarItem | CustomItem = typeof child === 'string' ? { command: child } : child;
+  const importance = asItem.importance ?? group.importance ?? DEFAULT_IMPORTANCE;
   const unit: NormalizedUnit =
     'slot' in asItem
       ? {
           kind: 'custom',
-          key: `${groupId}:${asItem.slot}`,
+          key: `${group.id}:${asItem.slot}`,
           slot: asItem.slot,
           variants: asItem.variants ?? DEFAULT_CUSTOM_VARIANTS,
           terminal: asItem.terminal ?? null,
-          importance:
-            asItem.terminal === undefined ? PINNED : (asItem.importance ?? DEFAULT_IMPORTANCE),
+          importance: asItem.terminal === undefined ? PINNED : importance,
         }
       : {
           kind: 'command',
-          key: `${groupId}:${asItem.command}`,
+          key: `${group.id}:${asItem.command}`,
           command: asItem.command,
           variants: asItem.variants ?? DEFAULT_COMMAND_VARIANTS,
-          importance: asItem.importance ?? DEFAULT_IMPORTANCE,
+          importance,
         };
   if (unit.variants.length === 0) throw new Error(`[ui-core] empty variant ladder: ${unit.key}`);
   if (seen.has(unit.key)) throw new Error(`[ui-core] duplicate unit in bar: ${unit.key}`);
@@ -218,8 +223,9 @@ function normalizeChild(groupId: string, child: BarChild, seen: Set<string>): No
 
 /**
  * Resolve shorthands + defaults; validate uniqueness. Solver/projection input.
- * A group holding a custom item without a command is pinned with it: it never
- * collapses or overflows whole, so the item stays in the bar.
+ * An item without an importance has its group's. A group holding a custom item
+ * without a command is pinned with it: it never collapses or overflows whole,
+ * so the item stays in the bar; its other items keep the group's own.
  */
 export function normalizeBar(bar: BarSchema): NormalizedBar {
   const seen = new Set<string>();
@@ -234,7 +240,7 @@ export function normalizeBar(bar: BarSchema): NormalizedBar {
         if (groupIds.has(group.id))
           throw new Error(`[ui-core] duplicate group in bar: ${group.id}`);
         groupIds.add(group.id);
-        const units = group.items.map((child) => normalizeChild(group.id, child, seen));
+        const units = group.items.map((child) => normalizeChild(group, child, seen));
         return {
           id: group.id,
           labelKey: group.labelKey,

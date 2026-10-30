@@ -1,8 +1,9 @@
 /**
  * The outline panel: the document's outline (its bookmarks) as a tree. A row goes where its item
  * goes; the row of the item the main view is reading is marked, and comes into view as the
- * reader moves on. A filter finds items by their title, in their place. A session that may change
- * the outline adds items (after the selected one, at the place in view, renaming them at once),
+ * reader moves on. The filter in the panel's bar (`outline` in the layout, with add, expand all
+ * and collapse all) finds items by their title, in their place. A session that may change the
+ * outline adds items (after the selected one, at the place in view, renaming them at once),
  * renames, drags and deletes them, and opens a row's menu for the rest.
  */
 import { useCommand } from '@embedpdf/react/commands';
@@ -16,12 +17,11 @@ import {
 import { useSurface } from '@embedpdf/react/shell';
 import { useEffect, useMemo, useState } from 'react';
 
-import { Icon } from './icons';
+import { useOutlineFilter } from './outline-filter';
 import { OutlineRows } from './outline-rows';
 import { filteredRows, outlineKeyOf } from './outline-tree';
 import { useCloseOnPick } from './panel-frame';
 import { useTheme } from './theme';
-import { CommandButton } from './toolbar';
 import { OUTLINE_RENAME } from '../config/outline';
 
 /** The rename request's props: an item to rename, or the selection an add is about to replace. */
@@ -53,10 +53,8 @@ export function OutlinePanel() {
   const { mode } = useTheme();
   const closeOnPick = useCloseOnPick();
   const add = useCommand('outline:add');
-  const expandAll = useCommand('outline:expand-all');
-  const collapseAll = useCommand('outline:collapse-all');
   const editable = add.visible && add.enabled;
-  const [filter, setFilter] = useState('');
+  const [filter, setFilter] = useOutlineFilter();
   const [renamingKey, setRenamingKey] = useState<string | null>(null);
 
   const filtering = filter.trim() !== '';
@@ -85,32 +83,7 @@ export function OutlinePanel() {
     setFilter('');
     setRenamingKey(outlineKeyOf(first));
     renameRequest.close();
-  }, [renameRequest, selected]);
-
-  const toolbar = (
-    <div className="border-border-subtle flex items-center gap-1 border-b p-2">
-      <div className="relative min-w-0 flex-1">
-        <div className="text-fg-muted pointer-events-none absolute inset-y-0 start-0 flex items-center ps-2">
-          <Icon name="search" size={14} />
-        </div>
-        <input
-          type="search"
-          value={filter}
-          placeholder={t('outline.filter')}
-          aria-label={t('outline.filter')}
-          onChange={(event) => setFilter(event.target.value)}
-          className="border-border bg-surface text-fg focus:border-accent focus:ring-accent w-full rounded-md border py-1 pe-2 ps-7 text-sm outline-none focus:ring-1"
-        />
-      </div>
-      {add.visible && <CommandButton cmd={add} variant="icon" run={() => void add.run()} />}
-      {expandAll.visible && (
-        <CommandButton cmd={expandAll} variant="icon" run={() => void expandAll.run()} />
-      )}
-      {collapseAll.visible && (
-        <CommandButton cmd={collapseAll} variant="icon" run={() => void collapseAll.run()} />
-      )}
-    </div>
-  );
+  }, [renameRequest, selected, setFilter]);
 
   const message = (text: string, withAdd = false) => (
     <div className="text-fg-muted flex flex-col items-center gap-3 p-6 text-center text-sm">
@@ -153,7 +126,6 @@ export function OutlinePanel() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {toolbar}
       {incomplete && (
         <p className="text-fg-muted border-border-subtle border-b px-3 py-2 text-xs">
           {t('outline.incomplete')}

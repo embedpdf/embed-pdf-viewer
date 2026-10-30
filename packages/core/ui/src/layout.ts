@@ -33,22 +33,24 @@ export type SelectionTarget = 'selection' | 'annotation';
 
 /**
  * Where a bar goes: along an edge, floating over the pages, along another bar on the side of the
- * pages, or over what's selected. Bars on one edge stack from the outside in, in the order they
- * were added; `before` and `after` put a bar next to another bar on that edge.
+ * pages, over what's selected, or at the top of a panel, under its title. Bars on one edge stack
+ * from the outside in, in the order they were added; `before` and `after` put a bar next to
+ * another bar on that edge. A panel's bars stack in the order they were added.
  */
 export type BarPlace =
   | BarEdge
   | { readonly edge: BarEdge; readonly before?: string; readonly after?: string }
   | { readonly float: FloatPosition }
   | { readonly with: string }
-  | { readonly at: SelectionTarget };
+  | { readonly at: SelectionTarget }
+  | { readonly panel: string };
 
 /** A command with options. */
 export interface LayoutCommandItem {
   readonly command: string;
   /** How it may show, richest first. Default `['icon']`. */
   readonly variants?: readonly Variant[];
-  /** Who makes room first: `1` to `5` (never leaves the bar). Default `3`. */
+  /** Who makes room first: `1` to `5` (never leaves the bar). Default: its group's. */
   readonly importance?: Importance;
 }
 
@@ -58,6 +60,7 @@ export interface LayoutCustomItem {
   readonly command?: string;
   /** Your component's forms, largest first. Default `['default']`. */
   readonly variants?: readonly string[];
+  /** Who makes room first, with a `command`. Default: its group's. */
   readonly importance?: Importance;
 }
 
@@ -73,7 +76,7 @@ export interface LayoutGroupObject {
   readonly collapse?: 'menu' | 'select';
   /** Move items behind a button inside the group before the group folds or leaves the bar. */
   readonly shed?: boolean;
-  /** Who makes room first: `1` to `5`. Default `3`. */
+  /** Who makes room first: `1` to `5`, for the group and each item without its own. Default `3`. */
   readonly importance?: Importance;
   /** Its title in the "More" menu, as a translation key. */
   readonly titleKey?: string;

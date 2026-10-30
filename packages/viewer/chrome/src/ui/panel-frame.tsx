@@ -69,6 +69,8 @@ export interface PanelFrameProps {
   readonly onClose: () => void;
   /** Drawn in the header in place of the title: the switcher between the panels on its side. */
   readonly header?: ReactNode;
+  /** Drawn under the header, outside what scrolls: the bars the layout puts in the panel. */
+  readonly bars?: ReactNode;
   /** It holds a list: in a sheet or an overlay, picking an item closes it ({@link useCloseOnPick}). */
   readonly list?: boolean;
   readonly children: ReactNode;
@@ -156,6 +158,7 @@ function DockedPanel({
   title,
   onClose,
   header,
+  bars,
   children,
 }: PanelFrameProps) {
   const env = useLayoutEnv();
@@ -180,6 +183,7 @@ function DockedPanel({
       style={{ width: shown }}
     >
       <PanelHeader title={title} header={header} onClose={onClose} />
+      {bars}
       <div className="flex min-h-0 flex-1 flex-col">{children}</div>
       {resizable && (
         <PanelEdge
@@ -292,6 +296,7 @@ function OverlayPanel({
   title,
   onClose,
   header,
+  bars,
   list,
   children,
 }: PanelFrameProps) {
@@ -329,6 +334,7 @@ function OverlayPanel({
         style={{ width: overlayWidthOf(clampPanelWidth(wanted, env.width, widths), env.width) }}
       >
         <PanelHeader title={title} header={header} onClose={onClose} />
+        {bars}
         <div className="flex min-h-0 flex-1 flex-col">
           <CloseOnPickProvider value={list ? () => close.current() : () => {}}>
             {children}
@@ -341,7 +347,7 @@ function OverlayPanel({
 
 // ── sheet ────────────────────────────────────────────────────────────────────
 
-function SheetPanel({ id, title, onClose, header, list, children }: PanelFrameProps) {
+function SheetPanel({ id, title, onClose, header, bars, list, children }: PanelFrameProps) {
   return (
     <Sheet
       label={title}
@@ -350,7 +356,12 @@ function SheetPanel({ id, title, onClose, header, list, children }: PanelFramePr
       list={list}
       part="panel"
       data={{ 'epdf-panel': id, present: 'sheet' }}
-      header={<PanelHeader title={title} header={header} onClose={onClose} />}
+      header={
+        <>
+          <PanelHeader title={title} header={header} onClose={onClose} />
+          {bars}
+        </>
+      }
     >
       {children}
     </Sheet>

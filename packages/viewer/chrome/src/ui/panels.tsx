@@ -3,7 +3,8 @@
  * that side, in the frame that opens it (docked beside the pages, over them,
  * or as a sheet: panel-frame.tsx). The panels on one side take turns: opening
  * one closes the other, however it was opened. The header switches between
- * the panels on the side; the body is the slot `panel:<id>`, which holds the
+ * the panels on the side; under it go the bars the layout puts in the panel
+ * (`place: { panel }`); the body is the slot `panel:<id>`, which holds the
  * built-in content, so content of your own replaces it, and a panel of your
  * own with nothing in its slot is empty.
  *
@@ -26,11 +27,13 @@ import {
 } from '@embedpdf/react/runtime';
 import { SearchToken } from '@embedpdf/react/search';
 import { ShellToken, useShellEvent } from '@embedpdf/react/shell';
-import { useLayoutEffect, useMemo, type ReactNode } from 'react';
+import { Fragment, useLayoutEffect, useMemo, type ReactNode } from 'react';
 
 import { panelsOnSide } from '../config/panels';
 import { useResolvedLayout } from '../config-context';
+import { PanelBars } from '../places';
 import { lazyComponent } from './lazy';
+import { OutlineFilterScope } from './outline-filter';
 import { PanelBar, PanelFrame } from './panel-frame';
 import type { PanelSide } from './panel-layout';
 import { PanelSwitcher } from './panel-switcher';
@@ -68,6 +71,8 @@ interface BuiltInContent {
   readonly draw: (documentId: string | null) => ReactNode;
   /** It holds a list: in a sheet or an overlay, picking one of its items closes the panel. */
   readonly list?: boolean;
+  /** Holds what its bar and its body share: around both. */
+  readonly scope?: (props: { readonly children: ReactNode }) => ReactNode;
   /** What it draws instead, as a bar ({@link PanelBar}), while `when` says its list would be empty. */
   readonly bar?: {
     readonly when: (kernel: Kernel, documentId: string | null) => boolean;
@@ -77,8 +82,15 @@ interface BuiltInContent {
 
 const BUILT_IN_CONTENT: ReadonlyMap<string, BuiltInContent> = new Map<string, BuiltInContent>([
   ['thumbnails', { draw: () => <ThumbnailList />, list: true }],
-  // Each document's own outline, its filter and its rows.
-  ['outline', { draw: (documentId) => <OutlinePanel key={documentId ?? 'none'} />, list: true }],
+  // Each document's own outline and its rows; the filter its bar and its rows share.
+  [
+    'outline',
+    {
+      draw: (documentId) => <OutlinePanel key={documentId ?? 'none'} />,
+      list: true,
+      scope: OutlineFilterScope,
+    },
+  ],
   // Each document's files: its attachments and the files on its pages.
   [
     'attachments',
@@ -193,21 +205,27 @@ function OpenPanel({
       </PanelBar>
     );
   }
+  const Scope = content?.scope ?? Fragment;
   return (
-    <PanelFrame
-      id={id}
-      side={side}
-      present={panel.present}
-      width={panel.width}
-      resizable={panel.resizable}
-      title={title}
-      header={
-        siblings.length > 1 ? <PanelSwitcher id={id} title={title} panels={siblings} /> : undefined
-      }
-      list={content?.list}
-      onClose={() => shell?.close(id)}
-    >
-      <slot name={`panel:${id}`}>{content?.draw(documentId)}</slot>
-    </PanelFrame>
+    <Scope>
+      <PanelFrame
+        id={id}
+        side={side}
+        present={panel.present}
+        width={panel.width}
+        resizable={panel.resizable}
+        title={title}
+        header={
+          siblings.length > 1 ? (
+            <PanelSwitcher id={id} title={title} panels={siblings} />
+          ) : undefined
+        }
+        bars={<PanelBars panel={id} />}
+        list={content?.list}
+        onClose={() => shell?.close(id)}
+      >
+        <slot name={`panel:${id}`}>{content?.draw(documentId)}</slot>
+      </PanelFrame>
+    </Scope>
   );
 }

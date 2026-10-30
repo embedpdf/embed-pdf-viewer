@@ -10,7 +10,8 @@
  * - dragging moves the selection if the page is in it, else that page, with a line where they
  *   land; a pen or a finger holds the page first, so a swipe still scrolls;
  * - PDFs dropped between pages are inserted there, not opened as a tab;
- * - the header has insert, rotate, delete, the selection's menu, and undo and redo;
+ * - the panel's bar (`thumbnails` in the layout) has insert, rotate, delete, the rest of the
+ *   page menu's actions, and undo and redo;
  * - the list is one tab stop: arrows go through the pages, Shift extends, Space adds or removes,
  *   Alt+arrows move the selection one place, Delete deletes and Ctrl/Cmd+A selects every page.
  */
@@ -52,16 +53,6 @@ const HOLD_MS = 450;
 const EDGE_PX = 28;
 /** The lens's spacing when its settings don't say it in px. */
 const DEFAULT_GAP_PX = 16;
-
-/** The header's commands: insert and rotate, delete, the menu of the rest, then the history. */
-const HEADER_EDITS = [
-  'page:insert-blank',
-  'page:rotate-counterclockwise',
-  'page:rotate-clockwise',
-  'page:delete',
-  'menu:page',
-] as const;
-const HEADER_HISTORY = ['history:undo', 'history:redo'] as const;
 
 interface Drag {
   readonly pointerId: number;
@@ -439,7 +430,6 @@ export function ThumbnailList() {
   const shownDrop = dragging ? drag.drop : fileDrop;
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {editable && <PageHeader />}
       <div
         ref={host}
         role="listbox"
@@ -579,25 +569,4 @@ function PageMenuButton() {
   const more = useCommand('menu:page');
   if (!more.visible) return null;
   return <CommandButton cmd={more} variant="icon" run={() => void more.run()} />;
-}
-
-/** The header over the thumbnails while the pages can be changed: the edits, then the history. */
-function PageHeader() {
-  return (
-    <div className="border-border-subtle flex items-center gap-1 border-b p-2">
-      {HEADER_EDITS.map((id) => (
-        <HeaderButton key={id} id={id} />
-      ))}
-      <span className="flex-1" />
-      {HEADER_HISTORY.map((id) => (
-        <HeaderButton key={id} id={id} />
-      ))}
-    </div>
-  );
-}
-
-function HeaderButton({ id }: { id: string }) {
-  const command = useCommand(id);
-  if (!command.visible) return null;
-  return <CommandButton cmd={command} variant="icon" run={() => void command.run()} />;
 }

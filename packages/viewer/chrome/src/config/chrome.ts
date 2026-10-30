@@ -7,8 +7,8 @@
  * a `mode`).
  *
  * `importance` (1 makes room first … 5 never leaves the bar) is the only
- * responsive knob. The bar, group and menu ids are API: they don't change
- * between minor versions.
+ * responsive knob; a group's is its items' unless they have their own. The
+ * bar, group and menu ids are API: they don't change between minor versions.
  */
 import { createLayout, type LayoutData, type LayoutGroupObject } from '@embedpdf/core-ui';
 
@@ -226,6 +226,46 @@ export const DEFAULT_LAYOUT: LayoutData = {
         // Its own group, so a line sets delete apart.
         { id: 'danger', items: ['annotation:delete'], importance: 5 },
       ],
+    },
+
+    // ── the bars at the top of a panel, under its title, named after it ──────
+    thumbnails: {
+      place: { panel: 'thumbnails' },
+      start: [
+        {
+          id: 'edit',
+          items: [
+            'page:insert-blank',
+            'page:rotate-counterclockwise',
+            'page:rotate-clockwise',
+            'page:delete',
+          ],
+          importance: 4,
+        },
+        // The page menu's other actions: buttons with room to spare, else the "More" menu.
+        {
+          id: 'more',
+          items: ['page:insert-file', 'page:duplicate', 'page:extract'],
+          importance: 1,
+        },
+      ],
+      end: [history],
+    },
+    outline: {
+      place: { panel: 'outline' },
+      start: [
+        {
+          id: 'filter',
+          items: [{ custom: 'outline-filter', variants: ['wide', 'narrow'] }],
+        },
+      ],
+      end: [{ id: 'items', items: ['outline:add', 'outline:expand-all', 'outline:collapse-all'] }],
+    },
+    attachments: {
+      place: { panel: 'attachments' },
+      // Dependent: the count shows beside the button that adds a file, never on its own.
+      start: [{ id: 'count', items: [{ custom: 'attachments-count' }], dependent: true }],
+      end: [{ id: 'files', items: ['attachment:add'] }],
     },
   },
 
