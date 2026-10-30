@@ -1,5 +1,11 @@
 # @embedpdf/viewer-vue
 
+## 3.0.0-next.19
+
+### Minor Changes
+
+- [#923](https://github.com/embedpdf/embed-pdf-viewer/pull/923) by [@bobsingor](https://github.com/bobsingor) – `<PDFViewer :fetch>`: your own `fetch` for documents at a URL, to add headers or cookies. It follows its prop, like `src`.
+
 ## 3.0.0-next.18
 
 ## 3.0.0-next.17

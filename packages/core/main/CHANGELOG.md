@@ -1,5 +1,14 @@
 # @embedpdf/core
 
+## 3.0.0-next.19
+
+### Minor Changes
+
+- [#918](https://github.com/embedpdf/embed-pdf-viewer/pull/918) by [@bobsingor](https://github.com/bobsingor) – A document opened with a grant reports what it waits for as `grantRequest`, and
+  `retry()` takes the grant's `passphrase`.
+
+- [#923](https://github.com/embedpdf/embed-pdf-viewer/pull/923) by [@bobsingor](https://github.com/bobsingor) – `createKernel({ fetch })` takes your own `fetch` for `{ kind: 'url' }` documents, to add headers or cookies; it gets the URL and an `init` with the document's cancel signal, and `retry()` calls it again. A `{ kind: 'url' }` source takes an `id` of its own. A download the server refuses with 401 or 403 fails as `permission-denied`, and one that isn't a PDF (a sign-in page, say) as `invalid-input`. New exports: the `HostFetch` type and `isPdf(bytes)`.
+
 ## 3.0.0-next.18
 
 ### Minor Changes

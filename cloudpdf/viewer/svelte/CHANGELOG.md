@@ -1,5 +1,13 @@
 # @cloudpdf/viewer-svelte
 
+## 3.0.0-next.19
+
+### Minor Changes
+
+- [#918](https://github.com/embedpdf/embed-pdf-viewer/pull/918) by [@bobsingor](https://github.com/bobsingor) – A document from a grant is `src: { grant, passphrase, restart }`; `password`
+  stays the PDF's own. The exchange helpers are `exchangeGrant`,
+  `grantSessionSource` and `GrantExchangeError`.
+
 ## 3.0.0-next.18
 
 ## 3.0.0-next.17

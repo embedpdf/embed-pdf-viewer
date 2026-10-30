@@ -1,5 +1,13 @@
 # @embedpdf/web
 
+## 3.0.0-next.19
+
+### Minor Changes
+
+- [#920](https://github.com/embedpdf/embed-pdf-viewer/pull/920) by [@bobsingor](https://github.com/bobsingor) – Theming for the zoom tool's box: `--epdf-zoom-box-fill` and `--epdf-zoom-box-stroke`, which win over the stage's `zoomBox` setting, plus `zoomBoxPaint(colors, accent)` and `ZOOM_BOX_DASH` to draw it.
+
+- [#923](https://github.com/embedpdf/embed-pdf-viewer/pull/923) by [@bobsingor](https://github.com/bobsingor) – Export `isFromTextField(event)`, which tells a key or a copy typed in a text field (an input, a text area, a select or editable content, inside a shadow root too) from one meant for the viewer around it.
+
 ## 3.0.0-next.18
 
 ## 3.0.0-next.17

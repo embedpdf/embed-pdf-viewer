@@ -1,5 +1,15 @@
 # @embedpdf/engine-core
 
+## 3.0.0-next.19
+
+### Minor Changes
+
+- [#918](https://github.com/embedpdf/embed-pdf-viewer/pull/918) by [@bobsingor](https://github.com/bobsingor) – The open input for a CloudPDF grant is `{ kind: 'grant', grant, passphrase?,
+restart? }` (`OpenInputGrant`), and a document opened with one has `doc.grant`
+  (`DocumentGrant`), whose `resume()` takes `passphrase`. `ShareOpenRequest` is
+  `GrantOpenRequest`, with `passphraseProvided`, and `SharePasswordRequired` is
+  `GrantPassphraseRequired`.
+
 ## 3.0.0-next.18
 
 ### Minor Changes

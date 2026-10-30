@@ -1,5 +1,7 @@
 # @embedpdf/plugin-measurement
 
+## 3.0.0-next.19
+
 ## 3.0.0-next.18
 
 ## 3.0.0-next.17

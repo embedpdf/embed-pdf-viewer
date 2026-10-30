@@ -1,5 +1,11 @@
 # @embedpdf/viewer
 
+## 3.0.0-next.19
+
+### Minor Changes
+
+- [#923](https://github.com/embedpdf/embed-pdf-viewer/pull/923) by [@bobsingor](https://github.com/bobsingor) – The `fetch` config key: your own `fetch` for every document at a URL (`src`, `documents` and `{ kind: 'url' }` in code), to add headers or cookies. It follows its prop, as `element.fetch` too: the next download uses a new one, and the viewer stays. A server that answers 401 or 403 shows in the tab as not allowed, and **Try again** calls `fetch` again.
+
 ## 3.0.0-next.18
 
 ## 3.0.0-next.17

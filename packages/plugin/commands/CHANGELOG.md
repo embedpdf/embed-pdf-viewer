@@ -1,5 +1,15 @@
 # @embedpdf/plugin-commands
 
+## 3.0.0-next.19
+
+### Minor Changes
+
+- [#920](https://github.com/embedpdf/embed-pdf-viewer/pull/920) by [@bobsingor](https://github.com/bobsingor) – The standard commands have `tool:zoom`, the marquee zoom tool, on `Z` (Acrobat's key), next to `tool:pointer` (`V`) and `tool:pan` (`H`).
+
+### Patch Changes
+
+- [#923](https://github.com/embedpdf/embed-pdf-viewer/pull/923) by [@bobsingor](https://github.com/bobsingor) – The standard `zoom:in` and `zoom:out` commands are off at the Stage's `maxZoom` and `minZoom`.
+
 ## 3.0.0-next.18
 
 ## 3.0.0-next.17

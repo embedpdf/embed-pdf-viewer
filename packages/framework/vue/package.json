@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/vue",
-  "version": "3.0.0-next.18",
+  "version": "3.0.0-next.19",
   "private": false,
   "description": "Vue adapter for EmbedPDF v3: composables, components with v-model and scoped slots, headless layers. The whole framework surface, one entry point per feature.",
   "type": "module",
