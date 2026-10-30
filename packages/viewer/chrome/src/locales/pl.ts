@@ -42,6 +42,7 @@ export const pl: Locale = {
         fitPage: 'Dopasuj do strony',
         fitWidth: 'Dopasuj do szerokości',
         automatic: 'Automatycznie',
+        marquee: 'Powiększ obszar',
         menu: 'Powiększenie',
         level: 'Poziom powiększenia',
         p50: '50%',

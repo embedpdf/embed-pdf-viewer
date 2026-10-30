@@ -44,6 +44,7 @@ export const en: Locale = {
         fitPage: 'Fit to Page',
         fitWidth: 'Fit to Width',
         automatic: 'Automatic',
+        marquee: 'Marquee Zoom',
         menu: 'Zoom',
         level: 'Zoom Level',
         p50: '50%',

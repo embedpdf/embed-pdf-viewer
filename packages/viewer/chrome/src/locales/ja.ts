@@ -42,6 +42,7 @@ export const ja: Locale = {
         fitPage: 'ページ全体を表示',
         fitWidth: '幅に合わせる',
         automatic: '自動',
+        marquee: '範囲選択ズーム',
         menu: 'ズーム',
         level: 'ズームレベル',
         p50: '50%',

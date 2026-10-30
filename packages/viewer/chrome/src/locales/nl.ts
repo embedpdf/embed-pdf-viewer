@@ -42,6 +42,7 @@ export const nl: Locale = {
         fitPage: 'Hele pagina',
         fitWidth: 'Paginabreedte',
         automatic: 'Automatisch',
+        marquee: 'Inzoomen op gebied',
         menu: 'Zoomen',
         level: 'Zoomniveau',
         p50: '50%',

@@ -16,10 +16,12 @@ export interface ScrollHandlerOptions {
 
 /**
  * Pan-the-camera as an interaction handler. Live under the built-in `pan` tool
- * (the `scroll` tag) and, with `panFallback`, under every tool, where it then
- * captures only page-gap drags (on-page downs belong to the active tool, which
- * claims them first at higher priority). It uses the sample's viewport delta,
- * so it pans over the whole viewport (pages and gaps).
+ * (the `scroll` tag) and, with `panFallback`, under every tool that acts only on
+ * pages, where it then captures only page-gap drags (on-page downs belong to the
+ * active tool, which claims them first at higher priority). A tool with a
+ * `gapCursor` acts over the gaps too (the `zoom` tool draws its box there), so
+ * the fallback leaves it alone. It uses the sample's viewport delta, so it pans
+ * over the whole viewport (pages and gaps).
  *
  * Cursors: a closed hand (`grabbing`) while dragging; an open hand (`grab`)
  * hovering a gap under a non-pan tool. The pan tool's own resting `grab` comes
@@ -36,7 +38,8 @@ export function createScrollHandler(
   return {
     id: 'stage-scroll',
     priority: 10, // below page-aware handlers (selection, annotation), which claim first
-    enabledFor: (tool) => tool.enables.has('scroll') || panFallback,
+    enabledFor: (tool) =>
+      tool.enables.has('scroll') || (panFallback && tool.gapCursor === undefined),
     onDown: (sample) => {
       // Fallback: a non-pan tool pans only over a gap. On a page, decline so the
       // tool's own (higher-priority) handler keeps the down it already captured.

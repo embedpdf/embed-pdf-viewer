@@ -126,6 +126,13 @@ it on, so two viewers on one page can each have their own colors from one styles
 | `page.background` | A page before its picture arrives                | `'#ffffff'`                      | `--epdf-page-background` |
 | `page.shadow`     | The shadow under each page; `'none'` for none    | `'0 6px 18px rgb(0 0 0 / 0.18)'` | `--epdf-page-shadow`     |
 
+**The stage**: `stagePlugin({ zoomBox })`
+
+| Setting          | What it colors                                     | Default                     | From CSS                 |
+| :-------------- | :------------------------------------------------- | :-------------------------- | :----------------------- |
+| `zoomBox.fill`   | Inside the box you drag with the [zoom tool](../viewing/stage#zoom-to-a-box) | the viewer's `accent` at 8% | `--epdf-zoom-box-fill`   |
+| `zoomBox.stroke` | Its dashed edge                                    | the viewer's `accent`       | `--epdf-zoom-box-stroke` |
+
 **Annotations**: `annotationPlugin({ chrome })`
 
 | Setting                         | What it colors                                                    | Default                   | From CSS                                   |

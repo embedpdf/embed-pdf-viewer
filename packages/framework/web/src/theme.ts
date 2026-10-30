@@ -62,6 +62,15 @@ export const EPDF_VARIABLES = {
   'page-background': { setting: 'viewer.page.background', default: '#ffffff' },
   'page-shadow': { setting: 'viewer.page.shadow', default: '0 6px 18px rgb(0 0 0 / 0.18)' },
 
+  // ── the stage: stagePlugin({ zoomBox }) ──
+  'zoom-box-fill': {
+    setting: 'stage.zoomBox.fill',
+    follows: 'accent',
+    accentPercent: 8,
+    default: 'color-mix(in srgb, #3858e9 8%, transparent)',
+  },
+  'zoom-box-stroke': { setting: 'stage.zoomBox.stroke', follows: 'accent', default: '#3858e9' },
+
   // ── annotations: annotationPlugin({ chrome }) and each tool ──
   'annotation-accent': {
     setting: 'annotation.chrome.accent',
