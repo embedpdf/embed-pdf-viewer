@@ -47,18 +47,54 @@ const KNOWN_CAPABILITIES: ReadonlySet<DocCapability> = new Set([
  * Recognised shapes:
  *   - `"*"`                              → wildcard
  *   - `"pdf.permissions"`                → virtual (expands at resolve time)
- *   - `"a.b.c..."` (dotted)              → capability
+ *   - `"doc.a.b"` (dotted, core namespace) → capability
+ *   - `"plugin-id.action"` (dotted, any other first segment) → plugin permission
  *   - `"entity:action:filter"` (colons)  → collab
  *
  * Throws {@link InvalidScope} for any string that fails to match one of
  * those shapes, or whose capability/entity/action/filter is not in the
- * closed enum.
+ * closed enum. A plugin permission only has to be well formed: whether its
+ * plugin is installed is the server's question, asked where people grant it.
  */
 export function parseScope(raw: string): ParsedScope {
   if (raw === '*') return { kind: 'wildcard' };
   if (raw === 'pdf.permissions') return { kind: 'virtual', name: 'pdf.permissions' };
   if (raw.includes(':')) return parseCollab(raw);
+  const plugin = pluginOfPermission(raw);
+  if (plugin !== null) return parsePluginPermission(raw, plugin);
   return parseCapability(raw);
+}
+
+/**
+ * The first segments the core owns, across every scope vocabulary: document
+ * capabilities (`doc.*`), the virtual `pdf.permissions`, the collab entities,
+ * and the tenant scopes (`docs.read`, `tokens.issue-doc`, `grants.manage`).
+ * A plugin id can never be one of these, so a dotted word that starts with
+ * one is the core's, and must be a word the core knows.
+ */
+export const CORE_PERMISSION_NAMESPACES: ReadonlySet<string> = new Set([
+  'doc',
+  'docs',
+  'pdf',
+  'annotations',
+  'fields',
+  'tokens',
+  'grants',
+  'shares',
+  'tenants',
+]);
+
+/**
+ * The plugin a permission belongs to: its first segment, when the word is
+ * dotted and that segment isn't one of the core's namespaces. Null for
+ * every core word (and for anything that isn't dotted).
+ */
+export function pluginOfPermission(raw: string): string | null {
+  if (raw.includes(':')) return null;
+  const dot = raw.indexOf('.');
+  if (dot <= 0) return null;
+  const namespace = raw.slice(0, dot);
+  return CORE_PERMISSION_NAMESPACES.has(namespace) ? null : namespace;
 }
 
 /**
@@ -156,6 +192,16 @@ function parseFilter(s: string, raw: string): CollabFilter {
 // Capability shape: lowercase dotted segments, e.g. "doc.text.copy".
 // Validates shape first, then membership in the closed set.
 const CAPABILITY_SHAPE = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/;
+
+/** A plugin id (lowercase words joined by dashes), then one or more dotted actions of the same form. */
+const PLUGIN_PERMISSION_SHAPE = /^[a-z][a-z0-9]*(-[a-z0-9]+)*(\.[a-z][a-z0-9]*(-[a-z0-9]+)*)+$/;
+
+function parsePluginPermission(raw: string, plugin: string): ParsedScope {
+  if (!PLUGIN_PERMISSION_SHAPE.test(raw)) {
+    throw new InvalidScope(raw, 'invalid plugin permission shape (expected <plugin id>.<action>)');
+  }
+  return { kind: 'plugin', name: raw, plugin };
+}
 
 function parseCapability(raw: string): ParsedScope {
   if (!CAPABILITY_SHAPE.test(raw)) {

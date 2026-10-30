@@ -666,6 +666,24 @@ describe('DOC_RESOURCES — pathPrefix invariants (anti-drift)', () => {
     const unique = new Set(cacheablePrefixes);
     expect(unique.size).toBe(cacheablePrefixes.length);
   });
+
+  it("no cacheable resource's prefix opens another resource's URLs", () => {
+    // A prefix-signed token opens every URL under its prefix, so a cacheable
+    // prefix must not be the start of another resource's prefix: the edge
+    // would serve that resource to a session its own requirement refuses
+    // (a session without doc.download, say, or without doc.render).
+    const resources = Object.values(DOC_RESOURCES);
+    for (const signed of resources.filter((r) => r.cdnCacheable)) {
+      const prefix = signed.resolvePathPrefix('doc_X', 'myLayer');
+      for (const other of resources) {
+        if (other === signed) continue;
+        expect(
+          other.resolvePathPrefix('doc_X', 'myLayer').startsWith(prefix),
+          `${signed.id}'s prefix would open ${other.id}`,
+        ).toBe(false);
+      }
+    }
+  });
 });
 
 describe('print pictures', () => {

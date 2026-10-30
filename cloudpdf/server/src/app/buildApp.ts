@@ -60,6 +60,7 @@ import { UsageMeters } from '../licensing/UsageMeters';
 import { InProcessRealtimeBus, type RealtimeBus } from '../realtime/RealtimeBus';
 import { SharpImageEncoder } from '../render/SharpImageEncoder';
 import { IMMUTABLE_CACHE_PRIVATE, IMMUTABLE_CACHE_SHARED } from '../routes/_helpers';
+import { PermissionRegistry } from '../auth/permission-registry';
 import { registerAccessRoutes } from '../routes/access';
 import { registerAdminDocumentsRoutes } from '../routes/admin/documents';
 import { registerAdminFoldersRoutes } from '../routes/admin/folders';
@@ -114,9 +115,21 @@ import { ObjectNumberService } from '../services/ObjectNumberService';
 import { BaseFileCache } from '../storage/BaseFileCache';
 import type { ObjectStoreWithInfo } from '../storage/ObjectStore';
 
+/** A route as the app mounted it: its method(s) and its URL pattern. */
+export interface MountedRoute {
+  readonly method: string;
+  readonly url: string;
+}
+
 export interface BuildAppOptions {
   /** Required commercial gate for every server construction. */
   licenseGate: LicenseGate;
+  /**
+   * The installed plugins' permissions. Tokens carry any well-formed plugin
+   * permission; only these take effect, and only these can be granted.
+   * Omitted: no plugins, so none.
+   */
+  permissions?: PermissionRegistry;
   /** Connected-only reporting diagnostics; never constructed in air-gap mode. */
   usageReporter?: Pick<ConnectedUsageReporter, 'status'>;
   /**
@@ -410,6 +423,10 @@ export interface BuildAppOptions {
 
 export interface AppBundle {
   app: FastifyInstance;
+  /** The installed plugins' permissions (empty without plugins). */
+  permissions: PermissionRegistry;
+  /** Every route the app mounted, in the order it mounted them. */
+  routes: readonly MountedRoute[];
   /** Present only when `workerEntry` was supplied. */
   pool?: EnginePool;
   /** Present only when `db` + `objectStore` were configured. */
@@ -555,6 +572,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
   // zero-config dev fallbacks; every other license refuses to boot on
   // missing / publicly-known / short secrets (fail closed).
   const enforceProductionSecrets = requiresProductionSecrets(opts.licenseGate.getStatus());
+  const permissions = opts.permissions ?? new PermissionRegistry();
   const app = Fastify({
     logger: {
       level: process.env['LOG_LEVEL'] ?? 'info',
@@ -575,6 +593,10 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
     // can exceed that ceiling without 404-ing at the router. The token
     // codec separately enforces a 512-char limit, so this stays bounded.
     maxParamLength: 512,
+  });
+  const routes: MountedRoute[] = [];
+  app.addHook('onRoute', (route) => {
+    for (const method of [route.method].flat()) routes.push({ method, url: route.url });
   });
   // A CDN in front of the engine: shared caches may keep versioned reads,
   // and /head asks for /access before the first cacheable read.
@@ -1194,6 +1216,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       ...(signer ? { sign: signer } : {}),
       documents: new DocumentsRepo(opts.db),
       securityEvents: new SecurityEventsRepo(opts.db),
+      permissions,
     });
     // The grant family (grant lifecycle + public exchange) exists only
     // where minting does — same condition as tokens.issue, because a
@@ -1202,6 +1225,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       const grants = new GrantsRepo(opts.db);
       await registerAdminGrantsRoutes(app, {
         grants: grants,
+        permissions,
         documents: new DocumentsRepo(opts.db),
         layers: new LayersRepo(opts.db),
         visitors: new GrantVisitorsRepo(opts.db),
@@ -1405,6 +1429,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       });
       await registerAccessRoutes(app, {
         service: documentService,
+        permissions,
         layers: layerService,
         cdnSigner: opts.cdnSigner ?? new NoneCdnSigner(),
         ...(derivedRenders ? { derivedRenders } : {}),
@@ -1546,6 +1571,8 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
 
   return {
     app,
+    permissions,
+    routes,
     pool,
     lifecycle,
     revokedJtisGuard,

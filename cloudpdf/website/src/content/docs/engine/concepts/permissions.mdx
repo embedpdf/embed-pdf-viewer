@@ -95,6 +95,19 @@ them (or `*`): no other permission, and not `pdf.permissions`, includes them. `d
 is about writing code into the form, never running it. Scripts run in each viewer, for everyone
 who fills the form in, so putting one in is a separate decision from designing fields.
 
+<Engine cloud>
+
+### Plugins' permissions
+
+A plugin on your server adds its own permissions, named after the plugin: `protected-display.view`,
+say. They travel in tokens like the ones above, and the plugin checks them; the engine only passes
+them on, so they show up in `doc.security.scope`. A plugin permission works only where its plugin
+is installed: the server refuses to issue a token or a grant that names one it doesn't know, and
+`*` includes every installed plugin's permissions. The first part of a permission says whose it is,
+so `doc.`, `docs.`, `pdf.`, `tokens.`, `grants.` and the other core prefixes are never a plugin's.
+
+</Engine>
+
 ## Annotations
 
 In a document many people work on, "may edit annotations" usually means "may edit _my_

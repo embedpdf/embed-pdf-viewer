@@ -3,6 +3,7 @@ import {
   EngineErrorCode,
   decodePdfBits,
   expandRawScope,
+  pluginPermissionsOf,
   permissionInfoWithAdvisory,
   type BundleLimits,
   type DocumentAccessInfo,
@@ -25,6 +26,7 @@ import {
   requireLayerDocAccessOnly,
   type RequestJwtContext,
 } from '../app/jwt-plugin';
+import type { PermissionRegistry } from '../auth/permission-registry';
 import type { CdnSigner } from '../cdn/CdnSigner';
 import type { TenantUsageRepo } from '../db/repos/tenant_usage.repo';
 import type { UsageMeters } from '../licensing/UsageMeters';
@@ -34,6 +36,8 @@ import type { LayerService } from '../services/LayerService';
 
 export interface AccessRouteDeps {
   service: DocumentService;
+  /** The installed plugins' permissions: the ones a session's effective scope can hold. */
+  permissions: PermissionRegistry;
   /** Opens the editing sessions of callers that may create. */
   layers: LayerService;
   cdnSigner: CdnSigner;
@@ -49,8 +53,16 @@ export async function registerAccessRoutes(
   app: FastifyInstance,
   deps: AccessRouteDeps,
 ): Promise<void> {
-  const { service, layers, cdnSigner, derivedRenders, usageMeters, tenantUsage, bundleLimits } =
-    deps;
+  const {
+    service,
+    layers,
+    cdnSigner,
+    derivedRenders,
+    usageMeters,
+    tenantUsage,
+    bundleLimits,
+    permissions,
+  } = deps;
 
   const handleAccess = async (
     req: FastifyRequest,
@@ -128,6 +140,7 @@ export async function registerAccessRoutes(
       bundleLimits,
       derivedRenders?.policy(),
       layerScopes,
+      permissions.documentPermissions(),
     );
     // A caller that may create gets its editing session: made, revived or
     // kept alive, and handed the object numbers it asks for.
@@ -196,6 +209,7 @@ function buildAccessResponse(
   bundleLimits: BundleLimits,
   renderPolicy?: RenderPolicy,
   layerScopes?: LayerScopes,
+  pluginPermissions: ReadonlySet<string> = new Set(),
 ): DocumentAccessInfo {
   if (!jwt.exp || jwt.exp <= 0) {
     throw new EngineError(EngineErrorCode.InvalidArg, 'doc token exp is required for access');
@@ -208,7 +222,12 @@ function buildAccessResponse(
   // also applies implication rules (e.g. annotations collab scopes
   // imply doc.annotate.read) and takes away what the document's
   // signatures forbid.
-  const effectiveScope = [...expandRawScope(jwt.scope, pdfBits, protection)].sort();
+  // Plugin permissions ride along: the installed ones the token names, or all
+  // of them under `*`. The core never interprets them; their plugins do.
+  const effectiveScope = [
+    ...expandRawScope(jwt.scope, pdfBits, protection),
+    ...pluginPermissionsOf(jwt.scope, pluginPermissions),
+  ].sort();
 
   const coverage = cdnCoverageForScope(jwt.scope, pdfBits, {
     docId,
