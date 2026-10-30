@@ -123,6 +123,16 @@ export function buildAdminOpenApiDocument(opts: BuildAdminOpenApiOptions): Recor
         'API. Generated from the @cloudpdf/contract operation registry — do not edit by hand.',
       license: { name: 'Apache-2.0', identifier: 'Apache-2.0' },
     },
+    // CloudPDF SaaS, so the SDKs reach it when given no address, as the
+    // browser engine does (`CLOUDPDF_SAAS_URL`). A self-hosted server is
+    // the address a client is given.
+    servers: [
+      {
+        url: 'https://engine.cloudpdf.com',
+        description: 'CloudPDF SaaS',
+        'x-fern-server-name': 'Saas',
+      },
+    ],
     paths: sortKeys(paths),
     // Docs navigation manifest: section titles and URL slugs for the API
     // reference, in sidebar order (see `docsGroups` in the registry).

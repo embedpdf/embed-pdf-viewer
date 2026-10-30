@@ -5,6 +5,7 @@ import { type NormalizedClientOptionsWithAuth, normalizeClientOptionsWithAuth } 
 import { mergeHeaders } from "../../../../core/headers.js";
 import * as core from "../../../../core/index.js";
 import { mergeAdditionalBodyParameters } from "../../../../core/requestBody.js";
+import * as environments from "../../../../environments.js";
 import { handleNonStatusCodeError } from "../../../../errors/handleNonStatusCodeError.js";
 import * as errors from "../../../../errors/index.js";
 import * as CloudPDF from "../../../index.js";
@@ -20,7 +21,7 @@ export class GrantsClient {
     protected readonly _options: NormalizedClientOptionsWithAuth<GrantsClient.Options>;
     protected _visitors: VisitorsClient | undefined;
 
-    constructor(options: GrantsClient.Options) {
+    constructor(options: GrantsClient.Options = {}) {
         this._options = normalizeClientOptionsWithAuth(options);
     }
 
@@ -62,7 +63,8 @@ export class GrantsClient {
         const _response = await core.fetcher({
             url: core.url.join(
                 (await core.Supplier.get(this._options.baseUrl)) ??
-                    (await core.Supplier.get(this._options.environment)),
+                    (await core.Supplier.get(this._options.environment)) ??
+                    environments.CloudPDFEnvironment.Saas,
                 "v1/grant-sessions",
             ),
             method: "POST",
@@ -151,7 +153,8 @@ export class GrantsClient {
         const _response = await core.fetcher({
             url: core.url.join(
                 (await core.Supplier.get(this._options.baseUrl)) ??
-                    (await core.Supplier.get(this._options.environment)),
+                    (await core.Supplier.get(this._options.environment)) ??
+                    environments.CloudPDFEnvironment.Saas,
                 `v1/tenants/${core.url.encodePathParam(tenantId)}/grants`,
             ),
             method: "GET",
@@ -227,7 +230,8 @@ export class GrantsClient {
         const _response = await core.fetcher({
             url: core.url.join(
                 (await core.Supplier.get(this._options.baseUrl)) ??
-                    (await core.Supplier.get(this._options.environment)),
+                    (await core.Supplier.get(this._options.environment)) ??
+                    environments.CloudPDFEnvironment.Saas,
                 `v1/tenants/${core.url.encodePathParam(tenantId)}/grants`,
             ),
             method: "POST",
@@ -306,7 +310,8 @@ export class GrantsClient {
         const _response = await core.fetcher({
             url: core.url.join(
                 (await core.Supplier.get(this._options.baseUrl)) ??
-                    (await core.Supplier.get(this._options.environment)),
+                    (await core.Supplier.get(this._options.environment)) ??
+                    environments.CloudPDFEnvironment.Saas,
                 `v1/tenants/${core.url.encodePathParam(tenantId)}/grants/${core.url.encodePathParam(grantId)}`,
             ),
             method: "GET",
@@ -379,7 +384,8 @@ export class GrantsClient {
         const _response = await core.fetcher({
             url: core.url.join(
                 (await core.Supplier.get(this._options.baseUrl)) ??
-                    (await core.Supplier.get(this._options.environment)),
+                    (await core.Supplier.get(this._options.environment)) ??
+                    environments.CloudPDFEnvironment.Saas,
                 `v1/tenants/${core.url.encodePathParam(tenantId)}/grants/${core.url.encodePathParam(grantId)}`,
             ),
             method: "DELETE",
@@ -455,7 +461,8 @@ export class GrantsClient {
         const _response = await core.fetcher({
             url: core.url.join(
                 (await core.Supplier.get(this._options.baseUrl)) ??
-                    (await core.Supplier.get(this._options.environment)),
+                    (await core.Supplier.get(this._options.environment)) ??
+                    environments.CloudPDFEnvironment.Saas,
                 `v1/tenants/${core.url.encodePathParam(tenantId)}/grants/${core.url.encodePathParam(grantId)}`,
             ),
             method: "PATCH",
@@ -536,7 +543,8 @@ export class GrantsClient {
         const _response = await core.fetcher({
             url: core.url.join(
                 (await core.Supplier.get(this._options.baseUrl)) ??
-                    (await core.Supplier.get(this._options.environment)),
+                    (await core.Supplier.get(this._options.environment)) ??
+                    environments.CloudPDFEnvironment.Saas,
                 `v1/tenants/${core.url.encodePathParam(tenantId)}/grants/${core.url.encodePathParam(grantId)}/archive`,
             ),
             method: "POST",

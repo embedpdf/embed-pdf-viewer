@@ -4,6 +4,7 @@ import type { BaseClientOptions, BaseRequestOptions } from "../../../../BaseClie
 import { type NormalizedClientOptionsWithAuth, normalizeClientOptionsWithAuth } from "../../../../BaseClient.js";
 import { mergeHeaders } from "../../../../core/headers.js";
 import * as core from "../../../../core/index.js";
+import * as environments from "../../../../environments.js";
 import { handleNonStatusCodeError } from "../../../../errors/handleNonStatusCodeError.js";
 import * as errors from "../../../../errors/index.js";
 import type * as CloudPDF from "../../../index.js";
@@ -17,7 +18,7 @@ export declare namespace DeploymentClient {
 export class DeploymentClient {
     protected readonly _options: NormalizedClientOptionsWithAuth<DeploymentClient.Options>;
 
-    constructor(options: DeploymentClient.Options) {
+    constructor(options: DeploymentClient.Options = {}) {
         this._options = normalizeClientOptionsWithAuth(options);
     }
 
@@ -48,7 +49,8 @@ export class DeploymentClient {
         const _response = await core.fetcher({
             url: core.url.join(
                 (await core.Supplier.get(this._options.baseUrl)) ??
-                    (await core.Supplier.get(this._options.environment)),
+                    (await core.Supplier.get(this._options.environment)) ??
+                    environments.CloudPDFEnvironment.Saas,
                 "v1/deployment/license/status",
             ),
             method: "GET",

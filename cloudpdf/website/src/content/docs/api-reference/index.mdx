@@ -36,7 +36,8 @@ remembered for every example in the reference.
 
     Your API key from the [dashboard](https://app.cloudpdf.com) is a **tenant token**: it can manage
     documents and mint document tokens under your account, and nothing else.
-    Use it as the `token` in every example in this reference.
+    Use it as the `token` in every example in this reference. The SDKs reach CloudPDF on their own,
+    so the token is all a client needs.
   </DeploymentTab>
   <DeploymentTab mode="self-hosted">
     On a self-hosted deployment **you are the operator**. Configure the root
@@ -51,6 +52,15 @@ remembered for every example in the reference.
     customers' documents. Use it as the `token` in every example, or mint
     scoped [tenant tokens](/docs/api-reference/authentication#tenant-tokens)
     for your services.
+
+    The examples reach CloudPDF SaaS. Give the client your server's address as well:
+
+    ```ts
+    const client = new CloudPDFClient({ baseUrl: 'https://pdf.example.com', token });
+    ```
+
+    Every SDK has the same option: `baseUrl` in PHP, `base_url` in Python and Ruby, `BaseUrl` in
+    C#'s `ClientOptions`, `option.WithBaseURL` in Go, and `.url()` in Java.
   </DeploymentTab>
 </DeploymentTabs>
 
