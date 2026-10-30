@@ -1,0 +1,86 @@
+---
+title: Grants
+description: A grant lets anyone open a document without an account, through its link or on a website. You decide what they can do, and change it whenever you like.
+---
+
+import { Cards, Card } from '@/components/docs/cards';
+
+# Grants
+
+A grant lets anyone open a document without an account: everyone with its link, or everyone on a
+website that embeds it. You decide what they can do, and you can change it, pause it or end it
+whenever you like. Every link and every page that embeds the grant follows.
+
+<Screenshot
+  name="grants-list"
+  alt="A document's Grants card with two grants, Website and Client review, each with Copy link and Embed buttons"
+/>
+
+A document can have as many grants as you need: one for your website, one for a client review,
+one for a printed QR code. Each has its own name, its own permissions and its own link, so you can
+end one without touching the others.
+
+## Make one
+
+On the document's page, click **New grant**. Each setting has a page of its own:
+
+| Setting | What it decides |
+| :-- | :-- |
+| **Name** | What you call it, such as "Website" or "Sent to Acme". Visitors never see it |
+| [**People can**](/docs/platform/grants/permissions) | What visitors can do: Read, Comment, Fill and sign or Edit, plus Download, Print and Copy text |
+| [**Who sees changes**](/docs/platform/grants/changes) | Whether visitors share one document, or each get their own copy |
+| [**Where it opens**](/docs/platform/grants/where) | Anywhere, or only on the websites you list |
+| [**More options**](/docs/platform/grants/protect) | A passphrase, an expiry date, and questions visitors answer first |
+
+[Put a PDF on your website](/docs/platform/quick-start/website) makes one, step by step.
+
+## Use it
+
+Each grant in the list has two buttons:
+
+- **Copy link** copies its page on cloudpdf.link. Whoever opens the link sees the document full
+  screen, with the grant's permissions. Only a grant that opens Anywhere has one.
+- **Embed** shows the code for your website: two lines of HTML, or a component for React, Vue,
+  Svelte or Angular.
+
+The line under its name says what the grant allows, and how many times it has been opened.
+
+## In code
+
+Your server can make and change grants too, with an API key that has **Grants** on:
+
+```ts
+import { permissions } from '@cloudpdf/sdk';
+
+const { grant } = await cloudpdf.grants.create({
+  docId: 'doc_20b05b13f613f795ffd14e57',
+  name: 'Website',
+  scope: permissions.read,
+});
+```
+
+`grant.id` is what the embed code opens: `<embedpdf-viewer grant="grt_…">`. A grant made in code
+appears in the dashboard too, and the other way round.
+
+| Call | What it does |
+| :-- | :-- |
+| `cloudpdf.grants.create({ docId, … })` | Makes a grant |
+| `cloudpdf.grants.list({ docId })` | A document's grants |
+| `cloudpdf.grants.update({ grantId, … })` | Changes any setting |
+| `cloudpdf.grants.update({ grantId, disabled: true })` | Pauses it |
+| `cloudpdf.grants.archive({ grantId })` | Ends it, and keeps what its visitors made |
+
+Every setting is in the API reference: [Create a grant](/docs/api-reference/grants/create).
+
+<Cards>
+  <Card
+    title="What people can do"
+    description="The four levels, and Download, Print and Copy text."
+    href="/docs/platform/grants/permissions"
+  />
+  <Card
+    title="Grants and tokens"
+    description="When a grant is right, and when your users need a token."
+    href="/docs/platform/concepts/access"
+  />
+</Cards>

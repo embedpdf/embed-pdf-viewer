@@ -1,0 +1,232 @@
+---
+title: Uploads from the browser
+description: Your users' browsers upload PDFs straight to CloudPDF with an upload token from your server. The file never passes through your server, and your API key never leaves it.
+---
+
+import { Cards, Card } from '@/components/docs/cards';
+import { Tabs } from '@/components/docs/tabs';
+
+# Uploads from the browser
+
+When your users pick a PDF in your app, their browser can upload it straight to CloudPDF. Your
+server only makes an upload token: it says where the file goes, and it runs out in minutes. The file
+never passes through your server, and your API key never leaves it.
+
+1. A user picks a PDF, and your page asks your server for an upload token.
+2. Your server checks the user may upload, and makes the token with your API key.
+3. The browser uploads the file with the token, and gets the document back.
+4. The browser tells your server the document's id, and your server checks it before keeping it.
+
+Your server can be in any language. The browser code is the same whichever it is.
+
+## 1. Make an upload token
+
+In a route your pages call, check that the signed-in user may upload, then make a token:
+
+<Tabs items={['Node.js', 'PHP', 'Python']} storageKey="docs-language">
+<Tabs.Tab>
+
+```ts
+const { token } = await cloudpdf.tokens.issue({
+  kind: 'upload',
+  sub: user.id,
+  folderId: contractsFolderId,
+  metadata: { contractId: contract.id },
+  expiresIn: 600,
+});
+```
+
+</Tabs.Tab>
+<Tabs.Tab>
+
+```php
+use CloudPDF\Tokens\Requests\IssueTokensRequest;
+
+$result = $cloudpdf->tokens->issue(new IssueTokensRequest([
+    'kind' => 'upload',
+    'sub' => $user->id,
+    'folderId' => $contractsFolderId,
+    'metadata' => ['contractId' => $contract->id],
+    'expiresIn' => 600,
+]));
+
+$token = $result->token;
+```
+
+</Tabs.Tab>
+<Tabs.Tab>
+
+```python
+result = cloudpdf.tokens.issue(
+    kind="upload",
+    sub=user.id,
+    folder_id=contracts_folder_id,
+    metadata={"contractId": contract.id},
+    expires_in=600,
+)
+
+token = result.token
+```
+
+</Tabs.Tab>
+</Tabs>
+
+Send it back to the page as JSON: `{ "token": "…" }`. The token decides where the file goes and
+what it carries. Whatever the browser sends, CloudPDF uses the token's folder and metadata.
+
+| Field | What it says | |
+| :-- | :-- | :-- |
+| `kind` | `'upload'` | Required |
+| `sub` | Who is uploading: their id in your app | Required |
+| `expiresIn` | How long the token works, in seconds. Ten minutes is plenty | Required |
+| `folderId` | The folder the files go into. Without it, the top level | |
+| `metadata` | Your own data, put on every document uploaded with the token, such as `{ contractId: 'c_381' }` | |
+| `maxFiles` | How many PDFs the token uploads. Without it, one | |
+| `maxBytes` | The largest file it takes, in bytes | |
+| `origins` | The websites the token works on, such as `['https://app.fernquill.example']` | |
+
+Your server makes upload tokens with an [API key](/docs/platform/app/api-keys) that has
+**Documents and folders** on Write. A key hands out only what it can do itself.
+
+## 2. Upload from the browser
+
+Install the SDK in your frontend, and import only its upload entry. It's about 3 KB, and brings
+nothing else from the SDK:
+
+```sh npm2yarn
+npm install @cloudpdf/sdk
+```
+
+```ts
+import { upload } from '@cloudpdf/sdk/upload';
+
+const input = document.querySelector('#contract-pdf');
+
+input.addEventListener('change', async () => {
+  const response = await fetch(`/contracts/${contractId}/upload-token`, { method: 'POST' });
+  const { token } = await response.json();
+
+  const uploaded = await upload(input.files[0], { token });
+
+  await fetch(`/contracts/${contractId}/document`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ documentId: uploaded.document.id }),
+  });
+});
+```
+
+`upload` hashes the file, sends it straight to storage, and has CloudPDF check what arrived. It
+takes a `File` or a `Blob`, and these options:
+
+| Option | What it does | |
+| :-- | :-- | :-- |
+| `token` | The upload token from your server | Required |
+| `name` | What the dashboard shows. Without it, the file's name | |
+| `onProgress` | Called with `(loaded, total)` as the bytes go | |
+| `signal` | An `AbortSignal` that stops the upload | |
+
+A progress bar, and a button that stops the upload:
+
+```ts
+const controller = new AbortController();
+cancelButton.onclick = () => controller.abort();
+
+const uploaded = await upload(file, {
+  token,
+  onProgress: (loaded, total) => (progressBar.value = loaded / total),
+  signal: controller.signal,
+});
+```
+
+### Without a build step
+
+A page without a bundler loads the same file from the CDN:
+
+```html
+<script type="module">
+  import { upload } from 'https://cdn.jsdelivr.net/npm/@cloudpdf/sdk@3/dist/esm/upload.mjs';
+</script>
+```
+
+## 3. Keep the document
+
+The browser tells your server which document it uploaded. Don't take its word for it: look the
+document up, and check the metadata the token put on it before you keep the id.
+
+<Tabs items={['Node.js', 'PHP', 'Python']} storageKey="docs-language">
+<Tabs.Tab>
+
+```ts
+const document = await cloudpdf.documents.get({ id: documentId });
+
+if (document.metadata.contractId !== contract.id) {
+  throw new Error('This document was not uploaded for this contract');
+}
+
+await db.contracts.update(contract.id, { documentId: document.id });
+```
+
+</Tabs.Tab>
+<Tabs.Tab>
+
+```php
+$document = $cloudpdf->documents->get($documentId);
+
+if (($document->metadata['contractId'] ?? null) !== $contract->id) {
+    throw new RuntimeException('This document was not uploaded for this contract');
+}
+
+$db->contracts->update($contract->id, ['documentId' => $document->id]);
+```
+
+</Tabs.Tab>
+<Tabs.Tab>
+
+```python
+document = cloudpdf.documents.get(id=document_id)
+
+if document.metadata.get("contractId") != contract.id:
+    raise PermissionError("This document was not uploaded for this contract")
+
+db.contracts.update(contract.id, document_id=document.id)
+```
+
+</Tabs.Tab>
+</Tabs>
+
+The browser can't change that metadata: it came from the token your server made.
+
+## What an upload token allows
+
+An upload token uploads, and nothing else:
+
+- into its folder, with its metadata;
+- as many files as `maxFiles`, each no larger than `maxBytes`;
+- until it runs out.
+
+It can't open, list, rename or delete a document, not even one it uploaded. CloudPDF checks each
+file against what the browser said it would send, so a file swapped halfway is refused. Copied out
+of the browser, the token gets someone its own few uploads, for a few minutes.
+
+## Good to know
+
+- **Check before you make one.** The token route is where your app decides who may upload, and
+  where to. A route that makes a token for anyone lets anyone fill your workspace.
+- **Every upload counts** toward your plan's uploads this month, from the browser or your server.
+- **Not a browser?** A mobile or desktop app uploads with the same token, through the API:
+  [Initialize an upload](/docs/api-reference/documents/init), send the file, then
+  [commit it](/docs/api-reference/documents/commit).
+
+<Cards>
+  <Card
+    title="Uploading from your server"
+    description="When the PDF is already on your server, or your app makes it."
+    href="/docs/platform/app/uploads"
+  />
+  <Card
+    title="What the browser holds"
+    description="Why a token in the browser is safe, and what it can't do."
+    href="/docs/platform/concepts/security"
+  />
+</Cards>

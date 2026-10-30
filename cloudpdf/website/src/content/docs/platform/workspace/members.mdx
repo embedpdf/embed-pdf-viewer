@@ -1,0 +1,58 @@
+---
+title: Members and roles
+description: Invite your team to the workspace as admins or members, change their roles, and remove them.
+---
+
+import { Cards, Card } from '@/components/docs/cards';
+
+# Members and roles
+
+Everyone in a workspace works with the same documents, grants and API keys. Invite your team from
+**Members**:
+
+<Screenshot
+  name="members"
+  alt="The Members page of Fernquill Studio: its members with their roles, and the Invite someone card"
+/>
+
+## Roles
+
+| Role | Can |
+| :-- | :-- |
+| **Owner** | Everything, including billing. The person who made the workspace |
+| **Admin** | Everything an owner can, except change the owner |
+| **Member** | Work with documents, folders and grants, and see the API keys |
+
+Only owners and admins invite people, change roles, remove members, make and revoke API keys, and
+see **Billing**.
+
+## Invite someone
+
+Type their business email, choose **Admin** or **Member**, and click **Send invite**. They get an
+email with a link to join, which works for 48 hours.
+
+Without a CloudPDF account, they make one with that address, then join. A personal email address
+can't make an account, so invite them at work.
+
+Until they join, the invite waits in the list, where you can **Resend** or **Cancel** it.
+
+## Change a role, or remove someone
+
+Each member's row has their role, which you can change, and **Remove**. Removing someone takes
+their access away at once. Nobody can change the owner, or their own row.
+
+Anyone but the owner can **Leave** a workspace from their own row. They need a new invite to come
+back.
+
+<Cards>
+  <Card
+    title="Plans and usage"
+    description="What each plan includes, and what this month used."
+    href="/docs/platform/workspace/plans"
+  />
+  <Card
+    title="API keys"
+    description="Owners and admins make the keys your servers use."
+    href="/docs/platform/app/api-keys"
+  />
+</Cards>

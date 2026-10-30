@@ -1,0 +1,71 @@
+---
+title: What the browser holds
+description: The browser gets a short pass for one document and the pages as images. Your API key, your other documents, and the file itself stay on CloudPDF.
+---
+
+import { Cards, Card } from '@/components/docs/cards';
+
+# What the browser holds
+
+Anything in a browser, its owner can read. So CloudPDF gives the browser as little as it needs to
+show the document, and checks everything else on CloudPDF's side.
+
+| The browser gets | The browser never gets |
+| :-- | :-- |
+| A short pass for one document | Your API key |
+| The pages, drawn as images | Your other documents |
+| The text, to select and search | The PDF file, unless you allow **Download** |
+| What the pass allows, to show the right buttons | A way to do more than the pass allows |
+
+## A short pass for one document
+
+When a document opens, with a grant or a token, the viewer holds a pass that names that one
+document and what the person may do. It runs out within minutes, and the viewer gets the next one
+before it does:
+
+- **With a grant**, the pass lasts 10 minutes. Pausing or ending the grant stops it at once.
+- **With a token**, the token is the pass, for as long as your server set. Revoking it stops it at
+  once.
+
+Copying the pass out of the browser gets someone the same document with the same permissions, for
+a few minutes. Nothing more: not another document, and not a way to make passes.
+
+## An upload token uploads, and nothing else
+
+When a user's browser [uploads a PDF](/docs/platform/app/browser-uploads), it holds an upload
+token from your server. The token names the folder, how many files, and for how long. It can't
+open, list or delete anything, not even what it uploaded.
+
+## Every request is checked
+
+The viewer shows only the buttons people may use, but that's for them, not for security. CloudPDF
+checks each page, search, comment and download against the pass, so a changed button or a
+hand-made request gets nothing the pass doesn't allow.
+
+## The file stays on CloudPDF
+
+The pages arrive as images, drawn on CloudPDF, so the PDF file never needs to reach the browser.
+Only with **Download** can someone save it. Without **Copy text**, the text is there to select and
+search, but not to copy.
+
+What people can see, they can still photograph or screenshot. Keep what must never leave out of
+the document, or out of reach with a passphrase or your own sign-in.
+
+## Your API key stays on your server
+
+The key makes passes. Your server keeps it, makes a token for each user after checking who they
+are, and hands out only the token. A key in a browser, a mobile app or a repository can be read, so
+revoke it and make a new one.
+
+<Cards>
+  <Card
+    title="Grants and tokens"
+    description="Which way in is right for who opens the document."
+    href="/docs/platform/concepts/access"
+  />
+  <Card
+    title="Where it opens"
+    description="Keep a grant on your own websites."
+    href="/docs/platform/grants/where"
+  />
+</Cards>

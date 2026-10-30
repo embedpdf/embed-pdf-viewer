@@ -1,0 +1,79 @@
+---
+title: Who sees changes
+description: Visitors who can comment, fill in or edit either work on one document together, or each on a copy of their own that you can see.
+---
+
+import { Cards, Card } from '@/components/docs/cards';
+
+# Who sees changes
+
+When visitors can change the document (comment on it, fill it in, or edit it), choose where their
+changes go: into one document everyone works on, or into a copy for each visitor.
+
+<Screenshot
+  name="grant-changes"
+  alt="Who sees changes: Everyone, or Only the person who made them"
+/>
+
+| Choice | Visitors see | Right for |
+| :-- | :-- | :-- |
+| **Everyone** | Each other's changes, as they're made | A review: everyone comments on the same document |
+| **Only the person who made them** | Only their own, on top of the document | A form: each visitor fills in their own |
+
+Either way, **you see every change**. With Everyone, the document itself shows them. With Only the
+person who made them, each visitor's copy is listed under the grant's
+[visitors](/docs/platform/grants/visitors), and the document stays as you uploaded it.
+
+The choice appears only when the grant lets people change something. A grant that lets people read
+has nothing to keep.
+
+## The default follows the level
+
+| Level | Starts as |
+| :-- | :-- |
+| **Comment** | Everyone, since comments are a conversation |
+| **Fill and sign** | Only the person who made them, since each form is someone's own |
+| **Edit** | Only the person who made them |
+
+Pick the other one whenever it fits better: a team filling in one shared checklist, say.
+
+## Their own copy
+
+A visitor's copy is made at their first change, and their browser brings them back to it on their
+next visit, with everything they did. Clearing the browser starts a new visitor with a new copy.
+
+## In code
+
+Two more options are only in the API, for grants your server makes:
+
+```ts
+await cloudpdf.grants.create({
+  docId: form.documentId,
+  name: 'Event registration',
+  scope: permissions.fillAndSign,
+  layerMode: 'per-visitor',
+  keepVisitorLayers: false,
+  visitorIdleSeconds: 86_400,
+});
+```
+
+| Option | What it does |
+| :-- | :-- |
+| `layerMode` | `'shared'` is Everyone, `'per-visitor'` is Only the person who made them |
+| `keepVisitorLayers` | `false` starts every visit fresh: a kiosk, or a demo anyone may try |
+| `visitorIdleSeconds` | Deletes a visitor and their copy after this long unseen: an hour to 30 days |
+
+The dashboard shows these when a grant has them, so it never describes a grant as less than it is.
+
+<Cards>
+  <Card
+    title="Visitors"
+    description="Who answered your questions or made changes, and their copies."
+    href="/docs/platform/grants/visitors"
+  />
+  <Card
+    title="Where it opens"
+    description="Anywhere, or only on your own websites."
+    href="/docs/platform/grants/where"
+  />
+</Cards>

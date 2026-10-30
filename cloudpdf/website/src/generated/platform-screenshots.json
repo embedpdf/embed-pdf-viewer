@@ -1,0 +1,109 @@
+{
+  "shots": {
+    "api-key-created": {
+      "file": "api-key-created.png",
+      "width": 2032,
+      "height": 1218
+    },
+    "api-key-dialog": {
+      "file": "api-key-dialog.png",
+      "width": 1392,
+      "height": 1812
+    },
+    "api-keys": {
+      "file": "api-keys.png",
+      "width": 2560,
+      "height": 1600
+    },
+    "documents": {
+      "file": "documents.png",
+      "width": 2560,
+      "height": 1600
+    },
+    "folder": {
+      "file": "folder.png",
+      "width": 2560,
+      "height": 1600
+    },
+    "grant-changes": {
+      "file": "grant-changes.png",
+      "width": 1236,
+      "height": 288
+    },
+    "grant-customize": {
+      "file": "grant-customize.png",
+      "width": 1236,
+      "height": 2496
+    },
+    "grant-dialog": {
+      "file": "grant-dialog.png",
+      "width": 1392,
+      "height": 1308
+    },
+    "grant-embed": {
+      "file": "grant-embed.png",
+      "width": 1392,
+      "height": 1216
+    },
+    "grant-end": {
+      "file": "grant-end.png",
+      "width": 992,
+      "height": 600
+    },
+    "grant-link": {
+      "file": "grant-link.png",
+      "width": 1392,
+      "height": 788
+    },
+    "grant-menu": {
+      "file": "grant-menu.png",
+      "width": 2032,
+      "height": 874
+    },
+    "grant-more": {
+      "file": "grant-more.png",
+      "width": 1204,
+      "height": 1646
+    },
+    "grant-permissions": {
+      "file": "grant-permissions.png",
+      "width": 1392,
+      "height": 1588
+    },
+    "grant-visitors": {
+      "file": "grant-visitors.png",
+      "width": 1392,
+      "height": 694
+    },
+    "grant-where": {
+      "file": "grant-where.png",
+      "width": 1236,
+      "height": 456
+    },
+    "grants-list": {
+      "file": "grants-list.png",
+      "width": 2032,
+      "height": 874
+    },
+    "members": {
+      "file": "members.png",
+      "width": 2560,
+      "height": 1600
+    },
+    "new-grant": {
+      "file": "new-grant.png",
+      "width": 2560,
+      "height": 1600
+    },
+    "search": {
+      "file": "search.png",
+      "width": 2560,
+      "height": 1600
+    },
+    "usage": {
+      "file": "usage.png",
+      "width": 2560,
+      "height": 1600
+    }
+  }
+}

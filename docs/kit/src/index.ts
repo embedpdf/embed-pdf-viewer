@@ -24,6 +24,7 @@ export {
   AngularIcon,
   ArrowRight,
   BoltBadgeIcon,
+  CloudBadgeIcon,
   CheckIcon,
   CopyIcon,
   EngineIcon,

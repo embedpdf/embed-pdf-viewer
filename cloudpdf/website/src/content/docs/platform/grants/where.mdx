@@ -1,0 +1,73 @@
+---
+title: Where it opens
+description: A grant opens anywhere, with a link of its own, or only on the websites you list, embedded and with no link.
+---
+
+import { Cards, Card } from '@/components/docs/cards';
+
+# Where it opens
+
+A grant opens **Anywhere**, or **Only on my websites**.
+
+| Choice | Opens | Has a link |
+| :-- | :-- | :-- |
+| **Anywhere** | On its link page, and on any website that embeds it | Yes |
+| **Only on my websites** | Only embedded on the websites you list | No |
+
+Anywhere is right for what you'd hand out anyway: a brochure, a price list, a menu. Choose your
+websites when the document belongs to your site, such as a manual for your customers, and copying
+the embed code to another site shouldn't work.
+
+<Screenshot
+  name="grant-where"
+  alt="Where it opens: Only on my websites, with two websites listed"
+/>
+
+## Listing your websites
+
+Write each website as its address, without a path, and separate them with commas:
+
+| You write | It opens on |
+| :-- | :-- |
+| `https://www.fernquill.example` | That site only |
+| `https://*.fernquill.example` | Every subdomain, such as `docs.fernquill.example`, but not `fernquill.example` itself |
+| `http://localhost:3000` | Your own computer, while you build |
+
+A grant takes up to 32 websites. Each needs `https://` or `http://`, and a port when it isn't the
+usual one.
+
+## What it protects
+
+A browser says which website a page is on, and CloudPDF checks it before the document opens. So the
+grant can't be embedded anywhere else, and the viewer refuses to open it there.
+
+It's protection against your document turning up on someone else's site, not against a determined
+person: code outside a browser can claim to be any website. For people who must not see the
+document at all, use a [passphrase](/docs/platform/grants/protect), or your own sign-in with
+[tokens](/docs/platform/app/tokens).
+
+## In code
+
+```ts
+await cloudpdf.grants.create({
+  docId: manual.documentId,
+  name: 'Customer manual',
+  scope: permissions.read,
+  origins: ['https://www.fernquill.example', 'https://*.fernquill.example'],
+});
+```
+
+Without `origins`, a grant opens anywhere. Tokens take `origins` too.
+
+<Cards>
+  <Card
+    title="Passphrase, expiry and questions"
+    description="Ask for a passphrase, end it on a date, and ask who visitors are."
+    href="/docs/platform/grants/protect"
+  />
+  <Card
+    title="What the browser holds"
+    description="What a visitor's browser gets, and what it can't do with it."
+    href="/docs/platform/concepts/security"
+  />
+</Cards>

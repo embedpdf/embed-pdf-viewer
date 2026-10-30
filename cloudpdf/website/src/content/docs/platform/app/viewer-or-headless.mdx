@@ -1,0 +1,79 @@
+---
+title: Full viewer or headless?
+description: The full viewer is finished and ready in minutes; headless gives you the parts to build your own interface. Both open the same documents the same way.
+---
+
+import { Cards, Card } from '@/components/docs/cards';
+
+# Full viewer or headless?
+
+Your users see CloudPDF documents through a viewer, and you choose which kind. Both open documents
+the same way, with a token or a grant, and both check the same permissions. Only what's on screen
+differs.
+
+| | The full viewer | Headless |
+| :-- | :-- | :-- |
+| What you get | A finished viewer: toolbar, sidebars, search, comments, forms and signatures | The parts: pages, text, annotations and forms, with no look of their own |
+| Your work | A few lines, then colors, features and buttons of your own | You build the toolbar, the panels and what happens on each click |
+| Right when | The viewer is a feature of your app | The viewer is part of your product's own interface |
+| Works in | Any page, React, Vue, Svelte and Angular | React, Vue, Svelte and Angular |
+
+You can start with the full viewer and move to headless later: the plugins, their settings and the
+documents stay the same.
+
+## The full viewer
+
+Two lines on any page, or one component:
+
+```tsx
+import { PDFViewer } from '@cloudpdf/viewer-react';
+
+<PDFViewer src={{ token: () => fetchToken(contractId) }} style={{ height: '100vh' }} />;
+```
+
+People can scroll, zoom, search, comment, fill in forms and sign, as far as their token or grant
+allows. Make it yours with your brand color, the features you want, and buttons of your own.
+
+## Headless
+
+The viewer's parts, and your own interface around them:
+
+```tsx
+import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
+import { Stage, stagePlugin } from '@embedpdf/react/stage';
+import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
+import { cloudEngine } from '@cloudpdf/engine';
+
+const engine = cloudEngine();
+const plugins = [stagePlugin(), renderPlugin()];
+
+export function Contract({ contractId }: { contractId: string }) {
+  return (
+    <Viewer
+      engine={engine}
+      plugins={plugins}
+      initialDocuments={[{ source: { kind: 'token', token: () => fetchToken(contractId) } }]}
+    >
+      <DocumentGate fallback={<p>Opening…</p>}>
+        <Stage style={{ height: 600 }}>{() => <RenderLayer />}</Stage>
+      </DocumentGate>
+    </Viewer>
+  );
+}
+```
+
+`cloudEngine()` talks to CloudPDF, and every plugin you add brings one feature: search,
+annotations, forms. You write the buttons.
+
+<Cards>
+  <Card
+    title="The full viewer"
+    description="Install it, give it a document, and make it yours."
+    href="/docs/viewer/react/quick-start"
+  />
+  <Card
+    title="Headless"
+    description="Build a viewer of your own, one plugin at a time."
+    href="/docs/headless/react"
+  />
+</Cards>

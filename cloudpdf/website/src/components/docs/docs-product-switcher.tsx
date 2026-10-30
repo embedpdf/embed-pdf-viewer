@@ -2,6 +2,7 @@
 
 import {
   BoltBadgeIcon,
+  CloudBadgeIcon,
   DocsProductSwitcher as KitSwitcher,
   EngineIcon,
   PuzzleBadgeIcon,
@@ -16,9 +17,17 @@ import { docsIntegrationFromPath, docsIntegrationHref } from '@/lib/docs-integra
  * CloudPDF's product binding over the kit switcher. Viewer and Headless
  * hrefs carry the visitor's current integration across products; the
  * framework-less products keep plain routes. The API reference stays in
- * the top navbar — this dropdown is the four product documentations.
+ * the top navbar. This dropdown is the product documentations, CloudPDF SaaS
+ * (Platform) first.
  */
 const PRODUCTS: DocsProductItem[] = [
+  {
+    key: 'platform',
+    label: 'Platform',
+    href: '/docs/platform',
+    icon: <CloudBadgeIcon />,
+    tintClass: 'bg-[#E6F4FF] text-[#0A6CD8]',
+  },
   {
     key: 'viewer',
     label: 'Viewer',

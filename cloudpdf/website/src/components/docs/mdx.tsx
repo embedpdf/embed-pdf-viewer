@@ -14,9 +14,11 @@ import {
 import { ApiClientSetup, ApiOperation, ApiSnippet } from './api-reference';
 import { DeploymentTab, DeploymentTabs } from './deployment-tabs';
 import { Fw } from './framework';
+import { GrantPreview } from './grant-preview';
 import { createHeading } from './heading';
 import { Pre } from './pre';
 import { RouteExample, type CompiledExampleProps } from './route-example';
+import { Screenshot } from './screenshot';
 import { Toc, type TocItem } from './toc';
 
 type WrapperProps = {
@@ -111,6 +113,8 @@ export function useMDXComponents(components?: MDXComponents): MDXComponents {
     ApiOperationCount,
     DeploymentTabs,
     DeploymentTab,
+    Screenshot,
+    GrantPreview,
     CodeExample,
     // A docs page passes its route's framework (app/…/[...mdxPath]/page.tsx); without one, the
     // code of every framework goes to the browser, which picks by pathname.
