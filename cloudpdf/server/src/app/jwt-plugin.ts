@@ -1,5 +1,6 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 
+import { adminOperations } from '@cloudpdf/contract';
 import {
   allowsSomeFieldWrite,
   checkAnyCapability,
@@ -33,12 +34,14 @@ import {
   hasTenantScope,
   isDocUserClaims,
   isTenantClaims,
+  isUploadClaims,
   type DocScope,
   type DownloadLinkClaim,
   type JwtClaims,
   type JwtVerifier,
   type JwtVerifierConfig,
   type TenantScope,
+  type UploadClaim,
 } from '../auth/JwtVerifier';
 import { matchesOrigin } from '../auth/origins';
 import { documentScopeOf } from '../auth/tenant-scope';
@@ -114,6 +117,17 @@ export interface JwtPluginOptions {
    */
   suspendedTenants?: SuspendedTenantsGuard;
 }
+
+/**
+ * The only routes an upload token reaches: starting an upload, the
+ * proxied transfer, and its commit. The auth hook refuses it everywhere
+ * else, before any guard runs.
+ */
+const UPLOAD_TOKEN_ROUTES: ReadonlySet<string> = new Set([
+  adminOperations['documents.init'].path,
+  adminOperations['documents.uploadProxy'].path,
+  adminOperations['documents.commit'].path,
+]);
 
 function asConfig(input: JwtPluginOptions['verifier']): JwtVerifierConfig {
   if ('mode' in input) return input;
@@ -217,11 +231,17 @@ export async function registerJwtAuth(app: FastifyInstance, opts: JwtPluginOptio
       return;
     }
 
+    // An upload token uploads, and nothing else.
+    if (isUploadClaims(claims) && !UPLOAD_TOKEN_ROUTES.has(req.routeOptions.url ?? '')) {
+      reply.code(403).send({ error: 'an upload token only uploads' });
+      return;
+    }
+
     // Origin lock: enforced whenever the browser identifies itself.
     // Absent Origin = non-browser caller, governed by the token itself
     // (the lock's threat model is hotlink embedding, which always
     // arrives cross-origin from a browser, which always sends Origin).
-    if (isDocUserClaims(claims) && claims.origins) {
+    if ((isDocUserClaims(claims) || isUploadClaims(claims)) && claims.origins) {
       const origin = req.headers['origin'];
       if (typeof origin === 'string' && !matchesOrigin(origin, claims.origins)) {
         limiter?.recordFailure(req.ip);
@@ -275,6 +295,55 @@ export interface TenantAccessContext {
   tenantId: string;
   sub: string;
   via: 'api-token' | 'tenant-jwt';
+}
+
+/** An upload route reached with an upload token: what the token allows. */
+export interface UploadAccessContext {
+  tenantId: string;
+  sub: string;
+  via: 'upload-jwt';
+  /** The token's id: every document it starts records it. */
+  jti: string;
+  /** When the token runs out, epoch ms. */
+  expiresAt: number;
+  upload: UploadClaim;
+}
+
+/**
+ * The upload routes' guard: an upload token for the path's tenant, or
+ * what {@link requireTenantAccess} admits. The route then applies the
+ * token's limits; the auth hook has already kept the token off every
+ * other route.
+ */
+export function requireUploadAccess(
+  req: FastifyRequest,
+  tenantId: string,
+  wanted: ReadonlyArray<TenantScope>,
+): TenantAccessContext | UploadAccessContext {
+  const claims = req.tenant?.claims;
+  if (!req.apiAuth && claims && isUploadClaims(claims)) {
+    if (claims.tenant_id !== tenantId) {
+      throw forbiddenError(
+        `token is for tenant "${claims.tenant_id}", path names tenant "${tenantId}"`,
+      );
+    }
+    return {
+      tenantId,
+      sub: claims.sub,
+      via: 'upload-jwt',
+      jti: claims.jti,
+      expiresAt: claims.exp * 1000,
+      upload: claims.upload,
+    };
+  }
+  return requireTenantAccess(req, tenantId, wanted);
+}
+
+function forbiddenError(message: string): Error & { code: string; status: number } {
+  const err = new Error(message) as Error & { code: string; status: number };
+  err.code = 'Forbidden';
+  err.status = 403;
+  return err;
 }
 
 /**
@@ -333,6 +402,7 @@ export async function requireTenantContentAccess(
     err.status = 403;
     return err;
   };
+  if (isUploadClaims(t.claims)) throw forbidden('an upload token only uploads');
   if (!isTenantClaims(t.claims)) throw forbidden('doc-scoped token cannot access tenant routes');
   if (t.id !== tenantId) {
     throw forbidden(`token is for tenant "${t.id}", path names tenant "${tenantId}"`);
@@ -378,6 +448,7 @@ export function requireScope(
     err.status = 401;
     throw err;
   }
+  if (isUploadClaims(t.claims)) throw forbiddenError('an upload token only uploads');
   if (isDocUserClaims(t.claims)) {
     const err = new Error('doc-scoped token cannot access tenant routes') as Error & {
       code: string;
@@ -445,6 +516,7 @@ export function requireDocAccess(
     err.status = 401;
     throw err;
   }
+  if (isUploadClaims(t.claims)) throw forbiddenError('an upload token only uploads');
 
   if (isDocUserClaims(t.claims)) {
     if (t.claims.doc_id !== docId) {
@@ -537,6 +609,7 @@ export function requireDocAccessOnly(
     err.status = 401;
     throw err;
   }
+  if (isUploadClaims(t.claims)) throw forbiddenError('an upload token only uploads');
 
   if (isDocUserClaims(t.claims)) {
     if (t.claims.doc_id !== docId) {
@@ -1023,8 +1096,12 @@ function jwtContext(claims: JwtClaims): RequestJwtContext {
     exp: typeof claims.exp === 'number' ? claims.exp : null,
     unlockKey: readUnlockKey(claims),
     // Inside documents a tenant token is checked like a doc token, against
-    // the document permissions its scope grants.
-    scope: isTenantClaims(claims) ? documentScopeOf(claims.scope) : claims.scope,
+    // the document permissions its scope grants. An upload token grants none.
+    scope: isTenantClaims(claims)
+      ? documentScopeOf(claims.scope)
+      : isDocUserClaims(claims)
+        ? claims.scope
+        : [],
     identity: claims.identity ? { ...claims.identity } : {},
   };
 }

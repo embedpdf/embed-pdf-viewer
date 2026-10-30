@@ -1483,6 +1483,20 @@ await client.documents.update({
 <dl>
 <dd>
 
+#### 📝 Description
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+An upload token commits only the documents it started; any other document answers 404.
+</dd>
+</dl>
+</dd>
+</dl>
+
 #### 🔌 Usage
 
 <dl>
@@ -1648,7 +1662,7 @@ await client.documents.thumbnail({
 <dl>
 <dd>
 
-This bounded origin-mediated fallback must only be used after documents.init returns upload.kind=proxy. Auto mode prefers a presigned object-store PUT whenever available.
+This bounded origin-mediated fallback must only be used after documents.init returns upload.kind=proxy. Auto mode prefers a presigned object-store PUT whenever available. An upload token sends files only to the documents it started.
 </dd>
 </dl>
 </dd>
@@ -1775,6 +1789,20 @@ await client.documents.importFrom({
 <details><summary><code>client.documents.<a href="/src/api/resources/documents/client/Client.ts">init</a>({ ...params }) -> CloudPDF.DocumentsInit200Response</code></summary>
 <dl>
 <dd>
+
+#### 📝 Description
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+With an upload token, the document goes into the token's folder with the token's metadata, whatever the request says; contentLength must be within the token's maxBytes, and the token makes at most maxFiles documents (403 after). docId, idempotencyKey and dedupMode reuse-existing are refused (400): each could reach a document the token didn't make.
+</dd>
+</dl>
+</dd>
+</dl>
 
 #### 🔌 Usage
 
@@ -2207,7 +2235,7 @@ await client.folders.moveInto({
 <dl>
 <dd>
 
-kind "tenant" requires the API token — authority mints only downward. Mounted only when the deployment can sign (HS256 mode); asymmetric deployments mint with their own private key.
+Authority mints only downward: kind "tenant" requires the API token, and kind "upload" requires docs.create instead of tokens.issue-doc, since an upload token can do only what docs.create allows. Mounted only when the deployment can sign (HS256 mode); asymmetric deployments mint with their own private key.
 </dd>
 </dl>
 </dd>

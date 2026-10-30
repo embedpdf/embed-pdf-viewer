@@ -48,6 +48,7 @@ import { PdfPasswordVerificationsRepo } from '../db/repos/pdf_password_verificat
 import { SecurityEventsRepo } from '../db/repos/security-events.repo';
 import { TenantUsageRepo } from '../db/repos/tenant_usage.repo';
 import { TenantsRepo } from '../db/repos/tenants.repo';
+import { UploadTokenUsesRepo } from '../db/repos/upload_token_uses.repo';
 import type { Database as Schema } from '../db/schema';
 import type { ImportConnection } from '../import/config/ImportConnectionSchema';
 import { defaultImportPolicy, type ImportPolicy } from '../import/config/ImportPolicySchema';
@@ -1107,6 +1108,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       documents: new DocumentsRepo(opts.db),
       tenants: new TenantsRepo(opts.db),
       folders: new FoldersRepo(opts.db),
+      uploadTokenUses: new UploadTokenUsesRepo(opts.db),
       storage: opts.objectStore,
       autoProvisionTenant: opts.autoProvisionTenant ?? false,
       uploadProxyPolicy: opts.uploadProxyPolicy ?? 'fallback-only',
@@ -1193,6 +1195,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       ...(revokedJtisGuard ? { guard: revokedJtisGuard } : {}),
       ...(signer ? { sign: signer } : {}),
       documents: new DocumentsRepo(opts.db),
+      folders: new FoldersRepo(opts.db),
       securityEvents: new SecurityEventsRepo(opts.db),
     });
     // The grant family (grant lifecycle + public exchange) exists only

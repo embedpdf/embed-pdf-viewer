@@ -228,6 +228,17 @@
             },
             "default": "./dist/cjs/api/resources/grants/resources/visitors/exports.js"
         },
+        "./upload": {
+            "import": {
+                "types": "./dist/esm/upload.d.mts",
+                "default": "./dist/esm/upload.mjs"
+            },
+            "require": {
+                "types": "./dist/cjs/upload.d.ts",
+                "default": "./dist/cjs/upload.js"
+            },
+            "default": "./dist/cjs/upload.js"
+        },
         "./package.json": "./package.json"
     },
     "files": [

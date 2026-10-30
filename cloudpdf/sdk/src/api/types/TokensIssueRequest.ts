@@ -2,7 +2,10 @@
 
 import type * as CloudPDF from "../index.js";
 
-export type TokensIssueRequest = CloudPDF.TokensIssueRequest.Doc | CloudPDF.TokensIssueRequest.Tenant;
+export type TokensIssueRequest =
+    | CloudPDF.TokensIssueRequest.Doc
+    | CloudPDF.TokensIssueRequest.Tenant
+    | CloudPDF.TokensIssueRequest.Upload;
 
 export namespace TokensIssueRequest {
     export interface Doc {
@@ -20,6 +23,18 @@ export namespace TokensIssueRequest {
         kind: "tenant";
         sub: string;
         scope: string[];
+        expiresIn: number;
+    }
+
+    export interface Upload {
+        kind: "upload";
+        sub: string;
+        /** A folder id, or root for the top level. */
+        folderId?: string | undefined;
+        metadata?: Record<string, unknown> | undefined;
+        maxFiles?: number | undefined;
+        maxBytes?: number | undefined;
+        origins?: string[] | undefined;
         expiresIn: number;
     }
 }

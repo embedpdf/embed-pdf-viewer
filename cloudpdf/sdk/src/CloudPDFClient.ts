@@ -1,6 +1,8 @@
 import type * as CloudPDF from "./api/index.js";
 import { CloudPDFClient as GeneratedCloudPDFClient } from "./Client.js";
 import { CloudPDFEnvironment } from "./environments.js";
+import { countingBody, isStreamBody } from "./uploads/progress.js";
+import { prepareUploadSource } from "./uploads/source.js";
 import { Uploads } from "./uploads/Uploads.js";
 
 export declare namespace CloudPDFClient {
@@ -20,21 +22,35 @@ export class CloudPDFClient extends GeneratedCloudPDFClient {
         const rawFetch = options.fetch ?? globalThis.fetch?.bind(globalThis);
         if (!rawFetch) throw new Error("CloudPDFClient requires a fetch implementation");
 
-        this.uploads = new Uploads({
-            init: async (request, requestOptions): Promise<unknown> =>
-                this.documents.init(request as never, requestOptions),
-            commit: async (request, requestOptions): Promise<unknown> =>
-                this.documents.commit(request as never, requestOptions),
-            proxy: async (url, form, requestOptions): Promise<Response> =>
-                this.fetch(
-                    url,
-                    { method: "POST", body: form },
-                    {
-                        abortSignal: requestOptions.abortSignal,
-                        maxRetries: requestOptions.maxRetries,
-                    },
-                ),
-            presigned: async (url, init): Promise<Response> => rawFetch(url, init),
-        });
+        this.uploads = new Uploads(
+            {
+                init: async (request, requestOptions): Promise<unknown> =>
+                    this.documents.init(request as never, requestOptions),
+                commit: async (request, requestOptions): Promise<unknown> =>
+                    this.documents.commit(request as never, requestOptions),
+                proxy: async (url, form, requestOptions): Promise<Response> =>
+                    this.fetch(
+                        url,
+                        { method: "POST", body: form },
+                        {
+                            abortSignal: requestOptions.abortSignal,
+                            maxRetries: requestOptions.maxRetries,
+                        },
+                    ),
+                presigned: async (url, transfer): Promise<Response> => {
+                    // Counting what fetch reads is the progress a server can
+                    // report. Either way, a stream body needs half duplex.
+                    const body = transfer.onProgress ? countingBody(transfer.body, transfer.onProgress) : transfer.body;
+                    return rawFetch(url, {
+                        method: transfer.method,
+                        headers: transfer.headers,
+                        body,
+                        signal: transfer.signal,
+                        ...(isStreamBody(body) ? ({ duplex: "half" } as Record<string, unknown>) : {}),
+                    });
+                },
+            },
+            prepareUploadSource,
+        );
     }
 }

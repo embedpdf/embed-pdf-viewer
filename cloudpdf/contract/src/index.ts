@@ -844,9 +844,45 @@ export const AdminTokenIssueTenantRequestSchema = z.object({
 });
 export type AdminTokenIssueTenantRequest = z.infer<typeof AdminTokenIssueTenantRequestSchema>;
 
+/** The most JSON an upload token's `metadata` may hold: it rides inside the token. */
+export const UPLOAD_TOKEN_METADATA_MAX_BYTES = 4096;
+
+export const AdminTokenIssueUploadRequestSchema = z.object({
+  kind: z.literal('upload'),
+  /** Who is uploading: the end user's id in your system. */
+  sub: z.string().min(1).max(256),
+  /** The folder every upload goes into: a folder id, or root (the default). */
+  folderId: FolderPlaceSchema.optional(),
+  /**
+   * Your own data, put on every document uploaded with the token. The
+   * browser can't change it: init takes the token's, not the request's.
+   */
+  metadata: z
+    .record(z.string(), z.unknown())
+    .refine(
+      (value) => JSON.stringify(value).length <= UPLOAD_TOKEN_METADATA_MAX_BYTES,
+      `metadata: at most ${UPLOAD_TOKEN_METADATA_MAX_BYTES} bytes of JSON`,
+    )
+    .optional(),
+  /** How many documents the token uploads. Defaults to 1. */
+  maxFiles: z.number().int().min(1).max(1000).optional(),
+  /** The largest file the token takes, in bytes. */
+  maxBytes: z.number().int().min(1).optional(),
+  /** Origin lock, as on a doc token: the websites the token works on. */
+  origins: originPatternArray.optional(),
+  /** Token lifetime in seconds. */
+  expiresIn: z
+    .number()
+    .int()
+    .min(60)
+    .max(60 * 60 * 24 * 90),
+});
+export type AdminTokenIssueUploadRequest = z.infer<typeof AdminTokenIssueUploadRequestSchema>;
+
 export const AdminTokenIssueRequestSchema = z.discriminatedUnion('kind', [
   AdminTokenIssueDocRequestSchema,
   AdminTokenIssueTenantRequestSchema,
+  AdminTokenIssueUploadRequestSchema,
 ]);
 export type AdminTokenIssueRequest = z.infer<typeof AdminTokenIssueRequestSchema>;
 
@@ -1288,7 +1324,7 @@ export const TenantSuspendRequestSchema = z.object({
 });
 export type TenantSuspendRequest = z.infer<typeof TenantSuspendRequestSchema>;
 
-export const adminCredentials = ['api-token', 'tenant-jwt', 'doc-jwt'] as const;
+export const adminCredentials = ['api-token', 'tenant-jwt', 'doc-jwt', 'upload-jwt'] as const;
 export type AdminCredential = (typeof adminCredentials)[number];
 
 export type AdminOperationMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
@@ -1444,14 +1480,17 @@ export const adminOperations = {
       'Begin an upload: create (or resume/dedupe) a pending document and issue upload access.',
     method: 'POST',
     path: '/v1/tenants/:tenantId/documents/init',
-    credentials: ['api-token', 'tenant-jwt'],
+    credentials: ['api-token', 'tenant-jwt', 'upload-jwt'],
     scope: ['docs.create'],
     params: AdminTenantParamsSchema,
     body: { contentType: 'application/json', schema: AdminDocumentInitRequestSchema },
     responses: {
       200: { contentType: 'application/json', schema: AdminDocumentInitResponseSchema },
       400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      403: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
     },
+    notes:
+      "With an upload token, the document goes into the token's folder with the token's metadata, whatever the request says; contentLength must be within the token's maxBytes, and the token makes at most maxFiles documents (403 after). docId, idempotencyKey and dedupMode reuse-existing are refused (400): each could reach a document the token didn't make.",
   },
   'documents.commit': {
     operationId: 'documents.commit',
@@ -1459,7 +1498,7 @@ export const adminOperations = {
     summary: 'Finish an upload: verify the SHA-256 and promote the document to ready.',
     method: 'POST',
     path: '/v1/tenants/:tenantId/documents/:id/commit',
-    credentials: ['api-token', 'tenant-jwt'],
+    credentials: ['api-token', 'tenant-jwt', 'upload-jwt'],
     scope: ['docs.create'],
     params: AdminTenantDocParamsSchema,
     body: { contentType: 'application/json', schema: AdminDocumentCommitRequestSchema },
@@ -1468,6 +1507,7 @@ export const adminOperations = {
       400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
       404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
     },
+    notes: 'An upload token commits only the documents it started; any other document answers 404.',
   },
   'documents.uploadProxy': {
     operationId: 'documents.uploadProxy',
@@ -1475,7 +1515,7 @@ export const adminOperations = {
     summary: 'Upload a bounded PDF through the API when the initialized transfer kind is proxy.',
     method: 'POST',
     path: '/v1/tenants/:tenantId/documents/:id/upload-proxy',
-    credentials: ['api-token', 'tenant-jwt'],
+    credentials: ['api-token', 'tenant-jwt', 'upload-jwt'],
     scope: ['docs.create'],
     params: AdminTenantDocParamsSchema,
     body: {
@@ -1484,10 +1524,11 @@ export const adminOperations = {
     responses: {
       200: { contentType: 'application/json', schema: AdminUploadProxyResponseSchema },
       400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
       409: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
     },
     notes:
-      'This bounded origin-mediated fallback must only be used after documents.init returns upload.kind=proxy. Auto mode prefers a presigned object-store PUT whenever available.',
+      'This bounded origin-mediated fallback must only be used after documents.init returns upload.kind=proxy. Auto mode prefers a presigned object-store PUT whenever available. An upload token sends files only to the documents it started.',
   },
   'documents.importFrom': {
     operationId: 'documents.importFrom',
@@ -1768,7 +1809,8 @@ export const adminOperations = {
   'tokens.issue': {
     operationId: 'tokens.issue',
     title: 'Issue token',
-    summary: 'Mint a delegated JWT: a doc token, or (API token only) a tenant token.',
+    summary:
+      'Mint a delegated JWT: a doc token, an upload token for a browser, or (API token only) a tenant token.',
     method: 'POST',
     path: '/v1/tenants/:tenantId/tokens',
     credentials: ['api-token', 'tenant-jwt'],
@@ -1782,7 +1824,7 @@ export const adminOperations = {
       404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
     },
     notes:
-      'kind "tenant" requires the API token — authority mints only downward. Mounted only when the deployment can sign (HS256 mode); asymmetric deployments mint with their own private key.',
+      'Authority mints only downward: kind "tenant" requires the API token, and kind "upload" requires docs.create instead of tokens.issue-doc, since an upload token can do only what docs.create allows. Mounted only when the deployment can sign (HS256 mode); asymmetric deployments mint with their own private key.',
   },
   'tokens.revoke': {
     operationId: 'tokens.revoke',

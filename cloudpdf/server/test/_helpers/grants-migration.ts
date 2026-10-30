@@ -21,7 +21,11 @@ export async function checkGrantsMigration(
 ): Promise<void> {
   const upTo046 = migrations.filter((m) => m.version < '047');
   expect(upTo046.at(-1)?.version).toBe('046');
-  const source = { kind: 'inline' as const, migrations };
+  // Up to 047 and no further, so later migrations leave this one on top.
+  const source = {
+    kind: 'inline' as const,
+    migrations: migrations.filter((m) => m.version <= '047'),
+  };
   await migrate(db, { source: { kind: 'inline', migrations: upTo046 } });
 
   await db.insertInto('tenants').values({ id: TENANT, name: TENANT }).execute();

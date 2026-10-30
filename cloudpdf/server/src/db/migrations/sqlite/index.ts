@@ -92,6 +92,8 @@ import down046 from './046_folders.down.sql';
 import sql046 from './046_folders.sql';
 import down047 from './047_grants.down.sql';
 import sql047 from './047_grants.sql';
+import down048 from './048_upload_tokens.down.sql';
+import sql048 from './048_upload_tokens.sql';
 import type { MigrationSource } from '../../migrator/runner';
 
 /**
@@ -237,5 +239,11 @@ export const sqliteMigrations: ReadonlyArray<MigrationSource> = [
     name: '047_grants.sql',
     sql: sql047,
     down: down047,
+  },
+  {
+    version: '048',
+    name: '048_upload_tokens.sql',
+    sql: sql048,
+    down: down048,
   },
 ];

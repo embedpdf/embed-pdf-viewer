@@ -5902,12 +5902,16 @@
         "x-fern-sdk-method-name": "commit",
         "x-docs-title": "Commit upload",
         "summary": "Finish an upload: verify the SHA-256 and promote the document to ready.",
+        "description": "An upload token commits only the documents it started; any other document answers 404.",
         "security": [
           {
             "apiToken": []
           },
           {
             "tenantToken": []
+          },
+          {
+            "uploadToken": []
           }
         ],
         "x-required-scope": ["docs.create"],
@@ -6364,13 +6368,16 @@
         "x-fern-sdk-method-name": "uploadProxy",
         "x-docs-title": "Upload document through the origin",
         "summary": "Upload a bounded PDF through the API when the initialized transfer kind is proxy.",
-        "description": "This bounded origin-mediated fallback must only be used after documents.init returns upload.kind=proxy. Auto mode prefers a presigned object-store PUT whenever available.",
+        "description": "This bounded origin-mediated fallback must only be used after documents.init returns upload.kind=proxy. Auto mode prefers a presigned object-store PUT whenever available. An upload token sends files only to the documents it started.",
         "security": [
           {
             "apiToken": []
           },
           {
             "tenantToken": []
+          },
+          {
+            "uploadToken": []
           }
         ],
         "x-required-scope": ["docs.create"],
@@ -6428,6 +6435,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DocumentsUploadProxy400Response"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentsUploadProxy404Response"
                 }
               }
             }
@@ -6564,12 +6581,16 @@
         "x-fern-sdk-method-name": "init",
         "x-docs-title": "Initialize upload",
         "summary": "Begin an upload: create (or resume/dedupe) a pending document and issue upload access.",
+        "description": "With an upload token, the document goes into the token's folder with the token's metadata, whatever the request says; contentLength must be within the token's maxBytes, and the token makes at most maxFiles documents (403 after). docId, idempotencyKey and dedupMode reuse-existing are refused (400): each could reach a document the token didn't make.",
         "security": [
           {
             "apiToken": []
           },
           {
             "tenantToken": []
+          },
+          {
+            "uploadToken": []
           }
         ],
         "x-required-scope": ["docs.create"],
@@ -6611,6 +6632,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DocumentsInit400Response"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentsInit403Response"
                 }
               }
             }
@@ -8015,8 +8046,8 @@
         "x-fern-sdk-group-name": ["tokens"],
         "x-fern-sdk-method-name": "issue",
         "x-docs-title": "Issue token",
-        "summary": "Mint a delegated JWT: a doc token, or (API token only) a tenant token.",
-        "description": "kind \"tenant\" requires the API token — authority mints only downward. Mounted only when the deployment can sign (HS256 mode); asymmetric deployments mint with their own private key.",
+        "summary": "Mint a delegated JWT: a doc token, an upload token for a browser, or (API token only) a tenant token.",
+        "description": "Authority mints only downward: kind \"tenant\" requires the API token, and kind \"upload\" requires docs.create instead of tokens.issue-doc, since an upload token can do only what docs.create allows. Mounted only when the deployment can sign (HS256 mode); asymmetric deployments mint with their own private key.",
         "security": [
           {
             "apiToken": []
@@ -8339,6 +8370,13 @@
         "bearerFormat": "JWT",
         "x-docs-title": "Document token",
         "description": "Doc-scoped JWT, valid only on the /v1/docs/{docId} subtree it names, gated by the capability scopes it carries (each operation's x-required-capability)."
+      },
+      "uploadToken": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "x-docs-title": "Upload token",
+        "description": "Upload-only JWT for a browser, made by tokens.issue with kind upload: valid on its own tenant's documents.init, documents.commit and documents.uploadProxy, and nowhere else. It uploads into its folder with its metadata, up to maxFiles documents within maxBytes each, and commits only the documents it started."
       }
     },
     "schemas": {
@@ -24920,6 +24958,9 @@
       "DocumentsInit400Response": {
         "$ref": "#/components/schemas/AdminErrorPayload"
       },
+      "DocumentsInit403Response": {
+        "$ref": "#/components/schemas/AdminErrorPayload"
+      },
       "DocumentsCommitRequest": {
         "type": "object",
         "properties": {
@@ -25033,6 +25074,9 @@
         "additionalProperties": false
       },
       "DocumentsUploadProxy400Response": {
+        "$ref": "#/components/schemas/AdminErrorPayload"
+      },
+      "DocumentsUploadProxy404Response": {
         "$ref": "#/components/schemas/AdminErrorPayload"
       },
       "DocumentsUploadProxy409Response": {
@@ -26151,6 +26195,48 @@
               }
             },
             "required": ["kind", "sub", "scope", "expiresIn"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": ["upload"]
+              },
+              "sub": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "folderId": {
+                "type": "string",
+                "pattern": "^(root|fld_[0-9a-f]{24})$",
+                "description": "A folder id, or root for the top level."
+              },
+              "metadata": {
+                "type": "object",
+                "additionalProperties": {}
+              },
+              "maxFiles": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1000
+              },
+              "maxBytes": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "origins": {
+                "$ref": "#/components/schemas/TokensIssueRequest/anyOf/0/properties/origins"
+              },
+              "expiresIn": {
+                "type": "integer",
+                "minimum": 60,
+                "maximum": 7776000
+              }
+            },
+            "required": ["kind", "sub", "expiresIn"],
             "additionalProperties": false
           }
         ]

@@ -48,6 +48,7 @@ const SECURITY_SCHEME: Record<AdminCredential, string> = {
   'api-token': 'apiToken',
   'tenant-jwt': 'tenantToken',
   'doc-jwt': 'docToken',
+  'upload-jwt': 'uploadToken',
 };
 
 const ADMIN_ERROR_REF = '#/components/schemas/AdminErrorPayload';
@@ -167,6 +168,17 @@ export function buildAdminOpenApiDocument(opts: BuildAdminOpenApiOptions): Recor
           description:
             'Doc-scoped JWT, valid only on the /v1/docs/{docId} subtree it names, gated by ' +
             "the capability scopes it carries (each operation's x-required-capability).",
+        },
+        uploadToken: {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+          'x-docs-title': 'Upload token',
+          description:
+            "Upload-only JWT for a browser, made by tokens.issue with kind upload: valid on its own tenant's " +
+            'documents.init, documents.commit and documents.uploadProxy, and nowhere else. It uploads ' +
+            'into its folder with its metadata, up to maxFiles documents within maxBytes each, and ' +
+            'commits only the documents it started.',
         },
       },
       schemas,

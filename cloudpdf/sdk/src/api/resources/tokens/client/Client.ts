@@ -24,7 +24,7 @@ export class TokensClient {
     }
 
     /**
-     * kind "tenant" requires the API token — authority mints only downward. Mounted only when the deployment can sign (HS256 mode); asymmetric deployments mint with their own private key.
+     * Authority mints only downward: kind "tenant" requires the API token, and kind "upload" requires docs.create instead of tokens.issue-doc, since an upload token can do only what docs.create allows. Mounted only when the deployment can sign (HS256 mode); asymmetric deployments mint with their own private key.
      *
      * @param {CloudPDF.IssueTokensRequest} request
      * @param {TokensClient.RequestOptions} requestOptions - Request-specific configuration.
