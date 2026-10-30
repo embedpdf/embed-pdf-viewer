@@ -73,7 +73,7 @@ export const DEFAULT_LAYOUT: LayoutData = {
             'panel:search',
             'panel:comments',
           ],
-          importance: 5,
+          importance: 3,
         },
       ],
     },
