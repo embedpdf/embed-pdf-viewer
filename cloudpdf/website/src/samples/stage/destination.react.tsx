@@ -10,7 +10,7 @@ import './destination.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin()];
 
-const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 // Destinations as a link, a bookmark or the document's opening view give them.
 const destinationsFor = (pages: readonly PageInfo[]) => {

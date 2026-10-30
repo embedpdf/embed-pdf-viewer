@@ -20,7 +20,7 @@ import { EpdfForm, EpdfFormLayer, toFieldRef, withForm } from '@embedpdf/angular
 import type { FormFieldDTO } from '@embedpdf/angular/form';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const forms: OpenInput = { kind: 'share', shareToken: 'shr_eBRW5E3MpolzD8G36Alp30EF' };
+const forms: OpenInput = { kind: 'grant', grant: 'shr_eBRW5E3MpolzD8G36Alp30EF' };
 
 @Component({
   selector: 'demo-root',

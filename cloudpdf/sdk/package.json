@@ -41,16 +41,16 @@
             },
             "default": "./dist/cjs/api/resources/doc/exports.js"
         },
-        "./shares": {
+        "./grants": {
             "import": {
-                "types": "./dist/esm/api/resources/shares/exports.d.mts",
-                "default": "./dist/esm/api/resources/shares/exports.mjs"
+                "types": "./dist/esm/api/resources/grants/exports.d.mts",
+                "default": "./dist/esm/api/resources/grants/exports.mjs"
             },
             "require": {
-                "types": "./dist/cjs/api/resources/shares/exports.d.ts",
-                "default": "./dist/cjs/api/resources/shares/exports.js"
+                "types": "./dist/cjs/api/resources/grants/exports.d.ts",
+                "default": "./dist/cjs/api/resources/grants/exports.js"
             },
-            "default": "./dist/cjs/api/resources/shares/exports.js"
+            "default": "./dist/cjs/api/resources/grants/exports.js"
         },
         "./tenants": {
             "import": {
@@ -217,16 +217,16 @@
             },
             "default": "./dist/cjs/api/resources/documents/resources/layers/exports.js"
         },
-        "./shares/visitors": {
+        "./grants/visitors": {
             "import": {
-                "types": "./dist/esm/api/resources/shares/resources/visitors/exports.d.mts",
-                "default": "./dist/esm/api/resources/shares/resources/visitors/exports.mjs"
+                "types": "./dist/esm/api/resources/grants/resources/visitors/exports.d.mts",
+                "default": "./dist/esm/api/resources/grants/resources/visitors/exports.mjs"
             },
             "require": {
-                "types": "./dist/cjs/api/resources/shares/resources/visitors/exports.d.ts",
-                "default": "./dist/cjs/api/resources/shares/resources/visitors/exports.js"
+                "types": "./dist/cjs/api/resources/grants/resources/visitors/exports.d.ts",
+                "default": "./dist/cjs/api/resources/grants/resources/visitors/exports.js"
             },
-            "default": "./dist/cjs/api/resources/shares/resources/visitors/exports.js"
+            "default": "./dist/cjs/api/resources/grants/resources/visitors/exports.js"
         },
         "./package.json": "./package.json"
     },

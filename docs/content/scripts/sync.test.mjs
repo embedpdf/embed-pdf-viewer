@@ -104,15 +104,14 @@ describe('the cloud site’s copy of a viewer file', () => {
     );
   });
 
-  it('takes no share grant but a demo document’s', () => {
+  it('takes no grant but a demo document’s', () => {
     assert.throws(
-      () =>
-        cloud("el.src = { shareToken: 'shr_notTheDemoGrant' };\n", 'viewer/a.cloud.vanilla.html'),
-      /isn't a demo document's share grant/,
+      () => cloud("el.src = { grant: 'grt_notTheDemoGrant' };\n", 'viewer/a.cloud.vanilla.html'),
+      /isn't a demo document's grant/,
     );
     assert.equal(
-      cloud("el.src = { shareToken: 'shr_…' };\n", 'viewer/a.vanilla.html'),
-      "el.src = { shareToken: 'shr_…' };\n",
+      cloud("el.src = { grant: 'grt_…' };\n", 'viewer/a.vanilla.html'),
+      "el.src = { grant: 'grt_…' };\n",
     );
   });
 

@@ -8,13 +8,13 @@ import {
 /**
  * Say, in development, what the page passed to `open()` that the document doesn't use, so
  * nothing is ignored silently. The document's token decides what the session may do, so
- * `scope` never applies here. It also decides who the session acts for: a share link takes the
+ * `scope` never applies here. It also decides who the session acts for: a grant takes the
  * page's `identity` as the visitor's answers, and only what it asks.
  */
 export function warnUnusedOpenOptions(
   options: OpenOptions | undefined,
   handle: DocumentHandle,
-  from: 'token' | 'share',
+  from: 'token' | 'grant',
 ): void {
   if (options?.scope !== undefined) {
     devWarn(
@@ -31,9 +31,9 @@ export function warnUnusedOpenOptions(
   );
   if (unused.length === 0) return;
   const why =
-    from === 'share'
-      ? 'a share link takes only the fields it asks its visitors, never `userId` or ' +
-        '`groupId`; an answer once given stays, and a link that says who its visitors are ' +
+    from === 'grant'
+      ? 'a grant takes only the fields it asks its visitors, never `userId` or ' +
+        '`groupId`; an answer once given stays, and a grant that says who its visitors are ' +
         'prevails'
       : "the document's token says who the user is";
   devWarn(

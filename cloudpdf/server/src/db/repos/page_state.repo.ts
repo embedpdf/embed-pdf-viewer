@@ -125,7 +125,7 @@ export interface ListedLayer {
   id: string;
   docId: string;
   name: string;
-  /** A visitor's layer: the share link that made it. */
+  /** A visitor's layer: the grant that made it. */
   grantId: string | null;
   visitorId: string | null;
   storageSizeBytes: number | null;
@@ -135,10 +135,10 @@ export interface ListedLayer {
 }
 
 export interface LayerListOptions {
-  /** Only this share link's visitors' layers. */
+  /** Only this grant's visitors' layers. */
   grantId?: string;
   limit: number;
-  /** Keyset cursor, the same shape as the documents, tenants and shares lists. */
+  /** Keyset cursor, the same shape as the documents, tenants and grants lists. */
   before?: { createdAt: number; id: string };
 }
 
@@ -163,7 +163,7 @@ export interface CreateLayerInput {
   annotationsVersion?: number;
   formsVersion?: number;
   outlineVersion?: number;
-  /** A visitor's layer: the share link that made it and the visitor. */
+  /** A visitor's layer: the grant that made it and the visitor. */
   visitor?: { grantId: string; visitorId: string };
 }
 
@@ -192,10 +192,10 @@ export class LayersRepo {
    * descending), after `before` when given. A deleted layer isn't listed.
    */
   async listForDocument(docId: string, opts: LayerListOptions): Promise<ListedLayer[]> {
-    // A visitor's last visit is the visitor's (`share_visitors`), not the layer's.
+    // A visitor's last visit is the visitor's (`grant_visitors`), not the layer's.
     let q = this.db
       .selectFrom('layers as l')
-      .leftJoin('share_visitors as v', (join) =>
+      .leftJoin('grant_visitors as v', (join) =>
         join.onRef('v.grant_id', '=', 'l.grant_id').onRef('v.visitor_id', '=', 'l.visitor_id'),
       )
       .select([
@@ -238,7 +238,7 @@ export class LayersRepo {
     }));
   }
 
-  /** How many live layers a share link's visitors made: what keeps the link from being deleted. */
+  /** How many live layers a grant's visitors made: what keeps the grant from being deleted. */
   async countForGrant(grantId: string): Promise<number> {
     const row = await this.db
       .selectFrom('layers')

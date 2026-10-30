@@ -3,4 +3,4 @@
   import { config } from './viewer-config';
 </script>
 
-<PDFViewer src={{ shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' }} {...config} style="height: 100vh" />
+<PDFViewer src={{ grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' }} {...config} style="height: 100vh" />

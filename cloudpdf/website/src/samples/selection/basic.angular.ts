@@ -13,7 +13,7 @@ import { withInteraction } from '@embedpdf/angular/interaction';
 import { EpdfSelection, EpdfSelectionLayer, withSelection } from '@embedpdf/angular/selection';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 @Component({
   selector: 'demo-root',

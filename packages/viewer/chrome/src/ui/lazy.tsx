@@ -16,7 +16,7 @@ interface LazyOptions {
   readonly shownWhile?: () => boolean;
   /**
    * Fetch its chunk in the background with the features' (true unless given). False for one
-   * only some documents need, like a share link's prompts: it loads when it first shows.
+   * only some documents need, like a grant's prompts: it loads when it first shows.
    */
   readonly prefetch?: boolean;
 }

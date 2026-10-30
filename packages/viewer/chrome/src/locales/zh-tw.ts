@@ -217,7 +217,7 @@ export const zhTW: Locale = {
       open: '開啟',
       opening: '正在開啟…',
     },
-    sharePrompt: {
+    grantPrompt: {
       passphraseTitle: '需要通關密語',
       passphraseRequired: '此連結受到保護。請輸入您收到的通關密語以開啟文件。',
       passphraseIncorrect: '通關密語無效，請再試一次。',

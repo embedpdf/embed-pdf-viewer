@@ -11,7 +11,7 @@ const engine = cloudEngine();
 // Facing pages from the start, like a book.
 const plugins = [stagePlugin({ spread: 'odd' }), renderPlugin()];
 
-const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 function LayoutControls() {
   const stage = useStage();

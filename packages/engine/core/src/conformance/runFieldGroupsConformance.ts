@@ -57,7 +57,7 @@ export const FIELD_GROUP_TOKENS = {
     scope: ['doc.open', 'doc.render', 'fields:fill:group=buyer', 'fields:sign:group=buyer'],
     identity: { userId: 'alice', displayName: 'Alice' },
   },
-  /** The seller, as a share link would grant it: everything on the seller's fields. */
+  /** The seller, as a grant would grant it: everything on the seller's fields. */
   seller: { scope: ['doc.open', 'doc.render', 'fields:*:group=seller'], identity: {} },
   /** The designer: her fields go in legal; she may put fields in the buyer's group too. */
   designer: {

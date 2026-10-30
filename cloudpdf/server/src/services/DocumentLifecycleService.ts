@@ -17,7 +17,7 @@ import {
   type DocumentListOptions,
   type DocumentRow,
 } from '../db/repos/documents.repo';
-import type { ShareGrantsRepo } from '../db/repos/share_grants.repo';
+import type { GrantsRepo } from '../db/repos/grants.repo';
 import type { TenantUsageRepo } from '../db/repos/tenant_usage.repo';
 import { TenantsRepo } from '../db/repos/tenants.repo';
 import type { Database as Schema } from '../db/schema';
@@ -178,8 +178,8 @@ export interface DocumentLifecycleOptions {
   usageMeters?: UsageMeters;
   /** When present, fresh commits also move the per-tenant upload fact. */
   tenantUsage?: TenantUsageRepo;
-  /** When present, document delete revokes the document's share grants. */
-  shareGrants?: ShareGrantsRepo;
+  /** When present, document delete revokes the document's grants. */
+  grants?: GrantsRepo;
   /** Controls whether origin-mediated uploads may be selected. */
   uploadProxyPolicy?: UploadProxyPolicy;
   /**
@@ -235,7 +235,7 @@ export class DocumentLifecycleService {
   private readonly derivedRenders?: DerivedRenderService;
   private readonly usageMeters?: UsageMeters;
   private readonly tenantUsage?: TenantUsageRepo;
-  private readonly shareGrants?: ShareGrantsRepo;
+  private readonly grants?: GrantsRepo;
   private readonly uploadProxyPolicy: UploadProxyPolicy;
   private readonly importPolicy?: ImportPolicy;
   private readonly importConnections: ImportConnectionRegistry;
@@ -257,7 +257,7 @@ export class DocumentLifecycleService {
     this.derivedRenders = opts.derivedRenders;
     this.usageMeters = opts.usageMeters;
     this.tenantUsage = opts.tenantUsage;
-    this.shareGrants = opts.shareGrants;
+    this.grants = opts.grants;
     this.uploadProxyPolicy = opts.uploadProxyPolicy ?? 'fallback-only';
     if (opts.importPolicy) this.importPolicy = opts.importPolicy;
     this.importConnections = opts.importConnections ?? new ImportConnectionRegistry();
@@ -1118,7 +1118,7 @@ export class DocumentLifecycleService {
     // because SQLite deployments may run without foreign_keys on and a
     // dangling grant would be a stored 404, not a security hole (the
     // exchange re-checks the document), but still a wart in listings.
-    await this.shareGrants?.deleteByDoc(docId, tenantId);
+    await this.grants?.deleteByDoc(docId, tenantId);
     // Import provenance dies with the document.
     await this.documentImports?.deleteByDoc(docId, tenantId);
     await this.documents.finalizeDelete(docId, tenantId);
@@ -1126,7 +1126,7 @@ export class DocumentLifecycleService {
 
   /**
    * Finish deletes that were begun, such as every document of a deleted
-   * folder: the stored files, share grants, import provenance and row of
+   * folder: the stored files, grants, import provenance and row of
    * each, a few at a time. Each document is attempted; the first failure
    * is rethrown at the end, and {@link sweepDeleting} retries it later.
    */

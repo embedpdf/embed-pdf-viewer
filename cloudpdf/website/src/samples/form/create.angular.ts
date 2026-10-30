@@ -16,7 +16,7 @@ import { EpdfForm, EpdfFormLayer, withForm } from '@embedpdf/angular/form';
 import type { FormFieldDTO } from '@embedpdf/angular/form';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const registration: OpenInput = { kind: 'share', shareToken: 'shr_sjOrUrwF2Sf0X5ADfySRG58L' };
+const registration: OpenInput = { kind: 'grant', grant: 'shr_sjOrUrwF2Sf0X5ADfySRG58L' };
 
 // The printed boxes are the fields' look: a new field only sets its text size.
 const look = { fontSize: 11 };

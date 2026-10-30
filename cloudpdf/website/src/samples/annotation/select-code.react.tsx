@@ -17,7 +17,7 @@ import './select-code.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-const layout: OpenInput = { kind: 'share', shareToken: 'shr_d2E_LaTuddJbZR00d1CvkqLM' };
+const layout: OpenInput = { kind: 'grant', grant: 'shr_d2E_LaTuddJbZR00d1CvkqLM' };
 
 // The top half of a page, where the box selects: on the home page, the image and the button.
 const TOP_HALF = { x: 0, y: 0, width: 612, height: 396 };

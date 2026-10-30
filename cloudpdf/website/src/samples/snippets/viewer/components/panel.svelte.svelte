@@ -8,7 +8,7 @@
       .add('panel:notes', { to: 'main', section: 'end' });
 </script>
 
-<PDFViewer src={{ shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' }} {layout} style="height: 100vh">
+<PDFViewer src={{ grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' }} {layout} style="height: 100vh">
   <Panel id="notes">
     <Notes />
   </Panel>

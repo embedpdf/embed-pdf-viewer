@@ -1,0 +1,349 @@
+import { createHash, randomBytes } from 'node:crypto';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import type { Kysely } from 'kysely';
+import {
+  createSqliteDb,
+  migrate,
+  sqliteMigrations,
+  FsObjectStore,
+  signDevToken,
+  StorageKeys,
+  type AppBundle,
+  type DbSchema,
+} from '@cloudpdf/server';
+import { buildAppForTesting } from '../../server/src/app/buildApp';
+import { createValidTestLicenseGate } from '../../server/src/licensing/testing';
+import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
+import { cloudEngine } from '../src/index';
+import { exchangeGrant, grantSessionSource, GrantExchangeError } from '../src/grant';
+
+/**
+ * SDK side of the no-backend embed flow, at both levels:
+ *
+ *   - the primitives: a grant exchanged into a self-renewing
+ *     token source that drives an ordinary `open({ kind: 'token' })`
+ *   - the engine arm: `open({ kind: 'grant' })`, which performs the
+ *     exchange itself on the engine's own transport (baseUrl + fetch)
+ *     and surfaces exchange failures as EngineErrors
+ *
+ * The exchange endpoint requires a browser Origin header — browsers
+ * send it automatically; here (Node) the fetch wrapper plays the
+ * browser.
+ */
+
+const STUB_ENTRY = fileURLToPath(
+  new URL('../../server/test/_helpers/stub-worker-entry.cjs', import.meta.url),
+);
+const SECRET = 'cloud-engine-grant-secret';
+const TENANT = 'acme';
+
+interface Fixture {
+  bundle: AppBundle;
+  db: Kysely<DbSchema>;
+  baseUrl: string;
+  storageRoot: string;
+  cacheRoot: string;
+}
+
+let fx: Fixture;
+
+beforeEach(async () => {
+  const storageRoot = await mkdtemp(join(tmpdir(), 'grant-session-store-'));
+  const cacheRoot = await mkdtemp(join(tmpdir(), 'grant-session-cache-'));
+  const db = createSqliteDb({ path: ':memory:' });
+  await migrate(db, { source: { kind: 'inline', migrations: sqliteMigrations } });
+  const store = new FsObjectStore({ root: storageRoot });
+  const bundle = await buildAppForTesting({
+    licenseGate: createValidTestLicenseGate(),
+    verifier: { mode: 'hs256', secret: SECRET },
+    workerEntry: STUB_ENTRY,
+    poolSize: 1,
+    db,
+    objectStore: store,
+    autoProvisionTenant: true,
+    sweepIntervalMs: 0,
+    cacheRoot,
+    cacheMaxBytes: 1024 * 1024,
+  });
+  const addr = await bundle.app.listen({ host: '127.0.0.1', port: 0 });
+  const baseUrl = typeof addr === 'string' ? addr : `http://127.0.0.1:${addr}`;
+  fx = { bundle, db, baseUrl, storageRoot, cacheRoot };
+});
+
+afterEach(async () => {
+  if (!fx) return;
+  await fx.bundle.shutdown();
+  await fx.db.destroy();
+  await rm(fx.storageRoot, { recursive: true, force: true });
+  await rm(fx.cacheRoot, { recursive: true, force: true });
+});
+
+async function seedDocument(docId: string): Promise<void> {
+  const padding = randomBytes(4095);
+  const bytes = new Uint8Array(4096);
+  bytes[0] = 3;
+  bytes.set(padding, 1);
+  const sha = createHash('sha256').update(bytes).digest('hex');
+  const storage = new FsObjectStore({ root: fx.storageRoot });
+  await storage.put(StorageKeys.basePdf(TENANT, docId), bytes, {
+    contentLength: bytes.byteLength,
+  });
+  await fx.db
+    .insertInto('tenants')
+    .values({ id: TENANT, name: TENANT })
+    .onConflict((oc) => oc.column('id').doNothing())
+    .execute();
+  const now = Date.now();
+  await fx.db
+    .insertInto('documents')
+    .values({
+      id: docId,
+      tenant_id: TENANT,
+      state: 'ready',
+      base_sha: sha,
+      storage_size_bytes: bytes.byteLength,
+      metadata_json: null,
+      idempotency_key: null,
+      failure_reason: null,
+      created_at: now,
+      updated_at: now,
+      created_by: null,
+    })
+    .execute();
+}
+
+async function createGrant(body: Record<string, unknown>): Promise<string> {
+  const token = signDevToken(SECRET, {
+    sub: 'dash-1',
+    tenant_id: TENANT,
+    scope: ['grants.manage'],
+  });
+  const res = await fetch(`${fx.baseUrl}/v1/tenants/${TENANT}/grants`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  expect(res.status).toBe(200);
+  return ((await res.json()) as { grant: { id: string } }).grant.id;
+}
+
+/**
+ * Node fetch playing the browser: attach Origin like a cross-origin page
+ * would. Merges via `Headers` — engine transport passes a `Headers`
+ * instance, which a plain object spread would silently flatten to `{}`
+ * (dropping `Authorization`).
+ */
+function browserFetch(origin: string, counter?: { exchanges: number }): typeof fetch {
+  return async (input, init) => {
+    if (counter && String(input).endsWith('/v1/grant-sessions')) counter.exchanges += 1;
+    const headers = new Headers(init?.headers);
+    headers.set('origin', origin);
+    return fetch(input, { ...init, headers });
+  };
+}
+
+describe('grant sessions (SDK)', () => {
+  test('grantSessionSource feeds open({kind: token}) and caches the session', async () => {
+    await seedDocument('doc-sdk-grant');
+    const grantId = await createGrant({
+      docId: 'doc-sdk-grant',
+      scope: ['doc.open', 'doc.render'],
+      origins: ['https://acme.com'],
+    });
+
+    const counter = { exchanges: 0 };
+    const source = grantSessionSource(fx.baseUrl, grantId, {
+      fetch: browserFetch('https://acme.com', counter),
+    });
+
+    const engine = cloudEngine({ baseUrl: fx.baseUrl });
+    try {
+      const handle = await engine.open({ kind: 'token', token: source });
+      expect(handle.id).toBe('doc-sdk-grant');
+      // A second open re-invokes the source (fresh /head with the
+      // bearer), but the cached session serves it: still one exchange.
+      const again = await engine.open({ kind: 'token', token: source });
+      expect(again.id).toBe('doc-sdk-grant');
+      expect(counter.exchanges).toBe(1);
+    } finally {
+      await engine.destroy();
+    }
+  });
+
+  test('one engine, multiple grant tokens — independent sessions per tab', async () => {
+    await seedDocument('doc-multi-a');
+    await seedDocument('doc-multi-b');
+    const grantA = await createGrant({ docId: 'doc-multi-a', scope: ['doc.open'] });
+    const grantB = await createGrant({ docId: 'doc-multi-b', scope: ['doc.open'] });
+
+    const counterA = { exchanges: 0 };
+    const counterB = { exchanges: 0 };
+    const engine = cloudEngine({ baseUrl: fx.baseUrl });
+    try {
+      // Exactly what the viewer's `documents: [{ source: { kind: 'grant' } }]`
+      // lowering produces: one exchanging source per entry, opened as a batch.
+      const [a, b] = await Promise.all([
+        engine.open({
+          kind: 'token',
+          token: grantSessionSource(fx.baseUrl, grantA, {
+            fetch: browserFetch('https://acme.com', counterA),
+          }),
+        }),
+        engine.open({
+          kind: 'token',
+          token: grantSessionSource(fx.baseUrl, grantB, {
+            fetch: browserFetch('https://acme.com', counterB),
+          }),
+        }),
+      ]);
+      expect(a.id).toBe('doc-multi-a');
+      expect(b.id).toBe('doc-multi-b');
+      // Each grant exchanged exactly once — sessions are per-document,
+      // never shared across tabs.
+      expect(counterA.exchanges).toBe(1);
+      expect(counterB.exchanges).toBe(1);
+
+      // Ending one grant does not disturb the other tab's session:
+      // B's already-minted JWT keeps serving until its own exp.
+      const admin = signDevToken(SECRET, {
+        sub: 'dash-1',
+        tenant_id: TENANT,
+        scope: ['grants.manage'],
+      });
+      const del = await fetch(`${fx.baseUrl}/v1/tenants/${TENANT}/grants/${grantA}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${admin}` },
+      });
+      expect(del.status).toBe(204);
+      const again = await engine.open({
+        kind: 'token',
+        token: grantSessionSource(fx.baseUrl, grantB, {
+          fetch: browserFetch('https://acme.com'),
+        }),
+      });
+      expect(again.id).toBe('doc-multi-b');
+    } finally {
+      await engine.destroy();
+    }
+  });
+
+  test("open({ kind: 'grant' }) exchanges on the engine's own transport", async () => {
+    await seedDocument('doc-open-grant');
+    const grantId = await createGrant({
+      docId: 'doc-open-grant',
+      scope: ['doc.open', 'doc.render'],
+      origins: ['https://acme.com'],
+    });
+
+    // The Origin-attaching fetch is configured on the engine, not the
+    // open call — proving the grant arm forwards the engine's transport
+    // (fetchImpl + baseUrl) into the exchange. No engine-level token:
+    // the anonymous-engine embed scenario.
+    const counter = { exchanges: 0 };
+    const engine = cloudEngine({
+      baseUrl: fx.baseUrl,
+      fetch: browserFetch('https://acme.com', counter),
+    });
+    try {
+      const handle = await engine.open({ kind: 'grant', grant: grantId });
+      expect(handle.id).toBe('doc-open-grant');
+      expect(counter.exchanges).toBe(1);
+    } finally {
+      await engine.destroy();
+    }
+  });
+
+  test("open({ kind: 'grant' }) with a passphrase-protected grant", async () => {
+    await seedDocument('doc-open-grant-pass');
+    const grantId = await createGrant({
+      docId: 'doc-open-grant-pass',
+      scope: ['doc.open'],
+      passphrase: 'open-sesame',
+    });
+
+    const engine = cloudEngine({
+      baseUrl: fx.baseUrl,
+      fetch: browserFetch('https://acme.com'),
+    });
+    try {
+      // Without the passphrase: an EngineError with the dedicated code —
+      // the prompt-and-retry signal — never a raw GrantExchangeError.
+      try {
+        await engine.open({ kind: 'grant', grant: grantId });
+        expect.unreachable('grant open without a passphrase must reject');
+      } catch (err) {
+        expect(err).toBeInstanceOf(EngineError);
+        expect(EngineError.is(err, EngineErrorCode.GrantPassphraseRequired)).toBe(true);
+        expect((err as EngineError).details).toMatchObject({
+          grantCode: 'GrantPassphraseRequired',
+        });
+      }
+
+      // With it: an ordinary handle.
+      const handle = await engine.open({
+        kind: 'grant',
+        grant: grantId,
+        passphrase: 'open-sesame',
+      });
+      expect(handle.id).toBe('doc-open-grant-pass');
+    } finally {
+      await engine.destroy();
+    }
+  });
+
+  test("open({ kind: 'grant' }) maps unknown grants to NotFound", async () => {
+    const engine = cloudEngine({
+      baseUrl: fx.baseUrl,
+      fetch: browserFetch('https://acme.com'),
+    });
+    try {
+      try {
+        await engine.open({ kind: 'grant', grant: `shr_${'B'.repeat(24)}` });
+        expect.unreachable('unknown grant must reject');
+      } catch (err) {
+        expect(err).toBeInstanceOf(EngineError);
+        expect(EngineError.is(err, EngineErrorCode.NotFound)).toBe(true);
+      }
+    } finally {
+      await engine.destroy();
+    }
+  });
+
+  test('exchange errors surface typed codes', async () => {
+    await seedDocument('doc-sdk-pass');
+    const grantId = await createGrant({
+      docId: 'doc-sdk-pass',
+      scope: ['doc.open'],
+      passphrase: 'open-sesame',
+    });
+
+    await expect(
+      exchangeGrant(fx.baseUrl, grantId, { fetch: browserFetch('https://x.example') }),
+    ).rejects.toMatchObject({ name: 'GrantExchangeError', code: 'GrantPassphraseRequired' });
+
+    await expect(
+      exchangeGrant(fx.baseUrl, `shr_${'B'.repeat(24)}`, {
+        fetch: browserFetch('https://x.example'),
+      }),
+    ).rejects.toMatchObject({ code: 'NotFound', status: 404 });
+
+    const session = await exchangeGrant(fx.baseUrl, grantId, {
+      passphrase: 'open-sesame',
+      fetch: browserFetch('https://x.example'),
+    });
+    expect(session.docId).toBe('doc-sdk-pass');
+    expect(session.expiresAt).toBeGreaterThan(Date.now() / 1000);
+
+    // The typed error is an instanceof, not just a shape.
+    try {
+      await exchangeGrant(fx.baseUrl, grantId, { fetch: browserFetch('https://x.example') });
+      expect.unreachable('exchange without a passphrase must throw');
+    } catch (err) {
+      expect(err).toBeInstanceOf(GrantExchangeError);
+    }
+  });
+});

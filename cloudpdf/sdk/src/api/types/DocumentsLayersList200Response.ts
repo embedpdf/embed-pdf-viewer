@@ -12,7 +12,7 @@ export namespace DocumentsLayersList200Response {
         export interface Item {
             docId: string;
             layerName: string;
-            shareId: string | null;
+            grantId: string | null;
             visitorId: string | null;
             storageSizeBytes: number | null;
             createdAt: number;

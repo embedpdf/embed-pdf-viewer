@@ -24,7 +24,7 @@ const engine = cloudEngine();
 const assetEngine = localEngine();
 const signer = createTestSigner({ commonName: 'Ada Lovelace' });
 
-const agreement: OpenInput = { kind: 'share', shareToken: 'shr_G5GcxJeEBa2IiwIs0DCNruCL' };
+const agreement: OpenInput = { kind: 'grant', grant: 'shr_G5GcxJeEBa2IiwIs0DCNruCL' };
 
 @Component({
   selector: 'demo-root',

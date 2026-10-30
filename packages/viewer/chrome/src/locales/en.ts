@@ -210,8 +210,8 @@ export const en: Locale = {
       open: 'Open',
       opening: 'Opening…',
     },
-    // A share link's passphrase, and what it asks its visitors before they open or change the document.
-    sharePrompt: {
+    // A grant's passphrase, and what it asks its visitors before they open or change the document.
+    grantPrompt: {
       passphraseTitle: 'Passphrase required',
       passphraseRequired:
         'This link is protected. Enter the passphrase you were given to open the document.',

@@ -46,7 +46,7 @@ export class CloudDocumentSecurityService implements DocumentSecurityService {
   /**
    * Parsed JWT identity + scope, decoded once at construction. Used by
    * the local-fallback path for `scope` and `identity` when
-   * /access hasn't run yet (public-share with no CDN, password not
+   * /access hasn't run yet (a grant with no CDN, password not
    * yet supplied, etc.).
    */
   private readonly tokenScope: ReadonlyArray<string>;

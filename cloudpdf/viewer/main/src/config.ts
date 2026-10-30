@@ -5,9 +5,9 @@
  * `@embedpdf/viewer` is the same viewer with the built-in engine. So the config is the viewer's,
  * in this engine's words: `engine` takes the cloud engine's settings (where your CloudPDF runs,
  * CloudPDF SaaS when you name none), and a document is one your CloudPDF holds, named by a token,
- * by its id or by a share link. The token says what the user may do, so there is no `scope`.
+ * by its id or by a grant. The token says what the user may do, so there is no `scope`.
  * `identity` is who your page knows the user is: a document token decides for itself, and a
- * share link takes it as the visitor's answers to what the link asks.
+ * grant takes it as the visitor's answers to what the link asks.
  */
 import type { CloudEngineOptions, OpenInput, TokenSource } from '@cloudpdf/engine';
 import type {
@@ -22,7 +22,7 @@ import type {
 /**
  * A CloudPDF document, in the three ways the engine opens one: with a document token your
  * backend creates for the user, which names the document; by its id, which the engine's
- * `token` (or this one) must allow; or with a share link from the dashboard (`shr_…`), with
+ * `token` (or this one) must allow; or with a grant from the dashboard (`grt_…`), with
  * its passphrase when it has one, and `restart` to start over on a link that keeps each
  * visitor's layer. A token is a string, or a function that gives a fresh one when the old one
  * runs out.
@@ -30,7 +30,7 @@ import type {
 export type DocumentSrc =
   | { readonly token: TokenSource }
   | { readonly id: string; readonly token?: TokenSource }
-  | { readonly shareToken: string; readonly sharePassword?: string; readonly restart?: boolean };
+  | { readonly grant: string; readonly passphrase?: string; readonly restart?: boolean };
 
 /** One of the documents `documents` opens, each in a tab of its own. */
 export type DocumentEntry = ViewerDocumentEntry<DocumentSrc>;
@@ -38,7 +38,7 @@ export type DocumentEntry = ViewerDocumentEntry<DocumentSrc>;
 /**
  * The cloud viewer's config: every key of the viewer's but `scope`, and `fetch`, which downloads
  * documents at a URL, where these live on CloudPDF. Its documents are in the cloud's words
- * (`src: { token }`, `{ id }` or `{ shareToken }`), and `engine` takes the cloud engine's
+ * (`src: { token }`, `{ id }` or `{ grant }`), and `engine` takes the cloud engine's
  * settings: `baseUrl` (CloudPDF SaaS when left out), the engine's own `token`, and the `fetch` it
  * reaches CloudPDF with. An engine you made yourself, or a function that makes one, goes there too.
  */
@@ -50,21 +50,21 @@ export interface InitOptions extends ViewerConfig, MountTarget {}
 
 /**
  * What the cloud engine opens for a document: `{ kind: 'token' }`, `{ kind: 'id' }` or
- * `{ kind: 'share' }`. Anything else (an open input already, or what the element reads itself)
+ * `{ kind: 'grant' }`. Anything else (an open input already, or what the element reads itself)
  * opens as it is.
  */
 export function openInputOf(src: ElementSrc): ElementSrc {
   if (typeof src !== 'object' || src === null || 'kind' in src) return src;
-  if ('shareToken' in src && typeof src.shareToken === 'string') {
-    const { shareToken, sharePassword, restart } = src as {
-      shareToken: string;
-      sharePassword?: string;
+  if ('grant' in src && typeof src.grant === 'string') {
+    const { grant, passphrase, restart } = src as {
+      grant: string;
+      passphrase?: string;
       restart?: boolean;
     };
     return {
-      kind: 'share',
-      shareToken,
-      ...(sharePassword !== undefined ? { sharePassword } : {}),
+      kind: 'grant',
+      grant,
+      ...(passphrase !== undefined ? { passphrase } : {}),
       ...(restart ? { restart } : {}),
     } satisfies OpenInput;
   }

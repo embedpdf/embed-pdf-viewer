@@ -11,7 +11,7 @@ export { AbortablePromise } from './promise/AbortablePromise';
 export { AbortError, isAbortError } from './promise/AbortError';
 export { EngineError } from './errors/EngineError';
 export { EngineErrorCode } from './errors/EngineErrorCode';
-export { shareOpenRequestOf, visitorIdentityRequestOf } from './dto/ShareVisitor';
+export { grantOpenRequestOf, visitorIdentityRequestOf } from './dto/GrantVisitor';
 
 // Local engine.
 export { isLocalEngine } from './engine/LocalEngine';
@@ -87,7 +87,7 @@ export type {
   Engine,
   EngineFactory,
   DocumentHandle,
-  DocumentShare,
+  DocumentGrant,
   PageHandle,
   LocalEngine,
   LocalDocumentHandle,
@@ -98,8 +98,8 @@ export type {
   OpenInputLayerFile,
   OpenInputById,
   OpenInputToken,
-  OpenInputShare,
-  ShareOpenRequest,
+  OpenInputGrant,
+  GrantOpenRequest,
   VisitorAnswers,
   VisitorIdentityField,
   VisitorIdentityRequest,

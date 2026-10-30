@@ -5,9 +5,9 @@ import * as errors from "../../errors/index.js";
 import type * as CloudPDF from "../index.js";
 
 export class GoneError extends errors.CloudPDFError {
-    public declare readonly body: CloudPDF.SharesExchange410Response;
+    public declare readonly body: CloudPDF.GrantsExchange410Response;
 
-    constructor(body: CloudPDF.SharesExchange410Response, rawResponse?: core.RawResponse) {
+    constructor(body: CloudPDF.GrantsExchange410Response, rawResponse?: core.RawResponse) {
         super({
             message: "GoneError",
             statusCode: 410,

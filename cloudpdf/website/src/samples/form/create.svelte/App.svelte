@@ -12,7 +12,7 @@
   const engine = cloudEngine();
   const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), formPlugin()];
 
-  const registration: OpenInput = { kind: 'share', shareToken: 'shr_sjOrUrwF2Sf0X5ADfySRG58L' };
+  const registration: OpenInput = { kind: 'grant', grant: 'shr_sjOrUrwF2Sf0X5ADfySRG58L' };
 </script>
 
 <Viewer {engine} {plugins} initialDocuments={[{ source: registration }]}>

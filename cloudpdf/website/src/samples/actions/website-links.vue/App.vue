@@ -10,7 +10,7 @@ import '../website-links.css';
 const engine = cloudEngine();
 const plugins = [actionsPlugin()];
 
-const links: OpenInput = { kind: 'share', shareToken: 'shr_xs-9Y5qwuYrJ2BKtWzuo_2xy' };
+const links: OpenInput = { kind: 'grant', grant: 'shr_xs-9Y5qwuYrJ2BKtWzuo_2xy' };
 </script>
 
 <template>

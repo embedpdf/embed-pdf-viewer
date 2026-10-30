@@ -79,7 +79,7 @@ const ENGINE_CODE_MAP: Readonly<Record<string, PluginErrorCode>> = {
   DocNotOpen: 'not-ready',
   DocPasswordRequired: 'permission-denied',
   DocPasswordIncorrect: 'permission-denied',
-  SharePasswordRequired: 'permission-denied',
+  GrantPassphraseRequired: 'permission-denied',
   Unauthenticated: 'permission-denied',
   Forbidden: 'permission-denied',
   ProtectedDocument: 'permission-denied',

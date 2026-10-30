@@ -1,16 +1,16 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 
 /**
- * Share-link visitors. Every exchange names a visitor: the session token
- * makes them the author of what they add, and on a per-visitor link it pins
+ * Grant visitors. Every exchange names a visitor: the session token
+ * makes them the author of what they add, and on a per-visitor grant it pins
  * their own layer, `visitor-<id>`. The visitor comes back as a handle,
  * `vis_<id>.<issued>.<mac>`: when it was issued (seconds, base 36), and an
- * HMAC over the link, the visitor and that time. A handle works only for
- * the link that issued it, needs no table, and can't be made to look
+ * HMAC over the grant, the visitor and that time. A handle works only for
+ * the grant that issued it, needs no table, and can't be made to look
  * newer than it is.
  */
 
-/** Every visitor layer's name starts with it; a layer a link or token names never does. */
+/** Every visitor layer's name starts with it; a layer a grant or token names never does. */
 export const VISITOR_LAYER_PREFIX = 'visitor-';
 
 /** A new visitor: 96 random bits as hex, so layer names and handles stay URL-safe. */
@@ -18,7 +18,7 @@ export function newVisitorId(): string {
   return randomBytes(12).toString('hex');
 }
 
-/** The visitor's own layer on a per-visitor link. */
+/** The visitor's own layer on a per-visitor grant. */
 export function visitorLayerName(visitorId: string): string {
   return `${VISITOR_LAYER_PREFIX}${visitorId}`;
 }
@@ -33,16 +33,16 @@ export function isVisitorLayerName(layerName: string): boolean {
 }
 
 /**
- * The link and visitor a layer belongs to, when a share session of that
+ * The grant and visitor a layer belongs to, when a grant session of that
  * visitor writes it: the stamps its row gets at the first write.
  */
 export function visitorLayerOf(
   sub: string,
   layerName: string,
 ): { grantId: string; visitorId: string } | null {
-  if (!sub.startsWith('share:') || !isVisitorLayerName(layerName)) return null;
+  if (!sub.startsWith('grant:') || !isVisitorLayerName(layerName)) return null;
   return {
-    grantId: sub.slice('share:'.length),
+    grantId: sub.slice('grant:'.length),
     visitorId: layerName.slice(VISITOR_LAYER_PREFIX.length),
   };
 }
@@ -69,7 +69,7 @@ export class VisitorHandles {
     return `vis_${visitorId}.${issued}.${this.mac(grantId, visitorId, issued)}`;
   }
 
-  /** The visitor a handle names and when, when this link issued it; `null` otherwise. */
+  /** The visitor a handle names and when, when this grant issued it; `null` otherwise. */
   read(grantId: string, handle: string): ReturningVisitor | null {
     const match = HANDLE.exec(handle);
     if (!match) return null;

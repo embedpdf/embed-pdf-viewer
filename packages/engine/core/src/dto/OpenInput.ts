@@ -87,7 +87,7 @@ export interface OpenInputById {
  *
  * Use this when your backend mints doc-scoped JWTs itself (e.g. a
  * logged-in reviewer authorised for exactly one document). For the
- * no-backend public-share flow, use `kind: 'share'` instead.
+ * no-backend grant flow, use `kind: 'grant'` instead.
  *
  * Rejected by `@embedpdf/engine`.
  */
@@ -103,31 +103,30 @@ export interface OpenInputToken {
 }
 
 /**
- * Cloud-engine: open via a public share token (`shr_…`) from the
- * dashboard's embed snippet. A share token is a reference to a
- * stored grant on the server, not a credential — the engine
- * exchanges it for a short-lived doc-scoped session JWT and
- * silently re-exchanges near expiry, so revoking or editing the
- * share retargets every embedded copy at the next renewal. No
- * backend required; the engine itself may be constructed with no
+ * Cloud-engine: open a grant (`grt_…`) from the dashboard's embed code.
+ * A grant's id is a reference to access stored on the server, not a
+ * credential — the engine exchanges it for a short-lived doc-scoped
+ * session JWT and silently re-exchanges near expiry, so ending or
+ * editing the grant retargets every link and embed at the next renewal.
+ * No backend required; the engine itself may be constructed with no
  * engine-level token at all.
  *
  * Rejected by `@embedpdf/engine`.
  */
-export interface OpenInputShare {
-  kind: 'share';
-  /** Public share token (`shr_…`) identifying the grant. */
-  shareToken: string;
+export interface OpenInputGrant {
+  kind: 'grant';
+  /** The grant's id (`grt_…`; older grants are `shr_…`). */
+  grant: string;
   /**
-   * Passphrase for a protected grant. This is the share passphrase,
-   * checked by the exchange endpoint — not the PDF's encryption
-   * password, which goes in `OpenOptions.password` like every other kind.
+   * The grant's passphrase, when it has one. Checked by the exchange
+   * endpoint — not the PDF's encryption password, which goes in
+   * `OpenOptions.password` like every other kind.
    */
-  sharePassword?: string;
+  passphrase?: string;
   /**
-   * Start over: on a link that gives each visitor their own layer and keeps
+   * Start over: on a grant that gives each visitor their own layer and keeps
    * it for their next visit, delete the layer this browser kept and open a
-   * fresh one as a new visitor (the document's `share.keep` says when that
+   * fresh one as a new visitor (the document's `grant.keep` says when that
    * applies). Elsewhere it changes nothing.
    */
   restart?: boolean;
@@ -165,7 +164,7 @@ export type OpenInput =
   | OpenInputLayerFile
   | OpenInputById
   | OpenInputToken
-  | OpenInputShare;
+  | OpenInputGrant;
 
 export interface OpenOptions {
   /**
@@ -205,10 +204,10 @@ export interface OpenOptions {
    *   mutation.
    * - The cloud engine with a document token: the token's `identity` claim
    *   decides.
-   * - The cloud engine with a share link: it goes with the first exchange as
+   * - The cloud engine with a grant: it goes with the first exchange as
    *   the visitor's answers, the same as the visitor typing them. Only the
-   *   fields the link asks count (never `userId` or `groupId`), an answer
-   *   once given stays, and a link that says who its visitors are prevails.
+   *   fields the grant asks count (never `userId` or `groupId`), an answer
+   *   once given stays, and a grant that says who its visitors are prevails.
    *
    * In development the cloud engine says which fields it didn't use.
    */

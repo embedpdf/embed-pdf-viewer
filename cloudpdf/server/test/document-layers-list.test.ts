@@ -2,7 +2,7 @@
  * `GET /v1/tenants/:tenantId/documents/:id/layers`: a document's layers that
  * hold changes, newest first, paged like the other tenant lists (`limit`,
  * an opaque keyset `cursor`, `nextCursor` null on the last page). Named and
- * shared layers are listed with share-link visitors' own; `shareId` keeps
+ * shared layers are listed with grant visitors' own; `grantId` keeps
  * one link's visitors, an archived link's too. A layer appears at its first
  * change, and a deleted one is not listed.
  */
@@ -142,18 +142,18 @@ async function writeNamed(docId: string, layerName: string): Promise<void> {
 }
 
 const createLink = async (docId: string, body: Record<string, unknown>) => {
-  const answer = await call('POST', `/v1/tenants/${TENANT}/shares`, {
+  const answer = await call('POST', `/v1/tenants/${TENANT}/grants`, {
     token: API_TOKEN,
     body: { docId, scope: ['*'], ...body },
   });
   expect(answer.status).toBe(200);
-  return answer.body.share as { id: string };
+  return answer.body.grant as { id: string };
 };
 
 /** A visitor of the link; `write` makes their layer. */
-async function visitor(shareId: string, write = true) {
-  const exchanged = await call('POST', '/v1/share-sessions', {
-    body: { shareToken: shareId },
+async function visitor(grantId: string, write = true) {
+  const exchanged = await call('POST', '/v1/grant-sessions', {
+    body: { grant: grantId },
     origin: ORIGIN,
   });
   expect(exchanged.status).toBe(200);
@@ -210,7 +210,7 @@ describe("a document's layers", () => {
     const [own, review, named] = answer.body.layers;
     expect(own).toMatchObject({
       docId,
-      shareId: perVisitor.id,
+      grantId: perVisitor.id,
       visitorId: visitorLayer.slice('visitor-'.length),
       lastSeenAt: expect.any(Number),
       storageSizeBytes: expect.any(Number),
@@ -218,7 +218,7 @@ describe("a document's layers", () => {
       updatedAt: expect.any(Number),
     });
     for (const layer of [review, named]) {
-      expect(layer).toMatchObject({ shareId: null, visitorId: null, lastSeenAt: null });
+      expect(layer).toMatchObject({ grantId: null, visitorId: null, lastSeenAt: null });
       expect(layer.storageSizeBytes).toBeGreaterThan(0);
     }
   });
@@ -239,7 +239,7 @@ describe("a document's layers", () => {
     ]);
   });
 
-  test("shareId keeps one link's visitors' layers, an archived link's too", async () => {
+  test("grantId keeps one link's visitors' layers, an archived link's too", async () => {
     const docId = await seedDocument();
     await writeNamed(docId, 'user-1');
     const first = await createLink(docId, { layerMode: 'per-visitor' });
@@ -247,17 +247,17 @@ describe("a document's layers", () => {
     const firsts = [await visitor(first.id), await visitor(first.id)];
     await visitor(second.id);
 
-    const filtered = await listLayers(docId, `?shareId=${first.id}`);
+    const filtered = await listLayers(docId, `?grantId=${first.id}`);
     expect(filtered.status).toBe(200);
     expect(
       filtered.body.layers.map((layer: { layerName: string }) => layer.layerName).sort(),
     ).toEqual([...firsts].sort());
 
-    const archived = await call('POST', `/v1/tenants/${TENANT}/shares/${first.id}/archive`, {
+    const archived = await call('POST', `/v1/tenants/${TENANT}/grants/${first.id}/archive`, {
       token: API_TOKEN,
     });
     expect(archived.status).toBe(200);
-    const afterArchive = await listLayers(docId, `?shareId=${first.id}`);
+    const afterArchive = await listLayers(docId, `?grantId=${first.id}`);
     expect(afterArchive.body.layers).toHaveLength(2);
   });
 });
@@ -281,14 +281,14 @@ describe('paging', () => {
     const theirs = [await visitor(link.id), await visitor(link.id), await visitor(link.id)];
     await writeNamed(docId, 'not-theirs');
 
-    const pages = await everyPage(docId, 2, `&shareId=${link.id}`);
+    const pages = await everyPage(docId, 2, `&grantId=${link.id}`);
     expect(pages.map((page) => page.length)).toEqual([2, 1]);
     expect(pages.flat().sort()).toEqual([...theirs].sort());
   });
 
-  test('refuses a limit out of range, a malformed cursor or shareId', async () => {
+  test('refuses a limit out of range, a malformed cursor or grantId', async () => {
     const docId = await seedDocument();
-    for (const query of ['?limit=0', '?limit=201', '?cursor=nope', '?shareId=shr_short']) {
+    for (const query of ['?limit=0', '?limit=201', '?cursor=nope', '?grantId=shr_short']) {
       const answer = await listLayers(docId, query);
       expect(answer.status, query).toBe(400);
       expect(answer.body.error.code).toBe('InvalidArg');
@@ -310,7 +310,7 @@ describe('who may list', () => {
     const sharer = signDevToken(SECRET, {
       sub: 'backend',
       tenant_id: TENANT,
-      scope: ['shares.manage'],
+      scope: ['grants.manage'],
     });
     expect((await listLayers(docId, '', sharer)).status).toBe(403);
     const stranger = signDevToken(SECRET, {

@@ -22,7 +22,7 @@ export interface ViewerSettings {
    * Who the user is, for every document opened without an `identity` of its own: the author of
    * the annotations they make, and whom `:self` and `:group` permissions are checked against.
    * Null for nobody in particular. With the cloud engine the document's token decides, and a
-   * share link takes it as the visitor's answers to what the link asks.
+   * grant takes it as the visitor's answers to what the grant asks.
    */
   readonly identity: Identity | null;
   /**

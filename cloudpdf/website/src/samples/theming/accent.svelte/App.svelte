@@ -14,7 +14,7 @@
 
   const SWATCHES = ['#3858e9', '#e91e63', '#0f6e56', '#c2410c'];
 
-  const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
+  const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 </script>
 
 <script lang="ts">

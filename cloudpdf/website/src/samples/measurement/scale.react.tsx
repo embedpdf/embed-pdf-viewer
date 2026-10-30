@@ -25,7 +25,7 @@ const plugins = [
   measurementPlugin(),
 ];
 
-const sketch: OpenInput = { kind: 'share', shareToken: 'shr_IyOgSdO4AmJqV4BoMv5V0nYU' };
+const sketch: OpenInput = { kind: 'grant', grant: 'shr_IyOgSdO4AmJqV4BoMv5V0nYU' };
 
 // Precision is steps per unit: 100 shows two decimals.
 const PRECISIONS = [1, 10, 100, 1000];

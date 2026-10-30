@@ -5,5 +5,5 @@ function onReady(viewer: Viewer) {
 }
 
 export function App() {
-  return <PDFViewer src={{ shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' }} onReady={onReady} style={{ height: '100vh' }} />;
+  return <PDFViewer src={{ grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' }} onReady={onReady} style={{ height: '100vh' }} />;
 }

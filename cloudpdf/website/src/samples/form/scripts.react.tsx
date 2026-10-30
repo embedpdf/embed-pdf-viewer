@@ -26,7 +26,7 @@ const plugins = [
   actionsPlugin({ javascript: { enabled: true } }),
 ];
 
-const invoice: OpenInput = { kind: 'share', shareToken: 'shr_NCOaGzAKFsdI2r-UaVUJG7zL' };
+const invoice: OpenInput = { kind: 'grant', grant: 'shr_NCOaGzAKFsdI2r-UaVUJG7zL' };
 
 // The amounts and the total are calculated by the form's scripts.
 function InvoiceBar() {

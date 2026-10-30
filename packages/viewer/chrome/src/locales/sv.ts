@@ -216,7 +216,7 @@ export const sv: Locale = {
       open: 'Öppna',
       opening: 'Öppnar…',
     },
-    sharePrompt: {
+    grantPrompt: {
       passphraseTitle: 'Lösenfras krävs',
       passphraseRequired:
         'Den här länken är skyddad. Ange lösenfrasen du fick för att öppna dokumentet.',

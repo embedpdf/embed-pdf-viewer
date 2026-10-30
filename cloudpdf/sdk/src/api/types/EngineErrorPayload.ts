@@ -19,7 +19,7 @@ export namespace EngineErrorPayload {
         DocOpenFailed: "DocOpenFailed",
         DocPasswordRequired: "DocPasswordRequired",
         DocPasswordIncorrect: "DocPasswordIncorrect",
-        SharePasswordRequired: "SharePasswordRequired",
+        GrantPassphraseRequired: "GrantPassphraseRequired",
         Aborted: "Aborted",
         Network: "Network",
         Unauthenticated: "Unauthenticated",

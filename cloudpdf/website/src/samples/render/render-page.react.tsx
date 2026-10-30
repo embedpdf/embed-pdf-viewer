@@ -10,7 +10,7 @@ const engine = cloudEngine();
 // No Stage: these pictures are plain images, rendered on demand.
 const plugins = [renderPlugin()];
 
-const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 interface Thumbnail {
   page: PageRef;

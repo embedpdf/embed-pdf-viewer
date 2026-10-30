@@ -16,7 +16,7 @@
  * door, which registers the cloud engine on `<embedpdf-viewer>`, re-exports the wrapper's parts,
  * and types the component's inputs with the cloud's `ViewerConfig`. `engine` takes the cloud
  * engine's settings (`baseUrl`, CloudPDF SaaS when left out), `src` a document token, an id or a
- * share link. There is no `scope` or `identity`: the document's token carries them.
+ * grant. There is no `scope` or `identity`: the document's token carries them.
  */
 import '@cloudpdf/viewer';
 
@@ -69,7 +69,7 @@ export class EpdfPdfViewer extends EpdfPdfViewerBase {
     input<ViewerConfig['engine']>();
   /**
    * One document: `{ token }` (a document token), `{ id }` (the engine's `token` must allow it)
-   * or `{ shareToken }` (a share link from the dashboard). Another one opens in its place;
+   * or `{ grant }` (a grant from the dashboard). Another one opens in its place;
    * `null` closes it.
    */
   readonly src: InputSignal<ViewerConfig['src'] | undefined> = input<ViewerConfig['src']>();

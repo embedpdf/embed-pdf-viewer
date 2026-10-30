@@ -6,4 +6,4 @@
   }
 </script>
 
-<PDFViewer src={{ shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' }} {onready} style="height: 100vh" />
+<PDFViewer src={{ grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' }} {onready} style="height: 100vh" />

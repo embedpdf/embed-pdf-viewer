@@ -13,7 +13,7 @@ import '../identity.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin()];
 
-const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 const dana = { userId: 'u_381', displayName: 'Dana Smith' };
 const role = ref<Role>('reader');

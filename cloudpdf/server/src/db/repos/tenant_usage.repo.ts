@@ -25,8 +25,8 @@ export interface TenantUsageSnapshot {
  * enforcement above the license is the operator's judgment, expressed
  * through tenant suspension, never a number the engine second-guesses.
  *
- * A view is a share exchange or an authorized `/v1/access` grant,
- * deduplicated: exchanged sessions carry `sub = share:<id>`, and
+ * A view is a grant exchange or an authorized `/v1/access` request,
+ * deduplicated: exchanged sessions carry `sub = grant:<id>`, and
  * `/v1/access` skips those (they were counted at exchange).
  */
 export class TenantUsageRepo {

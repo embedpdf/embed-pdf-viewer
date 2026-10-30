@@ -31,14 +31,14 @@ and who opens it:
 | :-- | :-- |
 | `{ token }` | A token your backend creates for the user and one document. It says who they are and what they may do. |
 | `{ id }` | A document by its id, when the engine's own token allows it (`engine: { token }`) |
-| `{ shareToken }` | A share link from the CloudPDF dashboard (`shr_…`), which needs no backend |
+| `{ grant }` | A grant from the CloudPDF dashboard (`grt_…`): public access, which needs no backend |
 
 ```js
 { src: { token: () => fetchDocumentToken('contract-42') } }
 ```
 
 A token is a string, or a function that gives a fresh one when the old one runs out. The pages come
-from CloudPDF, so there's no file to serve and no CORS to set up; a share link opens only on the
+from CloudPDF, so there's no file to serve and no CORS to set up; a grant opens only on the
 websites it allows. [Authentication](/docs/engine/authentication) has what a token carries.
 
 ## Open the document someone picks
@@ -102,7 +102,7 @@ Give `documents` instead of `src` to open several at once. Each one gets a tab:
 
 | Field | What it is | Default |
 | :-- | :-- | :-- |
-| `src` | `{ token }`, `{ id }` or `{ shareToken }` | none |
+| `src` | `{ token }`, `{ id }` or `{ grant }` | none |
 | `name` | What its tab shows | `Document` and the start of its id |
 | `password` | The PDF's password, if it has one | none |
 | `active` | Show this one first | the first document |
@@ -132,15 +132,15 @@ along and nobody is asked:
 { documents: [{ src: { token: payrollToken }, password: secret }] }
 ```
 
-That's the PDF's own password. A share link's passphrase is another one: it goes with the link,
-`src: { shareToken, sharePassword }`. Without it, the viewer asks for it in the document's tab.
+That's the PDF's own password. A grant's passphrase is another one: it goes with the grant,
+`src: { grant, passphrase }`. Without it, the viewer asks for it in the document's tab.
 
-A share link can also ask who the visitor is. The viewer asks in the document's tab before it
-opens, or in a dialog when the visitor first changes something, as the link says. When your page
+A grant can also ask who the visitor is. The viewer asks in the document's tab before it
+opens, or in a dialog when the visitor first changes something, as the grant says. When your page
 already knows who the visitor is, give it as the viewer's `identity`:
-`identity: { displayName, email }`. The link takes the fields it asks, as if the visitor typed
+`identity: { displayName, email }`. The grant takes the fields it asks, as if the visitor typed
 them. See
-[Authentication](/docs/engine/authentication#who-the-visitor-is) for what a link can ask.
+[Authentication](/docs/engine/authentication#who-the-visitor-is) for what a grant can ask.
 
 </Engine>
 
@@ -206,7 +206,7 @@ viewer.documents.close(document.id);
 ```
 
 `open()` takes a document as the engine names it: `{ kind: 'token' }`, `{ kind: 'id' }` or
-`{ kind: 'share' }`, as in [Authentication](/docs/engine/authentication).
+`{ kind: 'grant' }`, as in [Authentication](/docs/engine/authentication).
 
 </Engine>
 

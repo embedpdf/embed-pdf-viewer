@@ -215,7 +215,7 @@ export const ko: Locale = {
       open: '열기',
       opening: '여는 중…',
     },
-    sharePrompt: {
+    grantPrompt: {
       passphraseTitle: '암호 문구 필요',
       passphraseRequired: '이 링크는 보호되어 있습니다. 문서를 열려면 받은 암호 문구를 입력하세요.',
       passphraseIncorrect: '암호 문구가 올바르지 않습니다. 다시 시도하세요.',

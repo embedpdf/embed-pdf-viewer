@@ -16,7 +16,7 @@ import { withActions } from '@embedpdf/angular/actions';
 import { EpdfForm, EpdfFormLayer, toFieldRef, withForm } from '@embedpdf/angular/form';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const invoice: OpenInput = { kind: 'share', shareToken: 'shr_NCOaGzAKFsdI2r-UaVUJG7zL' };
+const invoice: OpenInput = { kind: 'grant', grant: 'shr_NCOaGzAKFsdI2r-UaVUJG7zL' };
 
 @Component({
   selector: 'demo-root',

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { PDFViewer, type ViewerConfig } from '@cloudpdf/viewer-vue';
 
-const welcome = { shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
+const welcome = { grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 const config: ViewerConfig = {
   theme: { accent: '#7c3aed' },

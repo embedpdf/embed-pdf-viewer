@@ -28,7 +28,7 @@ const plugins = [
   annotationPlugin(),
 ];
 
-const proposal: OpenInput = { kind: 'share', shareToken: 'shr_qnqHtCNRpzz-s7DPFBIbuOAF' };
+const proposal: OpenInput = { kind: 'grant', grant: 'shr_qnqHtCNRpzz-s7DPFBIbuOAF' };
 
 // The clicked annotation's comment and its replies, in your own card next to it: a note, or any
 // mark that carries a comment, such as a highlight. It shows while the annotation is selected.

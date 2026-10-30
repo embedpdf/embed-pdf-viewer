@@ -215,7 +215,7 @@ export const zhCN: Locale = {
       open: '打开',
       opening: '正在打开…',
     },
-    sharePrompt: {
+    grantPrompt: {
       passphraseTitle: '需要口令',
       passphraseRequired: '此链接受保护。请输入您收到的口令以打开文档。',
       passphraseIncorrect: '口令不正确，请重试。',

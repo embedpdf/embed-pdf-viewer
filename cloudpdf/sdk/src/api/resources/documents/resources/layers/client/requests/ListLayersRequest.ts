@@ -12,5 +12,5 @@ export interface ListLayersRequest {
     id: string;
     limit?: number;
     cursor?: string;
-    shareId?: string;
+    grantId?: string;
 }

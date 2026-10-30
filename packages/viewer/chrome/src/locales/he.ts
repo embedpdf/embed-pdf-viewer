@@ -216,7 +216,7 @@ export const he: Locale = {
       open: 'פתח',
       opening: 'פותח…',
     },
-    sharePrompt: {
+    grantPrompt: {
       passphraseTitle: 'נדרש ביטוי סיסמה',
       passphraseRequired: 'הקישור הזה מוגן. כדי לפתוח את המסמך יש להזין את ביטוי הסיסמה שקיבלת.',
       passphraseIncorrect: 'ביטוי הסיסמה שגוי. יש לנסות שוב.',

@@ -21,7 +21,7 @@ const plugins = [
 
 const TITLE = { start: 28, count: 30 };
 
-const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 // On load: the cover's title is selected and "PDF" is found, so every color below has something to paint.
 function ShowColors() {

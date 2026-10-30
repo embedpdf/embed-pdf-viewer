@@ -6,7 +6,7 @@ import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { EpdfSearch, EpdfSearchLayer, withSearch } from '@embedpdf/angular/search';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 // Which match is the active one: the first on load, then the one you click.
 @Component({

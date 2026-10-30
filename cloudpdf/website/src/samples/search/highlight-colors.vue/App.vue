@@ -17,7 +17,7 @@ const plugins = [
   searchPlugin({ highlight: { color: '#ffd500', activeColor: '#ff9632' } }),
 ];
 
-const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 const fromCss = ref(false);
 </script>

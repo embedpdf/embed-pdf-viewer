@@ -48,11 +48,11 @@ export class LayersClient {
         request: CloudPDF.documents.ListLayersRequest,
         requestOptions?: LayersClient.RequestOptions,
     ): Promise<core.WithRawResponse<CloudPDF.DocumentsLayersList200Response>> {
-        const { tenantId, id, limit, cursor, shareId } = request;
+        const { tenantId, id, limit, cursor, grantId } = request;
         const _queryParams: Record<string, unknown> = {
             limit,
             cursor,
-            shareId,
+            grantId,
         };
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(

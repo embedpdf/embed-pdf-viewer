@@ -20,7 +20,7 @@
     linkPlugin(),
   ];
 
-  const links: OpenInput = { kind: 'share', shareToken: 'shr_xs-9Y5qwuYrJ2BKtWzuo_2xy' };
+  const links: OpenInput = { kind: 'grant', grant: 'shr_xs-9Y5qwuYrJ2BKtWzuo_2xy' };
 </script>
 
 <script lang="ts">

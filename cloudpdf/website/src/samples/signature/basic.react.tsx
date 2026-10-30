@@ -36,7 +36,7 @@ const plugins = [
   }),
 ];
 
-const agreement: OpenInput = { kind: 'share', shareToken: 'shr_G5GcxJeEBa2IiwIs0DCNruCL' };
+const agreement: OpenInput = { kind: 'grant', grant: 'shr_G5GcxJeEBa2IiwIs0DCNruCL' };
 
 /**
  * Start at the agreement's signature field. The browser holds no signatures

@@ -215,7 +215,7 @@ export const it: Locale = {
       open: 'Apri',
       opening: 'Apertura…',
     },
-    sharePrompt: {
+    grantPrompt: {
       passphraseTitle: 'Passphrase richiesta',
       passphraseRequired:
         'Questo link è protetto. Immetti la passphrase che hai ricevuto per aprire il documento.',

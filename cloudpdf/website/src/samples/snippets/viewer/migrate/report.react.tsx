@@ -6,7 +6,7 @@
 //   return (
 //     <PDFViewer
 //       config={{
-//         src: { shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' },
+//         src: { grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' },
 //         theme: { preference: 'dark' },
 //         disabledCategories: ['redaction', 'document-print'],
 //       }}
@@ -21,7 +21,7 @@ import { PDFViewer } from '@cloudpdf/viewer-react';
 export function Report() {
   return (
     <PDFViewer
-      src={{ shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' }}
+      src={{ grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' }}
       theme="dark"
       disable={['redaction', 'documents.print']}
       onReady={(viewer) => console.log('ready', viewer)}

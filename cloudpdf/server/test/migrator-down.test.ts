@@ -8,6 +8,7 @@ import { sqliteMigrations } from '../src/db/migrations/sqlite/index';
 import { postgresMigrations } from '../src/db/migrations/postgres/index';
 import type { Database as Schema } from '../src/db/schema';
 import { checkDocumentNamesMigration } from './_helpers/document-names-migration';
+import { checkGrantsMigration } from './_helpers/grants-migration';
 import { checkVersionsByLayerMigration } from './_helpers/versions-by-layer-migration';
 
 /**
@@ -38,9 +39,10 @@ describe('migrateDown [sqlite]', () => {
   test('rolling back 046 rebuilds documents with every row and index, and drops folders', async () => {
     const db = createSqliteDb({ path: ':memory:' });
     try {
-      const source = { kind: 'inline' as const, migrations: sqliteMigrations };
+      const upTo046 = sqliteMigrations.filter((m) => m.version <= '046');
+      const source = { kind: 'inline' as const, migrations: upTo046 };
       await migrate(db, { source });
-      expect(sqliteMigrations.at(-1)?.version).toBe('046');
+      expect(upTo046.at(-1)?.version).toBe('046');
       await db.insertInto('tenants').values({ id: 'tenant-046', name: 'tenant-046' }).execute();
       await db
         .insertInto('folders')
@@ -103,6 +105,15 @@ describe('migrateDown [sqlite]', () => {
     const db = createSqliteDb({ path: ':memory:' });
     try {
       await checkDocumentNamesMigration(db, sqliteMigrations);
+    } finally {
+      await db.destroy();
+    }
+  });
+
+  test('migration 047 renames share grants to grants and back, keeping their rows', async () => {
+    const db = createSqliteDb({ path: ':memory:' });
+    try {
+      await checkGrantsMigration(db, sqliteMigrations);
     } finally {
       await db.destroy();
     }
@@ -366,6 +377,15 @@ describe.runIf(RUN_PG)('migrateDown [postgres]', () => {
     const db = await makeDb();
     try {
       await checkDocumentNamesMigration(db, postgresMigrations);
+    } finally {
+      await db.destroy();
+    }
+  });
+
+  test('migration 047 renames share grants to grants and back, keeping their rows', async () => {
+    const db = await makeDb();
+    try {
+      await checkGrantsMigration(db, postgresMigrations);
     } finally {
       await db.destroy();
     }

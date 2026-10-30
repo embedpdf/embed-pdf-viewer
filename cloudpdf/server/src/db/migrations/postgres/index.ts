@@ -90,6 +90,8 @@ import down045 from './045_document_names.down.sql';
 import sql045 from './045_document_names.sql';
 import down046 from './046_folders.down.sql';
 import sql046 from './046_folders.sql';
+import down047 from './047_grants.down.sql';
+import sql047 from './047_grants.sql';
 import type { MigrationSource } from '../../migrator/runner';
 
 /**
@@ -229,5 +231,11 @@ export const postgresMigrations: ReadonlyArray<MigrationSource> = [
     name: '046_folders.sql',
     sql: sql046,
     down: down046,
+  },
+  {
+    version: '047',
+    name: '047_grants.sql',
+    sql: sql047,
+    down: down047,
   },
 ];

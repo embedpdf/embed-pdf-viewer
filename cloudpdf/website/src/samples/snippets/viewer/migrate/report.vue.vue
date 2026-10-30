@@ -9,7 +9,7 @@ const onReady = (registry: PluginRegistry) => console.log('ready', registry);
 <template>
   <PDFViewer
     :config="{
-      src: { shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' },
+      src: { grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' },
       theme: { preference: 'dark' },
       disabledCategories: ['redaction', 'document-print'],
     }"
@@ -27,7 +27,7 @@ const onReady = (viewer: Viewer) => console.log('ready', viewer);
 
 <template>
   <PDFViewer
-    :src="{ shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' }"
+    :src="{ grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' }"
     theme="dark"
     :disable="['redaction', 'documents.print']"
     style="height: 100vh"

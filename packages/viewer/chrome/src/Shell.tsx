@@ -94,14 +94,14 @@ const PrintDialog = lazyComponent(() => import('./ui/print-dialog').then((ui) =>
   shownWhile: usePrintDialogOpen,
 });
 const useOutlinePropertiesOpen = () => useSurface(OUTLINE_PROPERTIES_DIALOG).isOpen;
-// A share link's passphrase or questions: only documents from share links ask, so these load
+// A grant's passphrase or questions: only documents from grants ask, so these load
 // when they first show, never in the background.
-const SharePrompt = lazyComponent(() => import('./ui/share-prompt').then((ui) => ui.SharePrompt), {
+const GrantPrompt = lazyComponent(() => import('./ui/grant-prompt').then((ui) => ui.GrantPrompt), {
   prefetch: false,
 });
 const useIdentityAsked = () => useDocument((document) => document.identityRequest !== undefined);
 const VisitorIdentityDialog = lazyComponent(
-  () => import('./ui/share-prompt').then((ui) => ui.VisitorIdentityDialog),
+  () => import('./ui/grant-prompt').then((ui) => ui.VisitorIdentityDialog),
   { shownWhile: useIdentityAsked, prefetch: false },
 );
 const OutlinePropertiesDialog = lazyComponent(
@@ -137,16 +137,16 @@ function OpeningDocuments() {
 /**
  * The document area's lifecycle switch. With no document open it shows the
  * `empty` region, or nothing. A `locked` tab shows its password prompt, an
- * `error` tab its error pane, or the share link's passphrase or questions it
+ * `error` tab its error pane, or the grant's passphrase or questions it
  * waits for — per tab (keyed by document), so several can coexist and tab
  * switching stays free. Everything else is the ready-gated Stage; the gate's
- * fallback covers `loading`. A ready document whose link asks again shows its
+ * fallback covers `loading`. A ready document whose grant asks again shows its
  * passphrase or questions over the Stage.
  */
 function DocumentArea({ children }: { children: ReactNode }) {
   const docId = useDocumentId();
   const status = useDocument((document) => document.status);
-  const shareAsks = useDocument((document) => document.shareRequest !== undefined);
+  const grantAsks = useDocument((document) => document.grantRequest !== undefined);
   if (docId === null) {
     return (
       <div className="min-w-0 flex-1 overflow-auto">
@@ -156,16 +156,16 @@ function DocumentArea({ children }: { children: ReactNode }) {
   }
   if (status === 'locked') return <PasswordPrompt key={docId} />;
   if (status === 'error') {
-    return shareAsks ? <SharePrompt key={docId} /> : <DocumentError key={docId} />;
+    return grantAsks ? <GrantPrompt key={docId} /> : <DocumentError key={docId} />;
   }
   return (
     <DocumentGate fallback={<OpeningDocuments />}>
       {children}
-      {/* a passphrase or questions the link got after the document opened: over the document,
+      {/* a passphrase or questions the grant got after the document opened: over the document,
       which goes on once they're given */}
-      {shareAsks && (
+      {grantAsks && (
         <div className="absolute inset-0 z-40">
-          <SharePrompt key={docId} />
+          <GrantPrompt key={docId} />
         </div>
       )}
     </DocumentGate>

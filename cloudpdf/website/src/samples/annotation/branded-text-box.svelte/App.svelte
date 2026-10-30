@@ -25,7 +25,7 @@
     annotationPlugin(),
   ];
 
-  const notice: OpenInput = { kind: 'share', shareToken: 'shr_LfeeUer1ogBI9mz8eYkWXa0d' };
+  const notice: OpenInput = { kind: 'grant', grant: 'shr_LfeeUer1ogBI9mz8eYkWXa0d' };
 
   const RENDERERS: AnnotationRenderer[] = [
     { for: (annotation) => annotation.subtype === 'free-text', component: BrandedTextBox },

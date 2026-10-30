@@ -15,7 +15,7 @@ export function Review() {
       <button disabled={!viewer} onClick={() => viewer?.commands.execute('document:print')}>
         Print
       </button>
-      <PDFViewer src={{ shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' }} onReady={setViewer} style={{ height: '80vh' }}>
+      <PDFViewer src={{ grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' }} onReady={setViewer} style={{ height: '80vh' }}>
         <ToolbarItem id="first-page">
           <FirstPage />
         </ToolbarItem>

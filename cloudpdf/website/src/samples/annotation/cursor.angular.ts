@@ -7,7 +7,7 @@ import { EpdfInteraction, withInteraction } from '@embedpdf/angular/interaction'
 import { EpdfAnnotation, EpdfAnnotationLayer, withAnnotation } from '@embedpdf/angular/annotation';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const sketch: OpenInput = { kind: 'share', shareToken: 'shr_IyOgSdO4AmJqV4BoMv5V0nYU' };
+const sketch: OpenInput = { kind: 'grant', grant: 'shr_IyOgSdO4AmJqV4BoMv5V0nYU' };
 
 // A pen, 24 × 24, in a color: its tip is the bottom-left corner.
 const penIcon = (color: string) =>

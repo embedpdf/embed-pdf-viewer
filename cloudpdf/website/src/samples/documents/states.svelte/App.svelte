@@ -12,7 +12,7 @@
   const engine = cloudEngine();
   const plugins = [stagePlugin(), renderPlugin()];
 
-  const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
+  const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
   // A file that isn't a PDF, so its document can't be opened.
   const broken: OpenInput = { kind: 'bytes', bytes: new TextEncoder().encode('Not a PDF') };

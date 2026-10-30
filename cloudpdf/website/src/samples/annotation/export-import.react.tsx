@@ -26,7 +26,7 @@ const plugins = [
   annotationPlugin(),
 ];
 
-const report: OpenInput = { kind: 'share', shareToken: 'shr__TWhIGdJtaKlcnVgJdg--bcm' };
+const report: OpenInput = { kind: 'grant', grant: 'shr__TWhIGdJtaKlcnVgJdg--bcm' };
 
 // The bundle as one JSON text: what you'd store in your own database.
 function Transfer() {

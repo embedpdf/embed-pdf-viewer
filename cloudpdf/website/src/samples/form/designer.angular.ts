@@ -16,7 +16,7 @@ import { EpdfAnnotationLayer, withAnnotation } from '@embedpdf/angular/annotatio
 import { EpdfForm, EpdfFormLayer, withForm } from '@embedpdf/angular/form';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const registration: OpenInput = { kind: 'share', shareToken: 'shr_sjOrUrwF2Sf0X5ADfySRG58L' };
+const registration: OpenInput = { kind: 'grant', grant: 'shr_sjOrUrwF2Sf0X5ADfySRG58L' };
 
 const FIELD_TOOLS = [
   ['form-text', 'Text'],

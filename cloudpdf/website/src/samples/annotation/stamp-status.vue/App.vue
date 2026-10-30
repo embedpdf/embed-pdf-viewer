@@ -21,7 +21,7 @@ const plugins = [
   annotationPlugin(),
 ];
 
-const approvals: OpenInput = { kind: 'share', shareToken: 'shr_lu5Sb4r9PYjKrHS3qfNeUywM' };
+const approvals: OpenInput = { kind: 'grant', grant: 'shr_lu5Sb4r9PYjKrHS3qfNeUywM' };
 </script>
 
 <template>

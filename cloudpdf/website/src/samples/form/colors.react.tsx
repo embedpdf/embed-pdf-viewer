@@ -17,7 +17,7 @@ const plugins = [
   formPlugin({ fields: { border: '#ea580c' } }),
 ];
 
-const forms: OpenInput = { kind: 'share', shareToken: 'shr_eBRW5E3MpolzD8G36Alp30EF' };
+const forms: OpenInput = { kind: 'grant', grant: 'shr_eBRW5E3MpolzD8G36Alp30EF' };
 
 const COLORS = [
   ['Accent', null],

@@ -1,6 +1,6 @@
 ---
 title: Authentication
-description: Open a document with a token from your backend, by id, or with a public share link, and what a token carries.
+description: Open a document with a token from your backend, by id, or with a grant, and what a token carries.
 engines: [cloud]
 ---
 
@@ -48,128 +48,128 @@ const doc = await engine.open({ kind: 'id', id: 'doc_proposal_2026' });
 The engine's `token` is used for every document opened by id. To use a different one for a
 single document, pass `token` in the input as well.
 
-### With a share link
+### With a grant
 
-A share link (`shr_…`) comes from the CloudPDF dashboard. It needs no backend at all, which makes
-it right for public embeds:
+A grant (`grt_…`) is public access to one document, made in the CloudPDF dashboard. It needs no
+backend at all, which makes it right for public embeds:
 
 ```ts
-const doc = await engine.open({ kind: 'share', shareToken: 'shr_9f2k…' });
+const doc = await engine.open({ kind: 'grant', grant: 'grt_9f2k…' });
 ```
 
-A share link isn't a credential itself: the engine exchanges it for a short-lived token, and
-renews that token before it expires. Editing or revoking the share in the dashboard changes every
-embed at the next renewal. The server only accepts the exchange from the websites the share
+A grant isn't a credential itself: the engine exchanges it for a short-lived token, and
+renews that token before it expires. Editing or ending the grant in the dashboard changes every
+embed at the next renewal. The server only accepts the exchange from the websites the grant
 allows.
 
-If the share has a passphrase, pass it as `sharePassword`. Without it, `open()` fails with
-`SharePasswordRequired`, so you can ask the user and try again:
+If the grant has a passphrase, pass it as `passphrase`. Without it, `open()` fails with
+`GrantPassphraseRequired`, so you can ask the user and try again:
 
 ```ts
-const doc = await engine.open({ kind: 'share', shareToken, sharePassword: 'open-sesame' });
+const doc = await engine.open({ kind: 'grant', grant, passphrase: 'open-sesame' });
 ```
 
-A share link gives everyone who opens it one shared layer, or each visitor a layer of their own,
-made at their first change. `doc.share` says which:
+A grant gives everyone who opens it one shared layer, or each visitor a layer of their own,
+made at their first change. `doc.grant` says which:
 
 ```ts
-doc.share?.layerMode; // 'per-visitor'
-doc.share?.keep; // true
+doc.grant?.layerMode; // 'per-visitor'
+doc.grant?.keep; // true
 ```
 
 The engine remembers the visitor in the browser's `localStorage`, so the next visit is the same
-visitor: their answers stay, what they added stays theirs, and on a per-visitor link the same layer
-opens. The exception is a per-visitor link that doesn't keep visitors' layers: there every visit is
+visitor: their answers stay, what they added stays theirs, and on a per-visitor grant the same layer
+opens. The exception is a per-visitor grant that doesn't keep visitors' layers: there every visit is
 a new visitor with a new layer, and `keep` is `false`. To start over, open with `restart`: a new
-visitor begins, and on a per-visitor link the old layer is deleted.
+visitor begins, and on a per-visitor grant the old layer is deleted.
 
 ```ts
-const doc = await engine.open({ kind: 'share', shareToken, restart: true });
+const doc = await engine.open({ kind: 'grant', grant, restart: true });
 ```
 
-Outside a browser the engine remembers no visitors, since a server opens links for many people.
+Outside a browser the engine remembers no visitors, since a server opens grants for many people.
 To keep them somewhere else, pass a `visitorStore` to `cloudEngine()`.
 
 ### Who the visitor is
 
-A share link can ask its visitors who they are: their name, email, job title, organization or
+A grant can ask its visitors who they are: their name, email, job title, organization or
 department, each required or optional. It asks when they open the document, or before their first
 change. The answers are given once. They become the visitor's identity in every session, so their
 name shows on what they add, and they can't be changed later: a visitor who made a typo starts
 over with `restart`.
 
-A link that asks on open makes `open()` fail with `VisitorIdentityRequired` until the answers come
-with it. `error.details` says what the link asks (`fields`), what's still `missing`, which answers
+A grant that asks on open makes `open()` fail with `VisitorIdentityRequired` until the answers come
+with it. `error.details` says what the grant asks (`fields`), what's still `missing`, which answers
 were `invalid`, and the owner's `purpose` and `privacyUrl` to show with the questions:
 
 ```ts
 try {
-  doc = await engine.open({ kind: 'share', shareToken });
+  doc = await engine.open({ kind: 'grant', grant });
 } catch (error) {
   if (!EngineError.is(error, EngineErrorCode.VisitorIdentityRequired)) throw error;
   const answers = await askTheVisitor(error.details); // your form
-  doc = await engine.open({ kind: 'share', shareToken }, { identity: answers });
+  doc = await engine.open({ kind: 'grant', grant }, { identity: answers });
 }
 ```
 
 When your page already knows who the visitor is, pass it as `identity`, as you would to the
-local engine. It counts the same as the visitor typing it: the link takes only the fields it asks
+local engine. It counts the same as the visitor typing it: the grant takes only the fields it asks
 (never `userId` or `groupId`, which the server gives each visitor), and an answer once given
 stays. A site that knows its users for certain gives them tokens from its backend instead.
 
 ```ts
 const doc = await engine.open(
-  { kind: 'share', shareToken },
+  { kind: 'grant', grant },
   { identity: { displayName: 'Dana Smith' } },
 );
-doc.security.identity; // { userId: 'visitor_…', displayName: 'Dana Smith' }, if the link asks for a name
+doc.security.identity; // { userId: 'visitor_…', displayName: 'Dana Smith' }, if the grant asks for a name
 ```
 
 `doc.security.identity` says who the session acts for. In development the engine warns when that
 isn't the `identity` you passed, and says why.
 
-A link made for one person can say who that is: its own `identity`, set when the link is made.
-Every session it gives acts for that person, whoever opens it. The link doesn't ask what it
-says, and no answer changes it, so anyone with the link acts as that person.
+A grant made for one person can say who that is: its own `identity`, set when the grant is made.
+Every session it gives acts for that person, whoever opens it. The grant doesn't ask what it
+says, and no answer changes it, so anyone with the grant acts as that person.
 
-A link that asks before the first change opens at once, and the visitor reads freely.
-`doc.share.identityRequest` says what it asks. Their changes wait for the answers: listen for a
+A grant that asks before the first change opens at once, and the visitor reads freely.
+`doc.grant.identityRequest` says what it asks. Their changes wait for the answers: listen for a
 change that waits, ask, and answer with `identify()`, or let the waiting changes fail with
 `decline()`.
 
 ```ts
-doc.share?.onIdentityRequest(async (request) => {
+doc.grant?.onIdentityRequest(async (request) => {
   const answers = await askTheVisitor(request);
-  if (answers) await doc.share!.identify(answers);
-  else doc.share!.decline();
+  if (answers) await doc.grant!.identify(answers);
+  else doc.grant!.decline();
 });
 ```
 
 A change made while nothing listens doesn't wait: it fails with `VisitorIdentityRequired`.
 
-### When the link changes while it's open
+### When the grant changes while it's open
 
-A passphrase, or questions asked on open, that the link gets while a document is open apply to that
-document too: its session isn't renewed without them. `doc.share.openRequest` says what the link
-asks: `{ kind: 'passphrase', passwordProvided }`, or `{ kind: 'identity', request }` with the
+A passphrase, or questions asked on open, that the grant gets while a document is open apply to that
+document too: its session isn't renewed without them. `doc.grant.openRequest` says what the grant
+asks: `{ kind: 'passphrase', passphraseProvided }`, or `{ kind: 'identity', request }` with the
 questions. The document reads on until its session runs out, then its requests wait. Listen for
 it, ask, and go on with `resume()` as the same visitor, or close the document:
 
 ```ts
-doc.share?.onOpenRequest(async (request) => {
-  const given = await askTheVisitor(request); // { sharePassword } or { identity }
-  if (given) await doc.share!.resume(given);
+doc.grant?.onOpenRequest(async (request) => {
+  const given = await askTheVisitor(request); // { passphrase } or { identity }
+  if (given) await doc.grant!.resume(given);
   else await doc.close();
 });
 ```
 
-`resume()` rejects with `SharePasswordRequired` or `VisitorIdentityRequired` while the link still
+`resume()` rejects with `GrantPassphraseRequired` or `VisitorIdentityRequired` while the grant still
 asks, and `openRequest` says what. With nothing listening, a request fails with the same error once
 the session runs out.
 
 ## Password-protected PDFs
 
-A PDF can have its own password, separate from any token or share passphrase. Pass it in the
+A PDF can have its own password, separate from any token or grant passphrase. Pass it in the
 options, whichever way you open:
 
 ```ts
@@ -188,7 +188,7 @@ annotations the user creates.
 
 Both come from the token: the `scope` and `identity` you pass to `open()` don't change them, and in
 development the engine warns when you pass `scope`, or an `identity` the session doesn't act for.
-(On a share link, `identity` is what your page knows about the visitor: see
+(On a grant, `identity` is what your page knows about the visitor: see
 [Who the visitor is](#who-the-visitor-is).) Read what the user was given from `doc.security`:
 
 ```ts

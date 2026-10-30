@@ -20,7 +20,7 @@
     annotationPlugin(),
   ];
 
-  const report: OpenInput = { kind: 'share', shareToken: 'shr__TWhIGdJtaKlcnVgJdg--bcm' };
+  const report: OpenInput = { kind: 'grant', grant: 'shr__TWhIGdJtaKlcnVgJdg--bcm' };
 </script>
 
 <Viewer

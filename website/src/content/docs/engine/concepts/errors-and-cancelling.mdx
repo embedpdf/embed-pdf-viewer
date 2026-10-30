@@ -109,14 +109,14 @@ The codes you'll handle most:
 
 On the cloud you'll also meet:
 
-| Code                      | What happened                                                                                                                            |
-| :------------------------ | :--------------------------------------------------------------------------------------------------------------------------------------- |
-| `Unauthenticated`         | The token is missing, invalid or expired.                                                                                                |
-| `SharePasswordRequired`   | The share link needs its passphrase, or the one you gave was wrong.                                                                      |
-| `VisitorIdentityRequired` | The share link asks who the visitor is; `error.details` says what. See [Authentication](/docs/engine/authentication#who-the-visitor-is). |
-| `Network`                 | The request didn't reach the server (offline, DNS, TLS).                                                                                 |
-| `LayerVersionConflict`    | Someone else saved at the same moment. Nothing was changed; try again.                                                                   |
-| `LayerDeleted`            | The layer was deleted, and its name can't be used again. Open another layer.                                                             |
+| Code                      | What happened                                                                                                                       |
+| :------------------------ | :---------------------------------------------------------------------------------------------------------------------------------- |
+| `Unauthenticated`         | The token is missing, invalid or expired.                                                                                           |
+| `GrantPassphraseRequired` | The grant needs its passphrase, or the one you gave was wrong.                                                                      |
+| `VisitorIdentityRequired` | The grant asks who the visitor is; `error.details` says what. See [Authentication](/docs/engine/authentication#who-the-visitor-is). |
+| `Network`                 | The request didn't reach the server (offline, DNS, TLS).                                                                            |
+| `LayerVersionConflict`    | Someone else saved at the same moment. Nothing was changed; try again.                                                              |
+| `LayerDeleted`            | The layer was deleted, and its name can't be used again. Open another layer.                                                        |
 
 When the server is busy or restarting, the engine retries for you before any of these reach you;
 see [Setup](/docs/engine/setup#busy-servers).

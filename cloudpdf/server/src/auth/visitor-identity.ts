@@ -1,12 +1,12 @@
 /**
- * What a share link asks its visitors (`visitorIdentity` on the link), and
+ * What a grant asks its visitors (`visitorIdentity` on the grant), and
  * how an exchange settles their answers. The answers are the server's from
  * then on: given once, stored with the visitor, and put into every token
  * issued for them. A visitor never changes an answer they gave; one who
  * mistyped starts over as a new visitor.
  */
 
-/** The fields a link can ask, as the token's `identity` names them. `userId` is never asked. */
+/** The fields a grant can ask, as the token's `identity` names them. `userId` is never asked. */
 export const VISITOR_IDENTITY_FIELDS = [
   'displayName',
   'email',
@@ -20,7 +20,7 @@ export type VisitorAnswers = Partial<Record<VisitorIdentityField, string>>;
 
 export interface VisitorIdentityConfig {
   fields: Partial<Record<VisitorIdentityField, 'required' | 'optional'>>;
-  /** Ask when they open (a lead gate), or before their first change (a review link). */
+  /** Ask when they open (a lead gate), or before their first change (a review grant). */
   ask: 'on-open' | 'before-first-change';
   /** Shown with the questions: why they're asked. */
   purpose?: string;
@@ -57,7 +57,7 @@ export interface SettledIdentity {
 /**
  * Settle a visitor's identity at an exchange. `stored` answers stand and are
  * never replaced; `given` fills the asked fields not answered yet, and
- * answers to fields the link doesn't ask are ignored. Whatever is required
+ * answers to fields the grant doesn't ask are ignored. Whatever is required
  * and still unanswered, or given and not valid, comes back as `request`.
  */
 export function settleVisitorIdentity(

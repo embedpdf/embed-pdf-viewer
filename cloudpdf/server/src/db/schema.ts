@@ -33,7 +33,7 @@ export interface TenantsTable {
   auto_provisioned: number;
   /**
    * `suspended` fails the namespace closed: every tenant JWT, doc JWT,
-   * and share exchange is refused (403) until resume. The API token is
+   * and grant exchange is refused (403) until resume. The API token is
    * exempt so the operator can always inspect, resume, or delete.
    */
   status: TenantStatus;
@@ -184,9 +184,9 @@ export interface LayersTable {
    * so its name is never used again. NULL for a live layer.
    */
   deleted_at: number | null;
-  /** A visitor's layer (migration 038): the share link that made it; NULL otherwise. */
+  /** A visitor's layer (migration 038): the grant that made it; NULL otherwise. */
   grant_id: string | null;
-  /** A visitor's layer: the visitor (its name is `visitor-<visitor_id>`); see `share_visitors`. */
+  /** A visitor's layer: the visitor (its name is `visitor-<visitor_id>`); see `grant_visitors`. */
   visitor_id: string | null;
   created_at: number;
   updated_at: number;
@@ -308,18 +308,11 @@ export interface SecurityEventsTable {
 }
 
 /**
- * Share grants: standing, revocable authorization decisions for the
- * no-backend embed flow. The row id is the public share token — a
- * reference evaluated at exchange time, never a bearer credential,
- * which is what makes grants long-lived, editable, and revocable while
- * every credential that reaches a browser stays a short-lived doc JWT.
- */
-/**
- * A share link's visitor who answered its questions or wrote (migration 042):
+ * A grant's visitor who answered its questions or wrote (migration 042):
  * the answers, given once and the server's from then on, and the visitor's
  * idle clock.
  */
-export interface ShareVisitorsTable {
+export interface GrantVisitorsTable {
   grant_id: string;
   visitor_id: string;
   doc_id: string;
@@ -335,19 +328,29 @@ export interface ShareVisitorsTable {
   last_seen_at: number;
 }
 
-export interface ShareGrantsTable {
-  /** `shr_` + 24 url-safe random chars; doubles as the public share token. */
+/**
+ * Grants: standing, revocable authorization decisions for the
+ * no-backend embed flow (migrations 021, 047). The row id is what a page
+ * holds — a reference evaluated at exchange time, never a bearer
+ * credential, which is what makes grants long-lived, editable, and
+ * revocable while every credential that reaches a browser stays a
+ * short-lived doc JWT.
+ */
+export interface GrantsTable {
+  /** `grt_` + 24 url-safe random chars (`shr_` before migration 047). */
   id: string;
   tenant_id: string;
   doc_id: string;
+  /** What the grant is called (migration 047); NULL when unnamed. */
+  name: string | null;
   /**
    * Whose layer visitors write into (migration 038): one shared layer, the
-   * link's `layer_name`, or a layer per visitor (`visitor-<id>`).
+   * grant's `layer_name`, or a layer per visitor (`visitor-<id>`).
    */
   layer_mode: 'shared' | 'per-visitor';
-  /** The shared layer; NULL for a per-visitor link. */
+  /** The shared layer; NULL for a per-visitor grant. */
   layer_name: string | null;
-  /** 1 = a visitor's browser keeps its layer for the next visit (per-visitor links). */
+  /** 1 = a visitor's browser keeps its layer for the next visit (per-visitor grants). */
   keep_visitor_layers: number;
   /**
    * Delete a visitor (their answers and their layer) after this long unseen
@@ -356,12 +359,12 @@ export interface ShareGrantsTable {
    */
   visitor_idle_seconds: number | null;
   /**
-   * What the link asks its visitors (migration 042): JSON
+   * What the grant asks its visitors (migration 042): JSON
    * `{ fields, ask, purpose?, privacyUrl? }`; NULL asks nothing.
    */
   visitor_identity_json: string | null;
   /**
-   * Who the link's visitors are, when the link says so (migration 043): JSON
+   * Who the grant's visitors are, when the grant says so (migration 043): JSON
    * `Identity`, the shape of `tokens.issue`'s. NULL: whoever they answer.
    */
   identity_json: string | null;
@@ -370,12 +373,12 @@ export interface ShareGrantsTable {
   /** Origin allowlist (JSON array); NULL = any origin. */
   origins_json: string | null;
   /** scrypt envelope (`scrypt$N$r$p$salt$hash`); NULL = no passphrase. */
-  password_hash: string | null;
+  passphrase_hash: string | null;
   session_ttl_seconds: number;
   /** 1 = paused: exchange refuses (404) but configuration is kept. */
   disabled: number;
   /**
-   * When the link was archived (migration 041): it exchanges no more, for
+   * When the grant was archived (migration 041): it exchanges no more, for
    * good, and keeps what its visitors made. NULL while it works.
    */
   archived_at: number | null;
@@ -717,8 +720,8 @@ export interface Database {
   pdf_password_verifications: PdfPasswordVerificationsTable;
   pdf_password_sessions: PdfPasswordSessionsTable;
   security_events: SecurityEventsTable & { id: Generated<number> };
-  share_grants: ShareGrantsTable;
-  share_visitors: ShareVisitorsTable;
+  grants: GrantsTable;
+  grant_visitors: GrantVisitorsTable;
   document_imports: DocumentImportsTable;
   tenant_usage_counter: TenantUsageCounterTable;
   engine_crashes: EngineCrashesTable;

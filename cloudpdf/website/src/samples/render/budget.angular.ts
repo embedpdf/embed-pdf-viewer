@@ -11,7 +11,7 @@ import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage'
 import { EpdfRender, EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const welcome: OpenInput = { kind: 'share', shareToken: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 const BUDGETS = [320, 640, 1280];
 

@@ -33,7 +33,7 @@ const lanternfieldCertificate = async () => {
   return new Uint8Array(await response.arrayBuffer());
 };
 
-const agreement: OpenInput = { kind: 'share', shareToken: 'shr_G5GcxJeEBa2IiwIs0DCNruCL' };
+const agreement: OpenInput = { kind: 'grant', grant: 'shr_G5GcxJeEBa2IiwIs0DCNruCL' };
 
 // Lanternfield's signature field, signed before the agreement was sent.
 const PROVIDER = toFieldRef('provider');

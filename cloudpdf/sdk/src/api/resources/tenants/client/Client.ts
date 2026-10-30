@@ -444,7 +444,7 @@ export class TenantsClient {
     }
 
     /**
-     * Facts only — no limits or billing state. Views count share exchanges plus authorized /v1/access grants, deduplicated across the two.
+     * Facts only — no limits or billing state. Views count grant exchanges plus authorized /v1/access requests, deduplicated across the two.
      *
      * @param {CloudPDF.UsageTenantsRequest} request
      * @param {TenantsClient.RequestOptions} requestOptions - Request-specific configuration.
