@@ -157,7 +157,7 @@ can't run now.
 | `page:next`, `page:previous`, `page:first`, `page:last`, `page:go-to` | Move through pages |
 | `view:single-page`, `view:two-pages`, `view:cover-page` | Pages side by side |
 | `view:scroll-vertical`, `view:scroll-horizontal` | The scrolling direction |
-| `view:rotate-clockwise`, `view:rotate-counterclockwise`, `view:fullscreen` | Turn the view, full screen |
+| `view:rotate-clockwise`, `view:rotate-counterclockwise`, `view:fullscreen` | Turn the view; fill the screen with the viewer, not your page: see [Full screen](../concepts/how-it-works#full-screen) |
 | `tool:pointer`, `tool:pan` | Select, or drag the pages |
 | `tool:zoom` | Drag a box to zoom to it, or click to zoom in (Alt-click: out) |
 | `tool:note`, `tool:link`, `tool:highlight`, `tool:underline`, `tool:strikeout`, `tool:squiggly` | Comment and mark up |
@@ -175,6 +175,7 @@ can't run now.
 | `outline:add`, `outline:add-child`, `outline:rename`, `outline:set-destination`, `outline:properties`, `outline:delete` | Change the outline: add an item after the selected one, at the place in view (`Ctrl`/`Cmd`+`B`), or inside it; rename it; point it at the place in view; edit its properties; delete it |
 | `outline:expand-all`, `outline:collapse-all`, `menu:outline-item` | Unfold or fold every outline item; open an outline row's [menu](menus) |
 | `attachment:add`, `attachment:save`, `attachment:go-to`, `attachment:delete`, `menu:attachment-item` | Attach a file (`args: { files }` attach these instead of asking); save, go to or delete the selected file; open a file's [menu](menus) |
+| `comment:status-accepted`, `comment:status-rejected`, `comment:status-cancelled`, `comment:status-completed`, `comment:status-none`, `comment:delete-thread`, `menu:comment-item` | Set the status of the selected annotation's comment thread, or delete the thread; open a comment card's [menu](menus) |
 | `page:rotate-clockwise`, `page:rotate-counterclockwise`, `page:duplicate`, `page:delete` | Act on the selected pages: turn them, copy them in right after themselves, delete them |
 | `page:insert-blank`, `page:insert-file` | Insert a blank page, or the pages of a PDF, after the selected pages, and select what came in; `args: { position, files }` say where, and which PDFs |
 | `page:extract`, `page:select-all`, `menu:page` | Save the selected pages as a new PDF; select every page; open the selected pages' [menu](menus) |
@@ -191,9 +192,9 @@ Every tool you add to the [annotation plugin](/docs/headless/annotations/tools) 
 ### The viewer's icons
 
 `area`, `bold`, `book`, `calibrate`, `callout`, `check`, `chevronsDown`, `chevronsUp`, `circle`,
-`comment`, `copy`, `distance`, `dots`, `download`, `eye`, `file`, `fileExport`, `filePlus`, `fullscreen`, `group`, `hand`, `highlight`, `italic`, `line`,
+`circleCheck`, `comment`, `copy`, `distance`, `dots`, `download`, `eye`, `file`, `fileExport`, `filePlus`, `fullscreen`, `fullscreenExit`, `group`, `hand`, `highlight`, `italic`, `line`,
 `link`, `lock`, `menu`, `message`, `pageRotateClockwise`, `pageRotateCounterClockwise`, `palette`, `paperclip`, `perimeter`, `photo`, `plus`,
-`pointer`, `polygon`, `print`, `redact`, `ruler`, `save`, `search`, `settings`, `sidebar`,
+`pointer`, `polygon`, `print`, `redact`, `ruler`, `save`, `search`, `send`, `settings`, `sidebar`,
 `signature`, `square`, `squiggly`, `strikethrough`, `text`, `trash`, `underline`, `ungroup`,
 `unlock`, `x`, `zigzag`.
 

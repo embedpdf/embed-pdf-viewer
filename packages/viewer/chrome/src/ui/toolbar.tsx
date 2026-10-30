@@ -18,6 +18,8 @@ import type {
 import { useCommand, useCommands } from '@embedpdf/react/commands';
 import type { ResolvedCommand } from '@embedpdf/react/commands';
 import { TOOLBAR_ITEM_ATTRIBUTE } from '@embedpdf/web';
+import { AttachmentsCount } from './attachments-count';
+import { OutlineFilterField } from './outline-filter';
 import { PageNumber } from './page-number';
 import { QuickStamps } from './quick-stamps';
 import { ViewOnlyLabel } from './view-only';
@@ -183,8 +185,9 @@ function ZoomControls() {
             <button
               type="button"
               title={zoomOut.label}
+              disabled={!zoomOut.enabled}
               part={buttonPart(false)}
-              className={buttonClass(false)}
+              className={buttonClass(false, zoomOut.enabled)}
               onClick={() => commands.execute('zoom:out')}
             >
               <Icon name="zoomOut" size={20} />
@@ -194,8 +197,9 @@ function ZoomControls() {
             <button
               type="button"
               title={zoomIn.label}
+              disabled={!zoomIn.enabled}
               part={buttonPart(false)}
-              className={buttonClass(false)}
+              className={buttonClass(false, zoomIn.enabled)}
               onClick={() => commands.execute('zoom:in')}
             >
               <Icon name="zoomIn" size={20} />
@@ -366,11 +370,14 @@ function StandIn({ commandId }: { commandId: string }) {
 export function AppToolbar({
   bar,
   orientation = 'horizontal',
+  gap = 8,
   className,
 }: {
   bar: BarSchema;
   /** A vertical toolbar (a bar at the start or end edge) draws its commands as icons. */
   orientation?: 'horizontal' | 'vertical';
+  /** Px between items: Tailwind's gap-2 along the viewer's edges, closer in a panel's bar. */
+  gap?: number;
   className?: string;
 }) {
   const vertical = orientation === 'vertical';
@@ -383,6 +390,9 @@ export function AppToolbar({
     'quick-stamps': () => <QuickStamps />,
     'page-number': () => <PageNumber />,
     'view-only': (variant) => <ViewOnlyLabel compact={variant === 'icon' || vertical} />,
+    // The outline panel's filter field and the attachments panel's count, in their panels' bars.
+    'outline-filter': (variant) => <OutlineFilterField variant={variant} />,
+    'attachments-count': () => <AttachmentsCount />,
   };
   // Every other one is yours, slotted in, so the measurement layer can't hold it: its socket is
   // measured where it renders.
@@ -408,7 +418,7 @@ export function AppToolbar({
     <Toolbar
       bar={bar}
       orientation={orientation}
-      gap={8} // Tailwind's gap-2
+      gap={gap}
       separatorWidth={1}
       className={className}
       renderCommand={(cmd, variant, run) => <CommandButton cmd={cmd} variant={variant} run={run} />}

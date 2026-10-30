@@ -76,6 +76,11 @@ export class EpdfPdfViewer extends EpdfPdfViewerBase {
   /** Several documents, with their names and passwords; with these, `src` is ignored. Read once. */
   readonly documents: InputSignal<ViewerConfig['documents'] | undefined> =
     input<ViewerConfig['documents']>();
+  /**
+   * How a document at a URL downloads: your own `fetch`, to add headers or cookies. Follows its
+   * input: the next download uses the new one.
+   */
+  readonly fetch: InputSignal<ViewerConfig['fetch'] | undefined> = input<ViewerConfig['fetch']>();
   /** What the user may do, as permissions, in every document. Read once. */
   readonly scope: InputSignal<ViewerConfig['scope'] | undefined> = input<ViewerConfig['scope']>();
   /** Who the user is, for comments and signatures. Read once. */
@@ -88,6 +93,7 @@ export class EpdfPdfViewer extends EpdfPdfViewerBase {
       engine: this.engine(),
       src: this.src(),
       documents: this.documents(),
+      fetch: this.fetch(),
       scope: this.scope(),
       identity: this.identity(),
     }),

@@ -3,8 +3,9 @@
  * pinned to its pages. A row shows the file's kind, its name (without the characters that can
  * disguise one), its size and description, and a page's file says its page. Clicking an
  * attachment saves it; clicking a page's file goes to it. A row's menu saves, goes to the page
- * and deletes. A session that may add files adds one with the header's button, or drops files
- * on the panel; a drop there never opens them as documents.
+ * and deletes. A session that may add files adds one with the button in the panel's bar
+ * (`attachments` in the layout, beside the count), or drops files on the panel; a drop there
+ * never opens them as documents.
  */
 import {
   displayNameOf,
@@ -164,16 +165,6 @@ export function AttachmentsPanel() {
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col" {...dropProps}>
-      {add.visible && (
-        <div className="border-border-subtle flex items-center gap-1 border-b p-2">
-          <span className="text-fg-muted min-w-0 flex-1 truncate text-xs">
-            {t(files.length === 1 ? 'attachments.count' : 'attachments.countPlural', {
-              params: { count: String(files.length) },
-            })}
-          </span>
-          <CommandButton cmd={add} variant="icon" run={() => void add.run()} />
-        </div>
-      )}
       {body}
       {dropping && (
         <div className="border-accent bg-accent/10 text-fg pointer-events-none absolute inset-1 flex items-center justify-center rounded-md border-2 border-dashed text-sm">

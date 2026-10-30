@@ -169,6 +169,9 @@ export const ja: Locale = {
         'doc-text-copy': 'コピーは許可されていません',
         'doc-text-search': '検索は許可されていません',
       },
+      commentThread: {
+        more: 'その他のオプション',
+      },
       attachment: {
         add: 'ファイルを追加',
         save: '保存',
@@ -594,6 +597,7 @@ export const ja: Locale = {
       commentsStatusRejected: '却下',
       commentsStatusCancelled: 'キャンセル',
       commentsStatusCompleted: '完了',
+      commentsMarkCompleted: '完了としてマーク',
       empty: 'このデモパネルにはまだ何もありません。',
       page: '{current} / {total} ページ',
       goToPage: 'ページへ移動',

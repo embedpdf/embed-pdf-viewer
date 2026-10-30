@@ -169,6 +169,9 @@ export const nl: Locale = {
         'doc-text-copy': 'Kopiëren is niet toegestaan',
         'doc-text-search': 'Zoeken is niet toegestaan',
       },
+      commentThread: {
+        more: 'Meer opties',
+      },
       attachment: {
         add: 'Bestand toevoegen',
         save: 'Opslaan',
@@ -596,6 +599,7 @@ export const nl: Locale = {
       commentsStatusRejected: 'Afgewezen',
       commentsStatusCancelled: 'Geannuleerd',
       commentsStatusCompleted: 'Voltooid',
+      commentsMarkCompleted: 'Markeren als voltooid',
       empty: 'Er staat nog niets in dit demodeelvenster.',
       page: 'Pagina {current} van {total}',
       goToPage: 'Ga naar pagina',

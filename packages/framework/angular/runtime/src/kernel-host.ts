@@ -359,6 +359,7 @@ export class EpdfKernelHost {
         settings: registeredViewerSettings(config),
         clock: browserClock(),
         printer: browserPrinter(),
+        fetch: config.fetch,
       });
     } catch (error) {
       if (owned) void engine.destroy();

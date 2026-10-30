@@ -170,6 +170,9 @@ export const fr: Locale = {
         'doc-text-copy': 'La copie n’est pas autorisée',
         'doc-text-search': 'La recherche n’est pas autorisée',
       },
+      commentThread: {
+        more: 'Plus d’options',
+      },
       attachment: {
         add: 'Ajouter un fichier',
         save: 'Enregistrer',
@@ -598,6 +601,7 @@ export const fr: Locale = {
       commentsStatusRejected: 'Refusé',
       commentsStatusCancelled: 'Annulé',
       commentsStatusCompleted: 'Terminé',
+      commentsMarkCompleted: 'Marquer comme terminé',
       empty: 'Rien pour l’instant dans ce panneau de démonstration.',
       page: 'Page {current} sur {total}',
       goToPage: 'Aller à la page',

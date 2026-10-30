@@ -427,7 +427,7 @@ export default function SveltePdfViewerPage() {
           },
           {
             topic: 'Languages',
-            ours: <Cell yes>13 built in, right-to-left included</Cell>,
+            ours: <Cell yes>15 built in, right-to-left included</Cell>,
             theirs: <Cell yes={false}>Every label to translate</Cell>,
           },
         ]}

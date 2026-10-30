@@ -1384,7 +1384,7 @@ describe("columns: 'auto' — the wrapped grid (thumbnail sidebar)", () => {
 
 describe('wrapped + discrete zoom: the scene re-wraps and the camera follows', () => {
   // viewport 1000, padding 24 → line = 952/zoom; cell = 600 + gap 16 = 616 world.
-  // zoom 0.35 → line 2720 → 4 columns; ×1.2 → 0.42 → line 2266 → 3 columns.
+  // zoom 0.35 → line 2720 → 4 columns; zoomIn → 0.5 → line 1904 → 3 columns.
   const WRAPPED = {
     layout: 'grid' as const,
     columns: 'auto' as const,

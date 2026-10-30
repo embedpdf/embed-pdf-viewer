@@ -168,6 +168,21 @@ body {
   background: var(--epdf-text-muted);
 }
 
+/* Full Screen where the browser has no full screen for the viewer (ui/fullscreen.ts): its box
+   over the whole window, from the top layer, so the page around it can't hold it in. Two parts,
+   so it wins over the element's own sizing of its root. */
+[data-epdf-fills-window]:popover-open {
+  position: fixed;
+  inset: 0;
+  width: auto;
+  height: auto;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
 /* With a finger as the main way of pointing (`data-touch` on the viewer's root, from its env),
    every button in a bar, document tab, panel header button and menu row, in a sheet or not, is
    at least 44 px tall: the size a fingertip hits. It follows the viewer's env, not a media

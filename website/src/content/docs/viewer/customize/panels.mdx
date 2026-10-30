@@ -138,8 +138,9 @@ apps:
 
 - **Select pages.** A click selects a page and goes to it; `Ctrl`/`Cmd`+click adds a page or
   takes it out, `Shift`+click selects a range.
-- **The header** inserts a blank page, rotates and deletes the selected pages, and opens the menu
-  of the rest; undo and redo sit at its end.
+- **The panel's bar** inserts a blank page, rotates and deletes the selected pages; with room to
+  spare it also inserts a PDF, duplicates and extracts. Undo and redo sit at its end, and in a
+  narrow panel what doesn't fit is in its "More" menu.
 - **Each page has a menu**: its button, a right-click, or a long press. It rotates, inserts a
   blank page or a PDF after the page, duplicates, extracts and deletes.
 - **Drag pages** to move them: a line shows where they land. Dragging a selected page moves the
@@ -163,8 +164,8 @@ shows the characters that can make one file look like another.
 - **Click a file** to save it; click a page's file to go to it on its page.
 - **Each file has a menu**: its button or a right-click. It saves the file, goes to a page's file,
   and deletes the file.
-- **Attach files** with the header's button, or drop them on the panel; a file dropped there is
-  attached, not opened as a tab. A name the document has already gets a number,
+- **Attach files** with the button in the panel's bar, beside how many files there are, or drop
+  them on the panel; a file dropped there is attached, not opened as a tab. A name the document has already gets a number,
   `notes (2).txt`.
 - **A selected file attachment** on the page has Save file in its bar.
 
@@ -172,6 +173,31 @@ Saving a file is a download: it goes with `documents.download` and needs `doc.do
 user's scope. Attaching and deleting are `attachments.adding`, which `readOnly` turns off, and need
 `doc.attachments.modify`; each is one step of the history. From code, `viewer.get('attachment')`
 is the [attachment plugin](/docs/headless/documents/attachments).
+
+## A bar in a panel
+
+The thumbnails, outline and attachments panels each have a bar under their title, named after the
+panel: [`thumbnails`, `outline` and `attachments`](layout#every-built-in-id). The outline's holds
+its filter. They're bars like the toolbar, so the same edits work, and what doesn't fit goes into a
+"More" menu:
+
+```js
+layout
+  .add('acme:print-pages', { to: 'thumbnails' })
+  .remove(['outline:expand-all', 'outline:collapse-all'], { from: 'outline' });
+```
+
+Any panel can have a bar, your own too: its place is `{ panel: id }`.
+
+```js
+layout.addBar('review', {
+  place: { panel: 'comments' },
+  start: [['acme:approve-all', 'acme:export']],
+});
+```
+
+A panel's bars stack under its title in the order you add them. The search panel shows its bars
+over its list of hits, not in the find bar it becomes when the hits come without their text.
 
 ## Panels on the same side
 

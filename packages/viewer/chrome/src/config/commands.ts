@@ -14,6 +14,8 @@
  *   zoom/pan/pointer/spread/scroll/rotate  → real Stage / Interaction / PageEdit
  *   modes                                  → shell exclusive surfaces ('mode')
  *   panels                                 → the layout's `panel:<id>` (panels.ts)
+ *   full screen                            → the layout root's `view:fullscreen`
+ *                                            (fullscreen.ts)
  *   menus / modals                         → declarative shell targets
  *   annotate + shape tools                 → real interaction tools
  *   form tools                             → real form plugin palette (draw-to-place)
@@ -43,6 +45,7 @@ import { saveFile } from '@embedpdf/web';
 
 import type { Feature } from '../features';
 import { attachmentCommands } from './attachments';
+import { commentCommands } from './comments';
 import { openModeSurfaceOf } from './modes';
 import { openFileCommand } from './open-files';
 import { outlineCommands } from './outline';
@@ -313,7 +316,7 @@ export const defaultCommands: CommandDef[] = [
     icon: 'zoomIn',
     shortcut: ['Mod+=', 'Mod+NumpadAdd'],
     run: (commandContext) => stage(commandContext)?.zoomIn(),
-    enabled: (commandContext) => stage(commandContext) != null,
+    enabled: (commandContext) => stage(commandContext)?.canZoomIn() ?? false,
   },
   {
     id: 'zoom:out',
@@ -321,7 +324,7 @@ export const defaultCommands: CommandDef[] = [
     icon: 'zoomOut',
     shortcut: ['Mod+-', 'Mod+NumpadSubtract'],
     run: (commandContext) => stage(commandContext)?.zoomOut(),
-    enabled: (commandContext) => stage(commandContext) != null,
+    enabled: (commandContext) => stage(commandContext)?.canZoomOut() ?? false,
   },
   {
     id: 'zoom:fit-page',
@@ -458,6 +461,9 @@ export const defaultCommands: CommandDef[] = [
   // ── the files the document carries ──────────────────────────────────────
   ...attachmentCommands,
 
+  // ── comment threads: their status, deleting one ─────────────────────────
+  ...commentCommands,
+
   // ── the pages: rotate, move, insert, delete, copy out ───────────────────
   ...pageCommands,
 
@@ -496,17 +502,6 @@ export const defaultCommands: CommandDef[] = [
     modal: PRINT_DIALOG,
     enabled: (commandContext) => commandContext.documentId != null,
   },
-  {
-    id: 'view:fullscreen',
-    labelKey: 'commands.fullscreen',
-    icon: 'externalLink',
-    run: () => {
-      if (document.fullscreenElement) document.exitFullscreen();
-      else document.documentElement.requestFullscreen().catch(() => {});
-    },
-    active: () => Boolean(document.fullscreenElement),
-  },
-
   // ── page settings (spread / scroll / rotate) ────────────────────────────
   spread('view:single-page', 'none', 'commands.spread.none', 'singlePage'),
   spread('view:two-pages', 'odd', 'commands.spread.odd', 'doublePage'),

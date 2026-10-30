@@ -29,6 +29,16 @@ function localHandle(id: string, allows: (permission: string) => boolean = () =>
 
 const change = { type: 'metadata.updated', origin: { kind: 'local' } };
 
+/** The start of a PDF, which is all a download has to be for the viewer to open it. */
+const PDF_BYTES = new TextEncoder().encode('%PDF-1.7\n');
+
+/** A server's answer with {@link PDF_BYTES}. */
+const pdfResponse = () => ({
+  ok: true,
+  status: 200,
+  arrayBuffer: async () => PDF_BYTES.slice().buffer,
+});
+
 async function openLocal(handle: ReturnType<typeof localHandle>, plugins: AnyPlugin[] = []) {
   const kernel = createKernel({
     engine: immediateEngine({ [handle.id]: handle }),
@@ -84,11 +94,7 @@ describe('open()', () => {
   });
 
   it('a URL source is downloaded under its loading tab, with the document’s signal', async () => {
-    const fetch = vi.fn(async (_url: string, _init: { signal: AbortSignal }) => ({
-      ok: true,
-      status: 200,
-      arrayBuffer: async () => new ArrayBuffer(4),
-    }));
+    const fetch = vi.fn(async (_url: string, _init: { signal: AbortSignal }) => pdfResponse());
     vi.stubGlobal('fetch', fetch);
     const open = vi.fn(async () => makeHandle('doc-1'));
     const kernel = createKernel({
@@ -99,11 +105,76 @@ describe('open()', () => {
     expect(fetch).toHaveBeenCalledWith('/files/contract.pdf', {
       signal: expect.any(AbortSignal),
     });
+    expect(open).toHaveBeenCalledWith({ kind: 'bytes', bytes: PDF_BYTES }, expect.anything());
+    expect(document.status).toBe('ready');
+  });
+
+  it('the host’s fetch downloads it instead, as a plain function, under the id the source names', async () => {
+    vi.stubGlobal('fetch', () => {
+      throw new Error('the global fetch is not the one to call');
+    });
+    const calls: { url: string; init: { signal: AbortSignal }; self: unknown }[] = [];
+    // The browser's own fetch throws "Illegal invocation" when called on anything but the page.
+    function hostFetch(this: unknown, url: string, init: { readonly signal: AbortSignal }) {
+      calls.push({ url, init, self: this });
+      return Promise.resolve(pdfResponse());
+    }
+    const open = vi.fn(async (input: { id: string }) => makeHandle(input.id));
+    const kernel = createKernel({
+      engine: { open, destroy: async () => {} } as unknown as Engine,
+      plugins: [],
+      fetch: hostFetch,
+    });
+    const { document } = await kernel.documents.open({
+      kind: 'url',
+      url: '/files/contract.pdf',
+      id: 'contract',
+    });
+    expect(calls).toEqual([
+      { url: '/files/contract.pdf', init: { signal: expect.any(AbortSignal) }, self: undefined },
+    ]);
     expect(open).toHaveBeenCalledWith(
-      { kind: 'bytes', bytes: new Uint8Array(4) },
+      { kind: 'bytes', id: 'contract', bytes: PDF_BYTES },
       expect.anything(),
     );
-    expect(document.status).toBe('ready');
+    expect(document.id).toBe('contract');
+  });
+
+  it('a URL the user may not have shows as not allowed, and retry() asks the host’s fetch again', async () => {
+    let token: string | null = null;
+    const fetch = vi.fn(async () =>
+      token
+        ? pdfResponse()
+        : { ok: false, status: 401, arrayBuffer: async () => new ArrayBuffer(0) },
+    );
+    const kernel = createKernel({ engine: immediateEngine(), plugins: [], fetch });
+    await expect(
+      kernel.documents.open({ kind: 'url', url: '/private.pdf', id: 'private' }),
+    ).rejects.toMatchObject({ code: 'permission-denied' });
+    expect(kernel.documents.get('private')).toMatchObject({
+      status: 'error',
+      error: { code: 'permission-denied', message: expect.stringContaining('HTTP 401') },
+    });
+    token = 'signed-in';
+    const { document } = await kernel.documents.retry('private');
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(document).toMatchObject({ id: 'private', status: 'ready' });
+  });
+
+  it('a URL that answers with something other than a PDF shows as the tab’s error', async () => {
+    const page = new TextEncoder().encode('<!doctype html><title>Sign in</title>');
+    const fetch = async () => ({ ok: true, status: 200, arrayBuffer: async () => page.buffer });
+    const open = vi.fn();
+    const kernel = createKernel({
+      engine: { open, destroy: async () => {} } as unknown as Engine,
+      plugins: [],
+      fetch,
+    });
+    await expect(kernel.documents.open({ kind: 'url', url: '/sign-in' })).rejects.toMatchObject({
+      code: 'invalid-input',
+      message: expect.stringContaining("/sign-in isn't a PDF"),
+    });
+    expect(open).not.toHaveBeenCalled();
   });
 
   it('a URL the server refuses shows as the tab’s error', async () => {

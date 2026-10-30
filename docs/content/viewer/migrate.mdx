@@ -46,8 +46,8 @@ The 2.x code is the comment at the top. The 3.0 code below it does the same:
 - **The viewer is one element, `<embedpdf-viewer>`.** 2.x's framework packages put an
   `<embedpdf-container>` inside a `<div>` of their own. Now there's no `<div>`: your class and style
   go on the viewer itself.
-- **Five keys follow their prop:** `src`, `theme`, `locale`, `disable` and `readOnly`. 2.x's
-  framework packages read the config once. Every other key is still read once: see
+- **Six keys follow their prop:** `src`, `theme`, `locale`, `disable`, `readOnly` and `fetch`.
+  2.x's framework packages read the config once. Every other key is still read once: see
   [Change the config later](setup#change-the-config-later).
 - **Server-side rendering needs no wrapper.** Every framework package is safe to import on the
   server, so a `<ClientOnly>` or a dynamic import around the viewer can go. See
@@ -66,6 +66,7 @@ The 2.x code is the comment at the top. The 3.0 code below it does the same:
 | :-- | :-- |
 | `src` | `src`: a URL, a `File` or bytes |
 | `documentManager.initialDocuments` | `documents`, each with `src`, `name`, `password` and `active`, in place of `url`, `name`, `password` and `autoActivate` |
+| A document's `requestOptions`: `headers` and `credentials` | `fetch`, your own, which every document at a URL downloads through: see [Files that need a sign-in](documents#files-that-need-a-sign-in) |
 | `tabBar` | `layout.tabs()` in the [layout](customize/layout): `'always'`, `'multiple'` (the default) or `'never'` |
 | `theme` | `theme`, with new keys: see [Theme](#theme) |
 | `icons` | `icons`, as path data: see [Buttons and the toolbar](#buttons-and-the-toolbar) |
@@ -81,6 +82,7 @@ The 2.x code is the comment at the top. The 3.0 code below it does the same:
 | `fonts.ui` | `theme.tokens.font` |
 | `fonts.signature` | `plugins.signature.fonts`: font files, each with a `key`, a `label` and a `url` |
 | `stamp.manifests` | `plugins.stamp.standard`: `true`, a URL, or `false` for none |
+| `fullscreen.targetElement` | Nothing: Full Screen fills the screen with the viewer. For an element of yours, give `view:fullscreen` your own `run`: see [Full screen](concepts/how-it-works#full-screen) |
 | Every other plugin's key: `zoom`, `scroll`, `annotations`, … | `plugins`, under the 3.0 plugin's name: see [Plugin settings](#plugin-settings) |
 
 ### Plugin settings
@@ -91,6 +93,8 @@ the headless docs lists them, with plain strings where 2.x had enums. The ones 2
 | 2.x | 3.0 |
 | :-- | :-- |
 | `zoom: { defaultZoomLevel: ZoomMode.FitWidth }` | `stage: { zoom: { mode: 'fit-width' } }` |
+| `zoom: { minZoom: 0.5, maxZoom: 4 }` | `stage: { minZoom: 0.5, maxZoom: 4 }` |
+| `zoom: { presets }` | The `zoom` menu: [change it](customize/menus#change-a-built-in-menu) |
 | `scroll: { defaultStrategy: ScrollStrategy.Horizontal }` | `stage: { layout: 'horizontal' }` |
 | `scroll: { defaultPageGap: 20 }` | `stage: { gap: 20 }` |
 | `spread: { defaultSpreadMode: SpreadMode.Odd }` | `stage: { spread: 'odd' }` |
@@ -108,6 +112,8 @@ All of them in one 3.0 config:
   plugins: {
     stage: {
       zoom: { mode: 'fit-width' },
+      minZoom: 0.5,
+      maxZoom: 4,
       layout: 'horizontal',
       gap: 20,
       spread: 'odd',
@@ -332,20 +338,17 @@ What 2.x had that 3.0 doesn't:
 
 - **Loading in parts.** 2.x's `mode: 'range-request'` fetched a big file a piece at a time. The
   built-in engine downloads the whole file first: see [Big files](documents#big-files).
-- **Request options.** For headers or credentials (`requestOptions`), fetch the file yourself and
-  give `src` its bytes or a `File`.
 - **A limit on open documents** (`maxDocuments`).
 - **The engine on the page's own thread** (`worker: false`), and its log (`log`). The engine
   always runs in a worker.
-- **Zoom limits and steps:** `minZoom`, `maxZoom`, `zoomStep`, `zoomRanges` and `presets`.
+- **Zoom steps:** `zoomStep` and `zoomRanges`. Zooming in and out steps through round levels: 100%,
+  125%, 150%, 200% and so on.
 - **The screenshot tool** (the `capture` plugin).
 - **Protect.** 2.x's Protect dialog, `setDocumentEncryption()` and `removeEncryption()`: 3.0 can't
   add or remove a document's password.
-- **Swedish and Traditional Chinese.** They aren't built in: add them with
-  [`strings`](customize/translations#a-language-of-your-own).
 - **Theme events:** `themechange`, `activeColorScheme` and `themePreference`.
-- **A few settings:** `export.defaultFileName`, `fullscreen.targetElement`, `i18n.fallbackLocale`
-  (English is the fallback) and `i18n.paramResolvers`.
+- **A few settings:** `export.defaultFileName`, `i18n.fallbackLocale` (English is the fallback)
+  and `i18n.paramResolvers`.
 
 ## Next steps
 

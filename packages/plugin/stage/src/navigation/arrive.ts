@@ -35,6 +35,7 @@ export function createArrival(
     camera,
     viewport,
     padding,
+    zoomLimits,
     paged,
     isFitAll,
     grouping,
@@ -75,7 +76,7 @@ export function createArrival(
       const current = buildScene();
       if (!current.itemCount) return;
       const item = current.items[current.itemOfPage(anchor.pageIndex)];
-      const zoom = resolveZoom(state().zoom, fitBox(item), viewport(), padding());
+      const zoom = resolveZoom(state().zoom, fitBox(item), viewport(), padding(), zoomLimits());
       // Resolved against the current viewport: a resize restores the anchor
       // to the new viewport's policy point (start/start keeps the top pinned).
       const at = alignPoint(align ?? state().anchorAlign, viewport());
@@ -114,7 +115,7 @@ export function createArrival(
       const current = buildScene(); // paged: the (possibly new) slice; continuous: the full scene
       if (!current.itemCount) return null;
       const item = paged() ? current.items[0] : current.items[itemIndexOfPage(target)];
-      const zoom = resolveZoom(state().zoom, fitBox(item), viewport(), padding());
+      const zoom = resolveZoom(state().zoom, fitBox(item), viewport(), padding(), zoomLimits());
       const subject = isFitAll()
         ? sceneRect()
         : fits(itemRect(item), zoom)

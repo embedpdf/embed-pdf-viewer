@@ -66,8 +66,8 @@ and the `watch` reactivity primitive. Inside the viewer's templates, inject
 when someone resizes a panel. When the viewer goes, its `viewer` is done: its
 listeners stop and its calls refuse.
 
-`src`, `theme`, `locale`, `disable` and `readOnly` follow their inputs while
-the viewer runs; every other input is read once, so render a new
+`src`, `theme`, `locale`, `disable`, `readOnly` and `fetch` follow their inputs
+while the viewer runs; every other input is read once, so render a new
 `<epdf-pdf-viewer>` (another `@if` branch) to start over with a changed one.
 
 ## Server-side rendering

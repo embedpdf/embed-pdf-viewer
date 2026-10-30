@@ -1,6 +1,6 @@
 /**
- * The layout's places, drawn: the bars along each edge of the viewer, and the
- * bars floating over the pages.
+ * The layout's places, drawn: the bars along each edge of the viewer, the bars
+ * floating over the pages, and the bars at the top of a panel.
  *
  * An edge's bars stack from the outside in, each followed by the bars that ride
  * along it on the side of the pages. Bars at `start` and `end` are vertical and
@@ -9,10 +9,12 @@
  * over the pages and under the bars over a selection. Each bar tells what opens
  * from it where it is ({@link BarEdgeProvider}). A bar with nothing visible
  * draws nothing, and a bar with a mode shows while that mode is open. On a
- * phone, a floating bar with the page number hides while the pages scroll.
+ * phone, a floating bar with the page number hides while the pages scroll. A
+ * panel's bars sit under its title, each in a band across the panel.
  */
 import {
   FLOAT_POSITIONS,
+  barsInPanel,
   commandOfUnit,
   edgeStackOf,
   floatStackOf,
@@ -242,5 +244,40 @@ function FloatingStack({ position, stack }: { position: FloatPosition; stack: re
         <FloatingBar key={id} id={id} position={position} />
       ))}
     </div>
+  );
+}
+
+// ── at the top of a panel ────────────────────────────────────────────────────
+
+/** One bar at the top of a panel: its toolbar in a band, or nothing when nothing in it is visible. */
+function BarInPanel({ id }: { id: string }) {
+  const bar = useResolvedLayout().bar(id);
+  const shows = useBarShows(bar);
+  if (!bar || !shows) return null;
+  // Under the panel's title, so what opens from it opens downward, as from a bar at the top.
+  return (
+    <BarEdgeProvider value="top">
+      <div
+        part="toolbar"
+        data-bar={id}
+        className="border-border-subtle flex shrink-0 items-center border-b p-2"
+      >
+        {/* As close together as a panel's own rows of buttons (gap-1). */}
+        <AppToolbar bar={bar} gap={4} className="w-full" />
+      </div>
+    </BarEdgeProvider>
+  );
+}
+
+/** The bars at the top of a panel, in the order they were added. */
+export function PanelBars({ panel }: { panel: string }) {
+  const { data } = useResolvedLayout();
+  const stack = useShownBars(useMemo(() => barsInPanel(data, panel), [data, panel]));
+  return (
+    <>
+      {stack.map((id) => (
+        <BarInPanel key={id} id={id} />
+      ))}
+    </>
   );
 }

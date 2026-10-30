@@ -169,6 +169,9 @@ export const de: Locale = {
         'doc-text-copy': 'Kopieren ist nicht zulässig',
         'doc-text-search': 'Suchen ist nicht zulässig',
       },
+      commentThread: {
+        more: 'Weitere Optionen',
+      },
       attachment: {
         add: 'Datei hinzufügen',
         save: 'Speichern',
@@ -595,6 +598,7 @@ export const de: Locale = {
       commentsStatusRejected: 'Abgelehnt',
       commentsStatusCancelled: 'Abgebrochen',
       commentsStatusCompleted: 'Abgeschlossen',
+      commentsMarkCompleted: 'Als abgeschlossen markieren',
       empty: 'In diesem Demo-Bereich gibt es noch nichts.',
       page: 'Seite {current} von {total}',
       goToPage: 'Gehe zu Seite',

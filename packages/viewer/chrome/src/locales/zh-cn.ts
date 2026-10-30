@@ -169,6 +169,9 @@ export const zhCN: Locale = {
         'doc-text-copy': '不允许复制',
         'doc-text-search': '不允许搜索',
       },
+      commentThread: {
+        more: '更多选项',
+      },
       attachment: {
         add: '添加文件',
         save: '保存',
@@ -592,6 +595,7 @@ export const zhCN: Locale = {
       commentsStatusRejected: '已拒绝',
       commentsStatusCancelled: '已取消',
       commentsStatusCompleted: '已完成',
+      commentsMarkCompleted: '标记为已完成',
       empty: '此演示面板暂无内容。',
       page: '第 {current} 页，共 {total} 页',
       goToPage: '转到页面',

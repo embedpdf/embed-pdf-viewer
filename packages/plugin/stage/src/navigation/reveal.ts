@@ -6,13 +6,7 @@
  * policy, and a resolved zoom becomes the zoom intent. A destination is a
  * positioned reveal of the spot it names.
  */
-import {
-  revealCamera,
-  ZOOM_MAX,
-  ZOOM_MIN,
-  type Camera,
-  type Rect as StageRect,
-} from '@embedpdf/core-stage';
+import { clampZoom, revealCamera, type Camera, type Rect as StageRect } from '@embedpdf/core-stage';
 import type { PageDestination, PluginContext, PageRef } from '@embedpdf/core';
 
 import type { GoToDestinationOptions, RevealAnchorValue, RevealOptions } from '../contract';
@@ -36,6 +30,7 @@ export function createReveal(
     camera,
     viewport,
     padding,
+    zoomLimits,
     paged,
     itemIndexOfPage,
     worldPageFrame,
@@ -155,7 +150,7 @@ export function createReveal(
       // A degenerate target (a point with a fit directive) only pans.
       if (!Number.isFinite(zoom) || zoom <= 0) zoom = camera().zoom;
       // A tiny rect fits at the zoom limit, centered, like any other zoom.
-      zoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom));
+      zoom = clampZoom(zoom, zoomLimits());
       const zoomChanged = zoomDirective !== 'keep';
       const anchor = options.anchor ?? {};
       return {

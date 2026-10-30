@@ -27,6 +27,7 @@ export type { StyleRecord } from './css-text';
 export { copySelection, wireSelectionClipboard } from './clipboard';
 export type { ClipboardSelectionSource, SelectionClipboardOptions } from './clipboard';
 export { bindCommandShortcuts, isMacPlatform } from './command-shortcuts';
+export { isFromTextField } from './text-field-event';
 export type {
   CommandShortcutOptions,
   ShortcutCommands,

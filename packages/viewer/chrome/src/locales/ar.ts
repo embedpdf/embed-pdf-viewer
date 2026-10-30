@@ -170,6 +170,9 @@ export const ar: Locale = {
         'doc-text-copy': 'لا يُسمح بالنسخ',
         'doc-text-search': 'لا يُسمح بالبحث',
       },
+      commentThread: {
+        more: 'خيارات إضافية',
+      },
       attachment: {
         add: 'إضافة ملف',
         save: 'حفظ',
@@ -593,6 +596,7 @@ export const ar: Locale = {
       commentsStatusRejected: 'مرفوض',
       commentsStatusCancelled: 'ملغى',
       commentsStatusCompleted: 'مكتمل',
+      commentsMarkCompleted: 'وضع علامة كمكتمل',
       empty: 'لا يوجد شيء هنا بعد في لوحة العرض التوضيحي هذه.',
       page: 'الصفحة {current} من {total}',
       goToPage: 'الانتقال إلى الصفحة',

@@ -85,7 +85,7 @@ export function createStandardCommands(
       shortcut: ['Mod+=', 'Mod+NumpadAdd'],
       categories: ['zoom'],
       run: (context) => stageOf(context)?.zoomIn(),
-      enabled: hasStage,
+      enabled: (context) => stageOf(context)?.canZoomIn() ?? false,
     },
     {
       id: 'zoom:out',
@@ -95,7 +95,7 @@ export function createStandardCommands(
       shortcut: ['Mod+-', 'Mod+NumpadSubtract'],
       categories: ['zoom'],
       run: (context) => stageOf(context)?.zoomOut(),
-      enabled: hasStage,
+      enabled: (context) => stageOf(context)?.canZoomOut() ?? false,
     },
     {
       id: 'zoom:fit-width',

@@ -3,7 +3,7 @@
   (never on the server) and destroys it when it unmounts; the components inside
   read it through composables. `engine`, `plugins` and `initialDocuments` are
   read once; `identity`, `scope`, `accent` and `page` are the viewer's settings
-  and follow the props.
+  and follow the props, and each download calls the latest `fetch`.
 -->
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, shallowRef, toRaw, watch } from 'vue';
@@ -13,6 +13,7 @@ import type {
   AnyPlugin,
   Engine,
   EngineFactory,
+  HostFetch,
   Identity,
   InitialDocument,
   Kernel,
@@ -52,6 +53,12 @@ const props = defineProps<{
   accent?: string;
   /** How pages look: `background` before the picture arrives, and the `shadow` under each page. */
   page?: Partial<ViewerPageSettings>;
+  /**
+   * How a document at a URL downloads: your own `fetch`, to add headers or cookies. It gets the
+   * URL and an `init` with the document's cancel `signal`, to pass on. Each download calls the
+   * latest one.
+   */
+  fetch?: HostFetch;
 }>();
 
 const emit = defineEmits<{
@@ -150,6 +157,11 @@ onMounted(() => {
       settings: settingsOf(),
       clock: browserClock(),
       printer: browserPrinter(),
+      fetch: (url, init) => {
+        // A plain call: the browser's own `fetch` refuses any other `this`.
+        const download = props.fetch ?? globalThis.fetch;
+        return download(url, init);
+      },
     });
   } catch (error) {
     // A plan or dependency error shows in the `error` slot.

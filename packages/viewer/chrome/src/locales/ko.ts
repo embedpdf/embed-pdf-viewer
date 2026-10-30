@@ -169,6 +169,9 @@ export const ko: Locale = {
         'doc-text-copy': '복사는 허용되지 않습니다',
         'doc-text-search': '검색은 허용되지 않습니다',
       },
+      commentThread: {
+        more: '추가 옵션',
+      },
       attachment: {
         add: '파일 추가',
         save: '저장',
@@ -593,6 +596,7 @@ export const ko: Locale = {
       commentsStatusRejected: '거부됨',
       commentsStatusCancelled: '취소됨',
       commentsStatusCompleted: '완료됨',
+      commentsMarkCompleted: '완료로 표시',
       empty: '이 데모 패널에는 아직 아무것도 없습니다.',
       page: '{current} / {total}페이지',
       goToPage: '페이지로 이동',
