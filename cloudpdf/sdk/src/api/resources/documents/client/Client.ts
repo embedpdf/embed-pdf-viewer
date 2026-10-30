@@ -352,6 +352,8 @@ export class DocumentsClient {
     }
 
     /**
+     * An upload token commits only the documents it started; any other document answers 404.
+     *
      * @param {CloudPDF.DocumentsCommitRequest} request
      * @param {DocumentsClient.RequestOptions} requestOptions - Request-specific configuration.
      *
@@ -565,12 +567,13 @@ export class DocumentsClient {
     }
 
     /**
-     * This bounded origin-mediated fallback must only be used after documents.init returns upload.kind=proxy. Auto mode prefers a presigned object-store PUT whenever available.
+     * This bounded origin-mediated fallback must only be used after documents.init returns upload.kind=proxy. Auto mode prefers a presigned object-store PUT whenever available. An upload token sends files only to the documents it started.
      *
      * @param {CloudPDF.UploadProxyDocumentsRequest} request
      * @param {DocumentsClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link CloudPDF.BadRequestError}
+     * @throws {@link CloudPDF.NotFoundError}
      * @throws {@link CloudPDF.ConflictError}
      * @throws {@link errors.CloudPDFError}
      * @throws {@link errors.CloudPDFTimeoutError}
@@ -634,6 +637,8 @@ export class DocumentsClient {
             switch (_response.error.statusCode) {
                 case 400:
                     throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                case 404:
+                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
                 case 409:
                     throw new CloudPDF.ConflictError(_response.error.body as unknown, _response.rawResponse);
                 default:
@@ -747,10 +752,13 @@ export class DocumentsClient {
     }
 
     /**
+     * With an upload token, the document goes into the token's folder with the token's metadata, whatever the request says; contentLength must be within the token's maxBytes, and the token makes at most maxFiles documents (403 after). docId, idempotencyKey and dedupMode reuse-existing are refused (400): each could reach a document the token didn't make.
+     *
      * @param {CloudPDF.DocumentsInitRequest} request
      * @param {DocumentsClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link CloudPDF.BadRequestError}
+     * @throws {@link CloudPDF.ForbiddenError}
      * @throws {@link errors.CloudPDFError}
      * @throws {@link errors.CloudPDFTimeoutError}
      *
@@ -806,6 +814,8 @@ export class DocumentsClient {
             switch (_response.error.statusCode) {
                 case 400:
                     throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                case 403:
+                    throw new CloudPDF.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,

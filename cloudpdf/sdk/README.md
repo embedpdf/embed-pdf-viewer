@@ -13,6 +13,7 @@ The official TypeScript SDK for the CloudPDF API.
 - [Request and Response Types](#request-and-response-types)
 - [Exception Handling](#exception-handling)
 - [File Uploads](#file-uploads)
+- [Uploads From the Browser](#uploads-from-the-browser)
 - [Binary Response](#binary-response)
 - [Advanced](#advanced)
   - [Subpackage Exports](#subpackage-exports)
@@ -110,6 +111,36 @@ intentionally rejected: the server pins size and hash during init, before any
 bytes are transferred. Set `uploadPreference: "proxy"` only when the server is
 configured to allow its bounded multipart fallback.
 
+`onProgress` reports the bytes sent as they go.
+
+## Uploads From the Browser
+
+A user's browser can upload a PDF straight to CloudPDF, so the file never passes
+through your server and your API key never leaves it. Your server makes an
+upload token, which says where the file goes and runs out in minutes:
+
+```typescript
+const { token } = await client.tokens.issue({
+    tenantId: "tenant_123",
+    body: { kind: "upload", sub: user.id, folderId, metadata: { contractId }, expiresIn: 600 },
+});
+```
+
+The page imports only the upload entry, about 3 KB gzipped, with nothing from
+Node or the rest of the SDK:
+
+```typescript
+import { upload } from "@cloudpdf/sdk/upload";
+
+const { document } = await upload(file, {
+    token,
+    onProgress: (loaded, total) => console.log(`${loaded}/${total}`),
+});
+```
+
+The token uploads into its folder with its metadata, up to `maxFiles` documents
+(one by default), and nothing else. `upload()` takes `name`, `signal` and, for
+your own CloudPDF server, `baseUrl`.
 
 ## Binary Response
 

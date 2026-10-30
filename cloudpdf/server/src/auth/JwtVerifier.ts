@@ -85,6 +85,7 @@ export interface TenantClaims extends BaseClaims {
   doc_id?: never;
   layer_name?: never;
   origins?: never;
+  upload?: never;
 }
 
 /**
@@ -119,6 +120,7 @@ export interface DocUserClaims extends BaseClaims {
    * It is never a bearer token. Needs `layer_name`.
    */
   download?: DownloadLinkClaim;
+  upload?: never;
 }
 
 /** What a download link downloads: the layer at `docVersion`, saved incrementally. */
@@ -128,17 +130,50 @@ export interface DownloadLinkClaim {
 }
 
 /**
- * The verified-and-typed claims object. A `JwtClaims` is *always*
- * exactly one of tenant / doc — class is determined by the presence
- * of `doc_id`. Both classes carry a `scope` field, but the value
- * type differs (TenantScope vs DocScope); TypeScript narrows it
- * correctly after a class-guard call (`isTenantClaims` /
- * `isDocUserClaims`).
+ * Upload token: a browser uploads into one tenant with it, and does
+ * nothing else. Minted by `tokens.issue` (kind `upload`) for a server
+ * that can upload itself; the auth hook admits it only on the upload
+ * routes (`UPLOAD_TOKEN_OPERATIONS`), which take where the file goes
+ * and what it carries from the `upload` claim, never from the request.
  *
- * Route helpers narrow with `isDocUserClaims(claims)` /
- * `isTenantClaims(claims)` rather than reading fields directly.
+ * It carries no `scope`: no tenant or document guard can read it as
+ * one of theirs. Its `jti` is required, since the documents it starts
+ * record it and commit checks it.
  */
-export type JwtClaims = TenantClaims | DocUserClaims;
+export interface UploadClaims extends BaseClaims {
+  jti: string;
+  upload: UploadClaim;
+  /** Origin lock, enforced as a doc token's is. Absent = any origin. */
+  origins?: ReadonlyArray<string>;
+  scope?: never;
+  doc_id?: never;
+  layer_name?: never;
+}
+
+/** What an upload token may upload. */
+export interface UploadClaim {
+  /** The folder every upload goes into; null is the top level. */
+  folder_id: string | null;
+  /** Put on every document the token uploads. */
+  metadata?: Record<string, unknown>;
+  /** How many documents the token may start. */
+  max_files: number;
+  /** The largest file it takes, in bytes. Absent = no limit of its own. */
+  max_bytes?: number;
+}
+
+/**
+ * The verified-and-typed claims object. A `JwtClaims` is *always*
+ * exactly one of tenant / doc / upload — class is determined by the
+ * presence of `doc_id`, then of `upload`. Tenant and doc tokens both
+ * carry a `scope` field, but the value type differs (TenantScope vs
+ * DocScope); TypeScript narrows it correctly after a class-guard call
+ * (`isTenantClaims` / `isDocUserClaims` / `isUploadClaims`).
+ *
+ * Route helpers narrow with the class guards rather than reading
+ * fields directly.
+ */
+export type JwtClaims = TenantClaims | DocUserClaims | UploadClaims;
 
 /**
  * Operations a tenant principal can be authorised for. `*` is a
@@ -637,11 +672,33 @@ function coerceClaims(payload: JWTPayload): JwtClaims {
     // a misconfigured token.
     throw new Error('jwt layer_name requires doc_id');
   }
+  const upload = coerceUploadClaim(payload);
+  if (upload) {
+    // An upload token uploads, and nothing else: anything that would
+    // let a guard read it as a doc or tenant token makes it malformed.
+    if (docId !== undefined || layerName !== undefined || scope !== undefined) {
+      throw new Error('jwt upload must not carry doc_id, layer_name or scope');
+    }
+    if (typeof payload.jti !== 'string' || payload.jti.length === 0) {
+      throw new Error('jwt upload requires jti');
+    }
+    if ((payload as { download?: unknown }).download !== undefined) {
+      throw new Error('jwt upload must not carry download');
+    }
+    const out: UploadClaims = {
+      ...base,
+      jti: payload.jti,
+      upload,
+      ...(origins !== undefined ? { origins } : {}),
+    };
+    return out;
+  }
+
   if (origins !== undefined && docId === undefined) {
     // Same shape of mistake as layer_name: an origin lock exists to
-    // constrain browser presentation, and only doc tokens reach
-    // browsers. A tenant token carrying one was mis-minted.
-    throw new Error('jwt origins requires doc_id');
+    // constrain browser presentation, and only doc and upload tokens
+    // reach browsers. A tenant token carrying one was mis-minted.
+    throw new Error('jwt origins requires doc_id or upload');
   }
 
   const download = coerceDownloadClaim(payload);
@@ -686,6 +743,40 @@ function coerceClaims(payload: JWTPayload): JwtClaims {
   const tenantScope = (scope ?? []) as ReadonlyArray<TenantScope | DocScope>;
   const out: TenantClaims = { ...base, scope: tenantScope };
   return out;
+}
+
+/** The `upload` claim (see `UploadClaims`); a malformed one rejects the token. */
+function coerceUploadClaim(payload: JWTPayload): UploadClaim | undefined {
+  const value = (payload as Record<string, unknown>).upload;
+  if (value === undefined) return undefined;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('jwt upload must be an object');
+  }
+  const { folder_id, metadata, max_files, max_bytes } = value as Record<string, unknown>;
+  if (folder_id !== null && (typeof folder_id !== 'string' || folder_id.length === 0)) {
+    throw new Error('jwt upload.folder_id must be a folder id or null');
+  }
+  if (
+    metadata !== undefined &&
+    (!metadata || typeof metadata !== 'object' || Array.isArray(metadata))
+  ) {
+    throw new Error('jwt upload.metadata must be an object');
+  }
+  if (typeof max_files !== 'number' || !Number.isInteger(max_files) || max_files < 1) {
+    throw new Error('jwt upload.max_files must be a positive integer');
+  }
+  if (
+    max_bytes !== undefined &&
+    (typeof max_bytes !== 'number' || !Number.isInteger(max_bytes) || max_bytes < 1)
+  ) {
+    throw new Error('jwt upload.max_bytes must be a positive integer');
+  }
+  return {
+    folder_id,
+    ...(metadata !== undefined ? { metadata: metadata as Record<string, unknown> } : {}),
+    max_files,
+    ...(max_bytes !== undefined ? { max_bytes } : {}),
+  };
 }
 
 /** The `download` claim (see `DocUserClaims.download`); a malformed one rejects the token. */
@@ -764,17 +855,23 @@ function optionalString(record: Record<string, unknown>, key: string): string | 
 }
 
 /**
- * Type guard for tenant-class tokens. The `?: never` discriminator
- * on the union means the absence of `doc_id` is sufficient to
- * commit to the tenant branch.
+ * Type guard for tenant-class tokens: neither a `doc_id` nor an
+ * `upload` claim. An upload token carries no scope, and must never
+ * reach a tenant guard as a tenant token with an empty one.
  */
 export function isTenantClaims(claims: JwtClaims): claims is TenantClaims {
-  return typeof (claims as { doc_id?: unknown }).doc_id !== 'string';
+  return !isDocUserClaims(claims) && !isUploadClaims(claims);
 }
 
 /** Type guard for doc-scoped tokens. */
 export function isDocUserClaims(claims: JwtClaims): claims is DocUserClaims {
   return typeof (claims as { doc_id?: unknown }).doc_id === 'string';
+}
+
+/** Type guard for upload tokens. */
+export function isUploadClaims(claims: JwtClaims): claims is UploadClaims {
+  const upload = (claims as { upload?: unknown }).upload;
+  return typeof upload === 'object' && upload !== null;
 }
 
 /**
@@ -838,8 +935,10 @@ export interface SignDevTokenInput {
   doc_id?: string;
   /** Optional layer pin; only valid with `doc_id`. */
   layer_name?: string;
-  /** Optional origin lock; only valid with `doc_id`. */
+  /** Optional origin lock; only valid with `doc_id` or `upload`. */
   origins?: ReadonlyArray<string>;
+  /** Upload token. Never with `doc_id` or `scope`; needs `jti`. */
+  upload?: UploadClaim;
   jti?: string;
   extras?: JwtClaimsExtras;
 }
@@ -848,8 +947,11 @@ export function signDevToken(secret: string | Buffer, input: SignDevTokenInput):
   if (input.layer_name && !input.doc_id) {
     throw new Error('signDevToken: layer_name requires doc_id');
   }
-  if (input.origins && !input.doc_id) {
-    throw new Error('signDevToken: origins requires doc_id');
+  if (input.origins && !input.doc_id && !input.upload) {
+    throw new Error('signDevToken: origins requires doc_id or upload');
+  }
+  if (input.upload && (input.doc_id || input.scope || !input.jti)) {
+    throw new Error('signDevToken: upload needs jti, and never doc_id or scope');
   }
   const now = Math.floor(Date.now() / 1000);
   const ttl = input.ttlSeconds ?? 3600;
@@ -862,6 +964,7 @@ export function signDevToken(secret: string | Buffer, input: SignDevTokenInput):
     ...(input.doc_id ? { doc_id: input.doc_id } : {}),
     ...(input.layer_name ? { layer_name: input.layer_name } : {}),
     ...(input.origins ? { origins: input.origins } : {}),
+    ...(input.upload ? { upload: input.upload } : {}),
     ...(input.jti ? { jti: input.jti } : {}),
     ...(input.extras ?? {}),
   };

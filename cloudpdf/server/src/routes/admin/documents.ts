@@ -19,7 +19,12 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { decodeSortedListCursor, encodeSortedListCursor } from './_cursor';
 import { formatIssues } from './_issues';
 import { folderIdOfPlace, placeOfFolderId, ROOT_PLACE } from './_place';
-import { requireTenantAccess, requireTenantContentAccess } from '../../app/jwt-plugin';
+import {
+  requireTenantAccess,
+  requireTenantContentAccess,
+  requireUploadAccess,
+  type UploadAccessContext,
+} from '../../app/jwt-plugin';
 import { listPositionOf } from '../../db/repos/documents.repo';
 import type { DocumentLifecycleService } from '../../services/DocumentLifecycleService';
 import type { ObjectStore } from '../../storage/ObjectStore';
@@ -76,8 +81,16 @@ export async function registerAdminDocumentsRoutes(
   const initOp = adminOperations['documents.init'];
   mount(initOp, async (req, reply) => {
     const { tenantId } = req.params as { tenantId: string };
-    const ctx = requireTenantAccess(req, tenantId, initOp.scope);
+    const ctx = requireUploadAccess(req, tenantId, initOp.scope);
     const body = parseInitBody(req);
+    // An upload token decides where the file goes and what it carries.
+    const filing =
+      ctx.via === 'upload-jwt'
+        ? uploadTokenFiling(ctx, body)
+        : {
+            folderId: folderIdOfPlace(body.folderId ?? ROOT_PLACE),
+            metadata: body.metadata ?? null,
+          };
 
     const result = await lifecycle.init({
       tenantId: ctx.tenantId,
@@ -85,13 +98,22 @@ export async function registerAdminDocumentsRoutes(
       contentLength: body.contentLength,
       contentSha256: body.contentSha256,
       name: body.name,
-      folderId: folderIdOfPlace(body.folderId ?? ROOT_PLACE),
-      metadata: body.metadata ?? null,
+      folderId: filing.folderId,
+      metadata: filing.metadata,
       idempotencyKey: body.idempotencyKey ?? null,
       dedupMode: body.dedupMode,
       docId: body.docId,
       uploadTtlSec: body.uploadTtlSec,
       uploadPreference: body.uploadPreference,
+      ...(ctx.via === 'upload-jwt'
+        ? {
+            uploadToken: {
+              jti: ctx.jti,
+              maxFiles: ctx.upload.max_files,
+              expiresAt: ctx.expiresAt,
+            },
+          }
+        : {}),
     });
 
     if (result.tag === 'deduped') {
@@ -120,8 +142,11 @@ export async function registerAdminDocumentsRoutes(
   const commitOp = adminOperations['documents.commit'];
   mount(commitOp, async (req, reply) => {
     const { tenantId, id } = req.params as { tenantId: string; id: string };
-    const ctx = requireTenantAccess(req, tenantId, commitOp.scope);
+    const ctx = requireUploadAccess(req, tenantId, commitOp.scope);
     const body = parseCommitBody(req);
+    if (ctx.via === 'upload-jwt') {
+      await lifecycle.requireStartedByUploadToken(ctx.tenantId, id, ctx.jti);
+    }
 
     const result = await lifecycle.commit({
       tenantId: ctx.tenantId,
@@ -134,7 +159,10 @@ export async function registerAdminDocumentsRoutes(
   const uploadProxyOp = adminOperations['documents.uploadProxy'];
   mount(uploadProxyOp, async (req, reply) => {
     const { tenantId, id } = req.params as { tenantId: string; id: string };
-    const ctx = requireTenantAccess(req, tenantId, uploadProxyOp.scope);
+    const ctx = requireUploadAccess(req, tenantId, uploadProxyOp.scope);
+    if (ctx.via === 'upload-jwt') {
+      await lifecycle.requireStartedByUploadToken(ctx.tenantId, id, ctx.jti);
+    }
 
     // Proxy uploads are deliberately multipart-only. That shape is portable
     // across Fern's generators and, unlike the previous implementation, we
@@ -297,6 +325,36 @@ export async function registerAdminDocumentsRoutes(
       .header('Cache-Control', 'private, max-age=60')
       .send(Buffer.from(bytes));
   });
+}
+
+/**
+ * Where an upload token's document goes and what it carries: the
+ * token's folder and metadata, never the request's. Refuses what could
+ * reach a document the token didn't make (a chosen id, a retry key, an
+ * existing file), and a file larger than the token takes.
+ */
+function uploadTokenFiling(
+  ctx: UploadAccessContext,
+  body: AdminDocumentInitRequest,
+): { folderId: string | null; metadata: Record<string, unknown> | null } {
+  if (body.docId !== undefined) {
+    throw makeError('InvalidArg', 400, 'an upload token cannot choose the document id');
+  }
+  if (body.idempotencyKey !== undefined) {
+    throw makeError('InvalidArg', 400, 'an upload token cannot use an idempotencyKey');
+  }
+  if (body.dedupMode === 'reuse-existing') {
+    throw makeError('InvalidArg', 400, 'an upload token always makes a new document');
+  }
+  const { max_bytes: maxBytes } = ctx.upload;
+  if (maxBytes !== undefined && body.contentLength > maxBytes) {
+    throw makeError(
+      'InvalidArg',
+      400,
+      `the file is ${body.contentLength} bytes; this upload token takes at most ${maxBytes}`,
+    );
+  }
+  return { folderId: ctx.upload.folder_id, metadata: ctx.upload.metadata ?? null };
 }
 
 function parseInitBody(req: FastifyRequest): AdminDocumentInitRequest {

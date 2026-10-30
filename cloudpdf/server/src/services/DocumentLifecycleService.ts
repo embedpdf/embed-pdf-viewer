@@ -20,6 +20,7 @@ import {
 import type { GrantsRepo } from '../db/repos/grants.repo';
 import type { TenantUsageRepo } from '../db/repos/tenant_usage.repo';
 import { TenantsRepo } from '../db/repos/tenants.repo';
+import type { UploadTokenUsesRepo } from '../db/repos/upload_token_uses.repo';
 import type { Database as Schema } from '../db/schema';
 import type { ImportPolicy } from '../import/config/ImportPolicySchema';
 import { createImportSource } from '../import/createImportSource';
@@ -113,6 +114,12 @@ export interface InitInput {
   uploadTtlSec?: number;
   /** Preferred transfer path. `auto` keeps object storage off the origin. */
   uploadPreference?: UploadPreference;
+  /**
+   * The upload token starting this document, when one is: the row
+   * records its `jti`, and the token starts at most `maxFiles` documents.
+   * `expiresAt` (epoch ms) is when the token runs out.
+   */
+  uploadToken?: { jti: string; maxFiles: number; expiresAt: number };
 }
 
 export type InitResult =
@@ -180,6 +187,8 @@ export interface DocumentLifecycleOptions {
   tenantUsage?: TenantUsageRepo;
   /** When present, document delete revokes the document's grants. */
   grants?: GrantsRepo;
+  /** Upload tokens' uses; without it, init refuses upload tokens. */
+  uploadTokenUses?: UploadTokenUsesRepo;
   /** Controls whether origin-mediated uploads may be selected. */
   uploadProxyPolicy?: UploadProxyPolicy;
   /**
@@ -236,6 +245,7 @@ export class DocumentLifecycleService {
   private readonly usageMeters?: UsageMeters;
   private readonly tenantUsage?: TenantUsageRepo;
   private readonly grants?: GrantsRepo;
+  private readonly uploadTokenUses?: UploadTokenUsesRepo;
   private readonly uploadProxyPolicy: UploadProxyPolicy;
   private readonly importPolicy?: ImportPolicy;
   private readonly importConnections: ImportConnectionRegistry;
@@ -258,6 +268,7 @@ export class DocumentLifecycleService {
     this.usageMeters = opts.usageMeters;
     this.tenantUsage = opts.tenantUsage;
     this.grants = opts.grants;
+    this.uploadTokenUses = opts.uploadTokenUses;
     this.uploadProxyPolicy = opts.uploadProxyPolicy ?? 'fallback-only';
     if (opts.importPolicy) this.importPolicy = opts.importPolicy;
     this.importConnections = opts.importConnections ?? new ImportConnectionRegistry();
@@ -313,24 +324,53 @@ export class DocumentLifecycleService {
       throw badRequest(`docId must be at least 2 characters: ${docId}`);
     }
     await this.requireFolder(input.tenantId, input.folderId);
+    await this.claimUploadTokenUse(input);
 
-    const created = await this.documents.createPending({
-      id: docId,
-      tenantId: input.tenantId,
-      name: input.name ?? docId,
-      folderId: input.folderId ?? null,
-      metadata: input.metadata ?? null,
-      idempotencyKey: input.idempotencyKey ?? null,
-      createdBy: input.sub,
-      expectedSha256: input.contentSha256,
-      expectedSizeBytes: input.contentLength,
-    });
+    const created = await this.documents
+      .createPending({
+        id: docId,
+        tenantId: input.tenantId,
+        name: input.name ?? docId,
+        folderId: input.folderId ?? null,
+        metadata: input.metadata ?? null,
+        idempotencyKey: input.idempotencyKey ?? null,
+        createdBy: input.sub,
+        expectedSha256: input.contentSha256,
+        expectedSizeBytes: input.contentLength,
+        uploadTokenJti: input.uploadToken?.jti ?? null,
+      })
+      .catch(async (err: unknown) => {
+        if (input.uploadToken) await this.uploadTokenUses?.release(input.uploadToken.jti);
+        throw err;
+      });
 
     // A concurrent request can win the idempotency-key insert between the
     // lookup and createPending. Validate the row returned from that race too.
     if (!created.created) this.assertSameUploadIntent(created.row, input);
 
     return { tag: created.created ? 'created' : 'resumed', doc: created.row };
+  }
+
+  /**
+   * Takes one of the upload token's uses before its document is made, in
+   * one statement, so no number of racing inits starts more than
+   * `maxFiles` documents.
+   */
+  private async claimUploadTokenUse(input: InitInput): Promise<void> {
+    if (!input.uploadToken) return;
+    if (!this.uploadTokenUses) throw new Error('upload tokens need the upload-token uses repo');
+    const { jti, maxFiles, expiresAt } = input.uploadToken;
+    const claimed = await this.uploadTokenUses.claim({
+      jti,
+      tenantId: input.tenantId,
+      maxFiles,
+      expiresAt,
+    });
+    if (!claimed) {
+      throw forbiddenError(
+        `this upload token uploads at most ${maxFiles} ${maxFiles === 1 ? 'file' : 'files'}`,
+      );
+    }
   }
 
   private buildUploadKey(docId: string, tenantId: string): string {
@@ -1068,6 +1108,23 @@ export class DocumentLifecycleService {
 
   async get(tenantId: string, docId: string): Promise<DocumentRow> {
     return this.documents.requireOwned(docId, tenantId);
+  }
+
+  /**
+   * A document the upload token `jti` started, in its tenant. Any other
+   * document is `NotFound`, as if it didn't exist: the token mustn't
+   * learn about documents it didn't make.
+   */
+  async requireStartedByUploadToken(
+    tenantId: string,
+    docId: string,
+    jti: string,
+  ): Promise<DocumentRow> {
+    const doc = await this.documents.findById(docId);
+    if (!doc || doc.tenantId !== tenantId || doc.uploadTokenJti !== jti) {
+      throw notFound(`document not found: ${docId}`);
+    }
+    return doc;
   }
 
   /** Throws `NotFound` for a document that is gone or being deleted, `Forbidden` across tenants. */

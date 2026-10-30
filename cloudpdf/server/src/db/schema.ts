@@ -102,6 +102,8 @@ export interface DocumentsTable {
   created_at: number;
   updated_at: number;
   created_by: string | null;
+  /** The upload token that started this document (migration 048); null otherwise. */
+  upload_token_jti: string | null;
 }
 
 export interface DocumentPagesTable {
@@ -450,6 +452,21 @@ export interface SchemaMigrationsTable {
  * request. Fronted by `RevokedJtisGuard`'s in-memory LRU so the DB
  * round-trip happens only on cache misses.
  */
+/**
+ * An upload token's uses (migration 048): how many documents it has
+ * started. Init takes one atomically before it makes the document, so
+ * concurrent inits can't start more than the token's `max_files`.
+ */
+export interface UploadTokenUsesTable {
+  /** The upload token's id; PK. */
+  jti: string;
+  tenant_id: string;
+  /** Documents the token has started. */
+  files: number;
+  /** When the token runs out, epoch ms: after it, the row is only history. */
+  expires_at: number;
+}
+
 export interface RevokedJtisTable {
   /** Opaque token id; PK. */
   jti: string;
@@ -730,6 +747,7 @@ export interface Database {
   engine_quarantine_audit: EngineQuarantineAuditTable;
   schema_migrations: SchemaMigrationsTable;
   revoked_jtis: RevokedJtisTable;
+  upload_token_uses: UploadTokenUsesTable;
   jwks_cache: JwksCacheTable;
   license_runtime_state: LicenseRuntimeStateTable;
   license_usage_counter: LicenseUsageCounterTable;

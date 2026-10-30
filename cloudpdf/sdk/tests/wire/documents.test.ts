@@ -601,4 +601,28 @@ describe("DocumentsClient", () => {
             });
         }).rejects.toThrow(CloudPDF.BadRequestError);
     });
+
+    test("init (3)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = { contentLength: 1, contentSha256: "contentSha256" };
+        const rawResponseBody = { key: "value" };
+
+        server
+            .mockEndpoint()
+            .post("/v1/tenants/tenantId/documents/init")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(403)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        await expect(async () => {
+            return await client.documents.init({
+                tenantId: "tenantId",
+                contentLength: 1,
+                contentSha256: "contentSha256",
+            });
+        }).rejects.toThrow(CloudPDF.ForbiddenError);
+    });
 });

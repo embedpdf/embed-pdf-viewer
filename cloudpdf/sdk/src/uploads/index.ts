@@ -1,6 +1,8 @@
-export { Uploads } from "./Uploads.js";
 export type {
     DedupMode,
+    PreparedUploadSource,
+    PrepareUploadSource,
+    PresignedTransfer,
     ReopenableUploadSource,
     UploadCreateInput,
     UploadCreateResult,
@@ -8,3 +10,4 @@ export type {
     UploadProtocol,
     UploadSource,
 } from "./types.js";
+export { Uploads } from "./Uploads.js";

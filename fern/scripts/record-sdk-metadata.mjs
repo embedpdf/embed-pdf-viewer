@@ -122,6 +122,22 @@ if (language === 'typescript') {
   manifest.scripts.test = 'vitest run';
   manifest.scripts['test:unit'] = 'vitest run --project unit';
   manifest.scripts['test:wire'] = 'vitest run --project wire';
+  // The browser upload entry (`src/upload.ts`, handwritten, in .fernignore)
+  // is an entry Fern doesn't know of. Pages import only it, so it gets its
+  // own export, in Fern's shape, before `./package.json`.
+  if (!manifest.exports?.['./package.json']) {
+    throw new Error('TypeScript package exports changed shape; revisit the ./upload export');
+  }
+  const { './package.json': packageJsonExport, ...entries } = manifest.exports;
+  manifest.exports = {
+    ...entries,
+    './upload': {
+      import: { types: './dist/esm/upload.d.mts', default: './dist/esm/upload.mjs' },
+      require: { types: './dist/cjs/upload.d.ts', default: './dist/cjs/upload.js' },
+      default: './dist/cjs/upload.js',
+    },
+    './package.json': packageJsonExport,
+  };
   writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 4)}\n`);
 }
 

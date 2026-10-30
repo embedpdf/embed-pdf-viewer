@@ -72,6 +72,8 @@ export interface DocumentRow {
   createdAt: number;
   updatedAt: number;
   createdBy: string | null;
+  /** The upload token that started this document; null for every other upload. */
+  uploadTokenJti: string | null;
 }
 
 export type DocumentThumbnailState = 'pending' | 'ready' | 'locked' | 'failed';
@@ -87,6 +89,8 @@ export interface CreatePendingInput {
   createdBy: string | null;
   expectedSha256?: string | null;
   expectedSizeBytes?: number | null;
+  /** The upload token starting this document, when one is. */
+  uploadTokenJti?: string | null;
 }
 
 export interface SetUploadIntentInput {
@@ -156,6 +160,7 @@ export class DocumentsRepo {
           created_at: now,
           updated_at: now,
           created_by: input.createdBy,
+          upload_token_jti: input.uploadTokenJti ?? null,
         })
         .execute();
     } catch (err) {
@@ -531,6 +536,7 @@ function mapRow(r: {
   created_at: number;
   updated_at: number;
   created_by: string | null;
+  upload_token_jti?: string | null;
 }): DocumentRow {
   return {
     id: r.id,
@@ -568,6 +574,7 @@ function mapRow(r: {
     createdAt: r.created_at,
     updatedAt: r.updated_at,
     createdBy: r.created_by,
+    uploadTokenJti: r.upload_token_jti ?? null,
   };
 }
 
