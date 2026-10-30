@@ -49,7 +49,7 @@ export class UploadError extends Error {
 
 /** Uploads a PDF from the browser with an upload token, and returns the document. */
 export async function upload(file: Blob, options: UploadOptions): Promise<UploadResult> {
-    const baseUrl = (options.baseUrl ?? CloudPDFEnvironment.Saas).replace(/\/+$/, "");
+    const baseUrl = withoutTrailingSlashes(options.baseUrl ?? CloudPDFEnvironment.Saas);
     const uploads = new Uploads<CloudPDF.DocumentsCommit200Response.Document>(
         tokenProtocol(baseUrl, options.token),
         prepareInBrowser,
@@ -177,6 +177,13 @@ function tenantOf(token: string): string {
         throw new Error("upload(): `token` must be an upload token (tokens.issue with kind 'upload')");
     }
     return claims.tenant_id;
+}
+
+/** Drops trailing slashes without a regex, which is quadratic on a long run of slashes. */
+function withoutTrailingSlashes(url: string): string {
+    let end = url.length;
+    while (end > 0 && url.charCodeAt(end - 1) === 0x2f /* '/' */) end -= 1;
+    return url.slice(0, end);
 }
 
 function nameOf(file: Blob): string | undefined {

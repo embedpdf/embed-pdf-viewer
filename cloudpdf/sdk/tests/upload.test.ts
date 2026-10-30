@@ -91,7 +91,7 @@ describe("upload() from the browser", () => {
     it("uses your own server when given baseUrl, and your name over the file's", async () => {
         const calls = stubCloudPDF();
 
-        await upload(file, { token: uploadToken(), baseUrl: "https://pdf.fernquill.example/", name: "Contract.pdf" });
+        await upload(file, { token: uploadToken(), baseUrl: "https://pdf.fernquill.example//", name: "Contract.pdf" });
 
         expect(calls[0]!.url).toBe("https://pdf.fernquill.example/v1/tenants/fernquill/documents/init");
         expect(JSON.parse(String(calls[0]!.init.body)).name).toBe("Contract.pdf");
