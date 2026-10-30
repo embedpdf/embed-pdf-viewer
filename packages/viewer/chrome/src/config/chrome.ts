@@ -33,19 +33,21 @@ export const DEFAULT_LAYOUT: LayoutData = {
       place: 'top',
       // The start section sits left-aligned: document menu, view, the zoom
       // field, pan and pointer. Only the mode tabs are truly centered.
+      // On a phone, after pan and pointer, the View menu and zoom make room
+      // (a finger pinches to zoom) before the folded mode tabs.
       start: [
         { id: 'document', items: ['menu:document'], importance: 5 },
         {
           id: 'view',
           items: [{ command: 'panel:thumbnails', importance: 5 }, 'menu:view'],
-          importance: 4,
+          importance: 3,
         },
         // The zoom field; when it can't fit it draws its 'button' variant,
         // and in the "More" menu it stands in as menu:zoom.
         {
           id: 'zoom',
           items: [{ custom: 'zoom', command: 'menu:zoom', variants: ['inline', 'button'] }],
-          importance: 4,
+          importance: 3,
         },
         { id: 'tools', items: ['tool:pan', 'tool:pointer'], importance: 2 },
       ],
