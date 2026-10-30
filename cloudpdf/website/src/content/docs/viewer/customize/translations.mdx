@@ -19,12 +19,12 @@ or with `'auto'`, the viewer follows the browser.
 
 ## The languages it speaks
 
-English, German, French, Spanish, Italian, Dutch, Portuguese, Polish, Japanese, Chinese
-(Simplified), Korean, Arabic and Hebrew. Each one loads only when it's needed. For Arabic and
-Hebrew, the viewer is right-to-left: the bars mirror, and `start` and `end` swap sides.
+English, German, French, Spanish, Italian, Dutch, Portuguese, Polish, Swedish, Japanese, Chinese
+(Simplified and Traditional), Korean, Arabic and Hebrew. Each one loads only when it's needed. For
+Arabic and Hebrew, the viewer is right-to-left: the bars mirror, and `start` and `end` swap sides.
 
-A language matches in its own script: readers of Traditional Chinese (`zh-TW`, `zh-HK`) see English,
-not Simplified Chinese, until there are strings for `zh-TW`.
+A language matches in its own script: readers in Taiwan and Hong Kong (`zh-TW`, `zh-HK`) see
+Traditional Chinese, and readers in China and Singapore (`zh-CN`, `zh-SG`) Simplified.
 
 ## Change a word
 
@@ -66,13 +66,12 @@ form field's settings by theirs (`form.settings.tooltip`). Change one like any o
 ## A language of your own
 
 Give `strings` for a language the viewer doesn't have, and it becomes one of its languages. Anything
-you don't translate shows in English, or in the plugins' own words where they have that language
-(in Swedish, the zoom, page and copy buttons):
+you don't translate shows in English:
 
 ```js
 {
-  locale: 'sv',
-  strings: { sv: { 'document:download': 'Ladda ner', 'zoom:in': 'Zooma in' } },
+  locale: 'da',
+  strings: { da: { 'document:download': 'Hent', 'zoom:in': 'Zoom ind' } },
 }
 ```
 

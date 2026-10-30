@@ -183,8 +183,9 @@ function ZoomControls() {
             <button
               type="button"
               title={zoomOut.label}
+              disabled={!zoomOut.enabled}
               part={buttonPart(false)}
-              className={buttonClass(false)}
+              className={buttonClass(false, zoomOut.enabled)}
               onClick={() => commands.execute('zoom:out')}
             >
               <Icon name="zoomOut" size={20} />
@@ -194,8 +195,9 @@ function ZoomControls() {
             <button
               type="button"
               title={zoomIn.label}
+              disabled={!zoomIn.enabled}
               part={buttonPart(false)}
-              className={buttonClass(false)}
+              className={buttonClass(false, zoomIn.enabled)}
               onClick={() => commands.execute('zoom:in')}
             >
               <Icon name="zoomIn" size={20} />

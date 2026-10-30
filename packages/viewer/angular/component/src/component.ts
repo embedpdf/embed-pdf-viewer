@@ -15,8 +15,8 @@
  * inside the next one. On the server it renders the empty element, and the viewer starts in the
  * browser: nothing here, or in the viewer it imports, touches the DOM when imported.
  *
- * `src`, `theme`, `locale`, `disable` and `readOnly` follow their inputs: the element changes
- * them in place. Every other key is read once, when the viewer starts; a later change is ignored
+ * `src`, `theme`, `locale`, `disable`, `readOnly` and `fetch` follow their inputs: the element
+ * changes them in place. Every other key is read once, when the viewer starts; a later change is ignored
  * (development warns once), and a new `@if` branch mounts a new viewer with it.
  */
 import { isPlatformBrowser, NgTemplateOutlet } from '@angular/common';
@@ -64,7 +64,14 @@ const kernelOf = (viewer: Viewer): Kernel | null =>
   (viewer as unknown as Partial<Record<symbol, Kernel>>)[VIEWER_KERNEL] ?? null;
 
 /** The keys the element follows while it runs; the component hands their changes on. */
-const LIVE_KEYS: readonly LiveConfigKey[] = ['src', 'theme', 'locale', 'disable', 'readOnly'];
+const LIVE_KEYS: readonly LiveConfigKey[] = [
+  'src',
+  'theme',
+  'locale',
+  'disable',
+  'readOnly',
+  'fetch',
+];
 
 /** The callbacks: the outputs, and the config's own, called with the latest config. */
 const CALLBACKS: ReadonlySet<string> = new Set(['onReady', 'onDocumentChange', 'onPanelResize']);
@@ -93,8 +100,11 @@ export function definedOf<Keys extends object>(keys: Keys): Partial<Keys> {
  */
 type ConfigInput<Key extends keyof ElementConfig> = InputSignal<ElementConfig[Key] | undefined>;
 
-/** The keys each door types its own way, as inputs of its own: the engine, the documents, the user. */
-type DoorKey = 'engine' | 'src' | 'documents' | 'scope' | 'identity';
+/**
+ * The keys each door types its own way, as inputs of its own: the engine, the documents, how a
+ * URL downloads, the user.
+ */
+type DoorKey = 'engine' | 'src' | 'documents' | 'fetch' | 'scope' | 'identity';
 
 /** A viewer that is ready, and the injector your templates in it get. */
 export interface ViewerInside {
@@ -274,6 +284,7 @@ export abstract class EpdfPdfViewerBase implements EpdfPdfViewerRef, OnInit {
     element.locale = config.locale;
     element.disable = config.disable;
     element.readOnly = config.readOnly;
+    element.fetch = config.fetch;
     if (this.warned || !isDevMode()) return;
     const key = changedReadOnceKey(this.started.config, config);
     if (key === null) return;

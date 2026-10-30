@@ -7,6 +7,7 @@ import type { Provider, Type } from '@angular/core';
 import type {
   AnyPlugin,
   Engine,
+  HostFetch,
   Identity,
   InitialDocument,
   Kernel,
@@ -49,6 +50,11 @@ export interface EmbedPdfConfig {
   readonly accent?: string;
   /** How pages look: `background` before the picture arrives, and the `shadow` under each page. */
   readonly page?: Partial<ViewerPageSettings>;
+  /**
+   * How a document at a URL downloads: your own `fetch`, to add headers or cookies. It gets the
+   * URL and an `init` with the document's cancel `signal`, to pass on.
+   */
+  readonly fetch?: HostFetch;
 }
 
 /**

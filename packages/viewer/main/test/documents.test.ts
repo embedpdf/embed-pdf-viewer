@@ -1,9 +1,9 @@
 /**
  * Documents, as the page says: `documents` entries with `src`, `name`, `password` and `active`
  * each open in a tab; a document that can't be opened says why in its tab, with **Try again**;
- * closing a tab or leaving the page with unsaved changes asks first; and a `src` that is an
+ * closing a tab or leaving the page with unsaved changes asks first; a `src` that is an
  * engine's open input (what the cloud viewer makes of `{ token }`) opens as it is and follows
- * its prop.
+ * its prop; and a document at a URL downloads with the config's `fetch`, which follows its prop.
  *
  * Runs against the built snippet (`pnpm build` first).
  */
@@ -86,6 +86,16 @@ const PAGES = {
     ],
   }`),
   '/token.html': page(`{ engine: tokenEngine, src: { kind: 'token', token: 'a' } }`),
+  // The page's own fetch, with the token the page has when it's called.
+  '/signed-in.html': page(`{
+    documents: [{ src: '/private.pdf', name: 'Private' }],
+    fetch: (url, init) =>
+      fetch(url, { ...init, headers: { Authorization: 'Bearer ' + window.token } }),
+  }`),
+  '/fetch-follows.html': page(`{
+    src: '/private.pdf',
+    fetch: (url, init) => fetch(url, { ...init, headers: { Authorization: 'Bearer good' } }),
+  }`),
 };
 
 declare global {
@@ -179,10 +189,23 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('documents', () => {
     await host?.close();
   });
 
-  /** A page of this test, with `/encrypted.pdf`, a `/flaky.pdf` that's missing until asked again, and a `/notes.pdf` that isn't a PDF. */
+  /**
+   * A page of this test, with `/encrypted.pdf`, a `/flaky.pdf` that's missing until asked again,
+   * a `/notes.pdf` that isn't a PDF, and a `/private.pdf` and `/other.pdf` that need a token.
+   */
   const open = async (path: string): Promise<Page> => {
     const tab = await browser.newPage({ viewport: { width: 1280, height: 800 } });
     let flakyAsked = 0;
+    for (const [file, token] of [
+      ['private.pdf', 'good'],
+      ['other.pdf', 'other'],
+    ]) {
+      await tab.route(`**/${file}`, (route) =>
+        route.request().headers()['authorization'] === `Bearer ${token}`
+          ? route.fulfill({ body: sample, contentType: 'application/pdf' })
+          : route.fulfill({ status: 401, body: 'sign in first' }),
+      );
+    }
     await tab.route('**/encrypted.pdf', (route) =>
       route.fulfill({ body: encryptedPdf, contentType: 'application/pdf' }),
     );
@@ -367,6 +390,48 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('documents', () => {
     // null closes it.
     await tab.evaluate(() => (window.element.src = null));
     await tab.waitForFunction(() => window.element.viewer.documents.getCount() === 0);
+    await tab.close();
+  });
+
+  it('downloads a document at a URL with the config’s fetch: a refusal shows as not allowed, and Try again asks it again', async () => {
+    const tab = await open('/signed-in.html');
+    await waitForSettled(tab, 1);
+    expect((await documentsOf(tab)).tabs).toMatchObject([
+      { name: 'Private', status: 'error', error: 'permission-denied' },
+    ]);
+    expect(
+      await tab.evaluate(
+        () => window.element.shadowRoot!.querySelector('[data-epdf-error-reason]')?.textContent,
+      ),
+    ).toBe('You don’t have access to this document.');
+
+    // Signed in now: the same fetch reads the new token.
+    await tab.evaluate(() => ((window as any).token = 'good'));
+    await click(tab, '[role="alert"] button', 'Try again');
+    await waitForSettled(tab, 1);
+    expect((await documentsOf(tab)).tabs).toMatchObject([
+      { name: 'Private', status: 'ready', error: null },
+    ]);
+    await tab.close();
+  });
+
+  it('follows its fetch: the next download uses the new one, in the same viewer', async () => {
+    const tab = await open('/fetch-follows.html');
+    await waitForSettled(tab, 1);
+    expect((await documentsOf(tab)).tabs).toMatchObject([{ status: 'ready' }]);
+    await tab.evaluate(() => ((window as any).before = window.element.viewer));
+
+    await tab.evaluate(() => {
+      window.element.fetch = (url: string, init: RequestInit) =>
+        fetch(url, { ...init, headers: { Authorization: 'Bearer other' } });
+      window.element.src = '/other.pdf';
+    });
+    await tab.waitForFunction(() => {
+      const list = window.element.viewer.documents.list();
+      return list.length === 1 && list[0].id === '/other.pdf' && list[0].status !== 'loading';
+    });
+    expect((await documentsOf(tab)).tabs).toMatchObject([{ status: 'ready', error: null }]);
+    expect(await tab.evaluate(() => window.element.viewer === (window as any).before)).toBe(true);
     await tab.close();
   });
 });

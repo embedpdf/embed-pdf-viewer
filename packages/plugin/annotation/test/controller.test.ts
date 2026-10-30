@@ -817,6 +817,30 @@ describe('the comments lens', () => {
     expect(harness.remove).not.toHaveBeenCalled();
   });
 
+  it('removeThread takes a hidden review state along: hidden is how it draws, not whether it may go', async () => {
+    const harness = createHarness();
+    await harness.load([
+      rootAt(20, 760),
+      textDto(21, { reply: { to: ref(20), type: 'reply' }, contents: 'a reply' }),
+      // As `setStatus` writes one: hidden, so no viewer draws an icon for it.
+      {
+        ...textDto(22, {
+          reply: { to: ref(20), type: 'reply' },
+          state: 'completed',
+          stateModel: 'review',
+        }),
+        ...NO_FLAGS,
+        hidden: true,
+      } as unknown as FileAnnotation,
+    ]);
+    expect(harness.capability.canDelete(ref(20))).toBe(true); // the page's delete
+    expect(commentChecks(harness.capability.comments, ref(20)).canDeleteThread).toBe(true);
+    const result = await harness.capability.comments.deleteThread(ref(20));
+    expect(result.failed).toEqual([]);
+    expect(result.deleted).toEqual([ref(21), ref(22), ref(20)]);
+    expect(harness.remove.mock.calls.map((call) => call[0])).toEqual([ref(20)]);
+  });
+
   it('permissionsFor splits the two lock flags and aggregates the thread gate', async () => {
     const harness = createHarness();
     await harness.load([
@@ -834,7 +858,8 @@ describe('the comments lens', () => {
     expect(perms.canSetStatus).toBe(true);
     expect(perms.canDeleteThread).toBe(true);
 
-    // Lock the reply: the thread gate flips, single-delete of root stays.
+    // Lock the reply: deleting the root would delete it too, so neither the
+    // root nor the thread may go, from the panel or from the page.
     await harness.load([
       rootAt(20, 760),
       {
@@ -844,11 +869,12 @@ describe('the comments lens', () => {
       } as unknown as FileAnnotation,
     ]);
     const perms2 = commentChecks(harness.capability.comments, ref(20));
-    expect(perms2.canDelete).toBe(true);
+    expect(perms2.canDelete).toBe(false);
     expect(perms2.canDeleteThread).toBe(false);
+    expect(harness.capability.canDelete(ref(20))).toBe(false); // the page's delete
   });
 
-  it('a foreign status annotation blocks the THREAD gate for a self-only deleter', async () => {
+  it('a foreign status keeps a self-only deleter from deleting the root and its thread', async () => {
     const harness = createHarness();
     // `annotations:delete:self`-shaped narrowing: only records stamped
     // with the session's own userId pass.
@@ -871,12 +897,17 @@ describe('the comments lens', () => {
         userId: 'alice',
       }),
     ]);
+    // Deleting my root would delete alice's status with it, which the engine
+    // refuses: the root, its thread and the page's delete all say no…
     const perms = commentChecks(harness.capability.comments, ref(20));
-    // My own root and reply delete fine one-by-one…
-    expect(perms.canDelete).toBe(true);
-    // …but alice's status is a thread member (statusRefs), and the
-    // all-or-nothing gate answers for every member.
+    expect(perms.canDelete).toBe(false);
     expect(perms.canDeleteThread).toBe(false);
+    expect(harness.capability.canDelete(ref(20))).toBe(false);
+    // …while my own reply, which takes nothing of hers along, may go.
+    expect(harness.capability.comments.canDelete(ref(21))).toBe(true);
+    const result = await harness.capability.comments.deleteThread(ref(20));
+    expect(result.failed.map((failure) => failure.ref)).toEqual([ref(22)]);
+    expect(harness.remove).not.toHaveBeenCalled();
   });
 
   it('canReply/canSetStatus gate on the CREATE mirror, not the target owner', async () => {

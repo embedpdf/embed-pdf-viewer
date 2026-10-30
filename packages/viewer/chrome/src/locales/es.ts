@@ -168,6 +168,9 @@ export const es: Locale = {
         'doc-text-copy': 'No está permitido copiar',
         'doc-text-search': 'No está permitido buscar',
       },
+      commentThread: {
+        more: 'Más opciones',
+      },
       attachment: {
         add: 'Agregar archivo',
         save: 'Guardar',
@@ -592,6 +595,7 @@ export const es: Locale = {
       commentsStatusRejected: 'Rechazado',
       commentsStatusCancelled: 'Cancelado',
       commentsStatusCompleted: 'Completado',
+      commentsMarkCompleted: 'Marcar como completado',
       empty: 'Aquí todavía no hay nada en este panel de demostración.',
       page: 'Página {current} de {total}',
       goToPage: 'Ir a la página',

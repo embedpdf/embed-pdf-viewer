@@ -132,6 +132,8 @@ export class EpdfStageRef {
   readonly zoomBy = this.binding.method('zoomBy');
   readonly zoomIn = this.binding.method('zoomIn');
   readonly zoomOut = this.binding.method('zoomOut');
+  readonly canZoomIn = this.binding.method('canZoomIn');
+  readonly canZoomOut = this.binding.method('canZoomOut');
   readonly fitWidth = this.binding.method('fitWidth');
   readonly fitPage = this.binding.method('fitPage');
   readonly fitAll = this.binding.method('fitAll');

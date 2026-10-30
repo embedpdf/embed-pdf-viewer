@@ -26,6 +26,7 @@ import type {
   CapabilityToken,
   Engine,
   EngineFactory,
+  HostFetch,
   Identity,
   InitialDocument,
 } from '@embedpdf/react/runtime';
@@ -184,6 +185,8 @@ export interface FullViewerProps extends ViewerCustomization {
   engine: Engine | EngineFactory;
   /** Documents to open at mount; more arrive via the tab bar's open button. */
   initialDocuments?: InitialDocument[];
+  /** How a document at a URL downloads: the delivery's `fetch`, called at each download. */
+  fetch?: HostFetch;
   /** Shown while the workspace boots. Default: a translated pulse line. */
   fallback?: ReactNode;
   /** Where the theme's `.dark` class goes — a delivery concern, not user
@@ -331,6 +334,7 @@ function Booting() {
 export function FullViewer({
   engine,
   initialDocuments,
+  fetch,
   fallback,
   commands,
   icons,
@@ -552,6 +556,7 @@ export function FullViewer({
         engine={engine}
         plugins={plugins}
         initialDocuments={initialDocuments}
+        fetch={fetch}
         scope={scope}
         identity={identity}
         fallback={fallback ?? <Booting />}

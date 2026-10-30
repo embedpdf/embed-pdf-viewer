@@ -237,6 +237,15 @@ export interface StageSettings {
   viewRotation: PageRotation;
   /** Zoom intent: a fit-mode (automatic/fit-page/fit-width/fit-all) or a fixed level. */
   zoom: ZoomSpec;
+  /**
+   * The zoom range this view allows, as levels like `camera.zoom` (1 = 100%).
+   * Every zoom stays inside it: the buttons, a pinch or wheel, `zoomTo`, a
+   * reveal, and the fit modes, which stop at a limit rather than fit. Within
+   * 0.05 to 64; a `minZoom` above `maxZoom` counts as `maxZoom`.
+   */
+  minZoom: number;
+  /** See {@link StageSettings.minZoom}. */
+  maxZoom: number;
   /** Default behavior for goToPage, nextPage and previousPage. */
   scrollBehavior: ScrollBehaviorKind;
   /**
@@ -501,10 +510,17 @@ export interface StageCapability {
   zoomTo(zoom: number | ZoomSpec, options?: ZoomToOptions): void;
   /** Multiply the zoom, holding a viewport point fixed (default: the `zoomAlign` point). */
   zoomBy(factor: number, options?: ZoomToOptions): void;
-  /** Zoom in one step around the `zoomAlign` point. */
+  /**
+   * Zoom in one step around the `zoomAlign` point: to the next round level
+   * (100%, 125%, 150%, 200%, …), or `maxZoom` when that comes first.
+   */
   zoomIn(): void;
-  /** Zoom out one step around the `zoomAlign` point. */
+  /** Zoom out one step around the `zoomAlign` point: the round levels down, to `minZoom`. */
   zoomOut(): void;
+  /** The zoom is below `maxZoom`, so `zoomIn()` moves. */
+  canZoomIn(): boolean;
+  /** The zoom is above `minZoom`, so `zoomOut()` moves. */
+  canZoomOut(): boolean;
   /** Zoom so the page width fills the viewport. */
   fitWidth(): void;
   /** Zoom so the whole page fits the viewport. */

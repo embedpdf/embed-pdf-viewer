@@ -262,6 +262,20 @@ export const DEFAULT_LAYOUT: LayoutData = {
     ],
     // A file of the attachments panel: its menu button and a right-click on it open this.
     'attachment-item': [['attachment:save', 'attachment:go-to'], ['attachment:delete']],
+    // A card of the comments panel: its menu button and a right-click on it open this.
+    'comment-item': [
+      {
+        titleKey: 'demo.commentsStatus',
+        items: [
+          'comment:status-accepted',
+          'comment:status-rejected',
+          'comment:status-cancelled',
+          'comment:status-completed',
+          'comment:status-none',
+        ],
+      },
+      ['comment:delete-thread'],
+    ],
     // A page of the thumbnails panel: its menu button, a right-click and a long-press open this.
     page: [
       ['page:rotate-clockwise', 'page:rotate-counterclockwise'],

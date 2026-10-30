@@ -8,6 +8,7 @@ import type {
   Engine,
   EngineFactory,
   FailedDocumentInfo,
+  HostFetch,
   Identity,
   InitialDocument,
   Kernel,
@@ -48,6 +49,12 @@ export interface ViewerProps {
   accent?: string;
   /** How pages look: `background` before the picture arrives, and the `shadow` under each page. */
   page?: Partial<ViewerPageSettings>;
+  /**
+   * How a document at a URL downloads: your own `fetch`, to add headers or cookies. It gets the
+   * URL and an `init` with the document's cancel `signal`, to pass on. Each download calls the
+   * latest one.
+   */
+  fetch?: HostFetch;
   /** Shown while the viewer starts. */
   fallback?: Snippet;
   /** Shown when the viewer couldn't start, with why. Without it, a failed start shows nothing. */

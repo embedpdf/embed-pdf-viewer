@@ -169,6 +169,9 @@ export const he: Locale = {
         'doc-text-copy': 'העתקה אינה מותרת',
         'doc-text-search': 'חיפוש אינו מותר',
       },
+      commentThread: {
+        more: 'אפשרויות נוספות',
+      },
       attachment: {
         add: 'הוספת קובץ',
         save: 'שמירה',
@@ -592,6 +595,7 @@ export const he: Locale = {
       commentsStatusRejected: 'נדחה',
       commentsStatusCancelled: 'בוטל',
       commentsStatusCompleted: 'הושלם',
+      commentsMarkCompleted: 'סמן כהושלם',
       empty: 'עדיין אין כאן כלום בחלונית ההדגמה הזו.',
       page: 'עמוד {current} מתוך {total}',
       goToPage: 'עבור לעמוד',

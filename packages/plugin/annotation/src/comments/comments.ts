@@ -170,7 +170,7 @@ export function createComments(
       const thread = threads.threadOf(ref);
       const members = threads.memberRefsOf(thread);
       // A courtesy preflight: all or nothing, as the engine decides it.
-      const blocked = members.filter((ref) => !authority.canDelete(ref));
+      const blocked = authority.blockersOf(root);
       if (blocked.length > 0) {
         announce(root, 'deleted');
         return {
@@ -199,7 +199,7 @@ export function createComments(
     canDelete: (ref) => authority.canDelete(ref),
     canDeleteThread: (ref) => {
       const thread = threads.index().byMember.get(annotationKey(ref)) ?? null;
-      return thread !== null && threads.memberRefsOf(thread).every(authority.canDelete);
+      return thread !== null && authority.canDelete(thread.root.ref);
     },
   };
 

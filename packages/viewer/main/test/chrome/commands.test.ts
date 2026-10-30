@@ -26,6 +26,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { DEFAULT_LAYOUT } from '../../../chrome/src/config/chrome';
 import { defaultCommands, toolCommandsFor } from '../../../chrome/src/config/commands';
+import { FULLSCREEN_COMMAND } from '../../../chrome/src/config/fullscreen';
 import { panelCommandsFor } from '../../../chrome/src/config/panels';
 import {
   mergeCommand,
@@ -310,6 +311,7 @@ describe('the built-in commands', () => {
     const ids = new Set([
       ...defaultCommands.map((command) => command.id),
       ...panelCommandsFor(DEFAULT_LAYOUT.panels, () => false).map((command) => command.id),
+      FULLSCREEN_COMMAND,
     ]);
     expect(documentedIds.length).toBeGreaterThan(80);
     expect(documentedIds.filter((id) => !ids.has(id))).toEqual([]);
