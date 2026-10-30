@@ -32,6 +32,8 @@ export class Uploads<Document = unknown> {
                 tenantId: input.tenantId,
                 contentLength: source.size,
                 contentSha256: source.sha256,
+                name: input.name,
+                folderId: input.folderId,
                 metadata: input.metadata,
                 idempotencyKey: input.idempotencyKey,
                 dedupMode: input.dedupMode,

@@ -1,5 +1,63 @@
 # @cloudpdf/server
 
+## 3.0.0-next.18
+
+### Minor Changes
+
+- [#917](https://github.com/embedpdf/embed-pdf-viewer/pull/917) by [@bobsingor](https://github.com/bobsingor) – Organize documents in folders. Folders nest up to 100 levels with names
+  unique among siblings, ignoring case. A move takes documents and folders
+  together or not at all and never makes a loop, even when two moves race;
+  only empty folders delete. Documents are filed at upload and listed per
+  folder, and a document being deleted leaves its folder. Migration 046 adds
+  the `folders` table and `documents.folder_id`. Errors thrown with
+  structured context now return it as `details`.
+
+- [#917](https://github.com/embedpdf/embed-pdf-viewer/pull/917) by [@bobsingor](https://github.com/bobsingor) – Store a name for every document, searchable and sortable without regard to
+  case, and rename documents with `PATCH /v1/tenants/:tenantId/documents/:id`
+  under the new `docs.update` scope. The documents list searches by name, sorts
+  by creation time, name or size in either order with stable cursors, and hides
+  documents that are being deleted unless asked for by state. Migration 045 names
+  existing documents from `metadata.name` when it is a non-empty string, otherwise
+  from their id.
+
+- [#917](https://github.com/embedpdf/embed-pdf-viewer/pull/917) by [@bobsingor](https://github.com/bobsingor) – Delete a folder with everything in it via `recursive=true`: the folder and
+  every folder under it go in one transaction, and every document in them stops
+  opening, leaves every list and stops answering its share links at once, while
+  their stored files are removed in the background. The sweeper now also
+  finishes deletes left behind, such as one interrupted by a crash, after
+  `deletingGraceMs` (default one minute). The filesystem object store no longer
+  fails a write when a delete elsewhere in the same tenant prunes the
+  directories the write has just made.
+
+- [#917](https://github.com/embedpdf/embed-pdf-viewer/pull/917) by [@bobsingor](https://github.com/bobsingor) – Tenant scopes act on records and document capabilities act on what is inside
+  documents, on any token. A tenant JWT is checked inside documents the way a
+  document JWT is, against the document capabilities its scope names, which hold
+  for every document of the tenant; `docs.read` lists documents but no longer
+  opens, reads or changes them. Downloading the original file needs
+  `doc.download` and the thumbnail needs `doc.render`. A tenant token whose scope
+  names no document capability is refused on the document routes, and
+  `tokens.issue` validates a tenant token's scope entries.
+
+### Patch Changes
+
+- [#910](https://github.com/embedpdf/embed-pdf-viewer/pull/910) by [@bobsingor](https://github.com/bobsingor) – A layer's versions are read through the layer. The version routes moved from `/v1/docs/:docId/versions…` to `/v1/docs/:docId/layers/:layerName/versions…`, checked like every other layer route.
+  - **The list** gives the layer's versions (the upload, then the ones its signatures made) and its `baseSha`.
+  - **A version's signatures, analysis, download and revisions** answer only for the upload or the layer's own versions: another layer's version is 404, and a token for one layer can't use another layer's path.
+  - **Tenant tokens** read any layer's versions, through that layer.
+
+- [#909](https://github.com/embedpdf/embed-pdf-viewer/pull/909) by [@bobsingor](https://github.com/bobsingor) – A share link can say who its visitors are, for a link made for one person: `identity` on `shares.create` and `shares.update`, the same shape as `tokens.issue`'s (migration 043). Every session the link gives carries it, whoever opens the link: a field it sets is never asked, and a visitor's answer for it is ignored. Its `userId` replaces the visitor's own `visitor_<id>`; each visit still gets its own layer on a per-visitor link. A link that asks a field its identity sets is refused (400), on create and on an update checked against the link as it will be.
+
+- [#907](https://github.com/embedpdf/embed-pdf-viewer/pull/907) by [@bobsingor](https://github.com/bobsingor) – A share link's visitor is remembered on every link except a per-visitor link that doesn't keep visitors' layers: the exchange answers `visitor.keep: true` for shared links too. A visitor who comes back in the same browser keeps their answers to the link's questions and stays the author of what they added, instead of being asked again on every page load and listed as a new visitor each time.
+
+- [#910](https://github.com/embedpdf/embed-pdf-viewer/pull/910) by [@bobsingor](https://github.com/bobsingor) – A signature moves only the layer it was made in. Completing a signature writes the new version as that layer's own: only its `base_sha` moves, and the document (`documents.base_sha`, the upload) and every other layer stay as they were.
+
+  Before, a signature moved the whole document, so on a per-visitor link the next visitor opened the signer's filled-in, signed copy, and layers still on the old version could no longer sign (`StaleBase`).
+  - **Every layer can sign**, over its own base. A layer that signs again signs over its previous version.
+  - **Versions belong to their layer:** a layer's versions are numbered along its own chain and stored under the layer, and they're deleted with it.
+  - **`/layers/:layerName/head`** reports the layer's own base.
+  - **Migration 044** gives each existing signed version its layer, puts a document a signature moved back on its upload, and starts layers that stored nothing on the upload too.
+  - **No document-wide signal any more:** the base-changed bus channel is gone. Other replicas reload the signing layer because its version moved.
+
 ## 3.0.0-next.17
 
 ### Minor Changes

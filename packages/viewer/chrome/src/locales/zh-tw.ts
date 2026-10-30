@@ -44,6 +44,7 @@ export const zhTW: Locale = {
         fitPage: '符合頁面',
         fitWidth: '符合寬度',
         automatic: '自動',
+        marquee: '框選放大',
         menu: '縮放',
         level: '縮放比例',
         p50: '50%',

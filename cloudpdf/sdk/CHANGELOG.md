@@ -1,5 +1,32 @@
 # @cloudpdf/sdk
 
+## 3.0.0-next.18
+
+### Minor Changes
+
+- [#917](https://github.com/embedpdf/embed-pdf-viewer/pull/917) by [@bobsingor](https://github.com/bobsingor) – Add the `folders` client (`create`, `list`, `get`, `update`, `moveInto`,
+  `delete`), a `folderId` option on `documents.init`, `documents.importFrom`,
+  `documents.list` and `uploads.create`, and `folderId` on document records.
+
+- [#917](https://github.com/embedpdf/embed-pdf-viewer/pull/917) by [@bobsingor](https://github.com/bobsingor) – Add `documents.update` for renaming documents, a `name` option on
+  `documents.init`, `documents.importFrom` and `uploads.create`, and the `q`,
+  `sort` and `order` options on `documents.list`. Document records now carry
+  `name`.
+
+- [#917](https://github.com/embedpdf/embed-pdf-viewer/pull/917) by [@bobsingor](https://github.com/bobsingor) – Add the `recursive` option to `folders.delete`.
+
+- [#910](https://github.com/embedpdf/embed-pdf-viewer/pull/910) by [@bobsingor](https://github.com/bobsingor) – `doc.versions.*` takes the layer: `list`, `signatures`, `signatureContents`, `signatureDigest`, `analysis`, `download` and `revision` read `/v1/docs/{docId}/layers/{layerName}/versions…`. `list` answers the layer's `baseSha` and its versions (the upload, then the ones its signatures made), and another layer's version is 404.
+
+- [#909](https://github.com/embedpdf/embed-pdf-viewer/pull/909) by [@bobsingor](https://github.com/bobsingor) – `shares.create` and `shares.update` take `identity`, and a share record returns it: who a link's visitors are, for a link made for one person. `Identity` is one shared type, used by `tokens.issue` too.
+
+- [#917](https://github.com/embedpdf/embed-pdf-viewer/pull/917) by [@bobsingor](https://github.com/bobsingor) – A tenant token's `scope` in `tokens.issue` takes document capabilities next to
+  tenant scopes, and the document operations document tenant tokens as a
+  credential.
+
+### Patch Changes
+
+- [#910](https://github.com/embedpdf/embed-pdf-viewer/pull/910) by [@bobsingor](https://github.com/bobsingor) – `StaleBase` is no longer an engine error code, and the signature notes describe the new rule: a signature's new version belongs to its layer, and the document and every other layer stay as they were.
+
 ## 3.0.0-next.17
 
 ### Minor Changes

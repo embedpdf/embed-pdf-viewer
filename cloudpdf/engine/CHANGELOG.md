@@ -1,5 +1,17 @@
 # @cloudpdf/engine
 
+## 3.0.0-next.18
+
+### Patch Changes
+
+- [#910](https://github.com/embedpdf/embed-pdf-viewer/pull/910) by [@bobsingor](https://github.com/bobsingor) – A document's signed bytes (`signatures.getContents`, `getDigest`, `downloadRevision` and history `analyze`) are read through its layer's version paths.
+
+- [#909](https://github.com/embedpdf/embed-pdf-viewer/pull/909) by [@bobsingor](https://github.com/bobsingor) – A share link takes the page's `identity` (the `open()` option, or the viewer's `identity`) as the visitor's answers, the same as the visitor typing them: only the fields the link asks, never `userId` or `groupId`. The share input's `visitor` is gone.
+
+  Nothing the page passes is ignored silently: in development the engine warns once when it doesn't use `scope` (the document's token says what the session may do), or when the session doesn't act for the `identity` passed, and says why.
+
+- [#907](https://github.com/embedpdf/embed-pdf-viewer/pull/907) by [@bobsingor](https://github.com/bobsingor) – A renewal the share link refuses for a passphrase, or for questions asked on open, no longer retries on every request. The document asks once (`doc.share.openRequest`, `onOpenRequest`), reads on with its session until it runs out, then waits for `resume()`; with nothing listening, a request fails with the refusal. A shared link's visitor is now kept in the visitor store for the next visit, as the server says (`visitor.keep`).
+
 ## 3.0.0-next.17
 
 ### Minor Changes

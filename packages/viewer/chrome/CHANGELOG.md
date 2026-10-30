@@ -1,5 +1,15 @@
 # @embedpdf/viewer-chrome
 
+## 3.0.0-next.18
+
+### Patch Changes
+
+- [#908](https://github.com/embedpdf/embed-pdf-viewer/pull/908) by [@bobsingor](https://github.com/bobsingor) – Hide the Measure tab when the session can neither draw measurements nor set a page's scale: the measurement panel, and the Measure bar's scale button that opens it, now follow the same permission checks as the measurement tools. The scale button is drawn like every other bar button, so the Measure bar is as tall as the other mode bars, and it shows pressed while the panel is open; clicking it again closes the panel.
+
+- [#907](https://github.com/embedpdf/embed-pdf-viewer/pull/907) by [@bobsingor](https://github.com/bobsingor) – Where a document allows searching but not copying text, search opens as a find bar over the top corner of the pages instead of a panel of empty result rows. It shows which match you're on and how many there are, `Enter` and `Shift`+`Enter` step through them, and its options sit behind a button. In the search panel, `Enter` and `Shift`+`Enter` step through the matches too, and a match the engine finds no text around reads "Result 3" instead of an empty row.
+
+- [#907](https://github.com/embedpdf/embed-pdf-viewer/pull/907) by [@bobsingor](https://github.com/bobsingor) – When a share link gets a passphrase or questions while its document is open, the viewer shows the same passphrase or questions form over the document, and the document goes on once they're given.
+
 ## 3.0.0-next.17
 
 ### Minor Changes

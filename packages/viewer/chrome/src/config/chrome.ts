@@ -291,7 +291,7 @@ export const DEFAULT_LAYOUT: LayoutData = {
         titleKey: 'commands.zoom.level',
         items: ['zoom:50', 'zoom:100', 'zoom:150', 'zoom:200', 'zoom:400'],
       },
-      ['zoom:in', 'zoom:out'],
+      ['zoom:in', 'zoom:out', 'tool:zoom'],
       ['zoom:fit-page', 'zoom:fit-width', 'zoom:automatic'],
     ],
     // A row of the outline panel: its menu button and a right-click on it open this.

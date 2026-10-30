@@ -1,5 +1,17 @@
 # @embedpdf/engine-runtime
 
+## 3.0.0-next.18
+
+### Minor Changes
+
+- [#911](https://github.com/embedpdf/embed-pdf-viewer/pull/911) by [@bobsingor](https://github.com/bobsingor) – New `EPDFDoc_ImportPages` copies pages with the form fields of their widgets, where `FPDF_ImportPagesByIndex` left each copied widget's `/Parent` naming an object of the source and wrote no `/AcroForm`. Each field above the copied widgets is copied once, its `/Kids` limited to what was copied, and the copied top-level fields join the destination's `/AcroForm /Fields` (made when it has none) with the source's `/DR` resources, `/DA` and `/Q`, `/NeedAppearances`, calculation order and `SignaturesExist`. A `/DR` font is shared only when the destination defines one of that name the same way, key for key (widths and descriptor included, no font program); otherwise it is copied under a free name, and the copied `/DA` strings follow, comments and all. A copied pop-up's `/Parent` names the copy of its annotation.
+
+  New `EPDFDoc_GetImportFieldRoots` lists the top-level fields an import of some pages brings, and `EPDFForm_GetFieldPartialName` reads a field's own `/T` by object number.
+
+- [#913](https://github.com/embedpdf/embed-pdf-viewer/pull/913) by [@bobsingor](https://github.com/bobsingor) – New `EPDFCatalog_GetMetadata` reads the document's XMP packet (the catalog's `/Metadata` stream) decoded, and `EPDFCatalog_SetMetadata` replaces it, unfiltered, keeping the stream's object number, or removes it.
+
+  Saving an encrypted document encrypts its metadata stream, unless the file says `/EncryptMetadata false`; it was written in the clear, so readers decrypted the XMP into noise. A metadata stream with a filter is written decoded, where its encoded bytes were written without the filter that decodes them.
+
 ## 3.0.0-next.17
 
 ## 3.0.0-next.16

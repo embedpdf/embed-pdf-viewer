@@ -150,6 +150,8 @@ export type {
   EpdfVariable,
   EpdfVariableDefinition,
 } from './theme';
+export { ZOOM_BOX_DASH, zoomBoxPaint } from './zoom-box';
+export type { ZoomBoxColors } from './zoom-box';
 export { isUprightQuad, quadInPixels, rectInPixels, svgPoints } from './page-pixels';
 export type { PagePoint, PageQuad, PageToPixels, PixelRect } from './page-pixels';
 export { isolatePointerDown, isolateWheel } from './event-isolation';

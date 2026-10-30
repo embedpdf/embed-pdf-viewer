@@ -53,6 +53,7 @@ describe('standard commands', () => {
       'view:rotate-counterclockwise': null,
       'tool:pointer': 'V',
       'tool:pan': 'H',
+      'tool:zoom': 'Z',
       'selection:copy': 'Mod+C',
       'annotation:delete': ['Delete', 'Backspace'],
       'document:download': 'Mod+S',

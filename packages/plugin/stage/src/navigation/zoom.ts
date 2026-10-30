@@ -96,8 +96,8 @@ export function createZoom(
   const state = () => ctx.state.get();
   const zoomAlignPoint = () => alignPoint(state().zoomAlign, viewport());
   // A step to `target`, around the zoomAlign point; none when the limit holds the zoom.
-  const stepTo = (target: number) => {
-    if (target !== camera().zoom) gestures.zoomAround(zoomAlignPoint(), target / camera().zoom);
+  const stepTo = (target: number, around = zoomAlignPoint()) => {
+    if (target !== camera().zoom) gestures.zoomAround(around, target / camera().zoom);
   };
 
   const setViewRotation = (viewRotation: PageRotation): void =>
@@ -156,8 +156,8 @@ export function createZoom(
         // The focal-anchored tween keeps the tapped point still.
         animateZoomAnchored(focal, point, target, undefined, syncCursorFromCamera);
       },
-      zoomIn: () => stepTo(stepIn(camera().zoom, zoomLimits())),
-      zoomOut: () => stepTo(stepOut(camera().zoom, zoomLimits())),
+      zoomIn: (options) => stepTo(stepIn(camera().zoom, zoomLimits()), options?.around),
+      zoomOut: (options) => stepTo(stepOut(camera().zoom, zoomLimits()), options?.around),
       canZoomIn: () => camera().zoom < zoomLimits().max * (1 - EPSILON),
       canZoomOut: () => camera().zoom > zoomLimits().min * (1 + EPSILON),
       zoomTo: (zoom, options) => {

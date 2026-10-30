@@ -324,7 +324,8 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const created = await sdkForTenant(tenantId).uploads.create({
       tenantId,
       source: bytes,
-      metadata: { name: fileName, source: 'cloud-dashboard' },
+      name: fileName,
+      metadata: { source: 'cloud-dashboard' },
       idempotencyKey: `demo-${tenantId}-${fileName}-${bytes.byteLength}-${Date.now()}`,
     });
     sendJson(res, 200, {
@@ -516,19 +517,18 @@ async function proxyAdminBinary(
 function toDemoDocument(
   doc: {
     id: string;
+    name: string;
     state: string;
     storageSizeBytes: number | null;
-    metadata: Record<string, unknown> | null;
     createdAt: number;
     thumbnailState?: string;
   },
   shareCount: number,
 ) {
-  const name = typeof doc.metadata?.['name'] === 'string' ? doc.metadata['name'] : doc.id;
   return {
     id: doc.id,
     state: doc.state,
-    name,
+    name: doc.name,
     sizeBytes: doc.storageSizeBytes,
     createdAt: doc.createdAt,
     // Older servers omit the field; treat that as "no tile coming".

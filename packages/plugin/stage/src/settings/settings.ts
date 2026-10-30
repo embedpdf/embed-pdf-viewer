@@ -110,14 +110,22 @@ export function createSettings(
    * whose caller runs its own reframe) only lands the patch and the cache
    * invalidation and reports the strongest effect, so the caller can
    * escalate a rule-driven flow flip.
+   *
+   * `asked` names the settings a caller just set. Each of them lands whenever
+   * the live value differs, even if the resolution itself didn't move: a zoom
+   * step, a pinch or a zoom box records its level straight into the state, so
+   * the resolution can still hold the fit mode the user now asks for again.
    */
-  const syncResponsive = (react: boolean): SettingEffect => {
+  const syncResponsive = (
+    react: boolean,
+    asked: readonly (keyof StageSettings)[] = [],
+  ): SettingEffect => {
     const { effective, active } = resolveResponsive(base, rules, boxOf(viewport()));
     const patch: Partial<StageSettings> = {};
     for (const key of SETTING_KEYS) {
-      if (!eqSetting(effective[key], lastEffective[key])) {
-        Object.assign(patch, { [key]: effective[key] });
-      }
+      const resolved = !eqSetting(effective[key], lastEffective[key]);
+      const reasserted = asked.includes(key) && !eqSetting(effective[key], state()[key]);
+      if (resolved || reasserted) Object.assign(patch, { [key]: effective[key] });
     }
     lastEffective = effective;
     publishActive(active);
@@ -143,7 +151,10 @@ export function createSettings(
     // matching rule's key wins until its rule stops matching). With no rules
     // in play this is a direct update.
     base = mergeSettings(base, changes);
-    syncResponsive(true);
+    syncResponsive(
+      true,
+      SETTING_KEYS.filter((key) => changes[key] !== undefined),
+    );
   };
 
   const applyViewState = (view: StageViewState): void => {
@@ -170,7 +181,7 @@ export function createSettings(
       getSettings: snapshotSettings,
       resetSettings: () => {
         base = mergeSettings(initialBase, {});
-        syncResponsive(true);
+        syncResponsive(true, SETTING_KEYS);
       },
       updateSettings,
       setResponsiveRules: (next) => {

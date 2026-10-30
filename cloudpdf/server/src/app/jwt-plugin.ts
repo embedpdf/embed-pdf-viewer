@@ -41,6 +41,7 @@ import {
   type TenantScope,
 } from '../auth/JwtVerifier';
 import { matchesOrigin } from '../auth/origins';
+import { documentScopeOf } from '../auth/tenant-scope';
 import type { SuspendedTenantsGuard } from '../auth/SuspendedTenantsGuard';
 import type { EditRequest } from '../services/LayerWriteObjectNumbers';
 import { MAX_OBJECT_NUMBER_TOP_UP } from '../services/ObjectNumberService';
@@ -303,6 +304,45 @@ export function requireTenantAccess(
   return { tenantId, sub: ctx.sub, via: 'tenant-jwt' };
 }
 
+/**
+ * A collection route that hands out what is inside a document (its
+ * original file, its thumbnail): the path's tenant, as
+ * {@link requireTenantAccess} asks, and then the document permission a doc
+ * token would need for the same content, against the document's own PDF
+ * bits. The API token passes without loading anything.
+ */
+export async function requireTenantContentAccess(
+  req: FastifyRequest,
+  tenantId: string,
+  capability: UnprotectableCapability,
+  pdfBitsOf: () => Promise<PdfBits>,
+): Promise<TenantAccessContext> {
+  if (req.apiAuth) {
+    return { tenantId, sub: 'api-token', via: 'api-token' };
+  }
+  const t = req.tenant;
+  if (!t) {
+    const err = new Error('tenant token required') as Error & { code: string; status: number };
+    err.code = 'Unauthenticated';
+    err.status = 401;
+    throw err;
+  }
+  const forbidden = (message: string) => {
+    const err = new Error(message) as Error & { code: string; status: number };
+    err.code = 'Forbidden';
+    err.status = 403;
+    return err;
+  };
+  if (!isTenantClaims(t.claims)) throw forbidden('doc-scoped token cannot access tenant routes');
+  if (t.id !== tenantId) {
+    throw forbidden(`token is for tenant "${t.id}", path names tenant "${tenantId}"`);
+  }
+  if (!checkCapability(capability, documentScopeOf(t.claims.scope), await pdfBitsOf())) {
+    throw forbidden(`document permission required: ${capability}`);
+  }
+  return { tenantId, sub: t.sub, via: 'tenant-jwt' };
+}
+
 /** Deployment-surface guard: the root credential only, never a JWT. */
 export function requireApiToken(req: FastifyRequest): void {
   if (!req.apiAuth) {
@@ -368,11 +408,11 @@ export type DocAccessMode = 'doc' | 'tenant';
  *
  *   1. **Doc-scoped token**: `doc_id` claim matches the URL, and
  *      the token's `DocScope[]` contains one of `needed` (or `*`).
- *   2. **Tenant token**: `scope` contains `docs.read` (or `*`).
- *      The doc-tenant binding is enforced one layer down by
- *      `DocumentsRepo.requireOwned(docId, tenantId)` — the service
- *      layer refuses to load a doc that doesn't belong to the
- *      token's tenant.
+ *   2. **Tenant token**: its document scope ({@link documentScopeOf})
+ *      contains one of `needed` (or `*`). The doc-tenant binding is
+ *      enforced one layer down by `DocumentsRepo.requireOwned(docId,
+ *      tenantId)` — the service layer refuses to load a doc that
+ *      doesn't belong to the token's tenant.
  *
  * Returns the resolved tenant context plus a `mode` flag for audit
  * logging (so we can see whether a request reached a doc via the
@@ -428,12 +468,13 @@ export function requireDocAccess(
     return { tenantId: t.id, sub: t.sub, mode: 'doc', jwt: requestJwtContext(req, t.claims) };
   }
 
-  // TenantClaims path. The tenant owns every doc in their tenant
-  // and the service-layer requireOwned enforces the doc-tenant
-  // match, so we only need to know the bearer is authorised for
-  // tenant-level doc reads.
-  if (!hasTenantScope(t.claims, ['*', 'docs.read'])) {
-    const err = new Error('tenant scope required: one of [*, docs.read]') as Error & {
+  // TenantClaims path: the service-layer requireOwned enforces the
+  // doc-tenant match; the token's document scope answers for `needed`.
+  const jwt = requestJwtContext(req, t.claims);
+  if (!jwt.scope.includes('*') && !needed.some((scope) => jwt.scope.includes(scope))) {
+    const err = new Error(
+      `document permission required: one of [${needed.join(', ')}]`,
+    ) as Error & {
       code: string;
       status: number;
     };
@@ -441,7 +482,7 @@ export function requireDocAccess(
     err.status = 403;
     throw err;
   }
-  return { tenantId: t.id, sub: t.sub, mode: 'tenant', jwt: requestJwtContext(req, t.claims) };
+  return { tenantId: t.id, sub: t.sub, mode: 'tenant', jwt };
 }
 
 export function requireLayerDocAccess(
@@ -467,17 +508,16 @@ export function requireLayerDocAccess(
 //   2. Mutation routes that have collab semantics call `requireCollab(...)`
 //      with the target row's userId/groupId.
 //
-// Tenant tokens still bypass capability checks here — a tenant owns every
-// doc in their tenant, and the service-layer `requireOwned` enforces the
-// doc-tenant binding. This mirrors the existing `requireDocAccess` policy
-// for the tenant branch.
+// A tenant token is checked like a doc token, against its document scope
+// ({@link documentScopeOf}): the document permissions it names, for every
+// document of its tenant. The service-layer `requireOwned` enforces the
+// doc-tenant binding.
 
 /**
  * Doc-scope-only preHandler that performs no capability check. Verifies
  * the JWT is doc-scoped to this `docId` (or that the bearer is a tenant
- * token with `docs.read`). Used by the next-layer capability/collab
- * helpers; the tenant branch they exit through is the same as the legacy
- * `requireDocAccess`.
+ * token whose scope names some document permission). Used by the
+ * next-layer capability/collab helpers, which then check the operation.
  *
  * Reading is implicit only in the sense that having a valid doc-scoped
  * token gets you this far — the capability/collab/resource helper layered
@@ -511,9 +551,13 @@ export function requireDocAccessOnly(
     return { tenantId: t.id, sub: t.sub, mode: 'doc', jwt: requestJwtContext(req, t.claims) };
   }
 
-  // Tenant branch — same policy as the legacy requireDocAccess.
-  if (!hasTenantScope(t.claims, ['*', 'docs.read'])) {
-    const err = new Error('tenant scope required: one of [*, docs.read]') as Error & {
+  // Tenant branch: a token whose scope grants nothing inside documents
+  // (only collection scopes) has no business on the doc plane.
+  const jwt = requestJwtContext(req, t.claims);
+  if (jwt.scope.length === 0) {
+    const err = new Error(
+      'tenant scope names no document permission: add the doc.* permissions it needs, or *',
+    ) as Error & {
       code: string;
       status: number;
     };
@@ -521,7 +565,7 @@ export function requireDocAccessOnly(
     err.status = 403;
     throw err;
   }
-  return { tenantId: t.id, sub: t.sub, mode: 'tenant', jwt: requestJwtContext(req, t.claims) };
+  return { tenantId: t.id, sub: t.sub, mode: 'tenant', jwt };
 }
 
 /** A capability no signature can take away: its check never needs the document's protection. */
@@ -559,10 +603,9 @@ function refuseProtected(capability: DocCapability, protection: DocumentProtecti
  *
  * A capability a signature can take away also takes the document's
  * protection (`DocumentService.getProtection`), checked first, for every
- * caller. Tenant tokens then bypass the scope check (existing policy:
- * tenant owns every doc in the tenant). Doc-scoped tokens evaluate the
- * capability against their JWT scope array + the document's PDF bits
- * (the bits matter for `pdf.permissions` expansion only).
+ * caller. The capability is then evaluated against the token's scope (a
+ * tenant token's document scope) + the document's PDF bits (the bits
+ * matter for `pdf.permissions` expansion only).
  */
 export function requireCapability<C extends DocCapability>(
   req: FastifyRequest,
@@ -573,7 +616,6 @@ export function requireCapability<C extends DocCapability>(
 ): { tenantId: string; sub: string; mode: DocAccessMode; jwt: RequestJwtContext } {
   const ctx = requireDocAccessOnly(req, docId);
   refuseProtected(capability, protectionOf(protection));
-  if (ctx.mode === 'tenant') return ctx;
   if (!checkCapability(capability, ctx.jwt.scope, pdfBits)) {
     throw new PermissionDenied(capability);
   }
@@ -592,7 +634,6 @@ export function requireAnyCapability(
   pdfBits: PdfBits,
 ): { tenantId: string; sub: string; mode: DocAccessMode; jwt: RequestJwtContext } {
   const ctx = requireDocAccessOnly(req, docId);
-  if (ctx.mode === 'tenant') return ctx;
   if (!checkAnyCapability(capabilities, ctx.jwt.scope, pdfBits)) {
     throw new PermissionDenied(capabilities[0] ?? 'doc.open', undefined, capabilities);
   }
@@ -612,7 +653,6 @@ export function requireResource(
   pdfBits: PdfBits,
 ): { tenantId: string; sub: string; mode: DocAccessMode; jwt: RequestJwtContext } {
   const ctx = requireDocAccessOnly(req, docId);
-  if (ctx.mode === 'tenant') return ctx;
   if (!checkResourceAccess(resourceId, ctx.jwt.scope, pdfBits)) {
     throwResourceDenied(resourceId, ctx.jwt.scope, pdfBits);
   }
@@ -637,7 +677,6 @@ export function requireCollabAction(
 ): { tenantId: string; sub: string; mode: DocAccessMode; jwt: RequestJwtContext } {
   const ctx = requireDocAccessOnly(req, docId);
   refuseProtected('doc.annotate.modify', protection);
-  if (ctx.mode === 'tenant') return ctx;
   if (!checkCollab(action, target, ctx.jwt.scope, ctx.jwt.identity, pdfBits)) {
     throw new PermissionDenied(`annotations:${action}`, 'target');
   }
@@ -648,14 +687,13 @@ export function requireCollabAction(
  * Whether the token may make new objects on the document, so its editing
  * session is handed object numbers: create annotations (as itself, in its
  * own group), insert pages, add form fields, or add outline items. What the
- * document's signatures forbid doesn't count. A tenant owns its documents.
+ * document's signatures forbid doesn't count.
  */
 export function mayCreateObjects(
   ctx: { mode: DocAccessMode; jwt: RequestJwtContext },
   pdfBits: PdfBits,
   protection: DocumentProtection | null,
 ): boolean {
-  if (ctx.mode === 'tenant') return true;
   const { scope, identity } = ctx.jwt;
   if (
     checkAnyCapability(
@@ -687,7 +725,7 @@ export function holdsCapability(
   protection: DocumentProtection | null,
 ): boolean {
   if (protection && protectedCapabilities(protection).has(capability)) return false;
-  return ctx.mode === 'tenant' || checkCapability(capability, ctx.jwt.scope, pdfBits);
+  return checkCapability(capability, ctx.jwt.scope, pdfBits);
 }
 
 // Layer-scoped variants — wrap the doc-only versions with the existing
@@ -841,8 +879,7 @@ export function requireLayerCollabAction(
  * An annotation write whose permission the worker checks against what the
  * write finds, inside the write (an update, a delete): the token reaches
  * this document's layer, no signature forbids annotation writes, and the
- * authority the write carries names who it acts for and the token's grants
- * (none to check for a tenant, which owns its documents).
+ * authority the write carries names who it acts for and the token's grants.
  */
 export function requireLayerAnnotationWrite(
   req: FastifyRequest,
@@ -858,7 +895,7 @@ export function requireLayerAnnotationWrite(
     ...writeRequestOf(req),
     authority: {
       identity: ctx.jwt.identity,
-      grants: ctx.mode === 'tenant' ? null : { scope: ctx.jwt.scope, pdfBits },
+      grants: { scope: ctx.jwt.scope, pdfBits },
     },
   };
 }
@@ -866,8 +903,7 @@ export function requireLayerAnnotationWrite(
 /**
  * A request's changes (`POST …/changes`): the token reaches this document's
  * layer, and the authority the changes carry names who they act for, the
- * token's grants (none for a tenant, which owns its documents) and what the
- * document's signatures forbid. The worker checks each op against it inside
+ * token's grants and what the document's signatures forbid. The worker checks each op against it inside
  * the write, the ops of an undo included.
  */
 export function requireLayerChangeWrite(
@@ -883,8 +919,7 @@ export function requireLayerChangeWrite(
 
 /**
  * What a write carries for the worker to check inside it: who it acts for,
- * the token's grants (none for a tenant, which owns its documents), and what
- * the document's signatures forbid.
+ * the token's grants, and what the document's signatures forbid.
  */
 export function changeAuthorityOf(
   ctx: { mode: DocAccessMode; jwt: RequestJwtContext },
@@ -893,7 +928,7 @@ export function changeAuthorityOf(
 ): ChangeAuthority {
   return {
     identity: ctx.jwt.identity,
-    grants: ctx.mode === 'tenant' ? null : { scope: ctx.jwt.scope, pdfBits },
+    grants: { scope: ctx.jwt.scope, pdfBits },
     protection,
   };
 }
@@ -987,7 +1022,9 @@ function jwtContext(claims: JwtClaims): RequestJwtContext {
     jti: typeof claims.jti === 'string' && claims.jti.length > 0 ? claims.jti : null,
     exp: typeof claims.exp === 'number' ? claims.exp : null,
     unlockKey: readUnlockKey(claims),
-    scope: claims.scope,
+    // Inside documents a tenant token is checked like a doc token, against
+    // the document permissions its scope grants.
+    scope: isTenantClaims(claims) ? documentScopeOf(claims.scope) : claims.scope,
     identity: claims.identity ? { ...claims.identity } : {},
   };
 }

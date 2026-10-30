@@ -29,10 +29,16 @@ leave its own tenant. Only the bottom rung is ever allowed to reach a browser.
 <DeploymentTabs>
   <DeploymentTab mode="saas">
     On managed CloudPDF the API token is the **platform's** credential and your
-    account is one tenant. You enter at the second rung: your [dashboard](https://app.cloudpdf.com) API key
-    *is* a tenant token, already scoped to your account. Everything below the
-    second rung — minting document tokens, capabilities, revocation — works
-    exactly as documented here, with your API key as the `token`.
+    account is one tenant. You enter at the second rung: an API key from your
+    [dashboard](https://app.cloudpdf.com) *is* a tenant token, scoped to your
+    account. It expires after 30, 60 or 90 days, whichever you pick when you
+    create it, and you can revoke it from the dashboard at any time.
+
+    Your server can call the document routes directly with that key: read form
+    values, fill or flatten a form, extract text, all without minting a
+    document token first. Browsers still only ever get document tokens. Minting
+    them, capabilities and revocation work exactly as documented here, with
+    your API key as the `token`.
   </DeploymentTab>
   <DeploymentTab mode="self-hosted">
     You operate the deployment, so you hold the top rung: the API token
@@ -66,15 +72,39 @@ configuration, never in a browser bundle):
 
 ## Tenant tokens
 
-A tenant JWT represents a principal inside **one** tenant. It carries a `scope`
-array naming the tenant-level operations it may perform, and the server rejects
-it on any path whose `tenantId` is not its own `tenant_id`.
+A tenant JWT represents a principal inside **one** tenant, and the server
+rejects it on any path whose `tenantId` is not its own `tenant_id`. Its `scope`
+array names two kinds of grant, and they never overlap:
 
-On managed CloudPDF this is what your dashboard API key is. On a self-hosted
-deployment, mint one with the API token via
-[issue token](/docs/api-reference/tokens/issue) using `kind: "tenant"` — that
+- **Tenant scopes** act on records: listing documents and folders with their
+  names, uploading, renaming and moving, deleting, minting tokens, managing
+  share links. No tenant scope reaches inside a document; `docs.read` lists
+  documents but cannot open one.
+- **Capabilities** act on what is inside documents, the same ones a document
+  token carries (see [Capabilities](#capabilities)). In a tenant token they hold
+  for every document the tenant owns. That covers the document routes
+  (`/v1/docs/{docId}`) and the two collection calls that hand out content:
+  downloading the original file needs `doc.download`, the thumbnail
+  `doc.render`.
+
+| Scope | For |
+| --- | --- |
+| `["docs.read"]` | A usage or listing service: sees names and folders, no content. |
+| `["docs.read", "doc.render"]` | A file browser: names plus thumbnails. |
+| `["docs.read", "doc.open", "doc.text.copy"]` | An indexer: lists documents and reads their text. |
+| `["doc.open", "doc.forms.fill"]` | A server that fills in forms and does nothing else. |
+| `["docs.read", "tokens.issue-doc"]` | The backend that opens documents for your users. |
+| `["*"]` | A full tenant administrator. |
+
+`tokens.issue-doc` mints document tokens with any capability, so a token holding
+it can reach anything inside the tenant's documents: treat it as the strongest
+scope after `*`.
+
+On managed CloudPDF this is what your dashboard API key is, with `*`. On a
+self-hosted deployment, mint one with the API token via
+[issue token](/docs/api-reference/tokens/issue) using `kind: "tenant"`. That
 request is rejected for every other credential, which is the "downward" rule
-doing its job. Use `scope: ["*"]` for a full tenant administrator.
+doing its job.
 
 The available scopes:
 

@@ -39,6 +39,7 @@ import { BaseVersionsRepo } from '../db/repos/base_versions.repo';
 import { DocumentImportsRepo } from '../db/repos/document_imports.repo';
 import { DocumentSigningsRepo } from '../db/repos/document_signings.repo';
 import { DocumentsRepo } from '../db/repos/documents.repo';
+import { FoldersRepo } from '../db/repos/folders.repo';
 import { DocumentPagesRepo, LayerPagesRepo, LayersRepo } from '../db/repos/page_state.repo';
 import { PdfPasswordSessionsRepo } from '../db/repos/pdf_password_sessions.repo';
 import { PdfPasswordVerificationsRepo } from '../db/repos/pdf_password_verifications.repo';
@@ -61,6 +62,7 @@ import { SharpImageEncoder } from '../render/SharpImageEncoder';
 import { IMMUTABLE_CACHE_PRIVATE, IMMUTABLE_CACHE_SHARED } from '../routes/_helpers';
 import { registerAccessRoutes } from '../routes/access';
 import { registerAdminDocumentsRoutes } from '../routes/admin/documents';
+import { registerAdminFoldersRoutes } from '../routes/admin/folders';
 import { registerAdminLayersRoutes } from '../routes/admin/layers';
 import { registerAdminSharesRoutes } from '../routes/admin/shares';
 import { registerAdminTenantsRoutes } from '../routes/admin/tenants';
@@ -101,6 +103,7 @@ import {
   DocumentLifecycleService,
   type UploadProxyPolicy,
 } from '../services/DocumentLifecycleService';
+import { FolderService } from '../services/FolderService';
 import { DocumentSecurityProbe } from '../services/DocumentSecurityProbe';
 import { DocumentService } from '../services/DocumentService';
 import { EventLogService } from '../services/EventLogService';
@@ -277,6 +280,11 @@ export interface BuildAppOptions {
   maxLayerSessionsPerDoc?: number;
   /** Max age of a `pending` doc before it's considered abandoned. */
   pendingTtlMs?: number;
+  /**
+   * How long a document may stay `deleting` before the sweeper finishes the
+   * delete itself. A live delete finishes well within it. Default 1 minute.
+   */
+  deletingGraceMs?: number;
   /**
    * When supplied (with `db`, `objectStore`, and a worker pool),
    * enables the cloud `/v1/docs/...` routes via the
@@ -1098,6 +1106,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
     lifecycle = new DocumentLifecycleService({
       documents: new DocumentsRepo(opts.db),
       tenants: new TenantsRepo(opts.db),
+      folders: new FoldersRepo(opts.db),
       storage: opts.objectStore,
       autoProvisionTenant: opts.autoProvisionTenant ?? false,
       uploadProxyPolicy: opts.uploadProxyPolicy ?? 'fallback-only',
@@ -1121,6 +1130,23 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
     await registerAdminDocumentsRoutes(app, {
       lifecycle,
       storage: opts.objectStore,
+    });
+    await registerAdminFoldersRoutes(app, {
+      folders: new FolderService({
+        db: opts.db,
+        tenants: new TenantsRepo(opts.db),
+        autoProvisionTenant: opts.autoProvisionTenant ?? false,
+        finishDeletes: (tenantId, docIds) => {
+          lifecycle!
+            .finishDeletes(tenantId, docIds)
+            .catch((err) =>
+              app.log.error(
+                { err, tenantId },
+                'finishing a folder delete failed; the sweeper retries',
+              ),
+            );
+        },
+      }),
     });
     const storedLayers = {
       db: opts.db,
@@ -1435,11 +1461,15 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
 
     const sweepIntervalMs = opts.sweepIntervalMs ?? 60_000;
     const pendingTtlMs = opts.pendingTtlMs ?? 60 * 60 * 1000; // 1h default
+    const deletingGraceMs = opts.deletingGraceMs ?? 60_000;
     if (sweepIntervalMs > 0) {
       sweeperTimer = setInterval(() => {
         lifecycle!
           .sweepStalePending({ olderThanMs: pendingTtlMs })
           .catch((err) => app.log.error({ err }, 'sweepStalePending failed'));
+        lifecycle!
+          .sweepDeleting({ olderThanMs: deletingGraceMs })
+          .catch((err) => app.log.error({ err }, 'sweepDeleting failed'));
         layerService
           ?.expireSignings(Date.now())
           .catch((err) => app.log.error({ err }, 'expireSignings failed'));
@@ -1584,10 +1614,21 @@ export function handleAppError(err: unknown, req: FastifyRequest, reply: Fastify
     });
     return;
   }
-  const e = err as Error & { code?: string; status?: number; statusCode?: number };
+  const e = err as Error & {
+    code?: string;
+    status?: number;
+    statusCode?: number;
+    details?: Record<string, unknown>;
+  };
   if (e.status && typeof e.status === 'number') {
     logHandledServerError(req, e, e.status);
-    reply.code(e.status).send({ error: { code: e.code ?? 'Unknown', message: e.message } });
+    reply.code(e.status).send({
+      error: {
+        code: e.code ?? 'Unknown',
+        message: e.message,
+        ...(e.details ? { details: e.details } : {}),
+      },
+    });
     return;
   }
   // Fastify's own errors (body parsing, payload limits, validation) carry

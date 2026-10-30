@@ -149,6 +149,7 @@ export function createReveal(
                 : camera().zoom;
       // A degenerate target (a point with a fit directive) only pans.
       if (!Number.isFinite(zoom) || zoom <= 0) zoom = camera().zoom;
+      // A tiny rect fits at the zoom limit, centered, like any other zoom.
       zoom = clampZoom(zoom, zoomLimits());
       const zoomChanged = zoomDirective !== 'keep';
       const anchor = options.anchor ?? {};

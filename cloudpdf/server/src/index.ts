@@ -85,6 +85,7 @@ export type {
   AuditLogTable,
 } from './db/schema';
 export { DocumentsRepo } from './db/repos/documents.repo';
+export { FoldersRepo, MAX_FOLDER_DEPTH } from './db/repos/folders.repo';
 export type { DocumentRow, CreatePendingInput, CommitInput } from './db/repos/documents.repo';
 export { TenantsRepo } from './db/repos/tenants.repo';
 export type { TenantRow } from './db/repos/tenants.repo';

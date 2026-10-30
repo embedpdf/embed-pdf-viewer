@@ -429,6 +429,15 @@ export const defaultCommands: CommandDef[] = [
     active: (commandContext) => interaction(commandContext)?.getActiveToolId() === 'pointer',
     enabled: (commandContext) => interaction(commandContext) != null,
   },
+  // Drag a box to fill the view with it, or click to zoom in a step (Alt: out).
+  {
+    id: 'tool:zoom',
+    labelKey: 'commands.zoom.marquee',
+    icon: 'zoomInArea',
+    run: (commandContext) => interaction(commandContext)?.activateTool('zoom'),
+    active: (commandContext) => interaction(commandContext)?.getActiveToolId() === 'zoom',
+    enabled: (commandContext) => interaction(commandContext) != null,
+  },
 
   // The panels' `panel:<id>` commands come from the layout's panels (config/panels.ts).
 

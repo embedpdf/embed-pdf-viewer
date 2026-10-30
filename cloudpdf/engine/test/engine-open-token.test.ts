@@ -139,11 +139,12 @@ function docToken(
   });
 }
 
+/** A tenant key that opens documents: a working session on each, as the file allows. */
 function tenantToken(tenantId: string, opts: { scope?: ReadonlyArray<string> } = {}): string {
   return signDevToken(SECRET, {
     sub: 'user-tenant',
     tenant_id: tenantId,
-    scope: opts.scope ?? ['docs.read'],
+    scope: opts.scope ?? ['pdf.permissions'],
   });
 }
 

@@ -180,9 +180,10 @@ export function createStandardCommands(
       enabled: hasStage,
     },
 
-    // ── tools: the two built-in ones have shortcuts; the family covers every other ──
+    // ── tools: the built-in ones have Acrobat's single keys; the family covers every other ──
     { ...toolCommand('pointer'), id: 'tool:pointer', shortcut: 'V' },
     { ...toolCommand('pan'), id: 'tool:pan', shortcut: 'H' },
+    { ...toolCommand('zoom'), id: 'tool:zoom', shortcut: 'Z' },
     toolCommands,
 
     // ── selections ──

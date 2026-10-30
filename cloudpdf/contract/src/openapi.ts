@@ -142,7 +142,12 @@ export function buildAdminOpenApiDocument(opts: BuildAdminOpenApiOptions): Recor
           bearerFormat: 'JWT',
           'x-docs-title': 'Tenant token',
           description:
-            "Delegated tenant JWT, valid only under its own /v1/tenants/{tenantId}/ subtree — the path tenant must equal the token's tenant_id. Doc-scoped viewer tokens are rejected on every admin route.",
+            'Delegated tenant JWT, valid only for its own tenant: under /v1/tenants/{tenantId}/ ' +
+            "the path tenant must equal the token's tenant_id, and on /v1/docs/{docId} the " +
+            "document must belong to that tenant and the token's scope must hold the operation's " +
+            'document permissions, as a document token does. ' +
+            'For servers; browsers get document tokens. Doc-scoped viewer tokens are rejected on ' +
+            'every admin route.',
         },
         docToken: {
           type: 'http',

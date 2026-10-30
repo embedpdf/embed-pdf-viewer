@@ -18,6 +18,7 @@ export const en = {
     tool: {
       pointer: 'Select',
       pan: 'Pan',
+      zoom: 'Marquee zoom',
       highlight: 'Highlight',
       underline: 'Underline',
       strikeout: 'Strikethrough',

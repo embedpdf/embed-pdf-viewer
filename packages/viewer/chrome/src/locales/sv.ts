@@ -43,6 +43,7 @@ export const sv: Locale = {
         fitPage: 'Anpassa till sida',
         fitWidth: 'Anpassa till bredd',
         automatic: 'Automatisk',
+        marquee: 'Zooma in på område',
         menu: 'Zoom',
         level: 'Zoomnivå',
         p50: '50 %',
