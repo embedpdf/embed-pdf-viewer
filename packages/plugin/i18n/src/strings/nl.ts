@@ -17,6 +17,7 @@ export const nl: EmbedpdfStrings = {
     tool: {
       pointer: 'Selecteren',
       pan: 'Verschuiven',
+      zoom: 'Inzoomen op gebied',
       highlight: 'Markeren',
       underline: 'Onderstrepen',
       strikeout: 'Doorhalen',

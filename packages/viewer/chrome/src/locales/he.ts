@@ -43,6 +43,7 @@ export const he: Locale = {
         fitPage: 'התאם לעמוד',
         fitWidth: 'התאם לרוחב',
         automatic: 'אוטומטי',
+        marquee: 'הגדל אזור',
         menu: 'זום',
         level: 'רמת זום',
         p50: '50%',

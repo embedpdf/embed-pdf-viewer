@@ -42,6 +42,7 @@ export const ko: Locale = {
         fitPage: '페이지에 맞추기',
         fitWidth: '너비에 맞추기',
         automatic: '자동',
+        marquee: '영역 확대',
         menu: '확대/축소',
         level: '배율',
         p50: '50%',

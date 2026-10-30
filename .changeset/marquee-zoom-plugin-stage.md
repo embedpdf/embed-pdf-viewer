@@ -1,0 +1,5 @@
+---
+'@embedpdf/plugin-stage': minor
+---
+
+The `zoom` tool's box. On the host lens, `beginZoomDrag`, `moveZoomDrag`, `endZoomDrag({ zoomOut })` and `cancelZoomDrag` run the drag, and `getZoomBox()` gives the box in viewport pixels for an adapter to draw. A box zooms straight in, about the one point that stays put, until it fills the view, centered; it glides with `scrollBehavior`. A click (under 4 pixels) zooms one step around the point. `createZoomDragHandler(stage, interaction)` connects it to the interaction hub. The new `zoomBox` setting (`{ fill, stroke }`, `null` follows the accent) colors the box. `zoomIn()` and `zoomOut()` take `{ around }`, like `zoomTo` and `zoomBy`. `reveal()` with a fit now stops at the zoom limit (64×) instead of zooming past it on a tiny rect. Under a tool with a `gapCursor` (pan, zoom), the pan fallback no longer takes drags between pages. A fit mode, a level or `resetSettings()` asked for again now applies after a zoom the user made: before, `fitAutomatic()` after a zoom step, pinch, double-tap or zoomed `reveal` did nothing when automatic was already the setting, and so did `zoomTo()` with the last level set.

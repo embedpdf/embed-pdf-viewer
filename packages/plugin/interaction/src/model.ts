@@ -47,12 +47,14 @@ export function setCursor(state: InteractionModel, cursor: Cursor): InteractionM
 }
 
 /**
- * The two built-in tools. Features add tools via `registerTool`. `enables`
+ * The three built-in tools. Features add tools via `registerTool`. `enables`
  * is the composition seam:
  *   pointer → text selection + annotation editing + marquee selection
  *   pan     → scrolling (contributed by Stage) + annotation editing, no text select
- * Both carry `form-fill` and `link-nav`: filling forms and following links is
- * the resting state of a viewer (Acrobat's hand tool does both).
+ *   zoom    → a box to zoom to, and a click to zoom a step (contributed by Stage)
+ * Pointer and pan carry `form-fill` and `link-nav`: filling forms and following
+ * links is the resting state of a viewer (Acrobat's hand tool does both). Under
+ * zoom a click zooms instead, as with Acrobat's Marquee Zoom.
  */
 export const builtinTools = (): HostTool[] => [
   {
@@ -71,5 +73,13 @@ export const builtinTools = (): HostTool[] => [
     cursor: 'grab',
     gapCursor: 'grab',
     enables: new Set(['scroll', 'annotation-edit', 'form-fill', 'link-nav']),
+  },
+  {
+    id: 'zoom',
+    cursor: 'zoom-in',
+    // A box can start anywhere, the space between pages included.
+    gapCursor: 'zoom-in',
+    touch: 'draw',
+    enables: new Set(['zoom-box']),
   },
 ];

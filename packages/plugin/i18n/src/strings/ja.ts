@@ -17,6 +17,7 @@ export const ja: EmbedpdfStrings = {
     tool: {
       pointer: '選択',
       pan: 'パン',
+      zoom: '範囲選択ズーム',
       highlight: 'ハイライト',
       underline: '下線',
       strikeout: '取り消し線',

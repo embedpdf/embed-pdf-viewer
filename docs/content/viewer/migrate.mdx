@@ -246,6 +246,7 @@ The ids changed:
 | The `selection` and `annotation` selection menus | The `selection` and `annotation` bars |
 | `document:export`, `document:fullscreen` | `document:download`, `view:fullscreen` |
 | `annotation:add-highlight`, `panel:toggle-search`, `scroll:next-page` | `tool:highlight`, `panel:search`, `page:next` |
+| `zoom:marquee` | `tool:zoom`, which switches to the `zoom` tool |
 
 Every 3.0 id is on [Layout](customize/layout#every-built-in-id) and
 [Buttons & commands](customize/commands#every-built-in-command).
@@ -337,7 +338,7 @@ What 2.x had that 3.0 doesn't:
 - **The engine on the page's own thread** (`worker: false`), and its log (`log`). The engine
   always runs in a worker.
 - **Zoom limits and steps:** `minZoom`, `maxZoom`, `zoomStep`, `zoomRanges` and `presets`.
-- **Marquee zoom, and the screenshot tool** (the `capture` plugin).
+- **The screenshot tool** (the `capture` plugin).
 - **Protect.** 2.x's Protect dialog, `setDocumentEncryption()` and `removeEncryption()`: 3.0 can't
   add or remove a document's password.
 - **Swedish and Traditional Chinese.** They aren't built in: add them with

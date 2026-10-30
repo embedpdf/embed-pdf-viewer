@@ -25,15 +25,13 @@ import type { StageModel } from './model';
 import { createArrival } from './navigation/arrive';
 import { createReveal } from './navigation/reveal';
 import { createZoom } from './navigation/zoom';
+import { createZoomDrag } from './navigation/zoom-drag';
 import { createPageReads } from './read/pages';
 import { createServices } from './services';
 import { createSettings } from './settings/settings';
 import { createViewLifecycle } from './view/lifecycle';
 
-export function createStageController(
-  ctx: PluginContext<StageModel>,
-  config: StageConfig = {},
-) {
+export function createStageController(ctx: PluginContext<StageModel>, config: StageConfig = {}) {
   const services = createServices(ctx);
   const { events } = services;
 
@@ -50,6 +48,7 @@ export function createStageController(
   const reveal = createReveal(ctx, services, write, animation, arrive);
   const settings = createSettings(ctx, services, config, write, animation, arrive);
   const zoom = createZoom(ctx, services, write, animation, gestures.api, settings);
+  const zoomDrag = createZoomDrag(ctx, services, write, animation, { ...reads.api, ...zoom.api });
   const view = createViewLifecycle(ctx, services, animation, arrive, settings);
 
   const api: StageHostCapability = composeApi('stage', [
@@ -60,6 +59,7 @@ export function createStageController(
     reveal.api,
     settings.api,
     zoom.api,
+    zoomDrag.api,
     view.api,
     {
       onPageChanged: events.pageChanged.on,

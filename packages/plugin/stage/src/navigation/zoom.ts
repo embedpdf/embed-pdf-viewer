@@ -78,8 +78,8 @@ export function createZoom(
         // The focal-anchored tween keeps the tapped point still.
         animateZoomAnchored(focal, point, target, undefined, syncCursorFromCamera);
       },
-      zoomIn: () => gestures.zoomAround(zoomAlignPoint(), ZOOM_STEP),
-      zoomOut: () => gestures.zoomAround(zoomAlignPoint(), 1 / ZOOM_STEP),
+      zoomIn: (options) => gestures.zoomAround(options?.around ?? zoomAlignPoint(), ZOOM_STEP),
+      zoomOut: (options) => gestures.zoomAround(options?.around ?? zoomAlignPoint(), 1 / ZOOM_STEP),
       zoomTo: (zoom, options) => {
         if (typeof zoom === 'number') {
           if (options?.around) gestures.zoomAround(options.around, zoom / camera().zoom);

@@ -42,6 +42,7 @@ export const zhCN: Locale = {
         fitPage: '适合页面',
         fitWidth: '适合宽度',
         automatic: '自动',
+        marquee: '框选放大',
         menu: '缩放',
         level: '缩放级别',
         p50: '50%',

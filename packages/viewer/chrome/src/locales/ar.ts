@@ -43,6 +43,7 @@ export const ar: Locale = {
         fitPage: 'ملاءمة الصفحة',
         fitWidth: 'ملاءمة العرض',
         automatic: 'تلقائي',
+        marquee: 'تكبير منطقة محددة',
         menu: 'تكبير/تصغير',
         level: 'مستوى التكبير',
         p50: '50%',

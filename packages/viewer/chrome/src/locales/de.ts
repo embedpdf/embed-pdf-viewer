@@ -42,6 +42,7 @@ export const de: Locale = {
         fitPage: 'Ganze Seite',
         fitWidth: 'Seitenbreite',
         automatic: 'Automatisch',
+        marquee: 'Bereich vergrößern',
         menu: 'Zoom',
         level: 'Zoomstufe',
         p50: '50 %',

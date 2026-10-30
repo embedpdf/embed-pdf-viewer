@@ -25,6 +25,7 @@ export const de: EmbedpdfStrings = {
     tool: {
       pointer: 'Auswählen',
       pan: 'Verschieben',
+      zoom: 'Bereich vergrößern',
       highlight: 'Hervorheben',
       underline: 'Unterstreichen',
       strikeout: 'Durchstreichen',
