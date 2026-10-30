@@ -27,7 +27,7 @@ export class CloudPDFClient {
     protected _folders: FoldersClient | undefined;
     protected _tokens: TokensClient | undefined;
 
-    constructor(options: CloudPDFClient.Options) {
+    constructor(options: CloudPDFClient.Options = {}) {
         this._options = normalizeClientOptionsWithAuth(options);
     }
 

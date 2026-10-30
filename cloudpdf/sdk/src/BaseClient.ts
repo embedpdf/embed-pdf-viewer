@@ -3,6 +3,7 @@
 import { BearerAuthProvider } from "./auth/BearerAuthProvider.js";
 import { mergeHeaders } from "./core/headers.js";
 import * as core from "./core/index.js";
+import type * as environments from "./environments.js";
 
 export type AuthOption =
     | false
@@ -11,7 +12,7 @@ export type AuthOption =
     | BearerAuthProvider.AuthOptions;
 
 export type BaseClientOptions = {
-    environment: core.Supplier<string>;
+    environment?: core.Supplier<environments.CloudPDFEnvironment | string>;
     /** Specify a custom URL to connect the client to. */
     baseUrl?: core.Supplier<string>;
     /** Additional headers to include in requests. */

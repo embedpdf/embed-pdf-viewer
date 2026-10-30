@@ -5,6 +5,7 @@ import { type NormalizedClientOptionsWithAuth, normalizeClientOptionsWithAuth } 
 import { mergeHeaders } from "../../../../core/headers.js";
 import * as core from "../../../../core/index.js";
 import { mergeAdditionalBodyParameters } from "../../../../core/requestBody.js";
+import * as environments from "../../../../environments.js";
 import { handleNonStatusCodeError } from "../../../../errors/handleNonStatusCodeError.js";
 import * as errors from "../../../../errors/index.js";
 import * as CloudPDF from "../../../index.js";
@@ -18,7 +19,7 @@ export declare namespace TenantsClient {
 export class TenantsClient {
     protected readonly _options: NormalizedClientOptionsWithAuth<TenantsClient.Options>;
 
-    constructor(options: TenantsClient.Options) {
+    constructor(options: TenantsClient.Options = {}) {
         this._options = normalizeClientOptionsWithAuth(options);
     }
 
@@ -58,7 +59,8 @@ export class TenantsClient {
         const _response = await core.fetcher({
             url: core.url.join(
                 (await core.Supplier.get(this._options.baseUrl)) ??
-                    (await core.Supplier.get(this._options.environment)),
+                    (await core.Supplier.get(this._options.environment)) ??
+                    environments.CloudPDFEnvironment.Saas,
                 "v1/tenants",
             ),
             method: "GET",
@@ -127,7 +129,8 @@ export class TenantsClient {
         const _response = await core.fetcher({
             url: core.url.join(
                 (await core.Supplier.get(this._options.baseUrl)) ??
-                    (await core.Supplier.get(this._options.environment)),
+                    (await core.Supplier.get(this._options.environment)) ??
+                    environments.CloudPDFEnvironment.Saas,
                 "v1/tenants",
             ),
             method: "POST",
@@ -196,7 +199,8 @@ export class TenantsClient {
         const _response = await core.fetcher({
             url: core.url.join(
                 (await core.Supplier.get(this._options.baseUrl)) ??
-                    (await core.Supplier.get(this._options.environment)),
+                    (await core.Supplier.get(this._options.environment)) ??
+                    environments.CloudPDFEnvironment.Saas,
                 `v1/tenants/${core.url.encodePathParam(tenantId)}`,
             ),
             method: "GET",
@@ -264,7 +268,8 @@ export class TenantsClient {
         const _response = await core.fetcher({
             url: core.url.join(
                 (await core.Supplier.get(this._options.baseUrl)) ??
-                    (await core.Supplier.get(this._options.environment)),
+                    (await core.Supplier.get(this._options.environment)) ??
+                    environments.CloudPDFEnvironment.Saas,
                 `v1/tenants/${core.url.encodePathParam(tenantId)}`,
             ),
             method: "DELETE",
@@ -330,7 +335,8 @@ export class TenantsClient {
         const _response = await core.fetcher({
             url: core.url.join(
                 (await core.Supplier.get(this._options.baseUrl)) ??
-                    (await core.Supplier.get(this._options.environment)),
+                    (await core.Supplier.get(this._options.environment)) ??
+                    environments.CloudPDFEnvironment.Saas,
                 `v1/tenants/${core.url.encodePathParam(tenantId)}/resume`,
             ),
             method: "POST",
@@ -403,7 +409,8 @@ export class TenantsClient {
         const _response = await core.fetcher({
             url: core.url.join(
                 (await core.Supplier.get(this._options.baseUrl)) ??
-                    (await core.Supplier.get(this._options.environment)),
+                    (await core.Supplier.get(this._options.environment)) ??
+                    environments.CloudPDFEnvironment.Saas,
                 `v1/tenants/${core.url.encodePathParam(tenantId)}/suspend`,
             ),
             method: "POST",
@@ -483,7 +490,8 @@ export class TenantsClient {
         const _response = await core.fetcher({
             url: core.url.join(
                 (await core.Supplier.get(this._options.baseUrl)) ??
-                    (await core.Supplier.get(this._options.environment)),
+                    (await core.Supplier.get(this._options.environment)) ??
+                    environments.CloudPDFEnvironment.Saas,
                 `v1/tenants/${core.url.encodePathParam(tenantId)}/usage`,
             ),
             method: "GET",

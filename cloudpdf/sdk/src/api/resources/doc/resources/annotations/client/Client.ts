@@ -5,6 +5,7 @@ import { type NormalizedClientOptionsWithAuth, normalizeClientOptionsWithAuth } 
 import { mergeHeaders, mergeOnlyDefinedHeaders } from "../../../../../../core/headers.js";
 import * as core from "../../../../../../core/index.js";
 import { mergeAdditionalBodyParameters } from "../../../../../../core/requestBody.js";
+import * as environments from "../../../../../../environments.js";
 import { handleNonStatusCodeError } from "../../../../../../errors/handleNonStatusCodeError.js";
 import * as errors from "../../../../../../errors/index.js";
 import * as CloudPDF from "../../../../../index.js";
@@ -18,7 +19,7 @@ export declare namespace AnnotationsClient {
 export class AnnotationsClient {
     protected readonly _options: NormalizedClientOptionsWithAuth<AnnotationsClient.Options>;
 
-    constructor(options: AnnotationsClient.Options) {
+    constructor(options: AnnotationsClient.Options = {}) {
         this._options = normalizeClientOptionsWithAuth(options);
     }
 
@@ -61,7 +62,8 @@ export class AnnotationsClient {
         const _response = await core.fetcher({
             url: core.url.join(
                 (await core.Supplier.get(this._options.baseUrl)) ??
-                    (await core.Supplier.get(this._options.environment)),
+                    (await core.Supplier.get(this._options.environment)) ??
+                    environments.CloudPDFEnvironment.Saas,
                 `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/annotations/items`,
             ),
             method: "GET",
@@ -140,7 +142,8 @@ export class AnnotationsClient {
         const _response = await core.fetcher({
             url: core.url.join(
                 (await core.Supplier.get(this._options.baseUrl)) ??
-                    (await core.Supplier.get(this._options.environment)),
+                    (await core.Supplier.get(this._options.environment)) ??
+                    environments.CloudPDFEnvironment.Saas,
                 `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/annotations/pages/${core.url.encodePathParam(pageKey)}/items`,
             ),
             method: "GET",
@@ -230,7 +233,8 @@ export class AnnotationsClient {
         const _response = await core.fetcher({
             url: core.url.join(
                 (await core.Supplier.get(this._options.baseUrl)) ??
-                    (await core.Supplier.get(this._options.environment)),
+                    (await core.Supplier.get(this._options.environment)) ??
+                    environments.CloudPDFEnvironment.Saas,
                 `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/annotations/pages/${core.url.encodePathParam(pageKey)}/items`,
             ),
             method: "POST",
@@ -320,7 +324,8 @@ export class AnnotationsClient {
         const _response = await core.fetcher({
             url: core.url.join(
                 (await core.Supplier.get(this._options.baseUrl)) ??
-                    (await core.Supplier.get(this._options.environment)),
+                    (await core.Supplier.get(this._options.environment)) ??
+                    environments.CloudPDFEnvironment.Saas,
                 `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/annotations/pages/${core.url.encodePathParam(pageKey)}/items/${core.url.encodePathParam(annotKey)}`,
             ),
             method: "DELETE",
@@ -410,7 +415,8 @@ export class AnnotationsClient {
         const _response = await core.fetcher({
             url: core.url.join(
                 (await core.Supplier.get(this._options.baseUrl)) ??
-                    (await core.Supplier.get(this._options.environment)),
+                    (await core.Supplier.get(this._options.environment)) ??
+                    environments.CloudPDFEnvironment.Saas,
                 `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/annotations/pages/${core.url.encodePathParam(pageKey)}/items/${core.url.encodePathParam(annotKey)}`,
             ),
             method: "PATCH",
@@ -483,7 +489,8 @@ export class AnnotationsClient {
         const _response = await core.fetcher<core.BinaryResponse>({
             url: core.url.join(
                 (await core.Supplier.get(this._options.baseUrl)) ??
-                    (await core.Supplier.get(this._options.environment)),
+                    (await core.Supplier.get(this._options.environment)) ??
+                    environments.CloudPDFEnvironment.Saas,
                 `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/annotations/pages/${core.url.encodePathParam(pageKey)}/items/${core.url.encodePathParam(annotKey)}/resources/appearance`,
             ),
             method: "GET",
@@ -554,7 +561,8 @@ export class AnnotationsClient {
         const _response = await core.fetcher<core.BinaryResponse>({
             url: core.url.join(
                 (await core.Supplier.get(this._options.baseUrl)) ??
-                    (await core.Supplier.get(this._options.environment)),
+                    (await core.Supplier.get(this._options.environment)) ??
+                    environments.CloudPDFEnvironment.Saas,
                 `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/annotations/pages/${core.url.encodePathParam(pageKey)}/items/${core.url.encodePathParam(annotKey)}/resources/file`,
             ),
             method: "GET",
@@ -624,7 +632,8 @@ export class AnnotationsClient {
         const _response = await core.fetcher<core.BinaryResponse>({
             url: core.url.join(
                 (await core.Supplier.get(this._options.baseUrl)) ??
-                    (await core.Supplier.get(this._options.environment)),
+                    (await core.Supplier.get(this._options.environment)) ??
+                    environments.CloudPDFEnvironment.Saas,
                 `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/annotations/pages/${core.url.encodePathParam(pageKey)}/items/appearance`,
             ),
             method: "POST",
@@ -715,7 +724,8 @@ export class AnnotationsClient {
         const _response = await core.fetcher({
             url: core.url.join(
                 (await core.Supplier.get(this._options.baseUrl)) ??
-                    (await core.Supplier.get(this._options.environment)),
+                    (await core.Supplier.get(this._options.environment)) ??
+                    environments.CloudPDFEnvironment.Saas,
                 `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/annotations/pages/${core.url.encodePathParam(pageKey)}/items/flatten`,
             ),
             method: "POST",
@@ -814,7 +824,8 @@ export class AnnotationsClient {
         const _response = await core.fetcher({
             url: core.url.join(
                 (await core.Supplier.get(this._options.baseUrl)) ??
-                    (await core.Supplier.get(this._options.environment)),
+                    (await core.Supplier.get(this._options.environment)) ??
+                    environments.CloudPDFEnvironment.Saas,
                 `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/annotations/pages/${core.url.encodePathParam(pageKey)}/items/reorder`,
             ),
             method: "POST",

@@ -1,15 +1,11 @@
-import { CloudPDFClient as GeneratedCloudPDFClient } from "./Client.js";
 import type * as CloudPDF from "./api/index.js";
+import { CloudPDFClient as GeneratedCloudPDFClient } from "./Client.js";
+import { CloudPDFEnvironment } from "./environments.js";
 import { Uploads } from "./uploads/Uploads.js";
 
 export declare namespace CloudPDFClient {
-    type GeneratedOptions = GeneratedCloudPDFClient.Options;
-    type Endpoint = GeneratedOptions["environment"];
-    export type Options = Omit<GeneratedOptions, "environment" | "baseUrl"> &
-        (
-            | { baseUrl: NonNullable<GeneratedOptions["baseUrl"]>; environment?: Endpoint }
-            | { environment: Endpoint; baseUrl?: GeneratedOptions["baseUrl"] }
-        );
+    /** CloudPDF SaaS unless `baseUrl` names your own server. */
+    export type Options = GeneratedCloudPDFClient.Options;
     export type RequestOptions = GeneratedCloudPDFClient.RequestOptions;
 }
 
@@ -17,11 +13,10 @@ export declare namespace CloudPDFClient {
 export class CloudPDFClient extends GeneratedCloudPDFClient {
     public readonly uploads: Uploads<CloudPDF.DocumentsCommit200Response.Document>;
 
-    public constructor(options: CloudPDFClient.Options) {
-        // Self-hosted CloudPDF has no universal environment URL. Let callers
-        // provide the familiar `baseUrl` alone while still satisfying Fern's
-        // generated client's internal environment slot.
-        super({ ...options, environment: options.environment ?? options.baseUrl } as GeneratedCloudPDFClient.Options);
+    public constructor(options: CloudPDFClient.Options = {}) {
+        // Generated requests fall back to SaaS by themselves; the passthrough
+        // `fetch` the uploads use doesn't, so the default is named here.
+        super({ ...options, environment: options.environment ?? CloudPDFEnvironment.Saas });
         const rawFetch = options.fetch ?? globalThis.fetch?.bind(globalThis);
         if (!rawFetch) throw new Error("CloudPDFClient requires a fetch implementation");
 

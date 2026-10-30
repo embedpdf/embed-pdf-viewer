@@ -44,10 +44,16 @@ Instantiate and use the client with the following:
 ```typescript
 import { CloudPDFClient } from "@cloudpdf/sdk";
 
-const client = new CloudPDFClient({ baseUrl: "YOUR_BASE_URL", token: "YOUR_TOKEN" });
+const client = new CloudPDFClient({ token: "YOUR_TOKEN" });
 await client.grants.exchange({
     grant: "grant"
 });
+```
+
+The client talks to CloudPDF SaaS (`https://engine.cloudpdf.com`). For your own CloudPDF server, pass its address:
+
+```typescript
+const client = new CloudPDFClient({ baseUrl: "https://pdf.example.com", token: "YOUR_TOKEN" });
 ```
 
 ## Request and Response Types

@@ -9,6 +9,13 @@
       "identifier": "Apache-2.0"
     }
   },
+  "servers": [
+    {
+      "url": "https://engine.cloudpdf.com",
+      "description": "CloudPDF SaaS",
+      "x-fern-server-name": "Saas"
+    }
+  ],
   "paths": {
     "/v1/deployment/license/status": {
       "get": {
