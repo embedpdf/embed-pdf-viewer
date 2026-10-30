@@ -601,11 +601,30 @@ export interface FailedDocumentInfo extends DocumentInfo {
   readonly error: PluginErrorInfo;
 }
 
-/** A file the viewer downloads itself, with the document's cancel signal: relative to the page, or absolute. */
+/**
+ * A file the viewer downloads itself, with its `fetch` (`createKernel({ fetch })`) and the
+ * document's cancel signal: relative to the page, or absolute.
+ */
 export interface UrlSource {
   readonly kind: 'url';
   readonly url: string;
+  /** A stable id of your own for the document, as `{ kind: 'bytes' }` takes one. Generated when omitted. */
+  readonly id?: string;
 }
+
+/**
+ * How the viewer downloads a URL: `fetch`'s own shape, so the browser's `fetch` is one. `init`
+ * carries the document's cancel `signal`, to pass on. Yours adds headers or cookies, or answers
+ * from somewhere else (`new Response(blob)`).
+ */
+export type HostFetch = (
+  url: string,
+  init: { readonly signal: AbortSignal },
+) => Promise<{
+  readonly ok: boolean;
+  readonly status: number;
+  arrayBuffer(): Promise<ArrayBuffer>;
+}>;
 
 /** Options for opening a document: the tab (`name`, `activate`), the engine's `OpenOptions`, and a `signal`. */
 export type OpenDocumentOptions = OpenOptions & {

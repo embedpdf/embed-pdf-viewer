@@ -79,7 +79,7 @@ const FAQS: Faq[] = [
   {
     question: 'Can the viewer use my app’s language?',
     answer:
-      'Yes. It speaks English, German, French, Spanish, Italian, Dutch, Portuguese, Polish, Japanese, Simplified Chinese, Korean, Arabic and Hebrew, and follows the browser by default. Bind locale to your own i18n setting to switch it, and use strings to change any label.',
+      'Yes. It speaks English, German, French, Spanish, Italian, Dutch, Portuguese, Polish, Swedish, Japanese, Simplified and Traditional Chinese, Korean, Arabic and Hebrew, and follows the browser by default. Bind locale to your own i18n setting to switch it, and use strings to change any label.',
   },
   {
     question: 'We use @embedpdf/vue-pdf-viewer from version 2. What changes?',
@@ -157,7 +157,7 @@ import { PDFViewer } from '@embedpdf/viewer-vue';
           ),
           bullets: [
             'Your brand color with one prop',
-            '13 languages, right-to-left included',
+            '15 languages, right-to-left included',
             'Add, move or hide any button',
           ],
           install: 'npm install @embedpdf/viewer-vue',
@@ -311,7 +311,7 @@ const layout = (layout: Layout) => layout.add({ custom: 'status' }, { to: 'main'
           },
           {
             icon: glyph(TranslateIcon, 22),
-            title: 'Speaks 13 languages',
+            title: 'Speaks 15 languages',
             body: 'It follows the browser, or your own locale. Arabic and Hebrew flip the whole layout right-to-left.',
           },
           {

@@ -12,7 +12,12 @@
 export * from '@embedpdf/plugin-stage';
 import * as React from 'react';
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
-import { createScrollHandler, DEFAULT_SETTINGS, stageState } from '@embedpdf/plugin-stage';
+import {
+  createScrollHandler,
+  createZoomDragHandler,
+  DEFAULT_SETTINGS,
+  stageState,
+} from '@embedpdf/plugin-stage';
 import type {
   StageCapability,
   StageSettings,
@@ -32,6 +37,8 @@ import {
   paint,
   stagePageDemand,
   stageViewProjector,
+  ZOOM_BOX_DASH,
+  zoomBoxPaint,
 } from '@embedpdf/web';
 import {
   ProjectorProvider,
@@ -148,6 +155,37 @@ function PageSurface({
         {chrome?.(ctx)}
       </PageProvider>
     </div>
+  );
+}
+
+/** The box the `zoom` tool drags, in viewport px, while the drag is a box. */
+function ZoomBox({ token }: { token: CapabilityToken<StageCapability> }) {
+  const hostToken = token as unknown as CapabilityToken<StageHostCapability>;
+  const box = useSelector(hostToken, (stage) => stage.getZoomBox());
+  const colors = useSelector(token, (stage) => stage.getSettings().zoomBox);
+  const accent = useViewerSettings((settings) => settings.accent);
+  if (!box) return null;
+  return (
+    <svg
+      aria-hidden
+      width={box.width}
+      height={box.height}
+      style={{
+        position: 'absolute',
+        left: box.x,
+        top: box.y,
+        overflow: 'visible',
+        pointerEvents: 'none',
+      }}
+    >
+      <rect
+        width={box.width}
+        height={box.height}
+        strokeWidth={1}
+        strokeDasharray={ZOOM_BOX_DASH}
+        style={zoomBoxPaint(colors, accent)}
+      />
+    </svg>
   );
 }
 
@@ -268,16 +306,22 @@ export function Stage({
       zoomGestures,
     });
     // Interaction opt-in lives with the sample source: the same knob that
-    // forwards this lens's samples also registers its pan-scroll handler,
-    // lens-scoped — two stages on one document can never pan each other.
+    // forwards this lens's samples also registers its pan-scroll and zoom-box
+    // handlers, lens-scoped — two stages on one document can never pan or
+    // zoom each other.
     const offScroll =
       useHub && ix
         ? ix.registerHandler(createScrollHandler(stage, ix, { panFallback }), {
             source: stage.getLensId(),
           })
         : null;
+    const offZoomDrag =
+      useHub && ix
+        ? ix.registerHandler(createZoomDragHandler(stage, ix), { source: stage.getLensId() })
+        : null;
 
     return () => {
+      offZoomDrag?.();
       offScroll?.();
       detachSurface();
     };
@@ -309,6 +353,7 @@ export function Stage({
             chrome={pageChrome}
           />
         ))}
+        <ZoomBox token={token} />
         {/* Anchored UI mounts in the overlay: absolute coords here are the
             projector's overlay space (the stage container). */}
         <ShownPagesProvider value={shownPages}>

@@ -146,7 +146,7 @@ describe('interaction hub', () => {
     removeFirst(); // must not remove the replacement
     expect(hub.getTool('x')?.cursor).toBe('copy');
     expect(hub.hasTool('x')).toBe(true);
-    expect(hub.listTools().map((tool) => tool.id)).toEqual(['pointer', 'pan', 'x']);
+    expect(hub.listTools().map((tool) => tool.id)).toEqual(['pointer', 'pan', 'zoom', 'x']);
     await kernel.destroy();
   });
 
@@ -284,14 +284,14 @@ describe('settings', () => {
   it('registers the tools setting from the start, and swaps them when it changes', async () => {
     const pin = { id: 'pin', cursor: 'copy' };
     const { kernel, hub } = await boot({ tools: [pin] });
-    expect(hub.listTools().map((tool) => tool.id)).toEqual(['pointer', 'pan', 'pin']);
+    expect(hub.listTools().map((tool) => tool.id)).toEqual(['pointer', 'pan', 'zoom', 'pin']);
     expect(hub.getTool('pin')?.enables.size).toBe(0);
     const changed = vi.fn();
     hub.onSettingsChanged(changed);
     const tools = hub.listTools();
     hub.updateSettings({ tools: [{ id: 'ruler', cursor: 'crosshair' }] });
     expect(hub.listTools()).not.toBe(tools);
-    expect(hub.listTools().map((tool) => tool.id)).toEqual(['pointer', 'pan', 'ruler']);
+    expect(hub.listTools().map((tool) => tool.id)).toEqual(['pointer', 'pan', 'zoom', 'ruler']);
     expect(changed).toHaveBeenCalledWith(expect.objectContaining({ changed: ['tools'] }));
     await kernel.destroy();
   });

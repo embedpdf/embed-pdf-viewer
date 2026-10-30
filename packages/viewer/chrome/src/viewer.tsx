@@ -26,6 +26,7 @@ import type {
   CapabilityToken,
   Engine,
   EngineFactory,
+  HostFetch,
   Identity,
   InitialDocument,
 } from '@embedpdf/react/runtime';
@@ -184,6 +185,8 @@ export interface FullViewerProps extends ViewerCustomization {
   engine: Engine | EngineFactory;
   /** Documents to open at mount; more arrive via the tab bar's open button. */
   initialDocuments?: InitialDocument[];
+  /** How a document at a URL downloads: the delivery's `fetch`, called at each download. */
+  fetch?: HostFetch;
   /** Shown while the workspace boots. Default: a translated pulse line. */
   fallback?: ReactNode;
   /** Where the theme's `.dark` class goes — a delivery concern, not user
@@ -331,6 +334,7 @@ function Booting() {
 export function FullViewer({
   engine,
   initialDocuments,
+  fetch,
   fallback,
   commands,
   icons,
@@ -431,7 +435,12 @@ export function FullViewer({
       columns: 'auto', // one column at the default width; more as the panel widens
       sizing: 'uniform', // equalize pages so the pixel target hits every thumb
       zoom: { pageWidth: 150 }, // thumbs are 150 screen px wide — for any document
-      padding: 12,
+      // Room around the grid: the first thumb sits as far below the panel's header as each thumb
+      // sits below the label over it.
+      padding: 20,
+      // No responsive rules: the default 'compact' rule gives a narrow view the phone's thin
+      // gutter (padding 4), and this panel is always narrow.
+      responsive: [],
       gap: { px: 16 }, // UI-stable spacing between thumbs
       pageFrame: { top: 0, right: 0, bottom: 20, left: 0 }, // reserved label band (screen px)
       fitAlign: { x: 'center', y: 'start' }, // few pages? thumbs hug the top
@@ -552,6 +561,7 @@ export function FullViewer({
         engine={engine}
         plugins={plugins}
         initialDocuments={initialDocuments}
+        fetch={fetch}
         scope={scope}
         identity={identity}
         fallback={fallback ?? <Booting />}

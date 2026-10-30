@@ -36,12 +36,13 @@ export type DocumentSrc =
 export type DocumentEntry = ViewerDocumentEntry<DocumentSrc>;
 
 /**
- * The cloud viewer's config: every key of the viewer's but `scope`, with its documents in the
- * cloud's words (`src: { token }`, `{ id }` or `{ grant }`), and `engine` for the cloud
- * engine's settings: `baseUrl` (CloudPDF SaaS when left out), the engine's own `token`, `fetch`.
- * An engine you made yourself, or a function that makes one, goes there too.
+ * The cloud viewer's config: every key of the viewer's but `scope`, and `fetch`, which downloads
+ * documents at a URL, where these live on CloudPDF. Its documents are in the cloud's words
+ * (`src: { token }`, `{ id }` or `{ grant }`), and `engine` takes the cloud engine's
+ * settings: `baseUrl` (CloudPDF SaaS when left out), the engine's own `token`, and the `fetch` it
+ * reaches CloudPDF with. An engine you made yourself, or a function that makes one, goes there too.
  */
-export interface ViewerConfig extends Omit<ViewerConfigBase<DocumentSrc>, 'scope'> {
+export interface ViewerConfig extends Omit<ViewerConfigBase<DocumentSrc>, 'scope' | 'fetch'> {
   engine?: CloudEngineOptions | Engine | EngineFactory;
 }
 

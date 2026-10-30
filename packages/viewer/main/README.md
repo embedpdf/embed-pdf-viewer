@@ -48,13 +48,13 @@ EmbedPDF.init({
 The default layout (`defaultLayout`) and `createLayout` re-export from this
 module for a layout written from scratch.
 
-Set `.config` (or the attributes) and the element builds the viewer. Five keys
+Set `.config` (or the attributes) and the element builds the viewer. Six keys
 follow their value while it runs, from `.config`, their own properties
-(`element.src = file`, `.theme`, `.locale`, `.disable`, `.readOnly`) or the
-`src`, `theme` and `locale` attributes: `src` opens the new document (a URL, a
-`File` or bytes) in place of the old one, and the others change the look, the
-language and the tools. Changing any other key re-creates the viewer from
-scratch, documents and all.
+(`element.src = file`, `.theme`, `.locale`, `.disable`, `.readOnly`, `.fetch`)
+or the `src`, `theme` and `locale` attributes: `src` opens the new document (a
+URL, a `File` or bytes) in place of the old one, `fetch` downloads the next
+document at a URL, and the others change the look, the language and the tools.
+Changing any other key re-creates the viewer from scratch, documents and all.
 
 ## Build notes
 

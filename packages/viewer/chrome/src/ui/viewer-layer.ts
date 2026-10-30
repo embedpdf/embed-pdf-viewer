@@ -28,7 +28,7 @@ export const POPOVER = { popover: 'manual' } as Record<string, string>;
 export const LAYER_CLASS = 'text-fg m-0 overflow-clip border-0 bg-transparent';
 
 /** The custom element's root: the viewer's box. */
-const VIEWER_ROOT_SELECTOR = '[data-embedpdf-root]';
+export const VIEWER_ROOT_SELECTOR = '[data-embedpdf-root]';
 
 /** What another surface that holds focus is marked with: a press in it is not a press outside. */
 export const MODAL_SELECTOR = '[aria-modal="true"]';
@@ -38,6 +38,19 @@ export const MODAL_SELECTOR = '[aria-modal="true"]';
  * takes focus itself (the pages), so the viewer's keys reach it from there.
  */
 export const FOCUS_ROOT_ATTRIBUTE = 'data-epdf-focus-root';
+
+/** Whether the browser shows `element` full screen, read in its own tree so a shadow root counts. */
+export const isFullscreenElement = (element: Element): boolean =>
+  (element.getRootNode() as Document | ShadowRoot).fullscreenElement === element;
+
+/** Whether the browser shows `element` full screen, or an element around it, across shadow roots. */
+function isInFullscreen(element: Element): boolean {
+  for (let node: Element | null = element; node; ) {
+    if (isFullscreenElement(node)) return true;
+    node = node.parentElement ?? (node.getRootNode() as Partial<ShadowRoot>).host ?? null;
+  }
+  return false;
+}
 
 /** Place `element` (`position: fixed`) at a box in window px. */
 function placeFixed(
@@ -96,7 +109,28 @@ export function attachViewerLayer(
   const resizes = new ResizeObserver(place);
   if (root) resizes.observe(root);
   const stopGeometry = observeClientGeometry(place);
+  // The viewer going into the top layer (full screen, or over the window) covers what opened
+  // before it: show the layer again, over the viewer, with the focus where it was. Each open
+  // layer listens from when it opened, so they come back in the order they opened.
+  const doc = layer.ownerDocument;
+  const raise = () => {
+    if (typeof layer.showPopover !== 'function' || !layer.matches(':popover-open')) return;
+    const focused = deepActiveElementOf(doc) as HTMLElement | null;
+    layer.hidePopover();
+    layer.showPopover();
+    if (focused && focused !== deepActiveElementOf(doc)) focused.focus({ preventScroll: true });
+  };
+  const onFullscreenChange = () => {
+    if (root && isInFullscreen(root)) raise();
+  };
+  const onRootToggle = (event: Event) => {
+    if ((event as ToggleEvent).newState === 'open') raise();
+  };
+  doc.addEventListener('fullscreenchange', onFullscreenChange);
+  root?.addEventListener('toggle', onRootToggle);
   return () => {
+    doc.removeEventListener('fullscreenchange', onFullscreenChange);
+    root?.removeEventListener('toggle', onRootToggle);
     stopGeometry();
     resizes.disconnect();
     if (typeof layer.hidePopover === 'function' && layer.matches(':popover-open')) {

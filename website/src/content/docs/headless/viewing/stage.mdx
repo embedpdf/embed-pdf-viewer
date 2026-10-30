@@ -69,6 +69,35 @@ stage.zoomTo({ pageWidth: 200 }); // every page 200 pixels wide, for thumbnails
 stage.zoomBy(1.25, { around: { x: 400, y: 300 } }); // 25% closer, around a point in the Stage
 ```
 
+`zoomIn()` and `zoomOut()` step through round levels: 100%, 125%, 150%, 200%, 300% and so on. From a
+level in between, such as a fit, they go to the next one.
+
+To keep the zoom in a range, set `minZoom` and `maxZoom`. Nothing zooms past them: not the buttons,
+a pinch, `zoomTo()` or a fit mode, which stops at the limit.
+
+```ts
+stagePlugin({ minZoom: 0.5, maxZoom: 4 }); // from 50% to 400%
+```
+
+At a limit, `canZoomIn()` or `canZoomOut()` is `false`, for disabling your buttons.
+
+## Zoom to a box
+
+The built-in `zoom` tool zooms to what you point at, like Acrobat's Marquee Zoom. Switch to it like
+any [tool](../ui/tools), with `activateTool('zoom')`:
+
+- **Drag a box**, on one page or across several, and the view zooms straight into it: the box grows
+  until it fills the view, with its middle in the middle. Near the edge of the document the view
+  stays inside it, as on every jump.
+- **Click** to zoom in one step around that point, and **Alt-click** (Option-click on a Mac) to zoom
+  out.
+- On a touch screen, **one finger draws the box**, and two fingers still pinch and scroll.
+
+The tool stays active until you switch to another one. While you drag, the Stage draws the box,
+dashed, in the accent color: change its colors with the `zoomBox` [setting](#settings), or with
+`--epdf-zoom-box-fill` and `--epdf-zoom-box-stroke` [from CSS](../ui/theming). The zoom glides with
+the [`scrollBehavior`](#settings) setting, and jumps when it's `'instant'`.
+
 ## Move through pages
 
 <Snippet name="viewing/page-navigation" />
@@ -412,7 +441,8 @@ from around it, or through `inject(EpdfStageRef)` from inside it.
 
 | Method                                                   | What it does                                                                                                                                                      |
 | :------------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `zoomIn()`, `zoomOut()`                                  | Zooms one step in or out, around the [`zoomAlign`](#make-it-feel-right) point. [Zoom](#zoom)                                                                       |
+| `zoomIn({ around? })`, `zoomOut({ around? })`            | Zooms to the next round level in or out, around the [`zoomAlign`](#make-it-feel-right) point, or around `around`, a point in the Stage. [Zoom](#zoom) |
+| `canZoomIn()`, `canZoomOut()`                            | Whether the zoom is below `maxZoom` or above `minZoom`, to disable your buttons                                                                                   |
 | `fitWidth()`, `fitPage()`, `fitAll()`, `fitAutomatic()`  | Switches to a fit mode, which keeps applying when the window resizes                                                                                              |
 | `zoomTo(zoom, { around? })`                              | Zooms to a level (`1.5`), a mode (`{ mode: 'fit-width' }`) or a page size (`{ pageWidth }`, `{ pageHeight }`). `around` is a point in the Stage that stays put.     |
 | `zoomBy(factor, { around? })`                            | Multiplies the zoom: `1.25` is 25% closer                                                                                                                         |
@@ -488,6 +518,8 @@ Set them when you register the plugin, and change them while the app runs with
 | `sizing`         | `'intrinsic'` (true sizes) or `'uniform'` (equal widths)                                  | `'intrinsic'`                  |
 | `columns`        | Grid columns: `'square'`, `'auto'` or a number                                            | `'square'`                     |
 | `zoom`           | A mode, a level, `{ pageWidth }` or `{ pageHeight }`                                      | `{ mode: 'automatic' }`        |
+| `minZoom`        | The lowest zoom: nothing zooms out past it, a fit mode included                           | `0.05` (5%)                    |
+| `maxZoom`        | The highest zoom: nothing zooms in past it, a fit mode included                           | `64` (6400%)                   |
 | `padding`        | Space around the pages, in screen pixels                                                  | `24` (`4` when compact)        |
 | `gap`            | Space between pages: a number (grows with zoom) or `{ px }`                               | `16`                           |
 | `pageFrame`      | Space reserved around each page for your labels, in screen pixels                         | `0` on every side              |
@@ -502,6 +534,7 @@ Set them when you register the plugin, and change them while the app runs with
 | `interaction`    | Drags reach the active tool, such as text selection; `false` for a view that only scrolls | `true`                         |
 | `panFallback`    | A drag in the space between pages scrolls, whatever the tool                              | `true`                         |
 | `zoomGestures`   | A pinch or Ctrl+wheel zooms; `false` keeps the zoom fixed                                 | `true`                         |
+| `zoomBox`        | The colors of the [zoom tool's box](#zoom-to-a-box): `fill` and `stroke`; `null` follows the accent | `{ fill: null, stroke: null }` |
 | `viewUnitsPerPoint` | Screen pixels per PDF point at 100%, so 100% is the page's real size; a native app sets its own | `96 / 72` on the web           |
 
 Set once, when you register the plugin:

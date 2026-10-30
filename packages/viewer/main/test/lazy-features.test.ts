@@ -64,7 +64,7 @@ const FEATURES = [
     marker: 'demo.redactConfirmTitle',
   },
   { name: 'print dialog', open: { surface: 'print' }, marker: 'print.preparingPage' },
-  { name: 'outline panel', open: { command: 'panel:outline' }, marker: 'outline.filter' },
+  { name: 'outline panel', open: { command: 'panel:outline' }, marker: 'outline.noMatches' },
   {
     name: 'attachments panel',
     open: { command: 'panel:attachments' },

@@ -42,6 +42,7 @@ export const nl: Locale = {
         fitPage: 'Hele pagina',
         fitWidth: 'Paginabreedte',
         automatic: 'Automatisch',
+        marquee: 'Inzoomen op gebied',
         menu: 'Zoomen',
         level: 'Zoomniveau',
         p50: '50%',
@@ -167,6 +168,9 @@ export const nl: Locale = {
         'doc-print': 'Afdrukken is niet toegestaan',
         'doc-text-copy': 'Kopiëren is niet toegestaan',
         'doc-text-search': 'Zoeken is niet toegestaan',
+      },
+      commentThread: {
+        more: 'Meer opties',
       },
       attachment: {
         add: 'Bestand toevoegen',
@@ -595,6 +599,7 @@ export const nl: Locale = {
       commentsStatusRejected: 'Afgewezen',
       commentsStatusCancelled: 'Geannuleerd',
       commentsStatusCompleted: 'Voltooid',
+      commentsMarkCompleted: 'Markeren als voltooid',
       empty: 'Er staat nog niets in dit demodeelvenster.',
       page: 'Pagina {current} van {total}',
       goToPage: 'Ga naar pagina',

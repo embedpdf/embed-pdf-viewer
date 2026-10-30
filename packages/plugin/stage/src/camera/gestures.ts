@@ -8,6 +8,7 @@ import {
   cameraForAnchorAtScreen,
   cameraFromScroll,
   clampCamera,
+  clampZoom,
   panByScreen,
   toWorld,
   zoomAround,
@@ -29,7 +30,7 @@ export function createGestures(
   { cancelAnimation, animateTo, startCameraPhysics }: StageAnimation,
   { scrollMetricsNow }: Pick<StagePageReads, 'scrollMetricsNow'>,
 ) {
-  const { camera, viewport, padding, buildScene, stayBounds, constraint } = scene;
+  const { camera, viewport, padding, zoomLimits, buildScene, stayBounds, constraint } = scene;
   const {
     gesture,
     armRest,
@@ -59,7 +60,7 @@ export function createGestures(
       setCamera: (next) => {
         markCause('user');
         cancelAnimation();
-        writeCamera(next);
+        writeCamera({ ...next, zoom: clampZoom(next.zoom, zoomLimits()) });
         syncCursorFromCamera();
       },
       panBy: (dx, dy) => {
@@ -92,7 +93,7 @@ export function createGestures(
         // The page-relative focal point: the durable identity of "what is
         // under the pointer".
         const focal = before.itemCount ? anchorAtPoint(before, toWorld(camera(), point)) : null;
-        writeCamera(zoomAround(camera(), point, factor));
+        writeCamera(zoomAround(camera(), point, factor, zoomLimits()));
         // Record the resulting level as the zoom intent (focal, so no
         // re-anchor). Inside a gesture bracket it is deferred to endGesture:
         // one patch per pinch instead of one per event.

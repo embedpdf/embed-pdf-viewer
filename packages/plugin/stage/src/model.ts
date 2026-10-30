@@ -4,7 +4,8 @@
  * pure transition; the controller's areas apply them with `ctx.state.update`,
  * and nothing else changes stage state.
  */
-import type { Camera, Size } from '@embedpdf/core-stage';
+import type { PageRef } from '@embedpdf/core';
+import type { Camera, Point, Size } from '@embedpdf/core-stage';
 
 import type { StageConfig, StageSettings } from './contract';
 import { mergeSettings } from './responsive';
@@ -56,6 +57,22 @@ export interface StageModel extends StageSettings {
    * counts only programmatic rounds, so user scrolling is never throttled.
    */
   readonly motionCause: 'user' | 'programmatic';
+  /** The `zoom` tool's drag in progress, or null when there is none. */
+  readonly zoomDrag: ZoomDrag | null;
+}
+
+/**
+ * A drag of the `zoom` tool, as two corners on one page's plane: the page
+ * under the press (or a visible one, for a press between pages). Page points
+ * keep the box on the content when the view scrolls during the drag, and the
+ * box may reach past that page onto its neighbours.
+ */
+export interface ZoomDrag {
+  readonly page: PageRef;
+  /** Where the press was, in page coordinates. */
+  readonly from: Point;
+  /** Where the pointer is now, in page coordinates. */
+  readonly to: Point;
 }
 
 export const initialStageModel = (config: StageConfig): StageModel => {
@@ -71,6 +88,7 @@ export const initialStageModel = (config: StageConfig): StageModel => {
     cursor: 0,
     motionCause: 'user',
     activeRules: [],
+    zoomDrag: null,
     ...mergeSettings(DEFAULT_SETTINGS, overrides),
   };
 };
@@ -117,3 +135,6 @@ export function patchSettings(state: StageModel, patch: Partial<StageSettings>):
 
 export const setActiveRules = (state: StageModel, activeRules: readonly string[]): StageModel =>
   state.activeRules === activeRules ? state : { ...state, activeRules };
+
+export const setZoomDrag = (state: StageModel, zoomDrag: ZoomDrag | null): StageModel =>
+  state.zoomDrag === zoomDrag ? state : { ...state, zoomDrag };

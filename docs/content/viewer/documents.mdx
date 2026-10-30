@@ -145,6 +145,33 @@ them. See
 A wrong password asks again. A document that can't be opened at all shows why in its tab, with a
 **Try again** button.
 
+<Engine local>
+
+## Files that need a sign-in
+
+When your server wants a header or a cookie for a file, give the viewer your own `fetch`. Every
+document at a URL downloads through it, from `src`, `documents` or `{ kind: 'url' }` in code. It
+gets the URL, and an `init` with the document's cancel signal to pass on:
+
+```js
+{
+  src: '/api/files/contract-42.pdf',
+  fetch: (url, init) =>
+    fetch(url, { ...init, headers: { Authorization: `Bearer ${getToken()}` } }),
+}
+```
+
+For your cookies on another site, add `credentials: 'include'` instead; that site's CORS headers
+have to allow it.
+
+The tab still shows the document loading, and closing it stops the download. A server that answers
+401 or 403 shows in the tab as not allowed, and **Try again** calls your `fetch` again, so a token
+it reads when it's called is a fresh one. `fetch` follows its prop: the next download uses a new
+one, and nothing reopens. The viewer's own files, such as the engine's, never go through it, so
+your token goes only to your own server.
+
+</Engine>
+
 ## Open and close documents from code
 
 `viewer.documents` opens, closes and switches documents. It's the documents plugin, the same as

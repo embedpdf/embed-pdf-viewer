@@ -664,21 +664,27 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('menus', () => {
     await tab.close();
   });
 
-  it('sits above a selected annotation, and below one at the top of the view', async () => {
+  it('sits below a selected annotation, and above one at the bottom of the view', async () => {
     const tab = await open('/selection.html');
     await tab.waitForTimeout(1500);
     // Mid-page, with room above and below it.
     const middle = await selectSquareAt(tab, 150);
+    const below = await selectionBarOf(tab);
+    expect(below?.placement).toBe('bottom');
+    expect(Math.round(below!.top - middle.bottom)).toBe(15);
+    await press(tab, 'Escape');
+
+    // Its bottom edge 20 px above the view's: no room below it for the bar.
+    const low = await tab.evaluate(() => {
+      const stage = (window as unknown as { element: { viewer: any } }).element.viewer.get('stage');
+      const { height } = stage.getViewportSize();
+      return stage.viewportToPage(0, { x: 10, y: height - 20 }).y - 100;
+    });
+    const bottom = await selectSquareAt(tab, low);
     const above = await selectionBarOf(tab);
     expect(above?.placement).toBe('top');
     // Clear of the annotation, and of the handle that turns it, which sits above it.
-    expect(above!.bottom).toBeLessThan(middle.top - 15);
-    await press(tab, 'Escape');
-
-    const top = await selectSquareAt(tab, 4);
-    const below = await selectionBarOf(tab);
-    expect(below?.placement).toBe('bottom');
-    expect(below!.top).toBeGreaterThanOrEqual(top.bottom);
+    expect(above!.bottom).toBeLessThan(bottom.top - 15);
     await tab.close();
   });
 

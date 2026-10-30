@@ -42,6 +42,7 @@ export const pl: Locale = {
         fitPage: 'Dopasuj do strony',
         fitWidth: 'Dopasuj do szerokości',
         automatic: 'Automatycznie',
+        marquee: 'Powiększ obszar',
         menu: 'Powiększenie',
         level: 'Poziom powiększenia',
         p50: '50%',
@@ -167,6 +168,9 @@ export const pl: Locale = {
         'doc-print': 'Drukowanie jest niedozwolone',
         'doc-text-copy': 'Kopiowanie jest niedozwolone',
         'doc-text-search': 'Wyszukiwanie jest niedozwolone',
+      },
+      commentThread: {
+        more: 'Więcej opcji',
       },
       attachment: {
         add: 'Dodaj plik',
@@ -593,6 +597,7 @@ export const pl: Locale = {
       commentsStatusRejected: 'Odrzucony',
       commentsStatusCancelled: 'Anulowany',
       commentsStatusCompleted: 'Ukończony',
+      commentsMarkCompleted: 'Oznacz jako ukończone',
       empty: 'W tym panelu demonstracyjnym nic jeszcze nie ma.',
       page: 'Strona {current} z {total}',
       goToPage: 'Przejdź do strony',

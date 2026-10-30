@@ -43,6 +43,7 @@ export const ar: Locale = {
         fitPage: 'ملاءمة الصفحة',
         fitWidth: 'ملاءمة العرض',
         automatic: 'تلقائي',
+        marquee: 'تكبير منطقة محددة',
         menu: 'تكبير/تصغير',
         level: 'مستوى التكبير',
         p50: '50%',
@@ -168,6 +169,9 @@ export const ar: Locale = {
         'doc-print': 'لا يُسمح بالطباعة',
         'doc-text-copy': 'لا يُسمح بالنسخ',
         'doc-text-search': 'لا يُسمح بالبحث',
+      },
+      commentThread: {
+        more: 'خيارات إضافية',
       },
       attachment: {
         add: 'إضافة ملف',
@@ -592,6 +596,7 @@ export const ar: Locale = {
       commentsStatusRejected: 'مرفوض',
       commentsStatusCancelled: 'ملغى',
       commentsStatusCompleted: 'مكتمل',
+      commentsMarkCompleted: 'وضع علامة كمكتمل',
       empty: 'لا يوجد شيء هنا بعد في لوحة العرض التوضيحي هذه.',
       page: 'الصفحة {current} من {total}',
       goToPage: 'الانتقال إلى الصفحة',

@@ -42,6 +42,7 @@ export const ja: Locale = {
         fitPage: 'ページ全体を表示',
         fitWidth: '幅に合わせる',
         automatic: '自動',
+        marquee: '範囲選択ズーム',
         menu: 'ズーム',
         level: 'ズームレベル',
         p50: '50%',
@@ -167,6 +168,9 @@ export const ja: Locale = {
         'doc-print': '印刷は許可されていません',
         'doc-text-copy': 'コピーは許可されていません',
         'doc-text-search': '検索は許可されていません',
+      },
+      commentThread: {
+        more: 'その他のオプション',
       },
       attachment: {
         add: 'ファイルを追加',
@@ -593,6 +597,7 @@ export const ja: Locale = {
       commentsStatusRejected: '却下',
       commentsStatusCancelled: 'キャンセル',
       commentsStatusCompleted: '完了',
+      commentsMarkCompleted: '完了としてマーク',
       empty: 'このデモパネルにはまだ何もありません。',
       page: '{current} / {total} ページ',
       goToPage: 'ページへ移動',

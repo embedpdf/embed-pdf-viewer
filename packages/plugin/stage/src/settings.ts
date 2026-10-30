@@ -1,4 +1,4 @@
-import { ZoomMode } from '@embedpdf/core-stage';
+import { ZOOM_MAX, ZOOM_MIN, ZoomMode } from '@embedpdf/core-stage';
 import type { ResponsiveRule, StageSettings } from './contract';
 import { eqSetting } from './responsive';
 
@@ -30,10 +30,13 @@ export const DEFAULT_SETTINGS: StageSettings = {
   anchorAlign: { x: 'start', y: 'start' },
   viewRotation: 0,
   zoom: { mode: ZoomMode.Automatic },
+  minZoom: ZOOM_MIN,
+  maxZoom: ZOOM_MAX,
   scrollBehavior: 'smooth',
   interaction: true,
   panFallback: true,
   zoomGestures: true,
+  zoomBox: { fill: null, stroke: null },
   // Web: 1 PDF point = 96/72 CSS px, so 100% is physically accurate. A native
   // adapter overrides this at registration with its own logical-unit factor.
   viewUnitsPerPoint: 96 / 72,
@@ -89,11 +92,15 @@ export const SETTINGS_EFFECT: Record<keyof StageSettings, SettingEffect> = {
   anchorAlign: 'none',
   viewRotation: 'scene', // a layout input: every page's footprint swaps w↔h
   zoom: 'refit',
+  // New limits re-resolve the zoom, which moves only when it falls outside them.
+  minZoom: 'refit',
+  maxZoom: 'refit',
   scrollBehavior: 'none',
   // Read by the surface binding, which rebinds its pointer input when they change.
   interaction: 'none',
   panFallback: 'none',
   zoomGestures: 'none',
+  zoomBox: 'none', // paint only
   viewUnitsPerPoint: 'scene', // a layout input: changing it resizes every page
 };
 export const SETTING_KEYS = Object.keys(SETTINGS_EFFECT) as Array<keyof StageSettings>;

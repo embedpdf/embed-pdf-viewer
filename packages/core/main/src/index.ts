@@ -10,6 +10,7 @@ export type { LatestCancellation, LatestLane, LatestRun } from './lanes';
 export { createLatestLane } from './lanes';
 export { guardHandle } from './guarded-handle';
 export { memo, memoByKey } from './memo';
+export { isPdf } from './pdf-header';
 export { reload } from './mirror';
 export type { Mirror, MirrorChange, MirrorReload, MirrorSpec } from './mirror';
 export type { PageMirror, PageMirrorChange, PageMirrorSpec } from './page-mirror';

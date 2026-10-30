@@ -121,7 +121,7 @@ function placeProblems(
 ): string[] {
   const bars = data.bars ?? {};
   const notAPlace = (shown: string) =>
-    `${where}: ${shown} is not a place (an edge, { edge, before | after }, { float }, { with } or { at })`;
+    `${where}: ${shown} is not a place (an edge, { edge, before | after }, { float }, { with }, { at } or { panel })`;
   if (place === undefined) return [`${where} has no place`];
   if (typeof place === 'string') return EDGES.includes(place) ? [] : [notAPlace(`"${place}"`)];
   if (typeof place !== 'object' || place === null) return [notAPlace(String(place))];
@@ -163,6 +163,12 @@ function placeProblems(
     return SELECTION_TARGETS.includes(place.at)
       ? []
       : [`${where}: "${place.at}" is not selection or annotation`];
+  if ('panel' in place) {
+    const panels = Object.keys(data.panels ?? {});
+    return panels.includes(place.panel)
+      ? []
+      : [`${where} goes in "${place.panel}": no such panel${didYouMean(place.panel, panels)}`];
+  }
   return [notAPlace(JSON.stringify(place))];
 }
 

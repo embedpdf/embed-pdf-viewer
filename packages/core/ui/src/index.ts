@@ -75,6 +75,7 @@ export {
   barsAt,
   barsFloating,
   barsInMode,
+  barsInPanel,
   barsOnEdge,
   barsWith,
   compileBar,
@@ -88,6 +89,7 @@ export {
   modesOf,
   omittedCommandsOf,
   panelCommandOf,
+  panelOf,
   selectionOf,
   tabsOf,
 } from './layout-compile';

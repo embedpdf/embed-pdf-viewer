@@ -7,8 +7,8 @@
   difference between the two doors, and it lives only in those two files.
 
   It renders the element and gives it the config before the element's deferred first mount, so the
-  viewer starts once, with it. `src`, `theme`, `locale`, `disable` and `readOnly` follow their
-  props: the element changes them in place, comparing by value. Every other prop is read once: a
+  viewer starts once, with it. `src`, `theme`, `locale`, `disable`, `readOnly` and `fetch` follow
+  their props: the element changes them in place, comparing by value. Every other prop is read once: a
   later change is ignored (development warns), and a `{#key}` block mounts a new viewer with it.
   `onready`, `ondocumentchange` and `onpanelresize` call the latest prop.
 

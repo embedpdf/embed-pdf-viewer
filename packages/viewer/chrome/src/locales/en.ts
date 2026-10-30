@@ -44,6 +44,7 @@ export const en: Locale = {
         fitPage: 'Fit to Page',
         fitWidth: 'Fit to Width',
         automatic: 'Automatic',
+        marquee: 'Marquee Zoom',
         menu: 'Zoom',
         level: 'Zoom Level',
         p50: '50%',
@@ -162,6 +163,9 @@ export const en: Locale = {
         'doc-print': "Printing isn't allowed",
         'doc-text-copy': "Copying isn't allowed",
         'doc-text-search': "Searching isn't allowed",
+      },
+      commentThread: {
+        more: 'More options',
       },
       attachment: {
         add: 'Add file',
@@ -598,6 +602,7 @@ export const en: Locale = {
       commentsStatusRejected: 'Rejected',
       commentsStatusCancelled: 'Cancelled',
       commentsStatusCompleted: 'Completed',
+      commentsMarkCompleted: 'Mark as completed',
       empty: 'Nothing here yet in this demo panel.',
       page: 'Page {current} of {total}',
       goToPage: 'Go to page',

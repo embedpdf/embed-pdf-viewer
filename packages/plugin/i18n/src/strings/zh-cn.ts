@@ -12,6 +12,7 @@ export const zhCN: EmbedpdfStrings = {
     tool: {
       pointer: '选择',
       pan: '平移',
+      zoom: '框选放大',
       highlight: '高亮',
       underline: '下划线',
       strikeout: '删除线',

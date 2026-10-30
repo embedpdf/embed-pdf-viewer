@@ -13,8 +13,9 @@ import {
 import type { SliceLease } from './store';
 import { cancellable } from './cancellable';
 import { createEventHook } from './event-hook';
-import { PluginError, toPluginError, toPluginErrorInfo } from './errors';
+import { PluginError, toPluginError, toPluginErrorInfo, type PluginErrorCode } from './errors';
 import { findPage } from './page-of';
+import { isPdf } from './pdf-header';
 import { permissionDenied, sessionAllows } from './permissions';
 import { settle } from './settle';
 import {
@@ -48,6 +49,7 @@ import {
   type DocumentActiveChangedEvent,
   type DocumentPagesChangedEvent,
   type DocumentUnsavedChangesChangedEvent,
+  type HostFetch,
   type HostPrinter,
   type PageInfo,
   type PendingMeta,
@@ -236,31 +238,43 @@ const changesDocument = (event: DocumentEvent): boolean =>
   event.type !== 'signatures.prepared' &&
   event.type !== 'signatures.cancelled';
 
-/** The part of `fetch` a `{ kind: 'url' }` source needs. */
-type FetchFile = (
-  url: string,
-  init: { readonly signal: AbortSignal },
-) => Promise<{
-  readonly ok: boolean;
-  readonly status: number;
-  arrayBuffer(): Promise<ArrayBuffer>;
-}>;
+/** What a download's HTTP status says: the file isn't there, the user may not have it, or neither. */
+const downloadErrorCode = (status: number): PluginErrorCode =>
+  status === 404
+    ? 'not-found'
+    : status === 401 || status === 403
+      ? 'permission-denied'
+      : 'operation-failed';
 
-/** Download a URL source's file; its tab shows the failure when the server says no. */
-async function fetchUrlSource(source: UrlSource, signal: AbortSignal): Promise<OpenInput> {
-  const fetchFile = (globalThis as { fetch?: FetchFile }).fetch;
+/**
+ * Download a URL source's file with the host's `fetch`, or the global one; its tab shows why
+ * when the server says no, or answers with something that isn't a PDF.
+ */
+async function fetchUrlSource(
+  source: UrlSource,
+  signal: AbortSignal,
+  hostFetch: HostFetch | undefined,
+): Promise<OpenInput> {
+  // Called as a plain function: the browser's own `fetch` refuses any other `this`.
+  const fetchFile = hostFetch ?? (globalThis as { fetch?: HostFetch }).fetch;
   if (!fetchFile) {
     throw new PluginError('unsupported', 'documents', `can't download ${source.url}: no fetch()`);
   }
   const response = await fetchFile(source.url, { signal });
   if (!response.ok) {
     throw new PluginError(
-      response.status === 404 ? 'not-found' : 'operation-failed',
+      downloadErrorCode(response.status),
       'documents',
       `couldn't download ${source.url} (HTTP ${response.status})`,
     );
   }
-  return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  // Said here, where it's known: the engine says only that it couldn't open the file. A sign-in
+  // page a server answers with instead is the usual one.
+  if (!isPdf(bytes)) {
+    throw new PluginError('invalid-input', 'documents', `${source.url} isn't a PDF`);
+  }
+  return { kind: 'bytes', ...(source.id !== undefined ? { id: source.id } : {}), bytes };
 }
 
 const isUrlSource = (source: OpenInput | UrlSource): source is UrlSource => source.kind === 'url';
@@ -402,6 +416,12 @@ export function createKernel(config: {
    * `browserPrinter()` from `@embedpdf/web`. Without one, nothing prints (`canPrint()` is false).
    */
   printer?: HostPrinter;
+  /**
+   * How a `{ kind: 'url' }` source downloads: `fetch`'s own shape, called with the URL and the
+   * document's cancel `signal`, and again on `retry()`. Yours adds headers or cookies. Default:
+   * the global `fetch`.
+   */
+  fetch?: HostFetch;
 }): Kernel {
   const { engine, plugins } = config;
   const report = config.report ?? ((error: unknown) => console.error('[kernel]', error));
@@ -1448,7 +1468,7 @@ export function createKernel(config: {
         checkpoint(session);
         // A URL is downloaded here, under the loading tab; closing the tab stops the download.
         const source = isUrlSource(given)
-          ? await engineCall(session, fetchUrlSource(given, session.cancel.signal))
+          ? await engineCall(session, fetchUrlSource(given, session.cancel.signal, config.fetch))
           : given;
         checkpoint(session);
         session.grantInput = source.kind === 'grant' ? source : null;

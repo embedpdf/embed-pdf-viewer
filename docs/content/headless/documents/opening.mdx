@@ -110,16 +110,21 @@ export class ContractPage {
 | `{ kind: 'bytes', bytes }`          | A file you already have: an upload, a file picker, a download.    |
 | `async (signal) => source`          | Anything else: a function that returns one of the above.          |
 
-A function is how you add your own fetch, such as one with a login header. The viewer calls it
-under the document's loading state, and `signal` cancels the download if the user closes the
-document first:
+The viewer calls a function under the document's loading state, and `signal` fires if the user
+closes the document first, so pass it on to what the function waits for.
 
-```ts
-const source = async (signal: AbortSignal) => {
-  const response = await fetch(`/api/files/${id}`, { headers: { authorization }, signal });
-  return { kind: 'bytes', bytes: await response.arrayBuffer() };
-};
-```
+### Files that need a sign-in
+
+When your server wants a header or a cookie for a file, give the viewer your own `fetch`. Every
+`{ kind: 'url' }` document downloads through it: it gets the URL, and an `init` with the
+document's cancel signal to pass on.
+
+<Snippet name="documents/fetch-headers" />
+
+For your cookies on another site, add `credentials: 'include'` instead; that site's CORS headers
+have to allow it. A server that answers 401 or 403 makes the document's error
+`permission-denied`, and `documents.retry(id)` calls your `fetch` again, so a token it reads when
+it's called is a fresh one. The engine's own files never go through it.
 
 </Engine>
 

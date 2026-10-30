@@ -183,9 +183,9 @@ const widthOf = (box: Box) => Math.round(box.right - box.left);
 const thumbsOf = (tab: Page) =>
   tab.evaluate(() => {
     const root = document.querySelector('embedpdf-viewer')!.shadowRoot!;
-    const thumbs = [
-      ...root.querySelectorAll('[data-epdf-panel="thumbnails"] [role="option"]'),
-    ].map((thumb) => thumb.getBoundingClientRect());
+    const thumbs = [...root.querySelectorAll('[data-epdf-panel="thumbnails"] [role="option"]')].map(
+      (thumb) => thumb.getBoundingClientRect(),
+    );
     return {
       columns: new Set(thumbs.map((rect) => Math.round(rect.left))).size,
       width: thumbs.length > 0 ? Math.round(thumbs[0]!.width) : 0,
@@ -451,11 +451,88 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('panel frames', () => {
       { timeout: 10_000 },
     );
     expect(await thumbsOf(tab)).toEqual({ columns: 1, width: 150 });
-    // Two 150 px thumbs, the 16 px between them and 12 px on either side fit in 340.
+    // Two 150 px thumbs, the 16 px between them and 20 px on either side fit in 356.
     await dragEdge(tab, 'thumbnails', 80);
     await settle(tab);
     expect(widthOf((await frameOf(tab, 'thumbnails'))!.box)).toBe(368);
     expect((await thumbsOf(tab)).columns).toBe(2);
+    await tab.close();
+  });
+
+  it("draws a panel's bar under its title, and a narrow one puts what doesn't fit in More", async () => {
+    const tab = await open(1280);
+    /** The bar in panel `id`: its box, the panel's and its header's, and its live controls. */
+    const barOf = (id: string) =>
+      tab.evaluate((panel) => {
+        const root = document.querySelector('embedpdf-viewer')!.shadowRoot!;
+        const frame = root.querySelector(`[data-epdf-panel="${panel}"]`);
+        const bar = frame?.querySelector(`[data-bar="${panel}"]`);
+        if (!frame || !bar) return null;
+        const box = (element: Element) => {
+          const rect = element.getBoundingClientRect();
+          return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom };
+        };
+        const controls = [...bar.querySelectorAll('button, input')].filter(
+          (control) =>
+            !control.closest('[aria-hidden="true"]') && control.getBoundingClientRect().width > 0,
+        );
+        return {
+          frame: box(frame),
+          header: box(frame.querySelector('[part="panel-header"]')!),
+          bar: box(bar),
+          text: bar.textContent ?? '',
+          controls: controls.map((control) => ({
+            tag: control.tagName.toLowerCase(),
+            label: control.getAttribute('aria-label') ?? control.getAttribute('title'),
+            box: box(control),
+          })),
+        };
+      }, id);
+    const inside = (outer: Box, inner: Box) =>
+      inner.left >= outer.left - 0.5 && inner.right <= outer.right + 0.5;
+
+    await execute(tab, 'panel:thumbnails');
+    await settle(tab);
+    const wide = await barOf('thumbnails');
+    expect(wide, 'the thumbnails bar').not.toBeNull();
+    expect(wide!.bar.top).toBeGreaterThanOrEqual(wide!.header.bottom - 0.5);
+    expect(wide!.controls.map((control) => control.label)).toEqual(
+      expect.arrayContaining(['Undo', 'Redo']),
+    );
+    expect(wide!.controls.every((control) => inside(wide!.frame, control.box))).toBe(true);
+
+    // At its narrowest the panel holds the whole bar: what doesn't fit is in More.
+    await dragEdge(tab, 'thumbnails', -200);
+    await settle(tab);
+    const narrow = (await barOf('thumbnails'))!;
+    expect(widthOf(narrow.frame)).toBe(200);
+    expect(narrow.controls.every((control) => inside(narrow.frame, control.box))).toBe(true);
+    expect(narrow.controls.map((control) => control.label)).toContain('More');
+
+    // The outline's filter is its bar's field, and the rows read what's typed in it.
+    await execute(tab, 'panel:outline');
+    await settle(tab);
+    const outline = (await barOf('outline'))!;
+    const field = outline.controls.find((control) => control.tag === 'input');
+    expect(field, 'the filter field').toBeDefined();
+    expect(inside(outline.frame, field!.box)).toBe(true);
+    await clickBox(tab, field!.box, 'the filter field');
+    await tab.keyboard.type('chapter');
+    expect(
+      await tab.evaluate(
+        () =>
+          document
+            .querySelector('embedpdf-viewer')!
+            .shadowRoot!.querySelector<HTMLInputElement>('[data-bar="outline"] input')!.value,
+      ),
+    ).toBe('chapter');
+
+    // The attachments bar: how many files, beside the button that adds one.
+    await execute(tab, 'panel:attachments');
+    await settle(tab);
+    const attachments = (await barOf('attachments'))!;
+    expect(attachments.text).toMatch(/\d/);
+    expect(attachments.controls.some((control) => control.tag === 'button')).toBe(true);
     await tab.close();
   });
 

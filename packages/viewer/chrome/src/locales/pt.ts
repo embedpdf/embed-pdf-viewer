@@ -42,6 +42,7 @@ export const pt: Locale = {
         fitPage: 'Ajustar à página',
         fitWidth: 'Ajustar à largura',
         automatic: 'Automático',
+        marquee: 'Ampliar área',
         menu: 'Zoom',
         level: 'Nível de zoom',
         p50: '50%',
@@ -167,6 +168,9 @@ export const pt: Locale = {
         'doc-print': 'Não é permitido imprimir',
         'doc-text-copy': 'Não é permitido copiar',
         'doc-text-search': 'Não é permitido pesquisar',
+      },
+      commentThread: {
+        more: 'Mais opções',
       },
       attachment: {
         add: 'Adicionar arquivo',
@@ -595,6 +599,7 @@ export const pt: Locale = {
       commentsStatusRejected: 'Rejeitado',
       commentsStatusCancelled: 'Cancelado',
       commentsStatusCompleted: 'Concluído',
+      commentsMarkCompleted: 'Marcar como concluído',
       empty: 'Ainda não há nada neste painel de demonstração.',
       page: 'Página {current} de {total}',
       goToPage: 'Ir para a página',

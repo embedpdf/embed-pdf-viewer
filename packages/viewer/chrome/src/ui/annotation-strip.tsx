@@ -5,8 +5,8 @@
  *   each command's visible/enabled        decides which items show
  *   <AnnotationMenu>                      solves where (camera transform,
  *                                         rotate-knob dodging, pointer isolation):
- *                                         above the selection, below it without
- *                                         room above
+ *                                         below the selection, above it without
+ *                                         room below
  *
  * useStripView is the live intersection: hidden commands drop out, empty
  * groups vanish, null when nothing applies. Mounted in the Stage `overlay`
@@ -38,7 +38,7 @@ export function AnnotationStrip() {
   }, [selection.length, editor.isOpen]);
   if (!view) return null;
   return (
-    <AnnotationMenu placement="top" gap={15}>
+    <AnnotationMenu placement="bottom" gap={15}>
       {editor.isOpen ? (
         <LinkEditorCard onClose={editor.close} />
       ) : (

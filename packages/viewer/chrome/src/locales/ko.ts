@@ -42,6 +42,7 @@ export const ko: Locale = {
         fitPage: '페이지에 맞추기',
         fitWidth: '너비에 맞추기',
         automatic: '자동',
+        marquee: '영역 확대',
         menu: '확대/축소',
         level: '배율',
         p50: '50%',
@@ -167,6 +168,9 @@ export const ko: Locale = {
         'doc-print': '인쇄는 허용되지 않습니다',
         'doc-text-copy': '복사는 허용되지 않습니다',
         'doc-text-search': '검색은 허용되지 않습니다',
+      },
+      commentThread: {
+        more: '추가 옵션',
       },
       attachment: {
         add: '파일 추가',
@@ -592,6 +596,7 @@ export const ko: Locale = {
       commentsStatusRejected: '거부됨',
       commentsStatusCancelled: '취소됨',
       commentsStatusCompleted: '완료됨',
+      commentsMarkCompleted: '완료로 표시',
       empty: '이 데모 패널에는 아직 아무것도 없습니다.',
       page: '{current} / {total}페이지',
       goToPage: '페이지로 이동',

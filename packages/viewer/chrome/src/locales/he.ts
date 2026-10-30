@@ -43,6 +43,7 @@ export const he: Locale = {
         fitPage: 'התאם לעמוד',
         fitWidth: 'התאם לרוחב',
         automatic: 'אוטומטי',
+        marquee: 'הגדל אזור',
         menu: 'זום',
         level: 'רמת זום',
         p50: '50%',
@@ -168,6 +169,9 @@ export const he: Locale = {
         'doc-print': 'הדפסה אינה מותרת',
         'doc-text-copy': 'העתקה אינה מותרת',
         'doc-text-search': 'חיפוש אינו מותר',
+      },
+      commentThread: {
+        more: 'אפשרויות נוספות',
       },
       attachment: {
         add: 'הוספת קובץ',
@@ -592,6 +596,7 @@ export const he: Locale = {
       commentsStatusRejected: 'נדחה',
       commentsStatusCancelled: 'בוטל',
       commentsStatusCompleted: 'הושלם',
+      commentsMarkCompleted: 'סמן כהושלם',
       empty: 'עדיין אין כאן כלום בחלונית ההדגמה הזו.',
       page: 'עמוד {current} מתוך {total}',
       goToPage: 'עבור לעמוד',
