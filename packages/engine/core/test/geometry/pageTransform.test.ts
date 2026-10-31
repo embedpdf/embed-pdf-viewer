@@ -29,6 +29,17 @@ describe('pageTransform', () => {
     });
   });
 
+  it("puts a thumbnail's long side at the thumbnail size, whatever the page and its turn", () => {
+    const thumbnail = { viewport: { kind: 'thumbnail' } } as const;
+    expect(pageTransform(LETTER, thumbnail)).toMatchObject({ width: 396, height: 512 });
+    expect(pageTransform(LETTER, { ...thumbnail, rotation: 90 })).toMatchObject({
+      width: 512,
+      height: 396,
+    });
+    const poster = { size: { width: 2384, height: 3370 } }; // A0
+    expect(pageTransform(poster, thumbnail)).toMatchObject({ width: 362, height: 512 });
+  });
+
   it('stretches the page onto the rounded size, each axis on its own', () => {
     const view = pageTransform(LETTER, { viewport: { kind: 'width', width: 800 } });
     close(view.pageToPixels({ x: 0, y: 0 }), { x: 0, y: 0 });

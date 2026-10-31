@@ -166,6 +166,7 @@ export const de: Locale = {
         'doc-outline-modify': 'Das Ändern der Lesezeichen ist nicht erlaubt',
         'doc-pages-assemble': 'Das Ändern der Seiten ist nicht erlaubt',
         'doc-print': 'Drucken ist nicht zulässig',
+        'doc-render-thumbnail': 'Anzeigen von Seitenminiaturen ist nicht zulässig',
         'doc-text-copy': 'Kopieren ist nicht zulässig',
         'doc-text-search': 'Suchen ist nicht zulässig',
       },

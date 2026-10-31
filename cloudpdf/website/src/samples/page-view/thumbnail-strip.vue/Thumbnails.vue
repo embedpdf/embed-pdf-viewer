@@ -22,7 +22,7 @@ watch(currentPageIndex, (index) => thumbs.reveal(index), { immediate: true });
         :aria-current="page.pageIndex === currentPageIndex"
         @click="main.goToPage(page.ref)"
       >
-        <RenderLayer />
+        <RenderLayer thumbnail />
       </button>
     </template>
     <template #page-chrome="{ page }">

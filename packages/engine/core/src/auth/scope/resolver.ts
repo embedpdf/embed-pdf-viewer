@@ -122,6 +122,8 @@ export function checkCollab(
  * `pdf.permissions` and applying implication rules.
  *
  * Implications applied:
+ *   - `doc.render` implies `doc.render.thumbnail`: pictures of any size
+ *     contain the thumbnails.
  *   - `doc.annotate.modify` implies `doc.annotate.read` (you can't
  *     sensibly modify what you can't see).
  *   - `doc.forms.modify` implies `doc.forms.fill` and `doc.forms.read`.
@@ -159,6 +161,7 @@ export function expandedCapabilities(
   }
 
   // Implications (apply after the explicit additions above)
+  if (out.has('doc.render')) out.add('doc.render.thumbnail');
   if (out.has('doc.annotate.modify')) out.add('doc.annotate.read');
   if (out.has('doc.forms.modify')) {
     out.add('doc.forms.fill');

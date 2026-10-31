@@ -166,6 +166,7 @@ export const es: Locale = {
         'doc-outline-modify': 'No se permite cambiar el esquema',
         'doc-pages-assemble': 'No se permite cambiar las páginas',
         'doc-print': 'No está permitido imprimir',
+        'doc-render-thumbnail': 'No está permitido ver miniaturas',
         'doc-text-copy': 'No está permitido copiar',
         'doc-text-search': 'No está permitido buscar',
       },

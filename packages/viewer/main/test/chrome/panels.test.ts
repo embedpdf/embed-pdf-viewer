@@ -8,6 +8,7 @@ import { createLayout } from '@embedpdf/core-ui';
 import { AttachmentToken } from '@embedpdf/plugin-attachment';
 import { CommandsToken, type CommandDef } from '@embedpdf/plugin-commands';
 import { OutlineToken } from '@embedpdf/plugin-outline';
+import { RenderToken } from '@embedpdf/plugin-render';
 import { describe, expect, it } from 'vitest';
 
 import { DEFAULT_LAYOUT } from '../../../chrome/src/config/chrome';
@@ -215,5 +216,28 @@ describe('the outline and attachments panels', () => {
     const none = { documentId: 'doc', tryGet: () => null, get: () => null } as unknown as Context;
     expect(visibleOf('outline')(none)).toBe(false);
     expect(visibleOf('attachments')(none)).toBe(false);
+  });
+});
+
+describe('the thumbnails panel', () => {
+  type Context = Parameters<NonNullable<CommandDef['allowed']>>[0];
+  const thumbnails = () =>
+    panelCommandsFor(DEFAULT_LAYOUT.panels, () => false).find(
+      (command) => command.id === 'panel:thumbnails',
+    )!;
+  const session = (mayHaveThumbnails: boolean): Context => {
+    const render = { canRenderThumbnail: () => mayHaveThumbnails };
+    const tryGet = (token: unknown) => (token === RenderToken ? render : null);
+    return { documentId: 'doc', tryGet, get: tryGet } as unknown as Context;
+  };
+
+  it('is allowed only to a session that may have thumbnails, and says why not', () => {
+    const command = thumbnails();
+    expect(command.allowed!(session(true))).toBe(true);
+    expect(command.allowed!(session(false))).toBe(false);
+    expect(command.notAllowedKey).toBe('commands.notAllowed.doc-render-thumbnail');
+    expect(typeof lookUp(en.translations, 'commands.notAllowed.doc-render-thumbnail')).toBe(
+      'string',
+    );
   });
 });

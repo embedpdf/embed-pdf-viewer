@@ -21,7 +21,7 @@
   import type { RenderLayerProps } from './props';
   import TilePlane from './TilePlane.svelte';
 
-  let { annotations, formFields, tiles = true }: RenderLayerProps = $props();
+  let { annotations, formFields, tiles = true, thumbnail = false }: RenderLayerProps = $props();
 
   const page = usePage();
   // The layer is a host of the render plugin: it paints conformed sources and drives a view's
@@ -61,7 +61,11 @@
     RenderToken,
     (renderer) =>
       layers
-        ? renderer.getSourceKey(page.ref, { scale: page.transform.renderScale, ...layers })
+        ? renderer.getSourceKey(page.ref, {
+            scale: page.transform.renderScale,
+            thumbnail,
+            ...layers,
+          })
         : null,
     null,
   );
@@ -79,6 +83,7 @@
     // Any scale that maps to this key gives this key's request: the plugin conforms it.
     const options = untrack(() => ({
       scale: page.transform.renderScale,
+      thumbnail,
       ...drawn,
       view: page.view,
     }));
@@ -111,6 +116,6 @@
   draggable="false"
   style="position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none"
 />
-{#if tiles && settings.current?.tiles && layers}
+{#if tiles && !thumbnail && settings.current?.tiles && layers}
   <TilePlane {layers} />
 {/if}

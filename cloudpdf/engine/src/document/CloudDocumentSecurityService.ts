@@ -22,7 +22,7 @@ import {
   fieldRightsOf,
   type Identity,
   type PageLayerRights,
-  type PagePrintRights,
+  type PagePictureRights,
   type PasswordPrompt,
   passwordPromptFromState,
   protectedCapabilities,
@@ -91,12 +91,14 @@ export class CloudDocumentSecurityService implements DocumentSecurityService {
   }
 
   /**
-   * What the caller may print, when the client can know it (as for
-   * {@link pageLayerRights}). Null leaves it to the server.
+   * Which kinds of page picture the caller may make, when the client can know
+   * it (as for {@link pageLayerRights}). Null leaves it to the server.
    */
-  pagePrintRights(): PagePrintRights | null {
+  pagePictureRights(): PagePictureRights | null {
     if (!this.access && !this.tokenHasDocScope) return null;
     return {
+      render: this.allows('doc.render'),
+      thumbnail: this.allows('doc.render.thumbnail'),
       print: this.allows('doc.print'),
       printHigh: this.allows('doc.print.high'),
     };

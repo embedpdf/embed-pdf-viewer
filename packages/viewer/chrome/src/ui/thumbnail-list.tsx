@@ -557,7 +557,7 @@ export function ThumbnailList() {
           }}
         >
           {/* page-space content: the bitmap, which rotates with the page */}
-          {() => <RenderLayer />}
+          {() => <RenderLayer thumbnail />}
         </Stage>
       </div>
     </div>

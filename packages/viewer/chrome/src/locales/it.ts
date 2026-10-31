@@ -166,6 +166,7 @@ export const it: Locale = {
         'doc-outline-modify': 'La modifica dei segnalibri non è consentita',
         'doc-pages-assemble': 'La modifica delle pagine non è consentita',
         'doc-print': 'La stampa non è consentita',
+        'doc-render-thumbnail': 'La visualizzazione delle miniature non è consentita',
         'doc-text-copy': 'La copia non è consentita',
         'doc-text-search': 'La ricerca non è consentita',
       },

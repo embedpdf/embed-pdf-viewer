@@ -54,7 +54,7 @@ const welcome = async (): Promise<OpenInput> => {
             [attr.aria-current]="page.pageIndex() === main.currentPageIndex()"
             (click)="main.goToPage(page.ref)"
           >
-            <epdf-render-layer />
+            <epdf-render-layer thumbnail />
           </button>
         </ng-template>
         <ng-template epdfPageChrome let-page>

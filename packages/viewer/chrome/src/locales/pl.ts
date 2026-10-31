@@ -166,6 +166,7 @@ export const pl: Locale = {
         'doc-outline-modify': 'Zmienianie zakładek jest niedozwolone',
         'doc-pages-assemble': 'Zmienianie stron jest niedozwolone',
         'doc-print': 'Drukowanie jest niedozwolone',
+        'doc-render-thumbnail': 'Wyświetlanie miniatur jest niedozwolone',
         'doc-text-copy': 'Kopiowanie jest niedozwolone',
         'doc-text-search': 'Wyszukiwanie jest niedozwolone',
       },

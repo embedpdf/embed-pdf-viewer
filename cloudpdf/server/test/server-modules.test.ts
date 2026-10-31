@@ -504,7 +504,7 @@ describe('a mounted module', () => {
     expect(response.status, await response.clone().text()).toBe(200);
     expect(await response.json()).toEqual({
       caller: ['doc.open', 'doc.text.select', 'snapshot.create'],
-      module: ['doc.open', 'doc.render'],
+      module: ['doc.open', 'doc.render', 'doc.render.thumbnail'],
       sameToken: true,
     });
   });

@@ -161,6 +161,7 @@ export const en: Locale = {
         'doc-outline-modify': 'Changing the outline isn’t allowed',
         'doc-pages-assemble': 'Changing pages isn’t allowed',
         'doc-print': "Printing isn't allowed",
+        'doc-render-thumbnail': "Showing thumbnails isn't allowed",
         'doc-text-copy': "Copying isn't allowed",
         'doc-text-search': "Searching isn't allowed",
       },

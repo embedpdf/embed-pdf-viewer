@@ -4,6 +4,7 @@ import { SIGNATURE_POLICY_VERSION } from '../signature/protection';
 import {
   PAGE_PRINT_FAMILIES,
   PAGE_RENDER_FAMILIES,
+  PAGE_THUMBNAIL_FAMILIES,
   type PagePrintTier,
   type PageRenderFamily,
 } from './renderFamilies';
@@ -30,6 +31,7 @@ import type {
  *   /v1/docs/{id}/manifest@{ver}                        — doc-level read
  *   /v1/docs/{id}/render/pages/{N}/data@{ver}                — render is its own prefix
  *   /v1/docs/{id}/render/{annotations,fields,all}/pages/{N}/data@{ver} — and each picture family
+ *   /v1/docs/{id}/render/thumbnail/…/pages/{N}/data@{ver}  — and each family's thumbnails
  *   /v1/docs/{id}/render/{print,print-high}/…/pages/{N}/data@{ver}  — and each print tier of each
  *   /v1/docs/{id}/text/pages/{N}/data@{ver}                  — text is its own prefix
  *   /v1/docs/{id}/geometry/pages/{N}/data@{ver}              — geometry is its own prefix
@@ -262,7 +264,8 @@ export const wirePaths = {
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/signatures/${encodeURIComponent(signingId)}`,
 
   /** A layer's versions, oldest first: the upload, then its signatures' (grows; never cached). */
-  layerVersions: (docId: string, layerName: string) => `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/versions`,
+  layerVersions: (docId: string, layerName: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/versions`,
   /** Immutable: the signature snapshot of one of a layer's versions. */
   layerVersionSignatures: (docId: string, layerName: string, sha256: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/versions/signatures/${sha256}`,
@@ -289,7 +292,8 @@ export const wirePaths = {
     layerName: string,
     sha256: string,
     query: AnalysisQueryInput,
-  ) => `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/versions/analysis/${sha256}?${analysisQueryString(query)}`,
+  ) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/versions/analysis/${sha256}?${analysisQueryString(query)}`,
   /** Immutable: the bytes of one of a layer's versions. */
   layerVersionDownload: (docId: string, layerName: string, sha256: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/versions/download/${sha256}`,
@@ -415,6 +419,18 @@ export const wirePaths = {
   ) =>
     `/v1/docs/${encodeURIComponent(docId)}/${PAGE_PRINT_FAMILIES[tier][family].path}/${encodeURIComponent(encodePageKey(page))}/data`,
 
+  /**
+   * A thumbnail (`PAGE_THUMBNAIL_FAMILIES`): a family as a small picture of
+   * the whole page. A thumbnail is its own right, so it is in the path like the
+   * family; the token carries the family's pins and the image format, nothing
+   * that sizes the picture.
+   */
+  docPageThumbnail: (docId: string, family: PageRenderFamily, page: PageRef, token: TokenInput) =>
+    `/v1/docs/${encodeURIComponent(docId)}/${PAGE_THUMBNAIL_FAMILIES[family].path}/${encodeURIComponent(encodePageKey(page))}/data@${encodeRenderToken(token)}`,
+
+  docPageThumbnailCurrent: (docId: string, family: PageRenderFamily, page: PageRef) =>
+    `/v1/docs/${encodeURIComponent(docId)}/${PAGE_THUMBNAIL_FAMILIES[family].path}/${encodeURIComponent(encodePageKey(page))}/data`,
+
   layerPageGeometry: (docId: string, layerName: string, page: PageRef, contentVersion: number) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/geometry/pages/${encodeURIComponent(encodePageKey(page))}/data@${encodeContentToken(contentVersion)}`,
 
@@ -437,6 +453,24 @@ export const wirePaths = {
     page: PageRef,
   ) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/${PAGE_RENDER_FAMILIES[family].path}/${encodeURIComponent(encodePageKey(page))}/data`,
+
+  /** Layer twin of `docPageThumbnail`. */
+  layerPageThumbnail: (
+    docId: string,
+    layerName: string,
+    family: PageRenderFamily,
+    page: PageRef,
+    token: TokenInput,
+  ) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/${PAGE_THUMBNAIL_FAMILIES[family].path}/${encodeURIComponent(encodePageKey(page))}/data@${encodeRenderToken(token)}`,
+
+  layerPageThumbnailCurrent: (
+    docId: string,
+    layerName: string,
+    family: PageRenderFamily,
+    page: PageRef,
+  ) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/${PAGE_THUMBNAIL_FAMILIES[family].path}/${encodeURIComponent(encodePageKey(page))}/data`,
 
   /** Layer twin of `docPagePrint`. */
   layerPagePrint: (

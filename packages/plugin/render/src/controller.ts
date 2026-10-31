@@ -33,6 +33,7 @@ import type {
   RenderPageOptions,
   RenderPagesOptions,
   RenderSettings,
+  RenderThumbnailOptions,
 } from './contract';
 import type {
   AppearancePicture,
@@ -58,6 +59,7 @@ import { baseAskWidth, resolveStrategy, type ResolvedStrategy } from './strategy
 import { TileManager } from './tile-manager';
 
 const RENDER_SCOPE: DocCapability = 'doc.render';
+const THUMBNAIL_SCOPE: DocCapability = 'doc.render.thumbnail';
 const FORMS_SCOPE: DocCapability = 'doc.forms.read';
 const ANNOTATIONS_SCOPE: DocCapability = 'doc.annotate.read';
 
@@ -117,6 +119,7 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
   const renderFailed = ctx.events.source<RenderFailedEvent>();
 
   const canRender = (): boolean => ctx.allows(RENDER_SCOPE);
+  const canRenderThumbnail = (): boolean => ctx.allows(THUMBNAIL_SCOPE);
 
   // ── what a picture draws ──
   // The engine's rule (`resolvePageLayers`): each option as given, and one
@@ -215,6 +218,16 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
   ): string =>
     `${pageObjectNumber}|w${width}|${layersKeyOf(layers)}|e${epochOf(pageObjectNumber, layers)}` +
     `${format ? `|f${format}` : ''}${quality !== undefined ? `|q${quality}` : ''}`;
+  // A thumbnail is one picture per page, whatever the screen asks: its key
+  // has no width.
+  const thumbnailKey = (
+    pageObjectNumber: PageObjectNumber,
+    layers: PageRenderLayers,
+    format: RenderFormat | undefined,
+    quality: number | undefined,
+  ): string =>
+    `${pageObjectNumber}|thumbnail|${layersKeyOf(layers)}|e${epochOf(pageObjectNumber, layers)}` +
+    `${format ? `|f${format}` : ''}${quality !== undefined ? `|q${quality}` : ''}`;
 
   // ── the raster store door (shared by both render doors and the tiles) ──
   function acquireRaster(
@@ -273,8 +286,9 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
   /** The host door: conformed to the render points. Async so refusals reject. */
   async function renderSource(
     page: PageRef,
-    { scale, view, signal, ...options }: RenderSourceOptions & { signal?: AbortSignal },
+    { scale, view, signal, thumbnail, ...options }: RenderSourceOptions & { signal?: AbortSignal },
   ): Promise<PageImageHandle> {
+    if (thumbnail) return thumbnailOf(page, { ...options, view, signal }, 'render.renderSource');
     ctx.assertAllowed(RENDER_SCOPE, 'render.renderSource');
     const layers = pictureLayers(options, 'render.renderSource');
     const viewport = conformViewport(page, scale);
@@ -330,6 +344,31 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
         },
         options.signal,
       ),
+    );
+  }
+
+  /** A page's thumbnail, by either door: one picture per page and layers. */
+  async function thumbnailOf(
+    page: PageRef,
+    {
+      view,
+      signal,
+      format: askedFormat,
+      quality: askedQuality,
+      ...options
+    }: RenderThumbnailOptions & { view?: string | undefined },
+    operation: string,
+  ): Promise<PageImageHandle> {
+    ctx.assertAllowed(THUMBNAIL_SCOPE, operation);
+    const layers = pictureLayers(options, operation);
+    const strategy = currentStrategy();
+    const format = askedFormat ?? strategy.format;
+    const quality = askedQuality ?? strategy.quality;
+    return acquireRaster(
+      page,
+      thumbnailKey(page.objectNumber, layers, format, askedQuality),
+      { viewport: { kind: 'thumbnail' }, layers, format, quality, view },
+      signal,
     );
   }
 
@@ -570,9 +609,13 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
     // ── public lens ──
     ...settings.api,
     canRender,
+    canRenderThumbnail,
     renderPage,
-    renderThumbnail: (page, { maxWidth, ...options }) =>
-      renderPage(page, { width: maxWidth, ...options }),
+    renderThumbnail: async (pageArgument, options = {}) =>
+      ctx.cancellable(
+        options.signal,
+        thumbnailOf(ctx.pageOf(pageArgument).ref, options, 'render.renderThumbnail'),
+      ),
     renderPages,
     getRenderPolicy: renderPolicy,
     getRenderEpoch: (page, layers = {}) => {
@@ -584,7 +627,15 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
 
     // ── host lens ──
     renderSource,
-    getSourceKey: (page, { scale, view: _view, ...options }) => {
+    getSourceKey: (page, { scale, view: _view, thumbnail, ...options }) => {
+      if (thumbnail) {
+        return thumbnailKey(
+          page.objectNumber,
+          layersOf(options),
+          currentStrategy().format,
+          undefined,
+        );
+      }
       const viewport = conformViewport(page, scale);
       return rasterKey(
         page.objectNumber,

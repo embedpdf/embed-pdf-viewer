@@ -45,20 +45,22 @@ export class LocalPageRenderService implements RawPageRenderService {
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
       );
     }
-    // Cloud parity: /render gates on `doc.render` (the session-level
-    // rendering capability), a picture draws the annotations and form
-    // fields the caller may read, and a print picture needs the print right
-    // of its DPI. image() flows through raw() so the checks here cover both.
+    // Cloud parity: each kind of picture needs its own right and no other
+    // (`doc.render` on screen, `doc.render.thumbnail` for a thumbnail, the
+    // print right of its DPI for print), and a picture draws the annotations
+    // and form fields the caller may read. image() flows through raw() so the
+    // checks here cover both.
     // Deployment render policy (localEngine({ renderPolicy })): an
     // enforced lattice rejects off-lattice full-page renders exactly like
     // the enforcing server, and the policy's pixel budget rides into the
     // worker either way. Both are the identity under the default
-    // `continuous` policy. Print pictures have their own sizes, off the
-    // lattice, as on the server.
+    // `continuous` policy. Print pictures and thumbnails have their own
+    // sizes, off the lattice, as on the server.
     let layers: ReturnType<typeof resolvePageLayers>;
     try {
-      this.guard.assertCapability('doc.render');
       checkRenderUsage(options, {
+        render: this.guard.can('doc.render'),
+        thumbnail: this.guard.can('doc.render.thumbnail'),
         print: this.guard.can('doc.print'),
         printHigh: this.guard.can('doc.print.high'),
       });
@@ -66,7 +68,9 @@ export class LocalPageRenderService implements RawPageRenderService {
         annotations: this.guard.can('doc.annotate.read'),
         formFields: this.guard.can('doc.forms.read'),
       });
-      if (options?.usage !== 'print') assertFullPageOnLattice(this.policy, options);
+      if (options?.usage !== 'print' && options?.viewport?.kind !== 'thumbnail') {
+        assertFullPageOnLattice(this.policy, options);
+      }
     } catch (err) {
       return AbortablePromise.rejectReason(err);
     }

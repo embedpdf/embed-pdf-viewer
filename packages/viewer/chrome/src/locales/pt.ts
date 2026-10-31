@@ -166,6 +166,7 @@ export const pt: Locale = {
         'doc-outline-modify': 'Não é permitido alterar os marcadores',
         'doc-pages-assemble': 'Não é permitido alterar as páginas',
         'doc-print': 'Não é permitido imprimir',
+        'doc-render-thumbnail': 'Não é permitido exibir miniaturas',
         'doc-text-copy': 'Não é permitido copiar',
         'doc-text-search': 'Não é permitido pesquisar',
       },

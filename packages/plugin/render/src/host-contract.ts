@@ -35,8 +35,13 @@ export interface PaintSettings {
 }
 
 export interface RenderSourceOptions extends PageLayerOptions {
-  /** Device px per PDF point (the page transform's `renderScale`). */
+  /** Device px per PDF point (the page transform's `renderScale`). A thumbnail ignores it. */
   scale: number;
+  /**
+   * The page's thumbnail instead: the whole page at the engine's thumbnail
+   * size, which needs only `doc.render.thumbnail` (a thumbnail rail's layer).
+   */
+  thumbnail?: boolean;
   /**
    * The view the picture is for (the page context's `view`): the engine ranks
    * the render by where the page is in that view (`doc.with({ view })`).

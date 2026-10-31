@@ -14,6 +14,7 @@
  */
 import { isPlatformBrowser } from '@angular/common';
 import {
+  booleanAttribute,
   ChangeDetectionStrategy,
   Component,
   computed,
@@ -213,7 +214,7 @@ export class EpdfTilePlane {
       draggable="false"
       style="position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none"
     />
-    @if (tiles() && paintSettings().tiles && layers(); as drawn) {
+    @if (tiles() && !thumbnail() && paintSettings().tiles && layers(); as drawn) {
       <epdf-tile-plane [layers]="drawn" />
     }
   `,
@@ -232,6 +233,11 @@ export class EpdfRenderLayer {
    * is decided by what the view wants; set it to false only for a view that must never tile.
    */
   readonly tiles = input(true);
+  /**
+   * Draw the page's thumbnail instead: one small picture of the whole page, without tiles, which
+   * needs only `doc.render.thumbnail` (a strip of thumbnails, a page picker).
+   */
+  readonly thumbnail = input(false, { transform: booleanAttribute });
 
   private readonly page = injectPage('<epdf-render-layer>');
   private readonly render = renderOf(this.page, '<epdf-render-layer>');
@@ -264,6 +270,7 @@ export class EpdfRenderLayer {
       return layers
         ? render.getSourceKey(this.page.ref, {
             scale: this.page.transform().renderScale,
+            thumbnail: this.thumbnail(),
             ...layers,
           })
         : null;
@@ -299,10 +306,12 @@ export class EpdfRenderLayer {
       });
       // Any scale inside this key's step asks for this key's picture, so reading it now is safe.
       const scale = untracked(() => this.page.transform().renderScale);
+      const thumbnail = untracked(() => this.thumbnail());
       void (async () => {
         try {
           const image = await render.renderSource(this.page.ref, {
             scale,
+            thumbnail,
             ...layers,
             view: this.page.view,
             signal: controller.signal,

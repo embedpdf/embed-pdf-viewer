@@ -166,6 +166,7 @@ export const nl: Locale = {
         'doc-outline-modify': 'Bladwijzers wijzigen is niet toegestaan',
         'doc-pages-assemble': 'Pagina’s wijzigen is niet toegestaan',
         'doc-print': 'Afdrukken is niet toegestaan',
+        'doc-render-thumbnail': 'Paginaminiaturen bekijken is niet toegestaan',
         'doc-text-copy': 'Kopiëren is niet toegestaan',
         'doc-text-search': 'Zoeken is niet toegestaan',
       },

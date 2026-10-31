@@ -166,6 +166,7 @@ export const ko: Locale = {
         'doc-outline-modify': '책갈피 변경은 허용되지 않습니다',
         'doc-pages-assemble': '페이지 변경은 허용되지 않습니다',
         'doc-print': '인쇄는 허용되지 않습니다',
+        'doc-render-thumbnail': '축소판 보기는 허용되지 않습니다',
         'doc-text-copy': '복사는 허용되지 않습니다',
         'doc-text-search': '검색은 허용되지 않습니다',
       },

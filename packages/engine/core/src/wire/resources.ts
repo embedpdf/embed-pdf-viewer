@@ -22,6 +22,7 @@ import { checkAnyCapability, checkCapability } from '../auth/scope';
 import {
   PAGE_PRINT_FAMILIES,
   PAGE_RENDER_FAMILIES,
+  PAGE_THUMBNAIL_FAMILIES,
   type PageRenderFamilySpec,
 } from './renderFamilies';
 
@@ -44,6 +45,13 @@ export type DocResourceId =
   | 'page-render-annotations'
   | 'page-render-fields'
   | 'page-render-all'
+  // The thumbnails (`PAGE_THUMBNAIL_FAMILIES`): each family as a small
+  // picture of the whole page. A thumbnail is a right of its own
+  // (`doc.render.thumbnail`), so it is a path of its own too.
+  | 'page-thumbnail'
+  | 'page-thumbnail-annotations'
+  | 'page-thumbnail-fields'
+  | 'page-thumbnail-all'
   // The print pictures (`PAGE_PRINT_FAMILIES`): each family at each print
   // tier. The tier is a right (`doc.print`, `doc.print.high`), so it is a
   // path of its own too.
@@ -114,6 +122,10 @@ export type DocResourceId =
   | 'layer-page-render-annotations'
   | 'layer-page-render-fields'
   | 'layer-page-render-all'
+  | 'layer-page-thumbnail'
+  | 'layer-page-thumbnail-annotations'
+  | 'layer-page-thumbnail-fields'
+  | 'layer-page-thumbnail-all'
   | 'layer-page-print'
   | 'layer-page-print-annotations'
   | 'layer-page-print-fields'
@@ -300,6 +312,10 @@ export const DOC_RESOURCES: Readonly<Record<DocResourceId, DocResourceDescriptor
   'page-render-annotations': pageRenderResource(PAGE_RENDER_FAMILIES.annotations),
   'page-render-fields': pageRenderResource(PAGE_RENDER_FAMILIES.fields),
   'page-render-all': pageRenderResource(PAGE_RENDER_FAMILIES.all),
+  'page-thumbnail': pageRenderResource(PAGE_THUMBNAIL_FAMILIES.pages),
+  'page-thumbnail-annotations': pageRenderResource(PAGE_THUMBNAIL_FAMILIES.annotations),
+  'page-thumbnail-fields': pageRenderResource(PAGE_THUMBNAIL_FAMILIES.fields),
+  'page-thumbnail-all': pageRenderResource(PAGE_THUMBNAIL_FAMILIES.all),
   'page-print': pageRenderResource(PAGE_PRINT_FAMILIES.print.pages),
   'page-print-annotations': pageRenderResource(PAGE_PRINT_FAMILIES.print.annotations),
   'page-print-fields': pageRenderResource(PAGE_PRINT_FAMILIES.print.fields),
@@ -536,6 +552,10 @@ export const DOC_RESOURCES: Readonly<Record<DocResourceId, DocResourceDescriptor
   'layer-page-render-annotations': layerPageRenderResource(PAGE_RENDER_FAMILIES.annotations),
   'layer-page-render-fields': layerPageRenderResource(PAGE_RENDER_FAMILIES.fields),
   'layer-page-render-all': layerPageRenderResource(PAGE_RENDER_FAMILIES.all),
+  'layer-page-thumbnail': layerPageRenderResource(PAGE_THUMBNAIL_FAMILIES.pages),
+  'layer-page-thumbnail-annotations': layerPageRenderResource(PAGE_THUMBNAIL_FAMILIES.annotations),
+  'layer-page-thumbnail-fields': layerPageRenderResource(PAGE_THUMBNAIL_FAMILIES.fields),
+  'layer-page-thumbnail-all': layerPageRenderResource(PAGE_THUMBNAIL_FAMILIES.all),
   'layer-page-print': layerPageRenderResource(PAGE_PRINT_FAMILIES.print.pages),
   'layer-page-print-annotations': layerPageRenderResource(PAGE_PRINT_FAMILIES.print.annotations),
   'layer-page-print-fields': layerPageRenderResource(PAGE_PRINT_FAMILIES.print.fields),
