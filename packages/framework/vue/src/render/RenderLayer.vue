@@ -1,22 +1,16 @@
 <!--
-  <RenderLayer>: the page's picture, in two planes. The base plane is a
-  whole-page <img> at the plugin's resolved size, always there, the instant
-  backdrop. The tile plane above it paints the plugin's tile plan when the view
-  wants more pixels than the base may spend; a thumbnail-sized view engages
-  none. The layer only paints: every decision (sizes, tiles, caching, release)
-  is the render plugin's, and anything mid-gesture scales with CSS until the
-  plugin hands down new pixels.
+  <RenderLayer>: the page's picture. The render plugin draws it (RasterLayer),
+  unless another plugin paints this view's pictures (`handOverPictures`): then
+  the layer lends that plugin its box (PainterBox).
 -->
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed } from 'vue';
+import type { PicturePainter } from '@embedpdf/plugin-render';
 import { RenderToken } from '@embedpdf/plugin-render/contract/host';
-import type { PaintSettings } from '@embedpdf/plugin-render/contract/host';
-import { partsDrawnTwice, pictureLayerOptionsOf } from '@embedpdf/web';
-import { devWarn } from '../dev';
-import { usePaintedParts } from '../page-layers';
-import { useOptionalCapability, useOptionalSelector } from '../runtime/capabilities';
+import { useOptionalSelector } from '../runtime/capabilities';
 import { usePage } from '../runtime/page';
-import TilePlane from './TilePlane.vue';
+import PainterBox from './PainterBox.vue';
+import RasterLayer from './RasterLayer.vue';
 
 const props = withDefaults(
   defineProps<{
@@ -46,101 +40,14 @@ const props = withDefaults(
 );
 
 const page = usePage();
-// The layer is a host of the render plugin: it paints conformed sources. The
-// host lens is the same runtime token, typed wider.
-const render = useOptionalCapability(RenderToken);
-const NO_PAINT: PaintSettings = { tiles: false };
-// The same object until a setting it reads changes.
-const settings = useOptionalSelector(RenderToken, (lens) => lens.getPaintSettings(), NO_PAINT);
-
-const pageRef = computed(() => page.value.ref);
-const parts = computed(() => ({ annotations: props.annotations, formFields: props.formFields }));
-const painted = usePaintedParts(pageRef);
-const may = useOptionalSelector(RenderToken, (lens) => lens.getLayerRights(), null);
-/** The parts the picture draws; `null` until the page's layers have said what they paint. */
-const layers = computed(() =>
-  painted.value && may.value ? pictureLayerOptionsOf(painted.value, parts.value, may.value) : null,
-);
-watch([painted, parts], ([current, asked]) => {
-  if (current && partsDrawnTwice(current, asked).length > 0) {
-    devWarn(
-      'render-layer-draws-what-a-layer-paints',
-      '<RenderLayer :annotations> or <RenderLayer :form-fields> draws what an <AnnotationLayer> ' +
-        'or a <FormLayer> on the page paints too, so it shows twice. Leave the prop out: the ' +
-        'picture leaves out what a layer paints.',
-    );
-  }
-});
-
-// The raster's identity: its conformed width, the parts it draws and the
-// page's epoch. Above the budget it stays put while zooming, so the deep-zoom
-// backdrop never fetches again.
-const sourceKey = useOptionalSelector(
-  RenderToken,
-  (lens) =>
-    layers.value
-      ? lens.getSourceKey(page.value.ref, {
-          scale: page.value.transform.renderScale,
-          ...(props.thumbnail ? { thumbnail: true } : {}),
-          ...layers.value,
-        })
-      : null,
-  null,
-);
-
-const image = ref<HTMLImageElement | null>(null);
-watch(
-  [render, pageRef, sourceKey, layers],
-  ([lens, shown, _key, drawn], _previous, onCleanup) => {
-    if (!lens || !drawn) return;
-    const controller = new AbortController();
-    let revoke: (() => void) | undefined;
-    onCleanup(() => {
-      controller.abort();
-      revoke?.();
-    });
-    void (async () => {
-      try {
-        // The plugin conforms this to its resolved size and collapses asks for
-        // the same key, so any scale that maps to this key asks for this key.
-        const picture = await lens.renderSource(shown, {
-          scale: page.value.transform.renderScale,
-          ...(props.thumbnail ? { thumbnail: true } : {}),
-          ...drawn,
-          view: page.value.view,
-          signal: controller.signal,
-        });
-        const object = await picture.objectUrl().abortWith(controller.signal);
-        if (controller.signal.aborted) {
-          object.revoke();
-          return;
-        }
-        revoke = object.revoke;
-        // Set on a lasting element: the browser keeps the old picture until the
-        // new one decodes, and never asks for the old URL again, so revoking it
-        // on cleanup is safe.
-        if (image.value) image.value.src = object.url;
-      } catch {
-        // Aborted (the view moved, or the layer unmounted), or the render failed.
-      }
-    })();
-  },
-  { immediate: true, flush: 'post' },
+const painter = useOptionalSelector(RenderToken, (lens) => lens.getPicturePainter(), null);
+/** The plugin that paints this view's pictures, or `null` while the render plugin does. */
+const painting = computed(() =>
+  painter.value?.paints(page.value.view) ? (painter.value as PicturePainter<HTMLElement>) : null,
 );
 </script>
 
 <template>
-  <img
-    ref="image"
-    alt=""
-    draggable="false"
-    :style="{
-      position: 'absolute',
-      inset: 0,
-      width: '100%',
-      height: '100%',
-      pointerEvents: 'none',
-    }"
-  />
-  <TilePlane v-if="tiles && !thumbnail && settings.tiles && layers" :layers="layers" />
+  <PainterBox v-if="painting" :painter="painting" />
+  <RasterLayer v-else v-bind="props" />
 </template>

@@ -27,7 +27,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { RenderToken } from '@embedpdf/plugin-render/contract/host';
 import type { PageViewDemand, TilePaintSource } from '@embedpdf/plugin-render/contract/host';
 import { RenderToken as RenderPublicToken } from '@embedpdf/plugin-render';
-import type { RenderCapability } from '@embedpdf/plugin-render';
+import type { PaintedPicture, PicturePainter, RenderCapability } from '@embedpdf/plugin-render';
 import type { EventHook } from '@embedpdf/core';
 import {
   bindPaintedImage,
@@ -82,12 +82,60 @@ export interface RenderLayerProps {
 
 let warnedTileSize = false;
 
-export function RenderLayer({
+export function RenderLayer(props: RenderLayerProps = {}) {
+  const page = usePage();
+  // Another plugin may paint this view's pictures (`handOverPictures`): the layer lends it its box.
+  const painter = useSelector(RenderToken, (render) => render.getPicturePainter());
+  if (painter?.paints(page.view)) {
+    return <PainterBox painter={painter as PicturePainter<HTMLElement>} />;
+  }
+  return <RasterLayer {...props} />;
+}
+
+/**
+ * The page's box, lent to the plugin that paints its picture: it paints into it once, follows the
+ * page as it changes, and takes the picture away when the page goes or the painter is given back.
+ */
+function PainterBox({ painter }: { painter: PicturePainter<HTMLElement> }) {
+  const page = usePage();
+  const host = useRef<HTMLDivElement>(null);
+  const painted = useRef<{ picture: PaintedPicture; page: typeof page } | null>(null);
+  useLayoutEffect(() => {
+    painted.current = { picture: painter.paint(host.current!, page), page };
+    return () => {
+      painted.current?.picture.destroy();
+      painted.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a new page context is an
+    // update of the same picture, below; only another painter or page paints anew.
+  }, [painter, page.ref]);
+  useLayoutEffect(() => {
+    const current = painted.current;
+    if (!current || current.page === page) return;
+    current.page = page;
+    current.picture.update(page);
+  }, [page]);
+  return (
+    <div
+      ref={host}
+      style={{
+        position: 'absolute',
+        inset: 0,
+        width: '100%',
+        height: '100%',
+        pointerEvents: 'none',
+      }}
+    />
+  );
+}
+
+/** The render plugin's own picture: the base plane and the tiles. */
+function RasterLayer({
   annotations,
   formFields,
   tiles = true,
   thumbnail = false,
-}: RenderLayerProps = {}) {
+}: RenderLayerProps) {
   const page = usePage();
   const render = useCapability(RenderToken);
   // The same object until a setting it reads changes, so a settings change re-renders the layer.

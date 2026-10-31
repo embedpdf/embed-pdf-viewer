@@ -730,6 +730,47 @@ describe('what a picture draws', () => {
   });
 });
 
+describe('painting the pictures another way', () => {
+  const painter = (views: string[] = ['main']) => ({
+    paints: (view: string) => views.includes(view),
+    paint: () => ({ update: () => {}, destroy: () => {} }),
+  });
+
+  it('holds one painter, wakes the views, and gives it back once', async () => {
+    const fixture = await boot();
+    const woken = vi.fn();
+    fixture.kernel.subscribe(woken);
+    expect(fixture.render.getPicturePainter()).toBeNull();
+    const held = painter();
+    const giveBack = fixture.render.handOverPictures(held);
+    expect(fixture.render.getPicturePainter()).toBe(held);
+    expect(woken).toHaveBeenCalled();
+
+    woken.mockClear();
+    giveBack();
+    expect(fixture.render.getPicturePainter()).toBeNull();
+    expect(woken).toHaveBeenCalled();
+    woken.mockClear();
+    giveBack(); // giving it back twice is harmless
+    expect(woken).not.toHaveBeenCalled();
+    await fixture.kernel.destroy();
+  });
+
+  it('refuses a second painter, and a stale give-back never drops the next one', async () => {
+    const fixture = await boot();
+    const giveBack = fixture.render.handOverPictures(painter());
+    expect(() => fixture.render.handOverPictures(painter(['thumbnails']))).toThrow(
+      expect.objectContaining({ code: 'conflict' }),
+    );
+    giveBack();
+    const next = painter();
+    fixture.render.handOverPictures(next);
+    giveBack();
+    expect(fixture.render.getPicturePainter()).toBe(next);
+    await fixture.kernel.destroy();
+  });
+});
+
 describe('appearance pictures', () => {
   const page = toPageRef(11);
   const ref = (objectNumber: number) => ({ kind: 'objectNumber' as const, page, objectNumber });
