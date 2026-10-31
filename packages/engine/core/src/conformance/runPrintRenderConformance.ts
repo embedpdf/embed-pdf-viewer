@@ -3,7 +3,12 @@ import { pdfOf } from './pdfOf';
 import type { ConformanceTestRunner } from './runMetadataConformance';
 import type { PageExtractOptions } from '../dto/PageExtract';
 import type { PageLayout } from '../dto/PageLayout';
-import type { PageImageHandle, PageImageOptions, PrintDpi } from '../dto/PageRender';
+import {
+  PAGE_THUMBNAIL_SIZE,
+  type PageImageHandle,
+  type PageImageOptions,
+  type PrintDpi,
+} from '../dto/PageRender';
 import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import type { PageRef } from '../identity/PageRef';
@@ -67,11 +72,16 @@ const ANNOTATION_SPOTS: readonly Spot[] = [
 ];
 const FIELD_SPOTS: readonly Spot[] = ['fieldScreenOnly', 'fieldPrintOnly'];
 
-/** The rights each case opens with: everything, no print, print but not high. */
+/**
+ * The rights each case opens with: everything, no print, print but not high,
+ * print without the screen, and thumbnails only.
+ */
 export const PRINT_SCOPES = {
   everything: ['*'],
   screen: ['doc.open', 'doc.render', 'doc.annotate.read', 'doc.forms.read'],
   print: ['doc.open', 'doc.render', 'doc.annotate.read', 'doc.forms.read', 'doc.print'],
+  printOnly: ['doc.open', 'doc.annotate.read', 'doc.forms.read', 'doc.print'],
+  thumbnails: ['doc.open', 'doc.annotate.read', 'doc.forms.read', 'doc.render.thumbnail'],
 } as const satisfies Record<string, readonly string[]>;
 
 export interface PrintRenderConformanceOptions {
@@ -90,7 +100,10 @@ export interface PrintRenderConformanceOptions {
  * `noView` ones included, `hidden` ones never. It is the whole page at its
  * DPI, never more pixels than the page fitted to A4 or Letter needs, and its
  * transform is `pageTransform`'s. It needs `doc.print`, and 300 DPI
- * `doc.print.high`; options that don't fit a print picture are refused.
+ * `doc.print.high`, and not `doc.render`; options that don't fit a print
+ * picture are refused. A thumbnail is the whole page at the thumbnail size
+ * and needs `doc.render.thumbnail` (which `doc.render` includes), not
+ * `doc.render`: each kind of picture needs its own right and no other.
  */
 export function runPrintRenderConformance(
   runner: ConformanceTestRunner,
@@ -215,6 +228,59 @@ export function runPrintRenderConformance(
         await expect(page.render.image({ format: 'png', ...print(300) })).rejects.toMatchObject({
           code: EngineErrorCode.Forbidden,
         });
+      });
+    });
+
+    test('printing needs no doc.render, and doc.print gives no screen picture', async () => {
+      await as(PRINT_SCOPES.printOnly, async (printOnly) => {
+        const page = printOnly.page(small.ref);
+        const image = await page.render.image({ format: 'png', ...print(150) });
+        expect((await decode(image)).width).toBe(417);
+        for (const options of [{}, { viewport: { kind: 'thumbnail' } }] as PageImageOptions[]) {
+          await expect(page.render.image({ format: 'png', ...options })).rejects.toMatchObject({
+            code: EngineErrorCode.Forbidden,
+          });
+        }
+      });
+    });
+
+    test('a thumbnail is the whole page, PAGE_THUMBNAIL_SIZE on its long side', async () => {
+      const page = doc.page(small.ref);
+      const image = await page.render.image({ format: 'png', viewport: { kind: 'thumbnail' } });
+      expect([image.width, image.height]).toEqual([PAGE_THUMBNAIL_SIZE, PAGE_THUMBNAIL_SIZE]);
+      const pixels = await decode(image);
+      expect([pixels.width, pixels.height]).toEqual([PAGE_THUMBNAIL_SIZE, PAGE_THUMBNAIL_SIZE]);
+      const tall = await doc
+        .page(large.ref)
+        .render.image({ format: 'png', viewport: { kind: 'thumbnail' } });
+      expect(Math.max(tall.width, tall.height)).toBe(PAGE_THUMBNAIL_SIZE);
+      const rect = { kind: 'rect', rect: { x: 0, y: 0, width: 50, height: 50 } } as const;
+      for (const options of [
+        { viewport: { kind: 'thumbnail' }, target: rect },
+        { usage: 'print', viewport: { kind: 'thumbnail' } },
+      ] as PageImageOptions[]) {
+        await expect(page.render.image({ format: 'png', ...options })).rejects.toMatchObject({
+          code: EngineErrorCode.InvalidArg,
+        });
+      }
+    });
+
+    test('a thumbnail needs doc.render.thumbnail, which doc.render includes', async () => {
+      await as(PRINT_SCOPES.thumbnails, async (thumbnailsOnly) => {
+        const page = thumbnailsOnly.page(small.ref);
+        const image = await page.render.image({ format: 'png', viewport: { kind: 'thumbnail' } });
+        expect(image.width).toBe(PAGE_THUMBNAIL_SIZE);
+        for (const options of [{}, print(150)] as PageImageOptions[]) {
+          await expect(page.render.image({ format: 'png', ...options })).rejects.toMatchObject({
+            code: EngineErrorCode.Forbidden,
+          });
+        }
+      });
+      await as(PRINT_SCOPES.screen, async (screenOnly) => {
+        const image = await screenOnly
+          .page(small.ref)
+          .render.image({ format: 'png', viewport: { kind: 'thumbnail' } });
+        expect(image.width).toBe(PAGE_THUMBNAIL_SIZE);
       });
     });
   });

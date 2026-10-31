@@ -287,6 +287,26 @@ describe('a protected session gets none of the page and none of the document', (
     expect(refusedAnyway).toEqual([]);
   });
 
+  test('a picture right opens its own pictures and nothing else of the page', async () => {
+    // Each kind of picture needs its own right and no other: thumbnails or
+    // printing given to a protected session open only those pictures.
+    const opened = async (scope: string[]) => {
+      const answered: string[] = [];
+      for (const route of documentRoutes().filter((r) => categoryOf(r) === 'page')) {
+        const response = await call(route, scope);
+        await response.arrayBuffer();
+        if (response.status !== 403) answered.push(route.path);
+      }
+      return answered;
+    };
+    const thumbnails = await opened([...PROTECTED_SCOPE, 'doc.render.thumbnail']);
+    expect(thumbnails.length).toBeGreaterThan(0);
+    expect(thumbnails.filter((path) => !/\/render\/thumbnail\//.test(path))).toEqual([]);
+    const print = await opened([...PROTECTED_SCOPE, 'doc.print']);
+    expect(print.length).toBeGreaterThan(0);
+    expect(print.filter((path) => !/\/render\/print\//.test(path))).toEqual([]);
+  });
+
   test('the overlay stays: annotation and form appearances answer a protected session', async () => {
     const refused: string[] = [];
     for (const route of documentRoutes().filter(

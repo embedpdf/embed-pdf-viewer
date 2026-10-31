@@ -167,6 +167,7 @@ export const sv: Locale = {
         'doc-outline-modify': 'Du får inte ändra bokmärkena',
         'doc-pages-assemble': 'Du får inte ändra sidorna',
         'doc-print': 'Du får inte skriva ut',
+        'doc-render-thumbnail': 'Du får inte visa miniatyrer',
         'doc-text-copy': 'Du får inte kopiera',
         'doc-text-search': 'Du får inte söka',
       },

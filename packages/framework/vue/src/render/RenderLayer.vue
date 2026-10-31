@@ -34,9 +34,15 @@ const props = withDefaults(
      * tile, even at deep zoom.
      */
     tiles?: boolean;
+    /**
+     * Draw the page's thumbnail instead: one small picture of the whole page,
+     * without tiles, which needs only `doc.render.thumbnail` (a strip of
+     * thumbnails, a page picker).
+     */
+    thumbnail?: boolean;
   }>(),
   // Unset stays unset: a boolean prop would otherwise read `false`.
-  { annotations: undefined, formFields: undefined, tiles: true },
+  { annotations: undefined, formFields: undefined, tiles: true, thumbnail: false },
 );
 
 const page = usePage();
@@ -75,6 +81,7 @@ const sourceKey = useOptionalSelector(
     layers.value
       ? lens.getSourceKey(page.value.ref, {
           scale: page.value.transform.renderScale,
+          ...(props.thumbnail ? { thumbnail: true } : {}),
           ...layers.value,
         })
       : null,
@@ -98,6 +105,7 @@ watch(
         // the same key, so any scale that maps to this key asks for this key.
         const picture = await lens.renderSource(shown, {
           scale: page.value.transform.renderScale,
+          ...(props.thumbnail ? { thumbnail: true } : {}),
           ...drawn,
           view: page.value.view,
           signal: controller.signal,
@@ -134,5 +142,5 @@ watch(
       pointerEvents: 'none',
     }"
   />
-  <TilePlane v-if="tiles && settings.tiles && layers" :layers="layers" />
+  <TilePlane v-if="tiles && !thumbnail && settings.tiles && layers" :layers="layers" />
 </template>

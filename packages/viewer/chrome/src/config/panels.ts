@@ -17,6 +17,7 @@ import { FormToken } from '@embedpdf/react/form';
 import { MeasurementToken } from '@embedpdf/react/measurement';
 import { OutlineToken } from '@embedpdf/react/outline';
 import { RedactionToken } from '@embedpdf/react/redaction';
+import { RenderToken } from '@embedpdf/react/render';
 import { SearchToken } from '@embedpdf/react/search';
 import { ShellToken } from '@embedpdf/react/shell';
 import { SignatureToken } from '@embedpdf/react/signature';
@@ -90,7 +91,16 @@ const FIND_COMMAND: CommandDef = {
 };
 
 const BUILT_IN_PANELS: ReadonlyMap<string, PanelCommandFacts> = new Map<string, PanelCommandFacts>([
-  ['thumbnails', { categories: ['thumbnails'] }],
+  // A thumbnail is a picture of the page with a right of its own (`doc.render.thumbnail`, which
+  // `doc.render` includes): without it there is nothing the panel could show.
+  [
+    'thumbnails',
+    {
+      categories: ['thumbnails'],
+      allowed: (commandContext) => commandContext.tryGet(RenderToken)?.canRenderThumbnail() ?? true,
+      notAllowedKey: 'commands.notAllowed.doc-render-thumbnail',
+    },
+  ],
   // The outline and attachments panels show while they have a job (`hasJob`): their lists are
   // read once a document shows (ui/sidebar-reads.tsx), so their buttons know.
   [

@@ -406,10 +406,10 @@ describe('the public door — exact sizes', () => {
     await fixture.kernel.destroy();
   });
 
-  it('renderThumbnail is a width render; renderPages reports in input order with per-page failures', async () => {
+  it('renderThumbnail asks for the thumbnail; renderPages reports in input order with per-page failures', async () => {
     const fixture = await boot();
-    void fixture.render.renderThumbnail(toPageRef(11), { maxWidth: 120 }).catch(() => {});
-    expect(fixture.imageCalls[0]!.options.viewport).toEqual({ kind: 'width', width: 120 });
+    void fixture.render.renderThumbnail(toPageRef(11)).catch(() => {});
+    expect(fixture.imageCalls[0]!.options.viewport).toEqual({ kind: 'thumbnail' });
 
     const batch = fixture.render.renderPages([toPageRef(22), toPageRef(99), toPageRef(33)], {
       width: 100,
@@ -431,6 +431,34 @@ describe('the public door — exact sizes', () => {
       [33, 'operation-failed'],
     ]);
     await fixture.kernel.destroy();
+  });
+
+  it('thumbnails need doc.render.thumbnail, not doc.render, by either door', async () => {
+    const fixture = await boot({ allows: (capability) => capability !== 'doc.render' });
+    expect(fixture.render.canRender()).toBe(false);
+    expect(fixture.render.canRenderThumbnail()).toBe(true);
+    void fixture.render.renderThumbnail(toPageRef(11)).catch(() => {});
+    void fixture.render.renderSource(toPageRef(22), { scale: 1, thumbnail: true }).catch(() => {});
+    expect(fixture.imageCalls.map((call) => call.options.viewport)).toEqual([
+      { kind: 'thumbnail' },
+      { kind: 'thumbnail' },
+    ]);
+    // One thumbnail per page, whatever the scale: the key has no width.
+    expect(fixture.render.getSourceKey(toPageRef(22), { scale: 1, thumbnail: true })).toBe(
+      fixture.render.getSourceKey(toPageRef(22), { scale: 3, thumbnail: true }),
+    );
+    await expect(fixture.render.renderPage(toPageRef(11))).rejects.toMatchObject({
+      code: 'permission-denied',
+    });
+    await fixture.kernel.destroy();
+
+    const screenOnly = await boot({
+      allows: (capability) => capability !== 'doc.render.thumbnail',
+    });
+    await expect(screenOnly.render.renderThumbnail(toPageRef(11))).rejects.toMatchObject({
+      code: 'permission-denied',
+    });
+    await screenOnly.kernel.destroy();
   });
 
   it('unknown pages are not-found; completed and failed renders are announced', async () => {

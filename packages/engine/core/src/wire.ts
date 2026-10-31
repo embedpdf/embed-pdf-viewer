@@ -73,6 +73,7 @@ export {
   PageNetworkRenderFormatSchema,
   PageRenderQuerySchemas,
   PagePrintQuerySchemas,
+  PageThumbnailQuerySchemas,
   pagePictureQuerySchema,
   AnnotationAppearancesQuerySchema,
   WidgetAppearancesQuerySchema,
@@ -207,12 +208,13 @@ export {
   ResourceKeySchema,
   SourceResourceKeysSchema,
 } from './wire/resourceKeys';
-// The page pictures, screen and print: what each draws, needs, depends on and pins.
+// The page pictures, screen, thumbnail and print: what each draws, needs, depends on and pins.
 export {
   PAGE_PICTURES,
   PAGE_PRINT_FAMILIES,
   PAGE_PRINT_TIERS,
   PAGE_RENDER_FAMILIES,
+  PAGE_THUMBNAIL_FAMILIES,
   pagePictureOf,
   pagePrintTierOf,
   pageRenderFamilyOf,

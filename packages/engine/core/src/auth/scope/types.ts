@@ -10,6 +10,7 @@ export type DocCapability =
   // Session establishment (cloud-only — no PDF bit)
   | 'doc.open' // /head, /manifest, /access
   | 'doc.render' // /pages/*/render
+  | 'doc.render.thumbnail' // the thumbnail pictures only: /render/thumbnail/*; `doc.render` implies it
 
   // Text/content extraction (PDF bit 5)
   | 'doc.text.select' // /pages/*/geometry

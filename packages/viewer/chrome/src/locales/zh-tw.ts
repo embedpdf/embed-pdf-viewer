@@ -168,6 +168,7 @@ export const zhTW: Locale = {
         'doc-outline-modify': '不允許變更書籤',
         'doc-pages-assemble': '不允許變更頁面',
         'doc-print': '不允許列印',
+        'doc-render-thumbnail': '不允許檢視頁面縮圖',
         'doc-text-copy': '不允許複製',
         'doc-text-search': '不允許搜尋',
       },

@@ -63,7 +63,7 @@ function Thumbnails() {
           aria-current={page.pageIndex === currentPageIndex}
           onClick={() => main.goToPage(page.ref)}
         >
-          <RenderLayer />
+          <RenderLayer thumbnail />
         </button>
       )}
     </Stage>

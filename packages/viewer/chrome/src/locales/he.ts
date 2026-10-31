@@ -167,6 +167,7 @@ export const he: Locale = {
         'doc-outline-modify': 'אין הרשאה לשנות סימניות',
         'doc-pages-assemble': 'אין הרשאה לשנות עמודים',
         'doc-print': 'הדפסה אינה מותרת',
+        'doc-render-thumbnail': 'הצגת תמונות ממוזערות אינה מותרת',
         'doc-text-copy': 'העתקה אינה מותרת',
         'doc-text-search': 'חיפוש אינו מותר',
       },

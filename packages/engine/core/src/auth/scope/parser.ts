@@ -14,6 +14,7 @@ import type { CollabAction, CollabFilter, DocCapability, FieldAction, ParsedScop
 const KNOWN_CAPABILITIES: ReadonlySet<DocCapability> = new Set([
   'doc.open',
   'doc.render',
+  'doc.render.thumbnail',
   'doc.text.select',
   'doc.text.copy',
   'doc.text.search',

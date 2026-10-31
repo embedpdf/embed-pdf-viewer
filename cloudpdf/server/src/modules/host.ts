@@ -27,7 +27,7 @@ import {
   type PdfBits,
   type WorkerJobId,
 } from '@embedpdf/engine-core/runtime';
-import { PAGE_RENDER_FAMILIES, pageRenderFamilyOf } from '@embedpdf/engine-core/wire';
+import { pagePictureOf } from '@embedpdf/engine-core/wire';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
 import { IN_PROCESS_BASE_URL, inProcessFetch } from './inProcessFetch';
@@ -391,9 +391,8 @@ async function renderRawAsModule(
   const includeAnnotations = options.includeAnnotations ?? holds('doc.annotate.read');
   const includeFormFields =
     options.includeFormFields ?? (includeAnnotations && holds('doc.forms.read'));
-  const family =
-    PAGE_RENDER_FAMILIES[pageRenderFamilyOf({ includeAnnotations, includeFormFields })];
-  for (const capability of family.needs) {
+  const picture = pagePictureOf({ includeAnnotations, includeFormFields }, options);
+  for (const capability of picture.needs) {
     if (!holds(capability)) throw new PermissionDenied(capability, `module ${module.id}`);
   }
 

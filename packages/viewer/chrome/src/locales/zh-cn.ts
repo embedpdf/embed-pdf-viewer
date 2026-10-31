@@ -166,6 +166,7 @@ export const zhCN: Locale = {
         'doc-outline-modify': '不允许更改书签',
         'doc-pages-assemble': '不允许更改页面',
         'doc-print': '不允许打印',
+        'doc-render-thumbnail': '不允许查看缩略图',
         'doc-text-copy': '不允许复制',
         'doc-text-search': '不允许搜索',
       },

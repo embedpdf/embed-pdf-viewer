@@ -1,6 +1,11 @@
 import type { DocCapability } from '../auth/scope';
 import type { LayerScopePlane } from '../dto/LayerScopes';
-import type { PageRenderLayers, PrintDpi } from '../dto/PageRender';
+import {
+  printDpiOf,
+  type PageRenderLayers,
+  type PageRenderOptions,
+  type PrintDpi,
+} from '../dto/PageRender';
 import type { DocResourceId } from './resources';
 
 /**
@@ -24,7 +29,11 @@ export interface PageRenderFamilySpec {
   readonly draws: PageRenderLayers;
   /** The path between the document and the page key: `render/annotations/pages`. */
   readonly path: string;
-  /** What reading the picture needs. */
+  /**
+   * What reading the picture needs: its own right (`doc.render` on screen,
+   * `doc.render.thumbnail` for a thumbnail, the tier's for print) and the
+   * rights to read what it draws, nothing else.
+   */
   readonly needs: ReadonlyArray<DocCapability>;
   /**
    * The planes the picture depends on. It's read at the document's shared
@@ -35,6 +44,8 @@ export interface PageRenderFamilySpec {
   readonly pins: ReadonlyArray<PageRenderPin>;
   /** The print tier of a print picture ({@link PAGE_PRINT_FAMILIES}); null for the screen. */
   readonly print: PagePrintTierSpec | null;
+  /** A thumbnail ({@link PAGE_THUMBNAIL_FAMILIES}): the whole page at the thumbnail size. */
+  readonly thumbnail: boolean;
 }
 
 export const PAGE_RENDER_FAMILIES: Readonly<Record<PageRenderFamily, PageRenderFamilySpec>> = {
@@ -48,6 +59,7 @@ export const PAGE_RENDER_FAMILIES: Readonly<Record<PageRenderFamily, PageRenderF
     planes: ['content'],
     pins: ['contentVersion'],
     print: null,
+    thumbnail: false,
   },
   annotations: {
     family: 'annotations',
@@ -59,6 +71,7 @@ export const PAGE_RENDER_FAMILIES: Readonly<Record<PageRenderFamily, PageRenderF
     planes: ['content', 'annotations'],
     pins: ['contentVersion', 'annotationVersion'],
     print: null,
+    thumbnail: false,
   },
   fields: {
     family: 'fields',
@@ -70,6 +83,7 @@ export const PAGE_RENDER_FAMILIES: Readonly<Record<PageRenderFamily, PageRenderF
     planes: ['content', 'forms'],
     pins: ['contentVersion', 'widgetVersion'],
     print: null,
+    thumbnail: false,
   },
   all: {
     family: 'all',
@@ -81,6 +95,7 @@ export const PAGE_RENDER_FAMILIES: Readonly<Record<PageRenderFamily, PageRenderF
     planes: ['content', 'annotations', 'forms'],
     pins: ['contentVersion', 'annotationVersion', 'widgetVersion'],
     print: null,
+    thumbnail: false,
   },
 };
 
@@ -89,6 +104,34 @@ export function pageRenderFamilyOf(layers: PageRenderLayers): PageRenderFamily {
   if (layers.includeAnnotations) return layers.includeFormFields ? 'all' : 'annotations';
   return layers.includeFormFields ? 'fields' : 'pages';
 }
+
+/** The rights to read what a picture draws: whatever kind of picture it is. */
+function readsOf(draws: PageRenderLayers): DocCapability[] {
+  return [
+    ...(draws.includeAnnotations ? (['doc.annotate.read'] as const) : []),
+    ...(draws.includeFormFields ? (['doc.forms.read'] as const) : []),
+  ];
+}
+
+/**
+ * The thumbnails: each of the four families as a small picture of the whole
+ * page, `PAGE_THUMBNAIL_SIZE` pixels on its long side, by the screen's
+ * rules. A thumbnail needs `doc.render.thumbnail` (which `doc.render`
+ * implies), not `doc.render`, so a session that may not render pages may
+ * still have thumbnails. It keeps its family's planes and pins, and its path
+ * is the family's with `thumbnail` after `render/`:
+ * `render/thumbnail/annotations/pages`.
+ */
+export const PAGE_THUMBNAIL_FAMILIES: Readonly<Record<PageRenderFamily, PageRenderFamilySpec>> = {
+  pages: thumbnailFamily('pages', 'page-thumbnail', 'layer-page-thumbnail'),
+  annotations: thumbnailFamily(
+    'annotations',
+    'page-thumbnail-annotations',
+    'layer-page-thumbnail-annotations',
+  ),
+  fields: thumbnailFamily('fields', 'page-thumbnail-fields', 'layer-page-thumbnail-fields'),
+  all: thumbnailFamily('all', 'page-thumbnail-all', 'layer-page-thumbnail-all'),
+};
 
 /**
  * The two print tiers, named for the right each needs: `print` (150 DPI,
@@ -118,9 +161,10 @@ export function pagePrintTierOf(dpi: PrintDpi): PagePrintTier {
  * The print pictures: each of the four families, printed at each tier. A
  * print picture draws what its family draws, by the print rules: layers in
  * their print state, annotations and fields by their `print` flag. So no
- * print family is a screen picture under another name, and each needs its
- * family's rights plus its tier's. It keeps its family's planes and pins,
- * and its path is the family's with the tier after `render/`:
+ * print family is a screen picture under another name. Each needs its tier's
+ * rights and the rights to read what it draws, and not `doc.render`: printing
+ * is its own right. It keeps its family's planes and pins, and its path is
+ * the family's with the tier after `render/`:
  * `render/print-high/annotations/pages`.
  */
 export const PAGE_PRINT_FAMILIES: Readonly<
@@ -155,21 +199,43 @@ export const PAGE_PRINT_FAMILIES: Readonly<
   },
 };
 
-/** Every page picture: the four screen families and the eight print ones. */
+/** Every page picture: the four screen families, their four thumbnails and the eight print ones. */
 export const PAGE_PICTURES: ReadonlyArray<PageRenderFamilySpec> = [
   ...Object.values(PAGE_RENDER_FAMILIES),
+  ...Object.values(PAGE_THUMBNAIL_FAMILIES),
   ...Object.values(PAGE_PRINT_FAMILIES).flatMap((tier) => Object.values(tier)),
 ];
 
-/** The picture that draws `layers`, for the screen or printed at `dpi`. */
+/**
+ * The picture that draws `layers` at the size `options` asks for: printed at
+ * its DPI, a thumbnail, or for the screen.
+ */
 export function pagePictureOf(
   layers: PageRenderLayers,
-  printDpi: PrintDpi | undefined,
+  options: Pick<PageRenderOptions, 'usage' | 'viewport'> | undefined,
 ): PageRenderFamilySpec {
   const family = pageRenderFamilyOf(layers);
-  return printDpi === undefined
-    ? PAGE_RENDER_FAMILIES[family]
-    : PAGE_PRINT_FAMILIES[pagePrintTierOf(printDpi)][family];
+  const printDpi = printDpiOf(options);
+  if (printDpi !== undefined) return PAGE_PRINT_FAMILIES[pagePrintTierOf(printDpi)][family];
+  return options?.viewport?.kind === 'thumbnail'
+    ? PAGE_THUMBNAIL_FAMILIES[family]
+    : PAGE_RENDER_FAMILIES[family];
+}
+
+function thumbnailFamily(
+  family: PageRenderFamily,
+  resource: DocResourceId,
+  layerResource: DocResourceId,
+): PageRenderFamilySpec {
+  const screen = PAGE_RENDER_FAMILIES[family];
+  return {
+    ...screen,
+    resource,
+    layerResource,
+    path: `render/thumbnail/${screen.path.slice('render/'.length)}`,
+    needs: ['doc.render.thumbnail', ...readsOf(screen.draws)],
+    thumbnail: true,
+  };
 }
 
 function printFamily(
@@ -185,7 +251,7 @@ function printFamily(
     resource,
     layerResource,
     path: `render/${tier}/${screen.path.slice('render/'.length)}`,
-    needs: [...screen.needs, ...print.needs],
+    needs: [...print.needs, ...readsOf(screen.draws)],
     print,
   };
 }

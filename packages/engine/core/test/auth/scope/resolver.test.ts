@@ -226,6 +226,12 @@ describe('checkAnyCapability', () => {
 // ============================================================================
 
 describe('expandedCapabilities — implications', () => {
+  it('doc.render implies doc.render.thumbnail, and not the other way', () => {
+    expect(expandRawScope(['doc.render'], NO_BITS).has('doc.render.thumbnail')).toBe(true);
+    expect(checkCapability('doc.render.thumbnail', ['doc.render'], NO_BITS)).toBe(true);
+    expect(checkCapability('doc.render', ['doc.render.thumbnail'], NO_BITS)).toBe(false);
+  });
+
   it('doc.annotate.modify implies doc.annotate.read', () => {
     const set = expandRawScope(['doc.annotate.modify'], NO_BITS);
     expect(set.has('doc.annotate.modify')).toBe(true);

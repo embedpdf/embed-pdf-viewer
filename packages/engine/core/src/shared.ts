@@ -142,7 +142,7 @@ export type {
   PageNetworkRenderFormat,
   PageRaster,
   PageLayerRights,
-  PagePrintRights,
+  PagePictureRights,
   PrintDpi,
   PageRenderBackground,
   PageRenderEncodedFormat,
@@ -160,6 +160,7 @@ export {
   checkImageQuality,
   checkRenderUsage,
   createPageImageHandle,
+  PAGE_THUMBNAIL_SIZE,
   printDpiOf,
   imageSourceOfBytes,
   resolvePageLayers,
@@ -918,12 +919,7 @@ export type {
   PdfBits,
 } from './auth/scope';
 export { PDF_BITS, decodePdfBits } from './auth/scope';
-export {
-  CORE_NAMESPACES,
-  parseScope,
-  pluginOfPermission,
-  validateScopeArray,
-} from './auth/scope';
+export { CORE_NAMESPACES, parseScope, pluginOfPermission, validateScopeArray } from './auth/scope';
 export { InvalidScope, MissingIdentity, PermissionDenied } from './auth/scope';
 export type { AnnotationAuthority, ChangeAuthority, FieldWriteAction } from './auth/scope';
 export {

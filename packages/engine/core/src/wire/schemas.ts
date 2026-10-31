@@ -32,6 +32,7 @@ import { AppearanceResourceKeysSchema, ImageResourceKeysSchema } from './resourc
 import {
   PAGE_PRINT_FAMILIES,
   PAGE_RENDER_FAMILIES,
+  PAGE_THUMBNAIL_FAMILIES,
   type PagePrintTier,
   type PageRenderFamily,
   type PageRenderFamilySpec,
@@ -830,24 +831,31 @@ const AppearanceModesSchema = z.string().transform((value, ctx) => {
  * A print picture (`PAGE_PRINT_FAMILIES`) takes only its pins and its image
  * format: its path says what it draws and at which DPI, and its size comes
  * from that and the paper, so a page has one print picture per family and
- * tier.
+ * tier. A thumbnail (`PAGE_THUMBNAIL_FAMILIES`) is always the whole page at
+ * the thumbnail size, so it takes no `viewport` or `target`, only `rotation`
+ * and `background` beside its pins and format.
  *
  * The transform stamps what the picture draws (and, for a print picture,
- * `usage` and its `dpi` viewport) onto the parsed options, so the worker
- * options downstream need no family.
+ * `usage` and its `dpi` viewport; for a thumbnail, its `thumbnail` viewport)
+ * onto the parsed options, so the worker options downstream need no family.
  */
 function buildPageRenderQuerySchema(picture: PageRenderFamilySpec): z.ZodType<PageRenderQuery> {
-  const { family, draws, pins, print } = picture;
+  const { family, draws, pins, print, thumbnail } = picture;
   const pinFields: Record<string, z.ZodTypeAny> = {};
   for (const pin of pins) pinFields[pin] = z.coerce.number().int().positive().optional();
+  const turnFields: Record<string, z.ZodTypeAny> = {
+    rotation: RenderRotationSchema.optional(),
+    background: RenderBackgroundSchema.optional(),
+  };
   const screenFields: Record<string, z.ZodTypeAny> = print
     ? {}
-    : {
-        viewport: RenderViewportSchema.optional(),
-        target: RenderTargetSchema.optional(),
-        rotation: RenderRotationSchema.optional(),
-        background: RenderBackgroundSchema.optional(),
-      };
+    : thumbnail
+      ? turnFields
+      : {
+          viewport: RenderViewportSchema.optional(),
+          target: RenderTargetSchema.optional(),
+          ...turnFields,
+        };
   return z
     .object({
       ...pinFields,
@@ -899,6 +907,7 @@ function buildPageRenderQuerySchema(picture: PageRenderFamilySpec): z.ZodType<Pa
         ...(print
           ? { usage: 'print' as const, viewport: { kind: 'dpi' as const, dpi: print.dpi } }
           : {}),
+        ...(thumbnail ? { viewport: { kind: 'thumbnail' as const } } : {}),
       };
       const query: PageRenderQuery = { options };
       for (const pin of pins) {
@@ -916,6 +925,16 @@ export const PageRenderQuerySchemas: Readonly<
   annotations: buildPageRenderQuerySchema(PAGE_RENDER_FAMILIES.annotations),
   fields: buildPageRenderQuerySchema(PAGE_RENDER_FAMILIES.fields),
   all: buildPageRenderQuerySchema(PAGE_RENDER_FAMILIES.all),
+};
+
+/** Query/token schemas of the thumbnails, by family. */
+export const PageThumbnailQuerySchemas: Readonly<
+  Record<PageRenderFamily, z.ZodType<PageRenderQuery>>
+> = {
+  pages: buildPageRenderQuerySchema(PAGE_THUMBNAIL_FAMILIES.pages),
+  annotations: buildPageRenderQuerySchema(PAGE_THUMBNAIL_FAMILIES.annotations),
+  fields: buildPageRenderQuerySchema(PAGE_THUMBNAIL_FAMILIES.fields),
+  all: buildPageRenderQuerySchema(PAGE_THUMBNAIL_FAMILIES.all),
 };
 
 /** Query/token schemas of the print pictures, by tier and family. */
@@ -936,10 +955,11 @@ export const PagePrintQuerySchemas: Readonly<
   },
 };
 
-/** The query/token schema of `picture`, screen or print. */
+/** The query/token schema of `picture`: screen, thumbnail or print. */
 export function pagePictureQuerySchema(picture: PageRenderFamilySpec): z.ZodType<PageRenderQuery> {
-  return picture.print
-    ? PagePrintQuerySchemas[picture.print.tier][picture.family]
+  if (picture.print) return PagePrintQuerySchemas[picture.print.tier][picture.family];
+  return picture.thumbnail
+    ? PageThumbnailQuerySchemas[picture.family]
     : PageRenderQuerySchemas[picture.family];
 }
 

@@ -166,6 +166,7 @@ export const ja: Locale = {
         'doc-outline-modify': 'しおりの変更は許可されていません',
         'doc-pages-assemble': 'ページの変更は許可されていません',
         'doc-print': '印刷は許可されていません',
+        'doc-render-thumbnail': 'サムネールの表示は許可されていません',
         'doc-text-copy': 'コピーは許可されていません',
         'doc-text-search': '検索は許可されていません',
       },

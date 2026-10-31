@@ -111,8 +111,9 @@ export interface RenderPageOptions extends OperationOptions, PageLayerOptions {
 }
 
 export interface RenderThumbnailOptions extends OperationOptions, PageLayerOptions {
-  /** The thumbnail's width in device pixels. */
-  maxWidth: number;
+  /** Per-call encode overrides; default to the plugin's strategy. */
+  format?: RenderFormat;
+  quality?: number;
 }
 
 export interface RenderPagesOptions extends RenderPageOptions {
@@ -169,6 +170,12 @@ export interface RenderCapability extends SettingsApi<RenderSettings> {
    */
   canRender(): boolean;
   /**
+   * May this session have the pages' thumbnails (`doc.render.thumbnail`,
+   * which `doc.render` includes)? A session that may not render pages may
+   * still have them.
+   */
+  canRenderThumbnail(): boolean;
+  /**
    * Render one page, by its ref or its index, at the requested size. The
    * size is honoured exactly (nothing is snapped to the viewer's render
    * points); the shared raster cache serves the call when it already holds a
@@ -177,8 +184,13 @@ export interface RenderCapability extends SettingsApi<RenderSettings> {
    * `operation-cancelled` when `signal` fires.
    */
   renderPage(page: PageRef | number, options?: RenderPageOptions): Promise<PageImage>;
-  /** Sugar for a small raster at `maxWidth` device pixels. Rejects like `renderPage`. */
-  renderThumbnail(page: PageRef | number, options: RenderThumbnailOptions): Promise<PageImage>;
+  /**
+   * The page's thumbnail: the whole page, `PAGE_THUMBNAIL_SIZE` (512) pixels
+   * on its long side, sharing the raster cache. Needs only
+   * `doc.render.thumbnail`; rejects `permission-denied` without it, otherwise
+   * like `renderPage`.
+   */
+  renderThumbnail(page: PageRef | number, options?: RenderThumbnailOptions): Promise<PageImage>;
   /**
    * Render several pages with bounded concurrency; best-effort per page: each
    * rendered page with its image, in the order given, and each page that

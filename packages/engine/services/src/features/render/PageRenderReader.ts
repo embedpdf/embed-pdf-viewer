@@ -61,7 +61,8 @@ export class PageRenderReader {
       // The worker draws what it's asked: who may see or print what is
       // checked before a render gets here, so a left-out option draws
       // everything. A print picture is the whole page, upright, sized for
-      // its paper by its `dpi` viewport.
+      // its paper by its `dpi` viewport; a thumbnail is the whole page at the
+      // thumbnail size.
       checkRenderUsage(options, null);
       const print = options.usage === 'print';
       const page = readPageBox(this.runtime, pagePtr);

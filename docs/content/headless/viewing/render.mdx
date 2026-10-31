@@ -79,12 +79,18 @@ const { url, revoke } = await image.objectUrl();
 layers' cache. For many pages at once, use `renderPages`, which renders a few at a time:
 
 ```ts
-const thumbnail = await render.renderThumbnail(page.ref, { maxWidth: 200 });
-
 const { applied } = await render.renderPages(
   pages.map((page) => page.ref),
   { width: 300 },
 );
+```
+
+For a page picker or a strip, `renderThumbnail` renders the page's
+[thumbnail](/docs/engine/documents/rendering#thumbnails): the whole page, 512 pixels on its long
+side. It needs only `doc.render.thumbnail`, so it works for users who may not render pages:
+
+```ts
+const thumbnail = await render.renderThumbnail(page.ref);
 ```
 
 | Option               | What it is                                       | Default                                                           |
@@ -127,12 +133,13 @@ Everything `useRender()` gives you.
 | Method                                     | What it does                                                                                                                                     |
 | :----------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------- |
 | `renderPage(page, options?)`               | Renders one page at exactly the size you ask for, sharing the layers' cache. Resolves an image; `image.objectUrl()` gives a URL for an `<img>`. [Render a page yourself](#render-a-page-yourself) |
-| `renderThumbnail(page, { maxWidth })`      | Renders a small picture of a page, `maxWidth` pixels wide                                                                                        |
+| `renderThumbnail(page, options?)`          | Renders the page's thumbnail: the whole page, 512 pixels on its long side. Takes `includeAnnotations` and `includeFormFields`. [Render a page yourself](#render-a-page-yourself) |
 | `renderPages(pages, options?)`             | Renders several pages, a few at a time. Resolves `{ applied, failed }`: each page with its image, in the order you gave, and the pages that failed with why. |
 | `invalidate({ pages?, scope? })`           | Redraws pages after a change the plugin can't see; without `pages`, every page. [When a page changes](#when-a-page-changes)                      |
 | `getRenderEpoch(page, layers?)`            | A number that changes whenever the page's pixels do, for a picture that draws what `layers` says (`includeAnnotations`, `includeFormFields`, as above). Key your own long-lived renders on it. |
 | `getRenderPolicy()`                        | The sizes the engine renders best at: any size on the local engine, a short list of widths on a CloudPDF server. See [Render policy](/docs/engine/documents/rendering#render-policy). |
 | `canRender()`                              | Whether page images are allowed. [Permissions](#permissions)                                                                                     |
+| `canRenderThumbnail()`                     | Whether thumbnails are allowed. [Permissions](#permissions)                                                                                      |
 | `getSettings()`, `updateSettings(changes)`, `resetSettings()` | Reads the settings, changes them while the app runs, or goes back to what you registered. In a component, use `useRenderSettings()`. [Settings](#settings) |
 
 Every method that returns a promise also takes a `signal` in its options, to cancel it.
@@ -157,8 +164,11 @@ Set them when you register the plugin, and change them while the app runs with
 | `quality`                     | WebP quality, from `0` to `1`                                         | per engine       |
 | `debug`                       | Log what the plugin renders, and why, to the console                  | `false`          |
 
-`<RenderLayer>` takes three <Word of="props" />: `annotations` and `formFields`, unset by default
-(see [What the picture draws](#what-the-picture-draws)), and `tiles` (default `true`).
+`<RenderLayer>` takes four <Word of="props" />: `annotations` and `formFields`, unset by default
+(see [What the picture draws](#what-the-picture-draws)), `tiles` (default `true`), and `thumbnail`:
+in a strip of thumbnails, `<RenderLayer thumbnail />` draws each page's
+[thumbnail](/docs/engine/documents/rendering#thumbnails) instead, one small picture without tiles,
+which needs only `doc.render.thumbnail`.
 
 ## Events
 
@@ -173,10 +183,12 @@ Set them when you register the plugin, and change them while the app runs with
 
 | Permission   | What it allows                            | Check                |
 | :----------- | :---------------------------------------- | :------------------- |
-| `doc.render` | Page images, thumbnails and page sections | `render.canRender()` |
+| `doc.render` | Page images and page sections, and thumbnails | `render.canRender()` |
+| `doc.render.thumbnail` | Thumbnails only (`<RenderLayer thumbnail />`, `renderThumbnail`) | `render.canRenderThumbnail()` |
 
-Without it, pages keep their size and place, so the Stage still scrolls and the other plugins still
-work, but nothing is painted.
+Without `doc.render`, pages keep their size and place, so the Stage still scrolls and the other
+plugins still work, but nothing is painted. A strip of thumbnails still draws with
+`doc.render.thumbnail`.
 
 ## Good to know
 

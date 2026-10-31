@@ -145,7 +145,8 @@ carries](/docs/engine/authentication#what-a-token-carries).
 </Engine>
 
 What the scope doesn't allow is hidden, like a disabled feature: a user without
-`doc.annotate.modify` gets no annotation tools and no Annotate tab. To show those buttons greyed out
+`doc.annotate.modify` gets no annotation tools and no Annotate tab, and one without
+`doc.render.thumbnail` (which `doc.render` includes) no thumbnails panel. To show those buttons greyed out
 instead, with the reason in their tooltip, for example to offer an upgrade:
 
 ```js

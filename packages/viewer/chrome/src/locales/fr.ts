@@ -167,6 +167,7 @@ export const fr: Locale = {
         'doc-outline-modify': 'La modification des signets n’est pas autorisée',
         'doc-pages-assemble': 'La modification des pages n’est pas autorisée',
         'doc-print': 'L’impression n’est pas autorisée',
+        'doc-render-thumbnail': 'L’affichage des vignettes n’est pas autorisé',
         'doc-text-copy': 'La copie n’est pas autorisée',
         'doc-text-search': 'La recherche n’est pas autorisée',
       },

@@ -51,7 +51,7 @@ const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY
             [attr.aria-current]="page.pageIndex() === main.currentPageIndex()"
             (click)="main.goToPage(page.ref)"
           >
-            <epdf-render-layer />
+            <epdf-render-layer thumbnail />
           </button>
         </ng-template>
         <ng-template epdfPageChrome let-page>

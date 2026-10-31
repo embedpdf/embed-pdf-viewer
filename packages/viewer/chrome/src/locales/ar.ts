@@ -167,6 +167,7 @@ export const ar: Locale = {
         'doc-outline-modify': 'لا يُسمح بتغيير المخطط',
         'doc-pages-assemble': 'لا يُسمح بتغيير الصفحات',
         'doc-print': 'لا يُسمح بالطباعة',
+        'doc-render-thumbnail': 'لا يُسمح بعرض الصور المصغرة',
         'doc-text-copy': 'لا يُسمح بالنسخ',
         'doc-text-search': 'لا يُسمح بالبحث',
       },

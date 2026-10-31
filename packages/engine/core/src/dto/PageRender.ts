@@ -62,8 +62,21 @@ export function resolvePageLayers(
  */
 export type PrintDpi = 150 | 300;
 
-/** What a caller may print, for {@link checkRenderUsage}. */
-export interface PagePrintRights {
+/**
+ * A thumbnail's long side, in pixels: a thumbnail is the whole page at this
+ * size, whatever the page's (a US Letter page is 396 × 512).
+ */
+export const PAGE_THUMBNAIL_SIZE = 512;
+
+/**
+ * What a caller may draw, for {@link checkRenderUsage}: each kind of picture
+ * has its own right, and needs no other.
+ */
+export interface PagePictureRights {
+  /** `doc.render`: pictures on screen, any size, any area. */
+  readonly render: boolean;
+  /** `doc.render.thumbnail`: thumbnails (`doc.render` implies it). */
+  readonly thumbnail: boolean;
   /** `doc.print`. */
   readonly print: boolean;
   /** `doc.print.high`. */
@@ -71,26 +84,40 @@ export interface PagePrintRights {
 }
 
 /**
- * Check what a render is for. A print picture (`usage: 'print'`) takes a
- * `{ kind: 'dpi', dpi }` viewport with a DPI of 150 or 300, and no `target`,
- * `rotation` or `background`: it is the whole page, upright, on white. A
- * `dpi` viewport is for print pictures only. Anything else is `InvalidArg`,
- * naming the option. With the caller's rights, a print they may not make is
- * refused (`PermissionDenied`): any print without `doc.print`, 300 DPI
- * without `doc.print.high`. Without them (a cloud caller whose rights the
- * client can't know), the server decides.
+ * Check what a render is for, and that the caller may make that picture. A
+ * print picture (`usage: 'print'`) takes a `{ kind: 'dpi', dpi }` viewport
+ * with a DPI of 150 or 300, and no `target`, `rotation` or `background`: it
+ * is the whole page, upright, on white. A `dpi` viewport is for print
+ * pictures only. A thumbnail (a `{ kind: 'thumbnail' }` viewport) is for the
+ * screen and is always the whole page, so it takes no `target`. Anything
+ * else is `InvalidArg`, naming the option. With the caller's rights, a
+ * picture they may not make is refused (`PermissionDenied`), each kind by its
+ * own right only: a screen picture without `doc.render`, a thumbnail without
+ * `doc.render.thumbnail`, any print without `doc.print` and 300 DPI without
+ * `doc.print.high`. Without them (a cloud caller whose rights the client
+ * can't know), the server decides.
  */
 export function checkRenderUsage<C extends Coordinates>(
   options:
     | Pick<PageRenderOptions<C>, 'usage' | 'viewport' | 'target' | 'rotation' | 'background'>
     | undefined,
-  may: PagePrintRights | null,
+  may: PagePictureRights | null,
 ): void {
   const { usage, viewport } = options ?? {};
   if (usage === undefined || usage === 'display') {
     if (viewport?.kind === 'dpi') {
       invalid('viewport', 'a dpi viewport is only for a print picture (usage: "print")');
     }
+    if (viewport?.kind === 'thumbnail') {
+      if (options?.target !== undefined && options.target.kind !== 'page') {
+        invalid('target', 'a thumbnail is the whole page: it takes no target');
+      }
+      if (may !== null && !may.thumbnail) {
+        throw new PermissionDenied('doc.render.thumbnail', 'viewport');
+      }
+      return;
+    }
+    if (may !== null && !may.render) throw new PermissionDenied('doc.render', 'usage');
     return;
   }
   if (usage !== 'print') invalid('usage', 'usage must be "display" or "print"');
@@ -141,9 +168,16 @@ export type PageScreenViewport =
       width: number;
     };
 
-/** A picture's size: a screen size, or a print picture's DPI. */
+/** A picture's size: a screen size, a thumbnail, or a print picture's DPI. */
 export type PageRenderViewport =
   | PageScreenViewport
+  | {
+      /**
+       * A thumbnail: the whole page, {@link PAGE_THUMBNAIL_SIZE} pixels on its
+       * long side. Needs `doc.render.thumbnail`, which `doc.render` includes.
+       */
+      kind: 'thumbnail';
+    }
   | {
       /**
        * A print picture's size (`usage: 'print'` only): `dpi` dots per inch
