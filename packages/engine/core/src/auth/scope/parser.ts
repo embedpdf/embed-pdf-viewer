@@ -66,13 +66,15 @@ export function parseScope(raw: string): ParsedScope {
 }
 
 /**
- * The first segments the core owns, across every scope vocabulary: document
- * capabilities (`doc.*`), the virtual `pdf.permissions`, the collab entities,
- * and the tenant scopes (`docs.read`, `tokens.issue-doc`, `grants.manage`).
- * A plugin id can never be one of these, so a dotted word that starts with
- * one is the core's, and must be a word the core knows.
+ * The first segments the core owns, across every vocabulary a plugin shares
+ * with it. Permissions: document capabilities (`doc.*`), the virtual
+ * `pdf.permissions`, the collab entities, and the tenant scopes
+ * (`docs.read`, `tokens.issue-doc`, `grants.manage`). Events: `layer.changed`,
+ * `visitor.identified`, `document.ready`, `submission.created`,
+ * `signature.completed`. A plugin id can never be one of these, so a dotted
+ * word that starts with one is the core's, and must be a word the core knows.
  */
-export const CORE_PERMISSION_NAMESPACES: ReadonlySet<string> = new Set([
+export const CORE_NAMESPACES: ReadonlySet<string> = new Set([
   'doc',
   'docs',
   'pdf',
@@ -82,6 +84,11 @@ export const CORE_PERMISSION_NAMESPACES: ReadonlySet<string> = new Set([
   'grants',
   'shares',
   'tenants',
+  'layer',
+  'visitor',
+  'document',
+  'submission',
+  'signature',
 ]);
 
 /**
@@ -94,7 +101,7 @@ export function pluginOfPermission(raw: string): string | null {
   const dot = raw.indexOf('.');
   if (dot <= 0) return null;
   const namespace = raw.slice(0, dot);
-  return CORE_PERMISSION_NAMESPACES.has(namespace) ? null : namespace;
+  return CORE_NAMESPACES.has(namespace) ? null : namespace;
 }
 
 /**

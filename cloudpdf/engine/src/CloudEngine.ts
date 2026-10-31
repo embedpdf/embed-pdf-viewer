@@ -163,7 +163,7 @@ export class CloudEngine implements Engine {
           resolvedToken !== null &&
           typeof decodeUnverifiedClaims(resolvedToken).doc_id !== 'string';
         try {
-          await establishOnOpen(handle, head, signal, effectivePassword, tenant);
+          await establishOnOpen(handle, head, signal, effectivePassword, tenant, docHttp.usesCdn);
         } catch (error) {
           await handle.close();
           throw error;
@@ -232,7 +232,7 @@ export class CloudEngine implements Engine {
       );
       this.handles.add(handle);
       try {
-        await establishOnOpen(handle, head, signal, password, false);
+        await establishOnOpen(handle, head, signal, password, false, docHttp.usesCdn);
       } catch (error) {
         await handle.close();
         throw error;
@@ -285,8 +285,9 @@ async function establishOnOpen(
   signal: AbortSignal,
   password: string | null,
   tenant: boolean,
+  usesCdn: boolean,
 ): Promise<void> {
-  const accessed = await maybeAutoEstablishAccess(handle, head, signal, password);
+  const accessed = await maybeAutoEstablishAccess(handle, head, signal, password, usesCdn);
   const security = handle.security as CloudDocumentSecurityService;
   const locked = !accessed && head.access.reasons.includes('password');
   await Promise.all([
@@ -331,7 +332,8 @@ function mayCreateObjects(security: CloudDocumentSecurityService): boolean {
  *
  * 2. **CDN-only** — unchanged: `/access` without a password, transparently.
  *    A required password with no supplied password never auto-calls; the
- *    dev prompts and `unlock()` runs the same POST.
+ *    dev prompts and `unlock()` runs the same POST. Skipped when the engine
+ *    reads no CDN (`cdn: false`): nothing would use the credentials.
  *
  * Non-password /access failures never break `open()` (the first real
  * request still tries origin, where the JWT check produces a regular
@@ -348,6 +350,7 @@ async function maybeAutoEstablishAccess(
   },
   signal: AbortSignal,
   password: string | null,
+  usesCdn: boolean,
 ): Promise<boolean> {
   const reasons = new Set(head.access.reasons);
   // CloudDocumentSecurityService exposes `establishAccess()` — the
@@ -372,6 +375,7 @@ async function maybeAutoEstablishAccess(
   if (!head.access.required) return false;
   if (reasons.has('password')) return false; // wait for explicit unlock()
   if (!reasons.has('cdn')) return false; // nothing actionable for the SDK
+  if (!usesCdn) return false; // CDN credentials nobody would use (`cdn: false`)
   return settleLinked(security.establishAccess(), signal);
 }
 

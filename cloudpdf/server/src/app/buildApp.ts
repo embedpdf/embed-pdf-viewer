@@ -29,6 +29,7 @@ import {
   type RevocationCheck,
   type SignDevTokenInput,
 } from '../auth/JwtVerifier';
+import { PermissionRegistry } from '../auth/permission-registry';
 import { RevokedJtisGuard } from '../auth/RevokedJtisGuard';
 import { SuspendedTenantsGuard } from '../auth/SuspendedTenantsGuard';
 import { VisitorHandles } from '../auth/visitor-handle';
@@ -57,10 +58,11 @@ import type { ConnectedUsageReporter } from '../licensing/ConnectedUsageReporter
 import type { LicenseGate } from '../licensing/LicenseRuntime';
 import { isLicenseGateTrusted } from '../licensing/trusted-license-gates';
 import { UsageMeters } from '../licensing/UsageMeters';
+import { mountModules } from '../modules/host';
+import type { HostedModule } from '../modules/protocol';
 import { InProcessRealtimeBus, type RealtimeBus } from '../realtime/RealtimeBus';
 import { SharpImageEncoder } from '../render/SharpImageEncoder';
 import { IMMUTABLE_CACHE_PRIVATE, IMMUTABLE_CACHE_SHARED } from '../routes/_helpers';
-import { PermissionRegistry } from '../auth/permission-registry';
 import { registerAccessRoutes } from '../routes/access';
 import { registerAdminDocumentsRoutes } from '../routes/admin/documents';
 import { registerAdminFoldersRoutes } from '../routes/admin/folders';
@@ -130,6 +132,14 @@ export interface BuildAppOptions {
    * Omitted: no plugins, so none.
    */
   permissions?: PermissionRegistry;
+  /**
+   * The server modules to mount (`CLOUDPDF_MODULES` in the CLI), in order.
+   * Their permissions join `permissions`; their routes need the document
+   * plane (`workerEntry` and `db`).
+   */
+  modules?: ReadonlyArray<HostedModule>;
+  /** Where module config (`CLOUDPDF_<ID>_*`) is read. Defaults to `process.env`. */
+  moduleEnv?: Readonly<Record<string, string | undefined>>;
   /** Connected-only reporting diagnostics; never constructed in air-gap mode. */
   usageReporter?: Pick<ConnectedUsageReporter, 'status'>;
   /**
@@ -1482,6 +1492,14 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       await registerSearchRoutes(app, {
         documentService,
       });
+      // After the core's routes: a module adds to the server, never in its place.
+      await mountModules(app, opts.modules ?? [], {
+        permissions,
+        documentService,
+        ...(derivedRenders ? { derivedRenders } : {}),
+        env: opts.moduleEnv ?? process.env,
+        ...(signer ? { sign: signer } : {}),
+      });
     }
 
     const sweepIntervalMs = opts.sweepIntervalMs ?? 60_000;
@@ -1513,6 +1531,10 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       }, sweepIntervalMs);
       sweeperTimer.unref();
     }
+  }
+
+  if (opts.modules !== undefined && opts.modules.length > 0 && documentService === undefined) {
+    throw new Error('server modules need the document plane: workerEntry, db and objectStore');
   }
 
   app.setErrorHandler(handleAppError);

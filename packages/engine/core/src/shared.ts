@@ -919,7 +919,7 @@ export type {
 } from './auth/scope';
 export { PDF_BITS, decodePdfBits } from './auth/scope';
 export {
-  CORE_PERMISSION_NAMESPACES,
+  CORE_NAMESPACES,
   parseScope,
   pluginOfPermission,
   validateScopeArray,

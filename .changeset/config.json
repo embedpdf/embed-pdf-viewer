@@ -13,6 +13,7 @@
       "@cloudpdf/sdk",
       "@cloudpdf/engine",
       "@cloudpdf/server",
+      "@cloudpdf/server-modules",
       "@cloudpdf/viewer",
       "@cloudpdf/viewer-react",
       "@embedpdf/angular",

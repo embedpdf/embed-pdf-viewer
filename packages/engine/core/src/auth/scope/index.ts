@@ -28,7 +28,7 @@ export type {
 export { PDF_BITS, decodePdfBits } from './pdf-bits';
 
 export {
-  CORE_PERMISSION_NAMESPACES,
+  CORE_NAMESPACES,
   parseScope,
   pluginOfPermission,
   validateScopeArray,

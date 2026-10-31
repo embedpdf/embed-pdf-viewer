@@ -191,3 +191,37 @@ describe('one client per open document', () => {
     expect(engineClient.sessionId).toBeNull();
   });
 });
+
+describe('reading through a CDN', () => {
+  const textPath = '/v1/docs/d1/layers/default/text/pages/obj:3/data@contentVersion=1';
+  const binding = {
+    docId: 'd1',
+    layerName: 'default',
+    cdn: {
+      adapter: 'custom-hmac',
+      baseUrlOverrides: { 'layer-page-text': 'https://cdn.example.test' },
+      authHeader: null,
+      signedQueryParams: { token: 'signed' },
+      signedCookies: null,
+      signedPathPolicies: null,
+    },
+  };
+
+  test('reads go to the CDN the server offered', async () => {
+    const { fetch, calls } = scriptedFetch([{ status: 200, body: {} }]);
+    const http = client(fetch, { token: 't' });
+    http.setCdnAccess(binding);
+    await http.getBytes(textPath, signal());
+    expect(calls[0]!.url).toBe(`https://cdn.example.test${textPath}?token=signed`);
+  });
+
+  test('cdn: false reads from the server itself, CDN credentials or not', async () => {
+    const { fetch, calls } = scriptedFetch([{ status: 200, body: {} }]);
+    const http = client(fetch, { token: 't', cdn: false }).forDocument({ sessionId: 's' });
+    http.setCdnAccess(binding);
+    await http.getBytes(textPath, signal());
+    expect(calls[0]!.url).toBe(`https://api.example.test${textPath}`);
+    expect(new Headers(calls[0]!.init.headers).get('authorization')).toBe('Bearer t');
+    expect(http.usesCdn).toBe(false);
+  });
+});

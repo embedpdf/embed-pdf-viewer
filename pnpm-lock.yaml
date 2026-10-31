@@ -294,6 +294,31 @@ importers:
         specifier: ^7.18.0
         version: 7.19.0(encoding@0.1.13)
 
+  cloudpdf/server-modules:
+    dependencies:
+      '@cloudpdf/engine':
+        specifier: workspace:*
+        version: link:../engine
+      '@embedpdf/engine-core':
+        specifier: workspace:*
+        version: link:../../packages/engine/core
+    devDependencies:
+      '@cloudpdf/server':
+        specifier: workspace:*
+        version: link:../server
+      '@embedpdf/tooling-build':
+        specifier: workspace:*
+        version: link:../../tooling/build
+      rimraf:
+        specifier: ^5.0.0
+        version: 5.0.10
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.19.11)(happy-dom@20.11.0)(less@4.6.7)(lightningcss@1.30.2)(msw@2.11.2(@types/node@22.19.11)(typescript@5.9.3))(sass-embedded@1.97.3)(sass@1.97.3)(terser@5.46.0)
+
   cloudpdf/viewer/angular:
     dependencies:
       '@angular/forms':

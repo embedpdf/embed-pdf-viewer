@@ -11,7 +11,7 @@ import {
   type PageRenderImage,
   type PageRenderOptions,
   type PageRenderRaster,
-  type LocalPageRenderService as LocalPageRenderServiceContract,
+  type RawPageRenderService,
   type PageRef,
   checkImageQuality,
   checkRenderUsage,
@@ -28,7 +28,7 @@ interface DocClosedView {
   isClosed(): boolean;
 }
 
-export class LocalPageRenderService implements LocalPageRenderServiceContract {
+export class LocalPageRenderService implements RawPageRenderService {
   constructor(
     private readonly docId: string,
     private readonly ref: PageRef,

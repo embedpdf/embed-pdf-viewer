@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  CORE_PERMISSION_NAMESPACES,
+  CORE_NAMESPACES,
   InvalidScope,
   parseScope,
   pluginOfPermission,
@@ -315,12 +315,13 @@ describe('pluginOfPermission', () => {
     expect(pluginOfPermission('doc.render')).toBeNull();
     expect(pluginOfPermission('pdf.permissions')).toBeNull();
     expect(pluginOfPermission('grants.manage')).toBeNull();
+    expect(pluginOfPermission('layer.changed')).toBeNull(); // the core's events share the list
     expect(pluginOfPermission('annotations:create:self')).toBeNull();
     expect(pluginOfPermission('*')).toBeNull();
   });
 
   it('reserves every core namespace', () => {
-    for (const namespace of CORE_PERMISSION_NAMESPACES) {
+    for (const namespace of CORE_NAMESPACES) {
       expect(pluginOfPermission(`${namespace}.anything`)).toBeNull();
     }
   });
