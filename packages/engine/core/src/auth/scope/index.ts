@@ -14,6 +14,8 @@ export type {
   CollabFilter,
   DocCapability,
   FieldAction,
+  PluginPermission,
+  PluginPermissions,
   FieldFilter,
   Identity,
   ParsedCapability,
@@ -29,6 +31,7 @@ export { PDF_BITS, decodePdfBits } from './pdf-bits';
 
 export {
   CORE_NAMESPACES,
+  isPluginId,
   parseScope,
   pluginOfPermission,
   validateScopeArray,

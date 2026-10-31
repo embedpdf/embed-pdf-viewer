@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   CORE_NAMESPACES,
   InvalidScope,
+  isPluginId,
   parseScope,
   pluginOfPermission,
   validateScopeArray,
@@ -303,6 +304,26 @@ describe('parseScope — plugin permissions', () => {
     expect(() =>
       validateScopeArray(['doc.open', 'doc.text.select', 'protected-display.view']),
     ).not.toThrow();
+  });
+});
+
+describe('isPluginId', () => {
+  it('takes lowercase words joined by dashes that are not a core name', () => {
+    expect(isPluginId('protected-display')).toBe(true);
+    expect(isPluginId('ai2')).toBe(true);
+    for (const id of [
+      'doc',
+      'pdf',
+      'layer',
+      'Protected',
+      'protected_display',
+      '-x',
+      'x-',
+      'a.b',
+      '',
+    ]) {
+      expect(isPluginId(id), id).toBe(false);
+    }
   });
 });
 

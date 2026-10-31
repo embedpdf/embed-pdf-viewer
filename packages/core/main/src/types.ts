@@ -33,6 +33,7 @@ import type {
   PageInsertBlankSpec,
   PdfSize,
   DocCapability,
+  PluginPermission,
   PdfSaveMode,
   DocumentMetadata,
   MetadataPatch,
@@ -75,6 +76,7 @@ export type {
   PageInsertBlankSpec,
   PdfSize,
   DocCapability,
+  PluginPermission,
   PdfSaveMode,
   DocumentMetadata,
   MetadataPatch,
@@ -94,6 +96,9 @@ export type {
    */
   EventOrigin,
 };
+// Re-exported straight from engine-core, where `allows()` reads it, so a plugin's
+// `declare module '@embedpdf/core' { interface PluginPermissions { … } }` merges into it.
+export type { PluginPermissions } from '@embedpdf/engine-core/runtime';
 
 export type Unsubscribe = () => void;
 
@@ -118,12 +123,13 @@ export interface BatchResult<T, R = unknown> {
 
 /**
  * A permission a verb can need, named as the engine names it: a document
- * capability (`'doc.forms.fill'`), or `'annotations:create'`. Creating is the
- * one annotation action that needs no target: whether the session may change
- * or delete an annotation depends on whose it is, so the annotation plugin
- * asks that per annotation (`doc.security.allowsAnnotation`).
+ * capability (`'doc.forms.fill'`), `'annotations:create'`, or a plugin's own
+ * permission, declared in `PluginPermissions` (`'protected-display.view'`).
+ * Creating is the one annotation action that needs no target: whether the
+ * session may change or delete an annotation depends on whose it is, so the
+ * annotation plugin asks that per annotation (`doc.security.allowsAnnotation`).
  */
-export type Permission = DocCapability | 'annotations:create';
+export type Permission = DocCapability | 'annotations:create' | PluginPermission;
 
 /** Anything `ctx.listen` can subscribe to: an EventHook, or an object with `subscribe`. */
 export type Subscribable<T> =

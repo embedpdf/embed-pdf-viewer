@@ -106,6 +106,27 @@ describe('the file’s own restrictions', () => {
   });
 });
 
+describe("a plugin's own permission", () => {
+  test('holds where the scope names it, or *, and the core never grants one', async () => {
+    await withEngine(async (engine) => {
+      const allows = async (scope: string[], permission: string) => {
+        const doc = await engine.open({ kind: 'bytes', bytes: await plain() }, { scope });
+        try {
+          return doc.security.allows(permission as never);
+        } finally {
+          await doc.close();
+        }
+      };
+      expect(await allows(['doc.open', 'reading-progress.track'], 'reading-progress.track')).toBe(
+        true,
+      );
+      expect(await allows(['*'], 'reading-progress.track')).toBe(true);
+      expect(await allows(['doc.open', 'doc.render'], 'reading-progress.track')).toBe(false);
+      expect(await allows(['doc.open', 'reading-progress.track'], 'doc.render')).toBe(false);
+    });
+  });
+});
+
 describe('without a scope', () => {
   /** What no PDF flag governs, which the file never takes away. */
   const UNFLAGGED = [
