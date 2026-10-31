@@ -1,11 +1,18 @@
 /**
  * Whether a command is there at all, apart from what it says about the
  * moment (`enabled`, `visible`): turned off in this viewer (its id, or one of
- * its categories), or not allowed for its document (the scope's `requires`, or
- * the plugins' checks in `allowed`), and the sentence that says why, translated
- * when the i18n plugin is there.
+ * its categories), not allowed for its document (the scope's `requires`, or
+ * the plugins' checks in `allowed`), or held by a lock on the setting it
+ * changes (`locked`), and the sentence that says why, translated when the
+ * i18n plugin is there.
  */
-import type { DocumentHandle, Permission, PluginContext, Settings } from '@embedpdf/core';
+import type {
+  DocumentHandle,
+  Permission,
+  PluginContext,
+  SettingLock,
+  Settings,
+} from '@embedpdf/core';
 import { I18nToken } from '@embedpdf/plugin-i18n/contract';
 
 import type { CommandContext, CommandDef, CommandRefusal, CommandsSettings } from '../contract';
@@ -61,6 +68,25 @@ export const notAllowedMessage = (key: string, label: string, context: CommandCo
   });
 };
 
+/** The general locked sentence's key: `{label} can't be changed in this document`. */
+const DEFAULT_LOCKED_KEY = 'commands.locked.default';
+
+/** The sentence for a command whose setting a lock holds: its `reasonKey`, else the general one. */
+export const lockedMessage = (
+  lock: SettingLock,
+  label: string,
+  context: CommandContext,
+): string => {
+  const fallback = `${label} can't be changed in this document`;
+  const i18n = context.tryGet(I18nToken);
+  if (!i18n) return fallback;
+  const params = { label };
+  const general = i18n.t(DEFAULT_LOCKED_KEY, { params, fallback });
+  return lock.reasonKey === undefined
+    ? general
+    : i18n.t(lock.reasonKey, { params, fallback: general });
+};
+
 /** The sentence for a command that's turned off. */
 const turnedOffMessage = (label: string, context: CommandContext): string => {
   const i18n = context.tryGet(I18nToken);
@@ -92,6 +118,16 @@ export function createAvailability(
     }
   };
 
+  /** The lock on the setting a command changes, or `null`; a `locked` that throws is no lock. */
+  const lockOf = (definition: CommandDef, context: CommandContext): SettingLock | null => {
+    if (!definition.locked) return null;
+    try {
+      return definition.locked(context);
+    } catch {
+      return null;
+    }
+  };
+
   /**
    * Why its document's session may not run a command, as the key of the sentence that says
    * so, or `null` when it may: the first permission `requires` names that the session doesn't
@@ -120,13 +156,17 @@ export function createAvailability(
       };
     }
     const notAllowed = notAllowedKeyOf(definition, context);
-    return notAllowed === null
+    if (notAllowed !== null) {
+      return {
+        reason: 'not-allowed',
+        message: notAllowedMessage(notAllowed, labelOf(definition, context), context),
+      };
+    }
+    const lock = lockOf(definition, context);
+    return lock === null
       ? null
-      : {
-          reason: 'not-allowed',
-          message: notAllowedMessage(notAllowed, labelOf(definition, context), context),
-        };
+      : { reason: 'locked', message: lockedMessage(lock, labelOf(definition, context), context) };
   };
 
-  return { isTurnedOff, notAllowedKeyOf, refusalOf };
+  return { isTurnedOff, notAllowedKeyOf, lockOf, refusalOf };
 }

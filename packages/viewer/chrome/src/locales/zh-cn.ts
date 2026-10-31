@@ -204,6 +204,10 @@ export const zhCN: Locale = {
         more: '页面选项',
       },
       turnedOff: '“{label}”不可用',
+      // Why a command is greyed out while a lock holds the setting it changes; `{label}` is its label.
+      locked: {
+        default: '此文档中无法更改“{label}”',
+      },
     },
     passwordPrompt: {
       title: '需要密码',

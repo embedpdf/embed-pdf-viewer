@@ -205,6 +205,10 @@ export const ar: Locale = {
         more: 'خيارات الصفحة',
       },
       turnedOff: '{label}: غير متاح',
+      // Why a command is greyed out while a lock holds the setting it changes; `{label}` is its label.
+      locked: {
+        default: 'لا يمكن تغيير {label} في هذا المستند',
+      },
     },
     passwordPrompt: {
       title: 'كلمة المرور مطلوبة',

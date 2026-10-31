@@ -205,6 +205,10 @@ export const he: Locale = {
         more: 'אפשרויות עמוד',
       },
       turnedOff: '{label}: לא זמין',
+      // Why a command is greyed out while a lock holds the setting it changes; `{label}` is its label.
+      locked: {
+        default: 'לא ניתן לשנות את {label} במסמך זה',
+      },
     },
     passwordPrompt: {
       title: 'נדרשת סיסמה',

@@ -4,7 +4,7 @@
  * pure transition; the controller's areas apply them with `ctx.state.update`,
  * and nothing else changes stage state.
  */
-import type { PageRef } from '@embedpdf/core';
+import type { PageRef, SettingLock } from '@embedpdf/core';
 import type { Camera, Point, Size } from '@embedpdf/core-stage';
 
 import type { StageConfig, StageSettings } from './contract';
@@ -59,7 +59,15 @@ export interface StageModel extends StageSettings {
   readonly motionCause: 'user' | 'programmatic';
   /** The `zoom` tool's drag in progress, or null when there is none. */
   readonly zoomDrag: ZoomDrag | null;
+  /**
+   * Who holds each locked setting (`lockSettings()`). State, so a lock that
+   * changes no value still reaches the controls that read `getLock()`.
+   */
+  readonly locks: StageLocks;
 }
+
+/** The holder of each locked setting. */
+export type StageLocks = Readonly<Partial<Record<keyof StageSettings, SettingLock>>>;
 
 /**
  * A drag of the `zoom` tool, as two corners on one page's plane: the page
@@ -89,6 +97,7 @@ export const initialStageModel = (config: StageConfig): StageModel => {
     motionCause: 'user',
     activeRules: [],
     zoomDrag: null,
+    locks: {},
     ...mergeSettings(DEFAULT_SETTINGS, overrides),
   };
 };
@@ -138,3 +147,6 @@ export const setActiveRules = (state: StageModel, activeRules: readonly string[]
 
 export const setZoomDrag = (state: StageModel, zoomDrag: ZoomDrag | null): StageModel =>
   state.zoomDrag === zoomDrag ? state : { ...state, zoomDrag };
+
+export const setLocks = (state: StageModel, locks: StageLocks): StageModel =>
+  state.locks === locks ? state : { ...state, locks };

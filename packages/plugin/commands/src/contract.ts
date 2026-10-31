@@ -14,6 +14,7 @@ import type {
   OperationOptions,
   Permission,
   PluginErrorInfo,
+  SettingLock,
   SettingsApi,
   Unsubscribe,
 } from '@embedpdf/core';
@@ -99,6 +100,15 @@ export interface CommandDef {
    * `commands.notAllowed.default`.
    */
   readonly notAllowedKey?: string;
+  /**
+   * The lock on the setting it changes, for a command that changes one
+   * (`(context) => context.get(StageToken).getLock('spread')`), or `null`.
+   * While a lock holds, it shows disabled, whatever the `notAllowed` setting
+   * says, with the sentence under the lock's `reasonKey` (else
+   * `commands.locked.default`) as its `disabledReason`; it stays `active` for
+   * its own value. One that throws counts as unlocked.
+   */
+  readonly locked?: (context: CommandContext) => SettingLock | null;
 
   // ── what the command opens ───────────────────────────────────────────────
   // A command that opens a panel, menu or dialog says so instead of opening
@@ -156,18 +166,19 @@ export interface ResolvedCommand {
   readonly categories: readonly string[];
   /**
    * Why it's disabled, as a sentence for its tooltip: set when the scope doesn't allow it and
-   * the `notAllowed` setting is `'disable'`.
+   * the `notAllowed` setting is `'disable'`, or when a lock holds the setting it changes.
    */
   readonly disabledReason?: string;
 }
 
 /**
  * Why a command won't run whatever the moment: it's turned off in this viewer
- * (`disabledCategories`, `disabledCommands`), or the scope doesn't allow it (`requires`).
- * A command that only can't run right now (`enabled`, `visible`) has no refusal.
+ * (`disabledCategories`, `disabledCommands`), the scope doesn't allow it (`requires`), or a lock
+ * holds the setting it changes (`locked`). A command that only can't run right now (`enabled`,
+ * `visible`) has no refusal.
  */
 export interface CommandRefusal {
-  readonly reason: 'turned-off' | 'not-allowed';
+  readonly reason: 'turned-off' | 'not-allowed' | 'locked';
   /** A sentence for the user, translated through the i18n plugin when it's there. */
   readonly message: string;
 }

@@ -155,6 +155,7 @@ PromiseMembers [TypeAliasDeclaration] (from packages/core/main/src/types.ts): ex
 ResourceStatus [TypeAliasDeclaration] (from packages/core/main/src/types.ts): export type ResourceStatus = 'idle' | 'loading' | 'ready' | 'forbidden' | 'error';
 RetryOptions [InterfaceDeclaration] (from packages/core/main/src/types.ts): export interface RetryOptions extends OperationOptions{ readonly passphrase?: string; readonly identity?: VisitorAnswers; }
 SerialQueue [InterfaceDeclaration] (from packages/core/main/src/serial-queue.ts): export interface SerialQueue{ <T>(operation: () => Promise<T>, options?: OperationOptions): Promise<T>; idle(): Promise<void>; }
+SettingLock [InterfaceDeclaration] (from packages/core/main/src/settings.ts): export interface SettingLock{ readonly by: string; readonly reasonKey?: string; }
 Settings [InterfaceDeclaration] (from packages/core/main/src/settings.ts): export interface Settings<T>{ get(): T; readonly api: SettingsApi<T>; }
 SettingsApi [InterfaceDeclaration] (from packages/core/main/src/settings.ts): export interface SettingsApi<T>{ getSettings(): T; updateSettings(changes: DeepPartial<T>): void; resetSettings(): void; readonly onSettingsChanged: EventHook<SettingsChangedEvent<T>>; }
 SettingsChangedEvent [InterfaceDeclaration] (from packages/core/main/src/settings.ts): export interface SettingsChangedEvent<T>{ readonly settings: T; readonly changed: readonly (keyof T)[]; }

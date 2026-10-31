@@ -27,6 +27,7 @@ export type {
 export type {
   DeepPartial,
   NoSettings,
+  SettingLock,
   Settings,
   SettingsApi,
   SettingsChangedEvent,

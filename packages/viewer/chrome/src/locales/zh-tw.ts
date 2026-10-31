@@ -206,6 +206,10 @@ export const zhTW: Locale = {
         more: '頁面選項',
       },
       turnedOff: '「{label}」無法使用',
+      // Why a command is greyed out while a lock holds the setting it changes; `{label}` is its label.
+      locked: {
+        default: '此文件中無法變更「{label}」',
+      },
     },
     passwordPrompt: {
       title: '需要密碼',

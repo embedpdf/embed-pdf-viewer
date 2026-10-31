@@ -307,6 +307,41 @@ describe('the built-in commands', () => {
     ).toEqual([]);
   });
 
+  it('say which stage setting they change, so a lock on it greys them out', () => {
+    // A stage whose every setting is locked, by the setting's own name.
+    const lockedStage = { getLock: (setting: string) => ({ by: setting }) };
+    const context = {
+      documentId: 'doc',
+      tryGet: (token: CapabilityToken<unknown>) => (token.name === 'stage' ? lockedStage : null),
+      get: (token: CapabilityToken<unknown>) => (token.name === 'stage' ? lockedStage : null),
+    } as unknown as PluginCommandContext;
+    const holderOf = (id: string) =>
+      (defaultCommands.find((command) => command.id === id)?.locked?.(context) ?? null)?.by;
+    expect(
+      Object.fromEntries(
+        [
+          'view:single-page',
+          'view:two-pages',
+          'view:cover-page',
+          'view:scroll-vertical',
+          'view:scroll-horizontal',
+          'view:rotate-clockwise',
+          'view:rotate-counterclockwise',
+        ].map((id) => [id, holderOf(id)]),
+      ),
+    ).toEqual({
+      'view:single-page': 'spread',
+      'view:two-pages': 'spread',
+      'view:cover-page': 'spread',
+      'view:scroll-vertical': 'layout',
+      'view:scroll-horizontal': 'layout',
+      'view:rotate-clockwise': 'viewRotation',
+      'view:rotate-counterclockwise': 'viewRotation',
+    });
+    // The zoom can't be locked: its commands say nothing of locks.
+    expect(defaultCommands.find((command) => command.id === 'zoom:in')?.locked).toBeUndefined();
+  });
+
   it('are every one the page lists, with the panels and modes the default layout brings', () => {
     const ids = new Set([
       ...defaultCommands.map((command) => command.id),

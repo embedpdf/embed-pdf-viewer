@@ -7,6 +7,7 @@ import type {
   PageDestination,
   PageInfo,
   PageRef,
+  SettingLock,
 } from '@embedpdf/core';
 import type { PageRotation, PageTransform, Rect } from '@embedpdf/core-geometry';
 import type {
@@ -302,6 +303,18 @@ export interface ZoomBoxLook {
 export interface StageSettingsPatch extends Partial<Omit<StageSettings, 'pageFrame' | 'zoomBox'>> {
   pageFrame?: Partial<PageFrame>;
   zoomBox?: Partial<ZoomBoxLook>;
+}
+
+/**
+ * Settings held at a value for one document: they keep it over every other
+ * writer (`updateSettings()`, the responsive rules, a restored view state,
+ * `resetSettings()`) until the function `lockSettings()` returns is called.
+ * Those still change the settings underneath, so the user's own choice is back
+ * when the lock goes. Every setting but `zoom`, which gestures set too.
+ */
+export interface StageSettingsLock extends SettingLock {
+  /** The settings it holds, at these values. */
+  readonly settings: Omit<StageSettingsPatch, 'zoom'>;
 }
 
 /**
@@ -608,6 +621,17 @@ export interface StageCapability {
   resetSettings(): void;
   /** Replace the container-query rules (see {@link ResponsiveRule}). */
   setResponsiveRules(rules: readonly ResponsiveRule[]): void;
+  /**
+   * Hold settings at a value for this document until the returned function is
+   * called, or the document closes (see {@link StageSettingsLock}). Call it
+   * only to let go while the document stays open. A lock on a setting another
+   * lock holds at a different value is refused (`conflict`), naming the
+   * holder; at the same value both hold, until both let go. `getViewState()`
+   * keeps the locked settings as they are underneath.
+   */
+  lockSettings(lock: StageSettingsLock): () => void;
+  /** Who holds a setting and why, or `null` when it isn't locked. */
+  getLock(setting: keyof StageSettings): SettingLock | null;
   /** Names of the responsive rules matching the current box, in source order. */
   listActiveRules(): readonly string[];
   /** Whether the named responsive rule matches the current box. */

@@ -204,6 +204,10 @@ export const ko: Locale = {
         more: '페이지 옵션',
       },
       turnedOff: '{label} 기능을 사용할 수 없습니다',
+      // Why a command is greyed out while a lock holds the setting it changes; `{label}` is its label.
+      locked: {
+        default: '이 문서에서는 {label} 설정을 변경할 수 없습니다',
+      },
     },
     passwordPrompt: {
       title: '암호 필요',

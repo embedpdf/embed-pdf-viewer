@@ -306,6 +306,7 @@ const spread = (id: string, mode: SpreadMode, labelKey: string, icon: string): C
   run: (commandContext) => stage(commandContext)?.updateSettings({ spread: mode }),
   active: (commandContext) => stage(commandContext)?.getSettings().spread === mode,
   enabled: (commandContext) => stage(commandContext) != null,
+  locked: (commandContext) => stage(commandContext)?.getLock('spread') ?? null,
 });
 
 export const defaultCommands: CommandDef[] = [
@@ -513,6 +514,7 @@ export const defaultCommands: CommandDef[] = [
     run: (commandContext) => stage(commandContext)?.updateSettings({ layout: 'vertical' }),
     active: (commandContext) => stage(commandContext)?.getSettings().layout === 'vertical',
     enabled: (commandContext) => stage(commandContext) != null,
+    locked: (commandContext) => stage(commandContext)?.getLock('layout') ?? null,
   },
   {
     id: 'view:scroll-horizontal',
@@ -521,6 +523,7 @@ export const defaultCommands: CommandDef[] = [
     run: (commandContext) => stage(commandContext)?.updateSettings({ layout: 'horizontal' }),
     active: (commandContext) => stage(commandContext)?.getSettings().layout === 'horizontal',
     enabled: (commandContext) => stage(commandContext) != null,
+    locked: (commandContext) => stage(commandContext)?.getLock('layout') ?? null,
   },
   // View rotation (Adobe's "Rotate View"): rotates how every page displays in
   // the main stage lens — non-persistent, nothing written to the PDF. The
@@ -532,6 +535,7 @@ export const defaultCommands: CommandDef[] = [
     icon: 'rotateClockwise',
     run: (commandContext) => stage(commandContext)?.rotateViewBy(90),
     enabled: (commandContext) => stage(commandContext) != null,
+    locked: (commandContext) => stage(commandContext)?.getLock('viewRotation') ?? null,
   },
   {
     id: 'view:rotate-counterclockwise',
@@ -539,6 +543,7 @@ export const defaultCommands: CommandDef[] = [
     icon: 'rotateCounterClockwise',
     run: (commandContext) => stage(commandContext)?.rotateViewBy(-90),
     enabled: (commandContext) => stage(commandContext) != null,
+    locked: (commandContext) => stage(commandContext)?.getLock('viewRotation') ?? null,
   },
 
   // ── modes (shell exclusive surfaces, tag 'mode') ────────────────────────

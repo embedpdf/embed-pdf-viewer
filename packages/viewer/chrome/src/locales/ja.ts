@@ -204,6 +204,10 @@ export const ja: Locale = {
         more: 'ページのオプション',
       },
       turnedOff: '{label}は使用できません',
+      // Why a command is greyed out while a lock holds the setting it changes; `{label}` is its label.
+      locked: {
+        default: '{label}はこの文書では変更できません',
+      },
     },
     passwordPrompt: {
       title: 'パスワードが必要です',
