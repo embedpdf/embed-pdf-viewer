@@ -126,6 +126,10 @@ changes the editing tools are gone, and with `notAllowed: 'disable'` they show g
 with the reason in their tooltip. To leave a command out for everyone, [disable](../features/turning-off)
 it instead: `disable: ['acme:approve']`.
 
+A command whose setting a plugin [locks](/docs/headless/viewing/stage#lock-a-setting) for the
+document, such as the facing-pages choices while a plugin shows one page at a time, shows greyed
+out with the plugin's reason, and its current choice still checked.
+
 ## Keyboard shortcuts
 
 A command's `shortcut` works while focus is anywhere inside the viewer, except in a text field,

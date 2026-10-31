@@ -204,6 +204,10 @@ export const fr: Locale = {
         more: 'Options de la page',
       },
       turnedOff: '{label} n’est pas disponible',
+      // Why a command is greyed out while a lock holds the setting it changes; `{label}` is its label.
+      locked: {
+        default: 'Impossible de modifier {label} dans ce document',
+      },
     },
     passwordPrompt: {
       title: 'Mot de passe requis',

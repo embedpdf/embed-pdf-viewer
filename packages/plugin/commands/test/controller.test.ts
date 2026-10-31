@@ -303,6 +303,113 @@ describe('turning single commands off', () => {
   });
 });
 
+describe('locked settings', () => {
+  /** The controller with an i18n stand-in that knows `strings`. */
+  function harnessWith(config: CommandsConfig, strings: Record<string, string> = {}) {
+    const i18n = {
+      t: (key: string, options?: { fallback?: string; params?: Record<string, string> }) => {
+        const text = strings[key] ?? options?.fallback ?? key;
+        return text.replace(/\{(\w+)\}/g, (slot, name) => options?.params?.[name] ?? slot);
+      },
+    };
+    const ctx = createTestContext({
+      id: 'commands',
+      settings: { defaults: COMMANDS_DEFAULTS, registered: config },
+      doc: null,
+      capabilities: [[I18nToken, i18n]],
+    });
+    return ctx.connect(createCommandsController(ctx));
+  }
+
+  // A spread setting the test holds or lets go, as the Stage's getLock() would answer.
+  let held: { by: string; reasonKey?: string } | null = null;
+  let spread = 'none';
+  const choice = (id: string, value: string): CommandDef => ({
+    id,
+    label: id === 'view:single-page' ? 'Single page' : 'Two pages',
+    run: () => {
+      spread = value;
+    },
+    active: () => spread === value,
+    locked: () => held,
+  });
+  const single = choice('view:single-page', 'none');
+  const two = choice('view:two-pages', 'odd');
+
+  it('shows a command disabled while a lock holds its setting, and still active for its value', async () => {
+    held = { by: 'protected-display', reasonKey: 'protectedDisplay.onePageAtATime' };
+    spread = 'none';
+    const commands = harnessWith(
+      { commands: [single, two] },
+      {
+        'protectedDisplay.onePageAtATime': 'Protected pages show one at a time',
+      },
+    );
+    expect(commands.resolveCommand('view:single-page')).toMatchObject({
+      visible: true,
+      enabled: false,
+      active: true,
+      disabledReason: 'Protected pages show one at a time',
+    });
+    expect(commands.resolveCommand('view:two-pages')).toMatchObject({
+      visible: true,
+      enabled: false,
+      active: false,
+    });
+    expect(commands.getRefusal('view:two-pages')).toEqual({
+      reason: 'locked',
+      message: 'Protected pages show one at a time',
+    });
+    await expect(commands.execute('view:two-pages')).resolves.toEqual({
+      status: 'rejected',
+      reason: 'disabled',
+    });
+    expect(spread).toBe('none');
+  });
+
+  it('says the general sentence without a reason of its own, and runs again once it goes', async () => {
+    held = { by: 'kiosk' };
+    spread = 'none';
+    const commands = harnessWith({ commands: [single, two] });
+    expect(commands.resolveCommand('view:two-pages')?.disabledReason).toBe(
+      "Two pages can't be changed in this document",
+    );
+    held = null;
+    expect(commands.getRefusal('view:two-pages')).toBeNull();
+    await expect(commands.execute('view:two-pages')).resolves.toMatchObject({ status: 'executed' });
+    expect(spread).toBe('odd');
+  });
+
+  it("shows disabled even under notAllowed: 'hide', and turned off stays hidden", () => {
+    held = { by: 'kiosk' };
+    const hidden = harnessWith({ commands: [single], notAllowed: 'hide' });
+    expect(hidden.resolveCommand('view:single-page')).toMatchObject({
+      visible: true,
+      enabled: false,
+    });
+    const off = harnessWith({ commands: [single], disabledCommands: ['view:single-page'] });
+    expect(off.resolveCommand('view:single-page')).toMatchObject({ visible: false });
+    expect(off.getRefusal('view:single-page')?.reason).toBe('turned-off');
+    held = null;
+  });
+
+  it('counts a locked check that throws as unlocked', () => {
+    const commands = harnessWith({
+      commands: [
+        {
+          id: 'view:odd',
+          label: 'Odd',
+          run: () => {},
+          locked: () => {
+            throw new Error('no stage');
+          },
+        },
+      ],
+    });
+    expect(commands.resolveCommand('view:odd')).toMatchObject({ enabled: true });
+  });
+});
+
 describe('permissions', () => {
   /** A session that holds every permission but the ones listed, and may not create annotations. */
   const securityWithout = (...missing: string[]) => ({

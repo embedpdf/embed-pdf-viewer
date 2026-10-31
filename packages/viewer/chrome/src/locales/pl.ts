@@ -203,6 +203,10 @@ export const pl: Locale = {
         more: 'Opcje strony',
       },
       turnedOff: 'Niedostępne: {label}',
+      // Why a command is greyed out while a lock holds the setting it changes; `{label}` is its label.
+      locked: {
+        default: 'Nie można zmienić w tym dokumencie: {label}',
+      },
     },
     passwordPrompt: {
       title: 'Wymagane hasło',

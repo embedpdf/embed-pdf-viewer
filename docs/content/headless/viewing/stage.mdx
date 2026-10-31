@@ -204,6 +204,41 @@ own chrome:
 
 <Snippet name="viewing/compact-layout" />
 
+## Lock a setting
+
+Sometimes a setting has to stay as it is for one document, whatever the user or a rule asks: a
+plugin that shows one page at a time, or your app's kiosk view. Lock it:
+
+```ts
+const unlock = stage.lockSettings({
+  settings: { flow: 'paged', spread: 'none' },
+  by: 'kiosk',
+  reasonKey: 'kiosk.onePageAtATime',
+});
+// …and when it no longer has to hold:
+unlock();
+```
+
+- **A lock wins over everything.** `updateSettings()`, a responsive rule, a restored view state and
+  `resetSettings()` still change the settings underneath, but the locked ones keep the lock's value
+  until you call the function `lockSettings()` returns. Then they're what they'd be without it, the
+  user's own choice included.
+- **Its controls show it.** The viewer's commands that change a locked setting show disabled, with
+  the current value still checked and the sentence under `reasonKey` as their tooltip. See
+  [Commands and locked settings](../ui/commands#commands-and-locked-settings).
+- **One document at a time.** Each document's Stage has its own settings, so a lock holds only in
+  the document whose Stage you locked. It lasts until that document closes: call the function only
+  to let go while it stays open.
+- **A saved view keeps what's underneath.** `getViewState()` saves the locked settings as they'd be
+  without the lock, so restoring a view never makes a lock's value the user's.
+- **Two locks agree or fail.** A second lock on a setting with the same value holds too, and the
+  setting stays locked until both let go. One with a different value is refused, naming who holds
+  the setting.
+- **Every setting but `zoom`.** Pinches and zoom gestures set the zoom too, so it can't be locked.
+
+Lock in a plugin's `connect()`, before the document shows, and the Stage lays its pages out locked
+from the first frame. `getLock(setting)` says who holds a setting and why, or `null`.
+
 ## On touch screens
 
 Touch works out of the box, tuned to feel like the platform rather than a web page:
@@ -461,6 +496,7 @@ from around it, or through `inject(EpdfStageRef)` from inside it.
 | `getViewState()`, `applyViewState(view)`                 | Every setting and the position as one object you can store, and restoring it. The responsive rules apply again on top.                                            |
 | `getSettings()`, `updateSettings(changes)`, `resetSettings()` | Reads, changes and resets the live settings, keeping you on the same page. [Settings](#settings)                                                             |
 | `setResponsiveRules(rules)`                              | Replaces the responsive rules while the app runs. [Adapt to the space you have](#adapt-to-the-space-you-have)                                                     |
+| `lockSettings(lock)`, `getLock(setting)`                 | Holds settings at a value for this document until the function it returns is called, and who holds a setting, or `null`. [Lock a setting](#lock-a-setting)        |
 | `listVisiblePages()`, `isPageVisible(page)`              | The pages on screen, each with its box in the Stage and the part of it that shows, and whether one page is on screen                                             |
 | `listCurrentItemPages()`                                 | The pages of the current spread, or the current page alone                                                                                                        |
 | `getPageAt(point)`                                       | The page under a point in the Stage and the point on that page, or `null` over the space between pages                                                            |

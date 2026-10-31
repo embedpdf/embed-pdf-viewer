@@ -204,6 +204,10 @@ export const sv: Locale = {
         more: 'Sidalternativ',
       },
       turnedOff: '{label} är inte tillgängligt',
+      // Why a command is greyed out while a lock holds the setting it changes; `{label}` is its label.
+      locked: {
+        default: '{label} kan inte ändras i det här dokumentet',
+      },
     },
     passwordPrompt: {
       title: 'Lösenord krävs',

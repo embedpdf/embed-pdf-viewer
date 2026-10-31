@@ -461,6 +461,36 @@ export const searchState = defineState(SearchToken, {
   color with its own default (Search's `highlight.color`) is a plain value.
 - The docs' Settings and State tables are checked against these declarations.
 
+### Locking a setting
+
+A setting another part of the viewer must hold for one document, whatever the user or the app
+asks (a plugin that shows one page at a time), is locked by the plugin that owns the setting, never
+by hiding its controls. The convention, with the Stage as its first owner:
+
+- The owner offers `lockSettings(lock)`, which returns the function that lets go, and
+  `getLock(key)`, which gives the holder or `null`. A lock is `{ settings, by, reasonKey? }`:
+  the values it holds, who holds them (a plugin's id, or `'app'`), and the translation key of the
+  sentence its controls show. `SettingLock` (`by`, `reasonKey`) is in `@embedpdf/core`.
+- A lock is the last layer of the owner's resolution, over every writer: the Stage's effective
+  settings are its base (registration and `updateSettings()`), then the matching responsive
+  rules, then the locks. Writes still land underneath, so nothing throws and the user's own choice
+  is back when the lock goes. A setting that something writes outside that resolution (the
+  Stage's `zoom`, which gestures set) isn't lockable until it is held against that writer too.
+- Two locks on one setting with the same value both hold; one with another value is refused
+  (`conflict`), naming the holder. Nothing replaces anything implicitly.
+- Locks are kept in state, so a lock that changes no value still re-resolves the controls.
+- A command that changes a setting declares it with `locked: (context) => owner.getLock(key)`. The
+  commands plugin turns a lock into the third refusal reason, `'locked'`, beside `'turned-off'`
+  and `'not-allowed'`: disabled whatever `notAllowed` says, still `active` for its own value, with
+  the lock's sentence as `disabledReason`.
+- A plugin locks synchronously in `connect()`. Every document plugin connects before the document
+  is `ready` and no view mounts before `ready`, so the first layout is already locked.
+- A lock lasts as long as its document. Letting go is for a lock that ends while the document stays
+  open; a plugin holding one for the document's whole life registers no cleanup for it (state
+  writes after close are dropped). `getViewState()` saves what's under the locks.
+- The kernel's own settings stores are shared by every open document, so a lock there would hold
+  for all of them: they get the same names when a plugin first needs one.
+
 ## Errors
 
 A capability rejects (or throws) with `PluginError` only:

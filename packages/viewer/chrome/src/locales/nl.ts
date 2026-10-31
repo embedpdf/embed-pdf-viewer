@@ -203,6 +203,10 @@ export const nl: Locale = {
         more: 'Paginaopties',
       },
       turnedOff: '{label} is niet beschikbaar',
+      // Why a command is greyed out while a lock holds the setting it changes; `{label}` is its label.
+      locked: {
+        default: '{label} kan in dit document niet worden gewijzigd',
+      },
     },
     passwordPrompt: {
       title: 'Wachtwoord vereist',

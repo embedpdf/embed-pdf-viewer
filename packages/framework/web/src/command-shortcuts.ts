@@ -9,8 +9,8 @@ import { isFromTextField } from './text-field-event';
 
 /** Why a matched command won't run whatever the moment, as the commands plugin says it. */
 export interface ShortcutRefusal {
-  /** Turned off in this viewer, or not allowed by the scope. */
-  readonly reason: 'turned-off' | 'not-allowed';
+  /** Turned off in this viewer, not allowed by the scope, or a lock holds the setting it changes. */
+  readonly reason: 'turned-off' | 'not-allowed' | 'locked';
   /** A sentence for the user. */
   readonly message: string;
 }
