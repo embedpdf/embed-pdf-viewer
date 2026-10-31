@@ -1,4 +1,12 @@
 cmake_minimum_required(VERSION 3.15)
+
+# The addon's minimum macOS. Unset, clang stamps the build machine's version,
+# so moving CI to a newer runner would silently drop older Macs. Must precede
+# project(); FORCE also replaces the empty value older build caches hold.
+if(NOT CMAKE_OSX_DEPLOYMENT_TARGET)
+  set(CMAKE_OSX_DEPLOYMENT_TARGET "14.0" CACHE STRING "Minimum macOS version" FORCE)
+endif()
+
 project(pdf_runtime_node)
 
 set(CMAKE_CXX_STANDARD 17)
