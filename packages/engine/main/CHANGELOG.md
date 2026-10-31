@@ -1,5 +1,11 @@
 # @embedpdf/engine
 
+## 3.0.0-next.20
+
+### Minor Changes
+
+- [#926](https://github.com/embedpdf/embed-pdf-viewer/pull/926) by [@bobsingor](https://github.com/bobsingor) – `LocalPageRenderService` is renamed `RawPageRenderService`: the page rendering that also gives the raw pixels (`raw()`). The local engine's pages have it, as before.
+
 ## 3.0.0-next.19
 
 ## 3.0.0-next.18

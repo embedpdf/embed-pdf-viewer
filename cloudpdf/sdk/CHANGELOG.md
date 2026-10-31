@@ -1,5 +1,13 @@
 # @cloudpdf/sdk
 
+## 3.0.0-next.20
+
+### Minor Changes
+
+- [#924](https://github.com/embedpdf/embed-pdf-viewer/pull/924) by [@bobsingor](https://github.com/bobsingor) – `new CloudPDFClient({ token })` reaches CloudPDF SaaS: `baseUrl` is only needed for your own CloudPDF server. `CloudPDFEnvironment.Saas` names the SaaS address. Proxy uploads go to the same address, with the client's token.
+
+- [#925](https://github.com/embedpdf/embed-pdf-viewer/pull/925) by [@bobsingor](https://github.com/bobsingor) – `import { upload } from '@cloudpdf/sdk/upload'` uploads a PDF from the browser with an upload token from your server: `upload(file, { token, name?, onProgress?, signal?, baseUrl? })`. The entry is about 3 KB gzipped and has no Node imports. It sends the file with XHR, so `onProgress` follows the bytes. `uploads.create` on a server now reports progress as the bytes go too, instead of only at the start and the end. `Uploads` takes the source reader as a second argument.
+
 ## 3.0.0-next.19
 
 ### Minor Changes

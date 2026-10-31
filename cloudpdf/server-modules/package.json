@@ -1,6 +1,6 @@
 {
   "name": "@cloudpdf/server-modules",
-  "version": "3.0.0-next.19",
+  "version": "3.0.0-next.20",
   "private": false,
   "description": "Write CloudPDF server modules: packages that run inside @cloudpdf/server with their own routes and permissions, and reach documents through the engine's document API, as the caller and as themselves.",
   "type": "module",

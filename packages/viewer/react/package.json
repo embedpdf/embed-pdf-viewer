@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/viewer-react",
-  "version": "3.0.0-next.19",
+  "version": "3.0.0-next.20",
   "private": false,
   "description": "React wrapper for the full viewer: the PDFViewer component around the embedpdf-viewer custom element. Your own components (ToolbarItem, Panel, Region) are light-DOM children the viewer shows in its slots while they stay in your React tree (your context, your CSS). No peer constraints beyond react>=18; the viewer inside is the Preact-compiled artifact.",
   "type": "module",
