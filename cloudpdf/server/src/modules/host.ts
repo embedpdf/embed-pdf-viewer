@@ -53,16 +53,24 @@ import type { DocumentService } from '../services/DocumentService';
 
 export interface ModuleHostDeps {
   readonly permissions: PermissionRegistry;
-  readonly documentService: DocumentService;
+  /**
+   * The document plane. Absent on a server without one (no worker pool or
+   * database): a module that adds routes then stops the server.
+   */
+  readonly documentService?: DocumentService;
   /** The deployment's render policy: its output-pixel budget binds module renders too. */
   readonly derivedRenders?: DerivedRenderService;
-  /** Where module config is read: `process.env` in the server. */
-  readonly env: Readonly<Record<string, string | undefined>>;
   /**
    * Signs the module's own tokens. Absent when the server verifies tokens it
    * doesn't sign (JWKS): a module then can't open documents as itself.
    */
   readonly sign?: (input: SignDevTokenInput) => string;
+}
+
+/** A module the server has checked, with its permissions registered and its settings read. */
+export interface DeclaredModule {
+  readonly module: HostedModule;
+  readonly config: Readonly<Record<string, string>>;
 }
 
 const MODULE_ID = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
@@ -72,57 +80,87 @@ const ROUTE_SEGMENT = /^(:[a-zA-Z][a-zA-Z0-9]*|[a-z0-9][a-z0-9._-]*)$/;
 const MODULE_TOKEN_TTL_SECONDS = 300;
 const MODULE_TOKEN_RENEW_SECONDS = 60;
 
-/** Mount `modules` in order. A mistake in any of them stops the server from starting. */
-export async function mountModules(
-  app: FastifyInstance,
+/**
+ * Check `modules`, register their permissions and read their settings,
+ * before anything else starts. Their permissions take part in tokens and
+ * grants on every deployment, with a document plane or without one; a
+ * plugin that only adds permissions (one a viewer plugin checks) is a module
+ * whose setup adds nothing. A mistake in any of them stops the server from
+ * starting.
+ */
+export function declareModules(
   modules: ReadonlyArray<HostedModule>,
-  deps: ModuleHostDeps,
-): Promise<void> {
+  permissions: PermissionRegistry,
+  env: Readonly<Record<string, string | undefined>>,
+): DeclaredModule[] {
   const ids = new Set<string>();
-  const fetch = inProcessFetch(app);
-  for (const module of modules) {
+  return modules.map((module) => {
     if (ids.has(module.id)) throw moduleError(module.id, 'is installed twice');
     ids.add(module.id);
-    await mountModule(app, module, { ...deps, fetch });
+    if (!MODULE_ID.test(module.id) || CORE_NAMESPACES.has(module.id)) {
+      throw moduleError(
+        module.id,
+        "isn't a module id: lowercase words joined by '-', not a core name",
+      );
+    }
+    for (const word of module.requires?.document ?? []) {
+      if (!isCoreCapability(word)) {
+        throw moduleError(
+          module.id,
+          `requires.document holds core document permissions, not "${word}"`,
+        );
+      }
+    }
+    try {
+      permissions.register(module.id, module.permissions ?? {});
+    } catch (err) {
+      throw moduleError(module.id, (err as Error).message);
+    }
+    return { module, config: readConfig(module, env) };
+  });
+}
+
+/**
+ * Run each declared module's setup, in order, and mount the routes it adds,
+ * after the core's own. A route needs the document plane; without it, a
+ * module that adds one stops the server.
+ */
+export async function mountModules(
+  app: FastifyInstance,
+  declared: ReadonlyArray<DeclaredModule>,
+  deps: ModuleHostDeps,
+): Promise<void> {
+  const fetch = inProcessFetch(app);
+  for (const { module, config } of declared) {
+    await mountModule(app, module, config, { ...deps, fetch });
   }
 }
 
 type MountDeps = ModuleHostDeps & { readonly fetch: typeof globalThis.fetch };
+/** What a module's routes need: the document plane, present. */
+type RouteDeps = MountDeps & { readonly documentService: DocumentService };
 
 async function mountModule(
   app: FastifyInstance,
   module: HostedModule,
+  config: Readonly<Record<string, string>>,
   deps: MountDeps,
 ): Promise<void> {
-  if (!MODULE_ID.test(module.id) || CORE_NAMESPACES.has(module.id)) {
-    throw moduleError(
-      module.id,
-      "isn't a module id: lowercase words joined by '-', not a core name",
-    );
-  }
-  for (const word of module.requires?.document ?? []) {
-    if (!isCoreCapability(word)) {
-      throw moduleError(
-        module.id,
-        `requires.document holds core document permissions, not "${word}"`,
-      );
-    }
-  }
-  try {
-    deps.permissions.register(module.id, module.permissions ?? {});
-  } catch (err) {
-    throw moduleError(module.id, (err as Error).message);
-  }
-  const config = readConfig(module, deps.env);
   const tokens = moduleTokens(module, deps.sign);
-
   let settingUp = true;
   let routes = 0;
   await module.setup(
     {
       docRoute(route) {
         if (!settingUp) throw moduleError(module.id, 'adds its routes in setup, not after it');
-        mountDocRoute(app, module, route, tokens, deps);
+        const { documentService } = deps;
+        if (documentService === undefined) {
+          throw moduleError(
+            module.id,
+            'adds routes, which need the document plane: workerEntry, db and objectStore',
+          );
+        }
+        mountDocRoute(app, module, route, tokens, { ...deps, documentService });
         routes += 1;
       },
       log: moduleLog(app, module.id),
@@ -220,7 +258,7 @@ function mountDocRoute(
   module: HostedModule,
   route: HostedDocRoute,
   tokens: (target: TokenTarget) => string,
-  deps: MountDeps,
+  deps: RouteDeps,
 ): void {
   const permission = `${module.id}.${route.permission}`;
   const declared = deps.permissions.list().find((p) => p.name === permission);
@@ -307,7 +345,7 @@ function connection(
   return { baseUrl: IN_PROCESS_BASE_URL, fetch, token };
 }
 
-function moduleSession(opened: Opened, deps: ModuleHostDeps): ModuleSession {
+function moduleSession(opened: Opened, deps: RouteDeps): ModuleSession {
   const { ctx, docId, layerName, pdfBits } = opened;
   let protection: Promise<DocumentProtection | null> | undefined;
   return {
@@ -340,7 +378,7 @@ async function renderRawAsModule(
   page: PageRef,
   options: PageRenderOptions,
   signal: AbortSignal,
-  deps: ModuleHostDeps,
+  deps: RouteDeps,
 ): Promise<PageRenderRaster> {
   const { ctx, docId, layerName, pdfBits } = opened;
   if (options.usage === 'print') {

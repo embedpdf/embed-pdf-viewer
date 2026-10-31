@@ -11,7 +11,6 @@ import {
   createSqliteDb,
   FsObjectStore,
   migrate,
-  PermissionRegistry,
   signDevToken,
   sqliteMigrations,
   StaticKmsKeyring,
@@ -21,7 +20,8 @@ import {
 } from '../src/index';
 import { buildAppForTesting } from '../src/app/buildApp';
 import { createValidTestLicenseGate } from '../src/licensing/testing';
-import { mountModules } from '../src/modules/host';
+import { PermissionRegistry } from '../src/auth/permission-registry';
+import { declareModules, mountModules } from '../src/modules/host';
 import { loadModules } from '../src/modules/load';
 import type { HostedModule, ModuleConnection, ModuleResponse } from '../src/modules/index';
 import type { DocumentService } from '../src/services/DocumentService';
@@ -201,10 +201,10 @@ describe('mounting a module checks it while the server starts', () => {
     env: Record<string, string> = {},
   ): Promise<PermissionRegistry> {
     const permissions = new PermissionRegistry();
-    await mountModules(Fastify(), modules, {
+    const declared = declareModules(modules, permissions, env);
+    await mountModules(Fastify(), declared, {
       permissions,
       documentService: {} as DocumentService,
-      env,
     });
     return permissions;
   }
@@ -357,7 +357,7 @@ describe('CLOUDPDF_MODULES', () => {
     );
   });
 
-  test('modules need the document plane', async () => {
+  test('a module that adds routes needs the document plane', async () => {
     await expect(
       buildAppForTesting({
         licenseGate: createValidTestLicenseGate(),
@@ -365,7 +365,28 @@ describe('CLOUDPDF_MODULES', () => {
         workerEntry: null,
         modules: [careless],
       }),
-    ).rejects.toThrow('server modules need the document plane');
+    ).rejects.toThrow('module careless adds routes, which need the document plane');
+  });
+
+  test('a module that only declares permissions works on any server', async () => {
+    // A plugin whose permission a viewer plugin checks: the server only needs to know the word.
+    const bundle = await buildAppForTesting({
+      licenseGate: createValidTestLicenseGate(),
+      verifier: { mode: 'hs256', secret: 'x' },
+      workerEntry: null,
+      modules: [
+        {
+          id: 'reading-progress',
+          permissions: { track: { level: 'document', label: 'Record reading progress' } },
+          setup() {},
+        },
+      ],
+    });
+    try {
+      expect([...bundle.permissions.documentPermissions()]).toEqual(['reading-progress.track']);
+    } finally {
+      await bundle.shutdown();
+    }
   });
 });
 

@@ -6,7 +6,7 @@
  */
 export { buildApp } from './app/buildApp';
 export type { BuildAppOptions, AppBundle, MountedRoute } from './app/buildApp';
-export { PermissionRegistry } from './auth/permission-registry';
+export type { PermissionRegistry } from './auth/permission-registry';
 export type {
   PermissionDeclaration,
   PermissionLevel,

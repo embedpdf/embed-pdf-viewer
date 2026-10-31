@@ -45,8 +45,9 @@ A module that's wrong stops the server before it listens, and the error says why
   declare;
 - something other than the core's document permissions in `requires.document`.
 
-Modules need the document plane, so a server without its worker pool and database doesn't start
-with any. Each module the server mounts is in the log:
+A module's routes need the document plane, so on a server without its worker pool and database a
+module that adds routes stops the boot. A module that only declares permissions works on any
+server. Each module the server mounts is in the log:
 
 ```json
 {
@@ -63,16 +64,30 @@ with any. Each module the server mounts is in the log:
 A module's permissions start with its id, like `snapshot.create`. With the module installed, they
 work like the core's: a token or grant may name them, `*` includes them, and `/access` lists the
 ones a session holds in `effectiveScope`. Issuing a token or saving a grant that names a module
-permission no installed module declares is refused. See
+permission no installed module declares is refused.
+
+A plugin whose permission is checked elsewhere, by a viewer plugin for example, is installed the
+same way: a module that declares the permission and adds no routes. The server needs to know the
+word, so tokens and grants can carry it.
+
+````ts
+export default defineServerModule({
+  id: 'reading-progress',
+  permissions: { track: { level: 'document', label: 'Record reading progress' } },
+  setup() {}, // no routes: the viewer plugin checks the permission
+});
+``` See
 [Plugins' permissions](/docs/engine/concepts/permissions#plugins-permissions).
 
 ## Routes
 
 Every route a module adds is on a document's layer:
 
-```
+````
+
 /v1/docs/{docId}/layers/{layerName}/{module id}/{path}
-```
+
+````
 
 Before the module's code runs, the server checks what it checks for its own routes: the token,
 the document and layer it's for, `doc.open`, and the permission the route needs. A response is
@@ -151,7 +166,7 @@ export default defineServerModule({
     });
   },
 });
-```
+````
 
 | Field                 | What it is                                                                                                                                                                                                                                                  |
 | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
