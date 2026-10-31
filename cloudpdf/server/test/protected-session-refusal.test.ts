@@ -8,7 +8,6 @@ import {
   createSqliteDb,
   FsObjectStore,
   migrate,
-  PermissionRegistry,
   signDevToken,
   sqliteMigrations,
   StaticKmsKeyring,
@@ -111,15 +110,20 @@ beforeAll(async () => {
   roots = [storageRoot, cacheRoot];
   db = createSqliteDb({ path: ':memory:' });
   await migrate(db, { source: { kind: 'inline', migrations: sqliteMigrations } });
-  const permissions = new PermissionRegistry();
-  permissions.register('protected-display', {
-    view: { level: 'document', label: 'See pages with screenshot protection' },
-  });
   bundle = await buildAppForTesting({
     licenseGate: createValidTestLicenseGate(),
     verifier: { mode: 'hs256', secret: SECRET },
     apiAuthTokens: [API_TOKEN],
-    permissions,
+    // The plugin's permission, declared by its module; the frames themselves aren't needed here.
+    modules: [
+      {
+        id: 'protected-display',
+        permissions: {
+          view: { level: 'document', label: 'See pages with screenshot protection' },
+        },
+        setup() {},
+      },
+    ],
     workerEntry: new URL('./_helpers/stub-worker-entry.cjs', import.meta.url),
     poolSize: 1,
     db,

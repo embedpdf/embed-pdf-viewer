@@ -58,7 +58,7 @@ import type { ConnectedUsageReporter } from '../licensing/ConnectedUsageReporter
 import type { LicenseGate } from '../licensing/LicenseRuntime';
 import { isLicenseGateTrusted } from '../licensing/trusted-license-gates';
 import { UsageMeters } from '../licensing/UsageMeters';
-import { mountModules } from '../modules/host';
+import { declareModules, mountModules } from '../modules/host';
 import type { HostedModule } from '../modules/protocol';
 import { InProcessRealtimeBus, type RealtimeBus } from '../realtime/RealtimeBus';
 import { SharpImageEncoder } from '../render/SharpImageEncoder';
@@ -127,15 +127,12 @@ export interface BuildAppOptions {
   /** Required commercial gate for every server construction. */
   licenseGate: LicenseGate;
   /**
-   * The installed plugins' permissions. Tokens carry any well-formed plugin
-   * permission; only these take effect, and only these can be granted.
-   * Omitted: no plugins, so none.
-   */
-  permissions?: PermissionRegistry;
-  /**
-   * The server modules to mount (`CLOUDPDF_MODULES` in the CLI), in order.
-   * Their permissions join `permissions`; their routes need the document
-   * plane (`workerEntry` and `db`).
+   * The installed plugins, as server modules (`CLOUDPDF_MODULES` in the CLI),
+   * in order. Their permissions are the plugin permissions this server knows:
+   * tokens carry any well-formed plugin permission, but only these take
+   * effect, and only these can be granted. A module that adds routes needs
+   * the document plane (`workerEntry`, `db` and `objectStore`); one that only
+   * declares permissions doesn't.
    */
   modules?: ReadonlyArray<HostedModule>;
   /** Where module config (`CLOUDPDF_<ID>_*`) is read. Defaults to `process.env`. */
@@ -433,7 +430,7 @@ export interface BuildAppOptions {
 
 export interface AppBundle {
   app: FastifyInstance;
-  /** The installed plugins' permissions (empty without plugins). */
+  /** The installed plugins' permissions, from their modules (empty without any). */
   permissions: PermissionRegistry;
   /** Every route the app mounted, in the order it mounted them. */
   routes: readonly MountedRoute[];
@@ -582,7 +579,14 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
   // zero-config dev fallbacks; every other license refuses to boot on
   // missing / publicly-known / short secrets (fail closed).
   const enforceProductionSecrets = requiresProductionSecrets(opts.licenseGate.getStatus());
-  const permissions = opts.permissions ?? new PermissionRegistry();
+  // The installed plugins' permissions, from their modules: checked and
+  // registered before anything starts, so a module's mistake stops the boot.
+  const permissions = new PermissionRegistry();
+  const declaredModules = declareModules(
+    opts.modules ?? [],
+    permissions,
+    opts.moduleEnv ?? process.env,
+  );
   const app = Fastify({
     logger: {
       level: process.env['LOG_LEVEL'] ?? 'info',
@@ -1492,14 +1496,6 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       await registerSearchRoutes(app, {
         documentService,
       });
-      // After the core's routes: a module adds to the server, never in its place.
-      await mountModules(app, opts.modules ?? [], {
-        permissions,
-        documentService,
-        ...(derivedRenders ? { derivedRenders } : {}),
-        env: opts.moduleEnv ?? process.env,
-        ...(signer ? { sign: signer } : {}),
-      });
     }
 
     const sweepIntervalMs = opts.sweepIntervalMs ?? 60_000;
@@ -1533,9 +1529,13 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
     }
   }
 
-  if (opts.modules !== undefined && opts.modules.length > 0 && documentService === undefined) {
-    throw new Error('server modules need the document plane: workerEntry, db and objectStore');
-  }
+  // After the core's routes: a module adds to the server, never in its place.
+  await mountModules(app, declaredModules, {
+    permissions,
+    ...(documentService ? { documentService } : {}),
+    ...(derivedRenders ? { derivedRenders } : {}),
+    ...(signer ? { sign: signer } : {}),
+  });
 
   app.setErrorHandler(handleAppError);
 
