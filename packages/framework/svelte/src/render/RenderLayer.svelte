@@ -63,7 +63,7 @@
       layers
         ? renderer.getSourceKey(page.ref, {
             scale: page.transform.renderScale,
-            thumbnail,
+            ...(thumbnail ? { thumbnail: true } : {}),
             ...layers,
           })
         : null,
@@ -83,7 +83,7 @@
     // Any scale that maps to this key gives this key's request: the plugin conforms it.
     const options = untrack(() => ({
       scale: page.transform.renderScale,
-      thumbnail,
+      ...(thumbnail ? { thumbnail: true } : {}),
       ...drawn,
       view: page.view,
     }));

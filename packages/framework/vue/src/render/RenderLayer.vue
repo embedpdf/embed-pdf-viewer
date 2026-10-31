@@ -81,7 +81,7 @@ const sourceKey = useOptionalSelector(
     layers.value
       ? lens.getSourceKey(page.value.ref, {
           scale: page.value.transform.renderScale,
-          thumbnail: props.thumbnail,
+          ...(props.thumbnail ? { thumbnail: true } : {}),
           ...layers.value,
         })
       : null,
@@ -105,7 +105,7 @@ watch(
         // the same key, so any scale that maps to this key asks for this key.
         const picture = await lens.renderSource(shown, {
           scale: page.value.transform.renderScale,
-          thumbnail: props.thumbnail,
+          ...(props.thumbnail ? { thumbnail: true } : {}),
           ...drawn,
           view: page.value.view,
           signal: controller.signal,

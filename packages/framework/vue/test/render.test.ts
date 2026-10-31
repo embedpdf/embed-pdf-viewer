@@ -202,6 +202,17 @@ describe('RenderLayer', () => {
     });
   });
 
+  it('asks for the page’s thumbnail when it is one, and plans no tiles', async () => {
+    const render = fakeRender({ tiles: true });
+    const { wrapper } = await renderWith(render.plugin, { thumbnail: true });
+    await until(() => wrapper.find('img').attributes('src') !== undefined);
+    expect(render.asked.map((ask) => ask.parts)).toEqual([
+      { thumbnail: true, includeAnnotations: true, includeFormFields: true },
+    ]);
+    expect(render.demands).toEqual([]);
+    expect(wrapper.findAll('img')).toHaveLength(1);
+  });
+
   it('paints the view’s tile plan above the picture, and lets go of it on unmount', async () => {
     const render = fakeRender({ tiles: true });
     const { wrapper } = await renderWith(render.plugin);

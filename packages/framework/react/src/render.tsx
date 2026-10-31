@@ -111,8 +111,10 @@ export function RenderLayer({
   // crossings; under exact mode it tracks the demand and is constant above
   // the budget — so the deep-zoom backdrop never refetches, and the sub-
   // budget range refetches once per settled demand.
+  // A thumbnail asks for one; anything else leaves the option out, as the plugin's default.
+  const asked = thumbnail ? ({ thumbnail: true } as const) : {};
   const sourceKey = useSelector(RenderToken, (render) =>
-    render.getSourceKey(page.ref, { scale: page.transform.renderScale, thumbnail, ...layers }),
+    render.getSourceKey(page.ref, { scale: page.transform.renderScale, ...asked, ...layers }),
   );
 
   useEffect(() => {
@@ -129,7 +131,7 @@ export function RenderLayer({
         // produces this key's canonical request.
         const image = await render.renderSource(page.ref, {
           scale: page.transform.renderScale,
-          thumbnail,
+          ...asked,
           ...layers,
           view: page.view,
           signal: controller.signal,
