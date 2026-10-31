@@ -33,6 +33,7 @@ import {
   type PageFlattenResult,
   type PageReorderResult,
   type PageScaleResult,
+  type RedactionApplyResult,
   type FormFieldRef,
   type SignatureCompleteResult,
 } from '@embedpdf/engine-core/runtime';
@@ -197,6 +198,12 @@ function eventOf(row: AuditEventRow, origin: EventOrigin): DocumentEvent | null 
         type: 'pages.flattened',
         origin,
         ...(row.payload as PageFlattenResult),
+      };
+    case 'redaction.apply':
+      return {
+        type: 'redaction.applied',
+        origin,
+        ...(row.payload as RedactionApplyResult),
       };
     case 'metadata.update':
       return {
