@@ -14,6 +14,7 @@ import { decodeListCursor, encodeListCursor } from './_cursor';
 import { formatIssues } from './_issues';
 import { requireTenantAccess } from '../../app/jwt-plugin';
 import { hashGrantPassphrase } from '../../auth/grant-passphrase';
+import type { PermissionRegistry } from '../../auth/permission-registry';
 import { isVisitorLayerName, VISITOR_LAYER_PREFIX } from '../../auth/visitor-handle';
 import type { DocumentsRepo } from '../../db/repos/documents.repo';
 import type { GrantVisitorsRepo, ListedGrantVisitor } from '../../db/repos/grant_visitors.repo';
@@ -23,6 +24,8 @@ import type { SecurityEventsRepo } from '../../db/repos/security-events.repo';
 
 export interface AdminGrantsRoutesDeps {
   grants: GrantsRepo;
+  /** The installed plugins' permissions: a grant may give only those. */
+  permissions: PermissionRegistry;
   documents: DocumentsRepo;
   /** A grant can't name a deleted layer: its name is refused for good. */
   layers: LayersRepo;
@@ -99,6 +102,7 @@ export async function registerAdminGrantsRoutes(
     const body = parsed.data;
     try {
       validateScopeArray(body.scope);
+      deps.permissions.assertGrantable(body.scope);
     } catch (err) {
       return reply
         .code(400)
@@ -212,6 +216,7 @@ export async function registerAdminGrantsRoutes(
     if (body.scope !== undefined) {
       try {
         validateScopeArray(body.scope);
+        deps.permissions.assertGrantable(body.scope);
       } catch (err) {
         return reply
           .code(400)

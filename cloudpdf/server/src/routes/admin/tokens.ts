@@ -17,6 +17,7 @@ import {
 } from '../../app/jwt-plugin';
 import type { SignDevTokenInput } from '../../auth/JwtVerifier';
 import type { RevokedJtisGuard } from '../../auth/RevokedJtisGuard';
+import type { PermissionRegistry } from '../../auth/permission-registry';
 import { validateTenantScope } from '../../auth/tenant-scope';
 import { isVisitorLayerName, VISITOR_LAYER_PREFIX } from '../../auth/visitor-handle';
 import type { DocumentsRepo } from '../../db/repos/documents.repo';
@@ -35,6 +36,8 @@ export interface AdminTokensRoutesDeps {
   documents: DocumentsRepo;
   folders: FoldersRepo;
   securityEvents: SecurityEventsRepo;
+  /** The installed plugins' permissions: a scope may grant only those. */
+  permissions: PermissionRegistry;
 }
 
 /**
@@ -84,6 +87,7 @@ export async function registerAdminTokensRoutes(
         if (body.kind === 'tenant') {
           try {
             validateTenantScope(body.scope);
+            deps.permissions.assertGrantable(body.scope, ['document', 'tenant']);
           } catch (err) {
             return reply.code(400).send({
               error: { code: 'InvalidArg', message: (err as Error).message },
@@ -94,6 +98,7 @@ export async function registerAdminTokensRoutes(
         if (body.kind === 'doc') {
           try {
             validateScopeArray(body.scope);
+            deps.permissions.assertGrantable(body.scope);
           } catch (err) {
             return reply.code(400).send({
               error: { code: 'InvalidArg', message: (err as Error).message },

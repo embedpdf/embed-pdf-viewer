@@ -12,6 +12,8 @@ import {
   type PageNetworkRenderFormat,
   type PageRef,
   type PageRenderImage,
+  type PageRenderOptions,
+  type PageRenderRaster,
   type PageRenderService,
   type PageRenderTransform,
   renderAreaTransform,
@@ -46,6 +48,30 @@ export class CloudPageRenderService implements PageRenderService {
     /** What the caller may print, when the client can know it; null leaves it to the server. */
     private readonly printRights: () => PagePrintRights | null,
   ) {}
+
+  /**
+   * The page's pixels, not encoded as an image, with the transform they were
+   * made with: only where this engine runs inside the server and was given a
+   * source (`renderRaw`, a server module's own document). Over the network
+   * the cloud API serves images: `image()`.
+   */
+  raw(options: PageRenderOptions = {}): AbortablePromise<PageRenderRaster> {
+    if (this.isClosed()) {
+      return AbortablePromise.rejectReason(
+        new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
+      );
+    }
+    const source = this.http.renderRaw;
+    if (source === undefined) {
+      return AbortablePromise.rejectReason(
+        new EngineError(
+          EngineErrorCode.NotImplemented,
+          'raw pixels are drawn only inside the server; use image()',
+        ),
+      );
+    }
+    return AbortablePromise.run((signal) => source(this.pageRef, options, signal));
+  }
 
   image(options: PageImageOptions = {}): AbortablePromise<PageRenderImage> {
     if (this.isClosed()) {

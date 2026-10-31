@@ -125,7 +125,25 @@ export interface ParsedWildcard {
   kind: 'wildcard';
 }
 
-export type ParsedScope = ParsedCapability | ParsedCollab | ParsedVirtual | ParsedWildcard;
+/**
+ * A plugin's own permission: `<plugin id>.<action>`, such as `protected-display.view`. The core
+ * carries it through tokens and effective scopes but never interprets it: only its plugin
+ * enforces it, and it takes effect only where that plugin is installed.
+ */
+export interface ParsedPluginPermission {
+  kind: 'plugin';
+  /** The whole permission, as written. */
+  name: string;
+  /** Its first segment: the id of the plugin that owns it. */
+  plugin: string;
+}
+
+export type ParsedScope =
+  | ParsedCapability
+  | ParsedCollab
+  | ParsedVirtual
+  | ParsedWildcard
+  | ParsedPluginPermission;
 
 /**
  * Typed boolean view of the PDF user-access permission word.

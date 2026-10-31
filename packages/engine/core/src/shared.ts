@@ -911,13 +911,19 @@ export type {
   Identity,
   ParsedCapability,
   ParsedCollab,
+  ParsedPluginPermission,
   ParsedScope,
   ParsedVirtual,
   ParsedWildcard,
   PdfBits,
 } from './auth/scope';
 export { PDF_BITS, decodePdfBits } from './auth/scope';
-export { parseScope, validateScopeArray } from './auth/scope';
+export {
+  CORE_NAMESPACES,
+  parseScope,
+  pluginOfPermission,
+  validateScopeArray,
+} from './auth/scope';
 export { InvalidScope, MissingIdentity, PermissionDenied } from './auth/scope';
 export type { AnnotationAuthority, ChangeAuthority, FieldWriteAction } from './auth/scope';
 export {
@@ -942,6 +948,7 @@ export {
   checkCapability,
   checkCollab,
   checkFieldAction,
+  checkPluginPermission,
   fieldRightsOf,
   type FieldGroupRight,
   type FieldRights,
@@ -949,6 +956,7 @@ export {
   expandedCapabilities,
   expandRawScope,
   filterMatches,
+  pluginPermissionsOf,
 } from './auth/scope';
 export { caps, collab, materializePdfPermissions, pdfPermissions } from './auth/scope';
 

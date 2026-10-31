@@ -122,7 +122,7 @@ export type {
   LocalPageAnnotationsService,
   PageTextService,
   PageRenderService,
-  LocalPageRenderService,
+  RawPageRenderService,
   DocumentSecurityService,
   DocumentSecurityState,
   DocumentUnlockInput,

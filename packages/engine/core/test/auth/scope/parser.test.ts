@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { InvalidScope, parseScope, validateScopeArray } from '../../../src/auth/scope';
+import {
+  CORE_NAMESPACES,
+  InvalidScope,
+  parseScope,
+  pluginOfPermission,
+  validateScopeArray,
+} from '../../../src/auth/scope';
 
 describe('parseScope — wildcards and virtuals', () => {
   it('parses "*" as wildcard', () => {
@@ -269,5 +275,54 @@ describe('validateScopeArray', () => {
 
   it('accepts an empty array (deny-by-default at resolution time)', () => {
     expect(() => validateScopeArray([])).not.toThrow();
+  });
+});
+
+describe('parseScope — plugin permissions', () => {
+  it.each(['protected-display.view', 'snapshot.create', 'ai-chat.ask', 'acme-hub.login.start'])(
+    'parses %s as a plugin permission',
+    (raw) => {
+      expect(parseScope(raw)).toEqual({ kind: 'plugin', name: raw, plugin: raw.split('.')[0] });
+    },
+  );
+
+  it('keeps the core namespaces to the core: an unknown word there is still an error', () => {
+    expect(() => parseScope('doc.future.thing')).toThrow(/unknown capability/);
+    expect(() => parseScope('docs.read')).toThrow(/unknown capability/); // a tenant scope, not a document permission
+    expect(() => parseScope('tokens.issue-doc')).toThrow(InvalidScope);
+  });
+
+  it('rejects plugin permissions that are not <plugin id>.<action>', () => {
+    expect(() => parseScope('Protected-display.view')).toThrow(/plugin permission shape/);
+    expect(() => parseScope('protected_display.view')).toThrow(/plugin permission shape/);
+    expect(() => parseScope('protected-display.')).toThrow(/plugin permission shape/);
+    expect(() => parseScope('protected--display.view')).toThrow(/plugin permission shape/);
+  });
+
+  it('validates arrays that mix core words and plugin words', () => {
+    expect(() =>
+      validateScopeArray(['doc.open', 'doc.text.select', 'protected-display.view']),
+    ).not.toThrow();
+  });
+});
+
+describe('pluginOfPermission', () => {
+  it('names the plugin of a plugin permission', () => {
+    expect(pluginOfPermission('protected-display.view')).toBe('protected-display');
+  });
+
+  it('is null for core words, collab scopes and undotted words', () => {
+    expect(pluginOfPermission('doc.render')).toBeNull();
+    expect(pluginOfPermission('pdf.permissions')).toBeNull();
+    expect(pluginOfPermission('grants.manage')).toBeNull();
+    expect(pluginOfPermission('layer.changed')).toBeNull(); // the core's events share the list
+    expect(pluginOfPermission('annotations:create:self')).toBeNull();
+    expect(pluginOfPermission('*')).toBeNull();
+  });
+
+  it('reserves every core namespace', () => {
+    for (const namespace of CORE_NAMESPACES) {
+      expect(pluginOfPermission(`${namespace}.anything`)).toBeNull();
+    }
   });
 });

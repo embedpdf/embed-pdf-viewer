@@ -1,0 +1,5 @@
+---
+'@embedpdf/engine-core': minor
+---
+
+Scopes accept plugin permissions. A dotted permission whose first part isn't one of the core's names parses as a plugin's own permission, such as `protected-display.view`, instead of being refused. The core carries it and never grants a core capability for it. `pluginPermissionsOf(scope, installed)` and `checkPluginPermission(permission, scope, installed)` answer which installed plugin permissions a scope holds (all of them under `*`); `pluginOfPermission` names whose a permission is. `CORE_NAMESPACES` lists the core's names, which no plugin id can take: the permission namespaces (`doc`, `docs`, `pdf`, `annotations`, `fields`, `tokens`, `grants`, `shares`, `tenants`) and the prefixes of the core's events (`layer`, `visitor`, `document`, `submission`, `signature`). `LocalPageRenderService` is renamed `RawPageRenderService`: the page rendering that also gives the raw pixels (`raw()`), which a server module's own pages have too, not only the local engine's.

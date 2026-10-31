@@ -107,7 +107,7 @@ export type {
   PieceInfoSnapshot,
 } from './dto/PieceInfo';
 export type { PageTextService } from './engine/PageTextService';
-export type { LocalPageRenderService, PageRenderService } from './engine/PageRenderService';
+export type { PageRenderService, RawPageRenderService } from './engine/PageRenderService';
 
 export { wirePack, EMPTY_TRANSFER } from './wire/WirePack';
 export type { WirePack } from './wire/WirePack';

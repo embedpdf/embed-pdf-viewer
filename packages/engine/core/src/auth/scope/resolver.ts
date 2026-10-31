@@ -175,6 +175,36 @@ export function expandedCapabilities(
   return out;
 }
 
+const NO_PLUGIN_PERMISSIONS: ReadonlySet<string> = new Set();
+
+/**
+ * The plugin permissions a scope holds where `installed` are the plugin
+ * permissions the server's installed plugins declare: the ones it names, and
+ * every installed one under `*`. A named permission whose plugin isn't
+ * installed is carried by the token but takes no effect, so it's left out.
+ * Where no plugins run (the local engine), pass nothing: the answer is empty.
+ */
+export function pluginPermissionsOf(
+  rawScope: ReadonlyArray<string>,
+  installed: ReadonlySet<string> = NO_PLUGIN_PERMISSIONS,
+): Set<string> {
+  const out = new Set<string>();
+  for (const s of rawScope.map(parseScope)) {
+    if (s.kind === 'wildcard') for (const permission of installed) out.add(permission);
+    else if (s.kind === 'plugin' && installed.has(s.name)) out.add(s.name);
+  }
+  return out;
+}
+
+/** True iff the scope holds this installed plugin permission (named, or under `*`). */
+export function checkPluginPermission(
+  permission: string,
+  rawScope: ReadonlyArray<string>,
+  installed: ReadonlySet<string> = NO_PLUGIN_PERMISSIONS,
+): boolean {
+  return pluginPermissionsOf(rawScope, installed).has(permission);
+}
+
 /**
  * Convenience wrapper: takes the raw scope array, parses each entry,
  * returns the expanded capability set. Exposed for the `/access`
