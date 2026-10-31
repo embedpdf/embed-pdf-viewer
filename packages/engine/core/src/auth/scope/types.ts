@@ -1,4 +1,23 @@
 /**
+ * The permissions plugins add, by declaration merging, so `allows()` and a
+ * command's `requires` type them like the core's and a typo stays an error:
+ *
+ *   declare module '@embedpdf/core' {
+ *     interface PluginPermissions {
+ *       'protected-display.view': true;
+ *     }
+ *   }
+ *
+ * The core carries them and never grants a core capability for one; the
+ * plugin checks its own.
+ */
+// eslint-disable-next-line @typescript-eslint/no-empty-interface -- filled by declaration merging
+export interface PluginPermissions {}
+
+/** A plugin's permission, as the plugin declared it in {@link PluginPermissions}. */
+export type PluginPermission = keyof PluginPermissions & string;
+
+/**
  * Closed enum of capability scopes. Any scope string not in this set (and
  * not a wildcard, virtual, or collab scope) is rejected at parse time.
  *

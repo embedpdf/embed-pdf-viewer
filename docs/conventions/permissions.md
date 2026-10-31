@@ -92,6 +92,27 @@ code.
 Authority is model-owned derived state (like `apVersion`), session-stable, and
 re-stamped when security state changes (owner unlock, `/access` refresh).
 
+## A plugin's own permissions
+
+A plugin whose verbs need a permission of its own (`protected-display.view`) declares it, so it's
+typed like the core's and a typo stays an error:
+
+```ts
+declare module '@embedpdf/core' {
+  interface PluginPermissions {
+    'protected-display.view': true;
+  }
+}
+```
+
+`PluginPermissions` is engine-core's, re-exported by `@embedpdf/core` straight from it (`export
+type { PluginPermissions } from`), which is what lets that augmentation merge. `ctx.allows()`,
+`doc.security.allows()` and a command's `requires` then take the word. The engines answer it from
+the scope: the cloud engine from the server's `effectiveScope` once `/access` answered (it knows
+the installed plugins and expands `*`), else, like the local engine, from whether the scope names
+it or holds `*`. The plugin's twins read `ctx.allows('<id>.<action>')`, and its server half
+enforces the same word.
+
 ## Pictures: one permission each
 
 A permission names one thing the server gives out, and it is enough on its own to get it. Page

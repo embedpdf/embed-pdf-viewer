@@ -910,6 +910,8 @@ export type {
   FieldAction,
   FieldFilter,
   Identity,
+  PluginPermission,
+  PluginPermissions,
   ParsedCapability,
   ParsedCollab,
   ParsedPluginPermission,
@@ -919,7 +921,13 @@ export type {
   PdfBits,
 } from './auth/scope';
 export { PDF_BITS, decodePdfBits } from './auth/scope';
-export { CORE_NAMESPACES, parseScope, pluginOfPermission, validateScopeArray } from './auth/scope';
+export {
+  CORE_NAMESPACES,
+  isPluginId,
+  parseScope,
+  pluginOfPermission,
+  validateScopeArray,
+} from './auth/scope';
 export { InvalidScope, MissingIdentity, PermissionDenied } from './auth/scope';
 export type { AnnotationAuthority, ChangeAuthority, FieldWriteAction } from './auth/scope';
 export {

@@ -9,6 +9,8 @@
 export { CloudEngine } from './CloudEngine';
 export type { CloudEngineOptions } from './CloudEngine';
 export { CloudDocumentHandle } from './document/CloudDocumentHandle';
+export { cloudDocument } from './document/cloudDocument';
+export type { CloudDocument, ModuleChannel } from './document/cloudDocument';
 export { CloudMetadataService } from './document/CloudMetadataService';
 export { CloudDocumentAnnotationsService } from './document/CloudDocumentAnnotationsService';
 export { CloudDocumentPagesService } from './document/CloudDocumentPagesService';
