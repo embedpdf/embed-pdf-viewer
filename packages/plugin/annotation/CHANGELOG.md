@@ -1,5 +1,7 @@
 # @embedpdf/plugin-annotation
 
+## 3.0.0-next.20
+
 ## 3.0.0-next.19
 
 ### Patch Changes

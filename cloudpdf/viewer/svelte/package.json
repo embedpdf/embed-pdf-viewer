@@ -1,6 +1,6 @@
 {
   "name": "@cloudpdf/viewer-svelte",
-  "version": "3.0.0-next.19",
+  "version": "3.0.0-next.20",
   "private": false,
   "description": "The full viewer as a Svelte component with the CloudPDF engine as its default: the same <PDFViewer> as @embedpdf/viewer-svelte, rendering on CloudPDF SaaS or your own @cloudpdf/server over HTTPS, the local engine loaded only when stamps need it.",
   "type": "module",
