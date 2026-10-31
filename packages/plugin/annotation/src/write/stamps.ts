@@ -1,5 +1,6 @@
 import { PluginError, type OperationOptions } from '@embedpdf/core';
 import {
+  defaultsFor,
   fitStampBox,
   type Id,
   type ModelAnnotation,
@@ -193,6 +194,9 @@ export function createStamps(
     ctx.tryGet(InteractionToken)?.activateTool(ARMED_STAMP_TOOL_ID);
   };
 
+  const toolOpacity = (preset: string): number | undefined =>
+    defaultsFor(store.model(), preset).opacity as number | undefined;
+
   const disarmStamp = (): void => {
     if (!armed) return;
     armed = null;
@@ -216,7 +220,7 @@ export function createStamps(
     desired: { width: number; height: number },
     look: StampPreviewProvider | null,
     rotCW = 0,
-    identity: { name?: string; subject?: string } = {},
+    identity: { name?: string; subject?: string; opacity?: number } = {},
     select = false,
   ): Promise<Applied> | null => {
     const doc = ctx.doc;
@@ -236,6 +240,7 @@ export function createStamps(
             fit: 'contain',
             ...(identity.name !== undefined ? { name: identity.name } : {}),
             ...(identity.subject !== undefined ? { subject: identity.subject } : {}),
+            ...(identity.opacity !== undefined ? { opacity: identity.opacity } : {}),
           },
           resources: { appearance: bytesOf(source) },
         },
@@ -265,7 +270,7 @@ export function createStamps(
     desired: { width: number; height: number },
     look: StampPreviewProvider | null,
     rotCW = 0,
-    identity: { name?: string; subject?: string } = {},
+    identity: { name?: string; subject?: string; opacity?: number } = {},
   ): boolean => {
     const placed = createStampAt(pageObjectNumber, point, source, desired, look, rotCW, identity);
     if (!placed) return false;
@@ -304,6 +309,7 @@ export function createStamps(
       {
         ...(input.name !== undefined ? { name: input.name } : {}),
         ...(input.subject !== undefined ? { subject: input.subject } : {}),
+        opacity: toolOpacity(ARMED_STAMP_TOOL_ID),
       },
       placement.select ?? false,
     );
@@ -341,6 +347,7 @@ export function createStamps(
       {
         ...(payload.name !== undefined ? { name: payload.name } : {}),
         ...(payload.subject !== undefined ? { subject: payload.subject } : {}),
+        opacity: toolOpacity(tools.activeTool()?.preset ?? ARMED_STAMP_TOOL_ID),
       },
     );
   };
@@ -353,6 +360,7 @@ export function createStamps(
     point: Point,
     source: BinarySource,
     rotCW: number,
+    opacity: number | undefined,
     targetWidth?: number,
   ): Promise<void> => {
     const resolved = await resolveBinarySource(source);
@@ -362,7 +370,15 @@ export function createStamps(
       return;
     }
     const look = await previewOf({}, resolved.bytes, meta.mimeType);
-    stageStampAt(pageObjectNumber, point, source, desiredStampSize(meta, targetWidth), look, rotCW);
+    stageStampAt(
+      pageObjectNumber,
+      point,
+      source,
+      desiredStampSize(meta, targetWidth),
+      look,
+      rotCW,
+      { opacity },
+    );
   };
 
   /**
@@ -383,8 +399,9 @@ export function createStamps(
     // belongs to the moment the author picked the spot, even when a 'prompt'
     // source resolves the bytes later.
     const rotCW = tools.uprightRotFor(tool.upright ? displayRotation : undefined);
+    const opacity = toolOpacity(tool.preset);
     if (spec.kind === 'bytes') {
-      void placeStampSource(pageObjectNumber, point, spec.source, rotCW);
+      void placeStampSource(pageObjectNumber, point, spec.source, rotCW, opacity);
       return true;
     }
     // kind === 'prompt' — needs the environment: the one file-picker port.
@@ -398,6 +415,7 @@ export function createStamps(
           point,
           picked.data instanceof ArrayBuffer ? new Uint8Array(picked.data) : picked.data,
           rotCW,
+          opacity,
         ),
     );
   };
