@@ -658,7 +658,7 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
       const admin = createCloudAdmin({
         baseUrl: fx.baseUrl,
         tenantToken: adminToken('mint-doc-t', {
-          scope: ['docs.create', 'docs.read', 'tokens.issue-doc'],
+          scope: ['docs.create', 'docs.read', 'tokens.issue-doc', 'doc.open', 'doc.render'],
         }),
       }).tenant('mint-doc-t');
       const doc = await admin.documents.create({ bytes: fakePdf(96, 420) });
@@ -689,6 +689,41 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
         err = e as AdminError;
       }
       expect(err?.status).toBe(403);
+    });
+
+    test('a tenant JWT mints only document permissions it holds', async () => {
+      const root = createCloudAdmin({ baseUrl: fx.baseUrl, apiToken: API_TOKEN });
+      const doc = await root.tenant('mint-held').documents.create({ bytes: fakePdf(99, 302) });
+      // A key that can do nothing but mint viewing tokens.
+      const viewing = createCloudAdmin({
+        baseUrl: fx.baseUrl,
+        tenantToken: adminToken('mint-held', {
+          scope: ['tokens.issue-doc', 'doc.open', 'doc.render', 'doc.text.search'],
+        }),
+      }).tenant('mint-held');
+
+      const issued = await viewing.tokens.issueDoc({
+        sub: 'reader',
+        docId: doc.document.id,
+        scope: ['doc.open', 'doc.render.thumbnail'],
+        expiresIn: 900,
+      });
+      expect(decodeJwtPayload(issued.token)['scope']).toEqual(['doc.open', 'doc.render.thumbnail']);
+
+      for (const scope of [['doc.open', 'doc.download'], ['pdf.permissions'], ['*']]) {
+        let err: AdminError | undefined;
+        try {
+          await viewing.tokens.issueDoc({
+            sub: 'reader',
+            docId: doc.document.id,
+            scope,
+            expiresIn: 900,
+          });
+        } catch (e) {
+          err = e as AdminError;
+        }
+        expect(err?.status, JSON.stringify(scope)).toBe(403);
+      }
     });
 
     test('kind tenant requires the api token — a tenant JWT cannot mint tenant authority', async () => {
