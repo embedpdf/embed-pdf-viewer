@@ -138,7 +138,7 @@ class Lexer {
     while (isRegular(this.text[this.at])) this.at += 1;
     if (this.at === start) this.at += 1;
     const word = this.text.slice(start, this.at);
-    if (/^[+-]?(\d+\.?\d*|\.\d+)$/.test(word)) return Number(word);
+    if (/^[+-]?(\d+(\.\d*)?|\.\d+)$/.test(word)) return Number(word);
     if (word === 'true' || word === 'false') return word === 'true';
     if (word === 'null') return null;
     return { op: word };
@@ -256,6 +256,21 @@ interface PdfObject {
   stream?: { start: number; end: number; exact: boolean };
 }
 
+const isIndex = (value: PdfValue | undefined): value is number =>
+  typeof value === 'number' && Number.isInteger(value) && value >= 0;
+
+/**
+ * Where the bytes of a stream whose dictionary ends at `at` start: after the `stream` keyword and
+ * its end of line. -1 when no `stream` follows.
+ */
+function streamStart(text: string, at: number): number {
+  while (at < text.length && WHITE.test(text[at]!)) at += 1;
+  if (!text.startsWith('stream', at)) return -1;
+  at += 'stream'.length;
+  if (text[at] === '\r') at += 1;
+  return text[at] === '\n' ? at + 1 : -1;
+}
+
 /** A PDF file's objects, by number. */
 class PdfFile {
   private readonly byNumber = new Map<number, PdfObject>();
@@ -270,28 +285,30 @@ class PdfFile {
 
   private constructor(private readonly bytes: Uint8Array) {
     const text = binary(bytes);
-    const header = /(\d+)\s+\d+\s+obj\b/g;
-    const marker = /\s*stream\r?\n/y;
+    // Token by token: `<number> <generation> obj` starts an object, and a stream's bytes are
+    // stepped over, never read as tokens.
     const lexer = new Lexer(text);
-    for (let match = header.exec(text); match; match = header.exec(text)) {
-      lexer.at = match.index + match[0].length;
+    let before: PdfValue | undefined;
+    let last: PdfValue | undefined;
+    for (let token = lexer.next(); token !== undefined; token = lexer.next()) {
+      if (!(isOperator(token) && token.op === 'obj' && isIndex(before) && isIndex(last))) {
+        [before, last] = [last, token];
+        continue;
+      }
       const value = lexer.next();
-      const object: PdfObject = { number: Number(match[1]), value };
-      marker.lastIndex = lexer.at;
-      const stream = value instanceof Map ? marker.exec(text) : null;
-      if (stream && value instanceof Map) {
+      const object: PdfObject = { number: before, value };
+      const start = value instanceof Map ? streamStart(text, lexer.at) : -1;
+      if (start >= 0 && value instanceof Map) {
         // Its /Length says where it ends; compressed bytes can hold anything.
-        const start = lexer.at + stream[0].length;
         const length = value.get('Length');
         object.stream =
           typeof length === 'number'
             ? { start, end: start + length, exact: true }
             : { start, end: text.indexOf('endstream', start), exact: false };
-        header.lastIndex = object.stream.end;
-      } else {
-        header.lastIndex = lexer.at;
+        lexer.at = Math.max(object.stream.end, start);
       }
       this.byNumber.set(object.number, object);
+      before = last = undefined;
     }
   }
 
