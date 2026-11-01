@@ -39,7 +39,7 @@ import { SearchLayer } from '@embedpdf/react/search';
 import { SelectionClipboard, SelectionHandles, SelectionLayer } from '@embedpdf/react/selection';
 import { useSurface } from '@embedpdf/react/shell';
 import { Scrollbar, Stage } from '@embedpdf/react/stage';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useRef, type ReactNode } from 'react';
 
 import { OUTLINE_PROPERTIES_DIALOG } from './config/outline';
 import { useLayoutEnv, useResolvedLayout } from './config-context';
@@ -125,13 +125,6 @@ function DocumentTabs() {
  *  engine behind them) are still loading — or if the user closes every tab. */
 function OpeningDocuments() {
   const t = useT();
-  // A document that opens quickly never flashes the spinner: it shows after 400 ms.
-  const [shown, setShown] = useState(false);
-  useEffect(() => {
-    const timer = setTimeout(() => setShown(true), 400);
-    return () => clearTimeout(timer);
-  }, []);
-  if (!shown) return null;
   return (
     <div className="grid h-full w-full place-items-center">
       <div className="text-fg-muted flex flex-col items-center gap-3">
