@@ -12,7 +12,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
 import { decodeListCursor, encodeListCursor } from './_cursor';
 import { formatIssues } from './_issues';
-import { requireTenantAccess } from '../../app/jwt-plugin';
+import { requireHeldScope, requireTenantAccess } from '../../app/jwt-plugin';
 import { hashGrantPassphrase } from '../../auth/grant-passphrase';
 import type { PermissionRegistry } from '../../auth/permission-registry';
 import { isVisitorLayerName, VISITOR_LAYER_PREFIX } from '../../auth/visitor-handle';
@@ -48,6 +48,9 @@ export interface AdminGrantsRoutesDeps {
  * `routes/grant-sessions.ts`. Mounted only when the deployment can
  * sign (alongside `tokens.issue` and the exchange route): a grant is a
  * standing mint capability, meaningless where minting is impossible.
+ *
+ * A grant's scope follows `tokens.issue`'s rule, because every visitor
+ * gets it: a tenant JWT gives only document permissions it holds itself.
  *
  * Create, update, and revoke write `security_events` rows — a grant is
  * durable authority, so its lifecycle belongs in the same append-only
@@ -108,6 +111,7 @@ export async function registerAdminGrantsRoutes(
         .code(400)
         .send({ error: { code: 'InvalidArg', message: (err as Error).message } });
     }
+    requireHeldScope(req, body.scope);
     const settingsRefusal = refuseLinkSettings(body);
     if (settingsRefusal) {
       return reply.code(400).send({ error: { code: 'InvalidArg', message: settingsRefusal } });
@@ -222,6 +226,7 @@ export async function registerAdminGrantsRoutes(
           .code(400)
           .send({ error: { code: 'InvalidArg', message: (err as Error).message } });
       }
+      requireHeldScope(req, body.scope);
     }
     const existing = await grants.findById(grantId);
     if (!existing || existing.tenantId !== tenantId) {

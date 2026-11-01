@@ -780,9 +780,10 @@ export type AdminTenantListResponse = z.infer<typeof AdminTenantListResponseSche
  * may carry them next to its tenant scopes, and then they hold for every
  * document of the tenant. That includes the two collection calls that hand
  * out content: the original file needs `doc.download`, the thumbnail
- * `doc.render`. `tokens.issue-doc` mints doc JWTs with any document
- * permission, so a token holding it reaches anything inside the tenant's
- * documents: it is the strongest content scope after `*`.
+ * `doc.render`. `tokens.issue-doc` and `grants.manage` hand out only the
+ * document permissions the token holds itself (`scopeNotCovered` in
+ * engine-core): next to `doc.open` and `doc.render` they make reading
+ * tokens and reading grants, and nothing more.
  */
 export const adminTenantScopes = [
   'docs.create',
@@ -804,7 +805,8 @@ export const AdminTokenIssueDocRequestSchema = z.object({
   /**
    * Doc capability scopes (`doc.open`, `doc.render`, …, plus the
    * collab grammar). Validated server-side against the engine's scope
-   * vocabulary — an unknown string rejects the whole request.
+   * vocabulary — an unknown string rejects the whole request. A tenant
+   * token gives only document permissions it holds itself.
    */
   scope: z.array(z.string().min(1).max(128)).min(1).max(64),
   /**
@@ -1096,7 +1098,8 @@ export const GrantCreateRequestSchema = z.object({
   /**
    * Doc capability scopes the exchanged session will carry. Validated
    * server-side against the engine's scope vocabulary, same as
-   * `tokens.issue`.
+   * `tokens.issue`, and as there a tenant token gives only document
+   * permissions it holds itself.
    */
   scope: z.array(z.string().min(1).max(128)).min(1).max(64),
   /** Origin allowlist; omit to allow any origin. */
@@ -1828,7 +1831,7 @@ export const adminOperations = {
       404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
     },
     notes:
-      'Authority mints only downward: kind "tenant" requires the API token, and kind "upload" requires docs.create instead of tokens.issue-doc, since an upload token can do only what docs.create allows. Mounted only when the deployment can sign (HS256 mode); asymmetric deployments mint with their own private key.',
+      'Authority mints only downward: kind "doc" gives only document permissions the caller holds itself, kind "tenant" requires the API token, and kind "upload" requires docs.create instead of tokens.issue-doc, since an upload token can do only what docs.create allows. Mounted only when the deployment can sign (HS256 mode); asymmetric deployments mint with their own private key.',
   },
   'tokens.revoke': {
     operationId: 'tokens.revoke',
@@ -1922,7 +1925,8 @@ export const adminOperations = {
       404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
     },
     notes:
-      'The returned id is what a link page or an embed opens. Mounted only when the deployment can ' +
+      'The returned id is what a link page or an embed opens. Its scope gives only document ' +
+      'permissions the caller holds itself, as tokens.issue does. Mounted only when the deployment can ' +
       'sign (HS256 mode) — exchange mints session JWTs, so grants exist only where minting does.',
   },
   'grants.list': {
@@ -1967,6 +1971,7 @@ export const adminOperations = {
     responses: {
       200: { contentType: 'application/json', schema: GrantResponseSchema },
       400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      403: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
       404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
       409: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
     },

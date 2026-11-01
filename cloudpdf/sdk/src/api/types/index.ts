@@ -298,6 +298,7 @@ export * from "./GrantsList200Response.js";
 export * from "./GrantsList400Response.js";
 export * from "./GrantsUpdate200Response.js";
 export * from "./GrantsUpdate400Response.js";
+export * from "./GrantsUpdate403Response.js";
 export * from "./GrantsUpdate404Response.js";
 export * from "./GrantsUpdate409Response.js";
 export * from "./GrantsVisitorsDeleteResponse.js";
