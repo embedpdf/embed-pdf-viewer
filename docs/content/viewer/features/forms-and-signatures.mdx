@@ -27,6 +27,21 @@ const values = await form.exportValues(); // { 'customer.name': 'Ada Lovelace', 
 `onValueChanged` fires for every change, from people or from your code. See [Filling
 forms](/docs/headless/forms#methods) for every method.
 
+## Take people to a field
+
+Tab and Shift+Tab move through the fields in the document's order, from page to page, and the view
+follows. From code, `focus()` brings a field into view and puts the cursor in it, and `focusNext()`
+goes on as Tab does:
+
+```js
+const { valid, missing } = form.validate();
+if (!valid) form.focus(missing[0].ref);
+
+form.focusNext({ empty: true, wrap: true }); // the next field that still needs an answer
+```
+
+See [Move between fields](/docs/headless/forms#move-between-fields).
+
 ## Build a form
 
 The **Form** mode opens for filling in and looking. Its **Form design** button switches design on:

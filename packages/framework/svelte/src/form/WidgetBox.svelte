@@ -17,6 +17,10 @@
   press, so the stopped press still reaches the field's "mouse down" action. Focus is
   `focusin`/`focusout`, so a control's own blur (where a text field starts its commit) runs
   before the box sends "blur", and a blur script sees the committed value.
+
+  The box is also where the form's cursor reaches the control: `focus()` and Tab go through the
+  form, in the document's order (`bindFieldFocus`), unless the box has nothing to focus
+  (`focusable={false}`).
 -->
 <script lang="ts">
   import type { Snippet } from 'svelte';
@@ -25,6 +29,7 @@
   // The widget's PDF events go to the plugin's host lens.
   import { FormToken as FormHostToken } from '@embedpdf/plugin-form/contract/host';
   import {
+    bindFieldFocus,
     bindWidgetEvents,
     cssText,
     isolatePointerDown,
@@ -39,6 +44,7 @@
     item,
     colors,
     edge = true,
+    focusable = true,
     style = '',
     children,
     ...rest
@@ -46,6 +52,8 @@
     item: FormWidgetItem;
     colors: FormColors;
     edge?: boolean;
+    /** Whether the box has a control the cursor can go into. */
+    focusable?: boolean;
     /** More style for the box, after its own place. */
     style?: string;
     children?: Snippet;
@@ -75,8 +83,16 @@
       unbind();
     };
   }
+
+  /** The form's cursor in this box; runs again when the widget or what it takes changes. */
+  function fieldFocus(box: HTMLElement): (() => void) | undefined {
+    const widget = item.annotationRef;
+    if (!widget || item.disabled || !focusable) return undefined;
+    const radio = item.control === 'toggle' && item.kind === 'radio';
+    return bindFieldFocus(box, form, widget, { radio });
+  }
 </script>
 
-<div {@attach eventSurface} {...rest} style={boxStyle}>
+<div {@attach eventSurface} {@attach fieldFocus} {...rest} style={boxStyle}>
   {@render children?.()}
 </div>

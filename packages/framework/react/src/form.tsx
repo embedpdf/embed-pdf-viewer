@@ -50,6 +50,7 @@ import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
 import { RenderToken } from '@embedpdf/plugin-render/contract/host';
 import { SignatureToken } from '@embedpdf/plugin-signature/contract';
 import {
+  bindFieldFocus,
   createShownUrls,
   createTextFieldEditor,
   FORM_CONTROL_FILL,
@@ -179,13 +180,16 @@ interface ControlProps<C extends FormWidgetItem['control']> {
 /**
  * The positioned box every control sits in: the widget's event surface, and
  * the edge a field without a border of its own gets, so people see where to
- * fill in.
+ * fill in. It's also where the form's cursor reaches the control: `focus()`
+ * and Tab go through the form, in the document's order (`bindFieldFocus`),
+ * unless the box has nothing to focus (`focusable`).
  */
 function WidgetBox({
   item,
   page,
   colors,
   edge = true,
+  focusable = true,
   onClick,
   children,
   ...rest
@@ -194,12 +198,24 @@ function WidgetBox({
   page: PageContextValue;
   colors: FormColors;
   edge?: boolean;
+  focusable?: boolean;
   onClick?: () => void;
   children?: React.ReactNode;
 } & Omit<React.HTMLAttributes<HTMLDivElement>, 'onClick' | 'children'>) {
+  const form = useCapability(FormHostToken);
   const { onPress, ...events } = useWidgetEvents(item.fieldRef, item.annotationRef);
   const wrap = useIsolated<HTMLDivElement>(onPress);
   const frame = rectInPixels(item.box, page.transform);
+  const widget = item.annotationRef;
+  const takesCursor = focusable && !item.disabled;
+  const radio = item.control === 'toggle' && item.kind === 'radio';
+  useEffect(
+    () =>
+      wrap.current && widget && takesCursor
+        ? bindFieldFocus(wrap.current, form, widget, { radio })
+        : undefined,
+    [wrap, form, widget, takesCursor, radio],
+  );
   return (
     <div
       ref={wrap}
@@ -420,6 +436,7 @@ function SignatureControl({ item, page, colors }: ControlProps<'signature'>) {
       item={item}
       page={page}
       colors={colors}
+      focusable={actionable}
       style={{ cursor: actionable ? 'pointer' : 'default' }}
     >
       {actionable ? (

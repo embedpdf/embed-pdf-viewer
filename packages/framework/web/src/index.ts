@@ -375,6 +375,8 @@ export { attachMenuKeys, menuItemLabelOf, typeaheadMatchOf } from './menu-keys';
 export type { MenuKeysOptions } from './menu-keys';
 export { attachFocusTrap, moveFocusInto } from './focus-trap';
 export type { FocusTrapOptions } from './focus-trap';
+export { bindFieldFocus } from './field-focus';
+export type { FieldFocusForm, FieldFocusOptions } from './field-focus';
 export { createSurfaceFocusFollower } from './surface-focus';
 export type { SurfaceFocusFollower, SurfaceFocusOptions } from './surface-focus';
 export { standardCommandsBrowser } from './standard-commands-platform';

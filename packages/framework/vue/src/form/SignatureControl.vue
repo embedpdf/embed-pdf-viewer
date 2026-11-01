@@ -17,10 +17,6 @@ const props = defineProps<{
   colors: FormColors;
 }>();
 
-const { element: box, style: boxStyle } = useWidgetBox(
-  () => props.item,
-  () => props.colors,
-);
 const signature = useOptionalCapability(SignatureToken);
 // The signature plugin knows best whether it's signed (it reads again after
 // every new version); the field's own value is the fallback.
@@ -32,6 +28,12 @@ const known = useOptionalSelector(
 const signed = computed(() => known.value ?? props.item.signed);
 const actionable = computed(
   () => signature.value !== null && (signed.value || !props.item.disabled),
+);
+const { element: box, style: boxStyle } = useWidgetBox(
+  () => props.item,
+  () => props.colors,
+  // Without the signature plugin the box has nothing to focus.
+  { focusable: () => actionable.value },
 );
 
 function onClick(): void {

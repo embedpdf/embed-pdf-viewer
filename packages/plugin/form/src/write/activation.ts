@@ -17,10 +17,10 @@ import type { Fills } from './fill';
 
 export function createActivation(
   ctx: FormContext,
-  services: Pick<FormServices, 'fields' | 'siblings' | 'scripting'>,
+  services: Pick<FormServices, 'fields' | 'siblings' | 'scripting' | 'cursor'>,
   { fill }: Fills,
 ) {
-  const { fields, scripting } = services;
+  const { fields, scripting, cursor } = services;
 
   /** The widget's activation action, from its row in the form. */
   const annotationActivation = async (ref: AnnotationRef) => {
@@ -122,6 +122,7 @@ export function createActivation(
         };
       },
       notifyWidgetEvent: (fieldRef, annotationRef, event) => {
+        if (event === 'focus' || event === 'blur') cursor.note(event, fieldRef, annotationRef);
         const actions = ctx.tryGet(ActionsToken);
         if (!actions) return;
         const source = widgetSource(fieldRef, annotationRef);

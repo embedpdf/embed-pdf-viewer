@@ -2136,6 +2136,9 @@ importers:
       '@embedpdf/plugin-render':
         specifier: workspace:*
         version: link:../render
+      '@embedpdf/plugin-stage':
+        specifier: workspace:*
+        version: link:../stage
     devDependencies:
       '@embedpdf/engine':
         specifier: workspace:*

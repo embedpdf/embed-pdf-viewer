@@ -246,7 +246,9 @@ export class FormComboControl extends FormWidgetBox<WidgetOf<'choice'>> {
   /** The field's choice, and its options, by value: what the select is set to show. */
   private readonly choice = computed(() => this.item().selected[0] ?? '');
   private readonly optionValues = computed(() =>
-    this.item().options.map((option) => option.value).join('\0'),
+    this.item()
+      .options.map((option) => option.value)
+      .join('\0'),
   );
 
   protected readonly selectStyle = computed(() => {
@@ -384,6 +386,8 @@ export class FormSignatureControl extends FormWidgetBox<WidgetOf<'signature'>> {
   protected readonly actionable = computed(
     () => this.signature.capability() !== null && (this.signed() || !this.item().disabled),
   );
+  // Without the signature plugin the box has nothing to focus.
+  protected override readonly focusable = this.actionable;
 
   protected readonly buttonStyle = {
     ...FORM_CONTROL_FILL,

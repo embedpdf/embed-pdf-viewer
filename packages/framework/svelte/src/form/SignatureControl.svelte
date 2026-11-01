@@ -36,7 +36,12 @@
   }
 </script>
 
-<WidgetBox {item} {colors} style="cursor: {actionable ? 'pointer' : 'default'}">
+<WidgetBox
+  {item}
+  {colors}
+  focusable={actionable}
+  style="cursor: {actionable ? 'pointer' : 'default'}"
+>
   {#if actionable}
     <button
       type="button"
