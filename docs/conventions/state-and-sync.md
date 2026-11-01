@@ -409,17 +409,24 @@ records are named by the object numbers they take, and typing is a hold
 The document's pages (`ctx.document().pages`, `ctx.getPage`, `ctx.pageOf`,
 `documents.listPages`) are a view as well: the engine's pages, from its layout
 events, with the pending changes' page ops replayed on top through
-engine-core's `pagesAfter` (a rotate, a move, a delete, a blank insert that
-names its pages, an undo that restores pages). The Stage, the thumbnails and
-every index a verb takes read it, so a page edit shows at once and an index
-names the page the user sees. `revision` moves when the list does; an answer
-the prediction got right leaves the same list and the same page objects.
+engine-core's `pagesAfter` (a rotate, a move, a delete, a blank insert or a
+copy that names its pages, an undo that restores pages). The Stage, the
+thumbnails and every index a verb takes read it, so a page edit shows at once
+and an index names the page the user sees. `revision` moves when the list
+does; an answer the prediction got right leaves the same list and the same
+page objects.
+
+The page label sections move with the pages (`ctx.document().pageLabels`), by
+the same rules the engine writes `/PageLabels` with (engine-core
+`pages/labels`), so each page's `label` is the one the engine will give it. An
+undo of a page edit ends with `pages.relabel`: the sections the edit found.
 
 A page a pending change makes is in the list before the engine has it.
 `ctx.document().pendingPages` names those pages, with where each one's look
-comes from (`blank`, `own`). Code that asks the engine about a page waits for
-them: page mirrors do it for you, and the render plugin asks for no picture
-until the page lands.
+comes from (`blank`, `own`, or `copy` of another page). Code that asks the
+engine about a page waits for them: page mirrors do it for you, and the render
+plugin asks for no picture until the page lands, except that a copy draws as
+the page it copies.
 
 ### Undo and redo
 

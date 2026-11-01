@@ -12,7 +12,7 @@ import type { DocumentSession } from '../../document-session/DocumentSession';
 import { readUtf8String, readUtf16String, writeUtf16String } from '../../runtime/memory/strings';
 import { throwIfAborted } from '../../shared/abort';
 import { formatPdfDate, pdfDateToIso } from '../../shared/pdf-date';
-import { withWideStringArray } from '../forms/internal/wideStringArray';
+import { withWideStringArray } from '../../runtime/memory/wideStringArray';
 
 // FPDF_OBJECT_* codes reported by EPDFDoc_Get(Page)PieceInfoValueType.
 const OBJ_BOOLEAN = 1;

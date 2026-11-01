@@ -64,7 +64,7 @@ import {
 } from './internal/fieldAttribution';
 import { writeFieldScripts } from './internal/fieldScripts';
 import { writeFieldEntry, writeSelectedIndices } from './internal/fieldValues';
-import { withWideStringArray } from './internal/wideStringArray';
+import { withWideStringArray } from '../../runtime/memory/wideStringArray';
 import { readFieldAt } from './internal/readFormSnapshot';
 import {
   fieldObjectNumberOf,

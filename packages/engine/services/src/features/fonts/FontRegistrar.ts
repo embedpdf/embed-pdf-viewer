@@ -258,7 +258,8 @@ export class FontRegistrar {
   /** Append a registered font to the ordered glyph-fallback chain. */
   addFallback(fontKey: string): void {
     const id = this.requireId(fontKey);
-    if (!this.runtime.fn.EPDFFont_AddFallbackFont(id)) {
+    // One tier: the fallbacks are tried in the order they were added.
+    if (!this.runtime.fn.EPDFFont_AddFallbackFont(id, 0)) {
       throw new EngineError(EngineErrorCode.InvalidArg, `addFallback failed: ${fontKey}`);
     }
   }

@@ -36,7 +36,7 @@ function answerOf(change: Change): ChangeResult {
   return {
     items: ops.map((op) => ({
       type: op.type,
-      ...(op.type === 'pages.insert' || op.type === 'pages.insertBlank'
+      ...(op.type === 'pages.insert' || op.type === 'pages.insertBlank' || op.type === 'pages.copy'
         ? { insertedPages: NEW_PAGES }
         : {}),
       meta,
@@ -354,22 +354,30 @@ describe('PageEditCapability', () => {
       expect(ctx.changes.pending()[0]!.label).toEqual({ key: 'pages.insert' });
     });
 
-    it('duplicate inserts copies right after the last of the pages, once the changes before it landed', async () => {
-      const { ctx, pageEdit, extract, sent, held, control } = harness({ pages: THREE_PAGES });
+    it('duplicate copies the pages right after the last of them, shown at once as they show', async () => {
+      const { ctx, pageEdit, extract, sent, control } = harness({ pages: THREE_PAGES });
       control.hold = true;
       void pageEdit.rotateBy([toPageRef(10)], 90);
-      const duplicated = pageEdit.duplicate([toPageRef(10), 1]);
-      await new Promise((resolve) => setTimeout(resolve));
-      // The copy waits for the rotate, so it holds the page as it shows.
-      expect(extract).not.toHaveBeenCalled();
-      control.hold = false;
-      held.shift()!.resolve();
-      await expect(duplicated).resolves.toEqual({ pages: NEW_PAGES });
-      expect(extract).toHaveBeenCalledWith([toPageRef(10), toPageRef(20)]);
+      void pageEdit.duplicate([toPageRef(10), 1]);
+      // One change after the rotate, named from the pool: the copies show turned, pending.
       expect(sent()[1]).toEqual([
-        { type: 'pages.insert', source: new Uint8Array([9]), position: { after: toPageRef(20) } },
+        {
+          type: 'pages.copy',
+          pages: [toPageRef(10), toPageRef(20)],
+          position: { after: toPageRef(20) },
+          objectNumbers: [101, 102],
+        },
       ]);
-      expect(ctx.changes.hasPending()).toBe(false);
+      expect(ctx.document()!.pages.map((page) => page.ref.objectNumber)).toEqual([
+        10, 20, 101, 102, 30,
+      ]);
+      expect(ctx.getPage(toPageRef(101))!.rotation).toBe(90);
+      expect(ctx.document()!.pendingPages.get(102)).toEqual({ look: 'copy', of: toPageRef(20) });
+      expect(ctx.changes.pending()[1]!.undo).toEqual([
+        { type: 'pages.delete', pages: [toPageRef(101), toPageRef(102)] },
+      ]);
+      // Nothing leaves the document.
+      expect(extract).not.toHaveBeenCalled();
     });
 
     it('insertFromDocument copies pages of another open document, by ref or index', async () => {
@@ -389,8 +397,14 @@ describe('PageEditCapability', () => {
         pageEdit.insertFromDocument('other', [1, toPageRef(500)], { position: 'start' }),
       ).resolves.toEqual({ pages: NEW_PAGES });
       expect(otherExtract).toHaveBeenCalledWith([toPageRef(501), toPageRef(500)]);
+      // Two pages come in: named first, so undoing the insert shows at once.
       expect(last()).toEqual([
-        { type: 'pages.insert', source: new Uint8Array([7]), position: 'start' },
+        {
+          type: 'pages.insert',
+          source: new Uint8Array([7]),
+          position: 'start',
+          objectNumbers: [101, 102],
+        },
       ]);
       await expect(pageEdit.insertFromDocument('other', [5])).rejects.toMatchObject({
         code: 'not-found',
@@ -453,7 +467,7 @@ describe('PageEditCapability', () => {
       expect(ctx.changes.hasPending()).toBe(false);
     });
 
-    it('refuses extract and duplicate without doc.download', async () => {
+    it('refuses extract without doc.download; duplicate needs only doc.pages.assemble', async () => {
       const { pageEdit, extract } = harness({
         pages: THREE_PAGES,
         allows: (permission) => permission !== 'doc.download',
@@ -462,10 +476,7 @@ describe('PageEditCapability', () => {
         code: 'permission-denied',
         permission: 'doc.download',
       });
-      await expect(pageEdit.duplicate([0])).rejects.toMatchObject({
-        code: 'permission-denied',
-        permission: 'doc.download',
-      });
+      await expect(pageEdit.duplicate([0])).resolves.toEqual({ pages: NEW_PAGES });
       expect(extract).not.toHaveBeenCalled();
     });
   });

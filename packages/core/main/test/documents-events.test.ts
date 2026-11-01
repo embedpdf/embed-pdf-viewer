@@ -27,7 +27,7 @@ describe('documents · lifecycle events', () => {
     await documents.open(bytesInput('b'));
     (handle.events as unknown as { emit(error: unknown): void }).emit({
       type: 'pages.rotated',
-      layout: { pageCount: 2, pages: [page(1, 0), { ...page(2, 1), rotation: 90 }] },
+      layout: { pageCount: 2, labels: [], pages: [page(1, 0), { ...page(2, 1), rotation: 90 }] },
     });
     documents.setActive('a');
     await documents.close('a');

@@ -46,6 +46,7 @@ describe('synthetic action form AF library acceptance', () => {
       revision: 0,
       hasUnsavedChanges: false,
       renderPolicy: { kind: 'continuous' },
+      pageLabels: [],
       pendingPages: new Map(),
     });
     const realm = standaloneRealm(doc, document, {

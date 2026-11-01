@@ -49,12 +49,17 @@ export interface PagePositionOptions extends OperationOptions {
 /**
  * Every edit is one change: one step of the history, so undo brings the
  * pages back as they were, a deleted page with its annotations under its old
- * ref. A rotate, a move, a delete and a blank insert show in the page list at
- * once, and so does undoing one; when the engine refuses the edit, the pages
- * go back. Pages copied in show once the engine answers. Edits apply in the
- * order they were called, except that the verbs that copy pages first
- * (`duplicate()`, `insertFromDocument()`, `insertFromBytes()` with
- * `pageIndexes`) take their place once the copy is made.
+ * ref, and the page labels as they read. A rotate, a move, a delete, a blank
+ * insert and a duplicate show in the page list at once, and so does undoing
+ * one; when the engine refuses the edit, the pages go back. Pages copied in
+ * from another PDF or document show once the engine answers. Edits apply in
+ * the order they were called, except that the verbs that copy pages out of
+ * another PDF or document first (`insertFromDocument()`, `insertFromBytes()`
+ * with `pageIndexes`) take their place once the copy is made.
+ *
+ * Page labels follow their sections, as the engine moves them: a section
+ * stays with the page it starts at, a page takes the numbering of the section
+ * it lands in, and the first section starts at the first page.
  *
  * Every verb rejects `permission-denied` (with `error.permission`) when the
  * session may not do it, `not-found` for a page the document doesn't have and
@@ -67,8 +72,8 @@ export interface PageEditCapability {
   /** Whether rotating, reordering, deleting and inserting pages is allowed (`doc.pages.assemble`). */
   canEdit(): boolean;
   /**
-   * Whether copying pages out is allowed (`doc.download`): `extract()`,
-   * `duplicate()` and `insertFromDocument()` need it.
+   * Whether copying pages out is allowed (`doc.download`): `extract()` and
+   * `insertFromDocument()` need it.
    */
   canExtract(): boolean;
 
@@ -119,7 +124,10 @@ export interface PageEditCapability {
   ): Promise<PageEditInsertResult>;
   /**
    * Copy pages as they show, with the edits on their way, right after the
-   * last of them unless `position` says otherwise.
+   * last of them unless `position` says otherwise. The copies bring the pages'
+   * annotations, and their form fields as fields of their own (a name the
+   * document already uses gets the first free `name_2`, `name_3`). Needs only
+   * `doc.pages.assemble`: the pages don't leave the document.
    */
   duplicate(
     pages: readonly (PageRef | number)[],

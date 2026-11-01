@@ -14,6 +14,7 @@ import type {
 import {
   EngineError,
   EngineErrorCode,
+  labelAt,
   normalizePdfRect,
   pageBoxesOf,
   pageRotationOf,
@@ -40,6 +41,7 @@ import {
 } from '../../runtime/memory/structs';
 import { throwIfAborted } from '../../shared/abort';
 import { ActionReadBudgetTracker, readActionModel } from '../actions/ActionModelReader';
+import { readLabelSections } from './internal/pageLabels';
 
 // EPDF_PAGE_BOX_TYPE (public/fpdfview.h).
 const BOX_MEDIA = 0;
@@ -67,6 +69,7 @@ export class PagesReader {
     const docPtr = this.session.requireDocPtr();
     const records = this.session.allRecords();
     const actionBudget = new ActionReadBudgetTracker();
+    const labels = readLabelSections(this.runtime, docPtr);
 
     // One scratch buffer per struct kind, reused across every page.
     return withScratchN(
@@ -81,7 +84,7 @@ export class PagesReader {
           return {
             index,
             ref: toPageRef(record.pageObjectNumber),
-            label: readLabel(fn, mem, docPtr, index),
+            label: labelAt(labels, index),
             size: pdfRectSize(boxes.crop),
             rotation: readRotation(fn, mem, docPtr, index, intPtr),
             userUnit: readUserUnit(fn, mem, docPtr, index, userUnitPtr),
@@ -91,7 +94,12 @@ export class PagesReader {
             ...(actions ? { actions } : {}),
           };
         });
-        return { pageCount: pages.length, pages, namedPages: readNamedPages(fn, mem, docPtr) };
+        return {
+          pageCount: pages.length,
+          pages,
+          labels,
+          namedPages: readNamedPages(fn, mem, docPtr),
+        };
       },
     );
   }
@@ -242,24 +250,6 @@ function readTabOrder(
     fn.EPDF_GetPageTabOrderByIndex(docPtr, index, buf, capacity),
   );
   return name ? (TAB_ORDER[name] ?? null) : null;
-}
-
-function readLabel(
-  fn: PdfFunctions,
-  mem: PdfRuntimeMemory,
-  docPtr: Ptr,
-  index: number,
-): string | null {
-  // A page label of '' is indistinguishable from "absent" for our DTO, so
-  // empty reads as null (`emptyAs: null`); the trailing `|| null` also maps
-  // a decoded-but-empty buffer to null.
-  return (
-    readUtf16String(
-      mem,
-      (buf, capacity) => fn.FPDF_GetPageLabel(docPtr, index, buf, capacity),
-      null,
-    ) || null
-  );
 }
 
 // `EPDF_NAMED_PAGE_TREE_*` / `EPDF_NAMED_PAGE_KIND_*` from public/epdf_named_pages.h.

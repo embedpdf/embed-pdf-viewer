@@ -153,6 +153,7 @@ function layoutSnapshot() {
         pdfCropBox: { ...box },
       },
     ],
+    labels: [],
     namedPages: [],
   };
 }
@@ -246,7 +247,7 @@ function buildStub(initial: ServerState): StubbedFixture {
     }
 
     const layoutMatch = path.match(
-      /^\/v1\/docs\/([^/]+)\/layers\/([^/]+)\/layout@layoutVersion=(\d+)$/,
+      /^\/v1\/docs\/([^/]+)\/layers\/([^/]+)\/layout@format=2,layoutVersion=(\d+)$/,
     );
     if (layoutMatch && method === 'GET') {
       const requested = Number(layoutMatch[3]);
@@ -552,7 +553,7 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
       expect(paths).toEqual([
         `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/head`,
         `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/manifest@docVersion=1`,
-        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/layout@layoutVersion=1`,
+        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/layout@format=2,layoutVersion=1`,
       ]);
       expect(paths.filter((path) => path.endsWith('/head'))).toHaveLength(1);
     } finally {
@@ -589,7 +590,7 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
         `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/manifest@docVersion=1`,
         `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/head`,
         `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/manifest@docVersion=2`,
-        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/layout@layoutVersion=1`,
+        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/layout@format=2,layoutVersion=1`,
       ]);
     } finally {
       await doc.close();

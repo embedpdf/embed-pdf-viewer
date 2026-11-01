@@ -1033,6 +1033,35 @@ function writeDelete(ctx: ChangeContext, before: ReadField, rights?: StepRights)
   );
 }
 
+/** The object numbers of the form's fields. */
+export function fieldNumbersOf(ctx: ChangeContext): Set<number> {
+  return new Set(allFields(ctx).map(({ objectNumber }) => objectNumber));
+}
+
+/**
+ * Deletes each of the fields `objectNumbers` whose widgets are all on `pages`:
+ * the fields pages an insert copied in brought, when those pages go again.
+ * Returns the steps that bring them back, which run once the pages are back.
+ */
+export function deleteFieldsOn(
+  ctx: ChangeContext,
+  objectNumbers: readonly number[],
+  pages: ReadonlySet<number>,
+): ReverseStep[] {
+  const reverse: ReverseStep[] = [];
+  for (const objectNumber of objectNumbers) {
+    const field = tryReadFieldByNumber(ctx, objectNumber);
+    if (
+      !field ||
+      !field.field.widgets.every((widget) => widget.page && pages.has(widget.page.objectNumber))
+    ) {
+      continue;
+    }
+    reverse.push(...writeDelete(ctx, field).reverse);
+  }
+  return reverse;
+}
+
 function revertStep(
   reports: ChangeItemType,
   objects: readonly CapturedObject[],

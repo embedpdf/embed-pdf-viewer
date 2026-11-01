@@ -163,7 +163,7 @@ async function boot(
       },
       lastServerId: () => null,
     },
-    pages: { list: () => Promise.resolve({ pageCount: pages.length, pages }) },
+    pages: { list: () => Promise.resolve({ pageCount: pages.length, labels: [], pages }) },
     security: {
       allows: (capability: string) => options.allows?.(capability) ?? options.allow ?? true,
     },
@@ -357,7 +357,7 @@ describe('policy conformance — the host door', () => {
     fixture.emit(
       documentEvent({
         type: 'pages.inserted',
-        layout: { pageCount: shown.length, pages: shown, namedPages: [] },
+        layout: { pageCount: shown.length, labels: [], pages: shown, namedPages: [] },
         origin: { kind: 'local' },
       }),
     );
@@ -371,6 +371,19 @@ describe('policy conformance — the host door', () => {
     refused.reject(new Error('refused'));
     await expect(never).rejects.toMatchObject({ code: 'not-found' });
     expect(fixture.imageCalls).toHaveLength(1);
+    await fixture.kernel.destroy();
+  });
+
+  it('draws a pending copy as the page it copies, before the engine has it', async () => {
+    const fixture = await boot();
+    fixture.stage({
+      label: { key: 'pages.duplicate' },
+      ops: [{ type: 'pages.copy', pages: [toPageRef(11)], objectNumbers: [46] }],
+    });
+    const picture = fixture.render.renderSource(toPageRef(46), { scale: 1 });
+    expect(fixture.imageCalls.map((call) => call.pageObjectNumber)).toEqual([11]);
+    fixture.tasks[0]!.resolve(image());
+    await picture;
     await fixture.kernel.destroy();
   });
 

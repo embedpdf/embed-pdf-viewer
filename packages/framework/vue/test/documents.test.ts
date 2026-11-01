@@ -87,7 +87,11 @@ describe('useDocument and useDocumentsState', () => {
       h(Probe),
       h(DocumentScope, { id: 'a' }, () => h(Scoped)),
     ]);
-    expect(latest(documents)).toMatchObject({ id: '', status: 'loading', hasUnsavedChanges: false });
+    expect(latest(documents)).toMatchObject({
+      id: '',
+      status: 'loading',
+      hasUnsavedChanges: false,
+    });
     expect(latest(states)).toEqual({ documents: [], activeId: null });
 
     await kernel.documents.open(bytesInput('a'), { name: 'Contract' });
@@ -202,7 +206,7 @@ describe('the Viewer’s own settings', () => {
         Promise.resolve({
           id: input.id,
           events: { subscribe: () => () => {}, lastServerId: () => null },
-          pages: { list: () => Promise.resolve({ pageCount: 0, pages: [] }) },
+          pages: { list: () => Promise.resolve({ pageCount: 0, labels: [], pages: [] }) },
           security: { allows: () => true },
           // Calls' facts and working sets change nothing here: the same document.
           with() {

@@ -54,7 +54,7 @@ function engine(): Engine {
   const handle = {
     id: 'd',
     events: { subscribe: () => () => {}, lastServerId: () => null },
-    pages: { list: () => Promise.resolve({ pageCount: 1, pages: [page] }) },
+    pages: { list: () => Promise.resolve({ pageCount: 1, labels: [], pages: [page] }) },
     security: { allows: () => true },
     close: () => Promise.resolve(),
   } as unknown as DocumentHandle;

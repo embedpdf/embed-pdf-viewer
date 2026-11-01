@@ -142,7 +142,7 @@ export type {
   AnnotationCreateOptions,
   AnnotationUpdateOptions,
   FlattenWriteOptions,
-  PageInsertBlankOptions,
+  PageInsertOptions,
   FormFieldCreateOptions,
   FormWidgetAddOptions,
   ObjectNumberPool,

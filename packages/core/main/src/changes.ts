@@ -33,6 +33,7 @@ import {
   type DocumentHandle,
   type FormFieldDTO,
   type OutlineItem,
+  type PageLabelSection,
   type RestoredPage,
   type WidgetAnnotation,
 } from '@embedpdf/engine-core/runtime';
@@ -84,6 +85,14 @@ export type PredictedOp =
       readonly type: 'pages.restore';
       /** The pages a delete took, in display order, each with the page it followed (`restoredPagesOf`). */
       readonly pages: readonly RestoredPage[];
+    }
+  | {
+      /**
+       * The page label sections an undo of a page edit puts back: those the
+       * edit found, after the ops that put the pages back.
+       */
+      readonly type: 'pages.relabel';
+      readonly labels: readonly PageLabelSection[];
     };
 
 /** One user action, as a plugin stages it. */

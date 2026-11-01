@@ -6,9 +6,10 @@
  * A verb refuses before anything starts (permission, pages, position), then
  * stages its edit as one change on the document's queue (`ctx.changes`): one
  * step of the history, sent after everything staged before it. The page list
- * shows a rotate, a move, a delete or a blank insert at once (the kernel's
- * page view), with what undoing it shows; an insert of another PDF's pages
- * shows once the engine answers.
+ * shows a rotate, a move, a delete, a blank insert or a duplicate at once (the
+ * kernel's page view), with what undoing it shows, the page labels moving as
+ * the engine moves them; an insert of another PDF's pages shows once the
+ * engine answers.
  */
 import {
   memo,
@@ -51,7 +52,7 @@ const NO_LAYOUTS: readonly PageLayout[] = Object.freeze([]);
 /** What undoing a page op looks like: page ops, and the pages a delete took coming back. */
 type PageUndo = Extract<PredictedOp, { type: `pages.${string}` }>;
 /** A page op, as a verb stages it. */
-type PageOp = Exclude<PageUndo, { type: 'pages.restore' }>;
+type PageOp = Exclude<PageUndo, { type: 'pages.restore' | 'pages.relabel' }>;
 
 /** What a change is called in history and refusals. */
 type PageVerb = 'rotate' | 'reorder' | 'delete' | 'insertBlank' | 'insert' | 'duplicate';
@@ -182,6 +183,15 @@ export function createPageEditController(ctx: PluginContext<PageEditModel>) {
   };
 
   /**
+   * What an undo of a page edit ends with: the label sections the pages show
+   * now, which the edit is about to move. None when the document has none.
+   */
+  const labelsBack = (): PageUndo[] => {
+    const labels = ctx.document()?.pageLabels ?? [];
+    return labels.length > 0 ? [{ type: 'pages.relabel', labels }] : [];
+  };
+
+  /**
    * Names for new pages from the session's pool, as many as it holds up to
    * `count`: final at birth, so the pages show before the engine answers and
    * later edits can name them.
@@ -196,20 +206,29 @@ export function createPageEditController(ctx: PluginContext<PageEditModel>) {
     return numbers;
   };
 
-  /** `count` more names, once the pool reserved them. */
-  const reservedNumbers = async (
+  /**
+   * `count` names for new pages, then `stage` with them: at once when the
+   * pool holds them, so verbs stage in the order they're called, else once it
+   * reserved more.
+   */
+  const withNumbers = <T>(
     count: number,
     options: OperationOptions | undefined,
-  ): Promise<number[]> => {
-    const numbers: number[] = [];
-    while (numbers.length < count) {
-      await ctx.cancellable(
-        options?.signal,
-        ctx.changes.reserveObjectNumbers(count - numbers.length),
-      );
-      numbers.push(...takeNumbers(count - numbers.length));
-    }
-    return numbers;
+    stage: (numbers: number[]) => T,
+  ): T | Promise<T> => {
+    const held = takeNumbers(count);
+    if (held.length === count) return stage(held);
+    return (async () => {
+      const numbers = [...held];
+      while (numbers.length < count) {
+        await ctx.cancellable(
+          options?.signal,
+          ctx.changes.reserveObjectNumbers(count - numbers.length),
+        );
+        numbers.push(...takeNumbers(count - numbers.length));
+      }
+      return stage(numbers);
+    })();
   };
 
   /**
@@ -230,17 +249,33 @@ export function createPageEditController(ctx: PluginContext<PageEditModel>) {
     return ctx.cancellable(options?.signal, ctx.doc.pages.extract([...refs]));
   };
 
-  /** Stage the insert of a PDF's pages; resolves the new pages. */
-  const insertBytes = (
-    verb: 'insert' | 'duplicate',
+  /**
+   * Stage the insert of a PDF's pages; resolves the new pages. When it knows
+   * how many pages the PDF has (`count`), they are named first, so its undo
+   * shows at once; the pages themselves show when the engine answers.
+   */
+  const insertBytes = async (
     count: number | null,
     bytes: Uint8Array | ArrayBuffer,
     position: PagePosition,
     options: OperationOptions | undefined,
   ): Promise<PageEditInsertResult> => {
     const source = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
-    const change = stageChange(verb, count, [{ type: 'pages.insert', source, position }]);
-    return inserted(change, options);
+    if (count === null) {
+      return inserted(
+        stageChange('insert', null, [{ type: 'pages.insert', source, position }]),
+        options,
+      );
+    }
+    return withNumbers(count, options, (objectNumbers) => {
+      const change = stageChange(
+        'insert',
+        count,
+        [{ type: 'pages.insert', source, position, objectNumbers }],
+        [{ type: 'pages.delete', pages: objectNumbers.map(toPageRef) }, ...labelsBack()],
+      );
+      return inserted(change, options);
+    });
   };
 
   /** Some pages of a PDF: open the bytes beside the document and extract them. */
@@ -305,7 +340,7 @@ export function createPageEditController(ctx: PluginContext<PageEditModel>) {
         'reorder',
         refs.length,
         [{ type: 'pages.reorder', pages: refs, position: positionOf(position) }],
-        reorderBackOf(registry(), refs),
+        [...reorderBackOf(registry(), refs), ...labelsBack()],
       );
       await answer(change, options);
     },
@@ -321,7 +356,7 @@ export function createPageEditController(ctx: PluginContext<PageEditModel>) {
         'delete',
         refs.length,
         [{ type: 'pages.delete', pages: refs }],
-        [{ type: 'pages.restore', pages: restoredPagesOf(registry(), refs) }],
+        [{ type: 'pages.restore', pages: restoredPagesOf(registry(), refs) }, ...labelsBack()],
       );
       await answer(change, options);
     },
@@ -331,19 +366,15 @@ export function createPageEditController(ctx: PluginContext<PageEditModel>) {
       const position = positionOf(options.position);
       const count = options.count ?? 1;
       const size = options.size ?? sizeAt(position);
-      // Staged at once when the pool holds the names, so verbs stage in the order they're called.
-      const held = takeNumbers(count);
-      const objectNumbers =
-        held.length === count
-          ? held
-          : [...held, ...(await reservedNumbers(count - held.length, options))];
-      const change = stageChange(
-        'insertBlank',
-        count,
-        [{ type: 'pages.insertBlank', spec: { size, count }, position, objectNumbers }],
-        [{ type: 'pages.delete', pages: objectNumbers.map(toPageRef) }],
-      );
-      return inserted(change, options);
+      return withNumbers(count, options, (objectNumbers) => {
+        const change = stageChange(
+          'insertBlank',
+          count,
+          [{ type: 'pages.insertBlank', spec: { size, count }, position, objectNumbers }],
+          [{ type: 'pages.delete', pages: objectNumbers.map(toPageRef) }, ...labelsBack()],
+        );
+        return inserted(change, options);
+      });
     },
 
     insertFromBytes: async (bytes, options = {}) => {
@@ -352,7 +383,7 @@ export function createPageEditController(ctx: PluginContext<PageEditModel>) {
       const { pageIndexes, signal } = options;
       if (pageIndexes?.length === 0) throw noPages();
       const source = pageIndexes ? await pagesOfBytes(bytes, pageIndexes, signal) : bytes;
-      return insertBytes('insert', pageIndexes?.length ?? null, source, position, options);
+      return insertBytes(pageIndexes?.length ?? null, source, position, options);
     },
 
     insertFromDocument: async (documentId, pages, options = {}) => {
@@ -384,18 +415,24 @@ export function createPageEditController(ctx: PluginContext<PageEditModel>) {
       const bytes = await mapErrors(() =>
         ctx.cancellable(options.signal, other.pages.extract(refs)),
       );
-      return insertBytes('insert', refs.length, bytes, position, options);
+      return insertBytes(refs.length, bytes, position, options);
     },
 
     duplicate: async (pages, options = {}) => {
       refuse(ASSEMBLE, 'pageEdit.duplicate', options);
-      ctx.assertAllowed(DOWNLOAD, 'pageEdit.duplicate');
       const refs = refsOf(pages);
       const position = options.position
         ? positionOf(options.position)
         : { after: refs[refs.length - 1]! };
-      const bytes = await extractShown(refs, options);
-      return insertBytes('duplicate', refs.length, bytes, position, options);
+      return withNumbers(refs.length, options, (objectNumbers) => {
+        const change = stageChange(
+          'duplicate',
+          refs.length,
+          [{ type: 'pages.copy', pages: refs, position, objectNumbers }],
+          [{ type: 'pages.delete', pages: objectNumbers.map(toPageRef) }, ...labelsBack()],
+        );
+        return inserted(change, options);
+      });
     },
 
     extract: async (pages, options) => {

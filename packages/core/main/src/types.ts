@@ -21,6 +21,7 @@ import type {
   EngineFactory,
   OpenInput,
   OpenOptions,
+  PageLabelSection,
   PageLayout,
   PageRef,
   PageObjectNumber,
@@ -190,9 +191,13 @@ export type PromiseMembers<Capability> = { readonly [Path in PromiseMemberOf<Cap
 /**
  * Where a page the engine doesn't have yet gets its look until the engine has
  * it: a blank insert is a white page of its size (`blank`); a deleted page an
- * undo brings back has the pictures it had (`own`).
+ * undo brings back has the pictures it had (`own`); a copy draws as the page
+ * it copies (`copy`).
  */
-export type PendingPage = { readonly look: 'blank' } | { readonly look: 'own' };
+export type PendingPage =
+  | { readonly look: 'blank' }
+  | { readonly look: 'own' }
+  | { readonly look: 'copy'; readonly of: PageRef };
 
 /**
  * What the kernel knows about an open document: its pages as the user sees
@@ -217,6 +222,12 @@ export interface DocumentMeta {
    * index a verb takes names a page of this list.
    */
   readonly pages: readonly PageLayout[];
+  /**
+   * The page label sections of `pages` (`PageListSnapshot.labels`), as they
+   * move with the changes on their way: each page's `label` is read from
+   * them. Empty when the document has none.
+   */
+  readonly pageLabels: readonly PageLabelSection[];
   /**
    * The pages of `pages` the engine doesn't have yet, by object number: a
    * change on its way makes them. Code that asks the engine about a page

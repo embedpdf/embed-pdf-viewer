@@ -120,6 +120,10 @@ export { runPageFormFieldsConformance } from './conformance/runPageFormFieldsCon
 export type { PageFormFieldsConformanceOptions } from './conformance/runPageFormFieldsConformance';
 export { runPageInsertBlankConformance } from './conformance/runPageInsertBlankConformance';
 export {
+  runPageCopyConformance,
+  type PageCopyConformanceOptions,
+} from './conformance/runPageCopyConformance';
+export {
   OBJECT_NUMBER_FIXTURE_PDF,
   runObjectNumberConformance,
   type ObjectNumberConformanceOptions,

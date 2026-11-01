@@ -12,15 +12,21 @@
  * object, and pages that all read as they did are the same list, so an
  * answer the prediction got right changes nothing.
  *
- * Pages a pending change makes (a blank insert, a deleted page coming back)
- * are in the list before the engine has them: `pending` names them, with
- * where their look comes from until it does.
+ * Pages a pending change makes (a blank insert, a copy, a deleted page coming
+ * back) are in the list before the engine has them: `pending` names them,
+ * with where their look comes from until it does. The page label sections
+ * move with the pages, as the engine moves them, so each page's `label` is
+ * the one the engine will give it.
  */
 import {
   pagesAfter,
   pagesAfterRestore,
+  pagesRelabelled,
+  sameSections,
   type DocumentEvent,
+  type PageLabelSection,
   type PageLayout,
+  type PageList,
   type PageObjectNumber,
   type PageRef,
 } from '@embedpdf/engine-core/runtime';
@@ -30,9 +36,10 @@ import { createFoldedChanges, replay, showingWith } from './mirror';
 import { sameValue } from './same-value';
 import type { PendingPage } from './types';
 
-/** The pages as the user sees them, and those of them the engine doesn't have yet. */
+/** The pages as the user sees them, their label sections, and the pages the engine doesn't have yet. */
 export interface PageView {
   readonly pages: readonly PageLayout[];
+  readonly labels: readonly PageLabelSection[];
   readonly pending: ReadonlyMap<PageObjectNumber, PendingPage>;
 }
 
@@ -48,8 +55,8 @@ export interface PageViewReads {
 
 /** The kernel's side of a document's page view. */
 export interface PageViewController extends PageViewReads {
-  /** The engine's pages: the snapshot at open, then each layout event's. */
-  setEnginePages(pages: readonly PageLayout[]): void;
+  /** The engine's pages and sections: the snapshot at open, then each layout event's. */
+  setEnginePages(list: PageList): void;
   /** One of the document's events: once it is a change's last, the change stops replaying. */
   fold(event: DocumentEvent): void;
   /** Work the view out again: the new one when it changed since the last time, else null. */
@@ -82,17 +89,20 @@ export function layoutFromEvent(event: DocumentEvent) {
 }
 
 /** One op of a pending change over the pages: the page ops, by the engine's rules. */
-export function predictPages(pages: readonly PageLayout[], op: PredictedOp): readonly PageLayout[] {
+export function predictPages(list: PageList, op: PredictedOp): PageList {
   switch (op.type) {
     case 'pages.rotate':
     case 'pages.reorder':
     case 'pages.delete':
     case 'pages.insertBlank':
-      return pagesAfter(pages, op);
+    case 'pages.copy':
+      return pagesAfter(list, op);
     case 'pages.restore':
-      return pagesAfterRestore(pages, op.pages);
+      return pagesAfterRestore(list, op.pages);
+    case 'pages.relabel':
+      return pagesRelabelled(list, op.labels);
     default:
-      return pages;
+      return list;
   }
 }
 
@@ -103,10 +113,10 @@ export function createPageView(options: {
   const { changes, report } = options;
   const folded = createFoldedChanges(changes);
   const listeners = new Set<() => void>();
-  let engine: readonly PageLayout[] = [];
+  let engine: PageList = { pages: [], labels: [] };
   /** What the last replay gave, before it was matched to the view: equal means nothing moved. */
-  let replayed: readonly PageLayout[] = engine;
-  let view: PageView = { pages: engine, pending: NO_PENDING_PAGES };
+  let replayed: PageList = engine;
+  let view: PageView = { ...engine, pending: NO_PENDING_PAGES };
 
   const shown = (): QueuedChange[] => showingWith(changes, [], folded);
 
@@ -115,10 +125,11 @@ export function createPageView(options: {
     const next = replay(engine, showing, predictPages, report);
     if (next === replayed) return null;
     replayed = next;
-    const pages = keptWhereSame(view.pages, next);
-    const pending = keptIfSame(view.pending, pendingOf(pages, engine, showing));
-    if (pages === view.pages && pending === view.pending) return null;
-    view = { pages, pending };
+    const pages = keptWhereSame(view.pages, next.pages);
+    const labels = sameSections(view.labels, next.labels) ? view.labels : next.labels;
+    const pending = keptIfSame(view.pending, pendingOf(pages, engine.pages, showing));
+    if (pages === view.pages && labels === view.labels && pending === view.pending) return null;
+    view = { pages, labels, pending };
     for (const listener of [...listeners]) {
       try {
         listener();
@@ -130,8 +141,8 @@ export function createPageView(options: {
   };
 
   return {
-    setEnginePages(pages) {
-      engine = pages;
+    setEnginePages(list) {
+      engine = { pages: list.pages, labels: list.labels };
     },
     fold(event) {
       folded.add(event);
@@ -172,7 +183,7 @@ function keptIfSame(
   next: ReadonlyMap<PageObjectNumber, PendingPage>,
 ): ReadonlyMap<PageObjectNumber, PendingPage> {
   if (previous.size !== next.size) return next;
-  for (const [page, look] of next) if (previous.get(page) !== look) return next;
+  for (const [page, look] of next) if (!sameValue(previous.get(page), look)) return next;
   return previous;
 }
 
@@ -190,6 +201,11 @@ function pendingOf(
     for (const op of change.shows) {
       if (op.type === 'pages.insertBlank') {
         for (const number of op.objectNumbers ?? []) looks.set(number, BLANK);
+      } else if (op.type === 'pages.copy') {
+        (op.objectNumbers ?? []).forEach((number, at) => {
+          const of = op.pages[at];
+          if (of) looks.set(number, { look: 'copy', of });
+        });
       } else if (op.type === 'pages.restore') {
         for (const { page } of op.pages) looks.set(page.ref.objectNumber, OWN);
       }

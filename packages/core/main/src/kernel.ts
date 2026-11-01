@@ -1,6 +1,6 @@
 import { createBurstGate } from './bursts';
 import { createDocumentChanges } from './changes';
-import { createPageView, layoutFromEvent, NO_PENDING_PAGES } from './page-view';
+import { createPageView, layoutFromEvent, NO_PENDING_PAGES, type PageView } from './page-view';
 import { timerClock, type HostClock } from './clock';
 import { createStore } from './store';
 import {
@@ -702,8 +702,7 @@ export function createKernel(config: {
   function commitReady(session: DocumentSession): void {
     session.phase = 'ready';
     session.pageView.refresh();
-    const view = session.pageView.current();
-    const meta = pageMetaOf(session.stagedMeta!, view.pages, view.pending);
+    const meta = pageMetaOf(session.stagedMeta!, session.pageView.current());
     const core = store.getCore();
     const { [session.id]: _resolved, ...pending } = core.pending;
     setCore({ documents: { ...core.documents, [session.id]: meta }, pending });
@@ -720,17 +719,17 @@ export function createKernel(config: {
     opened.emit({ documentId: session.id, info: documentInfoOf(meta) });
   }
 
-  /** `meta` with these pages: its revision moves when the pages do. */
-  function pageMetaOf(
-    meta: DocumentMeta,
-    pages: DocumentMeta['pages'],
-    pending: DocumentMeta['pendingPages'],
-  ): DocumentMeta {
-    if (meta.pages === pages && meta.pendingPages === pending) return meta;
+  /** `meta` with the pages a page view shows: its revision moves when the pages do. */
+  function pageMetaOf(meta: DocumentMeta, view: PageView): DocumentMeta {
+    const { pages, labels, pending } = view;
+    if (meta.pages === pages && meta.pageLabels === labels && meta.pendingPages === pending) {
+      return meta;
+    }
     return {
       ...meta,
       pageCount: pages.length,
       pages,
+      pageLabels: labels,
       pendingPages: pending,
       revision: meta.pages === pages ? meta.revision : meta.revision + 1,
     };
@@ -748,7 +747,7 @@ export function createKernel(config: {
     const now = store.getCore();
     const existing = now.documents[session.id];
     if (!existing) return; // not published yet (commitReady publishes the view), or closed
-    const updated = pageMetaOf(existing, view.pages, view.pending);
+    const updated = pageMetaOf(existing, view);
     if (updated === existing) return;
     setCore({ documents: { ...now.documents, [session.id]: updated } });
     if (updated.pages === existing.pages) return;
@@ -1311,7 +1310,11 @@ export function createKernel(config: {
    *  document was never `ready`. */
   async function bringUp(
     session: DocumentSession,
-    snapshot: { pageCount: number; pages: DocumentMeta['pages'] },
+    snapshot: {
+      pageCount: number;
+      pages: DocumentMeta['pages'];
+      labels: DocumentMeta['pageLabels'];
+    },
   ): Promise<void> {
     session.phase = 'bringup';
     // The render policy is a document fact (Pattern A, like the page
@@ -1327,7 +1330,7 @@ export function createKernel(config: {
       /* unreachable policy = continuous */
     }
     checkpoint(session);
-    session.pageView.setEnginePages(snapshot.pages);
+    session.pageView.setEnginePages(snapshot);
     session.pageView.refresh();
     session.stagedMeta = {
       id: session.id,
@@ -1335,6 +1338,7 @@ export function createKernel(config: {
       name: session.name,
       pageCount: snapshot.pageCount,
       pages: session.pageView.current().pages,
+      pageLabels: session.pageView.current().labels,
       pendingPages: NO_PENDING_PAGES,
       revision: 0,
       renderPolicy,
@@ -1362,7 +1366,7 @@ export function createKernel(config: {
         }
       }
       const layout = layoutFromEvent(event);
-      if (layout) session.pageView.setEnginePages(layout.pages);
+      if (layout) session.pageView.setEnginePages(layout);
       session.pageView.fold(event);
       refreshPages(session);
     });

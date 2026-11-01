@@ -18,7 +18,7 @@ function makeHandle(id: string) {
   const handle = {
     id,
     events: { subscribe: () => () => {}, lastServerId: () => null },
-    pages: { list: () => Promise.resolve({ pageCount: 1, pages: [page] }) },
+    pages: { list: () => Promise.resolve({ pageCount: 1, labels: [], pages: [page] }) },
     close: vi.fn(() => Promise.resolve()),
   };
   return { handle: handle as unknown as DocumentHandle, close: handle.close };

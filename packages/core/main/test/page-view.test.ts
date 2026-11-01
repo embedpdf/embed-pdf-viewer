@@ -62,6 +62,7 @@ const layoutEvent = (
     layout: {
       pageCount: pages.length,
       pages: pages.map((page, index) => ({ ...page, index })),
+      labels: [],
       namedPages: [],
     },
     origin: from,
@@ -170,6 +171,61 @@ describe('the page list', () => {
     await tick();
     expect(ctx.document()!.pages).toBe(shown);
     expect(ctx.document()!.pendingPages.size).toBe(0);
+  });
+
+  it('shows a copy at once, pending as a copy of its page', () => {
+    const { ctx, order } = harness();
+    ctx.changes.stage({
+      label: { key: 'pages.duplicate' },
+      ops: [{ type: 'pages.copy', pages: [TWO], position: { after: ONE }, objectNumbers: [40] }],
+    });
+    expect(order()).toEqual([1, 40, 2, 3]);
+    expect(ctx.getPage(toPageRef(40))!.rotation).toBe(90);
+    expect(ctx.document()!.pendingPages.get(40)).toEqual({ look: 'copy', of: TWO });
+  });
+
+  it('moves the labels with the pages as the engine does, and an undo puts them back', () => {
+    const labels = [
+      { firstPage: 0, style: 'lowerRoman' as const, firstNumber: 1, prefix: '' },
+      { firstPage: 1, style: 'decimal' as const, firstNumber: 1, prefix: '' },
+    ];
+    const ctx = createTestContext({
+      pages: [
+        { ref: ONE, label: 'i' },
+        { ref: TWO, label: '1' },
+        { ref: THREE, label: '2' },
+      ],
+      pageLabels: labels,
+      doc: { apply: () => new Promise(() => {}) } as never,
+    });
+    const shown = () => ctx.document()!.pages.map((page) => page.label);
+    // The body's first page goes: the body starts on its next page.
+    ctx.changes.stage({
+      label: { key: 'pages.delete' },
+      ops: [{ type: 'pages.delete', pages: [TWO] }],
+    });
+    expect(shown()).toEqual(['i', '1']);
+    // A page inserted before the body takes the front matter's numbering.
+    ctx.changes.stage({
+      label: { key: 'pages.insertBlank' },
+      ops: [
+        {
+          type: 'pages.insertBlank',
+          spec: { size: { width: 100, height: 100 } },
+          position: { after: ONE },
+          objectNumbers: [40],
+        },
+      ],
+    });
+    expect(shown()).toEqual(['i', 'ii', '1']);
+    // An undo that puts the sections back shows them so.
+    ctx.changes.stage({
+      label: { key: 'history.undo' },
+      undoOf: 'the-delete',
+      shows: [{ type: 'pages.relabel', labels }],
+    });
+    expect(ctx.document()!.pageLabels).toEqual(labels);
+    expect(shown()).toEqual(['i', '1', '2']);
   });
 
   it('shows deleted pages back at once when an undo restores them', async () => {

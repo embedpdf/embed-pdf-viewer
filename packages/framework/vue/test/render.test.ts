@@ -97,7 +97,8 @@ function fakeRender({ tiles }: { tiles: boolean }) {
   };
   /** How often the tile's picture has been asked for: once per binding. */
   const pictureAsks = () =>
-    (tile.handle as unknown as { objectUrl: { mock: { calls: unknown[] } } }).objectUrl.mock.calls.length;
+    (tile.handle as unknown as { objectUrl: { mock: { calls: unknown[] } } }).objectUrl.mock.calls
+      .length;
   return { plugin, asked, demands, view, createViewDemand, replan, pictureAsks };
 }
 
@@ -113,6 +114,7 @@ const engineWith = (pageCount: number) =>
           list: () =>
             Promise.resolve({
               pageCount,
+              labels: [],
               pages: Array.from({ length: pageCount }, (_, index) => ({
                 index,
                 ref: toPageRef(index + 1),

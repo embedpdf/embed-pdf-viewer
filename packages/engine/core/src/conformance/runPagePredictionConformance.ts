@@ -7,19 +7,23 @@ import { toPageRef, type PageRef } from '../identity/PageRef';
 import {
   pagesAfter,
   pagesAfterRestore,
+  pagesRelabelled,
   reorderBackOf,
   restoredPagesOf,
   rotateBackOf,
+  type PageList,
   type PredictablePageOp,
 } from '../pages/predict';
 
 /**
  * Four pages that read differently: a Letter page; an A4 page turned a
  * quarter; a page with a crop box, a user unit and a tab order; and a square
- * page with a trim box, turned three quarters. No page labels.
+ * page with a trim box, turned three quarters. Labelled in three sections: i,
+ * ii; 1; App-B.
  */
 export const PAGE_PREDICTION_FIXTURE_PDF = pdfOf([
-  '<< /Type /Catalog /Pages 2 0 R >>',
+  '<< /Type /Catalog /Pages 2 0 R /PageLabels << /Nums [0 << /S /r >> 2 << /S /D >> ' +
+    '3 << /S /A /P (App-) /St 2 >>] >> >>',
   '<< /Type /Pages /Kids [3 0 R 4 0 R 5 0 R 6 0 R] /Count 4 >>',
   '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] >>',
   '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Rotate 90 >>',
@@ -89,8 +93,16 @@ const CASES: readonly PredictionCase[] = [
     }),
   },
   {
+    name: "move a section's first page to the end",
+    op: (pages) => ({ type: 'pages.reorder', pages: at(pages, 2), position: 'end' }),
+  },
+  {
     name: 'delete a page in the middle',
     op: (pages) => ({ type: 'pages.delete', pages: at(pages, 1) }),
+  },
+  {
+    name: 'delete the only page of a section',
+    op: (pages) => ({ type: 'pages.delete', pages: at(pages, 2) }),
   },
   {
     name: 'delete pages apart from each other, named out of order',
@@ -126,6 +138,35 @@ const CASES: readonly PredictionCase[] = [
     op: (_pages, numbers) => ({
       type: 'pages.insertBlank',
       spec: { size: { width: 841.89, height: 595.28 }, count: 1 },
+      objectNumbers: numbers,
+    }),
+  },
+  {
+    name: 'copy pages after a neighbour, in the order given',
+    numbers: 2,
+    op: (pages, numbers) => ({
+      type: 'pages.copy',
+      pages: at(pages, 3, 0),
+      position: { after: pages[1]!.ref },
+      objectNumbers: numbers,
+    }),
+  },
+  {
+    name: 'copy a page to the start',
+    numbers: 1,
+    op: (pages, numbers) => ({
+      type: 'pages.copy',
+      pages: at(pages, 2),
+      position: 'start',
+      objectNumbers: numbers,
+    }),
+  },
+  {
+    name: 'copy a page twice, with no position (the end)',
+    numbers: 2,
+    op: (pages, numbers) => ({
+      type: 'pages.copy',
+      pages: at(pages, 1, 1),
       objectNumbers: numbers,
     }),
   },
@@ -182,29 +223,59 @@ const REFUSALS: readonly PredictionCase[] = [
       objectNumbers: numbers,
     }),
   },
+  {
+    name: 'copy a page the document does not have',
+    numbers: 1,
+    op: (_pages, numbers) => ({
+      type: 'pages.copy',
+      pages: [toPageRef(9_999)],
+      objectNumbers: numbers,
+    }),
+  },
+  {
+    name: 'copy a page under the number of a page',
+    op: (pages) => ({
+      type: 'pages.copy',
+      pages: at(pages, 0),
+      objectNumbers: [pages[1]!.ref.objectNumber],
+    }),
+  },
+  {
+    name: 'copy two pages with one number',
+    numbers: 1,
+    op: (pages, numbers) => ({
+      type: 'pages.copy',
+      pages: at(pages, 0, 1),
+      objectNumbers: numbers,
+    }),
+  },
 ];
 
 /**
- * What undoing `op` shows, from the pages before it and after it: what the
- * page-edit plugin stages as the change's `undo`.
+ * What undoing `op` shows, from the list before it and after it: what the
+ * page-edit plugin stages as the change's `undo`. The pages go back, then the
+ * label sections the edit found.
  */
-function undoneOf(
-  before: readonly PageLayout[],
-  after: readonly PageLayout[],
-  op: PredictablePageOp,
-): readonly PageLayout[] {
+function undoneOf(before: PageList, after: PageList, op: PredictablePageOp): PageList {
   switch (op.type) {
     case 'pages.rotate':
-      return rotateBackOf(before, op.pages).reduce<readonly PageLayout[]>(pagesAfter, after);
+      return rotateBackOf(before.pages, op.pages).reduce<PageList>(pagesAfter, after);
     case 'pages.reorder':
-      return reorderBackOf(before, op.pages).reduce<readonly PageLayout[]>(pagesAfter, after);
+      return pagesRelabelled(
+        reorderBackOf(before.pages, op.pages).reduce<PageList>(pagesAfter, after),
+        before.labels,
+      );
     case 'pages.delete':
-      return pagesAfterRestore(after, restoredPagesOf(before, op.pages));
+      return pagesRelabelled(
+        pagesAfterRestore(after, restoredPagesOf(before.pages, op.pages)),
+        before.labels,
+      );
     case 'pages.insertBlank':
-      return pagesAfter(after, {
-        type: 'pages.delete',
-        pages: (op.objectNumbers ?? []).map(toPageRef),
-      });
+    case 'pages.copy':
+      return pagesRelabelled(
+        pagesAfter(after, { type: 'pages.delete', pages: (op.objectNumbers ?? []).map(toPageRef) }),
+        before.labels,
+      );
   }
 }
 
@@ -228,7 +299,10 @@ export function runPagePredictionConformance(
       if (engine) await engine.destroy();
     });
 
-    const read = async (): Promise<readonly PageLayout[]> => (await doc.pages.list()).pages;
+    const read = async (): Promise<PageList> => {
+      const { pages, labels } = await doc.pages.list();
+      return { pages, labels };
+    };
     const take = async (count: number): Promise<number[]> => {
       if (count === 0) return [];
       await doc.objectNumbers.reserve(count);
@@ -238,7 +312,7 @@ export function runPagePredictionConformance(
     for (const scenario of CASES) {
       test(scenario.name, async () => {
         const before = await read();
-        const op = scenario.op(before, await take(scenario.numbers ?? 0));
+        const op = scenario.op(before.pages, await take(scenario.numbers ?? 0));
 
         const predicted = pagesAfter(before, op);
         const applied = await doc.apply({ ops: [op] });
@@ -263,7 +337,7 @@ export function runPagePredictionConformance(
     for (const scenario of REFUSALS) {
       test(`refused: ${scenario.name}`, async () => {
         const before = await read();
-        const op = scenario.op(before, await take(scenario.numbers ?? 0));
+        const op = scenario.op(before.pages, await take(scenario.numbers ?? 0));
         expect(pagesAfter(before, op)).toBe(before);
         const outcome = await doc.apply({ ops: [op] }).then(
           () => 'applied',
@@ -278,8 +352,8 @@ export function runPagePredictionConformance(
 
 /** Where the prediction and the read differ, by path; numbers within a thousandth of a point. */
 function differences(
-  predicted: readonly PageLayout[],
-  actual: readonly PageLayout[],
+  predicted: PageList,
+  actual: PageList,
 ): { path: string; predicted: unknown; actual: unknown }[] {
   const found: { path: string; predicted: unknown; actual: unknown }[] = [];
   const walk = (left: unknown, right: unknown, path: string): void => {

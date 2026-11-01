@@ -194,13 +194,19 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
     (ctx.document()?.pages ?? []).map((info) => info.ref.objectNumber);
 
   /**
-   * A page a change on its way makes (a blank insert, an undone delete) is in
-   * the page list before the engine has it. Until it lands nothing asks the
-   * engine for its pictures: a blank page shows its background, a page coming
-   * back the pictures still kept under its keys.
+   * A page a change on its way makes (a blank insert, a copy, an undone
+   * delete) is in the page list before the engine has it. Until it lands
+   * nothing asks the engine for its pictures: a blank page shows its
+   * background, a page coming back the pictures still kept under its keys,
+   * and a copy the pictures of the page it copies.
    */
   const isPending = (page: PageRef): boolean =>
     ctx.document()?.pendingPages.has(page.objectNumber) ?? false;
+  /** The page a pending copy copies; null for any other page. */
+  const copiedFrom = (page: PageRef): PageRef | null => {
+    const pending = ctx.document()?.pendingPages.get(page.objectNumber);
+    return pending?.look === 'copy' ? pending.of : null;
+  };
   /** Resolves once the engine has a pending page; rejects `not-found` when it went first. */
   const whenHeld = async (page: PageRef, signal: AbortSignal | undefined): Promise<void> => {
     await ctx.waitFor(() => !isPending(page), signal ? { signal } : undefined);
@@ -260,12 +266,12 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
     const result = store.acquire(
       key,
       (storeSignal) => {
-        const draw = (): Promise<PageImageHandle> => {
+        const draw = (drawn: PageRef): Promise<PageImageHandle> => {
           const doc = ctx.doc.with({
             priority: 'high',
             ...(request.view !== undefined ? { view: request.view } : {}),
           });
-          const task = doc.page(page).render.image({
+          const task = doc.page(drawn).render.image({
             viewport: request.viewport,
             ...request.layers,
             ...(request.format !== undefined ? { format: request.format } : {}),
@@ -278,7 +284,10 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
             });
           return task; // AbortablePromise<PageImageHandle> is a Promise<PageImageHandle>
         };
-        return isPending(page) ? whenHeld(page, storeSignal).then(draw) : draw();
+        const drawnWhenHeld = (drawn: PageRef) =>
+          isPending(drawn) ? whenHeld(drawn, storeSignal).then(() => draw(drawn)) : draw(drawn);
+        // A copy draws as the page it copies, which the engine may not have yet either.
+        return drawnWhenHeld(copiedFrom(page) ?? page);
       },
       signal,
     );

@@ -99,6 +99,7 @@ describe('interactive form JavaScript acceptance', () => {
       revision: 0,
       hasUnsavedChanges: false,
       renderPolicy: { kind: 'continuous' },
+      pageLabels: [],
       pendingPages: new Map(),
     });
     const realm = standaloneRealm(doc, document, {

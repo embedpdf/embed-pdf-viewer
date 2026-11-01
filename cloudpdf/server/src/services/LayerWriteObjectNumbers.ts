@@ -39,6 +39,8 @@ export const OBJECT_NUMBER_ESTIMATES = {
   blankPages: (count: number) => 64 + 16 * count,
   /** Pages copied from another file: about one object per 512 bytes of it. */
   insertedPages: (byteLength: number) => 1_024 + Math.ceil(byteLength / 512),
+  /** Copies of the document's pages: their contents, resources and annotations each. */
+  copiedPages: (count: number) => 1_024 + 256 * count,
   /** Embedded files: a file specification and its stream each. */
   embeddedFiles: (count: number) => 2 * count,
 } as const;

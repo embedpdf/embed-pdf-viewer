@@ -166,6 +166,15 @@ describe('page edits are steps of the history', () => {
     const { pages } = await inserted;
     expect(pages).toEqual([shown!.ref]);
     expect(documents.listPages()[0]).toBe(shown);
+
+    // A copy shows at once, as its page reads, and the engine's answer agrees.
+    const duplicated = pageEdit.duplicate([FIRST]);
+    const copy = documents.listPages()[2]!;
+    expect(orderOf(kernel)).toEqual([shown!.ref.objectNumber, 3, copy.ref.objectNumber, 4]);
+    expect(copy.size).toEqual(documents.listPages()[1]!.size);
+    revision = documents.getRevision();
+    expect((await duplicated).pages).toEqual([copy.ref]);
+    expect(documents.getRevision()).toBe(revision);
     await kernel.destroy();
   });
 

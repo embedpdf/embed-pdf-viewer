@@ -29,6 +29,7 @@ import type {
   DocumentEvent,
   DocumentHandle,
   Engine,
+  PageLabelSection,
   PageLayout,
   PageRef,
   PdfRect,
@@ -89,6 +90,8 @@ export interface TestContextOptions<S, T extends object = NoSettings> {
   readonly settings?: SettingsDeclaration<T>;
   /** The document's pages; `document()` and `geometry` derive from them. */
   readonly pages?: readonly TestPage[];
+  /** Their label sections (`DocumentMeta.pageLabels`); none when left out. */
+  readonly pageLabels?: readonly PageLabelSection[];
   readonly documentId?: string;
   /** Capabilities `get`/`tryGet` resolve, by token. `DocumentsToken` defaults to a
    *  registry holding this one document. */
@@ -272,7 +275,7 @@ export function createTestContext<S = void, T extends object = NoSettings>(
   settleFlushes.add(() => changes.settle());
   cleanups.push(() => changes.close());
   const pageView = createPageView({ changes, report });
-  pageView.setEnginePages(pages);
+  pageView.setEnginePages({ pages, labels: options.pageLabels ?? [] });
   pageView.refresh();
   const bursts = createBurstGate(store);
   const mirrors: MirrorController<unknown>[] = [];
@@ -297,6 +300,7 @@ export function createTestContext<S = void, T extends object = NoSettings>(
     instanceId,
     pageCount: pages.length,
     pages: pageView.current().pages,
+    pageLabels: pageView.current().labels,
     pendingPages: NO_PENDING_PAGES,
     revision: 1,
     renderPolicy: { kind: 'continuous' },
@@ -311,6 +315,7 @@ export function createTestContext<S = void, T extends object = NoSettings>(
       ...meta,
       pageCount: view.pages.length,
       pages: view.pages,
+      pageLabels: view.labels,
       pendingPages: view.pending,
       revision: moved ? meta.revision + 1 : meta.revision,
     };
@@ -319,7 +324,7 @@ export function createTestContext<S = void, T extends object = NoSettings>(
     cleanups.push(
       doc.events.subscribe((event) => {
         const layout = layoutFromEvent(event);
-        if (layout) pageView.setEnginePages(layout.pages);
+        if (layout) pageView.setEnginePages(layout);
         pageView.fold(event);
         showPages();
       }),
