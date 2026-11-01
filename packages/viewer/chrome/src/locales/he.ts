@@ -565,6 +565,9 @@ export const he: Locale = {
     demo: {
       starting: 'מפעיל את המציג…',
       opening: 'פותח את המסמך…',
+      pageLoading: 'טוען את עמוד {page}…',
+      pageError: 'לא ניתן לטעון עמוד זה.',
+      pageForbidden: 'אין לך גישה לעמוד זה.',
       more: 'עוד',
       searchPlaceholder: 'חפש במסמך…',
       searchCaseSensitive: 'התאמת רישיות',

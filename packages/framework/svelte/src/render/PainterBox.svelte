@@ -6,11 +6,14 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import type { PaintedPicture, PicturePainter } from '@embedpdf/plugin-render';
+  import { RenderToken } from '@embedpdf/plugin-render/contract/host';
   import { usePage } from '../runtime/page';
+  import { useOptionalCapability } from '../runtime/readers.svelte';
 
   let { painter }: { painter: PicturePainter<HTMLElement> } = $props();
 
   const page = usePage();
+  const render = useOptionalCapability(RenderToken);
   // The page context reads through one value that moves with every camera frame: the ref, the
   // same object while the page is, settles that to the page changing.
   const ref = $derived(page.ref);
@@ -24,13 +27,20 @@
   $effect(() => {
     const element = host;
     const current = painter;
+    const renderer = render.current;
     void ref;
-    if (!element) return;
-    const entry = untrack(() => ({ picture: current.paint(element, page), place: placeOf() }));
+    if (!element || !renderer) return;
+    // The page is loading until the painter reports its picture on screen.
+    const report = untrack(() => renderer.reportPicture(page.view, ref));
+    const entry = untrack(() => ({
+      picture: current.paint(element, page, report),
+      place: placeOf(),
+    }));
     painted = entry;
     return () => {
       entry.picture.destroy();
       if (painted === entry) painted = null;
+      report.close();
     };
   });
 

@@ -29,6 +29,7 @@ import type {
   InvalidateScope,
   PageLayerOptions,
   PageRender,
+  PictureStateChangedEvent,
   RenderFormat,
   RenderInvalidatedEvent,
   RenderPageOptions,
@@ -56,6 +57,7 @@ import {
   type ResolvedRenderOptions,
   type TilePaintPlan,
 } from './paint-plan';
+import { createPictureReports, PICTURE_STATES } from './pictures';
 import { RasterStore } from './raster-store';
 import { baseAskWidth, resolveStrategy, type ResolvedStrategy } from './strategy';
 import { TileManager } from './tile-manager';
@@ -119,6 +121,8 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
   const invalidated = ctx.events.source<RenderInvalidatedEvent>();
   const renderCompleted = ctx.events.source<RenderCompletedEvent>();
   const renderFailed = ctx.events.source<RenderFailedEvent>();
+  const pictureStateChanged = ctx.events.source<PictureStateChangedEvent>();
+  const pictures = createPictureReports(ctx, pictureStateChanged.emit);
 
   const canRender = (): boolean => ctx.allows(RENDER_SCOPE);
   const canRenderThumbnail = (): boolean => ctx.allows(THUMBNAIL_SCOPE);
@@ -649,6 +653,11 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
     },
     invalidate,
     onInvalidated: invalidated.on,
+    getPictureState: (page, view) => {
+      const info = ctx.getPage(page);
+      return info ? pictures.stateIn(view, info.ref.objectNumber) : PICTURE_STATES.idle;
+    },
+    onPictureStateChanged: pictureStateChanged.on,
 
     // ── host lens ──
     renderSource,
@@ -674,6 +683,7 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
     getPaintSettings: paintSettings,
     getLayerRights: rights,
     createViewDemand,
+    reportPicture: pictures.open,
     renderAppearances,
     keptAppearances: (family, item) => recentAppearances.of(family, annotationKey(item)),
     getAppearanceScale: (renderScale) => snapAppearanceScale(renderPolicy(), renderScale),

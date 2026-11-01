@@ -567,6 +567,9 @@ export const de: Locale = {
     demo: {
       starting: 'Viewer wird gestartet…',
       opening: 'Dokument wird geöffnet…',
+      pageLoading: 'Seite {page} wird geladen…',
+      pageError: 'Diese Seite konnte nicht geladen werden.',
+      pageForbidden: 'Sie haben keinen Zugriff auf diese Seite.',
       more: 'Mehr',
       searchPlaceholder: 'Dokument durchsuchen…',
       searchCaseSensitive: 'Groß-/Kleinschreibung',
