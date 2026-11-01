@@ -8,6 +8,9 @@
  *   - The tiles: sharper pieces above it, when the view wants more pixels than the base may
  *     spend. A thumbnail-sized demand engages none: the arithmetic is the configuration.
  *
+ * The page is loading in its view until the base is on screen: the layer reports that to the render
+ * plugin (`reportPicture`), and the box lent to a painter hands the painter the page's report.
+ *
  * The layer only paints: plain images, bound with `@embedpdf/web`'s painted-image helper, which
  * reports each tile painted after the browser could show it. What to fetch, when to settle,
  * what to keep and when to let go are all the render plugin's; mid-gesture the pictures are
@@ -32,6 +35,7 @@ import {
 import type { PaintedPicture, PicturePage, PicturePainter } from '@embedpdf/plugin-render';
 import {
   RenderToken,
+  type OpenPictureReport,
   type PageLayerOptions,
   type PaintSettings,
   type RenderHostCapability,
@@ -39,7 +43,12 @@ import {
   type TilePaintSource,
   type ViewDemand,
 } from '@embedpdf/plugin-render/contract/host';
-import { bindPaintedImage, partsDrawnTwice, pictureLayerOptionsOf } from '@embedpdf/web';
+import {
+  bindPaintedImage,
+  partsDrawnTwice,
+  pictureLayerOptionsOf,
+  whenPresented,
+} from '@embedpdf/web';
 import {
   CapabilityBinding,
   devWarn,
@@ -219,6 +228,7 @@ export class EpdfPainterBox {
   readonly painter = input.required<PicturePainter<HTMLElement>>();
 
   private readonly page = injectPage('<epdf-render-layer>');
+  private readonly render = renderOf(this.page, '<epdf-render-layer>');
   private readonly pageRef = computed(() => this.page.ref);
   /** What the painter is told of the page: a new object whenever a member moves. */
   private readonly picturePage = computed<PicturePage>(() => ({
@@ -235,14 +245,19 @@ export class EpdfPainterBox {
     let painted: { picture: PaintedPicture; page: PicturePage } | null = null;
     // Another painter or another page paints anew.
     effect((onCleanup) => {
+      const render = this.render.capability();
       const painter = this.painter();
       this.pageRef();
+      if (!render) return;
       const page = untracked(this.picturePage);
-      const entry = { picture: untracked(() => painter.paint(host, page)), page };
+      // The page is loading until the painter reports its picture on screen.
+      const report = untracked(() => render.reportPicture(page.view, page.ref));
+      const entry = { picture: untracked(() => painter.paint(host, page, report)), page };
       painted = entry;
       onCleanup(() => {
         entry.picture.destroy();
         if (painted === entry) painted = null;
+        report.close();
       });
     });
     // The page moving (zoom, turn, reorder) is an update of the same picture.
@@ -350,6 +365,8 @@ export class EpdfRenderLayer {
     Object.is,
   );
   private readonly picture = viewChild<ElementRef<HTMLImageElement>>('picture');
+  /** The report on this page's picture while the base is there: a failed fetch tells it. */
+  private report: OpenPictureReport | null = null;
 
   constructor() {
     effect(() => {
@@ -365,6 +382,24 @@ export class EpdfRenderLayer {
       }
     });
     if (!isPlatformBrowser(inject(PLATFORM_ID))) return;
+    // The page is loading in this view until the base picture is on screen; the tiles only
+    // sharpen. Opened again for another page or view, and closed as the base goes (the layer
+    // goes, or a painter takes the pictures over and its box reports instead).
+    effect((onCleanup) => {
+      const render = this.render.capability();
+      const element = this.picture()?.nativeElement;
+      const page = this.page.ref;
+      const view = this.page.view;
+      if (!render || !element) return;
+      const report = untracked(() => render.reportPicture(view, page));
+      this.report = report;
+      const stop = whenPresented(element, () => report.shown());
+      onCleanup(() => {
+        stop();
+        report.close();
+        if (this.report === report) this.report = null;
+      });
+    });
     effect((onCleanup) => {
       const render = this.render.capability();
       const key = this.sourceKey();
@@ -405,8 +440,10 @@ export class EpdfRenderLayer {
           // showing the old picture until the new one is decoded and never asks for the old URL
           // again, so revoking it when the next one comes is safe.
           element.src = objectUrl.url;
-        } catch {
-          // Cancelled (the camera moved on, the layer went away) or the render failed.
+        } catch (error) {
+          // Cancelled (the camera moved on, the layer went away), or the render failed: the page
+          // can't show.
+          if (!controller.signal.aborted) this.report?.failed(error);
         }
       })();
     });

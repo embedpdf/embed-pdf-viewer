@@ -11,8 +11,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { RenderToken } from '@embedpdf/plugin-render/contract/host';
-import type { PaintSettings } from '@embedpdf/plugin-render/contract/host';
-import { partsDrawnTwice, pictureLayerOptionsOf } from '@embedpdf/web';
+import type { OpenPictureReport, PaintSettings } from '@embedpdf/plugin-render/contract/host';
+import { partsDrawnTwice, pictureLayerOptionsOf, whenPresented } from '@embedpdf/web';
 import { devWarn } from '../dev';
 import { usePaintedParts } from '../page-layers';
 import { useOptionalCapability, useOptionalSelector } from '../runtime/capabilities';
@@ -90,6 +90,24 @@ const sourceKey = useOptionalSelector(
 );
 
 const image = ref<HTMLImageElement | null>(null);
+// The page is loading in this view until the base picture is on screen; the tiles only sharpen.
+let report: OpenPictureReport | null = null;
+watch(
+  [render, () => page.value.view, pageRef, image],
+  ([lens, view, shown, element], _previous, onCleanup) => {
+    if (!lens || !element) return;
+    const opened = lens.reportPicture(view, shown);
+    report = opened;
+    const stop = whenPresented(element, () => opened.shown());
+    onCleanup(() => {
+      stop();
+      opened.close();
+      if (report === opened) report = null;
+    });
+  },
+  { flush: 'post' },
+);
+
 watch(
   [render, pageRef, sourceKey, layers],
   ([lens, shown, _key, drawn], _previous, onCleanup) => {
@@ -121,8 +139,10 @@ watch(
         // new one decodes, and never asks for the old URL again, so revoking it
         // on cleanup is safe.
         if (image.value) image.value.src = object.url;
-      } catch {
-        // Aborted (the view moved, or the layer unmounted), or the render failed.
+      } catch (error) {
+        // Aborted (the view moved, or the layer unmounted), or the render
+        // failed: the page can't show.
+        if (!controller.signal.aborted) report?.failed(error);
       }
     })();
   },

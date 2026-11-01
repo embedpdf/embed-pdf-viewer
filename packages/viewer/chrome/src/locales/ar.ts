@@ -565,6 +565,9 @@ export const ar: Locale = {
     demo: {
       starting: 'جارٍ بدء العارض…',
       opening: 'جارٍ فتح المستند…',
+      pageLoading: 'جارٍ تحميل الصفحة {page}…',
+      pageError: 'تعذّر تحميل هذه الصفحة.',
+      pageForbidden: 'ليس لديك حق الوصول إلى هذه الصفحة.',
       more: 'المزيد',
       searchPlaceholder: 'البحث في المستند…',
       searchCaseSensitive: 'مطابقة حالة الأحرف',

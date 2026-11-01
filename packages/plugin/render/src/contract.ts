@@ -17,6 +17,7 @@ import {
   type PageImageHandle,
   type PageImageOptions,
   type PageRef,
+  type ResourceStatus,
   type SettingsApi,
 } from '@embedpdf/core';
 import type { PageTransform } from '@embedpdf/core-geometry';
@@ -53,6 +54,11 @@ export interface RenderSettings {
   readonly format: RenderFormat | undefined;
   /** WebP quality from 0 (smallest) to 1 (best); PNG and BMP ignore it. */
   readonly quality: number | undefined;
+  /**
+   * How long a page waits for its first picture before its state turns `slow`, in milliseconds:
+   * the moment to show a loading indicator ({@link PictureState}). `0` turns it on at once.
+   */
+  readonly slowAfterMs: number;
   /** Diagnostic logging of tile scheduling and fetch outcomes (console `debug`). */
   readonly debug: boolean;
 }
@@ -70,6 +76,7 @@ export const RENDER_DEFAULTS: RenderSettings = {
   },
   format: undefined,
   quality: undefined,
+  slowAfterMs: 400,
   debug: false,
 };
 
@@ -161,6 +168,44 @@ export interface RenderInvalidatedEvent {
   readonly origin: EventOrigin | null;
 }
 
+// ── whether a page's picture is on screen ───────────────────────────────────
+
+/**
+ * Whether a picture of a page is on screen in a view ({@link RenderCapability.getPictureState}).
+ * Only the first picture counts: tiles arriving as the view zooms in, and a redraw after a
+ * change, keep the old picture on screen, so the page stays `ready`.
+ */
+export interface PictureState {
+  /**
+   * `idle`: the view doesn't show the page. `loading`: it does, and no picture of the page is on
+   * screen yet. `ready`: one is. `forbidden`: the user may not see it (no `doc.render`).
+   * `error`: it couldn't be drawn.
+   */
+  readonly status: ResourceStatus;
+  /** Loading for longer than `slowAfterMs`: the moment to show an indicator. */
+  readonly slow: boolean;
+}
+
+/** A page's picture came on screen, failed, went slow, or the page left the view. */
+export interface PictureStateChangedEvent extends PictureState {
+  readonly page: PageRef;
+  readonly view: string;
+}
+
+/**
+ * What paints a page's picture tells the render plugin, so the page's {@link PictureState}
+ * knows: the page layers say it for the plugin's own pictures, a {@link PicturePainter} for its.
+ */
+export interface PictureReport {
+  /** A picture of the page is on screen now: it has been presented. */
+  shown(): void;
+  /**
+   * The picture can't be painted, and why: a `permission-denied` error makes the page
+   * `forbidden`, any other `error`. Ignored once a picture showed, which stays on screen.
+   */
+  failed(error: unknown): void;
+}
+
 // ── another plugin painting the pictures ────────────────────────────────────
 
 /**
@@ -196,8 +241,11 @@ export interface PaintedPicture {
 export interface PicturePainter<Host = unknown> {
   /** Whether it paints the pictures of this view; a view it doesn't paint keeps the render plugin's. */
   paints(view: string): boolean;
-  /** Paint `page`'s picture into `host`, an empty box over the page's content, until `destroy()`. */
-  paint(host: Host, page: PicturePage): PaintedPicture;
+  /**
+   * Paint `page`'s picture into `host`, an empty box over the page's content, until `destroy()`.
+   * The page is `loading` until `report.shown()`: call it once the first picture is on screen.
+   */
+  paint(host: Host, page: PicturePage, report: PictureReport): PaintedPicture;
 }
 
 // ── the public capability ───────────────────────────────────────────────────
@@ -260,6 +308,14 @@ export interface RenderCapability extends SettingsApi<RenderSettings> {
   invalidate(options?: InvalidateOptions): void;
   /** Pages' pixels changed and they will redraw. */
   readonly onInvalidated: EventHook<RenderInvalidatedEvent>;
+  /**
+   * Whether a picture of the page is on screen in `view` (a page context's `view`): `loading`
+   * until one is, and `slow` once it waited `slowAfterMs`. The same object while it's the same;
+   * `idle` for a page that isn't in the document.
+   */
+  getPictureState(page: PageRef | number, view: string): PictureState;
+  /** A page's {@link PictureState} changed in a view. */
+  readonly onPictureStateChanged: EventHook<PictureStateChangedEvent>;
   /**
    * Let another plugin paint the pages' pictures until the returned function
    * is called, or the document closes. While it holds them, every page layer

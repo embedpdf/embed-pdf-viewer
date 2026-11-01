@@ -565,6 +565,9 @@ export const ko: Locale = {
     demo: {
       starting: '뷰어 시작 중…',
       opening: '문서 여는 중…',
+      pageLoading: '{page}페이지를 불러오는 중…',
+      pageError: '이 페이지를 불러올 수 없습니다.',
+      pageForbidden: '이 페이지에 액세스할 수 없습니다.',
       more: '더 보기',
       searchPlaceholder: '문서 검색…',
       searchCaseSensitive: '대/소문자 구분',

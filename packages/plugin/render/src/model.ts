@@ -3,8 +3,8 @@
  * pure transition or projection; the controller applies the transitions with
  * `ctx.state.update`.
  */
-import type { PageObjectNumber, PageRenderLayers } from '@embedpdf/core';
-import type { InvalidateScope } from './contract';
+import type { PageObjectNumber, PageRenderLayers, ResourceStatus } from '@embedpdf/core';
+import type { InvalidateScope, PictureState } from './contract';
 
 /**
  * Per-page versions of what a page picture can draw: the page content, its
@@ -21,12 +21,18 @@ export interface RenderState {
   readonly annotationEpochs: Readonly<Record<PageObjectNumber, number>>;
   /** Form field versions, bumped by form facts: a fill, a widget's move or look, a signing. */
   readonly fieldEpochs: Readonly<Record<PageObjectNumber, number>>;
+  /**
+   * Whether each page's picture is on screen, per view: `pictures[view][page]`. A page a view
+   * doesn't show is absent (`idle`). Written from the layers' reports (`pictures.ts`).
+   */
+  readonly pictures: Readonly<Record<string, Readonly<Record<PageObjectNumber, PictureState>>>>;
 }
 
 export const initialRenderState = (): RenderState => ({
   contentEpochs: {},
   annotationEpochs: {},
   fieldEpochs: {},
+  pictures: {},
 });
 
 const bump = (
@@ -77,3 +83,43 @@ export function renderEpochOf(
 /** What a picture draws, as one key part: `a1f0` draws annotations and no form fields. */
 export const layersKeyOf = (layers: PageRenderLayers): string =>
   `a${layers.includeAnnotations ? 1 : 0}f${layers.includeFormFields ? 1 : 0}`;
+
+// ── whether a page's picture is on screen ──
+
+const pictureState = (status: ResourceStatus, slow = false): PictureState =>
+  Object.freeze({ status, slow });
+
+/** Every picture state there is, one object each, so the same state is the same object. */
+export const PICTURE_STATES = {
+  idle: pictureState('idle'),
+  loading: pictureState('loading'),
+  slow: pictureState('loading', true),
+  ready: pictureState('ready'),
+  forbidden: pictureState('forbidden'),
+  error: pictureState('error'),
+} as const;
+
+/** A page's picture state in a view: `idle` when the view doesn't show it. */
+export function pictureStateOf(
+  state: RenderState,
+  view: string,
+  pageObjectNumber: PageObjectNumber,
+): PictureState {
+  return state.pictures[view]?.[pageObjectNumber] ?? PICTURE_STATES.idle;
+}
+
+/** Set a page's picture state in a view; `idle` takes the page out (and the view, once empty). */
+export function setPictureState(
+  state: RenderState,
+  view: string,
+  pageObjectNumber: PageObjectNumber,
+  next: PictureState,
+): RenderState {
+  const { [pageObjectNumber]: _previous, ...others } = state.pictures[view] ?? {};
+  const pages = next.status === 'idle' ? others : { ...others, [pageObjectNumber]: next };
+  const { [view]: _view, ...otherViews } = state.pictures;
+  return {
+    ...state,
+    pictures: Object.keys(pages).length > 0 ? { ...otherViews, [view]: pages } : otherViews,
+  };
+}
