@@ -3,29 +3,29 @@ import { computed } from 'vue';
 import { usePageList } from '@embedpdf/vue/runtime';
 import { useAnnotation, useAnnotationState } from '@embedpdf/vue/annotation';
 
-// The top half of the cover, where the box selects.
+// The top half of a page, where the box selects: on the home page, the image and the button.
 const TOP_HALF = { x: 0, y: 0, width: 612, height: 396 };
 
 const annotation = useAnnotation();
 const { selected } = useAnnotationState(); // the selected annotations
 const pages = usePageList();
-const cover = computed(() => pages.value[0]?.ref);
+const page = computed(() => pages.value[0]?.ref); // the home page wireframe
 
 function selectAll() {
-  if (cover.value) annotation.selection.selectAll(cover.value);
+  if (page.value) annotation.selection.selectAll(page.value);
 }
 
 function selectTopHalf() {
-  if (cover.value) annotation.selection.selectInRect(cover.value, TOP_HALF);
+  if (page.value) annotation.selection.selectInRect(page.value, TOP_HALF);
 }
 </script>
 
 <template>
   <div class="toolbar">
-    <button type="button" class="button" :disabled="!cover" @click="selectAll">
-      Everything on the cover
+    <button type="button" class="button" :disabled="!page" @click="selectAll">
+      Everything on the page
     </button>
-    <button type="button" class="button" :disabled="!cover" @click="selectTopHalf">
+    <button type="button" class="button" :disabled="!page" @click="selectTopHalf">
       The top half
     </button>
     <button

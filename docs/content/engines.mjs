@@ -27,7 +27,7 @@ export const ENGINES = {
   cloud: {
     package: '@cloudpdf/engine',
     importLine: "import { cloudEngine } from '@cloudpdf/engine';",
-    // CloudPDF SaaS, the engine's default, where the docs' demo documents live (share grants
+    // CloudPDF SaaS, the engine's default, where the docs' demo documents live (grants
     // managed in the dashboard).
     factoryCall: 'cloudEngine()',
     // The document lives on the server; the stamp library still opens in the

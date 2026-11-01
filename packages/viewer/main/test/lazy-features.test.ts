@@ -1,9 +1,13 @@
 /**
  * A feature's interface isn't part of the viewer's first load: the search, comments, style,
- * stamps, signatures, redaction and measurement panels and the signature, redaction and print
- * dialogs are chunks of their own. None loads before the document shows; once it has and the browser is
- * idle, the viewer fetches them in the background, so opening one afterwards fetches nothing. A
- * module is known by a translation key only it asks for.
+ * stamps, signatures, redaction, measurement, outline, attachments and form design panels, the
+ * signature, redaction, outline properties and print dialogs and the link editor are chunks of
+ * their own. None loads before the document shows; once it has and the browser is idle, the
+ * viewer fetches them in the background, so opening one afterwards fetches nothing. A module is
+ * known by a translation key only it asks for.
+ *
+ * `FEATURES` lists every chunk the viewer fetches in the background: one missing from it can still
+ * be arriving when the last test opens the others, and counts as fetched by them.
  *
  * Runs against the built snippet (`pnpm build` first).
  */
@@ -60,6 +64,21 @@ const FEATURES = [
     marker: 'demo.redactConfirmTitle',
   },
   { name: 'print dialog', open: { surface: 'print' }, marker: 'print.preparingPage' },
+  { name: 'outline panel', open: { command: 'panel:outline' }, marker: 'outline.noMatches' },
+  {
+    name: 'attachments panel',
+    open: { command: 'panel:attachments' },
+    marker: 'attachments.dropHint',
+  },
+  {
+    name: 'outline properties dialog',
+    open: { surface: 'outline-properties' },
+    marker: 'outline.properties.bold',
+  },
+  // These show only in a state this page doesn't set up, the form designer's sidebar in Form
+  // mode and the link editor over a selected link, so they aren't opened here.
+  { name: 'form design panel', open: null, marker: 'formDesign.allFields' },
+  { name: 'link editor', open: null, marker: 'linkEditor.toUrl' },
 ] as const;
 
 const PAGE = `<!doctype html><html><head><meta charset="utf-8">
@@ -155,6 +174,7 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))("a feature's code", () =
   it('opens without fetching anything once fetched', async () => {
     const before = scripts.length;
     for (const { open } of FEATURES) {
+      if (!open) continue;
       await tab.evaluate((how) => {
         const { viewer } = window.element;
         if ('command' in how) return viewer.commands.execute(how.command);

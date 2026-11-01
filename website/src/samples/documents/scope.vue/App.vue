@@ -11,8 +11,13 @@ import '../scope.css';
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin()];
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/welcome.pdf');
+  return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
+};
+
+const article = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/article.pdf');
   return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 </script>
@@ -22,8 +27,8 @@ const ebook = async (): Promise<OpenInput> => {
     :engine="engine"
     :plugins="plugins"
     :initial-documents="[
-      { source: ebook, name: 'Original' },
-      { source: ebook, name: 'Revised' },
+      { source: welcome, name: 'Guide' },
+      { source: article, name: 'Article' },
     ]"
   >
     <SideBySide />

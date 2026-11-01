@@ -22,8 +22,8 @@ const plugins = [
   searchPlugin(),
 ];
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/welcome.pdf');
   return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
@@ -50,7 +50,7 @@ const role = ref<Role>('reviewer');
     :engine="engine"
     :plugins="plugins"
     :scope="roles[role]"
-    :initial-documents="[{ source: ebook, name: 'ebook.pdf' }]"
+    :initial-documents="[{ source: welcome, name: 'welcome.pdf' }]"
   >
     <div class="toolbar">
       <label class="label">
@@ -62,7 +62,7 @@ const role = ref<Role>('reviewer');
         </select>
       </label>
     </div>
-    <ReopenOnRoleChange :role="role" :ebook="ebook" />
+    <ReopenOnRoleChange :role="role" :welcome="welcome" />
     <DocumentGate>
       <template #fallback><p class="loading">Opening…</p></template>
       <Controls />

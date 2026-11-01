@@ -1,5 +1,31 @@
 # @embedpdf/engine
 
+## 3.0.0-next.19
+
+## 3.0.0-next.18
+
+## 3.0.0-next.17
+
+## 3.0.0-next.16
+
+### Minor Changes
+
+- [#891](https://github.com/embedpdf/embed-pdf-viewer/pull/891) by [@bobsingor](https://github.com/bobsingor) – On the local engine, `doc.attachments.create()` and `delete()` are changes that can be undone, and a download of a file (an attachment, or an annotation's `file`) that decodes to more than 256 MB is refused with `PayloadTooLarge`, so a small compressed file can't take the tab down.
+
+- [#885](https://github.com/embedpdf/embed-pdf-viewer/pull/885) by [@bobsingor](https://github.com/bobsingor) – `doc.outline` on the local engine: read the document's outline and create, update, move and delete its items as undoable changes.
+
+- [#890](https://github.com/embedpdf/embed-pdf-viewer/pull/890) by [@bobsingor](https://github.com/bobsingor) – On the local engine, `doc.pages.rotate()`, `reorder()`, `delete()`, `insert()` and `insertBlank()` are changes that can be undone.
+
+- [#883](https://github.com/embedpdf/embed-pdf-viewer/pull/883) by [@bobsingor](https://github.com/bobsingor) – The local engine's `pages.extract(pages, options)` makes flattened copies: `{ flatten: { usage: 'print' } }` returns the pages as they print, painted in, with nothing interactive left. It needs `doc.download` or `doc.download.flattened`, and paints only what the caller may read.
+
+- [#883](https://github.com/embedpdf/embed-pdf-viewer/pull/883) by [@bobsingor](https://github.com/bobsingor) – `page.render.image()` and `render.raw()` make print pictures (`usage: 'print'`, `viewport: { kind: 'dpi', dpi: 150 | 300 }`): drawn by the print rules, sized for the paper, refused without `doc.print` (or `doc.print.high` at 300 DPI). Print pictures are off the render lattice, so an enforced lattice doesn't refuse them.
+
+### Patch Changes
+
+- [#878](https://github.com/embedpdf/embed-pdf-viewer/pull/878) by [@bobsingor](https://github.com/bobsingor) – The local engine no longer stalls when a call that every job waits for, such as `engine.fonts.register()`, is queued while a page read runs: a running read now gives way only to work that is more urgent than what waits behind it, so every queued call still gets its answer.
+
+- [#884](https://github.com/embedpdf/embed-pdf-viewer/pull/884) by [@bobsingor](https://github.com/bobsingor) – The engine's workers now start under `next dev` when Next.js compiles them, as it does for a package in `transpilePackages` or a linked copy outside `node_modules`. React Fast Refresh used to add `$RefreshReg$` calls to `workers/embedpdf-worker.js`, which don't exist in a worker, so the viewer reported that the engine worker did not start. The worker is now a self-contained IIFE that Fast Refresh leaves alone, and the build checks that it stays that way. The image encoder worker now starts as a module worker, like the engine worker: Next.js appends `import.meta` code to it, which a classic worker can't parse, so encoding fell back to the main thread with a warning.
+
 ## 3.0.0-next.15
 
 ### Minor Changes

@@ -11,12 +11,12 @@ import './reorder.css';
 const engine = localEngine();
 const plugins = [renderPlugin(), pageEditPlugin()];
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/welcome.pdf');
+  return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
-// Pick a page, then move it. Each button uses another placement.
+// Pick a page, then move it. Each button uses another position.
 function PageOrder() {
   const pageEdit = usePageEdit();
   const pages = usePageList();
@@ -91,7 +91,7 @@ function PageOrder() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <PageOrder />
       </DocumentGate>

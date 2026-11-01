@@ -10,8 +10,8 @@ import {
   ViewEncapsulation,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { EpdfDocument, EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
-import type { OpenInput, PageRef } from '@embedpdf/angular/runtime';
+import { EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
+import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { withInteraction } from '@embedpdf/angular/interaction';
@@ -21,34 +21,36 @@ import {
   withAnnotation,
 } from '@embedpdf/angular/annotation';
 import { EpdfForm, toFieldRef, withForm } from '@embedpdf/angular/form';
-import { EpdfStamp, withStamp } from '@embedpdf/angular/stamp';
-import { createTestSigner, EpdfSignature, withSignature } from '@embedpdf/angular/signature';
+import { EpdfSignature, withSignature } from '@embedpdf/angular/signature';
 import { cloudEngine } from '@cloudpdf/engine';
-import { localEngine } from '@embedpdf/engine';
 
 const engine = cloudEngine();
-const assetEngine = localEngine();
-const signer = createTestSigner({ commonName: 'Ada Lovelace' });
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+// The certificate Lanternfield signed the agreement with, published next to it. Trusting it is what
+// makes the signature read 'valid'; your app trusts its own certificates the same way.
+const lanternfieldCertificate = async () => {
+  const response = await fetch('/pdfs/agreement.cer');
+  return new Uint8Array(await response.arrayBuffer());
+};
 
+const agreement: OpenInput = { kind: 'grant', grant: 'shr_G5GcxJeEBa2IiwIs0DCNruCL' };
+
+// Lanternfield's signature field, signed before the agreement was sent.
+const PROVIDER = toFieldRef('provider');
+
+// Two edits after an approval signature: a comment keeps it valid, a new form field breaks it.
 @Component({
   selector: 'demo-root',
   imports: [EpdfDocumentGate, EpdfStage, EpdfPageTemplate, EpdfRenderLayer, EpdfAnnotationLayer],
   providers: [
     provideEmbedPdf(
-      { engine, initialDocuments: [{ source: ebook }] },
+      { engine, initialDocuments: [{ source: agreement }] },
       withStage(),
       withRender(),
       withInteraction(),
       withAnnotation(),
       withForm(),
-      withStamp({ assetEngine }),
-      withSignature({
-        key: () => signer,
-        // Trust the demo key itself, so its signature checks out as 'valid'.
-        trust: { anchors: async () => [(await signer).certificate] },
-      }),
+      withSignature({ trust: { anchors: async () => [await lanternfieldCertificate()] } }),
     ),
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -57,8 +59,21 @@ const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrb
   template: `
     <ng-container *epdfDocumentGate="let document; fallback: loading">
       <div class="toolbar">
-        <button type="button" class="button" [disabled]="!signed() || !page()" (click)="drawBox()">
-          Draw a box on the page
+        <button
+          type="button"
+          class="button"
+          [disabled]="!signed() || made().comment"
+          (click)="addComment()"
+        >
+          Add a comment
+        </button>
+        <button
+          type="button"
+          class="button"
+          [disabled]="!signed() || made().field"
+          (click)="addField()"
+        >
+          Add a form field
         </button>
         <output class="readout">{{ status() }}</output>
         @if (warning(); as warning) {
@@ -78,23 +93,28 @@ const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrb
 })
 export class App {
   private readonly form = inject(EpdfForm);
-  private readonly stamp = inject(EpdfStamp);
   private readonly annotation = inject(EpdfAnnotation);
   private readonly signature = inject(EpdfSignature);
-  private readonly document = inject(EpdfDocument);
   private readonly stage = viewChild(EpdfStage);
-  private done = false;
+  private revealed = false;
 
-  /** The last page, which has room for the field. */
-  protected readonly page = computed(() => this.document.pages().at(-1)?.ref);
-  protected readonly signed = computed(() => this.signature.signatures()[0]);
+  protected readonly signed = computed(() =>
+    this.signature.signatures().find((each) => each.signed),
+  );
   protected readonly status = computed(() => {
     const signed = this.signed();
     return signed
       ? `Signed by ${signed.signer.name}: ${signed.verdict?.summary ?? 'checking…'}`
-      : 'Signing…';
+      : 'Opening…';
   });
   protected readonly warning = signal<string | null>(null);
+  protected readonly made = signal({ comment: false, field: false });
+
+  /** Where the signature is: the edits go next to it. */
+  private readonly widget = computed(() => {
+    const first = this.form.get(PROVIDER)?.widgets[0];
+    return first ? this.form.getWidget(first) : null;
+  });
 
   constructor() {
     // The moment a change would break a signature once it's saved, as Acrobat warns.
@@ -103,41 +123,44 @@ export class App {
       this.warning.set(`This change will break the signature in "${name}" when saved.`);
     });
 
-    // On load: a signature field on the last page, signed by Ada with a typed signature.
+    // On load: the signatures, in view. Nothing is changed until a button is pressed.
     effect(() => {
-      const page = this.page();
       const stage = this.stage();
-      if (this.form.status() !== 'ready' || !page || !stage || this.done) return;
-      this.done = true;
-      untracked(() => void this.signDocument(page, stage));
+      if (this.form.status() !== 'ready' || !stage || this.revealed) return;
+      this.revealed = true;
+      untracked(() => {
+        const widget = this.widget();
+        if (widget) stage.reveal(widget.page, { rect: widget.rect });
+      });
     });
   }
 
-  protected drawBox() {
-    const page = this.page();
-    if (!page) return;
-    void this.annotation.create(page, {
-      subtype: 'square',
-      box: { x: 320, y: 560, width: 140, height: 64 },
-      color: '#e11d48',
-      strokeWidth: 2,
+  protected async addComment() {
+    const widget = this.widget();
+    if (!widget) return;
+    const { rect } = widget;
+    await this.annotation.create(widget.page, {
+      subtype: 'text',
+      rect: { x: rect.x + rect.width + 6, y: rect.y, width: 20, height: 20 },
+      contents: 'Looks good to us.',
     });
+    this.made.update((current) => ({ ...current, comment: true }));
   }
 
-  private async signDocument(page: PageRef, stage: EpdfStage) {
+  protected async addField() {
+    const widget = this.widget();
+    if (!widget) return;
+    const { rect } = widget;
     await this.form.create({
-      family: 'signature',
-      name: 'approval',
-      widgets: [{ page, rect: { x: 72, y: 560, width: 220, height: 64 } }],
+      family: 'text',
+      name: 'purchase_order',
+      widgets: [
+        {
+          page: widget.page,
+          rect: { x: rect.x, y: rect.y + rect.height + 36, width: rect.width, height: 24 },
+        },
+      ],
     });
-    stage.goToPage(page);
-    const { library } = await this.stamp.createLibrary('Ada Lovelace', { kind: 'signatures' });
-    const { asset } = await this.stamp.createAsset({
-      libraryId: library.id,
-      name: 'signature',
-      label: 'Signature',
-      mark: { kind: 'text', text: 'Ada Lovelace', fontFamily: 'times-italic', color: '#1d2b53' },
-    });
-    await this.signature.sign({ field: toFieldRef('approval'), mark: { assetId: asset.id } });
+    this.made.update((current) => ({ ...current, field: true }));
   }
 }

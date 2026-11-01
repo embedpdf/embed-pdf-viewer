@@ -6,5 +6,6 @@ export default {
   metadata: 'Metadata',
   fonts: 'Fonts',
   outline: 'Outline',
+  attachments: 'Attachments',
   actions: 'Actions & scripts',
 };

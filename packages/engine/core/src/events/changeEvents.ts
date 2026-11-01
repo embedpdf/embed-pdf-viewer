@@ -1,5 +1,6 @@
 import type { DocumentEventInit } from './DocumentEvent';
 import { deletedAnnotationsOf } from '../mutation/AnnotationMutationResults';
+import { deletedAttachmentOf } from '../mutation/AttachmentMutationResults';
 import { isSkippedItem, type ChangeItem, type ChangeResult } from '../mutation/Change';
 import { deletedFieldOf, formResetFacts } from '../mutation/FormMutationResults';
 import { deletedOutlineItemsOf } from '../mutation/OutlineMutationResults';
@@ -141,6 +142,39 @@ function itemEvents(item: ChangeItem): DocumentEventInit[] {
     case 'outline.restore': {
       const { type: _type, ...result } = item;
       return [{ type: 'outline.restored', ...result }];
+    }
+    case 'pages.rotate': {
+      const { type: _type, ...result } = item;
+      return [{ type: 'pages.rotated', ...result }];
+    }
+    case 'pages.reorder': {
+      const { type: _type, ...result } = item;
+      return [{ type: 'pages.reordered', ...result }];
+    }
+    case 'pages.delete': {
+      const { type: _type, ...result } = item;
+      return [{ type: 'pages.deleted', ...result }];
+    }
+    case 'pages.insertBlank':
+    case 'pages.insert': {
+      const { type: _type, ...result } = item;
+      return [{ type: 'pages.inserted', ...result }];
+    }
+    case 'pages.restore': {
+      const { type: _type, ...result } = item;
+      return [{ type: 'pages.restored', ...result }];
+    }
+    case 'attachments.create': {
+      const { type: _type, ...result } = item;
+      return [{ type: 'attachments.created', ...result }];
+    }
+    case 'attachments.delete': {
+      const { type: _type, ...result } = item;
+      return [{ type: 'attachments.deleted', deleted: deletedAttachmentOf(result), ...result }];
+    }
+    case 'attachments.restore': {
+      const { type: _type, ...result } = item;
+      return [{ type: 'attachments.restored', ...result }];
     }
   }
 }

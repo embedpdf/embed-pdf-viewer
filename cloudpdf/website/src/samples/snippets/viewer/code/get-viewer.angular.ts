@@ -16,7 +16,7 @@ export class FirstPage {
   imports: [EpdfPdfViewer, EpdfToolbarItem, FirstPage],
   template: `
     <button [disabled]="!viewer()" (click)="viewer()?.commands?.execute('document:print')">Print</button>
-    <epdf-pdf-viewer [src]="{ shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' }" style="height: 80vh" (ready)="viewer.set($event)">
+    <epdf-pdf-viewer [src]="{ grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' }" style="height: 80vh" (ready)="viewer.set($event)">
       <ng-template epdfToolbarItem="first-page"><app-first-page /></ng-template>
     </epdf-pdf-viewer>
   `,

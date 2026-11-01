@@ -29,8 +29,8 @@
  * imported.
  *
  * Every config key is a prop, and `v-bind="config"` passes a whole config.
- * `src`, `theme`, `locale`, `disable` and `readOnly` follow their props: the
- * element changes them in place. The callbacks are events (`@ready`,
+ * `src`, `theme`, `locale`, `disable`, `readOnly` and `fetch` follow their
+ * props: the element changes them in place. The callbacks are events (`@ready`,
  * `@document-change`, `@panel-resize`), so they reach the handler the app gives
  * now. Every other prop is read once, when the viewer starts; a later change is
  * ignored (development warns), and a new `key` mounts a new viewer with it.
@@ -144,6 +144,7 @@ const CONFIG_PROPS = {
   plugins: null,
   fonts: null,
   theme: null,
+  fetch: null,
 } satisfies Record<keyof PDFViewerImplProps, unknown>;
 
 /** The options each entry defines <PDFViewer> with, next to {@link setupPDFViewer}. */
@@ -184,6 +185,7 @@ const LIVE_PROPS: Readonly<Record<LiveConfigKey, true>> = {
   locale: true,
   disable: true,
   readOnly: true,
+  fetch: true,
 };
 
 /** The config as the props give it, each value raw: a reactive copy is another object. */
@@ -256,7 +258,7 @@ export function setupPDFViewer(
   // The live props, on every change of one: the element compares them by value, so an unchanged
   // one (an inline `:disable="['forms']"` too) changes nothing.
   watch(
-    () => [props.src, props.theme, props.locale, props.disable, props.readOnly],
+    () => [props.src, props.theme, props.locale, props.disable, props.readOnly, props.fetch],
     () => {
       const target = element.value;
       if (!target) return;
@@ -265,6 +267,7 @@ export function setupPDFViewer(
       target.locale = props.locale;
       target.disable = toRaw(props.disable);
       target.readOnly = toRaw(props.readOnly);
+      target.fetch = props.fetch;
     },
   );
 

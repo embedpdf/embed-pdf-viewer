@@ -2,11 +2,11 @@ import { createTestContext } from '@embedpdf/core/testing';
 import { describe, expect, it } from 'vitest';
 
 import { createShellController } from '../src/controller';
-import { initialShellState } from '../src/model';
+import { initialShellModel } from '../src/model';
 import { shellState } from '../src/state';
 
 const harness = () => {
-  const ctx = createTestContext({ id: 'shell', state: initialShellState() });
+  const ctx = createTestContext({ id: 'shell', state: initialShellModel() });
   return ctx.connect(createShellController(ctx));
 };
 

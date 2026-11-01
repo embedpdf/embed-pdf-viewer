@@ -19,11 +19,11 @@ const plugins = [
   searchPlugin(),
 ];
 
-const TITLE = { start: 10, count: 52 };
+const TITLE = { start: 28, count: 30 };
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/welcome.pdf');
+  return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 // On load: the cover's title is selected and "PDF" is found, so every color below has something to paint.
@@ -56,7 +56,7 @@ export default function App() {
           </button>
         </div>
       </div>
-      <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+      <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
         <DocumentGate fallback={<p className="loading">Loading…</p>}>
           <ShowColors />
           <Stage className="stage">

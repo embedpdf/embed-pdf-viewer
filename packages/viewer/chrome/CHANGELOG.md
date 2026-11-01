@@ -1,5 +1,72 @@
 # @embedpdf/viewer-chrome
 
+## 3.0.0-next.19
+
+### Minor Changes
+
+- [#923](https://github.com/embedpdf/embed-pdf-viewer/pull/923) by [@bobsingor](https://github.com/bobsingor) – Comment cards show what their thread has and offer what comes next. A mark with nothing said yet shows one box to write the comment, which becomes the annotation's own text where it may change, and a reply where it may not. A thread shows its comment, its replies and a box to reply; the box shows on the selected card, and stays while it holds a draft. A thread's status shows as a chip by its date once one is set. A check on the card marks the thread completed, and the card's menu (its ⋯ button, or a right-click on the card) sets any review status and deletes the thread. A page's count says how many comments are written on it. New commands `comment:status-accepted`, `comment:status-rejected`, `comment:status-cancelled`, `comment:status-completed`, `comment:status-none`, `comment:delete-thread` and the `comment-item` menu, and the icons `circleCheck` and `send`.
+
+- [#918](https://github.com/embedpdf/embed-pdf-viewer/pull/918) by [@bobsingor](https://github.com/bobsingor) – The grant prompt (`grantPrompt` in every locale) asks for a grant's passphrase
+  or its questions.
+
+- [#920](https://github.com/embedpdf/embed-pdf-viewer/pull/920) by [@bobsingor](https://github.com/bobsingor) – Marquee Zoom in the zoom menu: the `tool:zoom` command switches to the `zoom` tool. Drag a box to zoom to it, or click to zoom in (Alt-click: out). It has labels in every built-in language.
+
+- [#923](https://github.com/embedpdf/embed-pdf-viewer/pull/923) by [@bobsingor](https://github.com/bobsingor) – The rows of buttons at the top of the thumbnails, outline and attachments panels are bars of the layout, named after their panel: `thumbnails` (groups `edit`, `more`, `history`), `outline` (`filter`, `items`) and `attachments` (`count`, `files`). They fit the panel's width like any bar, with what doesn't fit in a "More" menu, so a narrow panel no longer cuts off undo and redo, and `add`, `remove` and `replace` change them. The thumbnails bar also has insert from a file, duplicate and extract where there's room, in place of the page menu's button. The outline's filter and the attachments' count are `{ custom: 'outline-filter' }` and `{ custom: 'attachments-count' }`. Any panel, your own too, draws the bars placed in it with `place: { panel: id }`.
+
+- [#923](https://github.com/embedpdf/embed-pdf-viewer/pull/923) by [@bobsingor](https://github.com/bobsingor) – `FullViewer` takes a `fetch` prop, which every document at a URL downloads with.
+
+- [#923](https://github.com/embedpdf/embed-pdf-viewer/pull/923) by [@bobsingor](https://github.com/bobsingor) – The viewer speaks Swedish (`sv`) and Traditional Chinese (`zh-TW`), for fifteen languages. Readers of Traditional Chinese (`zh-TW`, `zh-HK`, `zh-MO`, `zh-Hant`) now see it instead of English. Both are machine-translated in the terms Adobe Acrobat uses in each language, are waiting for a native speaker's review, and load the first time the viewer shows them. `strings` an app gives for `sv` or `zh-TW` now change the built-in language's words, and the words it leaves out show in that language instead of English.
+
+### Patch Changes
+
+- [#923](https://github.com/embedpdf/embed-pdf-viewer/pull/923) by [@bobsingor](https://github.com/bobsingor) – The bar for selected annotations sits below them, and above them when there's no room below. Its menus and the link editor open on the same side.
+
+- [#923](https://github.com/embedpdf/embed-pdf-viewer/pull/923) by [@bobsingor](https://github.com/bobsingor) – The default bars make room in the order their groups say, now that a group's `importance` is its items' too. In a narrow main bar, pan and pointer are the first buttons to go into the "More" menu, then the View menu and zoom, and the document menu, thumbnails, search and comments never do. So a phone keeps the mode tabs, folded behind a chevron, beside search and comments. In the annotate, shapes and form bars, the text tools, polygons and the less common fields go before undo and redo. The measuring tools, and delete in the annotation bar, stay in their bars. An item you add with `layout.add(item, { group })` takes that group's importance unless you give it its own.
+
+- [#923](https://github.com/embedpdf/embed-pdf-viewer/pull/923) by [@bobsingor](https://github.com/bobsingor) – The thumbnails panel has a scrollbar like the pages', and room above the first thumbnail: 20 px around the thumbnails, where the panel's narrow width used to give them the 4 px phone gutter. `plugins.thumbnails` can still set `padding` and `responsive`.
+
+- [#923](https://github.com/embedpdf/embed-pdf-viewer/pull/923) by [@bobsingor](https://github.com/bobsingor) – Full Screen (`view:fullscreen`) fills the screen with the viewer's own box instead of the whole page, and leaves the page's own full screen alone. The viewer stays where the page put it, and nothing on the page moves or changes. In a frame without `allow="fullscreen"` the button isn't there, since the browser lets nothing in such a frame go full screen. Where the browser has no full screen for elements (Safari on iPhone) or refuses it, the viewer covers the whole window instead, until the button or Escape ends it; a viewer that already is the whole window there has no Full Screen. The button follows Escape and the page's own `requestFullscreen()` on the `<embedpdf-viewer>` element, shows the `fullscreenExit` icon while the viewer fills the screen, and dialogs and sheets open in the viewer stay on top as it goes full screen.
+
+- [#923](https://github.com/embedpdf/embed-pdf-viewer/pull/923) by [@bobsingor](https://github.com/bobsingor) – The `zoom:in` and `zoom:out` commands are off at the zoom limits, and the toolbar's − and + buttons show it: they grey out at `maxZoom` and `minZoom`, set under `plugins.stage`. Zooming in and out steps through round levels (100%, 125%, 150%, 200% and so on).
+
+## 3.0.0-next.18
+
+### Patch Changes
+
+- [#908](https://github.com/embedpdf/embed-pdf-viewer/pull/908) by [@bobsingor](https://github.com/bobsingor) – Hide the Measure tab when the session can neither draw measurements nor set a page's scale: the measurement panel, and the Measure bar's scale button that opens it, now follow the same permission checks as the measurement tools. The scale button is drawn like every other bar button, so the Measure bar is as tall as the other mode bars, and it shows pressed while the panel is open; clicking it again closes the panel.
+
+- [#907](https://github.com/embedpdf/embed-pdf-viewer/pull/907) by [@bobsingor](https://github.com/bobsingor) – Where a document allows searching but not copying text, search opens as a find bar over the top corner of the pages instead of a panel of empty result rows. It shows which match you're on and how many there are, `Enter` and `Shift`+`Enter` step through them, and its options sit behind a button. In the search panel, `Enter` and `Shift`+`Enter` step through the matches too, and a match the engine finds no text around reads "Result 3" instead of an empty row.
+
+- [#907](https://github.com/embedpdf/embed-pdf-viewer/pull/907) by [@bobsingor](https://github.com/bobsingor) – When a share link gets a passphrase or questions while its document is open, the viewer shows the same passphrase or questions form over the document, and the document goes on once they're given.
+
+## 3.0.0-next.17
+
+### Minor Changes
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – The viewer asks for what a share link waits for: its passphrase, or who the visitor is, in the document's tab before it opens, and in a dialog when a change waits for the visitor's answers. The questions show the link owner's purpose and privacy notice, say that the visitor's name shows on what they add, and that the answers can't be changed later. A tab waiting for a passphrase or answers shows a lock. Translated in every language the viewer ships.
+
+## 3.0.0-next.16
+
+### Minor Changes
+
+- [#891](https://github.com/embedpdf/embed-pdf-viewer/pull/891) by [@bobsingor](https://github.com/bobsingor) – The attachments panel: the files the document carries, its attachments and then the files on its pages, each with its kind, its name (without the characters that can disguise one), its size, its page and its description. Clicking an attachment saves it, clicking a page's file goes to it, and a row's menu saves, goes to the page and deletes, each as one undoable step. Add file in its header, or files dropped on it, attach them, a name the document has already getting a number. The outline and attachments panels show while they have a job: their list holds entries, or the session may add some with the feature on. A selected file attachment annotation's strip has Save file (`annotation:save-file`). New commands `attachment:add`, `attachment:save`, `attachment:go-to`, `attachment:delete` and the `attachment-item` menu.
+
+- [#885](https://github.com/embedpdf/embed-pdf-viewer/pull/885) by [@bobsingor](https://github.com/bobsingor) – The Outline panel shows the document's bookmarks as a tree, beside Thumbnails, for every document (one without an outline says so). A row goes where its item goes; the item for where you are reading is marked and scrolls into view; a filter finds items by their title, in their place; the keyboard works the tree as the ARIA tree pattern does. A session that may change the outline adds items (`Mod+B`, after the selected one, at the place in view, renaming at once), renames them in their row, drags them to another place and level, deletes them, and edits an item's title, colour, style, open state and destination in its Properties. Each edit is one step of the history. The new `outline:*` commands and the `outline-item` menu are in the layout, and `outline.editing` is a feature `readOnly` turns off. The page number field gives focus back to the number in the same frame it closes.
+
+- [#890](https://github.com/embedpdf/embed-pdf-viewer/pull/890) by [@bobsingor](https://github.com/bobsingor) – Pages are organized in the thumbnails panel, where the user may change them (`pages` feature, `doc.pages.assemble`).
+  - A click selects a page and goes to it; Ctrl/Cmd+click and Shift+click select more. Each page has a menu (its ⋯ button, a right-click or a long press) with rotate, insert a blank page or a PDF, duplicate, extract and delete. Dragging moves pages, with a line where they land; a PDF dropped between pages is inserted there instead of opening as a tab. The arrows, Shift, Space, Alt+arrows, Delete and Ctrl/Cmd+A work while the list has focus.
+  - The panel's header inserts a blank page, rotates and deletes the selection, opens its menu, and has undo and redo: every page edit is a step of the history.
+  - New commands: `page:rotate-clockwise`, `page:rotate-counterclockwise`, `page:delete`, `page:duplicate`, `page:insert-blank`, `page:insert-file` (`args: { position, files }`), `page:extract` (in `documents.download`, so `readOnly` keeps it), `page:select-all` and `menu:page`, with the `page` menu. New icons: `pageRotateClockwise`, `pageRotateCounterClockwise`, `filePlus`, `fileExport`. Their strings are in all 13 languages.
+  - Downloads of the document, a stamp library, a signature and a signed revision share one way of saving a file.
+
+- [#883](https://github.com/embedpdf/embed-pdf-viewer/pull/883) by [@bobsingor](https://github.com/bobsingor) – **Print** (`document:print`, `Ctrl`/`Cmd`+`P`) opens a Print dialog: every page, the current page or pages such as `1-3, 5`, and whether annotations print. Nothing is made while the user chooses: **Print** prepares the chosen pages, shows how far it is with a progress bar (Cancel stops it), and opens the browser's print dialog when they're ready. In Safari, which prints only from a tap, it says the pages are ready and prints from the next tap on **Print**. It says when the document allows only low-resolution printing. In every language the viewer ships.
+
+### Patch Changes
+
+- [#876](https://github.com/embedpdf/embed-pdf-viewer/pull/876) by [@bobsingor](https://github.com/bobsingor) – With a finger as the main way of pointing, the viewer's own fields (search, the page number, comments, signatures and the rest) write in 16 px text, so iOS Safari doesn't zoom the page in when one takes focus.
+
+- [#872](https://github.com/embedpdf/embed-pdf-viewer/pull/872) by [@bobsingor](https://github.com/bobsingor) – Fix sheets on a phone: a menu or panel sheet slides straight up from the bottom of the viewer instead of landing too high and dropping into place, and the whole viewer stays dimmed behind it while it slides in or is dragged. Dragging a sheet's handle down fades the dimming with it, and the dimming returns when the sheet is let go at rest.
+
 ## 3.0.0-next.15
 
 ### Minor Changes

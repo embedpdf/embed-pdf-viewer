@@ -4,7 +4,7 @@
   import { useSelection, useSelectionState } from '@embedpdf/svelte/selection';
 
   // On the cover: the characters of its title, and a point on its word "Viewers", in page coordinates.
-  const TITLE = { start: 10, count: 52 };
+  const TITLE = { start: 28, count: 30 };
   const POINT = { x: 260, y: 242 };
 
   const selection = useSelection();

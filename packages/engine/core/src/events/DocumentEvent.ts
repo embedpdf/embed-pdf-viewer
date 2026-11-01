@@ -12,6 +12,7 @@ import type {
 import type {
   AttachmentCreateResult,
   AttachmentDeleteResult,
+  AttachmentRestoreResult,
 } from '../mutation/AttachmentMutationResults';
 import type {
   FormFieldCreateResult,
@@ -46,6 +47,7 @@ import type { PageFlattenResult, PageFlattenUsage } from '../mutation/PageFlatte
 import type { RedactionApplyResult } from '../mutation/RedactionApplyResult';
 import type { PageInsertResult } from '../mutation/PageInsertResult';
 import type { PageReorderResult } from '../mutation/PageReorderResult';
+import type { PageRestoreResult } from '../mutation/PageRestoreResult';
 import type { PageNameResult } from '../mutation/PageNameResult';
 import type { PageRotateResult } from '../mutation/PageRotateResult';
 import type { FormFieldRef } from '../identity/FormFieldRef';
@@ -178,6 +180,8 @@ export type DocumentEvent =
       origin: EventOrigin;
     } & PageDeleteResult)
   | ({ type: 'pages.inserted'; origin: EventOrigin } & PageInsertResult)
+  /** An undo brought deleted pages back, or a redo brought inserted pages back. */
+  | ({ type: 'pages.restored'; origin: EventOrigin } & PageRestoreResult)
   | ({
       type: 'pages.named';
       /** The decoded key that was registered, renamed, or removed. */
@@ -202,6 +206,8 @@ export type DocumentEvent =
       type: 'fonts.changed';
       origin: EventOrigin;
     }
+  /** An undo brought a deleted file back, under the key it had. */
+  | ({ type: 'attachments.restored'; origin: EventOrigin } & AttachmentRestoreResult)
   | ({ type: 'metadata.updated'; origin: EventOrigin } & MetadataUpdateResult)
   | ({ type: 'metadata.customUpdated'; origin: EventOrigin } & CustomMetadataUpdateResult)
   | ({ type: 'outline.created'; origin: EventOrigin } & OutlineCreateResult)

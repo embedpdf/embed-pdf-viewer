@@ -10,7 +10,7 @@ import { describe, expect, it } from 'vitest';
 import {
   collapsed,
   expanded,
-  initialOutlineState,
+  initialOutlineModel,
   itemsOf,
   pruned,
   rowsOf,
@@ -114,14 +114,14 @@ describe('the reading position', () => {
 
 describe('the session', () => {
   it('starts expanded where the file opens items, once', () => {
-    const first = seeded(initialOutlineState(), OUTLINE);
+    const first = seeded(initialOutlineModel(), OUTLINE);
     expect(first.expanded).toEqual({ '6': true });
     const chosen = collapsed(first, ['6']);
     expect(seeded(chosen, OUTLINE)).toBe(chosen);
   });
 
   it('changes nothing when a transition has nothing to do', () => {
-    const state = expanded(initialOutlineState(), ['6']);
+    const state = expanded(initialOutlineModel(), ['6']);
     expect(expanded(state, ['6'])).toBe(state);
     expect(collapsed(state, ['7'])).toBe(state);
     const picked = selected(state, [A, A]);
@@ -130,7 +130,7 @@ describe('the session', () => {
   });
 
   it('forgets items the outline no longer has', () => {
-    const state = selected(expanded(initialOutlineState(), ['6', '99']), [A, ref(99)]);
+    const state = selected(expanded(initialOutlineModel(), ['6', '99']), [A, ref(99)]);
     const next = pruned(state, OUTLINE);
     expect(next.expanded).toEqual({ '6': true });
     expect(next.selected).toEqual([A]);

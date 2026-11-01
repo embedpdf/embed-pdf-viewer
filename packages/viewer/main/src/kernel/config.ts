@@ -8,7 +8,7 @@
  * here: each door declares its own (see ../doors and ../local), because a
  * config type may only promise what its door's imports actually deliver.
  */
-import { PluginError } from '@embedpdf/core';
+import { isPdf, PluginError, type HostFetch } from '@embedpdf/core';
 import type { OpenInput } from '@embedpdf/engine-core/runtime';
 import type {
   InitialDocument,
@@ -41,6 +41,11 @@ export interface ViewerConfigBase<Src = DocumentSrc> extends ViewerCustomization
   /** Several documents, each in a tab, with their names, passwords and the one
    *  that shows first. With these, `src` is ignored. Read once. */
   documents?: readonly DocumentEntry<Src>[];
+  /** How a document at a URL downloads: your own `fetch`, to add headers or
+   *  cookies. It gets the URL and an `init` with the document's cancel
+   *  `signal`, to pass on, and runs again on **Try again**. Follows its prop:
+   *  the next download uses the new one. */
+  fetch?: HostFetch;
 }
 
 /**
@@ -69,7 +74,7 @@ export interface ElementConfig extends ViewerConfigBase<ElementSrc> {
 }
 
 /** The config keys a running viewer follows; a change to any other key mounts a new viewer. */
-export type LiveConfigKey = 'src' | 'theme' | 'locale' | 'disable' | 'readOnly';
+export type LiveConfigKey = 'src' | 'theme' | 'locale' | 'disable' | 'readOnly' | 'fetch';
 
 const LIVE_CONFIG_KEYS: ReadonlySet<string> = new Set<LiveConfigKey>([
   'src',
@@ -77,6 +82,7 @@ const LIVE_CONFIG_KEYS: ReadonlySet<string> = new Set<LiveConfigKey>([
   'locale',
   'disable',
   'readOnly',
+  'fetch',
 ]);
 
 export const isLiveConfigKey = (key: string): key is LiveConfigKey => LIVE_CONFIG_KEYS.has(key);
@@ -132,34 +138,6 @@ export function pluginsOf(
   return merged;
 }
 
-/**
- * Download a URL `src`. Its tab says why when the server says no: the file isn't there
- * (`not-found`), or the download failed.
- */
-const fetchBytes = async (url: string, signal: AbortSignal): Promise<Uint8Array> => {
-  const response = await fetch(url, { signal });
-  if (!response.ok) {
-    throw new PluginError(
-      response.status === 404 ? 'not-found' : 'operation-failed',
-      'documents',
-      `couldn't download ${url} (HTTP ${response.status})`,
-    );
-  }
-  return new Uint8Array(await response.arrayBuffer());
-};
-
-/** `%PDF`, which a PDF has in its first 1024 bytes, as PDFium looks for it. */
-const PDF_HEADER = [0x25, 0x50, 0x44, 0x46];
-
-/** Whether bytes are a PDF's, by its header: a web page or an image a URL gave instead isn't. */
-function isPdf(bytes: Uint8Array): boolean {
-  const end = Math.min(bytes.length - PDF_HEADER.length, 1024);
-  for (let start = 0; start <= end; start++) {
-    if (PDF_HEADER.every((byte, index) => bytes[start + index] === byte)) return true;
-  }
-  return false;
-}
-
 /** Whether a `src` is an engine's open input, which opens as it is. */
 export const isOpenInput = (src: ElementSrc): src is OpenInput =>
   typeof src === 'object' && 'kind' in src;
@@ -202,10 +180,10 @@ export type SourceOf = (src: ElementSrc) => ElementSrc;
 
 /**
  * A `src` as a document to open, under the id given: its tab appears at once, named after the
- * file, and the bytes are read (a URL fetched) under the loading tab, which stops the fetch when
- * the tab closes first; bytes that aren't a PDF's fail as `invalid-input`. An open input opens
- * as it is, once `after` settles: a document of the same id still closing would refuse it, and
- * only the engine knows which document it names.
+ * file. A URL downloads under the loading tab with the viewer's `fetch`, which stops when the tab
+ * closes first; a file or bytes are read there; either fails as `invalid-input` when it isn't a
+ * PDF. An open input opens as it is, once `after` settles: a document of the same id still
+ * closing would refuse it, and only the engine knows which document it names.
  */
 export function documentFromSrc(
   src: ElementSrc,
@@ -229,17 +207,14 @@ export function documentFromSrc(
     };
   }
   const name = nameOfSrc(src);
+  if (typeof src === 'string') return { name, source: async () => ({ kind: 'url', url: src, id }) };
   return {
     name,
-    source: async (signal) => {
+    source: async () => {
       // Given bytes go as a view: the engine copies a view, where it would move a buffer to
       // its worker and leave the app's own copy empty for the next open.
       const bytes =
-        typeof src === 'string'
-          ? await fetchBytes(src, signal)
-          : src instanceof Blob
-            ? new Uint8Array(await src.arrayBuffer())
-            : new Uint8Array(src);
+        src instanceof Blob ? new Uint8Array(await src.arrayBuffer()) : new Uint8Array(src);
       // Said here, where it's known: the engine says only that it couldn't open the file.
       if (!isPdf(bytes)) throw new PluginError('invalid-input', 'documents', `${name} isn't a PDF`);
       return { kind: 'bytes', id, bytes };

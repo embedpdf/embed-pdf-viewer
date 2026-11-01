@@ -11,10 +11,13 @@
  */
 import { panelCommandOf, type LayoutData, type LayoutPanel } from '@embedpdf/core-ui';
 import { AnnotationToken } from '@embedpdf/react/annotation';
-import type { CommandDef } from '@embedpdf/react/commands';
+import { AttachmentToken } from '@embedpdf/react/attachment';
+import { CommandsToken, type CommandDef } from '@embedpdf/react/commands';
 import { FormToken } from '@embedpdf/react/form';
+import { MeasurementToken } from '@embedpdf/react/measurement';
 import { OutlineToken } from '@embedpdf/react/outline';
 import { RedactionToken } from '@embedpdf/react/redaction';
+import { RenderToken } from '@embedpdf/react/render';
 import { SearchToken } from '@embedpdf/react/search';
 import { ShellToken } from '@embedpdf/react/shell';
 import { SignatureToken } from '@embedpdf/react/signature';
@@ -46,6 +49,20 @@ type PanelCommandFacts = Pick<CommandDef, 'allowed' | 'notAllowedKey' | 'visible
   readonly focus?: boolean;
 };
 
+/**
+ * Whether a list panel has a job: its list holds entries, or the session may add some (the
+ * right, and `adding`, the feature that turns adding off, on). A document without an outline
+ * shows no outline button to a session that can't add items; the same for attachments.
+ */
+const hasJob = (
+  commandContext: Parameters<NonNullable<CommandDef['visible']>>[0],
+  entries: number,
+  mayAdd: boolean,
+  adding: Feature,
+): boolean =>
+  entries > 0 ||
+  (mayAdd && !(commandContext.tryGet(CommandsToken)?.isCategoryDisabled(adding) ?? false));
+
 /** The search panel's id in the layout. */
 const SEARCH_PANEL = 'search';
 
@@ -74,18 +91,49 @@ const FIND_COMMAND: CommandDef = {
 };
 
 const BUILT_IN_PANELS: ReadonlyMap<string, PanelCommandFacts> = new Map<string, PanelCommandFacts>([
-  ['thumbnails', { categories: ['thumbnails'] }],
-  // The outline panel shows whenever the plugin is there, even for a document without one: its
-  // button stays put from document to document, and the panel says there is none.
+  // A thumbnail is a picture of the page with a right of its own (`doc.render.thumbnail`, which
+  // `doc.render` includes): without it there is nothing the panel could show.
+  [
+    'thumbnails',
+    {
+      categories: ['thumbnails'],
+      allowed: (commandContext) => commandContext.tryGet(RenderToken)?.canRenderThumbnail() ?? true,
+      notAllowedKey: 'commands.notAllowed.doc-render-thumbnail',
+    },
+  ],
+  // The outline and attachments panels show while they have a job (`hasJob`): their lists are
+  // read once a document shows (ui/sidebar-reads.tsx), so their buttons know.
   [
     'outline',
     {
       categories: ['outline'],
-      visible: (commandContext) => commandContext.tryGet(OutlineToken) != null,
+      visible: (commandContext) => {
+        const outline = commandContext.tryGet(OutlineToken);
+        return (
+          outline != null &&
+          hasJob(commandContext, outline.list().length, outline.canEdit(), 'outline.editing')
+        );
+      },
     },
   ],
-  // No plugin lists the document's attached files: the panel has nothing to show, so it never shows.
-  ['attachments', { categories: ['attachments'], visible: () => false }],
+  [
+    'attachments',
+    {
+      categories: ['attachments'],
+      visible: (commandContext) => {
+        const attachment = commandContext.tryGet(AttachmentToken);
+        return (
+          attachment != null &&
+          hasJob(
+            commandContext,
+            attachment.list().length,
+            attachment.canAdd(),
+            'attachments.adding',
+          )
+        );
+      },
+    },
+  ],
   // Without searching the panel has no job; its button puts the cursor in the field, as Find does.
   [SEARCH_PANEL, { ...SEARCHES, focus: true }],
   // Without it there is nothing this panel could show.
@@ -130,7 +178,19 @@ const BUILT_IN_PANELS: ReadonlyMap<string, PanelCommandFacts> = new Map<string, 
       },
     },
   ],
-  ['measurement', { categories: ['measurement'] }],
+  // Useful to a session that can draw measurements or set a page's scale; with neither power the
+  // panel (and the Measure bar's scale button, which opens it) could only read the scale back.
+  [
+    'measurement',
+    {
+      categories: ['measurement'],
+      allowed: (commandContext) => {
+        const measurement = commandContext.tryGet(MeasurementToken);
+        const annotation = commandContext.tryGet(AnnotationToken);
+        return measurement ? measurement.canCalibrate() || (annotation?.canCreate() ?? true) : true;
+      },
+    },
+  ],
   // The form designer's sidebar: for a session that may design forms, and in Form mode only,
   // so it closes as Form mode does (`form:design` is its switch).
   [

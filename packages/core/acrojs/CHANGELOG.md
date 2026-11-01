@@ -1,5 +1,19 @@
 # @embedpdf/core-acrojs
 
+## 3.0.0-next.19
+
+## 3.0.0-next.18
+
+## 3.0.0-next.17
+
+## 3.0.0-next.16
+
+### Patch Changes
+
+- [#895](https://github.com/embedpdf/embed-pdf-viewer/pull/895) by [@bobsingor](https://github.com/bobsingor) – `AFDate_FormatEx` reads a date in the field's own format before trying a JavaScript date, as
+  Acrobat does. A `dd/mm/yyyy` field showing `12/02/2027` stays 12 February instead of turning
+  into `02/12/2027`.
+
 ## 3.0.0-next.15
 
 ### Minor Changes

@@ -1,5 +1,29 @@
 # @embedpdf/plugin-stage
 
+## 3.0.0-next.19
+
+### Minor Changes
+
+- [#920](https://github.com/embedpdf/embed-pdf-viewer/pull/920) by [@bobsingor](https://github.com/bobsingor) – The `zoom` tool's box. On the host lens, `beginZoomDrag`, `moveZoomDrag`, `endZoomDrag({ zoomOut })` and `cancelZoomDrag` run the drag, and `getZoomBox()` gives the box in viewport pixels for an adapter to draw. A box zooms straight in, about the one point that stays put, until it fills the view, centered; it glides with `scrollBehavior`. A click (under 4 pixels) zooms one step around the point. `createZoomDragHandler(stage, interaction)` connects it to the interaction hub. The new `zoomBox` setting (`{ fill, stroke }`, `null` follows the accent) colors the box. `zoomIn()` and `zoomOut()` take `{ around }`, like `zoomTo` and `zoomBy`. `reveal()` with a fit now stops at the zoom limit (64×) instead of zooming past it on a tiny rect. Under a tool with a `gapCursor` (pan, zoom), the pan fallback no longer takes drags between pages. A fit mode, a level or `resetSettings()` asked for again now applies after a zoom the user made: before, `fitAutomatic()` after a zoom step, pinch, double-tap or zoomed `reveal` did nothing when automatic was already the setting, and so did `zoomTo()` with the last level set.
+
+- [#923](https://github.com/embedpdf/embed-pdf-viewer/pull/923) by [@bobsingor](https://github.com/bobsingor) – The Stage has zoom limits: the `minZoom` and `maxZoom` settings, `0.05` and `64` by default (5% to 6400%). Nothing zooms past them: not `zoomIn()`, a pinch or Ctrl+wheel, `zoomTo()`, `zoomBy()`, `setCamera()`, a reveal or a destination, and not a fit mode, which stops at the limit. When the limits change, a zoom outside them moves to the nearest one; a `minZoom` above `maxZoom` counts as `maxZoom`. `canZoomIn()` and `canZoomOut()` say whether the zoom is below `maxZoom` or above `minZoom`, for disabling your buttons.
+
+  `zoomIn()` and `zoomOut()` step through round levels (100%, 125%, 150%, 200%, 300% and so on) in place of ×1.2. From a level in between, such as a fit, they go to the next one, and a level within 5% of a round one steps past it.
+
+## 3.0.0-next.18
+
+## 3.0.0-next.17
+
+### Minor Changes
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – A named type for the state: `StageState`, what `stageState` reads and `useStageState()` returns, the State table of the Stage page with a comment on each field. Published types now name it instead of spelling out its fields. The plugin's model, from `/contract/host`, is now `StageModel`, made by `initialStageModel()`, so `StageState` has one meaning.
+
+## 3.0.0-next.16
+
+### Minor Changes
+
+- [#885](https://github.com/embedpdf/embed-pdf-viewer/pull/885) by [@bobsingor](https://github.com/bobsingor) – `getCurrentDestination()` says where the view is as a destination: the page reaching past the top of the view, the point where `goToDestination()` puts one (a padding in from the top-left), and no zoom, so going there again keeps the reader's zoom.
+
 ## 3.0.0-next.15
 
 ### Minor Changes

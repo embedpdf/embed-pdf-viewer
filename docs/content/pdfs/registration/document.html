@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Community Day registration</title>
+<link rel="stylesheet" href="../shared/document.css">
+<style>
+  /* A form made for printing: boxes and circles drawn on the page, no fields in them yet. */
+  .sheet .title.form-title { margin-top: 24px; font-size: 28px; }
+  .fields { flex: none; display: grid; gap: 14px; margin-top: 12px; }
+  .pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; }
+  .label { display: block; margin-bottom: 6px; font: 600 12.5px/1.2 var(--font-body); color: var(--color-ink); }
+  .box { height: 30px; border: 1px solid var(--color-border); border-radius: 5px; background: #ffffff; }
+  .choices { display: flex; align-items: center; gap: 26px; }
+  .choice { display: flex; align-items: center; gap: 9px; }
+  .dot, .tick { flex: none; width: 18px; height: 18px; box-sizing: border-box; border: 1px solid var(--color-border); background: #ffffff; }
+  .dot { border-radius: 50%; }
+  .tick { border-radius: 4px; }
+
+  /* The group tickets: five printed rows, placed exactly, in points times 4/3. A row is 36pt:
+     a country box at x 96, 160 by 24, and a circle for each ticket at x 330 and 430. */
+  .at { position: absolute; }
+  .row-box { left: 128px; width: 213.33px; height: 32px; box-sizing: border-box; border: 1px solid var(--color-border); border-radius: 5px; background: #ffffff; }
+  .row-dot { width: 21.33px; height: 21.33px; box-sizing: border-box; border: 1px solid var(--color-border); border-radius: 50%; background: #ffffff; }
+  .row-rule { left: 80px; width: 656px; border-top: 1px solid var(--color-border-soft); }
+  .column { font: 700 11px/1.2 var(--font-display); letter-spacing: 0.07em; text-transform: uppercase; color: var(--color-fg-muted); }
+  .number-label { left: 96px; width: 24px; font: 500 12px/32px var(--font-body); color: var(--color-fg-muted); }
+</style>
+</head>
+<body class="lanternfield">
+<section class="page sheet">
+  <div class="letterhead">
+    <img src="../shared/lanternfield-logo.svg" alt="Lanternfield">
+    <span class="kind">Registration</span>
+  </div>
+
+  <h1 class="title form-title">Community Day 2027</h1>
+  <p class="meta">Amsterdam · 13 and 14 March 2027 · Return this form to events@lanternfield.example</p>
+
+  <h2>Your details</h2>
+  <div class="fields">
+    <div>
+      <span class="label">Full name</span>
+      <div class="box"></div>
+    </div>
+    <div class="pair">
+      <div><span class="label">Email</span><div class="box"></div></div>
+      <div><span class="label">Company</span><div class="box"></div></div>
+    </div>
+    <div class="pair">
+      <div>
+        <span class="label">Workshop</span>
+        <div class="choices">
+          <span class="choice"><span class="dot"></span>Morning</span>
+          <span class="choice"><span class="dot"></span>Afternoon</span>
+        </div>
+      </div>
+      <div>
+        <span class="label">Lunch</span>
+        <span class="choice"><span class="tick"></span>Vegetarian</span>
+      </div>
+    </div>
+  </div>
+
+  <h2 class="at" style="top:532px; left:80px; margin:0;">Group tickets</h2>
+  <p class="at" style="top:558px; left:80px; margin:0;">For teams of up to five. One line per person, with the days they come.</p>
+
+  <span class="at column" style="top:604px; left:128px;">Country</span>
+  <span class="at column" style="top:604px; left:450.67px; transform:translateX(-50%);">One day</span>
+  <span class="at column" style="top:604px; left:584px; transform:translateX(-50%);">Both days</span>
+
+  <span class="at number-label" style="top:626.67px;">1</span>
+  <div class="at row-box" style="top:626.67px;"></div>
+  <div class="at row-dot" style="top:632px; left:440px;"></div>
+  <div class="at row-dot" style="top:632px; left:573.33px;"></div>
+  <div class="at row-rule" style="top:666.67px;"></div>
+
+  <span class="at number-label" style="top:674.67px;">2</span>
+  <div class="at row-box" style="top:674.67px;"></div>
+  <div class="at row-dot" style="top:680px; left:440px;"></div>
+  <div class="at row-dot" style="top:680px; left:573.33px;"></div>
+  <div class="at row-rule" style="top:714.67px;"></div>
+
+  <span class="at number-label" style="top:722.67px;">3</span>
+  <div class="at row-box" style="top:722.67px;"></div>
+  <div class="at row-dot" style="top:728px; left:440px;"></div>
+  <div class="at row-dot" style="top:728px; left:573.33px;"></div>
+  <div class="at row-rule" style="top:762.67px;"></div>
+
+  <span class="at number-label" style="top:770.67px;">4</span>
+  <div class="at row-box" style="top:770.67px;"></div>
+  <div class="at row-dot" style="top:776px; left:440px;"></div>
+  <div class="at row-dot" style="top:776px; left:573.33px;"></div>
+  <div class="at row-rule" style="top:810.67px;"></div>
+
+  <span class="at number-label" style="top:818.67px;">5</span>
+  <div class="at row-box" style="top:818.67px;"></div>
+  <div class="at row-dot" style="top:824px; left:440px;"></div>
+  <div class="at row-dot" style="top:824px; left:573.33px;"></div>
+  <div class="at row-rule" style="top:858.67px;"></div>
+
+  <div class="page-footer"><span>Lanternfield · Community Day 2027 registration</span><span>1 of 1</span></div>
+</section>
+</body>
+</html>

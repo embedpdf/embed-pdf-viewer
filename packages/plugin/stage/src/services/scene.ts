@@ -7,9 +7,11 @@
  */
 import {
   anchorFromCamera,
+  clampZoom,
   gridLayout,
   groupPages,
   linearLayout,
+  resolveZoomLimits,
   ZoomMode,
   type AlignmentValue,
   type AlignValue,
@@ -21,21 +23,24 @@ import {
   type Scene,
   type SceneItem,
   type Size,
+  type ZoomLimits,
 } from '@embedpdf/core-stage';
 import { addRotations, applyRect, displaySize, rotateScaleMatrix } from '@embedpdf/core-geometry';
 import type { Rect } from '@embedpdf/core-geometry';
 import { memo, type PluginContext, type PageRef } from '@embedpdf/core';
 
 import type { StageSettings } from '../contract';
-import type { StageState } from '../model';
+import type { StageModel } from '../model';
 import { SETTINGS_EFFECT, SETTING_KEYS } from '../settings';
 
-export function createScene(ctx: PluginContext<StageState>) {
+export function createScene(ctx: PluginContext<StageModel>) {
   const state = () => ctx.state.get();
   const camera = () => state().camera;
   const viewport = () => state().viewport;
   const dpr = () => state().dpr;
   const padding = () => state().padding;
+  /** The `minZoom`/`maxZoom` range every zoom this view chooses is clamped into. */
+  const zoomLimits = (): ZoomLimits => resolveZoomLimits(state().minZoom, state().maxZoom);
   const paged = () => state().flow === 'paged';
   const isFitAll = () => {
     const zoom = state().zoom;
@@ -73,7 +78,9 @@ export function createScene(ctx: PluginContext<StageState>) {
   // way a scene depends on the viewport or the zoom.
   const effectiveZoom = (): number => {
     const zoom = state().zoom;
-    return 'level' in zoom ? zoom.level : Math.max(state().camera.zoom, 0.0001);
+    return 'level' in zoom
+      ? clampZoom(zoom.level, zoomLimits())
+      : Math.max(state().camera.zoom, 0.0001);
   };
 
   // Wrapped grid: the line width (world units) the columns must fit.
@@ -337,6 +344,7 @@ export function createScene(ctx: PluginContext<StageState>) {
     viewport,
     dpr,
     padding,
+    zoomLimits,
     paged,
     isFitAll,
     grouping,

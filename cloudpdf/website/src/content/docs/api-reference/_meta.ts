@@ -5,7 +5,8 @@ export default {
   deployment: 'Deployment',
   tenants: 'Tenants',
   documents: 'Tenant documents',
+  folders: 'Folders',
   tokens: 'Tokens',
-  shares: 'Shares',
+  grants: 'Grants',
   'document-operations': 'Document operations',
 };

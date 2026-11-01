@@ -34,7 +34,7 @@ import {
   type AnnotationSettings,
 } from '../src/contract';
 import { createAnnotationController } from '../src/controller';
-import { initialAnnotationState, type AnnotationState } from '../src/model';
+import { initialAnnotationModel, type AnnotationModel } from '../src/model';
 
 export const PAGE = toPageRef(1);
 
@@ -314,9 +314,9 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
     doc,
   });
   const render = renderDefinition.create(renderCtx as never) as { api: unknown };
-  const ctx = createTestContext<AnnotationState, AnnotationSettings>({
+  const ctx = createTestContext<AnnotationModel, AnnotationSettings>({
     id: 'annotation',
-    state: initialAnnotationState(),
+    state: initialAnnotationModel(),
     settings: { defaults: ANNOTATION_DEFAULTS, registered: options.config },
     capabilities: [
       [InteractionToken, interaction],

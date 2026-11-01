@@ -13,9 +13,9 @@ import { localEngine } from '@embedpdf/engine';
 // The strip is a second view of the document, with its own token and settings.
 const ThumbsToken = createCapabilityToken<StageCapability>('stage-thumbs');
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/welcome.pdf');
+  return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 @Component({
@@ -23,7 +23,7 @@ const ebook = async (): Promise<OpenInput> => {
   imports: [EpdfDocumentGate, EpdfStage, EpdfPageTemplate, EpdfPageChrome, EpdfRenderLayer],
   providers: [
     provideEmbedPdf(
-      { engine: () => localEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => localEngine(), initialDocuments: [{ source: welcome }] },
       withStage(), // the main view
       withStage({
         id: 'stage-thumbs',
@@ -54,7 +54,7 @@ const ebook = async (): Promise<OpenInput> => {
             [attr.aria-current]="page.pageIndex() === main.currentPageIndex()"
             (click)="main.goToPage(page.ref)"
           >
-            <epdf-render-layer />
+            <epdf-render-layer thumbnail />
           </button>
         </ng-template>
         <ng-template epdfPageChrome let-page>

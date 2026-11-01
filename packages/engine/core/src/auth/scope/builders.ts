@@ -8,16 +8,19 @@ import type { DocCapability, PdfBits } from './types';
  *   caps.doc.download()                   // "doc.download"
  *   caps.doc.download.flattened()         // "doc.download.flattened"
  *   caps.doc.print.high()                 // "doc.print.high"
+ *   caps.doc.render.thumbnail()           // "doc.render.thumbnail"
  *
  * Each leaf is a function returning the literal string (as `const`) so
- * TypeScript catches typos at the call site. Wrappers like `download`
- * and `print` are `Object.assign`'d to be callable and carry child
+ * TypeScript catches typos at the call site. Wrappers like `download`,
+ * `print` and `render` are `Object.assign`'d to be callable and carry child
  * properties for the refinement capabilities.
  */
 export const caps = {
   doc: {
     open: () => 'doc.open' as const,
-    render: () => 'doc.render' as const,
+    render: Object.assign(() => 'doc.render' as const, {
+      thumbnail: () => 'doc.render.thumbnail' as const,
+    }),
     text: {
       select: () => 'doc.text.select' as const,
       copy: () => 'doc.text.copy' as const,

@@ -1,11 +1,11 @@
 import { useEffect, useRef } from 'react';
-import { Viewer, DocumentGate, usePageList } from '@embedpdf/react/runtime';
+import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
 import { Stage, stagePlugin, useStage } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
 import { interactionPlugin } from '@embedpdf/react/interaction';
 import { AnnotationLayer, annotationPlugin } from '@embedpdf/react/annotation';
-import { FormLayer, formPlugin, useForm, useFormState } from '@embedpdf/react/form';
+import { FormLayer, formPlugin, toFieldRef, useForm, useFormState } from '@embedpdf/react/form';
 import { stampPlugin, useStamp, useStampState } from '@embedpdf/react/stamp';
 import {
   createTestSigner,
@@ -31,27 +31,23 @@ const plugins = [
   signaturePlugin({ key: () => signer }),
 ];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const agreement: OpenInput = { kind: 'grant', grant: 'shr_G5GcxJeEBa2IiwIs0DCNruCL' };
 
-/** On load: a signature field on the last page, and a person's signature, armed. */
+/** On load: the agreement, where the form's signature field is, and a person's signature, armed. */
 function useSetUp() {
   const form = useForm();
   const stamp = useStamp();
   const stage = useStage();
   const status = useFormState((state) => state.status);
-  const page = usePageList().at(-1)?.ref;
   const done = useRef(false);
 
   useEffect(() => {
-    if (status !== 'ready' || !page || done.current) return;
+    if (status !== 'ready' || done.current) return;
     done.current = true;
     void (async () => {
-      await form.create({
-        family: 'signature',
-        name: 'approval',
-        widgets: [{ page, rect: { x: 72, y: 560, width: 220, height: 64 }, color: '#94a3b8' }],
-      });
-      stage.goToPage(page);
+      // Bring the agreement's signature field into view.
+      const [widget] = form.getWidgets(toFieldRef('approval'));
+      if (widget) stage.reveal(widget.page, { rect: widget.rect });
       const { library } = await stamp.createLibrary('Ada Lovelace', { kind: 'signatures' });
       const { asset } = await stamp.createAsset({
         libraryId: library.id,
@@ -61,7 +57,7 @@ function useSetUp() {
       });
       await stamp.armAsset(asset.id, { targetWidth: 160 });
     })();
-  }, [form, stamp, stage, status, page]);
+  }, [form, stamp, stage, status]);
 }
 
 function ArmBar() {
@@ -73,7 +69,9 @@ function ArmBar() {
   const mark = person?.signatures[0];
 
   let hint = 'Getting ready…';
-  if (signatures[0]) hint = `The field is signed by ${signatures[0].signer.name}`;
+  // Ada's signature, once she signs: the agreement already carries Lanternfield's.
+  const signed = signatures.find((each) => each.fieldName === 'approval');
+  if (signed) hint = `The field is signed by ${signed.signer.name}`;
   else if (armedAsset) hint = 'Click the empty field to sign it, or anywhere else to place it';
   else if (mark) hint = 'Arm the signature, then click where it goes';
 
@@ -95,7 +93,7 @@ function ArmBar() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: agreement }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <ArmBar />
         <Stage className="stage">

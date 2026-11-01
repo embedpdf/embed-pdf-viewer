@@ -14,6 +14,7 @@ describe('caps — capability builders return the expected literal strings', () 
   it('session capabilities', () => {
     expect(caps.doc.open()).toBe('doc.open');
     expect(caps.doc.render()).toBe('doc.render');
+    expect(caps.doc.render.thumbnail()).toBe('doc.render.thumbnail');
   });
 
   it('text + content capabilities', () => {
@@ -55,6 +56,7 @@ describe('caps — capability builders return the expected literal strings', () 
     const all = [
       caps.doc.open(),
       caps.doc.render(),
+      caps.doc.render.thumbnail(),
       caps.doc.text.select(),
       caps.doc.text.copy(),
       caps.doc.text.search(),
@@ -229,6 +231,7 @@ describe('caps — covers every capability', () => {
     const every: Record<DocCapability, true> = {
       'doc.open': true,
       'doc.render': true,
+      'doc.render.thumbnail': true,
       'doc.text.select': true,
       'doc.text.copy': true,
       'doc.text.search': true,

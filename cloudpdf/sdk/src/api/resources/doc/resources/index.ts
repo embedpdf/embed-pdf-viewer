@@ -1,5 +1,7 @@
 export * from "./annotations/client/requests/index.js";
 export * as annotations from "./annotations/index.js";
+export * from "./attachments/client/requests/index.js";
+export * as attachments from "./attachments/index.js";
 export * from "./fonts/client/requests/index.js";
 export * as fonts from "./fonts/index.js";
 export * from "./forms/client/requests/index.js";

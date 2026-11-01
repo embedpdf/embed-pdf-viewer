@@ -11,7 +11,7 @@ import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfFonts, injectFontCss, withFonts } from '@embedpdf/angular/fonts';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 // Type in any font the document can be written in, drawn as the engine will write it.
 @Component({
@@ -19,7 +19,7 @@ const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrb
   imports: [EpdfDocumentGate],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: welcome }] },
       withFonts(),
     ),
   ],

@@ -13,7 +13,7 @@ const plugins = [stagePlugin(), renderPlugin(), metadataPlugin()];
 
 // The original stays as it is: the document opens with a layer over it, and the changes go there.
 const withLayer = async (layer?: Uint8Array): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
+  const response = await fetch('/pdfs/welcome.pdf');
   return {
     kind: 'layerBytes',
     baseBytes: new Uint8Array(await response.arrayBuffer()),
@@ -41,7 +41,7 @@ function LayerBar({ reopened, onReopened }: { reopened: boolean; onReopened: () 
     if (!layer) return;
     await documents.close(id);
     onReopened();
-    await documents.open(() => withLayer(layer), { name: 'ebook.pdf' });
+    await documents.open(() => withLayer(layer), { name: 'welcome.pdf' });
   };
 
   return (
@@ -78,7 +78,7 @@ export default function App() {
     <Viewer
       engine={engine}
       plugins={plugins}
-      initialDocuments={[{ source: () => withLayer(), name: 'ebook.pdf' }]}
+      initialDocuments={[{ source: () => withLayer(), name: 'welcome.pdf' }]}
     >
       <DocumentGate fallback={<p className="loading">Opening…</p>}>
         <LayerBar reopened={reopened} onReopened={() => setReopened(true)} />

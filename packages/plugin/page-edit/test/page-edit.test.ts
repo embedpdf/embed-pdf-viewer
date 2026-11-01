@@ -8,19 +8,44 @@ import {
   type PageRef,
 } from '@embedpdf/core';
 import { createTestContext, type TestPage } from '@embedpdf/core/testing';
+import {
+  EngineError,
+  EngineErrorCode,
+  type Change,
+  type ChangeOp,
+  type ChangeResult,
+} from '@embedpdf/engine-core/runtime';
 
 import { createPageEditController } from '../src/controller';
+import { initialPageEditModel } from '../src/model';
 
 /**
- * The controller forwards page edits to the engine handle with three bits of
- * its own: the relative `rotateBy` turned into the engine's absolute rotation
- * (grouped by the result), placements as positions with their pages fixed, and refusals
- * before anything starts.
+ * The controller turns page edits into changes on the document's queue, with
+ * three bits of its own: the relative `rotateBy` turned into the engine's
+ * absolute rotation (one op per result, from the rotation the pages have once
+ * the changes on their way apply), positions with their pages fixed, and
+ * refusals before anything starts. It also keeps the page selection.
  */
 
 const NEW_PAGES = [toPageRef(101), toPageRef(102)];
 
-/** A test context whose document handle's page verbs are spies. */
+/** An answer to a change: one item per op, as the engine answers. */
+function answerOf(change: Change): ChangeResult {
+  const ops = 'ops' in change ? change.ops : [];
+  const meta = { affectedPages: [], cacheDelta: null, opId: 'op', undoable: true };
+  return {
+    items: ops.map((op) => ({
+      type: op.type,
+      ...(op.type === 'pages.insert' || op.type === 'pages.insertBlank'
+        ? { insertedPages: NEW_PAGES }
+        : {}),
+      meta,
+    })) as unknown as ChangeResult['items'],
+    meta,
+  };
+}
+
+/** A test context whose document answers changes at once, or holds them while `hold` is set. */
 function harness(
   options: {
     pages?: readonly TestPage[];
@@ -28,23 +53,25 @@ function harness(
     otherDocument?: { pages: readonly PageInfo[]; handle: Partial<DocumentHandle> };
   } = {},
 ) {
-  const rotate = vi.fn(async (_pages: PageRef[], _rotation: number) => ({}));
-  const reorder = vi.fn(async (_pages: PageRef[], _position: unknown) => ({}));
-  const deletePages = vi.fn(async (_pages: PageRef[]) => ({}));
-  const insert = vi.fn(async (_bytes: unknown, _position?: unknown) => ({
-    insertedPages: NEW_PAGES,
-  }));
-  const insertBlank = vi.fn(async (_spec: unknown, _position?: unknown) => ({
-    insertedPages: NEW_PAGES,
-  }));
+  const held: { change: Change; resolve: () => void }[] = [];
+  const control = { hold: false };
+  const apply = vi.fn((change: Change) =>
+    control.hold
+      ? new Promise<ChangeResult>((resolve) =>
+          held.push({ change, resolve: () => resolve(answerOf(change)) }),
+        )
+      : Promise.resolve(answerOf(change)),
+  );
   const extract = vi.fn(async (_pages: PageRef[]): Promise<Uint8Array> => new Uint8Array([9]));
   const allows = vi.fn(options.allows ?? (() => true));
-  const ctx = createTestContext<void>({
+  const ctx = createTestContext({
     id: 'page-edit',
+    state: initialPageEditModel(),
     pages: options.pages ?? [],
     doc: {
       security: { allows },
-      pages: { rotate, reorder, delete: deletePages, insert, insertBlank, extract },
+      apply,
+      pages: { extract },
     } as unknown as Partial<DocumentHandle>,
   });
   if (options.otherDocument) {
@@ -60,7 +87,11 @@ function harness(
       documentId === 'other' ? (handle as DocumentHandle) : documentHandle(documentId);
   }
   const pageEdit = ctx.connect(createPageEditController(ctx));
-  return { ctx, pageEdit, rotate, reorder, deletePages, insert, insertBlank, extract, allows };
+  /** Every change sent, its ops. */
+  const sent = (): ChangeOp[][] =>
+    apply.mock.calls.map(([change]) => ('ops' in change ? [...change.ops] : []));
+  const last = (): ChangeOp[] => sent().at(-1) ?? [];
+  return { ctx, pageEdit, apply, sent, last, held, control, extract, allows };
 }
 
 /** Three pages in display order, distinct sizes so defaults are observable. */
@@ -78,154 +109,196 @@ const aborted = () => {
 
 describe('PageEditCapability', () => {
   describe('rotateBy', () => {
-    it('adds the delta to each page’s current rotation, wrapping past 360 and below 0', async () => {
-      const { pageEdit, rotate } = harness({ pages: [{ ref: toPageRef(7), rotation: 270 }] });
+    it('adds the delta to each page’s rotation, wrapping past 360 and below 0', async () => {
+      const { pageEdit, last } = harness({ pages: [{ ref: toPageRef(7), rotation: 270 }] });
       await pageEdit.rotateBy([toPageRef(7)], 90);
-      expect(rotate).toHaveBeenLastCalledWith([toPageRef(7)], 0);
+      expect(last()).toEqual([{ type: 'pages.rotate', pages: [toPageRef(7)], rotation: 0 }]);
       await pageEdit.rotateBy([toPageRef(7)], -90);
-      expect(rotate).toHaveBeenLastCalledWith([toPageRef(7)], 180);
+      expect(last()).toEqual([{ type: 'pages.rotate', pages: [toPageRef(7)], rotation: 180 }]);
     });
 
-    it('groups pages by their resulting rotation, one engine call each', async () => {
-      const { pageEdit, rotate } = harness({ pages: THREE_PAGES });
-      await expect(
-        pageEdit.rotateBy([toPageRef(10), toPageRef(20), toPageRef(30)], 90),
-      ).resolves.toBeUndefined();
-      expect(rotate).toHaveBeenCalledTimes(2);
-      expect(rotate).toHaveBeenNthCalledWith(1, [toPageRef(10), toPageRef(30)], 90);
-      expect(rotate).toHaveBeenNthCalledWith(2, [toPageRef(20)], 180);
+    it('is one change, with one op per rotation the pages end up with', async () => {
+      const { ctx, pageEdit, sent, control } = harness({ pages: THREE_PAGES });
+      control.hold = true;
+      void pageEdit.rotateBy([toPageRef(10), toPageRef(20), toPageRef(30)], 90);
+      expect(sent()).toEqual([
+        [
+          { type: 'pages.rotate', pages: [toPageRef(10), toPageRef(30)], rotation: 90 },
+          { type: 'pages.rotate', pages: [toPageRef(20)], rotation: 180 },
+        ],
+      ]);
+      // Undoing it turns each page back to the rotation it had.
+      const [change] = ctx.changes.pending();
+      expect(change!.label).toEqual({ key: 'pages.rotate', count: 3 });
+      expect(change!.undo).toEqual([
+        { type: 'pages.rotate', pages: [toPageRef(10), toPageRef(30)], rotation: 0 },
+        { type: 'pages.rotate', pages: [toPageRef(20)], rotation: 90 },
+      ]);
+    });
+
+    it('turns from the rotation the changes on their way give a page: two quarter turns are a half', () => {
+      const { pageEdit, sent, control } = harness({ pages: THREE_PAGES });
+      control.hold = true;
+      void pageEdit.rotateBy([toPageRef(10)], 90);
+      void pageEdit.rotateBy([toPageRef(10)], 90);
+      void pageEdit.setRotation([toPageRef(20)], 270);
+      void pageEdit.rotateBy([toPageRef(20)], -90);
+      expect(sent().map((ops) => ops.map((op) => 'rotation' in op && op.rotation))).toEqual([
+        [90],
+        [180],
+        [270],
+        [180],
+      ]);
     });
 
     it('takes a page index as well as a ref', async () => {
-      const { pageEdit, rotate } = harness({ pages: THREE_PAGES });
+      const { pageEdit, last } = harness({ pages: THREE_PAGES });
       await pageEdit.rotateBy([1], 90);
-      expect(rotate).toHaveBeenCalledWith([toPageRef(20)], 180);
+      expect(last()).toEqual([{ type: 'pages.rotate', pages: [toPageRef(20)], rotation: 180 }]);
     });
 
     it('rejects a page the document does not have, and an empty page list', async () => {
-      const { pageEdit, rotate } = harness({ pages: THREE_PAGES });
+      const { pageEdit, apply } = harness({ pages: THREE_PAGES });
       await expect(pageEdit.rotateBy([toPageRef(99)], 90)).rejects.toMatchObject({
         code: 'not-found',
       });
       await expect(pageEdit.rotateBy([7], 90)).rejects.toMatchObject({ code: 'not-found' });
       await expect(pageEdit.rotateBy([], 90)).rejects.toMatchObject({ code: 'invalid-input' });
-      expect(rotate).not.toHaveBeenCalled();
+      expect(apply).not.toHaveBeenCalled();
     });
   });
 
   describe('setRotation, reorder and delete', () => {
     it('setRotation gives every page the same rotation', async () => {
-      const { pageEdit, rotate } = harness({ pages: THREE_PAGES });
+      const { pageEdit, last } = harness({ pages: THREE_PAGES });
       await expect(pageEdit.setRotation([toPageRef(10), 2], 180)).resolves.toBeUndefined();
-      expect(rotate).toHaveBeenCalledWith([toPageRef(10), toPageRef(30)], 180);
+      expect(last()).toEqual([
+        { type: 'pages.rotate', pages: [toPageRef(10), toPageRef(30)], rotation: 180 },
+      ]);
     });
 
-    it('reorder hands the engine the placement, its page fixed when called', async () => {
-      const { pageEdit, reorder } = harness({ pages: THREE_PAGES });
+    it('reorder hands the engine the position, its page fixed when called', async () => {
+      const { pageEdit, last } = harness({ pages: THREE_PAGES });
+      const reorder = (pages: PageRef[], position: unknown) => [
+        { type: 'pages.reorder', pages, position },
+      ];
       await pageEdit.reorder([toPageRef(20), toPageRef(30)], 'start');
-      expect(reorder).toHaveBeenLastCalledWith([toPageRef(20), toPageRef(30)], 'start');
+      expect(last()).toEqual(reorder([toPageRef(20), toPageRef(30)], 'start'));
       await pageEdit.reorder([toPageRef(10)], { after: toPageRef(20) });
-      expect(reorder).toHaveBeenLastCalledWith([toPageRef(10)], { after: toPageRef(20) });
-      await pageEdit.reorder([0], { before: 2 });
-      expect(reorder).toHaveBeenLastCalledWith([toPageRef(10)], { before: toPageRef(30) });
+      expect(last()).toEqual(reorder([toPageRef(10)], { after: toPageRef(20) }));
+      await pageEdit.reorder([0], { before: toPageRef(30) });
+      expect(last()).toEqual(reorder([toPageRef(10)], { before: toPageRef(30) }));
       await pageEdit.reorder([toPageRef(10)], 'end');
-      expect(reorder).toHaveBeenLastCalledWith([toPageRef(10)], 'end');
+      expect(last()).toEqual(reorder([toPageRef(10)], 'end'));
     });
 
-    it('reorder rejects a placement page the document does not have', async () => {
-      const { pageEdit, reorder } = harness({ pages: THREE_PAGES });
+    it('reorder rejects a position page the document does not have', async () => {
+      const { pageEdit, apply } = harness({ pages: THREE_PAGES });
       await expect(pageEdit.reorder([0], { after: toPageRef(99) })).rejects.toMatchObject({
         code: 'not-found',
       });
-      expect(reorder).not.toHaveBeenCalled();
+      expect(apply).not.toHaveBeenCalled();
     });
 
-    it('delete forwards the pages, and refuses deleting every page', async () => {
-      const { pageEdit, deletePages } = harness({ pages: THREE_PAGES });
-      await expect(pageEdit.delete([toPageRef(30)])).resolves.toBeUndefined();
-      expect(deletePages).toHaveBeenCalledWith([toPageRef(30)]);
+    it('delete stages the pages, and refuses deleting every page', async () => {
+      const { ctx, pageEdit, sent, control } = harness({ pages: THREE_PAGES });
+      control.hold = true;
+      void pageEdit.delete([toPageRef(30), 0]);
+      expect(ctx.changes.pending()[0]!.label).toEqual({ key: 'pages.delete', count: 2 });
       await expect(pageEdit.delete([0, 1, 2])).rejects.toMatchObject({ code: 'invalid-input' });
-      expect(deletePages).toHaveBeenCalledTimes(1);
+      expect(sent()).toEqual([[{ type: 'pages.delete', pages: [toPageRef(30), toPageRef(10)] }]]);
+    });
+
+    it('rejects with the engine’s reason when the engine refuses the change', async () => {
+      const { pageEdit, apply } = harness({ pages: THREE_PAGES });
+      apply.mockImplementationOnce(() =>
+        Promise.reject(new EngineError(EngineErrorCode.NotFound, 'no such page')),
+      );
+      await expect(pageEdit.delete([0])).rejects.toMatchObject({ code: 'not-found' });
     });
   });
 
   describe('inserts resolve the new pages', () => {
+    const blank = (size: { width: number; height: number }, count: number, position: unknown) => [
+      { type: 'pages.insertBlank', spec: { size, count }, position },
+    ];
+
     it('insertBlank appends by default, sized like the last page', async () => {
-      const { pageEdit, insertBlank } = harness({ pages: THREE_PAGES });
+      const { pageEdit, last } = harness({ pages: THREE_PAGES });
       await expect(pageEdit.insertBlank()).resolves.toEqual({ pages: NEW_PAGES });
-      expect(insertBlank).toHaveBeenCalledWith(
-        { size: { width: 500, height: 600 }, count: undefined },
-        'end',
-      );
+      expect(last()).toEqual(blank({ width: 500, height: 600 }, 1, 'end'));
     });
 
     it('insertBlank sizes a blank page in an empty document as Letter', async () => {
-      const { pageEdit, insertBlank } = harness({ pages: [] });
+      const { pageEdit, last } = harness({ pages: [] });
       await pageEdit.insertBlank();
-      expect(insertBlank).toHaveBeenCalledWith(
-        { size: { width: 612, height: 792 }, count: undefined },
-        'end',
-      );
+      expect(last()).toEqual(blank({ width: 612, height: 792 }, 1, 'end'));
     });
 
     it('insertBlank { after } and { before } go next to the page and match its size', async () => {
-      const { pageEdit, insertBlank } = harness({ pages: THREE_PAGES });
-      await pageEdit.insertBlank({ placement: { after: toPageRef(20) } });
-      expect(insertBlank).toHaveBeenLastCalledWith(
-        { size: { width: 300, height: 400 }, count: undefined },
-        { after: toPageRef(20) },
-      );
-      await pageEdit.insertBlank({ placement: { before: 0 } });
-      expect(insertBlank).toHaveBeenLastCalledWith(
-        { size: { width: 100, height: 200 }, count: undefined },
-        { before: toPageRef(10) },
-      );
+      const { pageEdit, last } = harness({ pages: THREE_PAGES });
+      await pageEdit.insertBlank({ position: { after: toPageRef(20) } });
+      expect(last()).toEqual(blank({ width: 300, height: 400 }, 1, { after: toPageRef(20) }));
+      await pageEdit.insertBlank({ position: { before: toPageRef(10) } });
+      expect(last()).toEqual(blank({ width: 100, height: 200 }, 1, { before: toPageRef(10) }));
     });
 
     it("insertBlank 'start' goes first, sized like the first page", async () => {
-      const { pageEdit, insertBlank } = harness({ pages: THREE_PAGES });
-      await pageEdit.insertBlank({ placement: 'start' });
-      expect(insertBlank).toHaveBeenLastCalledWith(
-        { size: { width: 100, height: 200 }, count: undefined },
-        'start',
-      );
+      const { pageEdit, last } = harness({ pages: THREE_PAGES });
+      await pageEdit.insertBlank({ position: 'start' });
+      expect(last()).toEqual(blank({ width: 100, height: 200 }, 1, 'start'));
     });
 
-    it('insertBlank takes an explicit size and count', async () => {
-      const { pageEdit, insertBlank } = harness({ pages: THREE_PAGES });
-      await pageEdit.insertBlank({
+    it('insertBlank takes an explicit size and count, and counts them in its label', async () => {
+      const { ctx, pageEdit, last, control } = harness({ pages: THREE_PAGES });
+      control.hold = true;
+      void pageEdit.insertBlank({
         size: { width: 612, height: 792 },
         count: 3,
-        placement: { after: toPageRef(10) },
+        position: { after: toPageRef(10) },
       });
-      expect(insertBlank).toHaveBeenCalledWith(
-        { size: { width: 612, height: 792 }, count: 3 },
-        { after: toPageRef(10) },
-      );
+      expect(last()).toEqual(blank({ width: 612, height: 792 }, 3, { after: toPageRef(10) }));
+      expect(ctx.changes.pending()[0]!.label).toEqual({ key: 'pages.insertBlank', count: 3 });
     });
 
-    it('insertBlank rejects a placement page the document does not have', async () => {
-      const { pageEdit, insertBlank } = harness({ pages: THREE_PAGES });
+    it('insertBlank rejects a position page the document does not have', async () => {
+      const { pageEdit, apply } = harness({ pages: THREE_PAGES });
       await expect(
-        pageEdit.insertBlank({ placement: { after: toPageRef(99) } }),
+        pageEdit.insertBlank({ position: { after: toPageRef(99) } }),
       ).rejects.toMatchObject({ code: 'not-found' });
-      expect(insertBlank).not.toHaveBeenCalled();
+      expect(apply).not.toHaveBeenCalled();
     });
 
-    it('insertFromBytes appends by default and goes next to a page the placement names', async () => {
-      const { pageEdit, insert } = harness({ pages: THREE_PAGES });
+    it('insertFromBytes appends by default and goes next to a page the position names', async () => {
+      const { ctx, pageEdit, last, control } = harness({ pages: THREE_PAGES });
       const bytes = new Uint8Array([1, 2, 3]);
       await expect(pageEdit.insertFromBytes(bytes)).resolves.toEqual({ pages: NEW_PAGES });
-      expect(insert).toHaveBeenLastCalledWith(bytes, 'end');
-      await pageEdit.insertFromBytes(bytes, { placement: { after: 1 } });
-      expect(insert).toHaveBeenLastCalledWith(bytes, { after: toPageRef(20) });
+      expect(last()).toEqual([{ type: 'pages.insert', source: bytes, position: 'end' }]);
+      control.hold = true;
+      void pageEdit.insertFromBytes(bytes.buffer, { position: { after: toPageRef(20) } });
+      expect(last()).toEqual([
+        { type: 'pages.insert', source: bytes, position: { after: toPageRef(20) } },
+      ]);
+      // How many pages a PDF holds isn't known before the engine reads it.
+      expect(ctx.changes.pending()[0]!.label).toEqual({ key: 'pages.insert' });
     });
 
-    it('duplicate inserts copies right after the last of the pages', async () => {
-      const { pageEdit, extract, insert } = harness({ pages: THREE_PAGES });
-      await expect(pageEdit.duplicate([toPageRef(10), 1])).resolves.toEqual({ pages: NEW_PAGES });
+    it('duplicate inserts copies right after the last of the pages, once the changes before it landed', async () => {
+      const { ctx, pageEdit, extract, sent, held, control } = harness({ pages: THREE_PAGES });
+      control.hold = true;
+      void pageEdit.rotateBy([toPageRef(10)], 90);
+      const duplicated = pageEdit.duplicate([toPageRef(10), 1]);
+      await new Promise((resolve) => setTimeout(resolve));
+      // The copy waits for the rotate, so it holds the page as it shows.
+      expect(extract).not.toHaveBeenCalled();
+      control.hold = false;
+      held.shift()!.resolve();
+      await expect(duplicated).resolves.toEqual({ pages: NEW_PAGES });
       expect(extract).toHaveBeenCalledWith([toPageRef(10), toPageRef(20)]);
-      expect(insert).toHaveBeenCalledWith(new Uint8Array([9]), { after: toPageRef(20) });
+      expect(sent()[1]).toEqual([
+        { type: 'pages.insert', source: new Uint8Array([9]), position: { after: toPageRef(20) } },
+      ]);
+      expect(ctx.changes.hasPending()).toBe(false);
     });
 
     it('insertFromDocument copies pages of another open document, by ref or index', async () => {
@@ -234,7 +307,7 @@ describe('PageEditCapability', () => {
         { ref: toPageRef(500), index: 0 },
         { ref: toPageRef(501), index: 1 },
       ] as unknown as PageInfo[];
-      const { pageEdit, insert } = harness({
+      const { pageEdit, last } = harness({
         pages: THREE_PAGES,
         otherDocument: {
           pages: otherPages,
@@ -242,10 +315,12 @@ describe('PageEditCapability', () => {
         },
       });
       await expect(
-        pageEdit.insertFromDocument('other', [1, toPageRef(500)], { placement: 'start' }),
+        pageEdit.insertFromDocument('other', [1, toPageRef(500)], { position: 'start' }),
       ).resolves.toEqual({ pages: NEW_PAGES });
       expect(otherExtract).toHaveBeenCalledWith([toPageRef(501), toPageRef(500)]);
-      expect(insert).toHaveBeenCalledWith(new Uint8Array([7]), 'start');
+      expect(last()).toEqual([
+        { type: 'pages.insert', source: new Uint8Array([7]), position: 'start' },
+      ]);
       await expect(pageEdit.insertFromDocument('other', [5])).rejects.toMatchObject({
         code: 'not-found',
       });
@@ -254,10 +329,32 @@ describe('PageEditCapability', () => {
       });
     });
 
-    it('extract resolves the new PDF’s bytes', async () => {
-      const { pageEdit, extract } = harness({ pages: THREE_PAGES });
+    it('extract resolves the new PDF’s bytes and changes nothing', async () => {
+      const { pageEdit, extract, apply } = harness({ pages: THREE_PAGES });
       await expect(pageEdit.extract([2])).resolves.toEqual(new Uint8Array([9]));
       expect(extract).toHaveBeenCalledWith([toPageRef(30)]);
+      expect(apply).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('the selection', () => {
+    it('selects pages by ref or index, each once, in the order given', () => {
+      const { pageEdit } = harness({ pages: THREE_PAGES });
+      expect(pageEdit.getSelected()).toEqual([]);
+      pageEdit.select([toPageRef(30), 0, toPageRef(30)]);
+      expect(pageEdit.getSelected()).toEqual([toPageRef(30), toPageRef(10)]);
+      pageEdit.select([]);
+      expect(pageEdit.getSelected()).toEqual([]);
+    });
+
+    it('leaves out pages the document does not have, and is the same list until it changes', () => {
+      const { pageEdit } = harness({ pages: THREE_PAGES });
+      pageEdit.select([toPageRef(99), 7, 1]);
+      const selection = pageEdit.getSelected();
+      expect(selection).toEqual([toPageRef(20)]);
+      expect(pageEdit.getSelected()).toBe(selection);
+      pageEdit.select([1]);
+      expect(pageEdit.getSelected()).toBe(selection);
     });
   });
 
@@ -268,8 +365,8 @@ describe('PageEditCapability', () => {
       expect(pageEdit.canExtract()).toBe(true);
     });
 
-    it('refuses an edit without doc.pages.assemble, naming the permission, before any engine call', async () => {
-      const { pageEdit, rotate, insertBlank } = harness({
+    it('refuses an edit without doc.pages.assemble, naming the permission, before anything is staged', async () => {
+      const { ctx, pageEdit, apply } = harness({
         pages: THREE_PAGES,
         allows: (permission) => permission !== 'doc.pages.assemble',
       });
@@ -281,8 +378,8 @@ describe('PageEditCapability', () => {
         code: 'permission-denied',
         permission: 'doc.pages.assemble',
       });
-      expect(rotate).not.toHaveBeenCalled();
-      expect(insertBlank).not.toHaveBeenCalled();
+      expect(apply).not.toHaveBeenCalled();
+      expect(ctx.changes.hasPending()).toBe(false);
     });
 
     it('refuses extract and duplicate without doc.download', async () => {
@@ -303,8 +400,8 @@ describe('PageEditCapability', () => {
   });
 
   describe('cancelling', () => {
-    it('an edit whose signal fired before it ran never reaches the engine', async () => {
-      const { pageEdit, rotate, insertBlank, extract } = harness({ pages: THREE_PAGES });
+    it('an edit whose signal fired before it was called stages nothing', async () => {
+      const { pageEdit, apply, extract } = harness({ pages: THREE_PAGES });
       const signal = aborted();
       await expect(pageEdit.setRotation([0], 90, { signal })).rejects.toMatchObject({
         code: 'operation-cancelled',
@@ -315,8 +412,7 @@ describe('PageEditCapability', () => {
       await expect(pageEdit.extract([0], { signal })).rejects.toMatchObject({
         code: 'operation-cancelled',
       });
-      expect(rotate).not.toHaveBeenCalled();
-      expect(insertBlank).not.toHaveBeenCalled();
+      expect(apply).not.toHaveBeenCalled();
       expect(extract).not.toHaveBeenCalled();
     });
 
@@ -331,29 +427,16 @@ describe('PageEditCapability', () => {
     });
   });
 
-  it('runs edits one at a time, in the order they were called', async () => {
-    const order: string[] = [];
-    let release!: () => void;
-    const { ctx, pageEdit, rotate, deletePages } = harness({ pages: THREE_PAGES });
-    rotate.mockImplementationOnce(async () => {
-      order.push('rotate:start');
-      await new Promise<void>((resolve) => {
-        release = resolve;
-      });
-      order.push('rotate:end');
-      return {};
-    });
-    deletePages.mockImplementationOnce(async () => {
-      order.push('delete');
-      return {};
-    });
-    const rotated = pageEdit.setRotation([toPageRef(10)], 90);
-    const deleted = pageEdit.delete([toPageRef(30)]);
-    const settled = ctx.settle();
-    await new Promise((resolve) => setTimeout(resolve));
-    expect(order).toEqual(['rotate:start']);
-    release();
-    await Promise.all([rotated, deleted, settled]);
-    expect(order).toEqual(['rotate:start', 'rotate:end', 'delete']);
+  it('sends edits in the order they were called, each its own change', () => {
+    const { pageEdit, sent, control } = harness({ pages: THREE_PAGES });
+    control.hold = true;
+    void pageEdit.setRotation([toPageRef(10)], 90);
+    void pageEdit.delete([toPageRef(30)]);
+    void pageEdit.reorder([toPageRef(20)], 'start');
+    expect(sent().map((ops) => ops.map((op) => op.type))).toEqual([
+      ['pages.rotate'],
+      ['pages.delete'],
+      ['pages.reorder'],
+    ]);
   });
 });

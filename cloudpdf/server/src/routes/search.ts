@@ -109,14 +109,19 @@ async function runSearchSlice(
     );
   }
 
-  await documentService.ensureLayerOnPool(ctx, docId, layerName);
+  // A layer whose text and page order are still the base's searches the
+  // base: the same answer, without opening a session for the layer.
+  const view =
+    manifest.scopes?.content === 'base' && manifest.scopes.layout === 'base'
+      ? undefined
+      : layerName;
   const build = (jobId: WorkerJobId) =>
     wirePack({
       kind: 'search.query' as const,
       effect: 'read' as const,
       jobId,
       docId,
-      layerName,
+      ...(view !== undefined ? { layerName: view } : {}),
       request: {
         ...state.query,
         snippets: tier === 'full',
@@ -125,13 +130,7 @@ async function runSearchSlice(
         ...(state.limit !== undefined ? { limit: state.limit } : {}),
       },
     });
-  const result = await documentService.readOnPool(
-    ctx,
-    docId,
-    layerName,
-    build,
-    abortSignalOf(reply),
-  );
+  const result = await documentService.readOnPool(ctx, docId, view, build, abortSignalOf(reply));
   if (result.tag !== 'search.query') {
     throw new EngineError(
       EngineErrorCode.WireFormat,

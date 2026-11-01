@@ -5,6 +5,7 @@ export default {
   storage: 'Storage',
   imports: 'Imports',
   fonts: 'Fonts',
+  modules: 'Modules',
   authentication: 'Authentication',
   adapters: 'CDN, KMS & secrets',
 };

@@ -8,6 +8,8 @@ import {
 import { validateScopeArray, type Identity } from '@embedpdf/engine-core/runtime';
 import type { FastifyInstance } from 'fastify';
 
+import { formatIssues } from './_issues';
+import { folderIdOfPlace, ROOT_PLACE } from './_place';
 import {
   requireApiToken,
   requireTenantAccess,
@@ -15,7 +17,11 @@ import {
 } from '../../app/jwt-plugin';
 import type { SignDevTokenInput } from '../../auth/JwtVerifier';
 import type { RevokedJtisGuard } from '../../auth/RevokedJtisGuard';
+import type { PermissionRegistry } from '../../auth/permission-registry';
+import { validateTenantScope } from '../../auth/tenant-scope';
+import { isVisitorLayerName, VISITOR_LAYER_PREFIX } from '../../auth/visitor-handle';
 import type { DocumentsRepo } from '../../db/repos/documents.repo';
+import type { FoldersRepo } from '../../db/repos/folders.repo';
 import type { SecurityEventsRepo } from '../../db/repos/security-events.repo';
 
 export interface AdminTokensRoutesDeps {
@@ -28,7 +34,10 @@ export interface AdminTokensRoutesDeps {
    */
   sign?: (input: SignDevTokenInput) => string;
   documents: DocumentsRepo;
+  folders: FoldersRepo;
   securityEvents: SecurityEventsRepo;
+  /** The installed plugins' permissions: a scope may grant only those. */
+  permissions: PermissionRegistry;
 }
 
 /**
@@ -42,6 +51,8 @@ export interface AdminTokensRoutesDeps {
  *   - kind "tenant": API token only — a tenant JWT must not be able to
  *                    manufacture fresh tenant authority, not even for
  *                    its own tenant.
+ *   - kind "upload": API token, or a tenant JWT holding `docs.create`:
+ *                    the token uploads, which the minter can do itself.
  */
 export async function registerAdminTokensRoutes(
   app: FastifyInstance,
@@ -67,16 +78,38 @@ export async function registerAdminTokensRoutes(
         if (body.kind === 'tenant') {
           requireApiToken(req);
           ctx = { tenantId, sub: 'api-token', via: 'api-token' };
+        } else if (body.kind === 'upload') {
+          ctx = requireTenantAccess(req, tenantId, ['docs.create']);
         } else {
           ctx = requireTenantAccess(req, tenantId, op.scope);
+        }
+
+        if (body.kind === 'tenant') {
+          try {
+            validateTenantScope(body.scope);
+            deps.permissions.assertGrantable(body.scope, ['document', 'tenant']);
+          } catch (err) {
+            return reply.code(400).send({
+              error: { code: 'InvalidArg', message: (err as Error).message },
+            });
+          }
         }
 
         if (body.kind === 'doc') {
           try {
             validateScopeArray(body.scope);
+            deps.permissions.assertGrantable(body.scope);
           } catch (err) {
             return reply.code(400).send({
               error: { code: 'InvalidArg', message: (err as Error).message },
+            });
+          }
+          if (body.layerName !== undefined && isVisitorLayerName(body.layerName)) {
+            return reply.code(400).send({
+              error: {
+                code: 'InvalidArg',
+                message: `layerName: names starting with "${VISITOR_LAYER_PREFIX}" are for grant visitors' own layers`,
+              },
             });
           }
           const doc = await deps.documents.findById(body.docId);
@@ -91,6 +124,12 @@ export async function registerAdminTokensRoutes(
             });
           }
         }
+
+        // The folder must exist now: a token for a missing folder would
+        // only fail later, in the user's browser.
+        const uploadFolderId =
+          body.kind === 'upload' ? folderIdOfPlace(body.folderId ?? ROOT_PLACE) : null;
+        if (uploadFolderId !== null) await deps.folders.requireOwned(uploadFolderId, tenantId);
 
         const jti = randomUUID();
         const expiresAt = Math.floor(Date.now() / 1000) + body.expiresIn;
@@ -108,20 +147,34 @@ export async function registerAdminTokensRoutes(
                 ttlSeconds: body.expiresIn,
                 extras: identityExtras(body),
               })
-            : sign({
-                sub: body.sub,
-                tenant_id: tenantId,
-                scope: body.scope,
-                jti,
-                ttlSeconds: body.expiresIn,
-              });
+            : body.kind === 'upload'
+              ? sign({
+                  sub: body.sub,
+                  tenant_id: tenantId,
+                  upload: {
+                    folder_id: uploadFolderId,
+                    ...(body.metadata ? { metadata: body.metadata } : {}),
+                    max_files: body.maxFiles ?? 1,
+                    ...(body.maxBytes !== undefined ? { max_bytes: body.maxBytes } : {}),
+                  },
+                  ...(body.origins ? { origins: body.origins } : {}),
+                  jti,
+                  ttlSeconds: body.expiresIn,
+                })
+              : sign({
+                  sub: body.sub,
+                  tenant_id: tenantId,
+                  scope: body.scope,
+                  jti,
+                  ttlSeconds: body.expiresIn,
+                });
 
         await deps.securityEvents.append({
           tenantId,
           kind: 'token.issued',
           jti,
           ...(body.kind === 'doc' ? { docId: body.docId } : {}),
-          scope: body.scope,
+          scope: body.kind === 'upload' ? [] : body.scope,
           actor: ctx.sub,
           via: ctx.via,
           expiresAt: expiresAt * 1000,
@@ -177,13 +230,4 @@ export async function registerAdminTokensRoutes(
 
 function identityExtras(body: { identity?: Identity }): Record<string, unknown> {
   return body.identity ? { identity: body.identity } : {};
-}
-
-function formatIssues(issues: Array<{ path: Array<string | number>; message: string }>): string {
-  return issues
-    .map((issue) => {
-      const path = issue.path.length > 0 ? issue.path.join('.') : 'request body';
-      return `${path}: ${issue.message}`;
-    })
-    .join('; ');
 }

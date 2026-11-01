@@ -6,9 +6,12 @@ import {
   EngineErrorCode,
   EventHub,
   SessionEventPublisher,
+  attachmentVerbs,
   outlineVerbs,
+  pageVerbs,
   wirePack,
   type DocumentAnnotationsService,
+  type DocumentAttachmentsService,
   type DocumentActionsService,
   type DocumentEventStream,
   type DocumentOutlineService,
@@ -80,7 +83,7 @@ export class LocalDocumentHandle implements LocalDocumentHandleContract {
   readonly metadata: MetadataService;
   readonly pieceInfo: LocalPieceInfoService;
   readonly annotations: DocumentAnnotationsService;
-  readonly attachments: LocalDocumentAttachmentsService;
+  readonly attachments: DocumentAttachmentsService;
   readonly actions: DocumentActionsService;
   readonly outline: DocumentOutlineService;
   readonly forms: LocalDocumentFormsService;
@@ -176,7 +179,10 @@ export class LocalDocumentHandle implements LocalDocumentHandleContract {
     // Catalog-level /PieceInfo (no pon); page-level lives on each page handle.
     this.pieceInfo = new LocalPieceInfoService(id, queue, view, guard);
     this.annotations = new LocalDocumentAnnotationsService(id, queue, view, guard, publisher);
-    this.attachments = new LocalDocumentAttachmentsService(id, queue, view, guard, publisher);
+    this.attachments = attachmentVerbs(
+      new LocalDocumentAttachmentsService(id, queue, view, guard),
+      (change, options) => this.apply(change, options),
+    );
     this.actions = new LocalDocumentActionsService(id, queue, view, guard);
     this.outline = outlineVerbs(
       () => readLocalOutline(id, queue, view, guard),
@@ -185,7 +191,10 @@ export class LocalDocumentHandle implements LocalDocumentHandleContract {
     this.forms = new LocalDocumentFormsService(id, queue, view, guard, publisher);
     this.fonts = new LocalDocumentFontsService(id, queue, view, guard);
     this.search = new LocalDocumentSearchService(id, queue, view, guard);
-    this.pages = new LocalDocumentPagesService(id, queue, view, guard, publisher);
+    this.pages = pageVerbs(
+      new LocalDocumentPagesService(id, queue, view, guard, publisher),
+      (change, options) => this.apply(change, options),
+    );
     this.redaction = new LocalDocumentRedactionService(id, queue, view, guard, publisher);
     this.signatures = new LocalDocumentSignaturesService(id, queue, view, guard, publisher);
     this.changes = new LocalDocumentChanges(id, queue, view, guard, publisher);

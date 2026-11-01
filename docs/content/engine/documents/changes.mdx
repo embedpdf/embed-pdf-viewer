@@ -68,10 +68,17 @@ error. The document is as it was before the call.
 | `forms.setAppearanceText`      | `field`, `text`                                           | Sets the text a field shows without changing its value, as a format script does |
 | `metadata.update`              | `patch`, `expect`                                         | `doc.metadata.update(patch)`                                                    |
 | `metadata.updateCustom`        | `patch`                                                   | `doc.metadata.custom.update(patch)`                                             |
-| `outline.create`               | `parent`, `position`, `data`, `objectNumber`              | `doc.outline.create(data, { parent, position, objectNumber })`                 |
+| `outline.create`               | `parent`, `position`, `data`, `objectNumber`              | `doc.outline.create(data, { parent, position, objectNumber })`                  |
 | `outline.update`               | `ref`, `patch`, `expect`                                  | `doc.outline.update(ref, patch)`                                                |
 | `outline.move`                 | `refs`, `parent`, `position`                              | `doc.outline.move(refs, parent, position)`                                      |
 | `outline.delete`               | `ref`, `expect`                                           | `doc.outline.delete(ref)`                                                       |
+| `pages.rotate`                 | `pages`, `rotation`                                       | `doc.pages.rotate(pages, rotation)`                                             |
+| `pages.reorder`                | `pages`, `position`                                       | `doc.pages.reorder(pages, position)`                                            |
+| `pages.delete`                 | `pages`                                                   | `doc.pages.delete(pages)`                                                       |
+| `pages.insertBlank`            | `spec`, `position`, `objectNumbers`                       | `doc.pages.insertBlank(spec, position, { objectNumbers })`                      |
+| `pages.insert`                 | `source`, `position`                                      | `doc.pages.insert(source, position)`                                            |
+| `attachments.create`           | `file`, `resources`                                       | `doc.attachments.create({ data, ...file })`                                     |
+| `attachments.delete`           | `ref`                                                     | `doc.attachments.delete(ref)`                                                   |
 
 Put everything one action does into one change: it's one step in the user's undo history, and
 its events arrive together.
@@ -193,6 +200,12 @@ they left it:
 - A create isn't undone when someone changed what it made, or replied to it.
 - A reorder puts each annotation or widget back next to the neighbours it had, unless it was
   moved since or the one below it changed. Neighbours that are gone are skipped over.
+- A page move puts each page back after the page it followed, unless it was moved since or that
+  page is gone. A page rotate turns back only the pages that still have the rotation it set.
+- A page insert isn't undone when someone annotated or turned the new page since, or when it
+  would leave the document without pages.
+- An attached file isn't removed again when another file took its name since, and a deleted one
+  doesn't come back while another file has its name.
 
 Nothing is written for what's left alone, and no event fires for it. Tell the user when it
 happened:
@@ -209,8 +222,10 @@ put back.
 
 Undoing a delete brings back what was deleted as it was: the same refs, its place among the
 page's annotations, its replies and popup, and who wrote it. The item is `annotations.restore`,
-with the annotations that came back, `forms.restore`, with the field, or `forms.restoreWidget`, with
-the widget back at its place and in its field.
+with the annotations that came back, `forms.restore`, with the field, `forms.restoreWidget`, with
+the widget back at its place and in its field, `pages.restore`, with the pages back after the
+page each followed (first when that page is gone), with their annotations and their names, or
+`attachments.restore`, with the file back under its name.
 
 ### What can't be undone
 
@@ -218,7 +233,7 @@ the widget back at its place and in its field.
 
 - **A write that changed nothing**, such as a change with no ops, a reset of fields already at
   their defaults, or hiding a field that's already hidden.
-- **Writes a change can't hold**: page edits, attachments, form data imports. They're writes of
+- **Writes a change can't hold**: page edits, form data imports. They're writes of
   their own. An [annotation import](/docs/engine/annotations/import-export#undo-an-import) is a
   change and can be undone.
 - **Final writes**: [applying redactions](/docs/engine/documents/redaction),
@@ -344,8 +359,8 @@ several changes.
 
 A change fires the events its ops' calls fire, in op order, all with the change's `opId` in
 `origin.tx`. An undo fires what it did: `annotations.updated` for a field put back,
-`annotations.deleted` for a create taken back, `annotations.restored`, `forms.restored` and
-`outline.restored` for what came back. Its events carry `origin.undoOf`, the `opId` of the change it undid. See
+`annotations.deleted` for a create taken back, `annotations.restored`, `forms.restored`,
+`outline.restored`, `pages.restored` and `attachments.restored` for what came back. Its events carry `origin.undoOf`, the `opId` of the change it undid. See
 [Events](/docs/engine/concepts/events).
 
 ### How the engine puts things back

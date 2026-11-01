@@ -11,6 +11,7 @@ export * from './shared';
 export { AbortablePromise } from './promise/AbortablePromise';
 export type { AbortableExecutor } from './promise/AbortablePromise';
 export { AbortError, isAbortError } from './promise/AbortError';
+export { devWarn, isDev, resetDevWarnings } from './dev';
 
 export type { Engine, EngineFactory } from './engine/Engine';
 export { isLocalEngine } from './engine/LocalEngine';
@@ -26,7 +27,7 @@ export type {
   FontEmbeddingPolicy,
   LocalDocumentFontsService,
 } from './engine/DocumentFontsService';
-export type { DocumentHandle } from './engine/DocumentHandle';
+export type { DocumentHandle, DocumentGrant } from './engine/DocumentHandle';
 export type {
   DocumentEvent,
   DocumentEventInit,
@@ -75,7 +76,9 @@ export { passwordPromptFromState } from './engine/passwordPrompt';
 export type { PasswordPrompt } from './engine/passwordPrompt';
 export type { MetadataService } from './engine/MetadataService';
 export type { DocumentOutlineService, OutlineCreateOptions } from './engine/DocumentOutlineService';
+export { attachmentVerbs, type AttachmentWriteVerb } from './engine/attachmentVerbs';
 export { outlineVerbs } from './engine/outlineVerbs';
+export { pageVerbs, type PageStructureVerb } from './engine/pageVerbs';
 export type { CustomMetadataService } from './engine/CustomMetadataService';
 export type { PageHandle } from './engine/PageHandle';
 export type { PageMeasureService } from './engine/PageMeasureService';
@@ -108,7 +111,7 @@ export type {
   PieceInfoSnapshot,
 } from './dto/PieceInfo';
 export type { PageTextService } from './engine/PageTextService';
-export type { LocalPageRenderService, PageRenderService } from './engine/PageRenderService';
+export type { PageRenderService, RawPageRenderService } from './engine/PageRenderService';
 
 export { wirePack, EMPTY_TRANSFER } from './wire/WirePack';
 export type { WirePack } from './wire/WirePack';
@@ -168,16 +171,11 @@ export type {
   SignaturesCancelWorkerRequest,
   SignaturesAnalyzeWorkerRequest,
   SignaturesFinalizeCandidateWorkerRequest,
-  PagesReorderWorkerRequest,
-  PagesRotateWorkerRequest,
-  PagesDeleteWorkerRequest,
   AnnotationsFlattenWorkerRequest,
   AnnotationsExportAppearanceWorkerRequest,
   PagesSetNameWorkerRequest,
   PagesRemoveNameWorkerRequest,
   PagesExtractWorkerRequest,
-  PagesInsertWorkerRequest,
-  PagesInsertBlankWorkerRequest,
   PagesFlattenWorkerRequest,
   RedactionApplyWorkerRequest,
   PieceInfoReadWorkerRequest,
@@ -225,8 +223,6 @@ export type {
   ShutdownWorkerRequest,
   AttachmentsListWorkerRequest,
   AttachmentsReadFileWorkerRequest,
-  AttachmentsCreateWorkerRequest,
-  AttachmentsDeleteWorkerRequest,
   AnnotationsReadFileWorkerRequest,
   AnnotationsReadAppearanceWorkerRequest,
   AnnotationsExportWorkerRequest,

@@ -44,7 +44,7 @@ import {
   spotsOf,
   topmostOf,
   treeOf,
-  type OutlineState,
+  type OutlineModel,
   type OutlineTree,
 } from './model';
 import { foldOutline, predictOutline, undoOf } from './sync/tree';
@@ -87,7 +87,7 @@ type ItemOf<T extends ChangeItem['type']> = Extract<ChangeItem, { type: T }>;
  * once, is one step of the history, and undoing it shows the outline as it
  * was. Expanded and selected items are session state.
  */
-export function createOutlineController(ctx: PluginContext<OutlineState>) {
+export function createOutlineController(ctx: PluginContext<OutlineModel>) {
   const changed = ctx.events.source<OutlineChangedEvent>();
   const resynced = ctx.events.source<OutlineResyncedEvent>();
 

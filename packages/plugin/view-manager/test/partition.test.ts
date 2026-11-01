@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { addDocument, createPane, initialViewManagerState } from '../src/model';
+import { addDocument, createPane, initialViewManagerModel } from '../src/model';
 
 describe('view-manager partition', () => {
   it('moves a document that another pane already holds instead of duplicating it', () => {
-    let state = createPane(createPane(initialViewManagerState()));
+    let state = createPane(createPane(initialViewManagerModel()));
     state = addDocument(state, 'pane-1', 'doc');
     state = addDocument(state, 'pane-2', 'doc');
     expect(state.panes['pane-1'].documentIds).toEqual([]);

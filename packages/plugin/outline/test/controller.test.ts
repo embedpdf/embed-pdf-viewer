@@ -22,7 +22,7 @@ import { StageToken } from '@embedpdf/plugin-stage/contract';
 import { describe, expect, it, vi } from 'vitest';
 
 import { createOutlineController } from '../src/controller';
-import { initialOutlineState } from '../src/model';
+import { initialOutlineModel } from '../src/model';
 
 const FIRST_PAGE = toPageRef(3);
 const SECOND_PAGE = toPageRef(4);
@@ -68,7 +68,7 @@ async function harness(
 ) {
   const ctx = createTestContext({
     id: 'outline',
-    state: initialOutlineState(),
+    state: initialOutlineModel(),
     pages: [
       { ref: FIRST_PAGE, size: { width: 300, height: 300 } },
       { ref: SECOND_PAGE, size: { width: 300, height: 300 } },

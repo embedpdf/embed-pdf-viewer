@@ -19,15 +19,15 @@
     annotationPlugin(),
   ];
 
-  // [!doc-source ebook]
-  const ebook = async (): Promise<OpenInput> => {
-    const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-    return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+  // [!doc-source article]
+  const article = async (): Promise<OpenInput> => {
+    const response = await fetch('/pdfs/article.pdf');
+    return { kind: 'bytes', id: 'article', bytes: new Uint8Array(await response.arrayBuffer()) };
   };
   // [!/doc-source]
 </script>
 
-<Viewer {engine} {plugins} initialDocuments={[{ source: ebook }]}>
+<Viewer {engine} {plugins} initialDocuments={[{ source: article }]}>
   <DocumentGate>
     {#snippet fallback()}
       <p class="loading">Loading…</p>

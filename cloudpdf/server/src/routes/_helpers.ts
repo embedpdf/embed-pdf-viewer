@@ -33,15 +33,32 @@ export interface SchemaLike<T> {
   safeParse(raw: unknown): SafeParseLike<T>;
 }
 
-/** Long-cache header for content-addressed versioned URLs. */
-export const IMMUTABLE_CACHE = 'public, max-age=31536000, immutable';
+/**
+ * Long-cache headers for content-addressed versioned URLs: the bytes behind
+ * `…@{version}` never change, so whoever may keep them keeps them a year
+ * without asking again. Who may keep them is the deployment's:
+ *
+ *   - behind a CDN, the edge checks the signature before serving its copy,
+ *     so shared caches may store it (`public`);
+ *   - without one, nothing between the browser and the engine checks the
+ *     token, so only the caller's own browser may (`private`) — `public`
+ *     would let a proxy keep a response that needed a token and hand it to
+ *     anyone asking for the URL.
+ */
+export const IMMUTABLE_CACHE_SHARED = 'public, max-age=31536000, immutable';
+export const IMMUTABLE_CACHE_PRIVATE = 'private, max-age=31536000, immutable';
 /** No-cache header for unversioned aliases, mutations, and error responses. */
 export const NO_STORE = 'private, no-store';
 
-export function setImmutableCache(reply: {
-  header(name: 'Cache-Control', value: string): unknown;
-}): void {
-  reply.header('Cache-Control', IMMUTABLE_CACHE);
+declare module 'fastify' {
+  interface FastifyInstance {
+    /** The deployment's versioned-read header, chosen once by `buildApp` from its CDN. */
+    immutableCache: typeof IMMUTABLE_CACHE_SHARED | typeof IMMUTABLE_CACHE_PRIVATE;
+  }
+}
+
+export function setImmutableCache(reply: FastifyReply): void {
+  reply.header('Cache-Control', reply.server.immutableCache);
 }
 
 export function setNoStore(reply: { header(name: 'Cache-Control', value: string): unknown }): void {

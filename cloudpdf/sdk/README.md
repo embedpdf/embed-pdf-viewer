@@ -13,6 +13,7 @@ The official TypeScript SDK for the CloudPDF API.
 - [Request and Response Types](#request-and-response-types)
 - [Exception Handling](#exception-handling)
 - [File Uploads](#file-uploads)
+- [Uploads From the Browser](#uploads-from-the-browser)
 - [Binary Response](#binary-response)
 - [Advanced](#advanced)
   - [Subpackage Exports](#subpackage-exports)
@@ -44,10 +45,16 @@ Instantiate and use the client with the following:
 ```typescript
 import { CloudPDFClient } from "@cloudpdf/sdk";
 
-const client = new CloudPDFClient({ baseUrl: "YOUR_BASE_URL", token: "YOUR_TOKEN" });
-await client.shares.exchange({
-    shareToken: "shareToken"
+const client = new CloudPDFClient({ token: "YOUR_TOKEN" });
+await client.grants.exchange({
+    grant: "grant"
 });
+```
+
+The client talks to CloudPDF SaaS (`https://engine.cloudpdf.com`). For your own CloudPDF server, pass its address:
+
+```typescript
+const client = new CloudPDFClient({ baseUrl: "https://pdf.example.com", token: "YOUR_TOKEN" });
 ```
 
 ## Request and Response Types
@@ -72,7 +79,7 @@ will be thrown.
 import { CloudPDFError } from "@cloudpdf/sdk";
 
 try {
-    await client.shares.exchange(...);
+    await client.grants.exchange(...);
 } catch (err) {
     if (err instanceof CloudPDFError) {
         console.log(err.statusCode);
@@ -104,6 +111,36 @@ intentionally rejected: the server pins size and hash during init, before any
 bytes are transferred. Set `uploadPreference: "proxy"` only when the server is
 configured to allow its bounded multipart fallback.
 
+`onProgress` reports the bytes sent as they go.
+
+## Uploads From the Browser
+
+A user's browser can upload a PDF straight to CloudPDF, so the file never passes
+through your server and your API key never leaves it. Your server makes an
+upload token, which says where the file goes and runs out in minutes:
+
+```typescript
+const { token } = await client.tokens.issue({
+    tenantId: "tenant_123",
+    body: { kind: "upload", sub: user.id, folderId, metadata: { contractId }, expiresIn: 600 },
+});
+```
+
+The page imports only the upload entry, about 3 KB gzipped, with nothing from
+Node or the rest of the SDK:
+
+```typescript
+import { upload } from "@cloudpdf/sdk/upload";
+
+const { document } = await upload(file, {
+    token,
+    onProgress: (loaded, total) => console.log(`${loaded}/${total}`),
+});
+```
+
+The token uploads into its folder with its metadata, up to `maxFiles` documents
+(one by default), and nothing else. `upload()` takes `name`, `signal` and, for
+your own CloudPDF server, `baseUrl`.
 
 ## Binary Response
 
@@ -520,7 +557,7 @@ const client = new CloudPDFClient({
     }
 });
 
-const response = await client.shares.exchange(..., {
+const response = await client.grants.exchange(..., {
     headers: {
         'X-Custom-Header': 'custom value'
     }
@@ -532,7 +569,7 @@ const response = await client.shares.exchange(..., {
 If you would like to send additional query string parameters as part of the request, use the `queryParams` request option.
 
 ```typescript
-const response = await client.shares.exchange(..., {
+const response = await client.grants.exchange(..., {
     queryParams: {
         'customQueryParamKey': 'custom query param value'
     }
@@ -562,7 +599,7 @@ Which status codes are retried depends on the `retryStatusCodes` generator confi
 Use the `maxRetries` request option to configure this behavior.
 
 ```typescript
-const response = await client.shares.exchange(..., {
+const response = await client.grants.exchange(..., {
     maxRetries: 0 // override maxRetries at the request level
 });
 ```
@@ -572,7 +609,7 @@ const response = await client.shares.exchange(..., {
 The SDK defaults to a 60 second timeout. Use the `timeoutInSeconds` option to configure this behavior.
 
 ```typescript
-const response = await client.shares.exchange(..., {
+const response = await client.grants.exchange(..., {
     timeoutInSeconds: 30 // override timeout to 30s
 });
 ```
@@ -583,7 +620,7 @@ The SDK allows users to abort requests at any point by passing in an abort signa
 
 ```typescript
 const controller = new AbortController();
-const response = await client.shares.exchange(..., {
+const response = await client.grants.exchange(..., {
     abortSignal: controller.signal
 });
 controller.abort(); // aborts the request
@@ -595,7 +632,7 @@ The SDK provides access to raw response data, including headers, through the `.w
 The `.withRawResponse()` method returns a promise that results to an object with a `data` and a `rawResponse` property.
 
 ```typescript
-const { data, rawResponse } = await client.shares.exchange(...).withRawResponse();
+const { data, rawResponse } = await client.grants.exchange(...).withRawResponse();
 
 console.log(data);
 console.log(rawResponse.headers['X-My-Header']);

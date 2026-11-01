@@ -2,7 +2,10 @@
 src/index.ts
 src/CloudPDFClient.ts
 src/uploads/**
+src/upload.ts
 tests/uploads.test.ts
+tests/upload.test.ts
+tests/client.test.ts
 README.md
 
 # Changesets is the sole owner of the published package changelog. The pinned

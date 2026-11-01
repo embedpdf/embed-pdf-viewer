@@ -33,11 +33,17 @@ export type PdfValue =
  * lists the objects it was resolved through, from the anchor's side down
  * to the object. A widget's appearance stream reached through an unchanged
  * indirect `/AP` dictionary is therefore
- * `{ parent: widget, label: 'AP/N', via: [apDict] }`.
+ * `{ parent: widget, label: 'AP/N', via: [apDict] }`. A route inside a loop
+ * of unchanged objects is written `…`, and `via` names the member the edge
+ * enters the loop at and the one it leaves from: a page under a structure
+ * tree is `{ parent: catalog, label: 'StructTreeRoot/…/Pg', via: [structTreeRoot, element] }`.
  */
 export interface ObjectReferrer {
   parent: number;
-  /** Escaped dictionary keys and `[n]` indexes joined by `/`, e.g. `AcroForm/Fields/[0]`, `AP/N`. */
+  /**
+   * Escaped dictionary keys and `[n]` indexes joined by `/`, e.g.
+   * `AcroForm/Fields/[0]`, `AP/N`; `…` for a route inside a loop.
+   */
   label: string;
   via?: number[];
 }

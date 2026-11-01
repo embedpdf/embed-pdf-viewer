@@ -1,6 +1,7 @@
 import {
   EngineError,
   EngineErrorCode,
+  OUTLINE_READ_LIMITS,
   positionIndex,
   toOutlineItemRef,
   type OutlineCreateResult,
@@ -235,10 +236,31 @@ export class OutlineMutator {
     return { item, meta: this.meta([ref]) };
   }
 
-  /** The number a parent ref names: {@link TOP} for `null`; `NotFound` when it isn't an item. */
+  /**
+   * Counts the items above `ref` again from the tree, as every outline write
+   * does: a revert puts back the item's own dictionary, its `/Count` with
+   * it, and nothing above it. Setting the open state it reads changes
+   * nothing else.
+   */
+  countAgain(ref: OutlineItemRef): void {
+    const item = this.find(ref);
+    if (!item) return;
+    writeOutlineFields(this.runtime, this.session.requireDocPtr(), ref.objectNumber, {
+      open: item.open,
+    });
+  }
+
+  /**
+   * The number a parent ref names: {@link TOP} for `null`; `NotFound` when it
+   * isn't an item; `InvalidArg` for an item at the deepest level a read goes
+   * to, whose children no read shows.
+   */
   private parentNumberOf(tree: OutlineTree, parent: OutlineItemRef | null): number {
     if (parent === null) return TOP;
     this.requireItem(tree, parent, 'parent');
+    if ((tree.levelOf(parent.objectNumber) ?? 0) >= OUTLINE_READ_LIMITS.depth - 1) {
+      invalid('parent', `an item under ${parent.objectNumber} would be deeper than reads go`);
+    }
     return parent.objectNumber;
   }
 

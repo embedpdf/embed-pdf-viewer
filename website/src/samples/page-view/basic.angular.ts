@@ -12,9 +12,9 @@ import { EpdfPageView } from '@embedpdf/angular/page-view';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { localEngine } from '@embedpdf/engine';
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/welcome.pdf');
+  return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 // A card that shows one page, like a preview next to a search result or a comment.
@@ -69,7 +69,7 @@ export class PageCard {
   imports: [EpdfDocumentGate, PageCard],
   providers: [
     provideEmbedPdf(
-      { engine: () => localEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => localEngine(), initialDocuments: [{ source: welcome }] },
       withRender(),
     ),
   ],

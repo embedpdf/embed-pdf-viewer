@@ -21,8 +21,8 @@ export {
   LayerAnalysisQuerySchema,
   VersionAnalysisQuerySchema,
   analyzeInputFromQuery,
-  DocumentVersionSchema,
-  DocumentVersionsSchema,
+  LayerVersionSchema,
+  LayerVersionsSchema,
   DigestAlgorithmSchema,
   ModificationLevelSchema,
   SignaturePreparedWireSchema,
@@ -78,6 +78,7 @@ export {
   PageNetworkRenderFormatSchema,
   PageRenderQuerySchemas,
   PagePrintQuerySchemas,
+  PageThumbnailQuerySchemas,
   pagePictureQuerySchema,
   AnnotationAppearancesQuerySchema,
   WidgetAppearancesQuerySchema,
@@ -123,7 +124,6 @@ export {
   PageLayoutSchema,
   PageBoxesSchema,
   PagePositionSchema,
-  PageReorderInputSchema,
   PageReorderResultSchema,
   AnnotationFlattenInputSchema,
   AnnotationFlattenResultSchema,
@@ -137,14 +137,12 @@ export {
   PageNameInputSchema,
   PageNameResultSchema,
   PageRemoveNameInputSchema,
-  PageRotateInputSchema,
   PageRotateResultSchema,
-  PageDeleteInputSchema,
   PageDeleteResultSchema,
-  PageInsertInputSchema,
-  PageInsertBlankInputSchema,
+  PageInsertBlankSpecSchema,
   PageExtractInputSchema,
   PageInsertResultSchema,
+  PageRestoreResultSchema,
   PageFlattenInputSchema,
   PageFlattenResultSchema,
   RedactionApplyScopeSchema,
@@ -215,12 +213,13 @@ export {
   ResourceKeySchema,
   SourceResourceKeysSchema,
 } from './wire/resourceKeys';
-// The page pictures, screen and print: what each draws, needs, depends on and pins.
+// The page pictures, screen, thumbnail and print: what each draws, needs, depends on and pins.
 export {
   PAGE_PICTURES,
   PAGE_PRINT_FAMILIES,
   PAGE_PRINT_TIERS,
   PAGE_RENDER_FAMILIES,
+  PAGE_THUMBNAIL_FAMILIES,
   pagePictureOf,
   pagePrintTierOf,
   pageRenderFamilyOf,
@@ -439,6 +438,7 @@ export {
 export { WidgetDTOSchema, WidgetPatchSchema } from './annotation/kinds/widget';
 export { DateInputSchema, IsoDateTimeSchema } from './dto/IsoDateTime.schema';
 export {
+  AttachmentFileBaseSchema,
   AttachmentFileInfoSchema,
   WireAttachmentFileSchema,
   AttachmentSchema,
@@ -449,6 +449,8 @@ export {
   AttachmentMutationMetaSchema,
   AttachmentCreateResultSchema,
   AttachmentDeleteResultSchema,
+  AttachmentRestoreResultSchema,
+  AttachmentWireComponents,
 } from './wire/schemas';
 export type { SignaturePreparedWire, SignatureCompleteBody } from './wire/schemas';
 export type {
@@ -456,8 +458,8 @@ export type {
   SignatureAppearanceBody,
   LayerAnalysisQuery,
   VersionAnalysisQuery,
-  DocumentVersion,
-  DocumentVersions,
+  LayerVersion,
+  LayerVersions,
 } from './wire/schemas';
 export { encodeAnalysisToken, decodeAnalysisToken, type AnalysisToken } from './wire/tokens';
 export type {

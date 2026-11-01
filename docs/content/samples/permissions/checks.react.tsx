@@ -32,9 +32,9 @@ const plugins = [
   searchPlugin(),
 ];
 
-// [!doc-source ebook]
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
+// [!doc-source welcome]
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/welcome.pdf');
   return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
@@ -62,7 +62,7 @@ function ReopenOnRoleChange({ role }: { role: Role }) {
   useEffect(() => {
     if (role === opened.current || !id) return;
     opened.current = role;
-    void documents.close(id).then(() => documents.open(ebook, { name: 'ebook.pdf' }));
+    void documents.close(id).then(() => documents.open(welcome, { name: 'welcome.pdf' }));
   }, [role, id, documents]);
   return null;
 }
@@ -82,7 +82,7 @@ function Controls() {
     if (search.canSearch()) void search.search({ text });
   }, [search, text]);
   useEffect(() => {
-    if (cover) selection.select({ page: cover, start: 10, count: 52 });
+    if (cover) selection.select({ page: cover, start: 28, count: 30 });
   }, [selection, cover]);
 
   const copy = async () => {
@@ -111,7 +111,7 @@ function Controls() {
           <button
             type="button"
             className="button"
-            onClick={async () => saveFile(await documents.download(), 'ebook.pdf')}
+            onClick={async () => saveFile(await documents.download(), 'welcome.pdf')}
           >
             Download
           </button>
@@ -129,7 +129,7 @@ export default function App() {
       engine={engine}
       plugins={plugins}
       scope={roles[role]}
-      initialDocuments={[{ source: ebook, name: 'ebook.pdf' }]}
+      initialDocuments={[{ source: welcome, name: 'welcome.pdf' }]}
     >
       <div className="toolbar">
         <label className="label">

@@ -9,7 +9,7 @@ import './draw.css';
 const engine = cloudEngine();
 const plugins = [fontsPlugin()];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 // Type in any font the document can be written in, drawn as the engine will write it.
 function FontPreview() {
@@ -48,7 +48,7 @@ function FontPreview() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <FontPreview />
       </DocumentGate>

@@ -1,5 +1,5 @@
 export { signaturePlugin } from './signature.plugin';
-export { signatureState } from './state';
+export { signatureState, type SignatureState } from './state';
 export * from './contract';
 // The signer ports, re-exported so a viewer configures signing from one import.
 export {

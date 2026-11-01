@@ -1,24 +1,30 @@
 /**
- * The page-edit controller. Stateless: it turns the engine handle's page
- * service into page edits that take refs or indexes. Turning a page relative
- * to its own rotation, and fixing a placement's page, live here once instead
- * of in every app's click handler.
+ * The page-edit controller: page edits that take refs or indexes, and the
+ * page selection. Turning a page relative to its own rotation, and fixing a
+ * position's page, live here once instead of in every app's click handler.
  *
- * A verb refuses before anything starts (permission, pages, placement), then
- * queues its edit: edits run one at a time, in the order they were called.
+ * A verb refuses before anything starts (permission, pages, position), then
+ * stages its edit as one change on the document's queue (`ctx.changes`): one
+ * step of the history, sent after everything staged before it. The page list
+ * shows it once the engine answers; nothing predicts pages yet.
  */
-import { DocumentsToken, PluginError, toPluginError } from '@embedpdf/core';
+import { memo, PluginError, toPluginError, DocumentsToken } from '@embedpdf/core';
 import type {
+  ChangeLabel,
   DocCapability,
-  PageInfo,
+  OperationOptions,
+  PageLayout,
   PagePosition,
   PageRef,
   PdfRotation,
   PdfSize,
+  PendingChange,
   PluginContext,
+  PredictedOp,
 } from '@embedpdf/core';
 
-import type { PageEditCapability, PageEditInsertResult, PagePlacement } from './contract';
+import type { PageEditCapability, PageEditInsertResult } from './contract';
+import { selected, type PageEditModel } from './model';
 
 /** Inserting, rotating and deleting pages (PDF permission bit 4 or 11). The engine enforces it too. */
 const ASSEMBLE: DocCapability = 'doc.pages.assemble';
@@ -28,11 +34,16 @@ const DOWNLOAD: DocCapability = 'doc.download';
 /** The size of a blank page when the document has no page to match: Letter, in points. */
 const LETTER_SIZE: PdfSize = { width: 612, height: 792 };
 
-export function createPageEditController(ctx: PluginContext<void>) {
-  const enqueue = ctx.serialQueue('edits');
-  // A download waits for the page edits on their way.
-  ctx.onSettle(() => enqueue.idle());
+const NO_PAGES: readonly PageRef[] = Object.freeze([]);
+const NO_LAYOUTS: readonly PageLayout[] = Object.freeze([]);
 
+/** A page op, as a verb stages it. */
+type PageOp = Extract<PredictedOp, { type: `pages.${string}` }>;
+
+/** What a change is called in history and refusals. */
+type PageVerb = 'rotate' | 'reorder' | 'delete' | 'insertBlank' | 'insert' | 'duplicate';
+
+export function createPageEditController(ctx: PluginContext<PageEditModel>) {
   /** Engine calls outside the guarded `ctx.doc` (another document, a scratch document) map their errors here. */
   const mapErrors = async <T>(work: () => Promise<T>): Promise<T> => {
     try {
@@ -41,7 +52,7 @@ export function createPageEditController(ctx: PluginContext<void>) {
       throw toPluginError('page-edit', error);
     }
   };
-  const registry = (): readonly PageInfo[] => ctx.document()?.pages ?? [];
+  const registry = (): readonly PageLayout[] => ctx.document()?.pages ?? NO_LAYOUTS;
   const noPages = () => new PluginError('invalid-input', 'page-edit', 'no pages given');
 
   /**
@@ -53,17 +64,14 @@ export function createPageEditController(ctx: PluginContext<void>) {
     return pages.map((page) => ctx.pageOf(page).ref);
   };
 
-  /**
-   * A placement as the engine's position, its page fixed when the verb is
-   * called, like the verb's own pages. Default `'end'`.
-   */
-  const positionOf = (placement: PagePlacement | undefined): PagePosition => {
-    if (!placement || placement === 'start' || placement === 'end') return placement ?? 'end';
-    if ('after' in placement) return { after: ctx.pageOf(placement.after).ref };
-    return { before: ctx.pageOf(placement.before).ref };
+  /** A position, its page checked when the verb is called, like the verb's own pages. Default `'end'`. */
+  const positionOf = (position: PagePosition | undefined): PagePosition => {
+    if (!position || position === 'start' || position === 'end') return position ?? 'end';
+    if ('after' in position) return { after: ctx.pageOf(position.after).ref };
+    return { before: ctx.pageOf(position.before).ref };
   };
   /**
-   * Default blank-page size: the page the placement names, else the page the
+   * Default blank-page size: the page the position names, else the page the
    * new ones go next to (the first or the last), else Letter.
    */
   const sizeAt = (position: PagePosition): PdfSize => {
@@ -75,119 +83,237 @@ export function createPageEditController(ctx: PluginContext<void>) {
     return (position === 'start' ? pages[0] : pages[pages.length - 1]).size;
   };
 
-  /** Insert a PDF's pages; resolves the new pages. */
-  const insertBytes = async (
+  /* ── the selection ─────────────────────────────────────────────────────── */
+
+  const getSelected = memo(
+    () => [registry(), ctx.state.get().selected] as const,
+    (pages, refs) => {
+      if (refs.length === 0) return NO_PAGES;
+      const present = new Set(pages.map((page) => page.ref.objectNumber));
+      return refs.filter((ref) => present.has(ref.objectNumber));
+    },
+  );
+  const select = (pages: readonly (PageRef | number)[]): void => {
+    const refs = pages.flatMap((page) => {
+      const found = ctx.getPage(page);
+      return found ? [found.ref] : [];
+    });
+    ctx.state.update(selected, refs);
+  };
+
+  /* ── writes ────────────────────────────────────────────────────────────── */
+
+  /** Refuse before anything starts: without the right, or once the caller cancelled. */
+  const refuse = (
+    permission: DocCapability,
+    operation: string,
+    options: OperationOptions | undefined,
+  ): void => {
+    ctx.assertAllowed(permission, operation);
+    if (options?.signal?.aborted) {
+      throw new PluginError('operation-cancelled', 'page-edit', `${operation} was cancelled`);
+    }
+  };
+
+  /**
+   * Stage one user action: one change, one step of the history. Its label
+   * counts the pages it acts on, when the verb knows how many.
+   */
+  const stageChange = (
+    verb: PageVerb,
+    count: number | null,
+    ops: readonly PageOp[],
+    undo?: readonly PageOp[],
+  ): PendingChange => {
+    const label: ChangeLabel =
+      count === null ? { key: `pages.${verb}` } : { key: `pages.${verb}`, count };
+    return ctx.changes.stage({ label, ops, ...(undo ? { undo } : {}) });
+  };
+
+  /** The engine's answer to a staged change: its first item. */
+  const answer = async (change: PendingChange, options: OperationOptions | undefined) => {
+    try {
+      const result = await ctx.cancellable(options?.signal, change.result);
+      return result.items[0]!;
+    } catch (error) {
+      throw toPluginError('page-edit', error);
+    }
+  };
+
+  /** What an insert's answer names: the new pages. */
+  const inserted = async (
+    change: PendingChange,
+    options: OperationOptions | undefined,
+  ): Promise<PageEditInsertResult> => {
+    const item = await answer(change, options);
+    return { pages: 'insertedPages' in item ? item.insertedPages : NO_PAGES };
+  };
+
+  /**
+   * A page's rotation once this session's changes on their way apply: the
+   * last rotation one of them gives it, else the page's own. What a turn
+   * starts from, so two quick quarter turns are a half turn.
+   */
+  const rotationOf = (ref: PageRef): PdfRotation => {
+    let rotation = ctx.pageOf(ref).rotation;
+    for (const change of ctx.changes.pending()) {
+      for (const op of change.shows) {
+        if (op.type !== 'pages.rotate') continue;
+        if (op.pages.some((page) => page.objectNumber === ref.objectNumber)) {
+          rotation = op.rotation;
+        }
+      }
+    }
+    return rotation;
+  };
+
+  /**
+   * Rotate pages as one change: one op per rotation they end up with. What
+   * undoing it looks like is each page turned back, so a turn right after an
+   * undo starts from where the undo leaves the page.
+   */
+  const rotate = (refs: readonly PageRef[], rotationAfter: (ref: PageRef) => PdfRotation) => {
+    const after = new Map<PdfRotation, PageRef[]>();
+    const before = new Map<PdfRotation, PageRef[]>();
+    for (const ref of refs) {
+      const add = (groups: Map<PdfRotation, PageRef[]>, rotation: PdfRotation) =>
+        groups.set(rotation, [...(groups.get(rotation) ?? []), ref]);
+      add(before, rotationOf(ref));
+      add(after, rotationAfter(ref));
+    }
+    const opsOf = (groups: Map<PdfRotation, PageRef[]>): PageOp[] =>
+      [...groups].map(([rotation, pages]) => ({ type: 'pages.rotate', pages, rotation }));
+    return stageChange('rotate', refs.length, opsOf(after), opsOf(before));
+  };
+
+  /**
+   * The pages as they show: every change on its way sent and answered first,
+   * so a copy holds the edits made before it.
+   */
+  const settled = async (options: OperationOptions | undefined): Promise<void> => {
+    ctx.changes.sendHolds();
+    await ctx.cancellable(options?.signal, ctx.changes.whenSettled());
+  };
+
+  /** Copy pages of this document out, as they show. */
+  const extractShown = async (
+    refs: readonly PageRef[],
+    options: OperationOptions | undefined,
+  ): Promise<Uint8Array> => {
+    await settled(options);
+    return ctx.cancellable(options?.signal, ctx.doc.pages.extract([...refs]));
+  };
+
+  /** Stage the insert of a PDF's pages; resolves the new pages. */
+  const insertBytes = (
+    verb: 'insert' | 'duplicate',
+    count: number | null,
     bytes: Uint8Array | ArrayBuffer,
     position: PagePosition,
-    signal: AbortSignal | undefined,
+    options: OperationOptions | undefined,
   ): Promise<PageEditInsertResult> => {
-    const result = await ctx.cancellable(signal, ctx.doc.pages.insert(bytes, position));
-    return { pages: result.insertedPages };
+    const source = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+    const change = stageChange(verb, count, [{ type: 'pages.insert', source, position }]);
+    return inserted(change, options);
+  };
+
+  /** Some pages of a PDF: open the bytes beside the document and extract them. */
+  const pagesOfBytes = async (
+    bytes: Uint8Array | ArrayBuffer,
+    pageIndexes: readonly number[],
+    signal: AbortSignal | undefined,
+  ): Promise<Uint8Array> => {
+    const source = await mapErrors(() =>
+      ctx.engine.open(
+        {
+          kind: 'bytes',
+          id: `page-edit-source-${Date.now().toString(36)}`,
+          bytes: new Uint8Array(bytes),
+        },
+        { scope: ['*'] },
+      ),
+    );
+    try {
+      const layout = await mapErrors(() => ctx.cancellable(signal, source.pages.list()));
+      const refs = pageIndexes.map((index) => {
+        const page = layout.pages[index];
+        if (!page) {
+          throw new PluginError('not-found', 'page-edit', `the PDF has no page ${index}`);
+        }
+        return page.ref;
+      });
+      return await mapErrors(() => ctx.cancellable(signal, source.pages.extract(refs)));
+    } finally {
+      await source.close();
+    }
   };
 
   const api: PageEditCapability = {
     canEdit: () => ctx.allows(ASSEMBLE),
     canExtract: () => ctx.allows(DOWNLOAD),
 
+    getSelected,
+    select,
+
     rotateBy: async (pages, delta, options) => {
-      ctx.assertAllowed(ASSEMBLE, 'pageEdit.rotateBy');
+      refuse(ASSEMBLE, 'pageEdit.rotateBy', options);
       const refs = refsOf(pages);
-      const signal = options?.signal;
-      await enqueue(async () => {
-        // The engine sets one rotation per call, so pages are grouped by where
-        // they end up. Each page's rotation is read when the edit runs, after
-        // the edits queued before it; the double modulo keeps -90 from 0 at 270.
-        const groups = new Map<PdfRotation, PageRef[]>();
-        for (const ref of refs) {
-          const turned = (ctx.pageOf(ref).rotation + delta) % 360;
-          const rotation = ((turned + 360) % 360) as PdfRotation;
-          groups.set(rotation, [...(groups.get(rotation) ?? []), ref]);
-        }
-        for (const [rotation, group] of groups) {
-          await ctx.cancellable(signal, ctx.doc.pages.rotate(group, rotation));
-        }
-      }, options);
+      // The double modulo keeps -90 from 0 at 270.
+      const change = rotate(
+        refs,
+        (ref) => ((((rotationOf(ref) + delta) % 360) + 360) % 360) as PdfRotation,
+      );
+      await answer(change, options);
     },
 
     setRotation: async (pages, rotation, options) => {
-      ctx.assertAllowed(ASSEMBLE, 'pageEdit.setRotation');
-      const refs = refsOf(pages);
-      await enqueue(
-        () => ctx.cancellable(options?.signal, ctx.doc.pages.rotate(refs, rotation)),
-        options,
-      );
+      refuse(ASSEMBLE, 'pageEdit.setRotation', options);
+      const change = rotate(refsOf(pages), () => rotation);
+      await answer(change, options);
     },
 
-    reorder: async (pages, placement, options) => {
-      ctx.assertAllowed(ASSEMBLE, 'pageEdit.reorder');
+    reorder: async (pages, position, options) => {
+      refuse(ASSEMBLE, 'pageEdit.reorder', options);
       const refs = refsOf(pages);
-      const position = positionOf(placement);
-      await enqueue(
-        () => ctx.cancellable(options?.signal, ctx.doc.pages.reorder(refs, position)),
-        options,
-      );
+      const change = stageChange('reorder', refs.length, [
+        { type: 'pages.reorder', pages: refs, position: positionOf(position) },
+      ]);
+      await answer(change, options);
     },
 
     delete: async (pages, options) => {
-      ctx.assertAllowed(ASSEMBLE, 'pageEdit.delete');
+      refuse(ASSEMBLE, 'pageEdit.delete', options);
       const refs = refsOf(pages);
       const deleting = new Set(refs.map((ref) => ref.objectNumber));
       if (registry().every((page) => deleting.has(page.ref.objectNumber))) {
         throw new PluginError('invalid-input', 'page-edit', 'a document keeps at least one page');
       }
-      await enqueue(() => ctx.cancellable(options?.signal, ctx.doc.pages.delete(refs)), options);
+      const change = stageChange('delete', refs.length, [{ type: 'pages.delete', pages: refs }]);
+      await answer(change, options);
     },
 
     insertBlank: async (options = {}) => {
-      ctx.assertAllowed(ASSEMBLE, 'pageEdit.insertBlank');
-      const position = positionOf(options.placement);
-      return enqueue(async () => {
-        const size = options.size ?? sizeAt(position);
-        const result = await ctx.cancellable(
-          options.signal,
-          ctx.doc.pages.insertBlank({ size, count: options.count }, position),
-        );
-        return { pages: result.insertedPages };
-      }, options);
+      refuse(ASSEMBLE, 'pageEdit.insertBlank', options);
+      const position = positionOf(options.position);
+      const count = options.count ?? 1;
+      const size = options.size ?? sizeAt(position);
+      const change = stageChange('insertBlank', count, [
+        { type: 'pages.insertBlank', spec: { size, count }, position },
+      ]);
+      return inserted(change, options);
     },
 
     insertFromBytes: async (bytes, options = {}) => {
-      ctx.assertAllowed(ASSEMBLE, 'pageEdit.insertFromBytes');
-      const position = positionOf(options.placement);
+      refuse(ASSEMBLE, 'pageEdit.insertFromBytes', options);
+      const position = positionOf(options.position);
       const { pageIndexes, signal } = options;
       if (pageIndexes?.length === 0) throw noPages();
-      return enqueue(async () => {
-        if (!pageIndexes) return insertBytes(bytes, position, signal);
-        // Some of the pages: open the bytes beside the document, extract them, insert those.
-        const source = await mapErrors(() =>
-          ctx.engine.open(
-            {
-              kind: 'bytes',
-              id: `page-edit-source-${Date.now().toString(36)}`,
-              bytes: new Uint8Array(bytes),
-            },
-            { scope: ['*'] },
-          ),
-        );
-        try {
-          const layout = await mapErrors(() => ctx.cancellable(signal, source.pages.list()));
-          const refs = pageIndexes.map((index) => {
-            const page = layout.pages[index];
-            if (!page) {
-              throw new PluginError('not-found', 'page-edit', `the PDF has no page ${index}`);
-            }
-            return page.ref;
-          });
-          const subset = await mapErrors(() => ctx.cancellable(signal, source.pages.extract(refs)));
-          return await insertBytes(subset, position, signal);
-        } finally {
-          await source.close();
-        }
-      }, options);
+      const source = pageIndexes ? await pagesOfBytes(bytes, pageIndexes, signal) : bytes;
+      return insertBytes('insert', pageIndexes?.length ?? null, source, position, options);
     },
 
     insertFromDocument: async (documentId, pages, options = {}) => {
-      ctx.assertAllowed(ASSEMBLE, 'pageEdit.insertFromDocument');
+      refuse(ASSEMBLE, 'pageEdit.insertFromDocument', options);
       if (pages.length === 0) throw noPages();
       const other = ctx.documentHandle(documentId);
       if (!other) {
@@ -209,34 +335,29 @@ export function createPageEditController(ctx: PluginContext<void>) {
         }
         return found.ref;
       });
-      const position = positionOf(options.placement);
-      return enqueue(async () => {
-        // The other document's session decides whether its pages may be copied
-        // out: the engine refuses `doc.download` there with the permission named.
-        const bytes = await mapErrors(() =>
-          ctx.cancellable(options.signal, other.pages.extract(refs)),
-        );
-        return insertBytes(bytes, position, options.signal);
-      }, options);
+      const position = positionOf(options.position);
+      // The other document's session decides whether its pages may be copied
+      // out: the engine refuses `doc.download` there with the permission named.
+      const bytes = await mapErrors(() =>
+        ctx.cancellable(options.signal, other.pages.extract(refs)),
+      );
+      return insertBytes('insert', refs.length, bytes, position, options);
     },
 
     duplicate: async (pages, options = {}) => {
-      ctx.assertAllowed(ASSEMBLE, 'pageEdit.duplicate');
+      refuse(ASSEMBLE, 'pageEdit.duplicate', options);
       ctx.assertAllowed(DOWNLOAD, 'pageEdit.duplicate');
       const refs = refsOf(pages);
-      const position = options.placement
-        ? positionOf(options.placement)
+      const position = options.position
+        ? positionOf(options.position)
         : { after: refs[refs.length - 1]! };
-      return enqueue(async () => {
-        const bytes = await ctx.cancellable(options.signal, ctx.doc.pages.extract(refs));
-        return insertBytes(bytes, position, options.signal);
-      }, options);
+      const bytes = await extractShown(refs, options);
+      return insertBytes('duplicate', refs.length, bytes, position, options);
     },
 
     extract: async (pages, options) => {
-      ctx.assertAllowed(DOWNLOAD, 'pageEdit.extract');
-      const refs = refsOf(pages);
-      return enqueue(() => ctx.cancellable(options?.signal, ctx.doc.pages.extract(refs)), options);
+      refuse(DOWNLOAD, 'pageEdit.extract', options);
+      return extractShown(refsOf(pages), options);
     },
   };
   return { api };

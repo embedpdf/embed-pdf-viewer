@@ -59,8 +59,8 @@ functions of `@embedpdf/svelte` work there too. `ondocumentchange` and
 a panel. When the viewer unmounts, its `viewer` is done: its listeners stop and
 its calls refuse.
 
-`src`, `theme`, `locale`, `disable` and `readOnly` follow their props while the
-viewer runs; every other prop is read once, so wrap the viewer in `{#key}` to
+`src`, `theme`, `locale`, `disable`, `readOnly` and `fetch` follow their props
+while the viewer runs; every other prop is read once, so wrap the viewer in `{#key}` to
 start over with a changed one.
 
 ## Server-side rendering

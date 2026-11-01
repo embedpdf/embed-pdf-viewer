@@ -10,15 +10,17 @@
   const engine = cloudEngine();
   const plugins = [stagePlugin(), renderPlugin()];
 
-  const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+  const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
+
+  const article: OpenInput = { kind: 'grant', grant: 'shr_v09cJHOmj3C8vrfUlZNTDyqX' };
 </script>
 
 <Viewer
   {engine}
   {plugins}
   initialDocuments={[
-    { source: ebook, name: 'Original' },
-    { source: ebook, name: 'Revised' },
+    { source: welcome, name: 'Guide' },
+    { source: article, name: 'Article' },
   ]}
 >
   <SideBySide />

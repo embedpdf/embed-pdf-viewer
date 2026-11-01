@@ -39,7 +39,7 @@ function setBorder(event: Event) {
 
 function setLink(event: Event) {
   void annotation.selection.updateLink(
-    valueOf(event) === 'website' ? { kind: 'uri', uri: 'https://www.embedpdf.com' } : null,
+    valueOf(event) === 'website' ? { kind: 'uri', uri: 'https://example.com' } : null,
   );
 }
 </script>
@@ -140,6 +140,6 @@ function setLink(event: Event) {
     @change="setLink"
   >
     <option value="none">No link</option>
-    <option value="website">embedpdf.com</option>
+    <option value="website">example.com</option>
   </select>
 </template>

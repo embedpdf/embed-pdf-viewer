@@ -1,5 +1,39 @@
 # @embedpdf/react
 
+## 3.0.0-next.19
+
+### Minor Changes
+
+- [#920](https://github.com/embedpdf/embed-pdf-viewer/pull/920) by [@bobsingor](https://github.com/bobsingor) – The Stage draws the `zoom` tool's box while you drag, dashed in the accent color (the stage's `zoomBox` setting, or the `--epdf-zoom-box-*` variables). With interaction on, it registers the tool's handler for its own view only.
+
+- [#923](https://github.com/embedpdf/embed-pdf-viewer/pull/923) by [@bobsingor](https://github.com/bobsingor) – `<Viewer fetch>`: your own `fetch` for documents at a URL, to add headers or cookies. Each download calls the latest prop.
+
+## 3.0.0-next.18
+
+## 3.0.0-next.17
+
+### Patch Changes
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – The state hooks' published types name each plugin's state type (`useFormState: StateHook<FormState>`) instead of spelling out its fields. The declarations no longer carry a copy of engine types, which they did on some builds, from 34 kB to 229 kB with zod's types inside.
+
+## 3.0.0-next.16
+
+### Minor Changes
+
+- [#891](https://github.com/embedpdf/embed-pdf-viewer/pull/891) by [@bobsingor](https://github.com/bobsingor) – New entry `@embedpdf/react/attachment`: `useAttachment()`, `useAttachmentState()` (the files, the load state, `canAdd`, `canDownload`) and `useAttachmentEvent()` for `@embedpdf/plugin-attachment`. Reading the state reads the document's attachments.
+
+- [#885](https://github.com/embedpdf/embed-pdf-viewer/pull/885) by [@bobsingor](https://github.com/bobsingor) – `@embedpdf/react/outline`: `useOutline()`, `useOutlineState()` and `useOutlineEvent()` for the document's outline (its bookmarks), with the plugin and its types. Reading the state reads the outline.
+
+- [#876](https://github.com/embedpdf/embed-pdf-viewer/pull/876) by [@bobsingor](https://github.com/bobsingor) – Tapping a form field or editing a free text box on iOS no longer zooms the page in: their editors lay their text out at 16 px or more and draw it back at the page's size. `useRichTextEditor()`'s `style` now also makes your element fill its parent at that legible size, so draw the box's fill, border and padding on the parent: anything on the element itself scales with its text.
+
+- [#890](https://github.com/embedpdf/embed-pdf-viewer/pull/890) by [@bobsingor](https://github.com/bobsingor) – `usePageEditState()` returns the page edits' state: `selected`, `canEdit` and `canExtract`. It takes a selector. Page-edit positions are `position` now, in place of `placement`.
+
+### Patch Changes
+
+- [#883](https://github.com/embedpdf/embed-pdf-viewer/pull/883) by [@bobsingor](https://github.com/bobsingor) – The runtime hands the kernel the browser's printer (`browserPrinter()` from `@embedpdf/web`), so `documents.print()` and `preparePrint()` print.
+
+- [#895](https://github.com/embedpdf/embed-pdf-viewer/pull/895) by [@bobsingor](https://github.com/bobsingor) – A renderer that draws free text itself with `useRichTextEditor()` shows the text of every text box, including the ones saved in the PDF. Before, a saved box that wasn't being edited drew empty until it was double-clicked.
+
 ## 3.0.0-next.15
 
 ### Minor Changes

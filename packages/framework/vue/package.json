@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/vue",
-  "version": "3.0.0-next.15",
+  "version": "3.0.0-next.19",
   "private": false,
   "description": "Vue adapter for EmbedPDF v3: composables, components with v-model and scoped slots, headless layers. The whole framework surface, one entry point per feature.",
   "type": "module",
@@ -22,6 +22,7 @@
     "./actions": "./src/actions.ts",
     "./anchored": "./src/anchored.ts",
     "./annotation": "./src/annotation.ts",
+    "./attachment": "./src/attachment.ts",
     "./commands": "./src/commands.ts",
     "./form": "./src/form.ts",
     "./fonts": "./src/fonts.ts",
@@ -67,6 +68,10 @@
       "./annotation": {
         "import": "./dist/annotation.js",
         "require": "./dist/annotation.cjs"
+      },
+      "./attachment": {
+        "import": "./dist/attachment.js",
+        "require": "./dist/attachment.cjs"
       },
       "./commands": {
         "import": "./dist/commands.js",
@@ -173,6 +178,7 @@
     "@embedpdf/core-geometry": "workspace:*",
     "@embedpdf/core": "workspace:*",
     "@embedpdf/plugin-annotation": "workspace:*",
+    "@embedpdf/plugin-attachment": "workspace:*",
     "@embedpdf/plugin-commands": "workspace:*",
     "@embedpdf/plugin-fonts": "workspace:*",
     "@embedpdf/plugin-form": "workspace:*",

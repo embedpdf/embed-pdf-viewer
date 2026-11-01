@@ -6,9 +6,10 @@ import {
   inject,
   input,
   untracked,
+  viewChild,
   ViewEncapsulation,
 } from '@angular/core';
-import { EpdfDocument, EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
+import { EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
 import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
@@ -22,7 +23,7 @@ import {
 } from '@embedpdf/angular/annotation';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const layout: OpenInput = { kind: 'grant', grant: 'shr_d2E_LaTuddJbZR00d1CvkqLM' };
 
 // One control per property, by the control it asks for.
 @Component({
@@ -136,7 +137,7 @@ const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrb
           (change)="setLink(link.value)"
         >
           <option value="none" [selected]="!value()">No link</option>
-          <option value="website" [selected]="!!value()">embedpdf.com</option>
+          <option value="website" [selected]="!!value()">example.com</option>
         </select>
       }
     }
@@ -191,7 +192,7 @@ export class Control {
 
   protected setLink(value: string) {
     void this.annotation.selection.updateLink(
-      value === 'website' ? { kind: 'uri', uri: 'https://www.embedpdf.com' } : null,
+      value === 'website' ? { kind: 'uri', uri: 'https://example.com' } : null,
     );
   }
 }
@@ -232,7 +233,7 @@ export class StylePanel {
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: layout }] },
       withStage(),
       withRender(),
       withInteraction(),
@@ -260,42 +261,20 @@ export class StylePanel {
 })
 export class App {
   private readonly annotation = inject(EpdfAnnotation);
-  private readonly document = inject(EpdfDocument);
-  private added = false;
+  private readonly stage = viewChild(EpdfStage);
+  private done = false;
 
   constructor() {
-    // On load: a rectangle (selected), an arrow and a text box on the cover.
+    // On load: the document's square, selected, so the panel shows its style.
     effect(() => {
-      const cover = this.document.pages()[0]?.ref;
-      if (this.annotation.status() !== 'ready' || !cover || this.added) return;
-      this.added = true;
+      const stage = this.stage();
+      if (!stage || this.annotation.status() !== 'ready' || this.done) return;
+      this.done = true;
       untracked(() => {
-        void this.annotation.create(cover, {
-          subtype: 'line',
-          linePoints: { start: { x: 520, y: 120 }, end: { x: 470, y: 230 } },
-          lineEndings: { start: 'none', end: 'closed-arrow' },
-          color: '#1a2748',
-          strokeWidth: 3,
-        });
-        void this.annotation.create(cover, {
-          subtype: 'free-text',
-          box: { x: 300, y: 512, width: 230, height: 40 },
-          contents: 'Ready for review',
-          fontSize: 16,
-          fontColor: '#1a2748',
-        });
-        void this.annotation.create(
-          cover,
-          {
-            subtype: 'square',
-            box: { x: 96, y: 506, width: 178, height: 54 },
-            color: '#e5484d',
-            interiorColor: '#ffe4e1',
-            strokeWidth: 3,
-          },
-          undefined,
-          { select: true },
-        );
+        const square = this.annotation.list().find((each) => each.nm === 'square');
+        if (!square) return;
+        this.annotation.selection.set([square.ref]);
+        stage.reveal(square.page, { rect: square.rect });
       });
     });
   }

@@ -72,7 +72,7 @@ export const LANGUAGE_NAMES = Object.keys(LANGUAGES);
 
 /**
  * Every rendered example is a complete program: a per-language "frame"
- * (imports + client construction with token and base URL) wrapping the
+ * (imports + client construction with a token, for CloudPDF SaaS) wrapping the
  * operation call extracted from the generated SDK's reference.md.
  *
  * The call is derived truth — Fern generates it from the real SDK, so
@@ -83,14 +83,11 @@ export const LANGUAGE_NAMES = Object.keys(LANGUAGES);
  * `frameLines` marks where the frame ends so the renderer can
  * de-emphasise the boilerplate and keep the call as the visual hero.
  */
-const SNIPPET_BASE_URL = 'https://yourhost.com/path/to/api';
-
 const FRAMES = {
   typescript: {
     imports: () => ['import { CloudPDFClient } from "@cloudpdf/sdk";'],
     construction: [
       'const client = new CloudPDFClient({',
-      `    baseUrl: "${SNIPPET_BASE_URL}",`,
       '    token: "<token>",',
       '});',
     ],
@@ -101,7 +98,6 @@ const FRAMES = {
     construction: [
       'client = CloudPDFClient(',
       '    token="<token>",',
-      `    base_url="${SNIPPET_BASE_URL}",`,
       ')',
     ],
     marker: 'client = CloudPDFClient(',
@@ -111,7 +107,6 @@ const FRAMES = {
     construction: [
       '$client = new CloudPDFClient(',
       "    token: '<token>',",
-      `    options: ['baseUrl' => '${SNIPPET_BASE_URL}'],`,
       ');',
     ],
     marker: 'new CloudPDFClient(',
@@ -120,8 +115,7 @@ const FRAMES = {
     imports: () => ['using CloudPDF;'],
     construction: [
       'var client = new CloudPDFClient(',
-      '    "<token>",',
-      `    new ClientOptions { BaseUrl = "${SNIPPET_BASE_URL}" }`,
+      '    "<token>"',
       ');',
     ],
     marker: 'new CloudPDFClient(',
@@ -144,7 +138,6 @@ const FRAMES = {
     construction: [
       'client := client.NewClient(',
       '    option.WithToken("<token>"),',
-      `    option.WithBaseURL("${SNIPPET_BASE_URL}"),`,
       ')',
     ],
     marker: 'client.NewClient(',
@@ -155,7 +148,6 @@ const FRAMES = {
       'CloudPDFClient client = CloudPDFClient',
       '    .builder()',
       '    .token("<token>")',
-      `    .url("${SNIPPET_BASE_URL}")`,
       '    .build();',
     ],
     marker: 'CloudPDFClient client = CloudPDFClient',
@@ -164,8 +156,7 @@ const FRAMES = {
     imports: () => ['require "cloudpdf"'],
     construction: [
       'client = CloudPDF::Client.new(',
-      '  token: "<token>",',
-      `  base_url: "${SNIPPET_BASE_URL}"`,
+      '  token: "<token>"',
       ')',
     ],
     marker: 'CloudPDF::Client.new',
@@ -198,6 +189,8 @@ function stripPythonConstruction(source) {
       continue;
     }
     if (trimmed === 'from cloudpdf import CloudPDFClient') continue;
+    // Fern names the default environment in its construction; ours leaves it out.
+    if (trimmed.startsWith('from cloudpdf.environment import ')) continue;
     if (trimmed.startsWith('client = CloudPDFClient(')) {
       if (!trimmed.endsWith(')')) skipping = true;
       continue;

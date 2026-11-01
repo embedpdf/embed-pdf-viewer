@@ -16,7 +16,11 @@ import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage'
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
+
+const article: OpenInput = { kind: 'grant', grant: 'shr_v09cJHOmj3C8vrfUlZNTDyqX' };
+
+const sketch: OpenInput = { kind: 'grant', grant: 'shr_IyOgSdO4AmJqV4BoMv5V0nYU' };
 
 @Component({
   selector: 'demo-tabs',
@@ -44,7 +48,12 @@ const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrb
           </button>
         </div>
       }
-      <button type="button" class="button" aria-label="Open another copy" (click)="openCopy()">
+      <button
+        type="button"
+        class="button"
+        aria-label="Open the floor plan"
+        (click)="openFloorPlan()"
+      >
         +
       </button>
     </div>
@@ -53,8 +62,8 @@ const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrb
 export class Tabs {
   protected readonly documents = inject(EpdfDocuments);
 
-  protected openCopy() {
-    void this.documents.open(ebook, { name: `Copy ${this.documents.documents().length + 1}` });
+  protected openFloorPlan() {
+    void this.documents.open(sketch, { name: 'Floor plan' });
   }
 }
 
@@ -102,8 +111,8 @@ export class TabTools {
       {
         engine: () => cloudEngine(),
         initialDocuments: [
-          { source: ebook, name: 'Contract' },
-          { source: ebook, name: 'Report' },
+          { source: welcome, name: 'Guide' },
+          { source: article, name: 'Article' },
         ],
       },
       withStage(),

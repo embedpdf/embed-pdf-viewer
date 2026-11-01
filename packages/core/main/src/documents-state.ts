@@ -15,11 +15,14 @@ const NO_DOCUMENT: DocumentInfo = Object.freeze({
   hasUnsavedChanges: false,
   passwordProvided: undefined,
   error: undefined,
+  grantRequest: undefined,
+  identityRequest: undefined,
 });
 
 /**
  * The document in scope (the capability resolved for a document, or else the active one): its
- * id, name, status, page count, unsaved changes, and why it's locked or failed.
+ * id, name, status, page count, unsaved changes, why it's locked or failed, and what its share
+ * link waits for.
  */
 export const documentState = defineState(DocumentsToken, {
   read: (documents): DocumentInfo => documents.get() ?? NO_DOCUMENT,

@@ -1,5 +1,24 @@
 # @embedpdf/plugin-page-edit
 
+## 3.0.0-next.19
+
+## 3.0.0-next.18
+
+## 3.0.0-next.17
+
+### Minor Changes
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – A named type for the state: `PageEditState`, what `pageEditState` reads and `usePageEditState()` returns, the State table of the pages page with a comment on each field. Published types now name it instead of spelling out its fields.
+
+## 3.0.0-next.16
+
+### Minor Changes
+
+- [#890](https://github.com/embedpdf/embed-pdf-viewer/pull/890) by [@bobsingor](https://github.com/bobsingor) – Page edits are steps of the history, and the plugin keeps the page selection.
+  - Every edit is one change on the document's queue (`ctx.changes`), so undo puts the pages back as they were: a moved page goes back to its place, a deleted page comes back under its ref with its annotations, inserted pages go. `rotateBy` turns from the rotation the edits on their way give a page, so two quick quarter turns are a half turn. `duplicate()` and `extract()` copy the pages as they show, after the edits made before them.
+  - `getSelected()` and `select(pages)` hold the selected pages, and `pageEditState` declares `selected`, `canEdit` and `canExtract` for the framework hooks. A page that's deleted leaves the selection.
+  - `placement` is now `position`, and a position is the engine's `PagePosition`: `{ after: pageRef }`, `{ before: pageRef }`, `'start'` or `'end'`. `PagePlacement` and `PagePlacementOptions` are gone (`PagePositionOptions`).
+
 ## 3.0.0-next.15
 
 ### Minor Changes

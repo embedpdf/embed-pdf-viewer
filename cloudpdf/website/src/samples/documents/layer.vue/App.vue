@@ -15,7 +15,7 @@ const plugins = [stagePlugin(), renderPlugin(), metadataPlugin()];
 
 // The original stays as it is: the document opens with a layer over it, and the changes go there.
 const withLayer = async (layer?: Uint8Array): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
+  const response = await fetch('/pdfs/welcome.pdf');
   return {
     kind: 'layerBytes',
     baseBytes: new Uint8Array(await response.arrayBuffer()),
@@ -30,7 +30,7 @@ const reopened = ref(false);
   <Viewer
     :engine="engine"
     :plugins="plugins"
-    :initial-documents="[{ source: () => withLayer(), name: 'ebook.pdf' }]"
+    :initial-documents="[{ source: () => withLayer(), name: 'welcome.pdf' }]"
   >
     <DocumentGate>
       <template #fallback><p class="loading">Opening…</p></template>

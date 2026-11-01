@@ -26,7 +26,14 @@ export type ChangeOp =
     | CloudPDF.ChangeOp.OutlineCreate
     | CloudPDF.ChangeOp.OutlineUpdate
     | CloudPDF.ChangeOp.OutlineMove
-    | CloudPDF.ChangeOp.OutlineDelete;
+    | CloudPDF.ChangeOp.OutlineDelete
+    | CloudPDF.ChangeOp.PagesRotate
+    | CloudPDF.ChangeOp.PagesReorder
+    | CloudPDF.ChangeOp.PagesDelete
+    | CloudPDF.ChangeOp.PagesInsertBlank
+    | CloudPDF.ChangeOp.PagesInsert
+    | CloudPDF.ChangeOp.AttachmentsCreate
+    | CloudPDF.ChangeOp.AttachmentsDelete;
 
 export namespace ChangeOp {
     export interface AnnotationsCreate {
@@ -215,5 +222,86 @@ export namespace ChangeOp {
         type: "outline.delete";
         ref: CloudPDF.OutlineItemRef;
         expect?: CloudPDF.OutlineItemPatch | undefined;
+    }
+
+    export interface PagesRotate {
+        type: "pages.rotate";
+        pages: CloudPDF.PageRef[];
+        rotation: number;
+    }
+
+    export interface PagesReorder {
+        type: "pages.reorder";
+        pages: CloudPDF.PageRef[];
+        position: CloudPDF.PagePosition;
+    }
+
+    export interface PagesDelete {
+        type: "pages.delete";
+        pages: CloudPDF.PageRef[];
+    }
+
+    export interface PagesInsertBlank {
+        type: "pages.insertBlank";
+        spec: ChangeOpPagesInsertBlank.Spec;
+        position?: CloudPDF.PagePosition | undefined;
+        objectNumbers?: number[] | undefined;
+    }
+
+    export namespace ChangeOpPagesInsertBlank {
+        export interface Spec {
+            size: Spec.Size;
+            count?: number | undefined;
+        }
+
+        export namespace Spec {
+            export interface Size {
+                width: number;
+                height: number;
+            }
+        }
+    }
+
+    export interface PagesInsert {
+        type: "pages.insert";
+        resources: ChangeOpPagesInsert.Resources;
+        position?: CloudPDF.PagePosition | undefined;
+    }
+
+    export namespace ChangeOpPagesInsert {
+        export interface Resources {
+            source: string;
+        }
+    }
+
+    export interface AttachmentsCreate {
+        type: "attachments.create";
+        file: CloudPDF.AttachmentFileBase;
+        resources: ChangeOpAttachmentsCreate.Resources;
+    }
+
+    export namespace ChangeOpAttachmentsCreate {
+        export interface Resources {
+            file: string;
+        }
+    }
+
+    export interface AttachmentsDelete {
+        type: "attachments.delete";
+        ref: ChangeOpAttachmentsDelete.Ref;
+    }
+
+    export namespace ChangeOpAttachmentsDelete {
+        export interface Ref {
+            kind: Ref.Kind;
+            key: string;
+        }
+
+        export namespace Ref {
+            export const Kind = {
+                Key: "key",
+            } as const;
+            export type Kind = (typeof Kind)[keyof typeof Kind];
+        }
     }
 }

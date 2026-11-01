@@ -8,14 +8,10 @@ import {
   type PageImageOptions,
   type PageNetworkRenderFormat,
   type DocCapability,
-  type PageDeleteInput,
   type PageExtractInput,
   type PageFlattenInput,
-  type PagePosition,
-  type PageReorderInput,
   type PageNameInput,
   type PageRemoveNameInput,
-  type PageRotateInput,
   type WorkerJobId,
   resolvePageExtract,
   toPageRef,
@@ -24,16 +20,11 @@ import {
   decodeContentToken,
   decodeRenderToken,
   pageRenderOptionsFromImageOptions,
-  PageDeleteInputSchema,
   PageExtractInputSchema,
   PageFlattenInputSchema,
-  PageInsertBlankInputSchema,
-  PageInsertInputSchema,
-  PageReorderInputSchema,
   PageNameInputSchema,
   PageNetworkRenderFormatSchema,
   PageRemoveNameInputSchema,
-  PageRotateInputSchema,
   PAGE_PICTURES,
   pagePictureQuerySchema,
   unflatten,
@@ -42,7 +33,6 @@ import {
 } from '@embedpdf/engine-core/wire';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
-import { readMutationEnvelope, resourcesByRole } from './_mutationEnvelope';
 import {
   holdsCapability,
   requireLayerCapability,
@@ -50,7 +40,6 @@ import {
   requireLayerResource,
 } from '../app/jwt-plugin';
 import { requireSharedDocRead } from './_planeGuard';
-import type { WorkerThreadPool } from '../runtime/WorkerThreadPool';
 import type { DerivedRenderService } from '../services/DerivedRenderService';
 import type { DocumentService, OpenContext } from '../services/DocumentService';
 import type { LayerService } from '../services/LayerService';
@@ -65,7 +54,6 @@ import {
   setImmutableCache,
   setNoStore,
   type SchemaLike,
-  objectNumbersQuery,
 } from './_helpers';
 
 interface PageRouteDeps {
@@ -156,8 +144,8 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
   });
 
   // The page pictures, one per path (`PAGE_PICTURES`): the four families on
-  // screen and each printed at each print tier. Each needs its own rights
-  // and depends on its own planes, at the document's path and a layer's.
+  // screen, as thumbnails, and printed at each print tier. Each needs its own
+  // rights and depends on its own planes, at the document's path and a layer's.
   for (const spec of PAGE_PICTURES) {
     const route = `/v1/docs/:docId/${spec.path}/:pageKey/data`;
     const render = async (
@@ -359,107 +347,8 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
     );
   });
 
-  app.post('/v1/docs/:docId/layers/:layerName/pages/reorder', async (req, reply) => {
-    const { docId, layerName } = req.params as {
-      docId: string;
-      layerName: string;
-    };
-    const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-    const protection = await documentService.getProtection(accessCtx, docId, layerName);
-    const ctx = requireLayerCapability(
-      req,
-      docId,
-      layerName,
-      'doc.pages.assemble',
-      pdfBits,
-      protection,
-    );
-    const body = parseOrInvalidArg<PageReorderInput>(
-      PageReorderInputSchema as unknown as SchemaLike<PageReorderInput>,
-      req.body,
-      'request body',
-    );
-
-    setNoStore(reply);
-    return layerService.reorderPages(
-      ctx,
-      { docId, layerName, pages: body.pages, position: body.position },
-      abortSignalOf(reply),
-    );
-  });
-
-  app.post('/v1/docs/:docId/layers/:layerName/pages/rotate', async (req, reply) => {
-    const { docId, layerName } = req.params as {
-      docId: string;
-      layerName: string;
-    };
-    const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-    const protection = await documentService.getProtection(accessCtx, docId, layerName);
-    const ctx = requireLayerCapability(
-      req,
-      docId,
-      layerName,
-      'doc.pages.assemble',
-      pdfBits,
-      protection,
-    );
-    const body = parseOrInvalidArg<PageRotateInput>(
-      PageRotateInputSchema as unknown as SchemaLike<PageRotateInput>,
-      req.body,
-      'request body',
-    );
-
-    setNoStore(reply);
-    return layerService.rotatePages(
-      ctx,
-      {
-        docId,
-        layerName,
-        pages: body.pages,
-        rotation: body.rotation,
-      },
-      abortSignalOf(reply),
-    );
-  });
-
-  app.post('/v1/docs/:docId/layers/:layerName/pages/delete', async (req, reply) => {
-    const { docId, layerName } = req.params as {
-      docId: string;
-      layerName: string;
-    };
-    const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-    const protection = await documentService.getProtection(accessCtx, docId, layerName);
-    const ctx = requireLayerCapability(
-      req,
-      docId,
-      layerName,
-      'doc.pages.assemble',
-      pdfBits,
-      protection,
-    );
-    const body = parseOrInvalidArg<PageDeleteInput>(
-      PageDeleteInputSchema as unknown as SchemaLike<PageDeleteInput>,
-      req.body,
-      'request body',
-    );
-
-    setNoStore(reply);
-    return layerService.deletePages(
-      ctx,
-      {
-        docId,
-        layerName,
-        pages: body.pages,
-      },
-      abortSignalOf(reply),
-    );
-  });
-
   // Named pages are layout: registering/renaming/removing a `/Names /Pages`
-  // entry is a page-structure mutation like reorder/rotate/delete (same gate,
+  // entry is a page-structure mutation like the page changes (same gate,
   // same docVersion + layoutVersion bump, read back via /layout).
   app.post('/v1/docs/:docId/layers/:layerName/pages/names', async (req, reply) => {
     const { docId, layerName } = req.params as {
@@ -513,97 +402,6 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
     return layerService.removePageName(
       ctx,
       { docId, layerName, name: body.name },
-      abortSignalOf(reply),
-    );
-  });
-
-  app.post('/v1/docs/:docId/layers/:layerName/pages/insert', async (req, reply) => {
-    const { docId, layerName } = req.params as {
-      docId: string;
-      layerName: string;
-    };
-    const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-    const protection = await documentService.getProtection(accessCtx, docId, layerName);
-    const ctx = requireLayerCapability(
-      req,
-      docId,
-      layerName,
-      'doc.pages.assemble',
-      pdfBits,
-      protection,
-    );
-    // Multipart: the `body` part names the standalone PDF's part as
-    // `resources.source`. Policy 'any', not the strict sniff:
-    // the worker's FPDF_LoadMemDocument is the real gate here, and the
-    // conformance contract wants malformed source bytes to surface as
-    // MalformedPdf (the parser's verdict), never the envelope's InvalidArg.
-    const envelope = await readMutationEnvelope(req, () => 'any');
-    const body = parseOrInvalidArg<{ position?: PagePosition; resources: { source: string } }>(
-      PageInsertInputSchema as unknown as SchemaLike<{
-        position?: PagePosition;
-        resources: { source: string };
-      }>,
-      envelope.body,
-      'request body',
-    );
-    const source = resourcesByRole(envelope, body.resources).source!;
-
-    setNoStore(reply);
-    return layerService.insertPages(
-      ctx,
-      {
-        docId,
-        layerName,
-        bytes: source.bytes,
-        ...(body.position !== undefined ? { position: body.position } : {}),
-      },
-      abortSignalOf(reply),
-    );
-  });
-
-  app.post('/v1/docs/:docId/layers/:layerName/pages/insert-blank', async (req, reply) => {
-    const { docId, layerName } = req.params as {
-      docId: string;
-      layerName: string;
-    };
-    const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-    const protection = await documentService.getProtection(accessCtx, docId, layerName);
-    const ctx = requireLayerCapability(
-      req,
-      docId,
-      layerName,
-      'doc.pages.assemble',
-      pdfBits,
-      protection,
-    );
-    const body = parseOrInvalidArg<{
-      size: { width: number; height: number };
-      count?: number;
-      position?: PagePosition;
-    }>(
-      PageInsertBlankInputSchema as unknown as SchemaLike<{
-        size: { width: number; height: number };
-        count?: number;
-        position?: PagePosition;
-      }>,
-      req.body,
-      'request body',
-    );
-
-    const objectNumbers = objectNumbersQuery(req.query, 'objectNumbers');
-    setNoStore(reply);
-    return layerService.insertBlankPages(
-      ctx,
-      {
-        docId,
-        layerName,
-        size: body.size,
-        ...(body.count !== undefined ? { count: body.count } : {}),
-        ...(body.position !== undefined ? { position: body.position } : {}),
-        ...(objectNumbers ? { objectNumbers } : {}),
-      },
       abortSignalOf(reply),
     );
   });
@@ -757,11 +555,12 @@ async function renderPageImage(input: {
   // points. Off-lattice tokens are rejected when enforcement is on (the
   // storage-DoS guard); until the SDK ships its `snap` helper they fall
   // through to the legacy compute-only path below. A print picture has one
-  // size per page and tier, off the lattice: it is never classified, so
-  // never stored or refused here, and its versioned URL is still cached.
+  // size per page and tier, and a thumbnail one per page, both off the
+  // lattice: they are never classified, so never stored or refused here, and
+  // their versioned URLs are still cached.
   const derived = input.derivedRenders;
   const classification =
-    input.picture.print === null
+    input.picture.print === null && !input.picture.thumbnail
       ? derived?.classify({
           imageOptions,
           format,
@@ -933,7 +732,7 @@ async function renderPageImage(input: {
 
 async function readPageText(input: {
   documentService: DocumentService;
-  reply: { header(name: 'Cache-Control', value: string): unknown };
+  reply: FastifyReply;
   signal: AbortSignal;
   scope: ReadScope;
   pageObjectNumber: number;
@@ -995,7 +794,7 @@ async function readPageText(input: {
 
 async function readPageGeometry(input: {
   documentService: DocumentService;
-  reply: { header(name: 'Cache-Control', value: string): unknown };
+  reply: FastifyReply;
   signal: AbortSignal;
   scope: ReadScope;
   pageObjectNumber: number;

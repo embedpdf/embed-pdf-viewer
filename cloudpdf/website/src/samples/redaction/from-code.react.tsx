@@ -24,7 +24,7 @@ const plugins = [
   redactionPlugin(),
 ];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 function MarkFromCode() {
   const redaction = useRedaction();
@@ -32,14 +32,14 @@ function MarkFromCode() {
   const { hasSelection } = useSelectionState();
   const currentPage = useStageState((state) => state.currentPageIndex);
   const ready = useAnnotationState((state) => state.status === 'ready');
-  const [text, setText] = useState('EmbedPDF');
+  const [text, setText] = useState('John Warnock');
   const started = useRef(false);
 
-  // On load: every "EmbedPDF" in the document.
+  // On load: every "John Warnock" in the document.
   useEffect(() => {
     if (!ready || started.current) return;
     started.current = true;
-    void redaction.markMatches({ text: 'EmbedPDF' });
+    void redaction.markMatches({ text: 'John Warnock' });
   }, [redaction, ready]);
 
   return (
@@ -92,7 +92,7 @@ function MarkFromCode() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <MarkFromCode />
         <Stage className="stage">

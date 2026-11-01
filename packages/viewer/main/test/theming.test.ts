@@ -51,21 +51,38 @@ const page = (
 </script>
 </body></html>`;
 
-/** Open a config's page and select the document's title, so its highlight is drawn. */
+/** Whether the text selection's highlight is drawn on the pages. */
+const selectionDrawn = (tab: Page) =>
+  tab.evaluate(() =>
+    [
+      ...document
+        .querySelector('embedpdf-viewer')!
+        .shadowRoot!.querySelectorAll<SVGElement>('svg polygon'),
+    ].some((polygon) => polygon.style.fill.includes('--epdf-text-selection')),
+  );
+
+/**
+ * Open a config's page and select the document's title, so its highlight is drawn. The page's
+ * text arrives after the page shows, later on a busy machine, so it drags across the title until
+ * the highlight is there.
+ */
 async function open(browser: Browser, url: string): Promise<Page> {
   const tab = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   await tab.goto(url);
   await waitForDocument(tab);
-  // Wait for the first page's text, then drag across the title.
-  await tab.waitForTimeout(1500);
-  await tab.mouse.move(310, 196);
-  await tab.mouse.down();
-  await tab.mouse.move(450, 196, { steps: 5 });
-  await tab.mouse.move(600, 196, { steps: 5 });
-  await tab.mouse.up();
-  await tab.mouse.move(0, 0);
-  await frames(tab);
-  return tab;
+  const deadline = Date.now() + 15_000;
+  for (;;) {
+    await tab.mouse.move(310, 196);
+    await tab.mouse.down();
+    await tab.mouse.move(450, 196, { steps: 5 });
+    await tab.mouse.move(600, 196, { steps: 5 });
+    await tab.mouse.up();
+    await tab.mouse.move(0, 0);
+    await frames(tab);
+    if (await selectionDrawn(tab)) return tab;
+    if (Date.now() > deadline) throw new Error(`${url}: the title never got selected`);
+    await tab.waitForTimeout(250);
+  }
 }
 
 /**

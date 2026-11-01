@@ -5,9 +5,10 @@
  * (`<AnnotationMenu>`, `<SelectionMenu>`); the which is the commands'
  * `visible`/`enabled` derivations via `useStripView`. This file only draws.
  *
- * The strips sit above what's selected, and below it when there's no room, so
- * a menu from one opens on the strip's side, away from the selection (the
- * `selection` edge); it flips when there's no room there. Each strip is a
+ * The text strip sits above what's selected and the annotation strip below it,
+ * each on the other side when there's no room, so a menu from one opens on the
+ * strip's side, away from the selection (the `selection` edge); it flips when
+ * there's no room there. Each strip is a
  * `toolbar` part and its buttons `toolbar-button` parts, like any bar's.
  */
 import type { ResolvedCommand } from '@embedpdf/react/commands';

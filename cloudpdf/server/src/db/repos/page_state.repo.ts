@@ -1,3 +1,4 @@
+import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 import type { Kysely } from 'kysely';
 
 import type { Database as Schema } from '../schema';
@@ -120,6 +121,29 @@ export interface LayerRow {
   updatedAt: number;
 }
 
+/** A layer as `documents.layers.list` shows it. */
+export interface ListedLayer {
+  /** The row id: only the list cursor's tie-breaker. */
+  id: string;
+  docId: string;
+  name: string;
+  /** A visitor's layer: the grant that made it. */
+  grantId: string | null;
+  visitorId: string | null;
+  storageSizeBytes: number | null;
+  createdAt: number;
+  updatedAt: number;
+  lastSeenAt: number | null;
+}
+
+export interface LayerListOptions {
+  /** Only this grant's visitors' layers. */
+  grantId?: string;
+  limit: number;
+  /** Keyset cursor, the same shape as the documents, tenants and grants lists. */
+  before?: { createdAt: number; id: string };
+}
+
 export interface CreateLayerInput {
   id: string;
   docId: string;
@@ -142,11 +166,19 @@ export interface CreateLayerInput {
   formsVersion?: number;
   outlineVersion?: number;
   fontsVersion?: number;
+  /** A visitor's layer: the grant that made it and the visitor. */
+  visitor?: { grantId: string; visitorId: string };
 }
 
 export class LayersRepo {
   constructor(private readonly db: Kysely<Schema>) {}
 
+  /**
+   * The live layer, or `null` when nobody wrote it yet. A deleted layer is
+   * neither: its name is gone for good, so asking for it throws
+   * `LayerDeleted`, and every path that reads, writes or opens a layer by
+   * name refuses it here.
+   */
   async findByDocAndName(docId: string, name: string): Promise<LayerRow | null> {
     const row = await this.db
       .selectFrom('layers')
@@ -154,7 +186,81 @@ export class LayersRepo {
       .where('doc_id', '=', docId)
       .where('name', '=', name)
       .executeTakeFirst();
+    if (row?.deleted_at != null) throw layerDeleted(docId, name);
     return row ? mapLayerRow(row) : null;
+  }
+
+  /**
+   * A document's live layers newest first (`created_at`, then `id`,
+   * descending), after `before` when given. A deleted layer isn't listed.
+   */
+  async listForDocument(docId: string, opts: LayerListOptions): Promise<ListedLayer[]> {
+    // A visitor's last visit is the visitor's (`grant_visitors`), not the layer's.
+    let q = this.db
+      .selectFrom('layers as l')
+      .leftJoin('grant_visitors as v', (join) =>
+        join.onRef('v.grant_id', '=', 'l.grant_id').onRef('v.visitor_id', '=', 'l.visitor_id'),
+      )
+      .select([
+        'l.id',
+        'l.doc_id',
+        'l.name',
+        'l.grant_id',
+        'l.visitor_id',
+        'l.current_artifact_size',
+        'l.created_at',
+        'l.updated_at',
+        'v.last_seen_at',
+      ])
+      .where('l.doc_id', '=', docId)
+      .where('l.deleted_at', 'is', null)
+      .orderBy('l.created_at', 'desc')
+      .orderBy('l.id', 'desc');
+    if (opts.grantId !== undefined) q = q.where('l.grant_id', '=', opts.grantId);
+    if (opts.before) {
+      const { createdAt, id } = opts.before;
+      q = q.where((eb) =>
+        eb.or([
+          eb('l.created_at', '<', createdAt),
+          eb.and([eb('l.created_at', '=', createdAt), eb('l.id', '<', id)]),
+        ]),
+      );
+    }
+    const rows = await q.limit(opts.limit).execute();
+    return rows.map((row) => ({
+      id: row.id,
+      docId: row.doc_id,
+      name: row.name,
+      grantId: row.grant_id,
+      visitorId: row.visitor_id,
+      storageSizeBytes:
+        row.current_artifact_size === null ? null : Number(row.current_artifact_size),
+      createdAt: Number(row.created_at),
+      updatedAt: Number(row.updated_at),
+      lastSeenAt: row.last_seen_at === null ? null : Number(row.last_seen_at),
+    }));
+  }
+
+  /** How many live layers a grant's visitors made: what keeps the grant from being deleted. */
+  async countForGrant(grantId: string): Promise<number> {
+    const row = await this.db
+      .selectFrom('layers')
+      .select((eb) => eb.fn.countAll<number>().as('count'))
+      .where('grant_id', '=', grantId)
+      .where('deleted_at', 'is', null)
+      .executeTakeFirstOrThrow();
+    return Number(row.count);
+  }
+
+  /** Whether the layer was deleted: a visitor whose layer was starts over as someone new. */
+  async isDeleted(docId: string, name: string): Promise<boolean> {
+    const row = await this.db
+      .selectFrom('layers')
+      .select('deleted_at')
+      .where('doc_id', '=', docId)
+      .where('name', '=', name)
+      .executeTakeFirst();
+    return row?.deleted_at != null;
   }
 
   async createEmpty(input: CreateLayerInput): Promise<LayerRow> {
@@ -180,6 +286,8 @@ export class LayersRepo {
         current_artifact_key: null,
         current_artifact_sha: null,
         current_artifact_size: null,
+        grant_id: input.visitor?.grantId ?? null,
+        visitor_id: input.visitor?.visitorId ?? null,
         created_at: now,
         updated_at: now,
       })
@@ -291,6 +399,15 @@ function mapLayerPageRow(row: {
   updated_at: number;
 }): DurablePageRow {
   return mapDocumentPageRow(row);
+}
+
+/** A deleted layer's name, asked for. */
+export function layerDeleted(docId: string, name: string): EngineError {
+  return new EngineError(
+    EngineErrorCode.LayerDeleted,
+    `layer ${name} of document ${docId} was deleted; its name is not used again`,
+    { details: { docId, layerName: name } },
+  );
 }
 
 function mapLayerRow(row: {

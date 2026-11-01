@@ -20,30 +20,30 @@ import {
 } from '@embedpdf/angular/measurement';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const sketch: OpenInput = { kind: 'grant', grant: 'shr_IyOgSdO4AmJqV4BoMv5V0nYU' };
 
-// Points on the cover's empty lower half, in page coordinates: two for a
+// Points on the floor plan, in page coordinates: two for a
 // distance, the corners otherwise.
 const SHAPES: Record<MeasurementKind, { x: number; y: number }[]> = {
   distance: [
-    { x: 60, y: 750 },
-    { x: 550, y: 750 },
+    { x: 62, y: 723 },
+    { x: 550, y: 723 },
   ],
   perimeter: [
-    { x: 70, y: 600 },
-    { x: 150, y: 650 },
-    { x: 250, y: 600 },
+    { x: 62, y: 613 },
+    { x: 382, y: 613 },
+    { x: 382, y: 723 },
   ],
   area: [
-    { x: 70, y: 670 },
-    { x: 250, y: 670 },
-    { x: 250, y: 730 },
-    { x: 70, y: 730 },
+    { x: 382, y: 516 },
+    { x: 550, y: 516 },
+    { x: 550, y: 723 },
+    { x: 382, y: 723 },
   ],
 };
 
-// The cover's empty lower half, where the measurements go.
-const LOWER_HALF = { x: 40, y: 560, width: 532, height: 210 };
+// The floor plan's lower half, where the measurements go.
+const LOWER_HALF = { x: 50, y: 500, width: 512, height: 240 };
 
 /** Next to `<epdf-stage #stage="epdfStage">`: `<demo-measure-buttons [stage]="stage" />`. */
 @Component({
@@ -72,7 +72,7 @@ const LOWER_HALF = { x: 40, y: 560, width: 532, height: 210 };
       </button>
       <span class="spacer"></span>
       <output class="readout">
-        {{ count() }} {{ count() === 1 ? 'measurement' : 'measurements' }} on the cover
+        {{ count() }} {{ count() === 1 ? 'measurement' : 'measurements' }} on the plan
       </output>
     </div>
   `,
@@ -82,10 +82,10 @@ export class MeasureButtons {
 
   private readonly measurement = inject(EpdfMeasurement);
   protected readonly scale = this.measurement.scaleOf(0);
-  private readonly onCover = inject(EpdfAnnotation).watch({ pages: [0] });
+  private readonly onPlan = inject(EpdfAnnotation).watch({ pages: [0] });
   protected readonly count = computed(
     () =>
-      this.onCover().filter(
+      this.onPlan().filter(
         (annotation) => 'intent' in annotation && !!annotation.intent?.endsWith('-dimension'),
       ).length,
   );
@@ -121,7 +121,7 @@ export class MeasureButtons {
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: sketch }] },
       withStage(),
       withRender(),
       withInteraction(),

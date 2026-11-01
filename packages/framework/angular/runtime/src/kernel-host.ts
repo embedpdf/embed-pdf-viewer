@@ -360,6 +360,7 @@ export class EpdfKernelHost {
         clock: browserClock(),
         printer: browserPrinter(),
         measurer: browserTextMeasurer(),
+        fetch: config.fetch,
       });
     } catch (error) {
       if (owned) void engine.destroy();

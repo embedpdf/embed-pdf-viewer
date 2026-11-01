@@ -5,7 +5,7 @@ import {
   type PageObjectNumber,
   type PageRef,
 } from '@embedpdf/engine-core/runtime';
-import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
+import { NULL_PTR, type PdfRuntimeModule, type Ptr } from '@embedpdf/engine-runtime';
 
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { U64_BYTES, pokeU64 } from '../../runtime/memory/u64';
@@ -24,7 +24,8 @@ const EXPORT_FLATTENED_FORM_FIELDS = 0x2;
  * Export a subset of pages as a standalone PDF. A read over the session:
  * the pages are copied into a scratch document, so the source is untouched —
  * no registry refresh, no layer artifact. A plain copy is
- * `FPDF_ImportPagesByIndex`; a flattened one `EPDFDoc_ExportPagesFlattened`,
+ * `EPDFDoc_ImportPages`, which brings the form fields of the pages' widgets;
+ * a flattened one `EPDFDoc_ExportPagesFlattened`,
  * which copies the pages as they draw. Either keeps the document's title.
  * Lives next to `PagesReader`/`PagesMutator` (one file per page verb family)
  * so both worker hosts share the code path.
@@ -112,18 +113,22 @@ export class PagesExtractor {
     }
   }
 
-  /** A new document with copies of the pages at `indices`, as they are. */
+  /**
+   * A new document with copies of the pages at `indices`, as they are, and
+   * the form fields of their widgets: a new document has no fields of its own,
+   * so no name needs keeping apart.
+   */
   private copyPlain(srcPtr: Ptr, idxPtr: Ptr, indices: readonly number[]): Ptr {
     const { fn } = this.runtime;
     const destPtr = fn.FPDF_CreateNewDocument();
     if (!destPtr) {
       throw new EngineError(EngineErrorCode.Unknown, 'FPDF_CreateNewDocument failed');
     }
-    if (!fn.FPDF_ImportPagesByIndex(destPtr, srcPtr, idxPtr, indices.length, 0)) {
+    if (!fn.EPDFDoc_ImportPages(destPtr, srcPtr, idxPtr, indices.length, 0, NULL_PTR)) {
       fn.FPDF_CloseDocument(destPtr);
       throw new EngineError(
         EngineErrorCode.Unknown,
-        `FPDF_ImportPagesByIndex rejected the request (indices=[${indices.join(',')}])`,
+        `EPDFDoc_ImportPages rejected the request (indices=[${indices.join(',')}])`,
       );
     }
     return destPtr;

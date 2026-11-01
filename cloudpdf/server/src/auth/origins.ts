@@ -1,7 +1,7 @@
 /**
- * Origin-lock matching for doc tokens and share grants.
+ * Origin-lock matching for doc tokens and grants.
  *
- * The lock's threat model is hotlink embedding: a share token or doc
+ * The lock's threat model is hotlink embedding: a grant or doc
  * JWT lifted from one page and presented from another site's browser.
  * Browsers attach `Origin` to every cross-origin request and it cannot
  * be forged or suppressed from page JavaScript, so matching it is the

@@ -72,6 +72,7 @@ By the time `await page.annotations.create(…)` returns, your listeners have ru
 | `forms.restored`                                                          | An undo brought back a deleted field.                                                     |
 | `forms.repaired`                                                          | Many values or fields changed at once.                                                    |
 | `attachments.created`, `.deleted`                                         | An attached file was added or removed.                                                    |
+| `attachments.restored`                                                    | An undo brought back a deleted attached file.                                             |
 | `fonts.changed`                                                           | The fonts you can name in the document changed. Read `doc.fonts.list()` again.            |
 | `metadata.updated`                                                        | The title, author or another standard metadata field.                                     |
 | `metadata.customUpdated`                                                  | Your own metadata keys.                                                                   |

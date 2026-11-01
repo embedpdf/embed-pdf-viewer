@@ -21,10 +21,11 @@ Then switch tools from your toolbar:
 
 ## The built-in tools
 
-| Tool      | A drag on the page                              | Also                                     |
-| :-------- | :---------------------------------------------- | :--------------------------------------- |
-| `pointer` | Selects text, or selects and moves annotations  | Fills forms, follows links. The default. |
-| `pan`     | Scrolls, like Acrobat's hand tool               | Fills forms, follows links               |
+| Tool      | A drag on the page                                         | Also                                                           |
+| :-------- | :--------------------------------------------------------- | :------------------------------------------------------------- |
+| `pointer` | Selects text, or selects and moves annotations             | Fills forms, follows links. The default.                       |
+| `pan`     | Scrolls, like Acrobat's hand tool                          | Fills forms, follows links                                     |
+| `zoom`    | Draws a box and [zooms to it](../viewing/stage#zoom-to-a-box), like Acrobat's Marquee Zoom | A click zooms in a step, Alt-click (Option on a Mac) out |
 
 Plugins add their own: the annotation plugin a tool per kind (`square`, `highlight`, `note`…), the form
 plugin a tool per field, redaction `redact`, measurements `distance`. They're all switched the same
@@ -116,7 +117,8 @@ See [The cursor](../annotations/tools#the-cursor) for annotation tools.
 
 On a touch screen, the viewer behaves like a native app:
 
-- **One finger scrolls**, and two fingers pinch-zoom, with `pointer` and `pan`.
+- **One finger scrolls**, and two fingers pinch-zoom, with `pointer` and `pan`. With `zoom`, one
+  finger draws the box.
 - **Drawing tools take one finger**: it draws, and two fingers still scroll and zoom.
 - **Click tools**, such as placing a note, place with a tap, and a drag still scrolls.
 - **Long-press selects a word**, and handles grow the selection.

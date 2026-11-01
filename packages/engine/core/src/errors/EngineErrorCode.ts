@@ -6,13 +6,13 @@ export const EngineErrorCode = {
   DocPasswordRequired: 'DocPasswordRequired',
   DocPasswordIncorrect: 'DocPasswordIncorrect',
   /**
-   * A share-token exchange (`open({ kind: 'share' })`) needs the grant's
+   * A grant exchange (`open({ kind: 'grant' })`) needs the grant's
    * passphrase: none was supplied, or the supplied one was rejected —
    * indistinguishable by design, mirroring the server. Prompt and retry
-   * with `sharePassword`. Distinct from `DocPasswordRequired`, which is
+   * with `passphrase`. Distinct from `DocPasswordRequired`, which is
    * about the PDF's own encryption password.
    */
-  SharePasswordRequired: 'SharePasswordRequired',
+  GrantPassphraseRequired: 'GrantPassphraseRequired',
   Aborted: 'Aborted',
   Network: 'Network',
   Unauthenticated: 'Unauthenticated',
@@ -82,12 +82,6 @@ export const EngineErrorCode = {
    */
   ProtectedDocument: 'ProtectedDocument',
   /**
-   * The layer is built on a base version that is no longer the
-   * document's head (another signing completed); it can be read and
-   * edited but not signed from.
-   */
-  StaleBase: 'StaleBase',
-  /**
    * A payload passed one of its limits: an annotation bundle's bytes,
    * counts or image pixels. Nothing was read past the limit and nothing was
    * written. `details` has the `limit`, its `max` and the `value` found.
@@ -126,6 +120,22 @@ export const EngineErrorCode = {
    * payload. Nothing ran; a retry must send the same change.
    */
   IdempotencyKeyReused: 'IdempotencyKeyReused',
+  /**
+   * The layer was deleted: what it held is gone, and its name is refused
+   * from then on (its read URLs were cached as immutable). Work on another
+   * layer name.
+   */
+  LayerDeleted: 'LayerDeleted',
+  /**
+   * The grant asks its visitors who they are, and this visitor hasn't
+   * answered what it requires: opening (a grant that asks on open), or a
+   * change (one that asks before the first change), waits for the answers.
+   * `details` is a `VisitorIdentityRequest`: `fields` (what the grant asks,
+   * each required or optional), `missing`, `invalid`, `purpose` and
+   * `privacyUrl`. Answer by opening again with `visitor`, or with
+   * `doc.grant.identify()`.
+   */
+  VisitorIdentityRequired: 'VisitorIdentityRequired',
 } as const;
 
 export type EngineErrorCode = (typeof EngineErrorCode)[keyof typeof EngineErrorCode];

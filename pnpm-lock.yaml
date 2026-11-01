@@ -300,6 +300,31 @@ importers:
         specifier: ^7.18.0
         version: 7.19.0(encoding@0.1.13)
 
+  cloudpdf/server-modules:
+    dependencies:
+      '@cloudpdf/engine':
+        specifier: workspace:*
+        version: link:../engine
+      '@embedpdf/engine-core':
+        specifier: workspace:*
+        version: link:../../packages/engine/core
+    devDependencies:
+      '@cloudpdf/server':
+        specifier: workspace:*
+        version: link:../server
+      '@embedpdf/tooling-build':
+        specifier: workspace:*
+        version: link:../../tooling/build
+      rimraf:
+        specifier: ^5.0.0
+        version: 5.0.10
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.19.11)(happy-dom@20.11.0)(less@4.6.7)(lightningcss@1.30.2)(msw@2.11.2(@types/node@22.19.11)(typescript@5.9.3))(sass-embedded@1.97.3)(sass@1.97.3)(terser@5.46.0)
+
   cloudpdf/viewer/angular:
     dependencies:
       '@angular/forms':
@@ -594,7 +619,26 @@ importers:
         specifier: ^3.5.13
         version: 3.5.40(typescript@5.9.3)
 
-  docs/content: {}
+  docs/content:
+    devDependencies:
+      '@cloudpdf/sdk':
+        specifier: workspace:*
+        version: link:../../cloudpdf/sdk
+      '@embedpdf/core-signature':
+        specifier: workspace:*
+        version: link:../../packages/core/signature
+      '@embedpdf/default-stamps':
+        specifier: workspace:*
+        version: link:../../packages/default-stamps
+      '@embedpdf/engine':
+        specifier: workspace:*
+        version: link:../../packages/engine/main
+      playwright-core:
+        specifier: ^1.63.0
+        version: 1.63.0
+      tsx:
+        specifier: ^4.19.0
+        version: 4.21.0
 
   docs/kit:
     dependencies:
@@ -1079,14 +1123,14 @@ importers:
         specifier: workspace:*
         version: link:../acrojs
       '@jitl/quickjs-singlefile-browser-release-sync':
-        specifier: 0.32.0
-        version: 0.32.0
+        specifier: 0.31.0
+        version: 0.31.0
       '@jitl/quickjs-wasmfile-release-sync':
-        specifier: 0.32.0
-        version: 0.32.0
+        specifier: 0.31.0
+        version: 0.31.0
       quickjs-emscripten-core:
-        specifier: 0.32.0
-        version: 0.32.0
+        specifier: 0.31.0
+        version: 0.31.0
     devDependencies:
       '@embedpdf/engine':
         specifier: workspace:*
@@ -1415,6 +1459,9 @@ importers:
       '@embedpdf/plugin-annotation':
         specifier: workspace:*
         version: link:../../plugin/annotation
+      '@embedpdf/plugin-attachment':
+        specifier: workspace:*
+        version: link:../../plugin/attachment
       '@embedpdf/plugin-commands':
         specifier: workspace:*
         version: link:../../plugin/commands
@@ -1551,6 +1598,9 @@ importers:
       '@embedpdf/plugin-annotation':
         specifier: workspace:*
         version: link:../../plugin/annotation
+      '@embedpdf/plugin-attachment':
+        specifier: workspace:*
+        version: link:../../plugin/attachment
       '@embedpdf/plugin-commands':
         specifier: workspace:*
         version: link:../../plugin/commands
@@ -1678,6 +1728,9 @@ importers:
       '@embedpdf/plugin-annotation':
         specifier: workspace:*
         version: link:../../plugin/annotation
+      '@embedpdf/plugin-attachment':
+        specifier: workspace:*
+        version: link:../../plugin/attachment
       '@embedpdf/plugin-commands':
         specifier: workspace:*
         version: link:../../plugin/commands
@@ -1805,6 +1858,9 @@ importers:
       '@embedpdf/plugin-annotation':
         specifier: workspace:*
         version: link:../../plugin/annotation
+      '@embedpdf/plugin-attachment':
+        specifier: workspace:*
+        version: link:../../plugin/attachment
       '@embedpdf/plugin-commands':
         specifier: workspace:*
         version: link:../../plugin/commands
@@ -1979,6 +2035,40 @@ importers:
         specifier: workspace:*
         version: link:../selection
     devDependencies:
+      '@embedpdf/tooling-build':
+        specifier: workspace:*
+        version: link:../../../tooling/build
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.9
+        version: 2.1.9(@types/node@22.19.11)(happy-dom@20.11.0)(less@4.6.7)(lightningcss@1.30.2)(msw@2.11.2(@types/node@22.19.11)(typescript@5.9.3))(sass-embedded@1.97.3)(sass@1.97.3)(terser@5.46.0)
+
+  packages/plugin/attachment:
+    dependencies:
+      '@embedpdf/core':
+        specifier: workspace:*
+        version: link:../../core/main
+      '@embedpdf/engine-core':
+        specifier: workspace:*
+        version: link:../../engine/core
+      '@embedpdf/plugin-annotation':
+        specifier: workspace:*
+        version: link:../annotation
+      '@embedpdf/plugin-stage':
+        specifier: workspace:*
+        version: link:../stage
+    devDependencies:
+      '@embedpdf/engine':
+        specifier: workspace:*
+        version: link:../../engine/main
+      '@embedpdf/plugin-history':
+        specifier: workspace:*
+        version: link:../history
+      '@embedpdf/plugin-interaction':
+        specifier: workspace:*
+        version: link:../interaction
       '@embedpdf/tooling-build':
         specifier: workspace:*
         version: link:../../../tooling/build
@@ -2299,6 +2389,15 @@ importers:
         specifier: workspace:*
         version: link:../../core/main
     devDependencies:
+      '@embedpdf/engine':
+        specifier: workspace:*
+        version: link:../../engine/main
+      '@embedpdf/engine-core':
+        specifier: workspace:*
+        version: link:../../engine/core
+      '@embedpdf/plugin-history':
+        specifier: workspace:*
+        version: link:../history
       '@embedpdf/tooling-build':
         specifier: workspace:*
         version: link:../../../tooling/build
@@ -2688,6 +2787,9 @@ importers:
       '@embedpdf/plugin-annotation':
         specifier: workspace:*
         version: link:../../plugin/annotation
+      '@embedpdf/plugin-attachment':
+        specifier: workspace:*
+        version: link:../../plugin/attachment
       '@embedpdf/plugin-commands':
         specifier: workspace:*
         version: link:../../plugin/commands
@@ -3125,7 +3227,7 @@ importers:
         version: 15.5.12(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(sass@1.97.3)
       nextra:
         specifier: ^4.6.1
-        version: 4.6.1(next@15.5.12(@opentelemetry/api@1.9.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(sass@1.97.3))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.8.3)
+        version: 4.6.1(next@15.5.12(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(sass@1.97.3))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.8.3)
       npm-to-yarn:
         specifier: ^3.0.1
         version: 3.0.1
@@ -5339,14 +5441,14 @@ packages:
     resolution: {integrity: sha512-ZXRY4jNvVgSVQ8DL3LTcakaAtXwTVUxE81hslsyD2AtoXW/wVob10HkOJ1X/pAlcI7D+2YoZKg5do8G/w6RYgA==}
     engines: {node: '>=8'}
 
-  '@jitl/quickjs-ffi-types@0.32.0':
-    resolution: {integrity: sha512-v9T+GQpmk43VDJ7d72sf0Nexhk+ArvtUihW27dy7lqAl0zBObFKtSBBIm5RBjwIhE8VwsPPm9PNuvPvNqLWUEg==}
+  '@jitl/quickjs-ffi-types@0.31.0':
+    resolution: {integrity: sha512-1yrgvXlmXH2oNj3eFTrkwacGJbmM0crwipA3ohCrjv52gBeDaD7PsTvFYinlAnqU8iPME3LGP437yk05a2oejw==}
 
-  '@jitl/quickjs-singlefile-browser-release-sync@0.32.0':
-    resolution: {integrity: sha512-Hfdl7rh8dzxNWFRiYAYNbhn0RMF1/tO6SMH2mUW0aTibqwaAtqPRbi4WkwaIDlhNz8Z4dksJi1Zjl1R54Jsc/Q==}
+  '@jitl/quickjs-singlefile-browser-release-sync@0.31.0':
+    resolution: {integrity: sha512-JctBiLmRpxEp83gJWhDcBuFqm5X7T683OLmncN9g0chAHkC8+y5cJmgknaAk5Rb/ANDR3pXMMnGdnGXDdysfBQ==}
 
-  '@jitl/quickjs-wasmfile-release-sync@0.32.0':
-    resolution: {integrity: sha512-BKNDI/TPBfGlLNGYpLrhcDGXmIk4xHm4MRAisOBnOzpXVn9HZWsfmMAc9WMBrAHjvvds6HOikKeaOBKdPdpVrg==}
+  '@jitl/quickjs-wasmfile-release-sync@0.31.0':
+    resolution: {integrity: sha512-hYduecOByj9AsAfsJhZh5nA6exokmuFC8cls39+lYmTCGY51bgjJJJwReEu7Ff7vBWaQCL6TeDdVlnp2WYz0jw==}
 
   '@jridgewell/gen-mapping@0.3.13':
     resolution: {integrity: sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA==}
@@ -13094,8 +13196,8 @@ packages:
   quick-format-unescaped@4.0.4:
     resolution: {integrity: sha512-tYC1Q1hgyRuHgloV/YXs2w15unPVh8qfu/qCTfhTYamaw7fyhumKa2yGpdSo87vY32rIclj+4fWYQXUMs9EHvg==}
 
-  quickjs-emscripten-core@0.32.0:
-    resolution: {integrity: sha512-QFnPfjFey8EqknSrSxe1hZrf1/8z7/6s1QzGOmKo6++02r7QRRX7ZoyNaZh7JuVjWsVW87KnQrbZqnHkOAzUyg==}
+  quickjs-emscripten-core@0.31.0:
+    resolution: {integrity: sha512-oQz8p0SiKDBc1TC7ZBK2fr0GoSHZKA0jZIeXxsnCyCs4y32FStzCW4d1h6E1sE0uHDMbGITbk2zhNaytaoJwXQ==}
 
   railroad-diagrams@1.0.0:
     resolution: {integrity: sha512-cz93DjNeLY0idrCNOH6PviZGRN9GJhsdm9hpn1YCS879fj4W+x5IFJhhkRZcwVgMmFF7R82UA/7Oh+R8lLZg6A==}
@@ -17596,15 +17698,15 @@ snapshots:
 
   '@istanbuljs/schema@0.1.3': {}
 
-  '@jitl/quickjs-ffi-types@0.32.0': {}
+  '@jitl/quickjs-ffi-types@0.31.0': {}
 
-  '@jitl/quickjs-singlefile-browser-release-sync@0.32.0':
+  '@jitl/quickjs-singlefile-browser-release-sync@0.31.0':
     dependencies:
-      '@jitl/quickjs-ffi-types': 0.32.0
+      '@jitl/quickjs-ffi-types': 0.31.0
 
-  '@jitl/quickjs-wasmfile-release-sync@0.32.0':
+  '@jitl/quickjs-wasmfile-release-sync@0.31.0':
     dependencies:
-      '@jitl/quickjs-ffi-types': 0.32.0
+      '@jitl/quickjs-ffi-types': 0.31.0
 
   '@jridgewell/gen-mapping@0.3.13':
     dependencies:
@@ -25782,13 +25884,13 @@ snapshots:
       - '@babel/core'
       - babel-plugin-macros
 
-  nextra@4.6.1(next@15.5.12(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(sass@1.97.3))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.9.3):
+  nextra@4.6.1(next@15.5.12(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(sass@1.97.3))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.8.3):
     dependencies:
       '@formatjs/intl-localematcher': 0.6.2
       '@headlessui/react': 2.2.9(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@mdx-js/mdx': 3.1.1
       '@napi-rs/simple-git': 0.1.22
-      '@shikijs/twoslash': 3.22.0(typescript@5.9.3)
+      '@shikijs/twoslash': 3.22.0(typescript@5.8.3)
       '@theguild/remark-mermaid': 0.3.0(react@18.3.1)
       '@theguild/remark-npm2yarn': 0.3.3
       better-react-mathjax: 2.3.0(react@18.3.1)
@@ -25830,13 +25932,13 @@ snapshots:
       - supports-color
       - typescript
 
-  nextra@4.6.1(next@15.5.12(@opentelemetry/api@1.9.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(sass@1.97.3))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.8.3):
+  nextra@4.6.1(next@15.5.12(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(sass@1.97.3))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.9.3):
     dependencies:
       '@formatjs/intl-localematcher': 0.6.2
       '@headlessui/react': 2.2.9(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@mdx-js/mdx': 3.1.1
       '@napi-rs/simple-git': 0.1.22
-      '@shikijs/twoslash': 3.22.0(typescript@5.8.3)
+      '@shikijs/twoslash': 3.22.0(typescript@5.9.3)
       '@theguild/remark-mermaid': 0.3.0(react@18.3.1)
       '@theguild/remark-npm2yarn': 0.3.3
       better-react-mathjax: 2.3.0(react@18.3.1)
@@ -26732,9 +26834,9 @@ snapshots:
 
   quick-format-unescaped@4.0.4: {}
 
-  quickjs-emscripten-core@0.32.0:
+  quickjs-emscripten-core@0.31.0:
     dependencies:
-      '@jitl/quickjs-ffi-types': 0.32.0
+      '@jitl/quickjs-ffi-types': 0.31.0
 
   railroad-diagrams@1.0.0: {}
 

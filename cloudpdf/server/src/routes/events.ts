@@ -91,7 +91,7 @@ export async function registerEventsRoutes(
     // Each row is filtered to what this connection may read, as the reads
     // are: annotations and the form each take their own read capability.
     const may = (capability: DocCapability) =>
-      ctx.mode === 'tenant' || checkCapability(capability, ctx.jwt.scope, pdfBits, protection);
+      checkCapability(capability, ctx.jwt.scope, pdfBits, protection);
     const rights = { annotations: may('doc.annotate.read'), forms: may('doc.forms.read') };
 
     const head = await layerAuditHead(opts.db, ctx.tenantId, docId, layerName);

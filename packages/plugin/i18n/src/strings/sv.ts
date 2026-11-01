@@ -22,6 +22,7 @@ export const sv: EmbedpdfStrings = {
     tool: {
       pointer: 'Välj',
       pan: 'Panorera',
+      zoom: 'Zooma till markering',
       highlight: 'Markera',
       underline: 'Stryk under',
       strikeout: 'Stryk över',

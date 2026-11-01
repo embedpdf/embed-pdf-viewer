@@ -59,18 +59,18 @@ afterAll(async () => {
   await teardownDbSeededFixture(fx);
 });
 
-async function openLayer(layer: string) {
+async function openLayer(layer: string, docId = DOC_ID) {
   const engine = cloudEngine({
     baseUrl: fx!.baseUrl,
-    token: docScopedToken(fx!, TENANT_ID, DOC_ID, ['*'], layer),
+    token: docScopedToken(fx!, TENANT_ID, docId, ['*'], layer),
   });
-  const doc = await engine.open({ kind: 'id', id: DOC_ID, layerName: layer });
+  const doc = await engine.open({ kind: 'id', id: docId, layerName: layer });
   return { engine, doc };
 }
 
-async function fetchJson<T>(path: string, layer: string): Promise<T> {
+async function fetchJson<T>(path: string, layer: string, docId = DOC_ID): Promise<T> {
   const res = await fetch(`${fx!.baseUrl}${path}`, {
-    headers: { Authorization: `Bearer ${docScopedToken(fx!, TENANT_ID, DOC_ID, ['*'], layer)}` },
+    headers: { Authorization: `Bearer ${docScopedToken(fx!, TENANT_ID, docId, ['*'], layer)}` },
   });
   expect(res.status).toBe(200);
   return (await res.json()) as T;
@@ -145,12 +145,12 @@ describe('digital signatures (cloud SDK, real runtime)', () => {
     }
   });
 
-  test('a certification signs the layer, publishes a version, and every read follows it', async () => {
+  test("a certification signs the layer into a version of its own, and the layer's reads follow it", async () => {
     const signer = await createTestSigner({ commonName: 'Cloud Signer' });
     const bob = await openLayer('bob');
     const alice = await openLayer('alice');
     try {
-      // Bob edits his own layer before Alice signs: he will be behind the head.
+      // Bob edits his own layer before Alice signs: her signature never reaches him.
       await bob.doc.forms.setValue({ kind: 'fqn', name: 'group.total' }, { value: 'bob' });
       const bobBefore = await bob.doc.signatures.list();
       expect(bobBefore.signatures.some((s) => s.signed)).toBe(false);
@@ -182,7 +182,8 @@ describe('digital signatures (cloud SDK, real runtime)', () => {
       expect(result.version.byteLength).toBeGreaterThan(seeded.size);
       expect(result.protection.certification?.permission).toBe(2);
 
-      // The layer is clean over the new version: every plane inherited again.
+      // The layer is clean over its new version, which isn't the document's (the
+      // upload): every plane but actions is the layer's.
       const manifest = await fetchJson<{
         baseSha: string;
         baseByteLength: number;
@@ -195,9 +196,13 @@ describe('digital signatures (cloud SDK, real runtime)', () => {
       expect(manifest.working).toBe(false);
       // A fresh layer (0) → the fill (1) → prepare (2) → complete (3).
       expect(manifest.layerVersion).toBe(3);
-      expect(Object.values(manifest.scopes)).toEqual(
-        Object.values(manifest.scopes).map(() => 'base'),
-      );
+      expect(manifest.scopes).toMatchObject({
+        content: 'layer',
+        annotations: 'layer',
+        forms: 'layer',
+        layout: 'layer',
+        actions: 'base',
+      });
 
       // The snapshot describes the sealed bytes; the fill and the signature share one revision.
       const after = await alice.doc.signatures.list();
@@ -218,7 +223,7 @@ describe('digital signatures (cloud SDK, real runtime)', () => {
       expect(revision0.byteLength).toBe(seeded.size);
       expect(sha256(revision0)).toBe(seeded.sha);
       const download = await fetch(
-        `${fx!.baseUrl}/v1/docs/${DOC_ID}/versions/download/${result.version.sha256}`,
+        `${fx!.baseUrl}/v1/docs/${DOC_ID}/layers/alice/versions/download/${result.version.sha256}`,
         {
           headers: {
             Authorization: `Bearer ${docScopedToken(fx!, TENANT_ID, DOC_ID, ['*'], 'alice')}`,
@@ -245,17 +250,17 @@ describe('digital signatures (cloud SDK, real runtime)', () => {
         ['valid', 'valid', 'unchanged'],
       ]);
 
-      // The catalog: version 2 descends from version 1.
+      // Alice's versions: the upload, then her version 2, which is her base.
       const versions = await fetchJson<{
-        head: string;
+        baseSha: string;
         versions: Array<{
           sha256: string;
           number: number;
           parentSha256: string | null;
           producer: string;
         }>;
-      }>(`/v1/docs/${DOC_ID}/versions`, 'alice');
-      expect(versions.head).toBe(result.version.sha256);
+      }>(`/v1/docs/${DOC_ID}/layers/alice/versions`, 'alice');
+      expect(versions.baseSha).toBe(result.version.sha256);
       expect(
         versions.versions.map((v) => [v.number, v.sha256, v.parentSha256, v.producer]),
       ).toEqual([
@@ -268,20 +273,17 @@ describe('digital signatures (cloud SDK, real runtime)', () => {
       expect(history.verdict).toBe('unchanged');
       expect(history.basis.version.sha256).toBe(result.version.sha256);
 
-      // Bob is behind the head: diverged everywhere, and he cannot sign until rebased.
+      // Bob is still over the upload, owning only the plane he wrote, and can sign.
       const bobManifest = await fetchJson<{ baseSha: string; scopes: Record<string, string> }>(
         `/v1/docs/${DOC_ID}/layers/bob/manifest`,
         'bob',
       );
       expect(bobManifest.baseSha).toBe(seeded.sha);
-      expect(bobManifest.scopes).toMatchObject({
-        content: 'layer',
-        metadata: 'layer',
-        layout: 'layer',
-      });
-      expect(
-        await errorCode(bob.doc.signatures.prepare({ field: { kind: 'fqn', name: 'sig' } })),
-      ).toBe(EngineErrorCode.StaleBase);
+      expect(bobManifest.scopes).toMatchObject({ content: 'base', forms: 'layer' });
+      expect((await bob.doc.signatures.list()).signatures.some((s) => s.signed)).toBe(false);
+      const bobPrepared = await bob.doc.signatures.prepare({ field: { kind: 'fqn', name: 'sig' } });
+      expect(bobPrepared.expectedVersion.baseSha256).toBe(seeded.sha);
+      expect((await bob.doc.signatures.cancel(bobPrepared.signingId)).status).toBe('cancelled');
     } finally {
       await alice.doc.close();
       await bob.doc.close();
@@ -290,16 +292,27 @@ describe('digital signatures (cloud SDK, real runtime)', () => {
     }
   });
 
-  test('a new layer over the published version: fills are permitted, a pending signing blocks writes, cancel frees it', async () => {
+  test('a new layer starts on the upload; on the signed layer fills are permitted and the signed field refuses', async () => {
     const carol = await openLayer('carol');
+    const alice = await openLayer('alice');
     try {
-      const snapshot = await carol.doc.signatures.list();
+      // Carol never sees Alice's signature, certification or fill.
+      const fresh = await carol.doc.signatures.list();
+      expect(fresh.signatures.find((s) => s.fieldName === 'sig')?.signed).toBe(false);
+      expect(fresh.protection.certification ?? null).toBeNull();
+      const carolTotal = (await carol.doc.forms.list()).fields.find(
+        (f) => f.name === 'group.total',
+      );
+      expect(JSON.stringify(carolTotal?.value ?? null)).not.toContain('alice');
+
+      // Alice's layer is over her certified version (P=2).
+      const snapshot = await alice.doc.signatures.list();
       expect(snapshot.signatures.find((s) => s.fieldName === 'sig')?.signed).toBe(true);
       expect(snapshot.protection.certification?.permission).toBe(2);
 
-      // A form fill on a P=2 document is permitted; the working copy is judged at the layer URL.
-      await carol.doc.forms.setValue({ kind: 'fqn', name: 'group.total' }, { value: 'carol' });
-      const analysis = await carol.doc.signatures.analyze({
+      // A form fill under P=2 is permitted; the working copy is judged at the layer URL.
+      await alice.doc.forms.setValue({ kind: 'fqn', name: 'group.total' }, { value: 'alice 2' });
+      const analysis = await alice.doc.signatures.analyze({
         since: { signatureIndex: 0 },
         until: 'working-copy',
       });
@@ -308,11 +321,13 @@ describe('digital signatures (cloud SDK, real runtime)', () => {
 
       // A second signature needs a second field; preparing on the signed one is refused.
       expect(
-        await errorCode(carol.doc.signatures.prepare({ field: { kind: 'fqn', name: 'sig' } })),
+        await errorCode(alice.doc.signatures.prepare({ field: { kind: 'fqn', name: 'sig' } })),
       ).toBe(EngineErrorCode.SignatureRefused);
     } finally {
       await carol.doc.close();
+      await alice.doc.close();
       await carol.engine.destroy();
+      await alice.engine.destroy();
     }
   });
 
@@ -393,6 +408,55 @@ describe('digital signatures (cloud SDK, real runtime)', () => {
     } finally {
       await doc.close();
       await engine.destroy();
+    }
+  });
+
+  test("a second signature in the layer signs over its first: the layer's chain grows, the document stays its upload", async () => {
+    const docId = 'cloud-signatures-doc-3';
+    const seeded3 = await seedDocumentFromBytes(fx!, TENANT_ID, docId, fixturePath, 1);
+    const erin = await openLayer('erin', docId);
+    try {
+      const signer = await createTestSigner({ commonName: 'Erin' });
+      const page = (await erin.doc.pages.list()).pages[0]!;
+      await erin.doc.forms.create({
+        family: 'signature',
+        name: 'sig2',
+        widgets: [{ page: page.ref, rect: { x: 50, y: 50, width: 200, height: 70 } }],
+      });
+      const first = await sign(erin.doc, { field: { kind: 'fqn', name: 'sig' }, key: signer });
+      expect(first.previous.baseSha256).toBe(seeded3.sha);
+      const second = await sign(erin.doc, { field: { kind: 'fqn', name: 'sig2' }, key: signer });
+      expect(second.status).toBe('completed');
+      expect(second.previous.baseSha256).toBe(first.version.sha256);
+      const signed = await erin.doc.signatures.list();
+      expect(signed.signatures.map((s) => [s.fieldName, s.signed])).toEqual([
+        ['sig', true],
+        ['sig2', true],
+      ]);
+
+      const versions = await fetchJson<{
+        baseSha: string;
+        versions: Array<{ sha256: string; number: number; parentSha256: string | null }>;
+      }>(`/v1/docs/${docId}/layers/erin/versions`, 'erin', docId);
+      expect(versions.baseSha).toBe(second.version.sha256);
+      expect(versions.versions.map((v) => [v.number, v.sha256, v.parentSha256])).toEqual([
+        [1, seeded3.sha, null],
+        [2, first.version.sha256, seeded3.sha],
+        [3, second.version.sha256, first.version.sha256],
+      ]);
+
+      // A new layer: neither signature, nor the field Erin added.
+      const fred = await openLayer('fred', docId);
+      try {
+        const fresh = await fred.doc.signatures.list();
+        expect(fresh.signatures.map((s) => [s.fieldName, s.signed])).toEqual([['sig', false]]);
+      } finally {
+        await fred.doc.close();
+        await fred.engine.destroy();
+      }
+    } finally {
+      await erin.doc.close();
+      await erin.engine.destroy();
     }
   });
 });

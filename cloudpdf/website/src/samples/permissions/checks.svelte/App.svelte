@@ -20,7 +20,7 @@
     searchPlugin(),
   ];
 
-  const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+  const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
   // What each role may do, as permissions.
   const roles = {
@@ -46,7 +46,7 @@
   {engine}
   {plugins}
   scope={roles[role]}
-  initialDocuments={[{ source: ebook, name: 'ebook.pdf' }]}
+  initialDocuments={[{ source: welcome, name: 'welcome.pdf' }]}
 >
   <div class="toolbar">
     <label class="label">
@@ -58,7 +58,7 @@
       </select>
     </label>
   </div>
-  <ReopenOnRoleChange {role} {ebook} />
+  <ReopenOnRoleChange {role} {welcome} />
   <DocumentGate>
     {#snippet fallback()}
       <p class="loading">Opening…</p>

@@ -11,10 +11,10 @@ import './insert.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin(), pageEditPlugin()];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 /** Another PDF's bytes, to insert pages from. */
-const otherPdf = async () => (await fetch('https://snippet.embedpdf.com/ebook.pdf')).arrayBuffer();
+const otherPdf = async () => (await fetch('/pdfs/welcome.pdf')).arrayBuffer();
 
 // Inserts next to the page you're on, then goes to the first new page.
 function InsertToolbar() {
@@ -36,7 +36,7 @@ function InsertToolbar() {
   useEffect(() => {
     if (inserted.current || !pages[0]) return;
     inserted.current = true;
-    void pageEdit.insertBlank({ placement: { after: pages[0].ref } }).then(show);
+    void pageEdit.insertBlank({ position: { after: pages[0].ref } }).then(show);
   });
 
   if (!page) return null;
@@ -51,7 +51,7 @@ function InsertToolbar() {
         type="button"
         className="button"
         disabled={!canEdit}
-        onClick={() => pageEdit.insertBlank({ placement: { after: page.ref } }).then(show)}
+        onClick={() => pageEdit.insertBlank({ position: { after: page.ref } }).then(show)}
       >
         + Blank page after
       </button>
@@ -71,7 +71,7 @@ function InsertToolbar() {
           show(
             await pageEdit.insertFromBytes(await otherPdf(), {
               pageIndexes: [0, 2],
-              placement: { after: page.ref },
+              position: { after: page.ref },
             }),
           )
         }
@@ -90,7 +90,7 @@ function InsertToolbar() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <InsertToolbar />
         <Stage className="stage">{() => <RenderLayer />}</Stage>

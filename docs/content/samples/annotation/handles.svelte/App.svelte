@@ -10,7 +10,7 @@
     type RotationHandleProps,
   } from '@embedpdf/svelte/annotation';
   import { localEngine } from '@embedpdf/engine';
-  import AddRectangle from './AddRectangle.svelte';
+  import SelectSquare from './SelectSquare.svelte';
   import ChromeControls from './ChromeControls.svelte';
 
   import '../handles.css';
@@ -18,10 +18,10 @@
   const engine = localEngine();
   const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-  // [!doc-source ebook]
-  const ebook = async (): Promise<OpenInput> => {
-    const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-    return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+  // [!doc-source layout]
+  const layout = async (): Promise<OpenInput> => {
+    const response = await fetch('/pdfs/layout.pdf');
+    return { kind: 'bytes', id: 'layout', bytes: new Uint8Array(await response.arrayBuffer()) };
   };
   // [!/doc-source]
 </script>
@@ -54,12 +54,12 @@
   </div>
 {/snippet}
 
-<Viewer {engine} {plugins} initialDocuments={[{ source: ebook }]}>
+<Viewer {engine} {plugins} initialDocuments={[{ source: layout }]}>
   <DocumentGate>
     {#snippet fallback()}
       <p class="loading">Loading…</p>
     {/snippet}
-    <AddRectangle />
+    <SelectSquare />
     <ChromeControls bind:own />
     <Stage class="stage">
       <RenderLayer />

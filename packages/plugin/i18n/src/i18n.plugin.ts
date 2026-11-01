@@ -2,7 +2,7 @@ import { definePlugin } from '@embedpdf/core';
 
 import { I18N_DEFAULTS, I18nToken, type I18nConfig } from './contract';
 import { createI18nController } from './controller';
-import { initialI18nState } from './model';
+import { initialI18nModel } from './model';
 
 /**
  * Translations and the current language. Workspace-scoped, with no dependencies and no engine
@@ -14,7 +14,7 @@ export const i18nPlugin = (config?: I18nConfig) =>
     id: 'i18n',
     scope: 'workspace',
     token: I18nToken,
-    state: initialI18nState,
+    state: initialI18nModel,
     settings: { defaults: I18N_DEFAULTS, registered: config },
     create: createI18nController,
   });

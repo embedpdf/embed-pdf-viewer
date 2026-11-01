@@ -24,10 +24,10 @@ import {
 import { EpdfMeasurement, withMeasurement } from '@embedpdf/angular/measurement';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const sketch: OpenInput = { kind: 'grant', grant: 'shr_IyOgSdO4AmJqV4BoMv5V0nYU' };
 
-// The cover's empty lower half, where the measurements go.
-const LOWER_HALF = { x: 40, y: 560, width: 532, height: 210 };
+// The floor plan's lower half, where the measurements go.
+const LOWER_HALF = { x: 50, y: 500, width: 512, height: 240 };
 
 // A measurement is a line, polyline or polygon with a dimension intent.
 const isMeasurement = (annotation: Annotation) =>
@@ -66,7 +66,7 @@ export class Readout {
   selector: 'ul[demoReadouts]',
   imports: [Readout],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { class: 'readouts', 'aria-label': 'Measurements on the cover' },
+  host: { class: 'readouts', 'aria-label': 'Measurements on the plan' },
   template: `
     @for (annotation of measurements(); track key(annotation.ref)) {
       <li demoReadout [annotation]="annotation"></li>
@@ -74,8 +74,8 @@ export class Readout {
   `,
 })
 export class Readouts {
-  private readonly onCover = inject(EpdfAnnotation).watch({ pages: [0] });
-  protected readonly measurements = computed(() => this.onCover().filter(isMeasurement));
+  private readonly onPlan = inject(EpdfAnnotation).watch({ pages: [0] });
+  protected readonly measurements = computed(() => this.onPlan().filter(isMeasurement));
   protected readonly key = annotationKey;
 }
 
@@ -91,7 +91,7 @@ export class Readouts {
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: sketch }] },
       withStage(),
       withRender(),
       withInteraction(),
@@ -120,48 +120,48 @@ export class Readouts {
 })
 export class App {
   private readonly measurement = inject(EpdfMeasurement);
-  private readonly coverScale = this.measurement.scaleOf(0);
+  private readonly planScale = this.measurement.scaleOf(0);
   private readonly stage = viewChild(EpdfStage);
   private started = false;
 
   constructor() {
-    // On load: the cover at 1:50, and one measurement of each kind on it, scrolled into view.
+    // On load: the floor plan at 1:100, and one measurement of each kind on it, scrolled into view.
     effect(() => {
       const stage = this.stage();
-      if (!stage || !this.coverScale().ready || this.started) return;
+      if (!stage || !this.planScale().ready || this.started) return;
       this.started = true;
-      untracked(() => this.measureCover(stage));
+      untracked(() => this.measurePlan(stage));
     });
   }
 
-  private measureCover(stage: EpdfStage) {
-    void this.measurement.setPreset(0, 'metric-50').then(() =>
+  private measurePlan(stage: EpdfStage) {
+    void this.measurement.setPreset(0, 'metric-100').then(() =>
       Promise.all([
         this.measurement.createMeasurement({
           kind: 'distance',
           page: 0,
           points: [
-            { x: 60, y: 740 },
-            { x: 550, y: 740 },
+            { x: 62, y: 723 },
+            { x: 550, y: 723 },
           ],
         }),
         this.measurement.createMeasurement({
           kind: 'perimeter',
           page: 0,
           points: [
-            { x: 60, y: 580 },
-            { x: 160, y: 640 },
-            { x: 260, y: 590 },
+            { x: 62, y: 613 },
+            { x: 382, y: 613 },
+            { x: 382, y: 723 },
           ],
         }),
         this.measurement.createMeasurement({
           kind: 'area',
           page: 0,
           points: [
-            { x: 80, y: 650 },
-            { x: 250, y: 650 },
-            { x: 250, y: 710 },
-            { x: 80, y: 710 },
+            { x: 382, y: 516 },
+            { x: 550, y: 516 },
+            { x: 550, y: 723 },
+            { x: 382, y: 723 },
           ],
         }),
       ]).then(() => stage.reveal(0, { rect: LOWER_HALF })),

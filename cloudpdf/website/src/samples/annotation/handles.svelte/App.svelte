@@ -10,7 +10,7 @@
     type RotationHandleProps,
   } from '@embedpdf/svelte/annotation';
   import { cloudEngine } from '@cloudpdf/engine';
-  import AddRectangle from './AddRectangle.svelte';
+  import SelectSquare from './SelectSquare.svelte';
   import ChromeControls from './ChromeControls.svelte';
 
   import '../handles.css';
@@ -18,7 +18,7 @@
   const engine = cloudEngine();
   const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-  const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+  const layout: OpenInput = { kind: 'grant', grant: 'shr_d2E_LaTuddJbZR00d1CvkqLM' };
 </script>
 
 <script lang="ts">
@@ -49,12 +49,12 @@
   </div>
 {/snippet}
 
-<Viewer {engine} {plugins} initialDocuments={[{ source: ebook }]}>
+<Viewer {engine} {plugins} initialDocuments={[{ source: layout }]}>
   <DocumentGate>
     {#snippet fallback()}
       <p class="loading">Loading…</p>
     {/snippet}
-    <AddRectangle />
+    <SelectSquare />
     <ChromeControls bind:own />
     <Stage class="stage">
       <RenderLayer />

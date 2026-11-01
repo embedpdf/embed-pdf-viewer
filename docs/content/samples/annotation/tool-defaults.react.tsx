@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
-import { Viewer, DocumentGate, usePageList } from '@embedpdf/react/runtime';
+import { useEffect } from 'react';
+import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
 import { Stage, stagePlugin } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
@@ -10,7 +10,6 @@ import {
   useAnnotation,
   useAnnotationDefaults,
   useAnnotationEvent,
-  useAnnotationState,
 } from '@embedpdf/react/annotation';
 import { localEngine } from '@embedpdf/engine';
 
@@ -27,10 +26,10 @@ const plugins = [
   }),
 ];
 
-// [!doc-source ebook]
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source sketch]
+const sketch = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/sketch.pdf');
+  return { kind: 'bytes', id: 'sketch', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
@@ -92,31 +91,20 @@ function RememberDefaults() {
   return null;
 }
 
-// On load: the pen is active, with a stroke drawn in its current style.
+// On load: the pen is active.
 function StartWithThePen() {
-  const annotation = useAnnotation();
   const interaction = useInteraction();
-  const ready = useAnnotationState((state) => state.status === 'ready');
-  const cover = usePageList()[0]?.ref;
-  const added = useRef(false);
 
   useEffect(() => {
-    if (!ready || !cover || added.current) return;
-    added.current = true;
-    const wave = Array.from({ length: 24 }, (_, i) => ({
-      x: 300 + i * 10,
-      y: 540 + Math.sin(i / 2) * 14,
-    }));
-    void annotation.create(cover, { subtype: 'ink', inkList: [wave] }, undefined, { tool: 'ink' });
     interaction.activateTool('ink');
-  }, [annotation, interaction, ready, cover]);
+  }, [interaction]);
 
   return null;
 }
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: sketch }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <StartWithThePen />
         <RememberDefaults />

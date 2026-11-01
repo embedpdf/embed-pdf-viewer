@@ -17,10 +17,13 @@ import { assertExpected, leftAlone, type ChangeContext, type Done } from './chan
 import { captureAfter, captureBefore, revertObjects, unchangedSince } from './objectCaptures';
 import { valuesEqual } from '../../../shared/valuesEqual';
 import { OUTLINE_TOP, OutlineMutator } from '../../outline';
+import type { OutlineTree } from '../../outline/internal/readOutlineTree';
 import type {
+  CapturedObject,
   ObjectsRevertStep,
   OutlineMoveStep,
   OutlineRemoveStep,
+  OutlineReopenStep,
   OutlineRestoreStep,
   RevertFallback,
 } from '../ChangeRecord';
@@ -45,7 +48,9 @@ export function createOutlineItem(ctx: ChangeContext, op: Op<'outline.create'>):
   const result = mutatorOf(ctx).create(op.parent, op.position ?? 'end', op.data, op.objectNumber);
   return {
     item: { type: 'outline.create', ...result },
-    reverse: [{ kind: 'outline.remove', ref: result.item.ref, left: [result.item] }],
+    reverse: [
+      { kind: 'outline.remove', ref: result.item.ref, left: guardOf(ctx, [result.item.ref]) },
+    ],
   };
 }
 
@@ -64,19 +69,24 @@ export function updateOutlineItem(
   return writeUpdate(ctx, op.ref, op.patch, before);
 }
 
-/** `outline.move`; its reverse puts each item back beside the sibling it followed. */
+/**
+ * `outline.move`; its reverse puts each item back beside the sibling it
+ * followed, and opens again a parent it emptied that was open.
+ */
 export function moveOutlineItems(ctx: ChangeContext, op: Op<'outline.move'>): Done {
   authorize(ctx);
   const mutator = mutatorOf(ctx);
   const tree = mutator.tree();
   const items = op.refs.map((ref) => ref.objectNumber);
   const back = mutator.placementsOf(items, tree);
+  const reopens = reopensOf(ctx, tree, items);
   const result = mutator.move(op.refs, op.parent, op.position);
   const parent = op.parent?.objectNumber ?? OUTLINE_TOP;
   return {
     item: { type: 'outline.move', ...result },
     reverse: [
       { kind: 'outline.move', placements: back, left: items.map((item) => ({ item, parent })) },
+      ...reopens,
     ],
   };
 }
@@ -104,7 +114,10 @@ export function revertOutlineItem(
   if (!current) return leftAlone(ctx, 'outline.update');
   authorize(ctx);
   if (unchangedSince(ctx.runtime, ctx.session, step.objects)) {
-    const redo = revertObjects(ctx.runtime, ctx.session, step.objects);
+    const reverted = revertObjects(ctx.runtime, ctx.session, step.objects);
+    // The item came back with its own /Count; the items above it count again.
+    mutator.countAgain(ref);
+    const redo = captureAfter(ctx.runtime, ctx.session, reverted);
     return {
       item: { type: 'outline.update', ...mutator.updated(ref) },
       reverse: [{ ...step, objects: redo, ...swapped(step.fallback) }],
@@ -118,7 +131,7 @@ export function revertOutlineItem(
   const restore = fallback.restore as Record<string, unknown>;
   const keys = Object.keys(left);
   const kept = keys.filter(
-    (key) => valuesEqual(now[key], left[key]) && writable(key, restore[key]),
+    (key) => valuesEqual(now[key], left[key]) && writable(ctx, key, restore[key]),
   );
   if (kept.length === 0) return leftAlone(ctx, 'outline.update');
   const patch = Object.fromEntries(kept.map((key) => [key, restore[key]]));
@@ -130,14 +143,15 @@ export function revertOutlineItem(
 
 /**
  * Deletes what a create or a restore brought back, while the item and the
- * items under it read exactly as the change left them.
+ * items under it are the same ones and read exactly as the change left them.
  */
 export function removeOutlineItem(ctx: ChangeContext, step: OutlineRemoveStep): Done {
-  const mutator = mutatorOf(ctx);
-  const tree = mutator.tree();
+  const tree = mutatorOf(ctx).tree();
   if (!tree.has(step.ref.objectNumber)) return leftAlone(ctx, 'outline.delete');
   authorize(ctx);
-  if (!valuesEqual(mutator.subtree(step.ref.objectNumber, tree), step.left)) {
+  const items = tree.subtreeOf(step.ref.objectNumber);
+  const left = step.left.map((object) => object.objectNumber);
+  if (!valuesEqual(items, left) || !unchangedSince(ctx.runtime, ctx.session, step.left)) {
     return leftAlone(ctx, 'outline.delete');
   }
   return writeDelete(ctx, step.ref);
@@ -156,7 +170,16 @@ export function restoreOutlineItem(ctx: ChangeContext, step: OutlineRestoreStep)
   const result = mutator.restored(step.ref.objectNumber);
   return {
     item: { type: 'outline.restore', ...result },
-    reverse: [{ kind: 'outline.remove', ref: step.ref, left: result.items }],
+    reverse: [
+      {
+        kind: 'outline.remove',
+        ref: step.ref,
+        left: guardOf(
+          ctx,
+          result.items.map((item) => item.ref),
+        ),
+      },
+    ],
   };
 }
 
@@ -176,10 +199,9 @@ export function moveOutlineItemsBack(ctx: ChangeContext, step: OutlineMoveStep):
   );
   if (placements.length === 0) return leftAlone(ctx, 'outline.move');
   authorize(ctx);
-  const back = mutator.placementsOf(
-    placements.map(({ item }) => item),
-    tree,
-  );
+  const items = placements.map(({ item }) => item);
+  const back = mutator.placementsOf(items, tree);
+  const reopens = reopensOf(ctx, tree, items);
   const result = mutator.place(placements, tree);
   return {
     item: { type: 'outline.move', ...result },
@@ -189,8 +211,25 @@ export function moveOutlineItemsBack(ctx: ChangeContext, step: OutlineMoveStep):
         placements: back,
         left: placements.map(({ item, parent }) => ({ item, parent })),
       },
+      ...reopens,
     ],
   };
+}
+
+/** Opens a parent again, as its step says (see `OutlineReopenStep`). */
+export function reopenOutlineItem(ctx: ChangeContext, step: OutlineReopenStep): Done {
+  const mutator = mutatorOf(ctx);
+  const tree = mutator.tree();
+  const item = mutator.find(step.ref, tree);
+  const children = tree.childrenOf(step.ref.objectNumber);
+  const same =
+    children.length === step.children.length &&
+    children.every((child) => step.children.includes(child));
+  if (!item || item.open || !same) return leftAlone(ctx, 'outline.update');
+  authorize(ctx);
+  const result = mutator.update(step.ref, { open: true });
+  // Its redo empties the parent again, which leaves it without an open state.
+  return { item: { type: 'outline.update', ...result }, reverse: [] };
 }
 
 /** An update, captured so it can be put back exactly. */
@@ -219,10 +258,15 @@ function writeUpdate(
   };
 }
 
-/** A delete, captured in its transaction so an undo brings back the same objects. */
+/**
+ * A delete, captured in its transaction so an undo brings back the same
+ * objects, and opens again the parent it emptied when it was open.
+ */
 function writeDelete(ctx: ChangeContext, ref: OutlineItemRef): Done {
   const mutator = mutatorOf(ctx);
-  const parent = mutator.tree().parentOf(ref.objectNumber);
+  const tree = mutator.tree();
+  const parent = tree.parentOf(ref.objectNumber);
+  const reopens = reopensOf(ctx, tree, [ref.objectNumber]);
   const capture = exportOutlineItem(ctx.runtime, ctx.session.requireDocPtr(), ref.objectNumber);
   const result = mutator.delete(ref);
   return {
@@ -234,8 +278,38 @@ function writeDelete(ctx: ChangeContext, ref: OutlineItemRef): Done {
         parent: parent === undefined || parent === OUTLINE_TOP ? null : toOutlineItemRef(parent),
         capture,
       },
+      ...reopens,
     ],
   };
+}
+
+/**
+ * The parents that lose every child when `items` leave them, and are open:
+ * each comes back closed with its children, so the undo opens it again.
+ */
+function reopensOf(
+  ctx: ChangeContext,
+  tree: OutlineTree,
+  items: readonly number[],
+): OutlineReopenStep[] {
+  const leaving = new Set(items);
+  const parents = new Set(items.map((item) => tree.parentOf(item) ?? OUTLINE_TOP));
+  parents.delete(OUTLINE_TOP);
+  return [...parents].flatMap((parent) => {
+    const children = tree.childrenOf(parent);
+    if (!children.every((child) => leaving.has(child))) return [];
+    if (!mutatorOf(ctx).find(toOutlineItemRef(parent), tree)?.open) return [];
+    return [{ kind: 'outline.reopen' as const, ref: toOutlineItemRef(parent), children }];
+  });
+}
+
+/** The guard of items a change leaves: each dictionary as it reads now. */
+function guardOf(ctx: ChangeContext, refs: readonly OutlineItemRef[]): CapturedObject[] {
+  return captureAfter(
+    ctx.runtime,
+    ctx.session,
+    refs.map((ref) => ({ objectNumber: ref.objectNumber, deep: [], before: null })),
+  );
 }
 
 function requireItem(ctx: ChangeContext, ref: OutlineItemRef): OutlineItem<PdfDestination> {
@@ -264,11 +338,18 @@ function fallbackOf(
   };
 }
 
-/** Whether a value read back can be written again: a target another app made may not be. */
-function writable(field: string, value: unknown): boolean {
+/**
+ * Whether a value read back can be written again: a target another app made
+ * may not be, nor one that goes to a page the document no longer has.
+ */
+function writable(ctx: ChangeContext, field: string, value: unknown): boolean {
   if (field !== 'target' || value === null) return true;
-  const target = value as { kind: string; name?: string };
-  if (target.kind === 'goto' || target.kind === 'uri') return true;
+  const target = value as { kind: string; name?: string; destination?: PdfDestination };
+  if (target.kind === 'goto') {
+    const page = target.destination?.page.objectNumber;
+    return ctx.session.allRecords().some((record) => record.pageObjectNumber === page);
+  }
+  if (target.kind === 'uri') return true;
   return (
     target.kind === 'named' &&
     ['NextPage', 'PrevPage', 'FirstPage', 'LastPage'].includes(target.name ?? '')

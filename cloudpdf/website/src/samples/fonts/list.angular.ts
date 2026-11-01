@@ -12,7 +12,7 @@ import { EpdfAnnotation, withAnnotation } from '@embedpdf/angular/annotation';
 import { EpdfFonts, withFonts } from '@embedpdf/angular/fonts';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 const GROUPS = [
   ['document', 'In this document'],
@@ -36,7 +36,7 @@ const WHY: Record<FontRestriction, string> = {
   imports: [EpdfDocumentGate],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: welcome }] },
       withInteraction(),
       withAnnotation(),
       withFonts(),

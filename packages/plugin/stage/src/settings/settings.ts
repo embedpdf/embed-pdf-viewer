@@ -1,24 +1,32 @@
 /**
- * The settings bag and its responsive resolution. The base (config plus
- * `updateSettings()` changes) merged with the matching rules' patches is the effective
+ * The settings bag and its resolution. The base (config plus `updateSettings()`
+ * changes), then the matching rules' patches, then the locks, is the effective
  * settings the state holds. `applySettings` is the one reactive applier: the
  * strongest effect among the touched settings wins ('reflow' ⊃ 'scene'/'refit'
  * ⊃ 'reclamp' ⊃ 'none'), so a breakpoint crossing gets exactly the invariant a
  * hand-written update would.
  */
-import { memo, type PluginContext } from '@embedpdf/core';
+import { memo, PluginError, type PluginContext, type SettingLock } from '@embedpdf/core';
 
 import type {
   ResponsiveRule,
   StageConfig,
   StageSettings,
+  StageSettingsLock,
   StageSettingsPatch,
   StageViewState,
 } from '../contract';
 import type { StageAnimation } from '../camera/animation';
 import type { StageCameraWrite } from '../camera/write';
 import type { StageHostCapability } from '../host-contract';
-import { patchSettings, setActiveRules, setCursor, type StageState } from '../model';
+import {
+  patchSettings,
+  setActiveRules,
+  setCursor,
+  setLocks,
+  type StageLocks,
+  type StageModel,
+} from '../model';
 import type { StageArrival } from '../navigation/arrive';
 import { boxOf, eqSetting, mergeSettings, resolveResponsive } from '../responsive';
 import type { StageServices } from '../services';
@@ -34,7 +42,7 @@ const EFFECT_RANK: Record<SettingEffect, number> = {
 };
 
 export function createSettings(
-  ctx: PluginContext<StageState>,
+  ctx: PluginContext<StageModel>,
   { scene }: Pick<StageServices, 'scene'>,
   config: StageConfig,
   { writeCamera }: Pick<StageCameraWrite, 'writeCamera'>,
@@ -97,6 +105,41 @@ export function createSettings(
   const initialBase = base;
   let rules: readonly ResponsiveRule[] = config.responsive ?? DEFAULT_RESPONSIVE;
   let lastEffective = base; // rules first assert when a real box arrives
+  // The locks, in the order they were taken: the last layer, over the base and the rules.
+  let locks: readonly StageSettingsLock[] = [];
+  /** Base, then the matching rules, then the locks: what the state holds. */
+  const resolve = () => {
+    const { effective, active } = resolveResponsive(base, rules, boxOf(viewport()));
+    return {
+      effective: locks.reduce(
+        (settings, lock) => mergeSettings(settings, lock.settings),
+        effective,
+      ),
+      active,
+    };
+  };
+  /** Who holds each locked setting, in state: the first lock that names it. */
+  const publishLocks = () => {
+    const holders: Partial<Record<keyof StageSettings, SettingLock>> = {};
+    for (const lock of locks) {
+      for (const key of lockedKeys(lock)) {
+        holders[key] ??= {
+          by: lock.by,
+          ...(lock.reasonKey !== undefined ? { reasonKey: lock.reasonKey } : {}),
+        };
+      }
+    }
+    const current = state().locks;
+    const keys = Object.keys(holders) as (keyof StageSettings)[];
+    const same =
+      keys.length === Object.keys(current).length &&
+      keys.every(
+        (key) =>
+          current[key]?.by === holders[key]!.by &&
+          current[key]?.reasonKey === holders[key]!.reasonKey,
+      );
+    if (!same) ctx.state.update(setLocks, holders as StageLocks);
+  };
   const publishActive = (active: readonly string[]) => {
     const current = state().activeRules;
     if (current.length !== active.length || active.some((name, index) => name !== current[index])) {
@@ -110,14 +153,22 @@ export function createSettings(
    * whose caller runs its own reframe) only lands the patch and the cache
    * invalidation and reports the strongest effect, so the caller can
    * escalate a rule-driven flow flip.
+   *
+   * `asked` names the settings a caller just set. Each of them lands whenever
+   * the live value differs, even if the resolution itself didn't move: a zoom
+   * step, a pinch or a zoom box records its level straight into the state, so
+   * the resolution can still hold the fit mode the user now asks for again.
    */
-  const syncResponsive = (react: boolean): SettingEffect => {
-    const { effective, active } = resolveResponsive(base, rules, boxOf(viewport()));
+  const syncResponsive = (
+    react: boolean,
+    asked: readonly (keyof StageSettings)[] = [],
+  ): SettingEffect => {
+    const { effective, active } = resolve();
     const patch: Partial<StageSettings> = {};
     for (const key of SETTING_KEYS) {
-      if (!eqSetting(effective[key], lastEffective[key])) {
-        Object.assign(patch, { [key]: effective[key] });
-      }
+      const resolved = !eqSetting(effective[key], lastEffective[key]);
+      const reasserted = asked.includes(key) && !eqSetting(effective[key], state()[key]);
+      if (resolved || reasserted) Object.assign(patch, { [key]: effective[key] });
     }
     lastEffective = effective;
     publishActive(active);
@@ -143,7 +194,10 @@ export function createSettings(
     // matching rule's key wins until its rule stops matching). With no rules
     // in play this is a direct update.
     base = mergeSettings(base, changes);
-    syncResponsive(true);
+    syncResponsive(
+      true,
+      SETTING_KEYS.filter((key) => changes[key] !== undefined),
+    );
   };
 
   const applyViewState = (view: StageViewState): void => {
@@ -152,7 +206,7 @@ export function createSettings(
     // re-assert on top, so a snapshot saved on a desktop restores compact
     // padding on a phone. One patch carries the full effective result.
     base = mergeSettings(base, pickSettings(view));
-    const { effective, active } = resolveResponsive(base, rules, boxOf(viewport()));
+    const { effective, active } = resolve();
     lastEffective = effective;
     publishActive(active);
     ctx.state.update(patchSettings, effective);
@@ -161,8 +215,70 @@ export function createSettings(
     applyAnchor(view.anchor);
   };
 
+  /**
+   * The settings a saved view keeps: what shows, but the locked ones as they
+   * are underneath, so restoring it never writes a lock's value as the user's.
+   */
+  const viewStateSettings = (): StageSettings => {
+    const shown = snapshotSettings();
+    if (locks.length === 0) return shown;
+    const { effective: unlocked } = resolveResponsive(base, rules, boxOf(viewport()));
+    const settings = { ...shown };
+    for (const key of Object.keys(state().locks) as (keyof StageSettings)[]) {
+      Object.assign(settings, { [key]: unlocked[key] });
+    }
+    return settings;
+  };
+
+  /**
+   * Hold `lock.settings` over every other writer until the returned function
+   * runs, or the document closes. A setting another lock holds at a different
+   * value is refused.
+   */
+  const lockSettings = (lock: StageSettingsLock): (() => void) => {
+    const keys = lockedKeys(lock);
+    for (const key of keys) {
+      if (!SETTING_KEYS.includes(key)) {
+        throw new PluginError('invalid-input', 'stage', `"${key}" is not a Stage setting`);
+      }
+      if (key === 'zoom') {
+        throw new PluginError(
+          'invalid-input',
+          'stage',
+          'the zoom cannot be locked: gestures set it',
+        );
+      }
+      const holder = locks.find((held) => {
+        const value = held.settings[key as keyof StageSettingsLock['settings']];
+        return (
+          value !== undefined && !eqSetting(value, lock.settings[key as keyof typeof lock.settings])
+        );
+      });
+      if (holder) {
+        throw new PluginError(
+          'conflict',
+          'stage',
+          `"${key}" is locked by ${holder.by} at another value`,
+        );
+      }
+    }
+    const held: StageSettingsLock = { ...lock, settings: { ...lock.settings } };
+    locks = [...locks, held];
+    publishLocks();
+    syncResponsive(true, keys);
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      locks = locks.filter((other) => other !== held);
+      publishLocks();
+      syncResponsive(true, keys);
+    };
+  };
+
   return {
     snapshotSettings,
+    viewStateSettings,
     syncResponsive,
     updateSettings,
     applyViewState,
@@ -170,13 +286,15 @@ export function createSettings(
       getSettings: snapshotSettings,
       resetSettings: () => {
         base = mergeSettings(initialBase, {});
-        syncResponsive(true);
+        syncResponsive(true, SETTING_KEYS);
       },
       updateSettings,
       setResponsiveRules: (next) => {
         rules = next;
         syncResponsive(true);
       },
+      lockSettings,
+      getLock: (setting) => state().locks[setting] ?? null,
       matchesRule: (name) => state().activeRules.includes(name),
       listActiveRules: () => state().activeRules,
       applyViewState,
@@ -184,3 +302,9 @@ export function createSettings(
   };
 }
 export type StageSettingsArea = ReturnType<typeof createSettings>;
+
+/** The settings a lock names a value for. */
+const lockedKeys = (lock: StageSettingsLock): (keyof StageSettings)[] =>
+  (Object.keys(lock.settings) as (keyof StageSettings)[]).filter(
+    (key) => lock.settings[key as keyof StageSettingsLock['settings']] !== undefined,
+  );

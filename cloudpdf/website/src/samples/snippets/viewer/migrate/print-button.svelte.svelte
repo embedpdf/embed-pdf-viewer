@@ -10,7 +10,7 @@
 </script>
 
 <button disabled={!registry} onclick={print}>Print</button>
-<PDFViewer config={{ src: { shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' } }} style="height: 80vh" onready={(r) => (registry = r)} />
+<PDFViewer config={{ src: { grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' } }} style="height: 80vh" onready={(r) => (registry = r)} />
 -->
 
 <script lang="ts">
@@ -20,4 +20,4 @@
 </script>
 
 <button disabled={!viewer} onclick={() => viewer?.commands.execute('document:print')}>Print</button>
-<PDFViewer src={{ shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' }} onready={(v) => (viewer = v)} style="height: 80vh" />
+<PDFViewer src={{ grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' }} onready={(v) => (viewer = v)} style="height: 80vh" />

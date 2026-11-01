@@ -3,6 +3,7 @@ import { defineConfig } from 'tsup';
 export default defineConfig({
   entry: {
     index: 'src/index.ts',
+    'modules/index': 'src/modules/index.ts',
     'bin/cloudpdf-server': 'src/bin/cloudpdf-server.ts',
     'runtime/worker-entry': 'src/runtime/worker-entry.ts',
     'runtime/engine-host-entry': 'src/runtime/engine-host-entry.ts',

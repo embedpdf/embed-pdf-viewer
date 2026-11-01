@@ -1,5 +1,17 @@
 # @embedpdf/plugin-search
 
+## 3.0.0-next.19
+
+## 3.0.0-next.18
+
+## 3.0.0-next.17
+
+### Minor Changes
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – A named type for the state: `SearchState`, what `searchState` reads and `useSearchState()` returns, the State table of the search page with a comment on each field. Published types now name it instead of spelling out its fields.
+
+## 3.0.0-next.16
+
 ## 3.0.0-next.15
 
 ### Minor Changes

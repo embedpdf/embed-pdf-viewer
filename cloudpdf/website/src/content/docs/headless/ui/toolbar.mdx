@@ -30,11 +30,12 @@ When the items don't fit, the toolbar takes these steps, in order, until they do
    with `collapse: 'select'`.
 3. **An item moves into the "More" menu**, the least important first.
 
-`importance` decides the order, from `1` (goes first) to `5` (never leaves the bar):
+`importance` decides the order, from `1` (goes first) to `5` (never leaves the bar). An item without
+one has its group's:
 
 ```ts
 item('document:download', { importance: 5 }); // always visible
-group('annotate', ['tool:note', 'tool:ink'], { importance: 2 });
+group('annotate', ['tool:note', 'tool:ink'], { importance: 2 }); // both go early
 ```
 
 ## Sections

@@ -918,7 +918,7 @@ function actorFromJwt(
 
 async function readAnnotations(input: {
   documentService: DocumentService;
-  reply: { header(name: 'Cache-Control', value: string): unknown };
+  reply: FastifyReply;
   signal: AbortSignal;
   scope: ReadScope;
   pageObjectNumber: number;
@@ -1078,7 +1078,7 @@ async function exportAnnotations(input: {
 
 async function readAnnotationsAll(input: {
   documentService: DocumentService;
-  reply: { header(name: 'Cache-Control', value: string): unknown };
+  reply: FastifyReply;
   signal: AbortSignal;
   scope: ReadScope;
   requestedVersion?: number;

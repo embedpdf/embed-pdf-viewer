@@ -88,7 +88,8 @@ interface Job {
    * Once true, any subsequent response from the worker is ignored and the
    * caller sees AbortError instead. This makes the abort contract hold
    * even when the host completes the work faster than the abort message
-   * can propagate.
+   * can propagate. A document the worker opened anyway is closed
+   * ({@link WorkerQueue.closeAbandoned}).
    */
   aborted: boolean;
   abortReason: unknown;
@@ -110,7 +111,9 @@ interface Job {
  *   page it half loaded.
  * - `abort()` before the job is sent removes it: it never reaches the worker.
  *   After, it sends an AbortRequest; the worker rejects when it next checks
- *   its signal, and the caller sees an AbortError either way.
+ *   its signal, and the caller sees an AbortError either way. An open can't
+ *   stop part way: when the worker opened the document anyway, the queue
+ *   closes it ({@link closeAbandoned}).
  */
 export class WorkerQueue implements JobQueue {
   /** Every job not done yet, sent or not, in call order. */
@@ -138,6 +141,15 @@ export class WorkerQueue implements JobQueue {
   }
 
   enqueue<R extends WorkerResultPayload>(
+    spec: JobSpec,
+    facts: CallFacts = {},
+  ): AbortablePromise<R> {
+    return this.enqueueAt(this.jobs.length, spec, facts);
+  }
+
+  /** {@link enqueue}, with the job at `place` in line instead of last. */
+  private enqueueAt<R extends WorkerResultPayload>(
+    place: number,
     spec: JobSpec,
     facts: CallFacts = {},
   ): AbortablePromise<R> {
@@ -182,7 +194,7 @@ export class WorkerQueue implements JobQueue {
         aborted: false,
         abortReason: undefined,
       };
-      this.jobs.push(job);
+      this.jobs.splice(place, 0, job);
       this.byId.set(jobId, job);
 
       const onAbort = () => {
@@ -369,10 +381,14 @@ export class WorkerQueue implements JobQueue {
       this.tick();
       return;
     }
+    const place = this.jobs.indexOf(job);
     this.remove(job);
 
     if (job.aborted) {
       job.reject(new AbortError(job.abortReason));
+      if (msg.kind === 'resolve' && msg.result.tag === 'open') {
+        this.closeAbandoned(place, msg.result.docId);
+      }
     } else if (msg.kind === 'resolve') {
       job.resolve(msg.result);
     } else {
@@ -385,6 +401,19 @@ export class WorkerQueue implements JobQueue {
     }
 
     this.tick();
+  }
+
+  /**
+   * Closes a document the worker opened after its caller aborted the open (an
+   * open can't stop part way). The caller never gets a handle to close it, and
+   * the worker refuses to open its id again while it's open. The close takes
+   * the open's `place` in line, so a job asked after the open, such as opening
+   * that id again, waits for it.
+   */
+  private closeAbandoned(place: number, docId: string): void {
+    void this.enqueueAt(place, {
+      buildPack: (jobId: JobId) => wirePack({ kind: 'close', effect: 'close', jobId, docId }),
+    }).catch(() => {}); // only a shutdown rejects it, and that closes every document
   }
 
   async shutdown(): Promise<void> {

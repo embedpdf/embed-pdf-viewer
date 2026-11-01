@@ -10,7 +10,7 @@ import './pins.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin()];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 // A pin is a page and a point on it, in points from the page's top-left. No pixels.
 interface Pin {
@@ -57,7 +57,7 @@ export default function App() {
   const pressed = useRef({ x: 0, y: 0 });
 
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <Controls last={pins[pins.length - 1] ?? null} onClear={() => setPins([])} />
         <Stage

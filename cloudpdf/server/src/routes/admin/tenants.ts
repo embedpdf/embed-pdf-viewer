@@ -9,6 +9,7 @@ import {
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
 import { decodeListCursor, encodeListCursor } from './_cursor';
+import { formatIssues } from './_issues';
 import { requireApiToken, requireTenantAccess } from '../../app/jwt-plugin';
 import type { SuspendedTenantsGuard } from '../../auth/SuspendedTenantsGuard';
 import type { SecurityEventsRepo } from '../../db/repos/security-events.repo';
@@ -189,13 +190,4 @@ function tenantPublic(t: TenantRow): Record<string, unknown> {
     status: t.status,
     createdAt: t.createdAt,
   };
-}
-
-function formatIssues(issues: Array<{ path: Array<string | number>; message: string }>): string {
-  return issues
-    .map((issue) => {
-      const path = issue.path.length > 0 ? issue.path.join('.') : 'request body';
-      return `${path}: ${issue.message}`;
-    })
-    .join('; ');
 }

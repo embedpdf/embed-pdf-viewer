@@ -8,7 +8,7 @@
   const container = CloudPDF.init({
     type: 'container',
     target: document.getElementById('pdf-viewer'),
-    src: { shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' },
+    src: { grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' },
     theme: { preference: 'dark' },
     disabledCategories: ['redaction', 'document-print'],
   });
@@ -23,7 +23,7 @@
 
   CloudPDF.init({
     target: '#viewer',
-    src: { shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' },
+    src: { grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' },
     theme: 'dark',
     disable: ['redaction', 'documents.print'],
     onReady: (viewer) => console.log('ready', viewer),

@@ -131,16 +131,20 @@ detailed report of what changed since a signature, rule by rule, use `signature.
 
 ## Warn before an edit breaks a signature
 
-After an approval signature, filling in the form and adding more signatures keep it valid, but an
-annotation doesn't. The plugin warns you the moment a change would break a signature once it's saved,
-as Acrobat does:
+After an approval signature, filling in the form, commenting and adding more signatures keep it
+valid, as in Acrobat. Other changes break it once the file is saved, such as adding a form field. The
+plugin warns you the moment a change would do that, as Acrobat does:
 
 <Snippet name="forms/break-warning" />
 
 `signature.getProtection()` tells you what the document's signatures allow, before anyone tries. A
-signer who wants comments to stay allowed signs with a certification that allows them.
+signer who wants to rule out more, such as comments, certifies the document to allow form filling
+only: the engine then refuses those changes instead of warning about them.
 
 <Example name="signature/break-warning" />
+
+> **Try it:** Lanternfield signed this agreement before sending it. Add a comment: the signature
+> stays valid. Add a form field: the warning shows before anything is saved.
 
 ## A person's signatures
 

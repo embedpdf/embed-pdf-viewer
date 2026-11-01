@@ -1,15 +1,13 @@
-import { CloudPDFClient as GeneratedCloudPDFClient } from "./Client.js";
 import type * as CloudPDF from "./api/index.js";
+import { CloudPDFClient as GeneratedCloudPDFClient } from "./Client.js";
+import { CloudPDFEnvironment } from "./environments.js";
+import { countingBody, isStreamBody } from "./uploads/progress.js";
+import { prepareUploadSource } from "./uploads/source.js";
 import { Uploads } from "./uploads/Uploads.js";
 
 export declare namespace CloudPDFClient {
-    type GeneratedOptions = GeneratedCloudPDFClient.Options;
-    type Endpoint = GeneratedOptions["environment"];
-    export type Options = Omit<GeneratedOptions, "environment" | "baseUrl"> &
-        (
-            | { baseUrl: NonNullable<GeneratedOptions["baseUrl"]>; environment?: Endpoint }
-            | { environment: Endpoint; baseUrl?: GeneratedOptions["baseUrl"] }
-        );
+    /** CloudPDF SaaS unless `baseUrl` names your own server. */
+    export type Options = GeneratedCloudPDFClient.Options;
     export type RequestOptions = GeneratedCloudPDFClient.RequestOptions;
 }
 
@@ -17,29 +15,42 @@ export declare namespace CloudPDFClient {
 export class CloudPDFClient extends GeneratedCloudPDFClient {
     public readonly uploads: Uploads<CloudPDF.DocumentsCommit200Response.Document>;
 
-    public constructor(options: CloudPDFClient.Options) {
-        // Self-hosted CloudPDF has no universal environment URL. Let callers
-        // provide the familiar `baseUrl` alone while still satisfying Fern's
-        // generated client's internal environment slot.
-        super({ ...options, environment: options.environment ?? options.baseUrl } as GeneratedCloudPDFClient.Options);
+    public constructor(options: CloudPDFClient.Options = {}) {
+        // Generated requests fall back to SaaS by themselves; the passthrough
+        // `fetch` the uploads use doesn't, so the default is named here.
+        super({ ...options, environment: options.environment ?? CloudPDFEnvironment.Saas });
         const rawFetch = options.fetch ?? globalThis.fetch?.bind(globalThis);
         if (!rawFetch) throw new Error("CloudPDFClient requires a fetch implementation");
 
-        this.uploads = new Uploads({
-            init: async (request, requestOptions): Promise<unknown> =>
-                this.documents.init(request as never, requestOptions),
-            commit: async (request, requestOptions): Promise<unknown> =>
-                this.documents.commit(request as never, requestOptions),
-            proxy: async (url, form, requestOptions): Promise<Response> =>
-                this.fetch(
-                    url,
-                    { method: "POST", body: form },
-                    {
-                        abortSignal: requestOptions.abortSignal,
-                        maxRetries: requestOptions.maxRetries,
-                    },
-                ),
-            presigned: async (url, init): Promise<Response> => rawFetch(url, init),
-        });
+        this.uploads = new Uploads(
+            {
+                init: async (request, requestOptions): Promise<unknown> =>
+                    this.documents.init(request as never, requestOptions),
+                commit: async (request, requestOptions): Promise<unknown> =>
+                    this.documents.commit(request as never, requestOptions),
+                proxy: async (url, form, requestOptions): Promise<Response> =>
+                    this.fetch(
+                        url,
+                        { method: "POST", body: form },
+                        {
+                            abortSignal: requestOptions.abortSignal,
+                            maxRetries: requestOptions.maxRetries,
+                        },
+                    ),
+                presigned: async (url, transfer): Promise<Response> => {
+                    // Counting what fetch reads is the progress a server can
+                    // report. Either way, a stream body needs half duplex.
+                    const body = transfer.onProgress ? countingBody(transfer.body, transfer.onProgress) : transfer.body;
+                    return rawFetch(url, {
+                        method: transfer.method,
+                        headers: transfer.headers,
+                        body,
+                        signal: transfer.signal,
+                        ...(isStreamBody(body) ? ({ duplex: "half" } as Record<string, unknown>) : {}),
+                    });
+                },
+            },
+            prepareUploadSource,
+        );
     }
 }

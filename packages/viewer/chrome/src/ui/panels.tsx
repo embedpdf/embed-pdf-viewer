@@ -3,9 +3,13 @@
  * that side, in the frame that opens it (docked beside the pages, over them,
  * or as a sheet: panel-frame.tsx). The panels on one side take turns: opening
  * one closes the other, however it was opened. The header switches between
- * the panels on the side; the body is the slot `panel:<id>`, which holds the
+ * the panels on the side; under it go the bars the layout puts in the panel
+ * (`place: { panel }`); the body is the slot `panel:<id>`, which holds the
  * built-in content, so content of your own replaces it, and a panel of your
  * own with nothing in its slot is empty.
+ *
+ * A built-in panel with nothing to list opens as a bar instead (search whose
+ * hits come without their text: the find bar).
  *
  * Which panels are open is each document's own (the shell plugin keeps them
  * per document), so switching documents brings back that document's panels.
@@ -15,22 +19,29 @@
 import { panelCommandOf } from '@embedpdf/core-ui';
 import { useCommands } from '@embedpdf/react/commands';
 import { useT } from '@embedpdf/react/i18n';
-import { RenderLayer } from '@embedpdf/react/render';
-import { useDocumentId, useKernelValue, useOptionalCapability } from '@embedpdf/react/runtime';
+import {
+  useDocumentId,
+  useKernelValue,
+  useOptionalCapability,
+  type Kernel,
+} from '@embedpdf/react/runtime';
+import { SearchToken } from '@embedpdf/react/search';
 import { ShellToken, useShellEvent } from '@embedpdf/react/shell';
-import { Stage, useStage, useStageState } from '@embedpdf/react/stage';
-import { useEffect, useLayoutEffect, useMemo, type ReactNode } from 'react';
+import { Fragment, useLayoutEffect, useMemo, type ReactNode } from 'react';
 
 import { panelsOnSide } from '../config/panels';
-import { ThumbsStageToken } from '../config/stage';
 import { useResolvedLayout } from '../config-context';
+import { PanelBars } from '../places';
 import { lazyComponent } from './lazy';
-import { PanelFrame, useCloseOnPick } from './panel-frame';
+import { OutlineFilterScope } from './outline-filter';
+import { PanelBar, PanelFrame } from './panel-frame';
 import type { PanelSide } from './panel-layout';
 import { PanelSwitcher } from './panel-switcher';
+import { ThumbnailList } from './thumbnail-list';
 
 // Each feature's panel loads the first time it opens.
 const SearchPanel = lazyComponent(() => import('./search-panel').then((ui) => ui.SearchPanel));
+const FindBar = lazyComponent(() => import('./search-panel').then((ui) => ui.FindBar));
 const CommentsPanel = lazyComponent(() =>
   import('./comments-panel').then((ui) => ui.CommentsPanel),
 );
@@ -48,6 +59,9 @@ const RedactionPanel = lazyComponent(() =>
   import('./redaction-panel').then((ui) => ui.RedactionPanel),
 );
 const OutlinePanel = lazyComponent(() => import('./outline-panel').then((ui) => ui.OutlinePanel));
+const AttachmentsPanel = lazyComponent(() =>
+  import('./attachments-panel').then((ui) => ui.AttachmentsPanel),
+);
 const FormDesignPanel = lazyComponent(() =>
   import('./form-design-panel').then((ui) => ui.FormDesignPanel),
 );
@@ -57,14 +71,47 @@ interface BuiltInContent {
   readonly draw: (documentId: string | null) => ReactNode;
   /** It holds a list: in a sheet or an overlay, picking one of its items closes the panel. */
   readonly list?: boolean;
+  /** Holds what its bar and its body share: around both. */
+  readonly scope?: (props: { readonly children: ReactNode }) => ReactNode;
+  /** What it draws instead, as a bar ({@link PanelBar}), while `when` says its list would be empty. */
+  readonly bar?: {
+    readonly when: (kernel: Kernel, documentId: string | null) => boolean;
+    readonly draw: (documentId: string | null) => ReactNode;
+  };
 }
 
 const BUILT_IN_CONTENT: ReadonlyMap<string, BuiltInContent> = new Map<string, BuiltInContent>([
   ['thumbnails', { draw: () => <ThumbnailList />, list: true }],
-  // Each document's own outline, its filter and its rows.
-  ['outline', { draw: (documentId) => <OutlinePanel key={documentId ?? 'none'} />, list: true }],
+  // Each document's own outline and its rows; the filter its bar and its rows share.
+  [
+    'outline',
+    {
+      draw: (documentId) => <OutlinePanel key={documentId ?? 'none'} />,
+      list: true,
+      scope: OutlineFilterScope,
+    },
+  ],
+  // Each document's files: its attachments and the files on its pages.
+  [
+    'attachments',
+    { draw: (documentId) => <AttachmentsPanel key={documentId ?? 'none'} />, list: true },
+  ],
   // These read the document as they mount, so each document gets its own.
-  ['search', { draw: (documentId) => <SearchPanel key={documentId ?? 'none'} />, list: true }],
+  [
+    'search',
+    {
+      draw: (documentId) => <SearchPanel key={documentId ?? 'none'} />,
+      list: true,
+      // Without snippets (copying isn't allowed) every hit would be a blank row.
+      bar: {
+        when: (kernel, documentId) =>
+          kernel
+            .tryCapability(SearchToken, documentId ?? undefined)
+            ?.canSearch({ snippets: true }) === false,
+        draw: (documentId) => <FindBar key={documentId ?? 'none'} />,
+      },
+    },
+  ],
   ['comments', { draw: (documentId) => <CommentsPanel key={documentId ?? 'none'} /> }],
   ['measurement', { draw: (documentId) => <MeasurementSection key={documentId ?? 'none'} /> }],
   ['style', { draw: () => <AnnotationStylePanel /> }],
@@ -147,95 +194,38 @@ function OpenPanel({
   const panel = useResolvedLayout().data.panels?.[id];
   const shell = useOptionalCapability(ShellToken);
   const documentId = useDocumentId();
+  const content = BUILT_IN_CONTENT.get(id);
+  const bar = useKernelValue((kernel) => content?.bar?.when(kernel, documentId) === true);
   if (!panel) return null;
   const title = panel.title ?? (panel.titleKey !== undefined ? t(panel.titleKey) : id);
-  const content = BUILT_IN_CONTENT.get(id);
+  if (bar) {
+    return (
+      <PanelBar id={id} side={side} title={title} onClose={() => shell?.close(id)}>
+        <slot name={`panel:${id}`}>{content?.bar?.draw(documentId)}</slot>
+      </PanelBar>
+    );
+  }
+  const Scope = content?.scope ?? Fragment;
   return (
-    <PanelFrame
-      id={id}
-      side={side}
-      present={panel.present}
-      width={panel.width}
-      resizable={panel.resizable}
-      title={title}
-      header={
-        siblings.length > 1 ? <PanelSwitcher id={id} title={title} panels={siblings} /> : undefined
-      }
-      list={content?.list}
-      onClose={() => shell?.close(id)}
-    >
-      <slot name={`panel:${id}`}>{content?.draw(documentId)}</slot>
-    </PanelFrame>
-  );
-}
-
-// The thumbnail rail: the same document through the thumbnail Stage lens (a
-// fixed-zoom grid that wraps into as many columns as the panel's width fits —
-// see the viewer's `thumbnails` plugin). Click a thumb to navigate the main
-// lens; the rail follows the main view. Read-only — no page edits
-// (rotate/move/delete), just the page bitmap and its number.
-function ThumbnailList() {
-  const t = useT();
-  const main = useStage(); // the main lens
-  const thumbs = useStage(ThumbsStageToken); // the sidebar lens
-  const currentPage = useStageState((state) => state.currentPageIndex);
-  // A sheet or an overlay closes once a page is picked, so you see where it took you.
-  const closeOnPick = useCloseOnPick();
-  // Follow the main view: when its current page changes, make that thumb visible —
-  // minimal movement, zero when it's already on screen.
-  useEffect(() => thumbs.reveal(currentPage), [currentPage, thumbs]);
-  return (
-    <Stage
-      token={ThumbsStageToken}
-      className="flex-1"
-      style={{ position: 'relative' }}
-      pageChrome={(page) => (
-        <>
-          {/* BOX-SPACE chrome: the click target + selection border hug the page
-              box; the number sits in the reserved bottom band. Neither rotates. */}
-          <button
-            type="button"
-            onClick={() => {
-              main.goToPage(page.pageIndex);
-              closeOnPick();
-            }}
-            title={t('thumbnails.page', { params: { page: page.pageIndex + 1 } })}
-            // The current page in the accent with a tint around it, the others in a light line.
-            className={`box-border cursor-pointer rounded ${
-              page.pageIndex === currentPage
-                ? 'border-accent ring-accent-light border-2 ring-2'
-                : 'border-border-subtle border'
-            }`}
-            style={{
-              position: 'absolute',
-              top: page.frame.top,
-              left: page.frame.left,
-              right: page.frame.right,
-              bottom: page.frame.bottom,
-            }}
-          />
-          <div
-            style={{
-              position: 'absolute',
-              bottom: 0,
-              left: 0,
-              right: 0,
-              height: page.frame.bottom,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 11,
-              color: 'var(--epdf-text-muted)',
-              pointerEvents: 'none',
-            }}
-          >
-            {page.pageIndex + 1}
-          </div>
-        </>
-      )}
-    >
-      {/* page-space content: the bitmap, which rotates with the page */}
-      {() => <RenderLayer />}
-    </Stage>
+    <Scope>
+      <PanelFrame
+        id={id}
+        side={side}
+        present={panel.present}
+        width={panel.width}
+        resizable={panel.resizable}
+        title={title}
+        header={
+          siblings.length > 1 ? (
+            <PanelSwitcher id={id} title={title} panels={siblings} />
+          ) : undefined
+        }
+        bars={<PanelBars panel={id} />}
+        list={content?.list}
+        onClose={() => shell?.close(id)}
+      >
+        <slot name={`panel:${id}`}>{content?.draw(documentId)}</slot>
+      </PanelFrame>
+    </Scope>
   );
 }

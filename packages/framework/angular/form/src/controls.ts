@@ -34,7 +34,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { CapabilityBinding, injectFontMounts, injectKernelHost } from '@embedpdf/angular/runtime';
-import { FontsToken } from '@embedpdf/plugin-fonts';
+import { FontsToken } from '@embedpdf/plugin-fonts/contract';
 import { SignatureToken } from '@embedpdf/plugin-signature/contract';
 import {
   createTextFieldEditor,

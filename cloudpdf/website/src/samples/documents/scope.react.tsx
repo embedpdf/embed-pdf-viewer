@@ -15,7 +15,9 @@ import './scope.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin()];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
+
+const article: OpenInput = { kind: 'grant', grant: 'shr_v09cJHOmj3C8vrfUlZNTDyqX' };
 
 // The same component in both panes: each talks to the document its <DocumentScope> names.
 function Header() {
@@ -67,8 +69,8 @@ export default function App() {
       engine={engine}
       plugins={plugins}
       initialDocuments={[
-        { source: ebook, name: 'Original' },
-        { source: ebook, name: 'Revised' },
+        { source: welcome, name: 'Guide' },
+        { source: article, name: 'Article' },
       ]}
     >
       <SideBySide />

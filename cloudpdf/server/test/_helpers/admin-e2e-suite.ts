@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import type { Kysely } from 'kysely';
 import {
+  DocumentsRepo,
   FsObjectStore,
   signDevToken,
   StorageKeys,
@@ -51,7 +52,7 @@ export interface AdminE2eDialectFixture {
  */
 export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
   async function buildFixture(
-    opts: { sweepIntervalMs?: number; enableRevocation?: boolean } = {},
+    opts: { sweepIntervalMs?: number; deletingGraceMs?: number; enableRevocation?: boolean } = {},
   ): Promise<Fixture> {
     const storageRoot = await mkdtemp(join(tmpdir(), 'embedpdf-admin-e2e-'));
     const db = await dialect.makeDb();
@@ -67,6 +68,7 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
       autoProvisionTenant: true,
       sweepIntervalMs: opts.sweepIntervalMs ?? 0,
       pendingTtlMs: 100,
+      ...(opts.deletingGraceMs !== undefined ? { deletingGraceMs: opts.deletingGraceMs } : {}),
       ...(opts.enableRevocation ? { enableRevocation: true } : {}),
     });
     const addr = await bundle.app.listen({ host: '127.0.0.1', port: 0 });
@@ -88,6 +90,7 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
         | '*'
         | 'docs.create'
         | 'docs.read'
+        | 'docs.update'
         | 'docs.delete'
         | 'tokens.issue-doc'
         | 'tokens.revoke'
@@ -99,6 +102,27 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
       tenant_id: tenantId,
       scope: opts.scope ?? ['*'],
     });
+  }
+
+  async function failureOf(promise: Promise<unknown>): Promise<AdminError | undefined> {
+    try {
+      await promise;
+      return undefined;
+    } catch (e) {
+      return e as AdminError;
+    }
+  }
+
+  const detailsOf = (err: AdminError | undefined) =>
+    (err?.body as { error?: { details?: Record<string, unknown> } } | undefined)?.error?.details;
+
+  /** Poll until `check` holds; deletes finish in the background. */
+  async function eventually(check: () => Promise<boolean>, timeoutMs = 5000): Promise<void> {
+    const deadline = Date.now() + timeoutMs;
+    while (!(await check())) {
+      if (Date.now() > deadline) throw new Error('condition did not hold in time');
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
   }
 
   function fakePdf(seed: number, size: number): Uint8Array {
@@ -385,6 +409,31 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
         headers: { authorization: `Bearer ${adminToken('tenant-a')}` },
       });
       expect(withTenantJwt.status).toBe(403);
+    });
+
+    test('the original file and the thumbnail need document permissions, not docs.read', async () => {
+      const tenant = 'tenant-content';
+      const owner = createCloudAdmin({
+        baseUrl: fx.baseUrl,
+        tenantToken: adminToken(tenant),
+      }).tenant(tenant);
+      const doc = (await owner.documents.create({ bytes: fakePdf(90, 256) })).document;
+      const keyWith = (scope: string[]) =>
+        signDevToken(SECRET, { sub: `key-${scope.join('+')}`, tenant_id: tenant, scope });
+      const get = (token: string, rest: string) =>
+        fetch(`${fx.baseUrl}/v1/tenants/${tenant}/documents/${doc.id}${rest}`, {
+          headers: { authorization: `Bearer ${token}` },
+        });
+
+      const records = keyWith(['docs.read']);
+      expect((await get(records, '')).status).toBe(200);
+      expect((await get(records, '/download')).status).toBe(403);
+      expect((await get(records, '/thumbnail')).status).toBe(403);
+
+      expect((await get(keyWith(['doc.download']), '/download')).status).toBe(200);
+      // Allowed in, and the tile is not warmed here (no engine), so 404.
+      expect((await get(keyWith(['doc.render']), '/thumbnail')).status).toBe(404);
+      expect((await get(keyWith(['doc.render']), '/download')).status).toBe(403);
     });
 
     test('docs.read scope alone cannot create', async () => {
@@ -811,7 +860,11 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
         expect(err?.status).toBe(400);
       }
 
-      for (const cursor of ['not-a-cursor', 'v1.%%%%', `v1.${Buffer.from('[1]').toString('base64url')}`]) {
+      for (const cursor of [
+        'not-a-cursor',
+        'v1.%%%%',
+        `v1.${Buffer.from('[1]').toString('base64url')}`,
+      ]) {
         let err: AdminError | undefined;
         try {
           await admin.documents.list({ cursor });
@@ -880,6 +933,728 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
       }
       expect(ids).toHaveLength(5);
       expect(new Set(ids).size).toBe(5);
+    });
+  });
+
+  describe(`Document names, search and sort [${dialect.label}]`, () => {
+    let fx: Fixture;
+
+    beforeAll(async () => {
+      fx = await buildFixture();
+    });
+    afterAll(async () => {
+      await tearDown(fx);
+    });
+
+    function tenantAdmin(
+      tenantId: string,
+      scope?: NonNullable<Parameters<typeof adminToken>[1]>['scope'],
+    ) {
+      return createCloudAdmin({
+        baseUrl: fx.baseUrl,
+        tenantToken: adminToken(tenantId, scope ? { scope } : {}),
+      }).tenant(tenantId);
+    }
+
+    async function statusOf(promise: Promise<unknown>): Promise<number> {
+      try {
+        await promise;
+        return 200;
+      } catch (e) {
+        return (e as AdminError).status;
+      }
+    }
+
+    async function walk(
+      admin: ReturnType<typeof tenantAdmin>,
+      options: Record<string, unknown>,
+    ): Promise<string[]> {
+      const ids: string[] = [];
+      let cursor: string | undefined;
+      do {
+        const page = await admin.documents.list({ ...options, limit: 2, cursor });
+        ids.push(...page.documents.map((d: { id: string }) => d.id));
+        cursor = page.nextCursor ?? undefined;
+      } while (cursor !== undefined);
+      return ids;
+    }
+
+    test('a document is named at upload, or after its id', async () => {
+      const admin = tenantAdmin('tenant-names-upload');
+      const named = await admin.documents.create({
+        bytes: fakePdf(100, 300),
+        name: 'Quarterly report.pdf',
+      });
+      expect(named.document.name).toBe('Quarterly report.pdf');
+      const unnamed = await admin.documents.create({ bytes: fakePdf(101, 300) });
+      expect(unnamed.document.name).toBe(unnamed.document.id);
+      expect((await admin.documents.get(named.document.id)).name).toBe('Quarterly report.pdf');
+    });
+
+    test('names a person cannot read are 400s at upload and rename', async () => {
+      const admin = tenantAdmin('tenant-names-invalid');
+      const bytes = fakePdf(110, 300);
+      const doc = await admin.documents.create({ bytes, name: 'Valid.pdf' });
+      for (const name of ['', ' leading.pdf', 'trailing.pdf ', 'tab\there.pdf', 'a'.repeat(256)]) {
+        const init = admin.documents.init({
+          contentLength: bytes.byteLength,
+          contentSha256: sha256Hex(bytes),
+          name,
+        });
+        expect(await statusOf(init)).toBe(400);
+        expect(await statusOf(admin.documents.rename(doc.document.id, name))).toBe(400);
+      }
+      expect((await admin.documents.rename(doc.document.id, 'a'.repeat(255))).name).toHaveLength(
+        255,
+      );
+      expect((await admin.documents.rename(doc.document.id, 'Überweisung März.pdf')).name).toBe(
+        'Überweisung März.pdf',
+      );
+    });
+
+    test('rename changes the name; gone, deleting and foreign documents are refused', async () => {
+      const admin = tenantAdmin('tenant-names-rename');
+      const doc = await admin.documents.create({ bytes: fakePdf(120, 300), name: 'Draft.pdf' });
+      const renamed = await admin.documents.rename(doc.document.id, 'Final.pdf');
+      expect(renamed.name).toBe('Final.pdf');
+      expect((await admin.documents.get(doc.document.id)).name).toBe('Final.pdf');
+      expect(
+        (await admin.documents.list({ q: 'final' })).documents.map((d: { id: string }) => d.id),
+      ).toEqual([doc.document.id]);
+
+      expect(await statusOf(admin.documents.rename('doc_missing', 'X.pdf'))).toBe(404);
+      const other = tenantAdmin('tenant-names-rename-other');
+      expect(await statusOf(other.documents.rename(doc.document.id, 'Mine.pdf'))).toBe(403);
+
+      await fx.db
+        .updateTable('documents')
+        .set({ state: 'deleting' })
+        .where('id', '=', doc.document.id)
+        .execute();
+      expect(await statusOf(admin.documents.rename(doc.document.id, 'Again.pdf'))).toBe(404);
+    });
+
+    test('renaming needs docs.update', async () => {
+      const owner = tenantAdmin('tenant-names-scope');
+      const doc = await owner.documents.create({ bytes: fakePdf(130, 300), name: 'Before.pdf' });
+      const withoutUpdate = tenantAdmin('tenant-names-scope', [
+        'docs.create',
+        'docs.read',
+        'docs.delete',
+      ]);
+      expect(await statusOf(withoutUpdate.documents.rename(doc.document.id, 'After.pdf'))).toBe(
+        403,
+      );
+      const updateOnly = tenantAdmin('tenant-names-scope', ['docs.update']);
+      expect((await updateOnly.documents.rename(doc.document.id, 'After.pdf')).name).toBe(
+        'After.pdf',
+      );
+    });
+
+    test('search matches part of a name, ignoring case, with % and _ taken literally', async () => {
+      const admin = tenantAdmin('tenant-names-search');
+      const ids: Record<string, string> = {};
+      for (const [i, name] of [
+        'Invoice 2026.pdf',
+        'invoice_final.pdf',
+        'invoiceXfinal.pdf',
+        'Report 100%.pdf',
+        'Überweisung.pdf',
+        'Contract.pdf',
+      ].entries()) {
+        ids[name] = (
+          await admin.documents.create({ bytes: fakePdf(140 + i, 300), name })
+        ).document.id;
+      }
+      const search = async (q: string, options: Record<string, unknown> = {}) =>
+        (await admin.documents.list({ q, ...options })).documents
+          .map((d: { name: string }) => d.name)
+          .sort();
+
+      expect(await search('INVOICE')).toEqual([
+        'Invoice 2026.pdf',
+        'invoiceXfinal.pdf',
+        'invoice_final.pdf',
+      ]);
+      expect(await search('_')).toEqual(['invoice_final.pdf']);
+      expect(await search('e_f')).toEqual(['invoice_final.pdf']);
+      expect(await search('100%')).toEqual(['Report 100%.pdf']);
+      expect(await search('%')).toEqual(['Report 100%.pdf']);
+      expect(await search('ÜBER')).toEqual(['Überweisung.pdf']);
+      expect(await search('nothing like this')).toEqual([]);
+
+      // Search composes with the name sort and its cursor.
+      expect(await walk(admin, { q: 'invoice', sort: 'name' })).toEqual([
+        ids['Invoice 2026.pdf'],
+        ids['invoice_final.pdf'],
+        ids['invoiceXfinal.pdf'],
+      ]);
+    });
+
+    test('every sort and order pages through ties in a stable order', async () => {
+      const admin = tenantAdmin('tenant-names-sort');
+      const specs = [
+        { name: 'beta.pdf', size: 300, createdAt: 1_700_000_000_000 },
+        { name: 'Alpha.pdf', size: 100, createdAt: 1_700_000_000_000 },
+        { name: 'alpha.pdf', size: 300, createdAt: 1_700_000_001_000 },
+        { name: 'Gamma.pdf', size: 200, createdAt: 1_700_000_002_000 },
+        { name: 'beta.pdf', size: 100, createdAt: 1_700_000_002_000 },
+      ];
+      const docs: Array<{ id: string; name: string; size: number; createdAt: number }> = [];
+      for (const [i, spec] of specs.entries()) {
+        const { document } = await admin.documents.create({
+          bytes: fakePdf(160 + i, spec.size),
+          name: spec.name,
+        });
+        await fx.db
+          .updateTable('documents')
+          .set({ created_at: spec.createdAt })
+          .where('id', '=', document.id)
+          .execute();
+        docs.push({ id: document.id, ...spec });
+      }
+
+      const keyOf = {
+        createdAt: (d: (typeof docs)[number]) => d.createdAt,
+        name: (d: (typeof docs)[number]) => d.name.toLowerCase(),
+        size: (d: (typeof docs)[number]) => d.size,
+      } as const;
+      for (const sort of ['createdAt', 'name', 'size'] as const) {
+        for (const order of ['asc', 'desc', undefined] as const) {
+          const direction = order ?? (sort === 'name' ? 'asc' : 'desc');
+          const sign = direction === 'asc' ? 1 : -1;
+          const expected = [...docs]
+            .sort((left, right) => {
+              const leftKey = keyOf[sort](left);
+              const rightKey = keyOf[sort](right);
+              if (leftKey !== rightKey) return (leftKey < rightKey ? -1 : 1) * sign;
+              return (left.id < right.id ? -1 : 1) * sign;
+            })
+            .map((d) => d.id);
+          const options = order ? { sort, order } : { sort };
+          expect(await walk(admin, options), `${sort} ${order ?? 'default'}`).toEqual(expected);
+        }
+      }
+    });
+
+    test('a cursor only continues the sort and order it was made with', async () => {
+      const admin = tenantAdmin('tenant-names-cursor');
+      for (let i = 0; i < 3; i++) {
+        await admin.documents.create({ bytes: fakePdf(180 + i, 300), name: `File ${i}.pdf` });
+      }
+      const first = await admin.documents.list({ sort: 'name', limit: 1 });
+      const cursor = first.nextCursor!;
+      expect(cursor).toBeTruthy();
+      expect(await statusOf(admin.documents.list({ sort: 'name', order: 'asc', cursor }))).toBe(
+        200,
+      );
+      expect(await statusOf(admin.documents.list({ sort: 'size', cursor }))).toBe(400);
+      expect(await statusOf(admin.documents.list({ sort: 'name', order: 'desc', cursor }))).toBe(
+        400,
+      );
+      expect(await statusOf(admin.documents.list({ cursor }))).toBe(400);
+    });
+
+    test('documents being deleted are hidden unless asked for by state', async () => {
+      const admin = tenantAdmin('tenant-names-deleting');
+      const kept = await admin.documents.create({ bytes: fakePdf(190, 300), name: 'Kept.pdf' });
+      const going = await admin.documents.create({ bytes: fakePdf(191, 300), name: 'Going.pdf' });
+      await fx.db
+        .updateTable('documents')
+        .set({ state: 'deleting' })
+        .where('id', '=', going.document.id)
+        .execute();
+      const ids = (page: { documents: Array<{ id: string }> }) => page.documents.map((d) => d.id);
+      expect(ids(await admin.documents.list())).toEqual([kept.document.id]);
+      expect(ids(await admin.documents.list({ q: 'going' }))).toEqual([]);
+      expect(ids(await admin.documents.list({ state: 'deleting' }))).toEqual([going.document.id]);
+    });
+  });
+
+  describe(`Folders [${dialect.label}]`, () => {
+    let fx: Fixture;
+
+    beforeAll(async () => {
+      fx = await buildFixture();
+    });
+    afterAll(async () => {
+      await tearDown(fx);
+    });
+
+    function tenantAdmin(
+      tenantId: string,
+      scope?: NonNullable<Parameters<typeof adminToken>[1]>['scope'],
+    ) {
+      return createCloudAdmin({
+        baseUrl: fx.baseUrl,
+        tenantToken: adminToken(tenantId, scope ? { scope } : {}),
+      }).tenant(tenantId);
+    }
+
+    test('folders are made at the top level or inside another, and listed by name', async () => {
+      const admin = tenantAdmin('tenant-folders-list');
+      const contracts = await admin.folders.create({ name: 'Contracts' });
+      const invoices = await admin.folders.create({ name: 'invoices', parentId: 'root' });
+      const year = await admin.folders.create({ name: '2026', parentId: contracts.id });
+      expect(contracts.parentId).toBe('root');
+      expect(year.parentId).toBe(contracts.id);
+      expect(contracts.id).toMatch(/^fld_[0-9a-f]{24}$/);
+
+      const names = (page: { folders: Array<{ name: string }> }) => page.folders.map((f) => f.name);
+      expect(names(await admin.folders.list())).toEqual(['2026', 'Contracts', 'invoices']);
+      expect(names(await admin.folders.list({ parentId: 'root' }))).toEqual([
+        'Contracts',
+        'invoices',
+      ]);
+      expect(names(await admin.folders.list({ parentId: contracts.id }))).toEqual(['2026']);
+      expect(names(await admin.folders.list({ parentId: invoices.id }))).toEqual([]);
+
+      const walked: string[] = [];
+      let cursor: string | undefined;
+      do {
+        const page = await admin.folders.list({ limit: 1, cursor });
+        walked.push(...names(page));
+        cursor = page.nextCursor ?? undefined;
+      } while (cursor !== undefined);
+      expect(walked).toEqual(['2026', 'Contracts', 'invoices']);
+
+      expect(
+        (await failureOf(admin.folders.list({ parentId: 'fld_000000000000000000000000' })))?.status,
+      ).toBe(404);
+    });
+
+    test('a folder comes with the path above it', async () => {
+      const admin = tenantAdmin('tenant-folders-path');
+      const a = await admin.folders.create({ name: 'A' });
+      const b = await admin.folders.create({ name: 'B', parentId: a.id });
+      const c = await admin.folders.create({ name: 'C', parentId: b.id });
+      const got = await admin.folders.get(c.id);
+      expect(got.folder.name).toBe('C');
+      expect(got.path).toEqual([
+        { id: a.id, name: 'A' },
+        { id: b.id, name: 'B' },
+      ]);
+      expect((await admin.folders.get(a.id)).path).toEqual([]);
+      expect((await failureOf(admin.folders.get('fld_000000000000000000000000')))?.status).toBe(
+        404,
+      );
+    });
+
+    test('sibling names are unique ignoring case, at the top level too', async () => {
+      const admin = tenantAdmin('tenant-folders-names');
+      const reports = await admin.folders.create({ name: 'Reports' });
+      const clash = await failureOf(admin.folders.create({ name: 'reports' }));
+      expect(clash?.status).toBe(409);
+      expect(detailsOf(clash)).toEqual({ reason: 'name-taken', name: 'Reports' });
+
+      const other = await admin.folders.create({ name: 'Other' });
+      await admin.folders.create({ name: 'Reports', parentId: other.id });
+      expect((await failureOf(admin.folders.rename(other.id, 'REPORTS')))?.status).toBe(409);
+      expect((await admin.folders.rename(reports.id, 'REPORTS')).name).toBe('REPORTS');
+
+      for (const name of ['', ' padded', 'tab\there']) {
+        expect((await failureOf(admin.folders.create({ name })))?.status).toBe(400);
+      }
+
+      await admin.folders.delete(reports.id);
+      expect((await admin.folders.create({ name: 'reports' })).name).toBe('reports');
+    });
+
+    test('documents are filed at upload and listed per folder', async () => {
+      const admin = tenantAdmin('tenant-folders-docs');
+      const folder = await admin.folders.create({ name: 'Inbox' });
+      const filed = await admin.documents.create({ bytes: fakePdf(200, 300), folderId: folder.id });
+      const loose = await admin.documents.create({ bytes: fakePdf(201, 300) });
+      expect(filed.document.folderId).toBe(folder.id);
+      expect(loose.document.folderId).toBe('root');
+
+      const ids = (page: { documents: Array<{ id: string }> }) => page.documents.map((d) => d.id);
+      expect(ids(await admin.documents.list({ folderId: folder.id }))).toEqual([filed.document.id]);
+      expect(ids(await admin.documents.list({ folderId: 'root' }))).toEqual([loose.document.id]);
+      expect(new Set(ids(await admin.documents.list()))).toEqual(
+        new Set([filed.document.id, loose.document.id]),
+      );
+
+      const missing = 'fld_000000000000000000000000';
+      expect((await failureOf(admin.documents.list({ folderId: missing })))?.status).toBe(404);
+      expect(
+        (await failureOf(admin.documents.create({ bytes: fakePdf(202, 300), folderId: missing })))
+          ?.status,
+      ).toBe(404);
+      const foreign = await tenantAdmin('tenant-folders-docs-other').folders.create({
+        name: 'Theirs',
+      });
+      expect(
+        (
+          await failureOf(
+            admin.documents.create({ bytes: fakePdf(203, 300), folderId: foreign.id }),
+          )
+        )?.status,
+      ).toBe(403);
+    });
+
+    test('a move takes documents and folders together, or nothing', async () => {
+      const admin = tenantAdmin('tenant-folders-move');
+      const a = await admin.folders.create({ name: 'A' });
+      const b = await admin.folders.create({ name: 'B' });
+      const doc1 = (await admin.documents.create({ bytes: fakePdf(210, 300) })).document;
+      const doc2 = (await admin.documents.create({ bytes: fakePdf(211, 300) })).document;
+
+      await admin.folders.moveInto(b.id, { documentIds: [doc1.id], folderIds: [a.id] });
+      expect((await admin.folders.get(a.id)).folder.parentId).toBe(b.id);
+      expect((await admin.documents.get(doc1.id)).folderId).toBe(b.id);
+
+      await admin.folders.moveInto('root', { documentIds: [doc1.id], folderIds: [a.id] });
+      expect((await admin.documents.get(doc1.id)).folderId).toBe('root');
+      expect((await admin.folders.get(a.id)).folder.parentId).toBe('root');
+
+      const missing = await failureOf(
+        admin.folders.moveInto(b.id, {
+          documentIds: [doc2.id, 'doc_missing'],
+          folderIds: [a.id, 'fld_000000000000000000000000'],
+        }),
+      );
+      expect(missing?.status).toBe(404);
+      expect(detailsOf(missing)).toEqual({
+        documentIds: ['doc_missing'],
+        folderIds: ['fld_000000000000000000000000'],
+      });
+      expect((await admin.documents.get(doc2.id)).folderId).toBe('root');
+      expect((await admin.folders.get(a.id)).folder.parentId).toBe('root');
+
+      expect((await failureOf(admin.folders.moveInto(b.id, {})))?.status).toBe(400);
+    });
+
+    test('a folder cannot move into itself or anything inside it', async () => {
+      const admin = tenantAdmin('tenant-folders-cycle');
+      const a = await admin.folders.create({ name: 'A' });
+      const b = await admin.folders.create({ name: 'B', parentId: a.id });
+      const c = await admin.folders.create({ name: 'C', parentId: b.id });
+
+      for (const [target, moved] of [
+        [a.id, [a.id]],
+        [c.id, [a.id]],
+        [c.id, [b.id, c.id]],
+      ] as const) {
+        const err = await failureOf(admin.folders.moveInto(target, { folderIds: [...moved] }));
+        expect(err?.status).toBe(409);
+        expect(detailsOf(err)?.['reason']).toBe('cycle');
+      }
+
+      // A folder and its own subfolder may move together, out of each other.
+      await admin.folders.moveInto(a.id, { folderIds: [b.id, c.id] });
+      expect((await admin.folders.get(c.id)).folder.parentId).toBe(a.id);
+      expect((await admin.folders.get(b.id)).folder.parentId).toBe(a.id);
+    });
+
+    test('a name clash fails the whole move', async () => {
+      const admin = tenantAdmin('tenant-folders-move-names');
+      const target = await admin.folders.create({ name: 'Target' });
+      await admin.folders.create({ name: 'Same', parentId: target.id });
+      const p1 = await admin.folders.create({ name: 'P1' });
+      const p2 = await admin.folders.create({ name: 'P2' });
+      const same = await admin.folders.create({ name: 'same', parentId: p1.id });
+      const x1 = await admin.folders.create({ name: 'X', parentId: p1.id });
+      const x2 = await admin.folders.create({ name: 'x', parentId: p2.id });
+      const doc = (await admin.documents.create({ bytes: fakePdf(220, 300) })).document;
+
+      const clash = await failureOf(
+        admin.folders.moveInto(target.id, { documentIds: [doc.id], folderIds: [same.id] }),
+      );
+      expect(detailsOf(clash)).toEqual({ reason: 'name-taken', name: 'Same' });
+      expect((await admin.documents.get(doc.id)).folderId).toBe('root');
+
+      const together = await failureOf(
+        admin.folders.moveInto(target.id, { folderIds: [x1.id, x2.id] }),
+      );
+      expect(detailsOf(together)?.['reason']).toBe('name-taken');
+
+      // Moving a folder to where it already is clashes with nothing.
+      await admin.folders.moveInto(p1.id, { folderIds: [same.id] });
+    });
+
+    test('folders nest at most 100 levels, on create and on move', async () => {
+      const admin = tenantAdmin('tenant-folders-depth');
+      const chain: string[] = [];
+      for (let level = 1; level <= 100; level++) {
+        const parentId = chain[chain.length - 1];
+        chain.push(
+          (await admin.folders.create({ name: `L${level}`, ...(parentId ? { parentId } : {}) })).id,
+        );
+      }
+      const deepest = await failureOf(admin.folders.create({ name: 'L101', parentId: chain[99]! }));
+      expect(detailsOf(deepest)).toEqual({ reason: 'too-deep', maxDepth: 100 });
+
+      const x = await admin.folders.create({ name: 'X' });
+      await admin.folders.create({ name: 'Y', parentId: x.id });
+      const tooDeep = await failureOf(admin.folders.moveInto(chain[98]!, { folderIds: [x.id] }));
+      expect(detailsOf(tooDeep)?.['reason']).toBe('too-deep');
+      await admin.folders.moveInto(chain[97]!, { folderIds: [x.id] });
+      expect((await admin.folders.get(x.id)).path).toHaveLength(98);
+    });
+
+    test('only an empty folder is deleted; otherwise the refusal says what it holds', async () => {
+      const admin = tenantAdmin('tenant-folders-delete');
+      const outer = await admin.folders.create({ name: 'Outer' });
+      const inner = await admin.folders.create({ name: 'Inner', parentId: outer.id });
+      const doc = (await admin.documents.create({ bytes: fakePdf(230, 300), folderId: inner.id }))
+        .document;
+
+      const full = await failureOf(admin.folders.delete(outer.id));
+      expect(full?.status).toBe(409);
+      expect(detailsOf(full)).toEqual({ reason: 'not-empty', folders: 1, documents: 1 });
+      expect(detailsOf(await failureOf(admin.folders.delete(inner.id)))).toEqual({
+        reason: 'not-empty',
+        folders: 0,
+        documents: 1,
+      });
+
+      // A document being deleted is in no folder, so it holds nothing back.
+      await new DocumentsRepo(fx.db).beginDelete(doc.id, 'tenant-folders-delete');
+      await admin.folders.delete(inner.id);
+      await admin.folders.delete(outer.id);
+      expect((await failureOf(admin.folders.get(outer.id)))?.status).toBe(404);
+    });
+
+    test('each folder route needs its docs scope', async () => {
+      const owner = tenantAdmin('tenant-folders-scope');
+      const folder = await owner.folders.create({ name: 'Scoped' });
+      const doc = (await owner.documents.create({ bytes: fakePdf(240, 300) })).document;
+      const readOnly = tenantAdmin('tenant-folders-scope', ['docs.read']);
+      const noUpdate = tenantAdmin('tenant-folders-scope', [
+        'docs.create',
+        'docs.read',
+        'docs.delete',
+      ]);
+      const noDelete = tenantAdmin('tenant-folders-scope', [
+        'docs.create',
+        'docs.read',
+        'docs.update',
+      ]);
+
+      expect((await failureOf(readOnly.folders.create({ name: 'Nope' })))?.status).toBe(403);
+      expect((await readOnly.folders.get(folder.id)).folder.name).toBe('Scoped');
+      expect((await failureOf(noUpdate.folders.rename(folder.id, 'Renamed')))?.status).toBe(403);
+      expect(
+        (await failureOf(noUpdate.folders.moveInto(folder.id, { documentIds: [doc.id] })))?.status,
+      ).toBe(403);
+      expect((await failureOf(noDelete.folders.delete(folder.id)))?.status).toBe(403);
+      await tenantAdmin('tenant-folders-scope', ['docs.update']).folders.moveInto(folder.id, {
+        documentIds: [doc.id],
+      });
+      expect((await owner.documents.get(doc.id)).folderId).toBe(folder.id);
+    });
+
+    test("another tenant's folders are out of reach", async () => {
+      const mine = tenantAdmin('tenant-folders-iso-a');
+      const theirs = tenantAdmin('tenant-folders-iso-b');
+      const folder = await mine.folders.create({ name: 'Private' });
+      const doc = (await mine.documents.create({ bytes: fakePdf(250, 300) })).document;
+      expect((await failureOf(theirs.folders.get(folder.id)))?.status).toBe(403);
+      expect((await failureOf(theirs.folders.rename(folder.id, 'Mine')))?.status).toBe(403);
+      expect((await failureOf(theirs.folders.delete(folder.id)))?.status).toBe(403);
+      const target = await theirs.folders.create({ name: 'Target' });
+      const moved = await failureOf(
+        theirs.folders.moveInto(target.id, { documentIds: [doc.id], folderIds: [folder.id] }),
+      );
+      expect(moved?.status).toBe(404);
+      expect(detailsOf(moved)).toEqual({ documentIds: [doc.id], folderIds: [folder.id] });
+    });
+
+    test('opposite moves at the same time never make a loop', async () => {
+      const admin = tenantAdmin('tenant-folders-race');
+      for (let round = 0; round < 5; round++) {
+        const a = await admin.folders.create({ name: `A${round}` });
+        const b = await admin.folders.create({ name: `B${round}` });
+        const results = await Promise.allSettled([
+          admin.folders.moveInto(b.id, { folderIds: [a.id] }),
+          admin.folders.moveInto(a.id, { folderIds: [b.id] }),
+        ]);
+        expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+        const refused = results.find((r) => r.status === 'rejected') as PromiseRejectedResult;
+        expect(detailsOf(refused.reason as AdminError)?.['reason']).toBe('cycle');
+        const parents = [
+          (await admin.folders.get(a.id)).folder.parentId,
+          (await admin.folders.get(b.id)).folder.parentId,
+        ];
+        expect(parents.filter((parent) => parent === 'root')).toHaveLength(1);
+      }
+    });
+
+    test('deleting a tenant deletes its folders', async () => {
+      const admin = tenantAdmin('tenant-folders-cascade');
+      const outer = await admin.folders.create({ name: 'Outer' });
+      const inner = await admin.folders.create({ name: 'Inner', parentId: outer.id });
+      await admin.documents.create({ bytes: fakePdf(260, 300), folderId: inner.id });
+      const root = createCloudAdmin({ baseUrl: fx.baseUrl, apiToken: API_TOKEN });
+      await root.tenants.delete('tenant-folders-cascade');
+      const left = await fx.db
+        .selectFrom('folders')
+        .select('id')
+        .where('tenant_id', '=', 'tenant-folders-cascade')
+        .execute();
+      expect(left).toEqual([]);
+    });
+  });
+
+  describe(`Deleting folders with what they hold [${dialect.label}]`, () => {
+    let fx: Fixture;
+
+    beforeAll(async () => {
+      fx = await buildFixture();
+    });
+    afterAll(async () => {
+      await tearDown(fx);
+    });
+
+    function tenantAdmin(
+      tenantId: string,
+      scope?: NonNullable<Parameters<typeof adminToken>[1]>['scope'],
+    ) {
+      return createCloudAdmin({
+        baseUrl: fx.baseUrl,
+        tenantToken: adminToken(tenantId, scope ? { scope } : {}),
+      }).tenant(tenantId);
+    }
+
+    const gone = async (admin: ReturnType<typeof tenantAdmin>, docId: string) =>
+      (await failureOf(admin.documents.get(docId)))?.status === 404;
+
+    test('a folder goes with everything under it, at once; stored files follow', async () => {
+      const tenant = 'tenant-rdel-all';
+      const admin = tenantAdmin(tenant);
+      const a = await admin.folders.create({ name: 'A' });
+      const b = await admin.folders.create({ name: 'B', parentId: a.id });
+      const keep = await admin.folders.create({ name: 'Keep' });
+      const inA = (await admin.documents.create({ bytes: fakePdf(300, 300), folderId: a.id }))
+        .document;
+      const inB = (await admin.documents.create({ bytes: fakePdf(301, 300), folderId: b.id }))
+        .document;
+      const kept = (await admin.documents.create({ bytes: fakePdf(302, 300), folderId: keep.id }))
+        .document;
+
+      await admin.folders.delete(a.id, { recursive: true });
+
+      expect((await failureOf(admin.folders.get(a.id)))?.status).toBe(404);
+      expect((await failureOf(admin.folders.get(b.id)))?.status).toBe(404);
+      expect((await admin.documents.list()).documents.map((d: { id: string }) => d.id)).toEqual([
+        kept.id,
+      ]);
+      expect((await admin.folders.create({ name: 'a' })).name).toBe('a');
+
+      await eventually(async () => (await gone(admin, inA.id)) && (await gone(admin, inB.id)));
+      expect(await fx.store.stat(StorageKeys.basePdf(tenant, inA.id))).toBeNull();
+      expect(await fx.store.stat(StorageKeys.basePdf(tenant, inB.id))).toBeNull();
+      expect((await admin.documents.get(kept.id)).state).toBe('ready');
+    });
+
+    test('a deep tree goes in one delete', async () => {
+      const admin = tenantAdmin('tenant-rdel-deep');
+      const chain: string[] = [];
+      const docs: string[] = [];
+      for (let level = 1; level <= 30; level++) {
+        const parentId = chain[chain.length - 1];
+        const folder = await admin.folders.create({
+          name: `L${level}`,
+          ...(parentId ? { parentId } : {}),
+        });
+        chain.push(folder.id);
+        if (level % 10 === 0) {
+          docs.push(
+            (
+              await admin.documents.create({
+                bytes: fakePdf(310 + level, 300),
+                folderId: folder.id,
+              })
+            ).document.id,
+          );
+        }
+      }
+      await admin.folders.delete(chain[0]!, { recursive: true });
+      expect((await admin.folders.list()).folders).toEqual([]);
+      expect((await admin.documents.list()).documents).toEqual([]);
+      await eventually(async () => {
+        for (const id of docs) if (!(await gone(admin, id))) return false;
+        return true;
+      });
+    });
+
+    test('without recursive, a folder holding anything is still refused', async () => {
+      const admin = tenantAdmin('tenant-rdel-plain');
+      const folder = await admin.folders.create({ name: 'Full' });
+      const doc = (await admin.documents.create({ bytes: fakePdf(320, 300), folderId: folder.id }))
+        .document;
+      for (const options of [{}, { recursive: false }]) {
+        const refused = await failureOf(admin.folders.delete(folder.id, options));
+        expect(detailsOf(refused)).toEqual({ reason: 'not-empty', folders: 0, documents: 1 });
+      }
+      expect((await admin.documents.get(doc.id)).state).toBe('ready');
+    });
+
+    test('deleting a folder with what it holds needs docs.delete', async () => {
+      const owner = tenantAdmin('tenant-rdel-scope');
+      const folder = await owner.folders.create({ name: 'Scoped' });
+      await owner.documents.create({ bytes: fakePdf(330, 300), folderId: folder.id });
+      const noDelete = tenantAdmin('tenant-rdel-scope', [
+        'docs.create',
+        'docs.read',
+        'docs.update',
+      ]);
+      expect(
+        (await failureOf(noDelete.folders.delete(folder.id, { recursive: true })))?.status,
+      ).toBe(403);
+      expect((await owner.folders.get(folder.id)).folder.name).toBe('Scoped');
+    });
+
+    test('an upload into a deleted folder cannot finish, and nothing moves into it', async () => {
+      const admin = tenantAdmin('tenant-rdel-upload');
+      const folder = await admin.folders.create({ name: 'Inbox' });
+      const bytes = fakePdf(340, 300);
+      const init = await admin.documents.init({
+        contentLength: bytes.byteLength,
+        contentSha256: sha256Hex(bytes),
+        folderId: folder.id,
+      });
+      await admin.documents.uploadProxy({ docId: init.document.id, body: bytes });
+
+      await admin.folders.delete(folder.id, { recursive: true });
+
+      const commit = await failureOf(
+        admin.documents.commit({ docId: init.document.id, sha256: sha256Hex(bytes) }),
+      );
+      expect([404, 409]).toContain(commit?.status);
+      const loose = (await admin.documents.create({ bytes: fakePdf(341, 300) })).document;
+      expect(
+        (await failureOf(admin.folders.moveInto(folder.id, { documentIds: [loose.id] })))?.status,
+      ).toBe(404);
+    });
+  });
+
+  describe(`Finishing deletes left behind [${dialect.label}]`, () => {
+    let fx: Fixture;
+
+    beforeAll(async () => {
+      fx = await buildFixture({ sweepIntervalMs: 50, deletingGraceMs: 0 });
+    });
+    afterAll(async () => {
+      await tearDown(fx);
+    });
+
+    test('a document left deleting is finished by the sweeper', async () => {
+      const tenant = 'tenant-sweep-deleting';
+      const admin = createCloudAdmin({
+        baseUrl: fx.baseUrl,
+        tenantToken: adminToken(tenant),
+      }).tenant(tenant);
+      const doc = (await admin.documents.create({ bytes: fakePdf(350, 300) })).document;
+      const key = StorageKeys.basePdf(tenant, doc.id);
+      expect(await fx.store.stat(key)).not.toBeNull();
+
+      // The first phase alone, as a crash between the two would leave it.
+      await new DocumentsRepo(fx.db).beginDelete(doc.id, tenant);
+
+      await eventually(async () => (await failureOf(admin.documents.get(doc.id)))?.status === 404);
+      expect(await fx.store.stat(key)).toBeNull();
     });
   });
 }

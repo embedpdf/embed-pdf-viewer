@@ -11,6 +11,7 @@
 
 import {
   AnnotationWireComponents,
+  AttachmentWireComponents,
   ChangeWireComponents,
   DocumentWireComponents,
   EngineErrorPayloadSchema,
@@ -48,6 +49,7 @@ const SECURITY_SCHEME: Record<AdminCredential, string> = {
   'api-token': 'apiToken',
   'tenant-jwt': 'tenantToken',
   'doc-jwt': 'docToken',
+  'upload-jwt': 'uploadToken',
 };
 
 const ADMIN_ERROR_REF = '#/components/schemas/AdminErrorPayload';
@@ -65,6 +67,7 @@ const SHARED_COMPONENT_SCHEMAS = sharedComponents([
   AnnotationWireComponents,
   FormWireComponents,
   OutlineWireComponents,
+  AttachmentWireComponents,
   ChangeWireComponents,
   FontWireComponents,
 ]);
@@ -123,6 +126,16 @@ export function buildAdminOpenApiDocument(opts: BuildAdminOpenApiOptions): Recor
         'API. Generated from the @cloudpdf/contract operation registry — do not edit by hand.',
       license: { name: 'Apache-2.0', identifier: 'Apache-2.0' },
     },
+    // CloudPDF SaaS, so the SDKs reach it when given no address, as the
+    // browser engine does (`CLOUDPDF_SAAS_URL`). A self-hosted server is
+    // the address a client is given.
+    servers: [
+      {
+        url: 'https://engine.cloudpdf.com',
+        description: 'CloudPDF SaaS',
+        'x-fern-server-name': 'Saas',
+      },
+    ],
     paths: sortKeys(paths),
     // Docs navigation manifest: section titles and URL slugs for the API
     // reference, in sidebar order (see `docsGroups` in the registry).
@@ -142,7 +155,12 @@ export function buildAdminOpenApiDocument(opts: BuildAdminOpenApiOptions): Recor
           bearerFormat: 'JWT',
           'x-docs-title': 'Tenant token',
           description:
-            "Delegated tenant JWT, valid only under its own /v1/tenants/{tenantId}/ subtree — the path tenant must equal the token's tenant_id. Doc-scoped viewer tokens are rejected on every admin route.",
+            'Delegated tenant JWT, valid only for its own tenant: under /v1/tenants/{tenantId}/ ' +
+            "the path tenant must equal the token's tenant_id, and on /v1/docs/{docId} the " +
+            "document must belong to that tenant and the token's scope must hold the operation's " +
+            'document permissions, as a document token does. ' +
+            'For servers; browsers get document tokens. Doc-scoped viewer tokens are rejected on ' +
+            'every admin route.',
         },
         docToken: {
           type: 'http',
@@ -152,6 +170,17 @@ export function buildAdminOpenApiDocument(opts: BuildAdminOpenApiOptions): Recor
           description:
             'Doc-scoped JWT, valid only on the /v1/docs/{docId} subtree it names, gated by ' +
             "the capability scopes it carries (each operation's x-required-capability).",
+        },
+        uploadToken: {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+          'x-docs-title': 'Upload token',
+          description:
+            "Upload-only JWT for a browser, made by tokens.issue with kind upload: valid on its own tenant's " +
+            'documents.init, documents.commit and documents.uploadProxy, and nowhere else. It uploads ' +
+            'into its folder with its metadata, up to maxFiles documents within maxBytes each, and ' +
+            'commits only the documents it started.',
         },
       },
       schemas,

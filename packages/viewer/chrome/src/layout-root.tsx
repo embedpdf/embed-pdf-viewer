@@ -11,9 +11,10 @@
  * notch and the home bar on the edges of the screen it reaches. Under
  * the root, the bars leave out the tab of a mode whose bars show nothing and
  * the button of a menu that shows nothing; an open mode whose tab goes falls
- * back to View; a bar with a new mode gets its `mode:<mode>` command, and each
- * panel its `panel:<id>`, with a command of yours of the same id merged over
- * it; and each problem with the layout is logged once. The root takes focus on
+ * back to View; a bar with a new mode gets its `mode:<mode>` command, each
+ * panel its `panel:<id>` and the root Full Screen (`view:fullscreen`), with a
+ * command of yours of the same id merged over it; and each problem with the
+ * layout is logged once. The root takes focus on
  * a press anywhere in the viewer that lands on nothing focusable (the pages),
  * so the viewer's keys reach it from there.
  */
@@ -53,6 +54,7 @@ import {
 import { ShellToken } from '@embedpdf/react/shell';
 import { observeWidth } from '@embedpdf/web';
 import { defaultLayout } from './config/chrome';
+import { fullscreenCommandOf } from './config/fullscreen';
 import {
   modeCommandsFor,
   modeSpecsOf,
@@ -70,6 +72,7 @@ import {
   type ResolvedLayout,
 } from './config-context';
 import { useScreenEdges } from './ui/compact';
+import { fullscreenTargetOf, useFullscreen } from './ui/fullscreen';
 import { safeAreaPaddingOf } from './ui/screen-edges';
 import { FOCUS_ROOT_ATTRIBUTE } from './ui/viewer-layer';
 
@@ -197,6 +200,7 @@ export function LayoutRoot({
   useLayoutWarnings(measured === null ? null : layout);
 
   const edges = useScreenEdges(root);
+  useFullscreenCommand(root, edges.top && edges.right && edges.bottom && edges.left);
   return (
     <div
       ref={root}
@@ -250,6 +254,24 @@ function usePanelCommands(panels: LayoutData['panels']): void {
       ? commands.registerCommands(definitions, { replace: true })
       : undefined;
   }, [commands, panels, yours]);
+}
+
+/**
+ * Registers Full Screen for the viewer's box, with a command of yours of the same id merged over
+ * it, and again as the box starts or stops filling the screen. `coversWindow` says the root
+ * covers the window already.
+ */
+function useFullscreenCommand(root: RefObject<HTMLElement | null>, coversWindow: boolean): void {
+  const commands = useCommands();
+  const yours = useViewerCommands();
+  const fullscreen = useFullscreen(root);
+  // Before paint, like a panel's button.
+  useLayoutEffect(() => {
+    const element = root.current;
+    if (!element) return undefined;
+    const command = fullscreenCommandOf(fullscreenTargetOf(element), fullscreen, coversWindow);
+    return commands.registerCommands([yours.over(command)], { replace: true });
+  }, [commands, yours, root, fullscreen, coversWindow]);
 }
 
 /** Back to View when the open mode has no tab: its bars show nothing, or the layout lost it. */

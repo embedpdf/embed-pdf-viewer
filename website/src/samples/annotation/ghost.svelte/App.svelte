@@ -23,9 +23,9 @@
     }),
   ];
 
-  const ebook = async (): Promise<OpenInput> => {
-    const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-    return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+  const sketch = async (): Promise<OpenInput> => {
+    const response = await fetch('/pdfs/sketch.pdf');
+    return { kind: 'bytes', id: 'sketch', bytes: new Uint8Array(await response.arrayBuffer()) };
   };
 </script>
 
@@ -34,7 +34,7 @@
   let opacity = $state<number | null>(null);
 </script>
 
-<Viewer {engine} {plugins} initialDocuments={[{ source: ebook }]}>
+<Viewer {engine} {plugins} initialDocuments={[{ source: sketch }]}>
   <DocumentGate>
     {#snippet fallback()}
       <p class="loading">Loading…</p>

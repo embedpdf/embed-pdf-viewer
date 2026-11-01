@@ -16,8 +16,13 @@ import './panes.css';
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin(), viewManagerPlugin()];
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/welcome.pdf');
+  return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
+};
+
+const article = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/article.pdf');
   return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
@@ -104,8 +109,8 @@ export default function App() {
       engine={engine}
       plugins={plugins}
       initialDocuments={[
-        { source: ebook, name: 'Contract' },
-        { source: ebook, name: 'Report' },
+        { source: welcome, name: 'Guide' },
+        { source: article, name: 'Article' },
       ]}
     >
       <Panes />

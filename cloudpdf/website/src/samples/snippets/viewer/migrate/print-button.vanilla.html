@@ -9,7 +9,7 @@
   const container = CloudPDF.init({
     type: 'container',
     target: document.getElementById('pdf-viewer'),
-    src: { shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' },
+    src: { grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' },
   });
   const registry = await container.registry;
 
@@ -28,7 +28,7 @@
 
   CloudPDF.init({
     target: '#viewer',
-    src: { shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' },
+    src: { grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' },
     onReady: (viewer) => {
       print.disabled = false;
       print.onclick = () => viewer.commands.execute('document:print');

@@ -1,3 +1,3 @@
 export { redactionPlugin } from './redaction.plugin';
-export { redactionState } from './state';
+export { redactionState, type RedactionState } from './state';
 export * from './contract';

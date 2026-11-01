@@ -6,7 +6,7 @@
  * policy, and a resolved zoom becomes the zoom intent. A destination is a
  * positioned reveal of the spot it names.
  */
-import { revealCamera, type Camera, type Rect as StageRect } from '@embedpdf/core-stage';
+import { clampZoom, revealCamera, type Camera, type Rect as StageRect } from '@embedpdf/core-stage';
 import type { PageDestination, PluginContext, PageRef } from '@embedpdf/core';
 
 import type { GoToDestinationOptions, RevealAnchorValue, RevealOptions } from '../contract';
@@ -14,13 +14,13 @@ import { revealOfDestination } from '../destination';
 import type { StageAnimation } from '../camera/animation';
 import type { StageCameraWrite } from '../camera/write';
 import type { StageHostCapability } from '../host-contract';
-import { patchSettings, setCursor, type StageState } from '../model';
+import { patchSettings, setCursor, type StageModel } from '../model';
 import type { StageServices } from '../services';
 import { whenPlaced } from '../services/placement-latch';
 import type { StageArrival } from './arrive';
 
 export function createReveal(
-  ctx: PluginContext<StageState>,
+  ctx: PluginContext<StageModel>,
   { scene, placement }: Pick<StageServices, 'scene' | 'placement'>,
   { writeCamera, markCause }: Pick<StageCameraWrite, 'writeCamera' | 'markCause'>,
   { cancelAnimation, animateTo }: Pick<StageAnimation, 'cancelAnimation' | 'animateTo'>,
@@ -30,6 +30,7 @@ export function createReveal(
     camera,
     viewport,
     padding,
+    zoomLimits,
     paged,
     itemIndexOfPage,
     worldPageFrame,
@@ -148,6 +149,8 @@ export function createReveal(
                 : camera().zoom;
       // A degenerate target (a point with a fit directive) only pans.
       if (!Number.isFinite(zoom) || zoom <= 0) zoom = camera().zoom;
+      // A tiny rect fits at the zoom limit, centered, like any other zoom.
+      zoom = clampZoom(zoom, zoomLimits());
       const zoomChanged = zoomDirective !== 'keep';
       const anchor = options.anchor ?? {};
       return {

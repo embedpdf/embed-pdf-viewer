@@ -106,6 +106,7 @@ export function runDbConformance(fx: DialectFixture): void {
 
         const r = await docs.createPending({
           id: 'doc12345',
+          name: 'doc12345',
           tenantId: 'tenant-a',
           metadata: { name: 'Q1' },
           idempotencyKey: null,
@@ -128,6 +129,7 @@ export function runDbConformance(fx: DialectFixture): void {
         await tenants.ensure({ id: 'tenant-a' });
         const first = await docs.createPending({
           id: 'doc12345',
+          name: 'doc12345',
           tenantId: 'tenant-a',
           metadata: null,
           idempotencyKey: 'kx-1',
@@ -135,6 +137,7 @@ export function runDbConformance(fx: DialectFixture): void {
         });
         const second = await docs.createPending({
           id: 'doc99999',
+          name: 'doc99999',
           tenantId: 'tenant-a',
           metadata: null,
           idempotencyKey: 'kx-1',
@@ -156,6 +159,7 @@ export function runDbConformance(fx: DialectFixture): void {
         await tenants.ensure({ id: 'tenant-b' });
         await docs.createPending({
           id: 'doc12345',
+          name: 'doc12345',
           tenantId: 'tenant-a',
           metadata: null,
           idempotencyKey: 'kx-1',
@@ -163,6 +167,7 @@ export function runDbConformance(fx: DialectFixture): void {
         });
         const other = await docs.createPending({
           id: 'doc23456',
+          name: 'doc23456',
           tenantId: 'tenant-b',
           metadata: null,
           idempotencyKey: 'kx-1',
@@ -183,6 +188,7 @@ export function runDbConformance(fx: DialectFixture): void {
         await tenants.ensure({ id: 'tenant-a' });
         await docs.createPending({
           id: 'doc12345',
+          name: 'doc12345',
           tenantId: 'tenant-a',
           metadata: null,
           idempotencyKey: null,
@@ -218,6 +224,7 @@ export function runDbConformance(fx: DialectFixture): void {
         await tenants.ensure({ id: 'tenant-a' });
         await docs.createPending({
           id: 'docsecure',
+          name: 'docsecure',
           tenantId: 'tenant-a',
           metadata: null,
           idempotencyKey: null,
@@ -259,6 +266,7 @@ export function runDbConformance(fx: DialectFixture): void {
         await tenants.ensure({ id: 'tenant-b' });
         await docs.createPending({
           id: 'doc12345',
+          name: 'doc12345',
           tenantId: 'tenant-a',
           metadata: null,
           idempotencyKey: null,
@@ -279,6 +287,7 @@ export function runDbConformance(fx: DialectFixture): void {
         await tenants.ensure({ id: 'tenant-a' });
         await docs.createPending({
           id: 'doc12345',
+          name: 'doc12345',
           tenantId: 'tenant-a',
           metadata: null,
           idempotencyKey: null,
@@ -301,6 +310,7 @@ export function runDbConformance(fx: DialectFixture): void {
         await tenants.ensure({ id: 'tenant-a' });
         await docs.createPending({
           id: 'doc12345',
+          name: 'doc12345',
           tenantId: 'tenant-a',
           metadata: null,
           idempotencyKey: null,
@@ -322,6 +332,7 @@ export function runDbConformance(fx: DialectFixture): void {
         await tenants.ensure({ id: 'tenant-b' });
         await docs.createPending({
           id: 'doc12345',
+          name: 'doc12345',
           tenantId: 'tenant-a',
           metadata: null,
           idempotencyKey: null,

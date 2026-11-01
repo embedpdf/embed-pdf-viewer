@@ -4,7 +4,7 @@ import { usePageList } from '@embedpdf/vue/runtime';
 import { useSelection, useSelectionState } from '@embedpdf/vue/selection';
 
 // On the cover: the characters of its title, and a point on its word "Viewers", in page coordinates.
-const TITLE = { start: 10, count: 52 };
+const TITLE = { start: 28, count: 30 };
 const POINT = { x: 260, y: 242 };
 
 // Every button selects on the cover, the first page: by its ref, or by its index, 0.

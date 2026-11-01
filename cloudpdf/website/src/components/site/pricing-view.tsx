@@ -30,7 +30,7 @@ const TIER_COPY: Record<string, { tagline: string }> = {
 
 const SHARED_FEATURES: { icon: IconSvgElement; name: string }[] = [
   { name: 'Embeddable viewer snippet', icon: SourceCodeIcon },
-  { name: 'Public share links, domain-locked', icon: Link02Icon },
+  { name: 'Public links and embeds, domain-locked', icon: Link02Icon },
   { name: 'Annotations & forms', icon: PencilEdit02Icon },
   { name: 'Developer API & SDKs', icon: ApiIcon },
   { name: 'Usage dashboard', icon: Analytics01Icon },

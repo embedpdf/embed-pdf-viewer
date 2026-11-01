@@ -11,9 +11,9 @@ import './reorder.css';
 const engine = cloudEngine();
 const plugins = [renderPlugin(), pageEditPlugin()];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
-// Pick a page, then move it. Each button uses another placement.
+// Pick a page, then move it. Each button uses another position.
 function PageOrder() {
   const pageEdit = usePageEdit();
   const pages = usePageList();
@@ -88,7 +88,7 @@ function PageOrder() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <PageOrder />
       </DocumentGate>

@@ -15,10 +15,10 @@ import { EpdfSelection, EpdfSelectionLayer, withSelection } from '@embedpdf/angu
 import { cloudEngine } from '@cloudpdf/engine';
 
 // On the cover: the characters of its title, and a point on its word "Viewers", in page coordinates.
-const TITLE = { start: 10, count: 52 };
+const TITLE = { start: 28, count: 30 };
 const POINT = { x: 260, y: 242 };
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 // Every button selects on the cover, the first page: by its ref, or by its index, 0.
 @Component({
@@ -117,7 +117,7 @@ export class SelectionToolbar {
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: welcome }] },
       withStage(),
       withRender(),
       withInteraction(),

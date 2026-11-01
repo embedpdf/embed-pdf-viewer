@@ -1,5 +1,21 @@
 # @embedpdf/plugin-interaction
 
+## 3.0.0-next.19
+
+### Minor Changes
+
+- [#920](https://github.com/embedpdf/embed-pdf-viewer/pull/920) by [@bobsingor](https://github.com/bobsingor) – A third built-in tool, `zoom`: drag a box to zoom to it, or click to zoom in a step (Alt-click zooms out), like Acrobat's Marquee Zoom. Its cursor is `zoom-in` on the pages and between them, one finger draws the box on a touch screen, and it neither follows links nor fills forms. The stage draws the box and does the zooming. `listTools()` now starts `['pointer', 'pan', 'zoom']`.
+
+## 3.0.0-next.18
+
+## 3.0.0-next.17
+
+### Minor Changes
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – A named type for the state: `InteractionState`, what `interactionState` reads and `useInteractionState()` returns, the State table of the tools page with a comment on each field. Published types now name it instead of spelling out its fields.
+
+## 3.0.0-next.16
+
 ## 3.0.0-next.15
 
 ### Minor Changes

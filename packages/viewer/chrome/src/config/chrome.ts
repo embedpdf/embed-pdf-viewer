@@ -7,8 +7,8 @@
  * a `mode`).
  *
  * `importance` (1 makes room first … 5 never leaves the bar) is the only
- * responsive knob. The bar, group and menu ids are API: they don't change
- * between minor versions.
+ * responsive knob; a group's is its items' unless they have their own. The
+ * bar, group and menu ids are API: they don't change between minor versions.
  */
 import { createLayout, type LayoutData, type LayoutGroupObject } from '@embedpdf/core-ui';
 
@@ -33,19 +33,21 @@ export const DEFAULT_LAYOUT: LayoutData = {
       place: 'top',
       // The start section sits left-aligned: document menu, view, the zoom
       // field, pan and pointer. Only the mode tabs are truly centered.
+      // On a phone, after pan and pointer, the View menu and zoom make room
+      // (a finger pinches to zoom) before the folded mode tabs.
       start: [
         { id: 'document', items: ['menu:document'], importance: 5 },
         {
           id: 'view',
           items: [{ command: 'panel:thumbnails', importance: 5 }, 'menu:view'],
-          importance: 4,
+          importance: 3,
         },
         // The zoom field; when it can't fit it draws its 'button' variant,
         // and in the "More" menu it stands in as menu:zoom.
         {
           id: 'zoom',
           items: [{ custom: 'zoom', command: 'menu:zoom', variants: ['inline', 'button'] }],
-          importance: 4,
+          importance: 3,
         },
         { id: 'tools', items: ['tool:pan', 'tool:pointer'], importance: 2 },
       ],
@@ -182,7 +184,6 @@ export const DEFAULT_LAYOUT: LayoutData = {
         style,
       ],
     },
-
     // ── over the pages ────────────────────────────────────────────────────────
     pager: {
       place: { float: 'bottom' },
@@ -217,6 +218,7 @@ export const DEFAULT_LAYOUT: LayoutData = {
             'annotation:stamp-from-selection',
             'annotation:link',
             'annotation:goto-link',
+            'annotation:save-file',
             'annotation:remove-link',
             'annotation:group',
             'annotation:ungroup',
@@ -226,6 +228,46 @@ export const DEFAULT_LAYOUT: LayoutData = {
         // Its own group, so a line sets delete apart.
         { id: 'danger', items: ['annotation:delete'], importance: 5 },
       ],
+    },
+
+    // ── the bars at the top of a panel, under its title, named after it ──────
+    thumbnails: {
+      place: { panel: 'thumbnails' },
+      start: [
+        {
+          id: 'edit',
+          items: [
+            'page:insert-blank',
+            'page:rotate-counterclockwise',
+            'page:rotate-clockwise',
+            'page:delete',
+          ],
+          importance: 4,
+        },
+        // The page menu's other actions: buttons with room to spare, else the "More" menu.
+        {
+          id: 'more',
+          items: ['page:insert-file', 'page:duplicate', 'page:extract'],
+          importance: 1,
+        },
+      ],
+      end: [history],
+    },
+    outline: {
+      place: { panel: 'outline' },
+      start: [
+        {
+          id: 'filter',
+          items: [{ custom: 'outline-filter', variants: ['wide', 'narrow'] }],
+        },
+      ],
+      end: [{ id: 'items', items: ['outline:add', 'outline:expand-all', 'outline:collapse-all'] }],
+    },
+    attachments: {
+      place: { panel: 'attachments' },
+      // Dependent: the count shows beside the button that adds a file, never on its own.
+      start: [{ id: 'count', items: [{ custom: 'attachments-count' }], dependent: true }],
+      end: [{ id: 'files', items: ['attachment:add'] }],
     },
   },
 
@@ -251,7 +293,7 @@ export const DEFAULT_LAYOUT: LayoutData = {
         titleKey: 'commands.zoom.level',
         items: ['zoom:50', 'zoom:100', 'zoom:150', 'zoom:200', 'zoom:400'],
       },
-      ['zoom:in', 'zoom:out'],
+      ['zoom:in', 'zoom:out', 'tool:zoom'],
       ['zoom:fit-page', 'zoom:fit-width', 'zoom:automatic'],
     ],
     // A row of the outline panel: its menu button and a right-click on it open this.
@@ -259,6 +301,29 @@ export const DEFAULT_LAYOUT: LayoutData = {
       ['outline:add', 'outline:add-child'],
       ['outline:rename', 'outline:set-destination', 'outline:properties'],
       ['outline:delete'],
+    ],
+    // A file of the attachments panel: its menu button and a right-click on it open this.
+    'attachment-item': [['attachment:save', 'attachment:go-to'], ['attachment:delete']],
+    // A card of the comments panel: its menu button and a right-click on it open this.
+    'comment-item': [
+      {
+        titleKey: 'demo.commentsStatus',
+        items: [
+          'comment:status-accepted',
+          'comment:status-rejected',
+          'comment:status-cancelled',
+          'comment:status-completed',
+          'comment:status-none',
+        ],
+      },
+      ['comment:delete-thread'],
+    ],
+    // A page of the thumbnails panel: its menu button, a right-click and a long-press open this.
+    page: [
+      ['page:rotate-clockwise', 'page:rotate-counterclockwise'],
+      ['page:insert-blank', 'page:insert-file', 'page:duplicate'],
+      ['page:extract'],
+      ['page:delete'],
     ],
   },
 

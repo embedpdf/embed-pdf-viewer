@@ -3,18 +3,19 @@ import type {
   AnnotationFamily,
   AnnotationPatch,
   AnnotationRef,
+  AttachmentRef,
   ChangeItemType,
   CustomMetadataPatch,
   FormFieldDTO,
   FormFieldPatch,
   FormFieldValue,
   MetadataPatch,
-  OutlineItem,
   OutlineItemPatch,
   OutlineItemRef,
   PageRef,
   PdfCoordinates,
   PdfDestination,
+  PdfRotation,
   WidgetAnnotation,
 } from '@embedpdf/engine-core/runtime';
 
@@ -45,7 +46,14 @@ export type ReverseStep =
   | MetadataRevertStep
   | OutlineRemoveStep
   | OutlineRestoreStep
-  | OutlineMoveStep;
+  | OutlineMoveStep
+  | OutlineReopenStep
+  | PageRotateStep
+  | PageReorderStep
+  | PageRestoreStep
+  | PageRemoveStep
+  | AttachmentRemoveStep
+  | AttachmentRestoreStep;
 
 /**
  * One dictionary a change wrote, as it was before (the capture, with the
@@ -246,15 +254,29 @@ export interface MetadataRevertStep {
 
 /**
  * Deletes outline items a create or a restore brought back, when nobody
- * changed them since: the item and the items under it read exactly as the
- * change left them. Undoing a create never deletes an item someone gave a
- * child, or renamed, since.
+ * changed them since: the item and the items under it are the same ones, and
+ * their dictionaries read exactly as the change left them. Undoing a create
+ * never deletes an item someone gave a child, or renamed, since; a page its
+ * target goes to going away changes nothing of it.
  */
 export interface OutlineRemoveStep {
   readonly kind: 'outline.remove';
   readonly ref: OutlineItemRef;
-  /** The item and the items under it, depth first, as the change left them. */
-  readonly left: readonly OutlineItem<PdfDestination>[];
+  /** The item and the items under it, depth first, each as the change left it (the guard). */
+  readonly left: readonly CapturedObject[];
+}
+
+/**
+ * Opens again a parent that the op this step follows emptied, as it was open
+ * before: a parent without children has no open state, so it comes back
+ * closed with its first child. Only while its children are just the ones the
+ * undo put back: a parent someone filled since keeps what they left.
+ */
+export interface OutlineReopenStep {
+  readonly kind: 'outline.reopen';
+  readonly ref: OutlineItemRef;
+  /** The children it has once the undo put them back. */
+  readonly children: readonly number[];
 }
 
 /**
@@ -291,6 +313,84 @@ export interface OutlineMoveStep {
   readonly left: readonly { readonly item: number; readonly parent: number }[];
 }
 
+/**
+ * Turns pages to `rotation`: its reverse, and, the other way round, its redo.
+ * Each page turns only while it still has the rotation the change left it
+ * with (`left`). A change that turned pages from several rotations has one
+ * step for each.
+ */
+export interface PageRotateStep {
+  readonly kind: 'pages.rotate';
+  /** The pages, by object number. */
+  readonly pages: readonly number[];
+  readonly rotation: PdfRotation;
+  readonly left: PdfRotation;
+}
+
+/**
+ * Puts pages back where they were before a move: its reverse, and, the other
+ * way round, its redo. Each page goes only while it still follows the page the
+ * move left it after, and the page it goes after is still there.
+ */
+export interface PageReorderStep {
+  readonly kind: 'pages.reorder';
+  /**
+   * Where each goes back to, by object number (after 0: first), in display
+   * order, so an anchor is placed before what follows it.
+   */
+  readonly placements: readonly { readonly page: number; readonly after: number }[];
+  /** The page each was left after (0: first). */
+  readonly left: readonly { readonly page: number; readonly after: number }[];
+}
+
+/**
+ * Brings back what a page delete removed: the same pages, at the same
+ * numbers, each after the page it followed while that is still there, else
+ * first (`EPDFPage_ImportRaw`), with their annotations and names. A page that
+ * is back already is left alone.
+ */
+export interface PageRestoreStep {
+  readonly kind: 'pages.restore';
+  /** Each page and its capture, in the display order they had. */
+  readonly pages: readonly { readonly page: number; readonly capture: Uint8Array }[];
+}
+
+/**
+ * Deletes pages an insert or a restore brought, each while it reads as the
+ * change left it: the page and what the layer holds of its annotations,
+ * contents and resources. Undoing an insert never deletes a page someone
+ * annotated, or turned, since. A step that would delete every page is left
+ * alone: a document keeps one.
+ */
+export interface PageRemoveStep {
+  readonly kind: 'pages.remove';
+  /** Each page, and the digest of how the change left it. */
+  readonly pages: readonly { readonly page: number; readonly left: string }[];
+}
+
+/**
+ * Deletes the embedded file a create or a restore brought, while it is still
+ * that file, as the change left it: undoing an upload never deletes a file
+ * someone put under its name since, even one with the same bytes.
+ */
+export interface AttachmentRemoveStep {
+  readonly kind: 'attachments.remove';
+  readonly ref: AttachmentRef;
+  /** The file as the change left it, in canonical bytes (the guard). */
+  readonly left: Uint8Array;
+}
+
+/**
+ * Brings back the file a delete removed, under its key, with its file
+ * specification and bytes as they were (`EPDFAttachment_ImportRaw`). Left
+ * alone when another file has the key now.
+ */
+export interface AttachmentRestoreStep {
+  readonly kind: 'attachments.restore';
+  readonly ref: AttachmentRef;
+  readonly capture: Uint8Array;
+}
+
 /** The bytes a record's captures hold. */
 export function recordBytes(record: ChangeRecord): number {
   let bytes = 0;
@@ -308,6 +408,18 @@ export function recordBytes(record: ChangeRecord): number {
         break;
       case 'field.restore':
       case 'outline.restore':
+        bytes += step.capture.byteLength;
+        break;
+      case 'outline.remove':
+        objects(step.left);
+        break;
+      case 'pages.restore':
+        for (const { capture } of step.pages) bytes += capture.byteLength;
+        break;
+      case 'attachments.remove':
+        bytes += step.left.byteLength;
+        break;
+      case 'attachments.restore':
         bytes += step.capture.byteLength;
         break;
       default:

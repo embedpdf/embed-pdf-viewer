@@ -11,7 +11,7 @@ import './reveal.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin()];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 // Spots to jump to: a page index and a box in page coordinates (points from
 // the page's top-left), like a search hit or a comment would give you.
@@ -32,7 +32,7 @@ export default function App() {
   const [zoom, setZoom] = useState<RevealZoom>('fit-width');
 
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <SpotPicker active={active} zoom={zoom} onActive={setActive} onZoom={setZoom} />
         <Stage

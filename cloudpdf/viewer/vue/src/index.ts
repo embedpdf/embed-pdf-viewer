@@ -19,7 +19,7 @@
  * door, which registers the cloud engine on `<embedpdf-viewer>`, re-exports the wrapper's parts,
  * and defines `<PDFViewer>` with the cloud's `ViewerConfig` as its props. `engine` takes the
  * cloud engine's settings (`baseUrl`, CloudPDF SaaS when left out), `src` a document token, an id
- * or a share link.
+ * or a grant.
  */
 import '@cloudpdf/viewer';
 

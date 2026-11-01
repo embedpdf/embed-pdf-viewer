@@ -14,12 +14,19 @@ export type {
   OpenInputLayerSource,
   OpenInputById,
   OpenInputToken,
-  OpenInputShare,
+  OpenInputGrant,
   OpenInputLayerFile,
   OpenInputLayerFileSource,
   OpenOptions,
   TokenSource,
 } from './dto/OpenInput';
+export type {
+  GrantOpenRequest,
+  VisitorAnswers,
+  VisitorIdentityField,
+  VisitorIdentityRequest,
+} from './dto/GrantVisitor';
+export { grantOpenRequestOf, visitorIdentityRequestOf } from './dto/GrantVisitor';
 export type { DocumentMetadata, DocumentMetadataTrapped } from './dto/DocumentMetadata';
 export type {
   DocumentOutline,
@@ -135,7 +142,7 @@ export type {
   PageNetworkRenderFormat,
   PageRaster,
   PageLayerRights,
-  PagePrintRights,
+  PagePictureRights,
   PrintDpi,
   PageRenderBackground,
   PageRenderEncodedFormat,
@@ -153,6 +160,7 @@ export {
   checkImageQuality,
   checkRenderUsage,
   createPageImageHandle,
+  PAGE_THUMBNAIL_SIZE,
   printDpiOf,
   imageSourceOfBytes,
   resolvePageLayers,
@@ -403,11 +411,12 @@ export type {
   AttachmentContent,
   WireAttachmentFile,
 } from './dto/Attachment';
-export { toAttachmentRef } from './dto/Attachment';
+export { ATTACHMENT_LIMITS, toAttachmentRef } from './dto/Attachment';
 export type {
   AttachmentCreateResult,
   AttachmentDeleteResult,
   AttachmentMutationMeta,
+  AttachmentRestoreResult,
 } from './mutation/AttachmentMutationResults';
 export { deletedAttachmentOf } from './mutation/AttachmentMutationResults';
 
@@ -845,6 +854,7 @@ export type { PageRotateResult } from './mutation/PageRotateResult';
 export type { PageDeleteInput } from './mutation/PageDeleteInput';
 export type { PageDeleteResult } from './mutation/PageDeleteResult';
 export type { PageInsertResult } from './mutation/PageInsertResult';
+export type { PageRestoreResult } from './mutation/PageRestoreResult';
 export type { PageInsertBlankSpec } from './mutation/PageInsertBlankInput';
 export { opIdOf } from './mutation/WriteOptions';
 export {
@@ -917,13 +927,14 @@ export type {
   Identity,
   ParsedCapability,
   ParsedCollab,
+  ParsedPluginPermission,
   ParsedScope,
   ParsedVirtual,
   ParsedWildcard,
   PdfBits,
 } from './auth/scope';
 export { PDF_BITS, decodePdfBits } from './auth/scope';
-export { parseScope, validateScopeArray } from './auth/scope';
+export { CORE_NAMESPACES, parseScope, pluginOfPermission, validateScopeArray } from './auth/scope';
 export { InvalidScope, MissingIdentity, PermissionDenied } from './auth/scope';
 export type { AnnotationAuthority, ChangeAuthority, FieldWriteAction } from './auth/scope';
 export {
@@ -948,6 +959,7 @@ export {
   checkCapability,
   checkCollab,
   checkFieldAction,
+  checkPluginPermission,
   fieldRightsOf,
   type FieldGroupRight,
   type FieldRights,
@@ -955,6 +967,7 @@ export {
   expandedCapabilities,
   expandRawScope,
   filterMatches,
+  pluginPermissionsOf,
 } from './auth/scope';
 export { caps, collab, materializePdfPermissions, pdfPermissions } from './auth/scope';
 

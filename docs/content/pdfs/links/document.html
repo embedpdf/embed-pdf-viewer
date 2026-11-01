@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Brand guidelines</title>
+<link rel="stylesheet" href="../shared/document.css">
+<style>
+  /* A short manual: a contents page, one section per page, cross-references, a footnote, and a
+     footer that steps through the pages. Text in the accent colour is always a link. */
+  .section-label { margin: 36px 0 0; font: 700 11.5px/1.2 var(--font-display); letter-spacing: 0.09em; text-transform: uppercase; color: var(--color-fg-muted); }
+  .sheet .section-label + .title { margin-top: 8px; }
+
+  .contents { flex: none; margin: 14px 0 0; padding: 0; list-style: none; border-top: 1px solid var(--color-border); }
+  .contents a { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 16px; align-items: baseline; padding: 14px 4px; border-bottom: 1px solid var(--color-border-soft); }
+  .contents .number { font: 700 15px/1 var(--font-display); }
+  .contents .name { font: 700 16px/1.3 var(--font-display); }
+  .contents .about { display: block; margin-top: 3px; font: 400 13px/1.5 var(--font-body); color: var(--color-fg-muted); }
+  .contents .page-number { font: 500 13px/1 var(--font-mono); }
+
+  .panels { flex: none; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; margin-top: 22px; }
+  .panel { display: grid; gap: 10px; }
+  .panel .ground { display: flex; align-items: center; justify-content: center; height: 150px; border-radius: 10px; border: 1px solid var(--color-border-soft); }
+  .panel .clear-space { padding: 22px; border: 1px dashed var(--color-accent-soft); }
+  .panel img { display: block; height: 34px; }
+  .panel .caption { font-size: 12px; color: var(--color-fg-muted); }
+
+  .rules { flex: none; margin: 10px 0 0; padding-left: 20px; display: grid; gap: 6px; }
+
+  .swatch { display: inline-block; width: 30px; height: 30px; border-radius: 6px; vertical-align: middle; box-shadow: inset 0 0 0 1px rgba(10, 26, 77, 0.12); }
+  .hex { font: 500 12px/1 var(--font-mono); }
+  .sheet td { vertical-align: middle; }
+  .sheet th sup, .sheet p sup { font-size: 9px; line-height: 0; }
+
+  .footnotes { flex: none; margin-top: auto; padding-top: 10px; border-top: 1px solid var(--color-border-soft); font-size: 11.5px; line-height: 1.5; color: var(--color-fg-muted); }
+  .footnotes p { margin: 0; }
+  .footnotes + .page-footer { margin-top: 14px; }
+
+  .specimens { flex: none; display: grid; gap: 12px; margin-top: 18px; }
+  .specimen { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 20px; align-items: baseline; padding: 14px 0; border-bottom: 1px solid var(--color-border-soft); }
+  .specimen .face { font: 700 12.5px/1.4 var(--font-display); color: var(--color-ink); }
+  .specimen .face span { display: block; font: 400 12px/1.4 var(--font-body); color: var(--color-fg-muted); }
+  .specimen .sample { color: var(--color-ink); }
+
+  .pager { display: flex; align-items: center; gap: 14px; }
+  .pager .step { display: inline-flex; align-items: center; padding: 2px 0; color: var(--color-accent); }
+  .pager .count { min-width: 36px; text-align: right; }
+</style>
+</head>
+<body class="fernquill">
+<section class="page sheet" id="page-1">
+  <div class="letterhead">
+    <img src="../shared/fernquill-logo.svg" alt="Fernquill">
+    <span class="kind">Brand guidelines</span>
+  </div>
+
+  <h1 class="title">Brand guidelines</h1>
+  <p class="meta">Version 2 · October 2026 · Kept by the Fernquill brand team</p>
+
+  <p class="lead">How Fernquill looks wherever it appears: in the portal, on the website, on slides and in the documents we send. Use these pages for anything that carries our name.</p>
+
+  <h2>Contents</h2>
+  <ol class="contents">
+    <li><a href="#page-2"><span class="number">01</span><span><span class="name">Logo</span><span class="about">The mark and the name, clear space, and where the logo goes.</span></span><span class="page-number">2</span></a></li>
+    <li><a href="#page-3"><span class="number">02</span><span><span class="name">Colour</span><span class="about">Five colours, all from one green, and what each one is for.</span></span><span class="page-number">3</span></a></li>
+    <li><a href="#page-4"><span class="number">03</span><span><span class="name">Type</span><span class="about">Manrope for headings, Inter for reading, JetBrains Mono for code.</span></span><span class="page-number">4</span></a></li>
+    <li><a href="#resources"><span class="number">04</span><span><span class="name">Resources</span><span class="about">The fonts, the contrast rules, and who to ask.</span></span><span class="page-number">4</span></a></li>
+  </ol>
+
+  <h2>Questions</h2>
+  <p>Write to <a href="mailto:brand@fernquill.example">brand@fernquill.example</a> before you put the logo on a product, an event or merchandise. The fonts are free to download: <a href="https://fonts.google.com/specimen/Manrope">Manrope</a>, <a href="https://fonts.google.com/specimen/Inter">Inter</a> and <a href="https://fonts.google.com/specimen/JetBrains+Mono">JetBrains Mono</a>.</p>
+
+  <div class="page-footer">
+    <span>Fernquill · Brand guidelines</span>
+    <span class="pager">
+      <span class="step" data-pdf="next-page">Next<svg class="arrow" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></span>
+      <span class="count">1 of 4</span>
+    </span>
+  </div>
+</section>
+
+<section class="page sheet" id="page-2">
+  <div class="letterhead">
+    <img src="../shared/fernquill-logo.svg" alt="Fernquill">
+    <span class="kind">Brand guidelines</span>
+  </div>
+
+  <p class="section-label">Section 01</p>
+  <h1 class="title">Logo</h1>
+
+  <p class="lead">The logo is the mark, a quill drawn as a leaf, followed by the name. They always appear together, in this order, at the same proportions.</p>
+
+  <div class="panels">
+    <div class="panel">
+      <div class="ground" style="background:#ffffff;"><div class="clear-space"><img src="../shared/fernquill-logo.svg" alt="Fernquill"></div></div>
+      <span class="caption">On white, with its clear space marked.</span>
+    </div>
+    <div class="panel">
+      <div class="ground" style="background:var(--color-accent-tint);"><img src="../shared/fernquill-logo.svg" alt="Fernquill"></div>
+      <span class="caption">On Mist green, the lightest colour of the palette.</span>
+    </div>
+  </div>
+
+  <h2>Clear space</h2>
+  <p>Keep a margin around the logo at least as wide as the mark is tall. Nothing else goes inside it: no text, no other logo, no edge of the page.</p>
+
+  <h2>Size</h2>
+  <p>The logo is at least 24 pixels tall on a screen and 8 millimetres tall in print. Below that the name stops being readable; use the mark on its own instead.</p>
+
+  <h2>Where it goes</h2>
+  <p>Put the logo on white or on Mist green. The colours, and the contrast each one gives, are on <a href="#page-3">page 3</a>.</p>
+  <ul class="rules">
+    <li>Don't stretch, rotate or recolour it.</li>
+    <li>Don't put it on a photo or on a busy pattern.</li>
+    <li>Don't set the name in another typeface next to the mark.</li>
+  </ul>
+
+  <div class="page-footer">
+    <span>Fernquill · Brand guidelines</span>
+    <span class="pager">
+      <span class="step" data-pdf="previous-page"><svg class="arrow before" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>Previous</span>
+      <a class="step" href="#page-1">Contents</a>
+      <span class="step" data-pdf="next-page">Next<svg class="arrow" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></span>
+      <span class="count">2 of 4</span>
+    </span>
+  </div>
+</section>
+
+<section class="page sheet" id="page-3">
+  <div class="letterhead">
+    <img src="../shared/fernquill-logo.svg" alt="Fernquill">
+    <span class="kind">Brand guidelines</span>
+  </div>
+
+  <p class="section-label">Section 02</p>
+  <h1 class="title">Colour</h1>
+
+  <p class="lead">Five colours, all from one green. Forest carries the words, Fern green marks what responds to a click, and the light tints sit behind panels and badges.</p>
+
+  <table>
+    <thead>
+      <tr><th style="width:44px;"></th><th>Colour</th><th>Hex</th><th>Use it for</th><th class="number">Contrast on white<sup><a href="#footnote-1">1</a></sup></th></tr>
+    </thead>
+    <tbody>
+      <tr><td><span class="swatch" style="background:#0f3324;"></span></td><td>Forest</td><td class="hex">#0F3324</td><td>Headings and body text</td><td class="number">13.8 : 1</td></tr>
+      <tr><td><span class="swatch" style="background:#1b7a4b;"></span></td><td>Fern green</td><td class="hex">#1B7A4B</td><td>Links, buttons and the logo</td><td class="number">5.3 : 1</td></tr>
+      <tr><td><span class="swatch" style="background:#4c6157;"></span></td><td>Moss</td><td class="hex">#4C6157</td><td>Captions, dates and other quiet text</td><td class="number">6.7 : 1</td></tr>
+      <tr><td><span class="swatch" style="background:#86c4a2;"></span></td><td>Sage</td><td class="hex">#86C4A2</td><td>Illustrations, charts and outlines</td><td class="number">2.0 : 1</td></tr>
+      <tr><td><span class="swatch" style="background:#e3f2ea;"></span></td><td>Mist green</td><td class="hex">#E3F2EA</td><td>Backgrounds behind panels and badges</td><td class="number">1.2 : 1</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Text on colour</h2>
+  <p>Words are Forest or Moss. Sage and Mist green are too light to carry text on white; put Forest text on them instead, which reads at 6.9 : 1 on Sage and 11.9 : 1 on Mist green.</p>
+  <p>Fern green is kept for links and buttons, so a reader learns that green means something happens. Its sizes are with the type, on <a href="#page-4">page 4</a>.</p>
+
+  <div class="footnotes" id="footnote-1">
+    <p><sup>1</sup> The ratio between a colour and white, worked out as the Web Content Accessibility Guidelines define it: <a href="https://www.w3.org/TR/WCAG22/">www.w3.org/TR/WCAG22</a>.</p>
+  </div>
+
+  <div class="page-footer">
+    <span>Fernquill · Brand guidelines</span>
+    <span class="pager">
+      <span class="step" data-pdf="previous-page"><svg class="arrow before" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>Previous</span>
+      <a class="step" href="#page-1">Contents</a>
+      <span class="step" data-pdf="next-page">Next<svg class="arrow" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></span>
+      <span class="count">3 of 4</span>
+    </span>
+  </div>
+</section>
+
+<section class="page sheet" id="page-4">
+  <div class="letterhead">
+    <img src="../shared/fernquill-logo.svg" alt="Fernquill">
+    <span class="kind">Brand guidelines</span>
+  </div>
+
+  <p class="section-label">Section 03</p>
+  <h1 class="title">Type</h1>
+
+  <p class="lead">Three typefaces, each with one job. All three are open source, so anyone who makes something for Fernquill can use them too.</p>
+
+  <div class="specimens">
+    <div class="specimen">
+      <span class="face">Manrope<span>Titles and headings</span></span>
+      <span class="sample" style="font:800 30px/1.15 var(--font-display); letter-spacing:-0.02em;">Every document in one place</span>
+    </div>
+    <div class="specimen">
+      <span class="face">Inter<span>Paragraphs, tables and captions</span></span>
+      <span class="sample" style="font:400 15px/1.6 var(--font-body);">Share, review and sign documents with your clients, all in one place.</span>
+    </div>
+    <div class="specimen">
+      <span class="face">JetBrains Mono<span>Code, colours and figures</span></span>
+      <span class="sample" style="font:500 14px/1.6 var(--font-mono);">Fern green #1B7A4B · 5.3 : 1</span>
+    </div>
+  </div>
+
+  <h2>Sizes</h2>
+  <p>Titles are 32 pixels, headings 16 and paragraphs 13.5, with a line height of 1.65. A link in Fern green uses the size of the text around it and no underline.</p>
+
+  <h2 id="resources">Resources</h2>
+  <table>
+    <thead>
+      <tr><th>What</th><th>Where</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>The fonts</td><td><a href="https://fonts.google.com/specimen/Manrope">Manrope</a>, <a href="https://fonts.google.com/specimen/Inter">Inter</a> and <a href="https://fonts.google.com/specimen/JetBrains+Mono">JetBrains Mono</a> on Google Fonts</td></tr>
+      <tr><td>How contrast is measured</td><td><a href="https://www.w3.org/TR/WCAG22/">www.w3.org/TR/WCAG22</a></td></tr>
+      <tr><td>The logo files</td><td>From the brand team</td></tr>
+      <tr><td>Questions about the brand</td><td><a href="mailto:brand@fernquill.example">brand@fernquill.example</a></td></tr>
+    </tbody>
+  </table>
+
+  <div class="page-footer">
+    <span>Fernquill · Brand guidelines</span>
+    <span class="pager">
+      <span class="step" data-pdf="previous-page"><svg class="arrow before" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>Previous</span>
+      <a class="step" href="#page-1">Contents</a>
+      <span class="count">4 of 4</span>
+    </span>
+  </div>
+</section>
+</body>
+</html>

@@ -122,6 +122,8 @@ export function checkCollab(
  * `pdf.permissions` and applying implication rules.
  *
  * Implications applied:
+ *   - `doc.render` implies `doc.render.thumbnail`: pictures of any size
+ *     contain the thumbnails.
  *   - `doc.annotate.modify` implies `doc.annotate.read` (you can't
  *     sensibly modify what you can't see).
  *   - `doc.forms.modify` implies `doc.forms.fill` and `doc.forms.read`.
@@ -159,6 +161,7 @@ export function expandedCapabilities(
   }
 
   // Implications (apply after the explicit additions above)
+  if (out.has('doc.render')) out.add('doc.render.thumbnail');
   if (out.has('doc.annotate.modify')) out.add('doc.annotate.read');
   if (out.has('doc.forms.modify')) {
     out.add('doc.forms.fill');
@@ -173,6 +176,36 @@ export function expandedCapabilities(
   for (const removed of protectedCapabilities(protection)) out.delete(removed);
 
   return out;
+}
+
+const NO_PLUGIN_PERMISSIONS: ReadonlySet<string> = new Set();
+
+/**
+ * The plugin permissions a scope holds where `installed` are the plugin
+ * permissions the server's installed plugins declare: the ones it names, and
+ * every installed one under `*`. A named permission whose plugin isn't
+ * installed is carried by the token but takes no effect, so it's left out.
+ * Where no plugins run (the local engine), pass nothing: the answer is empty.
+ */
+export function pluginPermissionsOf(
+  rawScope: ReadonlyArray<string>,
+  installed: ReadonlySet<string> = NO_PLUGIN_PERMISSIONS,
+): Set<string> {
+  const out = new Set<string>();
+  for (const s of rawScope.map(parseScope)) {
+    if (s.kind === 'wildcard') for (const permission of installed) out.add(permission);
+    else if (s.kind === 'plugin' && installed.has(s.name)) out.add(s.name);
+  }
+  return out;
+}
+
+/** True iff the scope holds this installed plugin permission (named, or under `*`). */
+export function checkPluginPermission(
+  permission: string,
+  rawScope: ReadonlyArray<string>,
+  installed: ReadonlySet<string> = NO_PLUGIN_PERMISSIONS,
+): boolean {
+  return pluginPermissionsOf(rawScope, installed).has(permission);
 }
 
 /**

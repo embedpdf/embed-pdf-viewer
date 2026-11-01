@@ -6,7 +6,7 @@
   import { AnnotationLayer, annotationPlugin } from '@embedpdf/svelte/annotation';
   import { measurementPlugin } from '@embedpdf/svelte/measurement';
   import { cloudEngine } from '@cloudpdf/engine';
-  import MeasureCover from './MeasureCover.svelte';
+  import MeasurePlan from './MeasurePlan.svelte';
   import ScaleToolbar from './ScaleToolbar.svelte';
 
   import '../scale.css';
@@ -20,15 +20,15 @@
     measurementPlugin(),
   ];
 
-  const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+  const sketch: OpenInput = { kind: 'grant', grant: 'shr_IyOgSdO4AmJqV4BoMv5V0nYU' };
 </script>
 
-<Viewer {engine} {plugins} initialDocuments={[{ source: ebook }]}>
+<Viewer {engine} {plugins} initialDocuments={[{ source: sketch }]}>
   <DocumentGate>
     {#snippet fallback()}
       <p class="loading">Loading…</p>
     {/snippet}
-    <MeasureCover />
+    <MeasurePlan />
     <ScaleToolbar />
     <Stage class="stage">
       <RenderLayer />

@@ -86,7 +86,7 @@ const CLOUD_PAGE = `<embedpdf-viewer id="viewer" src="/report.pdf" style="height
 <script type="module">
   import CloudPDF from 'https://cdn.jsdelivr.net/npm/@cloudpdf/viewer@3/dist/cloudpdf.js';
 
-  document.getElementById('viewer').src = { shareToken: 'shr_example' };
+  document.getElementById('viewer').src = { grant: 'grt_example' };
   CloudPDF.init({ target: '#other', src: { token: () => 'a token' }, scope: ['doc.open'] });
 </script>
 `;

@@ -12,16 +12,16 @@ import '../open.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin()];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 </script>
 
 <template>
   <Viewer
     :engine="engine"
     :plugins="plugins"
-    :initial-documents="[{ source: ebook, name: 'ebook.pdf' }]"
+    :initial-documents="[{ source: welcome, name: 'welcome.pdf' }]"
   >
-    <Toolbar :ebook="ebook" />
+    <Toolbar :welcome="welcome" />
     <DocumentGate>
       <template #fallback><Empty /></template>
       <Stage class="stage">

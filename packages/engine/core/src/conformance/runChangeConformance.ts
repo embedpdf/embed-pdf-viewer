@@ -1,5 +1,7 @@
 import { pdfOf } from './pdfOf';
 import type { ConformanceTestRunner } from './runMetadataConformance';
+import { toAttachmentRef } from '../dto/Attachment';
+import { OUTLINE_READ_LIMITS } from '../dto/DocumentOutline';
 import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
@@ -79,6 +81,31 @@ const outlineItem = (
   data: { title, target: { kind: 'goto', destination: { kind: 'fit', page: PAGE } } },
   ...(objectNumber === undefined ? {} : { objectNumber }),
 });
+
+/** The bytes of a file to embed. */
+const NOTES = new TextEncoder().encode('Notes for the change conformance.');
+const NOTES_REF = toAttachmentRef('notes.txt');
+
+/** `notes.txt` embedded in the document, with `bytes`. */
+const embedNotes = (bytes: Uint8Array = NOTES): ChangeOp => ({
+  type: 'attachments.create',
+  file: { name: 'notes.txt', mimeType: 'text/plain', description: 'Meeting notes' },
+  resources: { file: bytes },
+});
+
+/** A saved PDF as text, one character per byte. */
+const latin1 = (bytes: Uint8Array | ArrayBuffer): string =>
+  new TextDecoder('latin1').decode(bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes));
+
+/** The `/Count` of object `objectNumber` in a saved PDF, as its last version writes it. */
+const countIn = (pdf: string, objectNumber: number): number | null => {
+  const versions = [...pdf.matchAll(new RegExp(`(?:^|[\\r\\n])${objectNumber} 0 obj`, 'g'))];
+  const last = versions[versions.length - 1];
+  if (!last) return null;
+  const body = pdf.slice(last.index, pdf.indexOf('endobj', last.index));
+  const count = /\/Count (-?\d+)/.exec(body);
+  return count ? Number(count[1]) : null;
+};
 
 export interface ChangeConformanceOptions {
   label: string;
@@ -342,6 +369,38 @@ const ROUND_TRIPS: { readonly [T in ChangeOp['type']]: RoundTrip } = {
     ],
     ops: ([parent]) => [{ type: 'outline.delete', ref: toOutlineItemRef(parent!) }],
   },
+  'pages.rotate': {
+    ops: () => [{ type: 'pages.rotate', pages: [PAGE, EMPTY_PAGE], rotation: 90 }],
+  },
+  'pages.reorder': {
+    ops: () => [{ type: 'pages.reorder', pages: [EMPTY_PAGE], position: 'start' }],
+  },
+  'pages.delete': {
+    // The page goes with its annotations and the form's widget; the undo brings them back.
+    ops: () => [{ type: 'pages.delete', pages: [PAGE] }],
+  },
+  'pages.insertBlank': {
+    ops: ([page]) => [
+      {
+        type: 'pages.insertBlank',
+        spec: { size: { width: 300, height: 300 } },
+        position: { after: PAGE },
+        objectNumbers: [page!],
+      },
+    ],
+  },
+  'pages.insert': {
+    // The redo brings back the same pages, under the same refs.
+    ops: () => [{ type: 'pages.insert', source: SIGNATURE_ARTWORK_PDF, position: 'start' }],
+  },
+  'attachments.create': {
+    // The redo brings back the same file, with its dates.
+    ops: () => [embedNotes()],
+  },
+  'attachments.delete': {
+    setup: () => [embedNotes()],
+    ops: () => [{ type: 'attachments.delete', ref: NOTES_REF }],
+  },
 };
 
 /**
@@ -394,22 +453,25 @@ export function runChangeConformance(
 
     /** Everything a change can write, as the document reads it. */
     const factsOf = async (doc: DocumentHandle) => {
-      const [onPage, onEmptyPage, form, metadata, custom, outline] = await Promise.all([
-        doc.page(PAGE).annotations.list(),
-        doc.page(EMPTY_PAGE).annotations.list(),
+      const pages = await doc.pages.list();
+      const [annotations, form, metadata, custom, outline, attachments] = await Promise.all([
+        Promise.all(pages.pages.map((page) => doc.page(page.ref).annotations.list())),
         doc.forms.list(),
         doc.metadata.get(),
         doc.metadata.custom.get(),
         doc.outline.get(),
+        doc.attachments.list(),
       ]);
       return {
-        annotations: [onPage.annotations, onEmptyPage.annotations],
+        pages,
+        annotations: annotations.map((list) => list.annotations),
         fields: form.fields,
         widgets: form.widgets,
         calculationOrder: form.calculationOrder,
         metadata: { title: metadata.title, subject: metadata.subject },
         custom,
         outline,
+        attachments: attachments.attachments,
       };
     };
 
@@ -799,6 +861,361 @@ export function runChangeConformance(
       });
     });
 
+    const pageOrderOf = async (doc: DocumentHandle) =>
+      (await doc.pages.list()).pages.map((page) => page.ref);
+    const blankPage = (objectNumber: number): ChangeOp => ({
+      type: 'pages.insertBlank',
+      spec: { size: { width: 300, height: 300 } },
+      objectNumbers: [objectNumber],
+    });
+
+    test('the undo of a page insert is skipped when someone annotated the page since', async () => {
+      await withDocument(async (doc) => {
+        const [page, square] = await take(doc, 2);
+        const inserted = await doc.apply({ ops: [blankPage(page!)] });
+        const added = toPageRef(page!);
+        await doc.apply({
+          ops: [
+            {
+              type: 'annotations.create',
+              page: added,
+              data: { subtype: 'square', box: box(20) },
+              objectNumber: square,
+            },
+          ],
+        });
+        const undo = await doc.apply({ undoOf: inserted.meta.opId });
+        expect(isSkippedItem(itemOfType(undo, 'pages.delete'))).toBe(true);
+        expect(await pageOrderOf(doc)).toEqual([PAGE, EMPTY_PAGE, added]);
+      });
+    });
+
+    test('the undo of a page insert still applies after pages moved around it', async () => {
+      await withDocument(async (doc) => {
+        const [page] = await take(doc, 1);
+        const inserted = await doc.apply({ ops: [blankPage(page!)] });
+        await doc.apply({ ops: [{ type: 'pages.reorder', pages: [EMPTY_PAGE], position: 'end' }] });
+        const undo = await doc.apply({ undoOf: inserted.meta.opId });
+        expect(appliedOfType(undo, 'pages.delete').pages).toEqual([toPageRef(page!)]);
+        expect(await pageOrderOf(doc)).toEqual([PAGE, EMPTY_PAGE]);
+      });
+    });
+
+    test('the undo of a page move leaves a page someone moved since', async () => {
+      await withDocument(async (doc) => {
+        const moved = await doc.apply({
+          ops: [{ type: 'pages.reorder', pages: [EMPTY_PAGE], position: 'start' }],
+        });
+        await doc.apply({ ops: [{ type: 'pages.reorder', pages: [EMPTY_PAGE], position: 'end' }] });
+        const undo = await doc.apply({ undoOf: moved.meta.opId });
+        expect(isSkippedItem(itemOfType(undo, 'pages.reorder'))).toBe(true);
+        expect(await pageOrderOf(doc)).toEqual([PAGE, EMPTY_PAGE]);
+      });
+    });
+
+    test('the undo of a page rotate leaves a page someone turned since', async () => {
+      await withDocument(async (doc) => {
+        const turned = await doc.apply({
+          ops: [{ type: 'pages.rotate', pages: [PAGE, EMPTY_PAGE], rotation: 90 }],
+        });
+        await doc.apply({ ops: [{ type: 'pages.rotate', pages: [EMPTY_PAGE], rotation: 180 }] });
+        const undo = await doc.apply({ undoOf: turned.meta.opId });
+        expect(appliedOfType(undo, 'pages.rotate').pages).toEqual([PAGE]);
+        const { pages } = await doc.pages.list();
+        expect(pages.map((page) => page.rotation)).toEqual([0, 180]);
+      });
+    });
+
+    test('a deleted page comes back at its place, with its name', async () => {
+      await withDocument(async (doc) => {
+        await doc.pages.setName({ name: 'Appendix', page: EMPTY_PAGE });
+        await doc.apply({
+          ops: [{ type: 'pages.reorder', pages: [EMPTY_PAGE], position: 'start' }],
+        });
+        const deleted = await doc.apply({ ops: [{ type: 'pages.delete', pages: [EMPTY_PAGE] }] });
+        expect((await doc.pages.list()).namedPages).toEqual([]);
+
+        const recorded = recordEvents(doc);
+        const undo = await doc.apply({ undoOf: deleted.meta.opId });
+        recorded.stop();
+        expect(appliedOfType(undo, 'pages.restore').pages).toEqual([EMPTY_PAGE]);
+        expect(await pageOrderOf(doc)).toEqual([EMPTY_PAGE, PAGE]);
+        expect((await doc.pages.list()).namedPages).toEqual([
+          { name: 'Appendix', target: { kind: 'page', page: EMPTY_PAGE } },
+        ]);
+        expect(recorded.events.map((event) => event.type)).toEqual(['pages.restored']);
+      });
+    });
+
+    test('an op meets the pages as the ops before it in the change left them', async () => {
+      await withDocument(async (doc) => {
+        // An annotation changed, then its page deleted, in one change.
+        const deleted = await doc.apply({
+          ops: [
+            { type: 'annotations.update', ref: FILE_SQUARE, patch: { color: '#e11d48' } },
+            { type: 'pages.delete', pages: [PAGE] },
+          ],
+        });
+        expect(deleted.items.map((item) => item.type)).toEqual([
+          'annotations.update',
+          'pages.delete',
+        ]);
+        expect(await pageOrderOf(doc)).toEqual([EMPTY_PAGE]);
+
+        // A page made, then annotated, in one change.
+        const [page, square] = await take(doc, 2);
+        const added = toPageRef(page!);
+        await doc.apply({
+          ops: [
+            blankPage(page!),
+            {
+              type: 'annotations.create',
+              page: added,
+              data: { subtype: 'square', box: box(20) },
+              objectNumber: square,
+            },
+          ],
+        });
+        const { annotations } = await doc.page(added).annotations.list();
+        expect(annotations.map((annotation) => annotation.ref)).toEqual([at(square!, added)]);
+      });
+    });
+
+    test('the undo of a page insert applies after the page was turned and turned back', async () => {
+      await withDocument(async (doc) => {
+        const inserted = await doc.apply({
+          ops: [{ type: 'pages.insert', source: SIGNATURE_ARTWORK_PDF, position: 'end' }],
+        });
+        const [added] = appliedOfType(inserted, 'pages.insert').insertedPages;
+        const turned = await doc.apply({
+          ops: [{ type: 'pages.rotate', pages: [added!], rotation: 90 }],
+        });
+        await doc.apply({ undoOf: turned.meta.opId });
+        const undo = await doc.apply({ undoOf: inserted.meta.opId });
+        expect(appliedOfType(undo, 'pages.delete').pages).toEqual([added]);
+        expect(await pageOrderOf(doc)).toEqual([PAGE, EMPTY_PAGE]);
+      });
+    });
+
+    test('the undo of a page insert is skipped when someone turned the page since', async () => {
+      await withDocument(async (doc) => {
+        const inserted = await doc.apply({
+          ops: [{ type: 'pages.insert', source: SIGNATURE_ARTWORK_PDF, position: 'end' }],
+        });
+        const [added] = appliedOfType(inserted, 'pages.insert').insertedPages;
+        await doc.apply({ ops: [{ type: 'pages.rotate', pages: [added!], rotation: 90 }] });
+        const undo = await doc.apply({ undoOf: inserted.meta.opId });
+        expect(isSkippedItem(itemOfType(undo, 'pages.delete'))).toBe(true);
+        expect(await pageOrderOf(doc)).toEqual([PAGE, EMPTY_PAGE, added]);
+      });
+    });
+
+    test('a page op naming no pages is refused', async () => {
+      await withDocument(async (doc) => {
+        for (const op of [
+          { type: 'pages.rotate', pages: [], rotation: 90 },
+          { type: 'pages.delete', pages: [] },
+          { type: 'pages.reorder', pages: [], position: 'start' },
+        ] as ChangeOp[]) {
+          await expect(doc.apply({ ops: [op] })).rejects.toMatchObject({
+            code: EngineErrorCode.InvalidArg,
+          });
+        }
+        expect(await pageOrderOf(doc)).toEqual([PAGE, EMPTY_PAGE]);
+      });
+    });
+
+    test('the undo of opening an item counts the items above it again', async () => {
+      await withDocument(async (doc) => {
+        const [parent, child, grandchild] = await take(doc, 3);
+        await doc.apply({
+          ops: [
+            outlineItem(parent, 'Parent'),
+            outlineItem(child, 'Child', parent),
+            outlineItem(grandchild, 'Grandchild', child),
+            { type: 'outline.update', ref: toOutlineItemRef(parent!), patch: { open: true } },
+          ],
+        });
+        const opened = await doc.apply({
+          ops: [{ type: 'outline.update', ref: toOutlineItemRef(child!), patch: { open: true } }],
+        });
+        expect(countIn(latin1(await doc.download()), parent!)).toBe(2);
+        await doc.apply({ undoOf: opened.meta.opId });
+        // Open, the parent shows its child; closed, the child hides the grandchild.
+        expect(countIn(latin1(await doc.download()), parent!)).toBe(1);
+      });
+    });
+
+    test('the undo of a delete or a move that emptied an open item opens it again', async () => {
+      await withDocument(async (doc) => {
+        const [parent, child] = await take(doc, 2);
+        await doc.apply({
+          ops: [
+            outlineItem(parent, 'Parent'),
+            outlineItem(child, 'Child', parent),
+            { type: 'outline.update', ref: toOutlineItemRef(parent!), patch: { open: true } },
+          ],
+        });
+        const openOf = async (item: number) =>
+          (await doc.outline.get()).items.find((read) => read.ref.objectNumber === item)?.open;
+
+        const deleted = await doc.apply({
+          ops: [{ type: 'outline.delete', ref: toOutlineItemRef(child!) }],
+        });
+        expect(await openOf(parent!)).toBe(false);
+        const undoDelete = await doc.apply({ undoOf: deleted.meta.opId });
+        expect(undoDelete.items.map((item) => item.type)).toEqual([
+          'outline.restore',
+          'outline.update',
+        ]);
+        expect(await openOf(parent!)).toBe(true);
+
+        const moved = await doc.apply({
+          ops: [
+            {
+              type: 'outline.move',
+              refs: [toOutlineItemRef(child!)],
+              parent: null,
+              position: 'end',
+            },
+          ],
+        });
+        expect(await openOf(parent!)).toBe(false);
+        await doc.apply({ undoOf: moved.meta.opId });
+        expect(await openOf(parent!)).toBe(true);
+      });
+    });
+
+    test('the undo of an item made applies after the page it goes to was deleted', async () => {
+      await withDocument(async (doc) => {
+        const [item] = await take(doc, 1);
+        const created = await doc.apply({
+          ops: [
+            {
+              type: 'outline.create',
+              parent: null,
+              data: {
+                title: 'Appendix',
+                target: { kind: 'goto', destination: { kind: 'fit', page: EMPTY_PAGE } },
+              },
+              objectNumber: item,
+            },
+          ],
+        });
+        await doc.apply({ ops: [{ type: 'pages.delete', pages: [EMPTY_PAGE] }] });
+        const undo = await doc.apply({ undoOf: created.meta.opId });
+        expect(appliedOfType(undo, 'outline.delete')).toBeTruthy();
+        expect((await doc.outline.get()).items).toEqual([]);
+      });
+    });
+
+    test('the undo of a new target leaves it when the old one goes to a page that is gone', async () => {
+      await withDocument(async (doc) => {
+        const [item] = await take(doc, 1);
+        const ref = toOutlineItemRef(item!);
+        await doc.apply({ ops: [outlineItem(item, 'Chapter')] });
+        const retargeted = await doc.apply({
+          ops: [
+            {
+              type: 'outline.update',
+              ref,
+              patch: { target: { kind: 'goto', destination: { kind: 'fit', page: EMPTY_PAGE } } },
+            },
+          ],
+        });
+        // Renamed since, so the undo goes field by field; the old target's page goes.
+        await doc.apply({ ops: [{ type: 'outline.update', ref, patch: { title: 'Renamed' } }] });
+        await doc.apply({ ops: [{ type: 'pages.delete', pages: [PAGE] }] });
+        const undo = await doc.apply({ undoOf: retargeted.meta.opId });
+        expect(isSkippedItem(itemOfType(undo, 'outline.update'))).toBe(true);
+        const [read] = (await doc.outline.get()).items;
+        expect(read?.target).toEqual({
+          kind: 'goto',
+          destination: { kind: 'fit', page: EMPTY_PAGE },
+        });
+      });
+    });
+
+    test('no item is made under the deepest item a read shows', async () => {
+      await withDocument(async (doc) => {
+        const numbers = await take(doc, OUTLINE_READ_LIMITS.depth);
+        await doc.apply({
+          ops: numbers.map((item, level) =>
+            outlineItem(item, `Level ${level}`, level ? numbers[level - 1] : undefined),
+          ),
+        });
+        const deepest = toOutlineItemRef(numbers[numbers.length - 1]!);
+        await expect(
+          doc.apply({
+            ops: [{ type: 'outline.create', parent: deepest, data: { title: 'Deeper' } }],
+          }),
+        ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
+        const { items } = await doc.outline.get();
+        expect(items).toHaveLength(OUTLINE_READ_LIMITS.depth);
+      });
+    });
+
+    test('a deleted file comes back with its bytes, its description and its dates', async () => {
+      await withDocument(async (doc) => {
+        await doc.apply({ ops: [embedNotes()] });
+        const [embedded] = (await doc.attachments.list()).attachments;
+        const deleted = await doc.apply({
+          ops: [{ type: 'attachments.delete', ref: NOTES_REF }],
+        });
+        expect((await doc.attachments.list()).attachments).toEqual([]);
+
+        const recorded = recordEvents(doc);
+        const undo = await doc.apply({ undoOf: deleted.meta.opId });
+        recorded.stop();
+        expect(appliedOfType(undo, 'attachments.restore').attachment).toEqual(embedded);
+        expect((await doc.attachments.list()).attachments).toEqual([embedded]);
+        expect(await doc.attachments.download(NOTES_REF)).toEqual(NOTES);
+        expect(recorded.events.map((event) => event.type)).toEqual(['attachments.restored']);
+      });
+    });
+
+    test('the undo of a file added is skipped when someone added another under its name', async () => {
+      await withDocument(async (doc) => {
+        const added = await doc.apply({ ops: [embedNotes()] });
+        const other = new TextEncoder().encode('Other notes.');
+        await doc.apply({ ops: [{ type: 'attachments.delete', ref: NOTES_REF }] });
+        await doc.apply({ ops: [embedNotes(other)] });
+
+        const undo = await doc.apply({ undoOf: added.meta.opId });
+        expect(isSkippedItem(itemOfType(undo, 'attachments.delete'))).toBe(true);
+        expect(await doc.attachments.download(NOTES_REF)).toEqual(other);
+      });
+    });
+
+    test('the undo of a file removed is skipped when another file has its name', async () => {
+      await withDocument(async (doc) => {
+        await doc.apply({ ops: [embedNotes()] });
+        const deleted = await doc.apply({
+          ops: [{ type: 'attachments.delete', ref: NOTES_REF }],
+        });
+        const other = new TextEncoder().encode('Other notes.');
+        await doc.apply({ ops: [embedNotes(other)] });
+
+        const undo = await doc.apply({ undoOf: deleted.meta.opId });
+        expect(isSkippedItem(itemOfType(undo, 'attachments.restore'))).toBe(true);
+        expect((await doc.attachments.list()).attachments).toHaveLength(1);
+        expect(await doc.attachments.download(NOTES_REF)).toEqual(other);
+      });
+    });
+
+    test('a file whose name another file has is refused, and the change writes nothing', async () => {
+      await withDocument(async (doc) => {
+        await doc.apply({ ops: [embedNotes()] });
+        const before = await factsOf(doc);
+        await expect(
+          doc.apply({
+            ops: [{ type: 'metadata.update', patch: { title: 'Changed' } }, embedNotes()],
+          }),
+        ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
+        expect(await factsOf(doc)).toEqual(before);
+      });
+    });
+
     test('undoing a change twice is harmless', async () => {
       await withDocument(async (doc) => {
         const before = await factsOf(doc);
@@ -914,6 +1331,25 @@ export function runChangeConformance(
         const updated = await doc.page(PAGE).annotations.update(FILE_SQUARE, { color: '#e11d48' });
         expect(updated.meta.undoable).toBe(true);
         await doc.apply({ undoOf: updated.meta.opId });
+        expect(await factsOf(doc)).toEqual(before);
+      });
+    });
+
+    test('adding and removing a file are one-op changes: their opIds undo them', async () => {
+      await withDocument(async (doc) => {
+        const before = await factsOf(doc);
+        const picked = new File([NOTES], 'notes.txt', { type: 'text/plain' });
+        const created = await doc.attachments.create({ data: picked });
+        expect(created.attachment.ref).toEqual(NOTES_REF);
+        expect(created.meta.undoable).toBe(true);
+        const withFile = await factsOf(doc);
+
+        const deleted = await doc.attachments.delete(NOTES_REF);
+        expect(deleted.meta.undoable).toBe(true);
+        await doc.apply({ undoOf: deleted.meta.opId });
+        expect(await factsOf(doc)).toEqual(withFile);
+
+        await doc.apply({ undoOf: created.meta.opId });
         expect(await factsOf(doc)).toEqual(before);
       });
     });

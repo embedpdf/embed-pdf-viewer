@@ -8,7 +8,7 @@ import { SelectionToken } from '@embedpdf/plugin-selection/contract/host';
 import { ANNOTATION_DEFAULTS, type AnnotationConfig } from './contract';
 import { createAnnotationController } from './controller';
 import { AnnotationToken } from './host-contract';
-import { initialAnnotationState } from './model';
+import { initialAnnotationModel } from './model';
 
 /**
  * The annotation plugin. Document-scoped; requires the interaction hub and
@@ -26,7 +26,7 @@ export const annotationPlugin = (config?: AnnotationConfig) =>
     scope: 'document',
     requires: [InteractionToken],
     optional: [SelectionToken, PublicActionsToken, RenderToken, FontsToken],
-    state: initialAnnotationState,
+    state: initialAnnotationModel,
     settings: { defaults: ANNOTATION_DEFAULTS, registered: config },
     create: createAnnotationController,
   });

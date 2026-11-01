@@ -1,7 +1,7 @@
 <script lang="ts">
   import { PDFViewer, type ViewerConfig } from '@cloudpdf/viewer-svelte';
 
-  const ebook = { shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+  const welcome = { grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
   const config: ViewerConfig = {
     theme: { accent: '#7c3aed' },
@@ -21,4 +21,4 @@
   };
 </script>
 
-<PDFViewer src={ebook} {...config} style="height: 100%" />
+<PDFViewer src={welcome} {...config} style="height: 100%" />

@@ -4,13 +4,14 @@
  * pure transition; the controller's areas apply them with `ctx.state.update`,
  * and nothing else changes stage state.
  */
-import type { Camera, Size } from '@embedpdf/core-stage';
+import type { PageRef, SettingLock } from '@embedpdf/core';
+import type { Camera, Point, Size } from '@embedpdf/core-stage';
 
 import type { StageConfig, StageSettings } from './contract';
 import { mergeSettings } from './responsive';
 import { DEFAULT_SETTINGS } from './settings';
 
-export interface StageState extends StageSettings {
+export interface StageModel extends StageSettings {
   readonly camera: Camera;
   /**
    * One-way render-commit latch. False while the initial viewport-driven
@@ -56,9 +57,33 @@ export interface StageState extends StageSettings {
    * counts only programmatic rounds, so user scrolling is never throttled.
    */
   readonly motionCause: 'user' | 'programmatic';
+  /** The `zoom` tool's drag in progress, or null when there is none. */
+  readonly zoomDrag: ZoomDrag | null;
+  /**
+   * Who holds each locked setting (`lockSettings()`). State, so a lock that
+   * changes no value still reaches the controls that read `getLock()`.
+   */
+  readonly locks: StageLocks;
 }
 
-export const initialStageState = (config: StageConfig): StageState => {
+/** The holder of each locked setting. */
+export type StageLocks = Readonly<Partial<Record<keyof StageSettings, SettingLock>>>;
+
+/**
+ * A drag of the `zoom` tool, as two corners on one page's plane: the page
+ * under the press (or a visible one, for a press between pages). Page points
+ * keep the box on the content when the view scrolls during the drag, and the
+ * box may reach past that page onto its neighbours.
+ */
+export interface ZoomDrag {
+  readonly page: PageRef;
+  /** Where the press was, in page coordinates. */
+  readonly from: Point;
+  /** Where the pointer is now, in page coordinates. */
+  readonly to: Point;
+}
+
+export const initialStageModel = (config: StageConfig): StageModel => {
   // `responsive` configures the capability, not the settings: strip it so the
   // spread below stays a pure settings override.
   const { responsive: _responsive, ...overrides } = config;
@@ -71,39 +96,41 @@ export const initialStageState = (config: StageConfig): StageState => {
     cursor: 0,
     motionCause: 'user',
     activeRules: [],
+    zoomDrag: null,
+    locks: {},
     ...mergeSettings(DEFAULT_SETTINGS, overrides),
   };
 };
 
-export const setCamera = (state: StageState, camera: Camera): StageState =>
+export const setCamera = (state: StageModel, camera: Camera): StageModel =>
   state.camera === camera ? state : { ...state, camera };
 
-export const setCameraResting = (state: StageState, resting: boolean): StageState =>
+export const setCameraResting = (state: StageModel, resting: boolean): StageModel =>
   state.cameraResting === resting ? state : { ...state, cameraResting: resting };
 
-export const markPlaced = (state: StageState): StageState =>
+export const markPlaced = (state: StageModel): StageModel =>
   state.placed ? state : { ...state, placed: true };
 
-export const setViewport = (state: StageState, viewport: Size): StageState =>
+export const setViewport = (state: StageModel, viewport: Size): StageModel =>
   state.viewport === viewport ? state : { ...state, viewport };
 
-export const setDpr = (state: StageState, dpr: number): StageState =>
+export const setDpr = (state: StageModel, dpr: number): StageModel =>
   state.dpr === dpr ? state : { ...state, dpr };
 
-export const setCursor = (state: StageState, cursor: number): StageState =>
+export const setCursor = (state: StageModel, cursor: number): StageModel =>
   state.cursor === cursor ? state : { ...state, cursor };
 
 export const setMotionCause = (
-  state: StageState,
-  motionCause: StageState['motionCause'],
-): StageState => (state.motionCause === motionCause ? state : { ...state, motionCause });
+  state: StageModel,
+  motionCause: StageModel['motionCause'],
+): StageModel => (state.motionCause === motionCause ? state : { ...state, motionCause });
 
 /**
  * Merge a settings patch. Undefined values are skipped, so a partial restore
  * never clears a setting; the area that patches decides what camera
  * follow-up the change needs.
  */
-export function patchSettings(state: StageState, patch: Partial<StageSettings>): StageState {
+export function patchSettings(state: StageModel, patch: Partial<StageSettings>): StageModel {
   let next = state;
   let key: keyof StageSettings;
   for (key in patch) {
@@ -115,5 +142,11 @@ export function patchSettings(state: StageState, patch: Partial<StageSettings>):
   return next;
 }
 
-export const setActiveRules = (state: StageState, activeRules: readonly string[]): StageState =>
+export const setActiveRules = (state: StageModel, activeRules: readonly string[]): StageModel =>
   state.activeRules === activeRules ? state : { ...state, activeRules };
+
+export const setZoomDrag = (state: StageModel, zoomDrag: ZoomDrag | null): StageModel =>
+  state.zoomDrag === zoomDrag ? state : { ...state, zoomDrag };
+
+export const setLocks = (state: StageModel, locks: StageLocks): StageModel =>
+  state.locks === locks ? state : { ...state, locks };

@@ -45,7 +45,12 @@ import {
   type ConfiguredCommands,
   type RegisteredCommand,
 } from './registry';
-import { createAvailability, labelOf, notAllowedMessage } from './services/availability';
+import {
+  createAvailability,
+  labelOf,
+  lockedMessage,
+  notAllowedMessage,
+} from './services/availability';
 import { createTurningOff } from './write/turning-off';
 
 const panelTarget = (
@@ -212,17 +217,19 @@ export function createCommandsController(ctx: PluginContext<void, CommandsSettin
     }
   };
 
-  const { isTurnedOff, notAllowedKeyOf, refusalOf } = createAvailability(ctx, settings);
+  const { isTurnedOff, notAllowedKeyOf, lockOf, refusalOf } = createAvailability(ctx, settings);
 
   const derivationsOf = (entry: RegisteredCommand, documentId?: string): Derivations => {
     const { definition } = entry;
     const context = commandContext(documentId);
     const label = labelOf(definition, context);
-    // Turned off hides it; not allowed hides it, or disables it with the reason.
+    // Turned off hides it; not allowed hides it, or disables it with the reason; a lock on the
+    // setting it changes disables it with the lock's reason, whatever `notAllowed` says.
     const turnedOff = isTurnedOff(definition);
     const notAllowed = turnedOff ? null : notAllowedKeyOf(definition, context);
     const shownWhenNotAllowed = settings.get().notAllowed === 'disable';
-    const ruledOut = turnedOff || notAllowed !== null;
+    const lock = turnedOff || notAllowed !== null ? null : lockOf(definition, context);
+    const ruledOut = turnedOff || notAllowed !== null || lock !== null;
     // A command that opens something is active while it's open, unless it says otherwise.
     let active: boolean;
     if (definition.active) {
@@ -253,7 +260,9 @@ export function createCommandsController(ctx: PluginContext<void, CommandsSettin
         derive(definition.visible, context, true),
       notAllowed !== null && shownWhenNotAllowed
         ? notAllowedMessage(notAllowed, label, context)
-        : undefined,
+        : lock !== null
+          ? lockedMessage(lock, label, context)
+          : undefined,
     ];
   };
 

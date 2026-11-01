@@ -1,5 +1,52 @@
 # @cloudpdf/engine
 
+## 3.0.0-next.19
+
+### Minor Changes
+
+- [#918](https://github.com/embedpdf/embed-pdf-viewer/pull/918) by [@bobsingor](https://github.com/bobsingor) – Opens a grant with `open({ kind: 'grant', grant, passphrase })`, and the
+  document's grant is `doc.grant`. The client half is `exchangeGrant`,
+  `grantSessionSource`, `GrantSessionSource` and `GrantExchangeError`, and it
+  exchanges at `/v1/grant-sessions`.
+
+## 3.0.0-next.18
+
+### Patch Changes
+
+- [#910](https://github.com/embedpdf/embed-pdf-viewer/pull/910) by [@bobsingor](https://github.com/bobsingor) – A document's signed bytes (`signatures.getContents`, `getDigest`, `downloadRevision` and history `analyze`) are read through its layer's version paths.
+
+- [#909](https://github.com/embedpdf/embed-pdf-viewer/pull/909) by [@bobsingor](https://github.com/bobsingor) – A share link takes the page's `identity` (the `open()` option, or the viewer's `identity`) as the visitor's answers, the same as the visitor typing them: only the fields the link asks, never `userId` or `groupId`. The share input's `visitor` is gone.
+
+  Nothing the page passes is ignored silently: in development the engine warns once when it doesn't use `scope` (the document's token says what the session may do), or when the session doesn't act for the `identity` passed, and says why.
+
+- [#907](https://github.com/embedpdf/embed-pdf-viewer/pull/907) by [@bobsingor](https://github.com/bobsingor) – A renewal the share link refuses for a passphrase, or for questions asked on open, no longer retries on every request. The document asks once (`doc.share.openRequest`, `onOpenRequest`), reads on with its session until it runs out, then waits for `resume()`; with nothing listening, a request fails with the refusal. A shared link's visitor is now kept in the visitor store for the next visit, as the server says (`visitor.keep`).
+
+## 3.0.0-next.17
+
+### Minor Changes
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – Share links keep their visitor. Every renewal sends the handle the last exchange answered, so the visitor and, on a per-visitor link, their layer stay the same; an open document also renews on a timer, so a visitor who only reads still counts as seen. When the link keeps visitors' layers, the handle waits in the engine's `visitorStore` for the next open: the browser's `localStorage` by default, none outside a browser (`browserVisitorStore()`, or a store of your own). `open({ kind: 'share', shareToken, restart: true })` deletes the kept layer and starts a new visitor, and `doc.share` says whether the layer is shared or the visitor's own and whether it is kept. An open whose layer was deleted under it (another tab started over) refuses with `Forbidden` (`details.reason: 'layer-changed'`); opening again picks up the new layer.
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – Share links that ask who the visitor is. `open({ kind: 'share', shareToken, visitor })` sends the answers; without the required ones, a link that asks on open fails the open with `VisitorIdentityRequired`, whose `details` are the questions. A link that asks before the first change opens at once: its changes wait in the document's write line while something listens (`doc.share.onIdentityRequest`), and go out as they were once `doc.share.identify(answers)` succeeds; `doc.share.decline()` fails them, and with nothing listening they fail at once. A change the server refuses for the answers waits the same way and is sent again with the same `opId`. A passphrase or answer the exchange refuses keeps its details on the `EngineError`.
+
+## 3.0.0-next.16
+
+### Minor Changes
+
+- [#891](https://github.com/embedpdf/embed-pdf-viewer/pull/891) by [@bobsingor](https://github.com/bobsingor) – On the cloud engine, `doc.attachments.create()` and `delete()` are changes that can be undone, sent through `POST …/changes`, and `download()` returns the bytes. Another session follows `attachments.restored`.
+
+- [#885](https://github.com/embedpdf/embed-pdf-viewer/pull/885) by [@bobsingor](https://github.com/bobsingor) – `doc.outline` on the cloud engine: the outline is read from the shared URL while the layer inherits it, from the layer's otherwise, and its edits are undoable changes.
+
+- [#890](https://github.com/embedpdf/embed-pdf-viewer/pull/890) by [@bobsingor](https://github.com/bobsingor) – On the cloud engine, `doc.pages.rotate()`, `reorder()`, `delete()`, `insert()` and `insertBlank()` are changes that can be undone, sent through `POST …/changes`.
+
+- [#883](https://github.com/embedpdf/embed-pdf-viewer/pull/883) by [@bobsingor](https://github.com/bobsingor) – `pages.extract(pages, options)` sends its options to the server, so a cloud document makes flattened copies too: `{ flatten: { usage: 'print' } }` returns the pages as they print.
+
+- [#883](https://github.com/embedpdf/embed-pdf-viewer/pull/883) by [@bobsingor](https://github.com/bobsingor) – `page.render.image()` makes print pictures (`usage: 'print'`, `viewport: { kind: 'dpi', dpi: 150 | 300 }`), fetched from the print family's path at its tier (`render/print/…` or `render/print-high/…`). A session whose rights the client knows is refused before the request without `doc.print`, or `doc.print.high` at 300 DPI.
+
+### Patch Changes
+
+- [#891](https://github.com/embedpdf/embed-pdf-viewer/pull/891) by [@bobsingor](https://github.com/bobsingor) – Another session's outline edits, and its undos of annotation deletes, move this session's cached pins, so it never reads the old outline or annotations from a cached URL. Every remote event kind is named where they are absorbed, so a new one can't be forgotten.
+
 ## 3.0.0-next.15
 
 ### Minor Changes

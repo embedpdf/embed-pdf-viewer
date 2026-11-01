@@ -1,5 +1,87 @@
 # @cloudpdf/contract
 
+## 3.0.0-next.19
+
+### Minor Changes
+
+- [#918](https://github.com/embedpdf/embed-pdf-viewer/pull/918) by [@bobsingor](https://github.com/bobsingor) – Share links are grants. The operations are `grants.*` under
+  `/v1/tenants/{tenantId}/grants`, the scope is `grants.manage`, and the public
+  exchange is `POST /v1/grant-sessions` with `{ grant, passphrase }`. Answers say
+  `grant`/`grants`, the record says `passphraseProtected`, and create and update
+  take `passphrase`. A grant has a `name` (1 to 100 characters, trimmed, or null).
+  New grants are `grt_…`; `shr_…` ids keep working. The errors are
+  `GrantPassphraseRequired` and `GrantExpired`, a layer names its `grantId`, and
+  every `Share*` schema and type is `Grant*`.
+
+## 3.0.0-next.18
+
+### Minor Changes
+
+- [#917](https://github.com/embedpdf/embed-pdf-viewer/pull/917) by [@bobsingor](https://github.com/bobsingor) – Add folders: `folders.create`, `folders.list`, `folders.get` (with the path
+  above the folder), `folders.update` to rename, `folders.moveInto` to move
+  documents and folders together, and `folders.delete` for empty folders. The
+  top level is the place `root`. Document records carry `folderId`;
+  `documents.init` and `documents.importFrom` take one, and `documents.list`
+  filters by it. Folder conflicts answer 409 with `details.reason`.
+
+- [#917](https://github.com/embedpdf/embed-pdf-viewer/pull/917) by [@bobsingor](https://github.com/bobsingor) – Documents have a `name`: set it with `documents.init` or `documents.import`
+  (it defaults to the document id) and change it with the new `documents.update`
+  operation, which needs the new `docs.update` tenant scope. `documents.list`
+  gains `q` to search names ignoring case, `sort` (`createdAt`, `name` or
+  `size`) and `order`, and no longer lists documents that are being deleted
+  unless `state=deleting` asks for them.
+
+- [#917](https://github.com/embedpdf/embed-pdf-viewer/pull/917) by [@bobsingor](https://github.com/bobsingor) – `folders.delete` takes `recursive=true` to delete a folder with everything in
+  it. Without it, a folder that holds anything is still refused.
+
+- [#917](https://github.com/embedpdf/embed-pdf-viewer/pull/917) by [@bobsingor](https://github.com/bobsingor) – Document operations accept tenant JWTs, which need the operation's document
+  capabilities exactly as a document JWT does; no tenant scope reaches inside a
+  document. A tenant token's `scope` now takes document capabilities next to
+  tenant scopes, and they hold for every document of the tenant.
+  `documents.download` needs `doc.download` and `documents.thumbnail` needs
+  `doc.render` instead of `docs.read`. `docs.update` renames and moves, and never
+  changes content.
+
+### Patch Changes
+
+- [#910](https://github.com/embedpdf/embed-pdf-viewer/pull/910) by [@bobsingor](https://github.com/bobsingor) – The `doc.versions.*` operations take the layer: their paths are `/v1/docs/:docId/layers/:layerName/versions…`. `doc.versions.list` answers `LayerVersions` (`{ baseSha, versions }`): the layer's base and its versions, the upload first.
+
+- [#909](https://github.com/embedpdf/embed-pdf-viewer/pull/909) by [@bobsingor](https://github.com/bobsingor) – Share links carry `identity` (who their visitors are, for a link made for one person) on the link record, `shares.create` and `shares.update`. `Identity` is a named component, shared with `tokens.issue`, so the SDKs have one type for it.
+
+- [#910](https://github.com/embedpdf/embed-pdf-viewer/pull/910) by [@bobsingor](https://github.com/bobsingor) – The signature notes describe the new rule. A signature is made over the layer's own base, and its new version is that layer's own: the document and every other layer stay as they were. `StaleBase` is no longer an error code.
+
+## 3.0.0-next.17
+
+### Minor Changes
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – Share links can be archived: `shares.archive` (`POST /v1/tenants/{tenantId}/shares/{shareId}/archive`) ends a link for good while keeping what its visitors made, and the record carries `archivedAt`. `shares.list` leaves archived links out unless asked with `archived=true`. `shares.delete` deletes only a link whose visitors made no changes and answers 409 otherwise, and `shares.update` answers 409 for an archived link.
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – Add `doc.downloadLink` (`POST /v1/docs/{docId}/layers/{layerName}/download-link`, `doc.download`): a short-lived URL (`expiresIn` 60 to 3600 seconds, default 300) that downloads the layer's current PDF with a plain GET and no Authorization header, for services that only take a URL. It downloads that one file as it is when made, and answers 404 once the layer changes.
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – Add `documents.layers.delete` (`DELETE /v1/tenants/{tenantId}/documents/{id}/layers/{layerName}`, scope `docs.delete`): delete a layer and everything it stored, for example a user's data. A layer that was written can't be used again under its name; one nobody wrote stays usable. A layer a share link uses is refused with 409 until the link is deleted.
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – Add `documents.layers.list` (`GET /v1/tenants/{tenantId}/documents/{id}/layers`, scope `docs.read`): a document's layers that hold changes, newest first, paged like the other tenant lists with `limit`, `cursor` and `nextCursor`. Each record says whose layer it is (`shareId` and `visitorId` for a share-link visitor's own), its `storageSizeBytes`, and when it was made, last changed and last seen. `shareId` filters to one link's visitors, a deleted link's too. A layer appears at its first change, and a deleted one is not listed.
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – A share link's `visitorIdleSeconds` is nullable and null by default: visitors' layers stay until they are deleted on purpose. Set it (an hour to 30 days) only for links whose visitors' layers are throwaway, and set it back to null on `shares.update` to stop deleting them.
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – Share links take `visitorIdentity` (`ShareVisitorIdentitySchema`: the fields to ask, each required or optional, `ask`, `purpose`, `privacyUrl`), and the exchange request takes the visitor's answers (`ShareVisitorAnswersSchema`). The exchange response's `visitor.identityRequest` (`ShareVisitorIdentityRequestSchema`) says what a link that asks before the first change still needs. New operations `shares.visitors.list` and `shares.visitors.delete`, with `ShareVisitorRecordSchema`. Admin error payloads may carry `error.details`. `visitorLayerIdleSeconds` is now `visitorIdleSeconds`.
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – Share links say whose layer their visitors write into. `layerMode` is `'shared'` (one layer, `layerName`, as before) or `'per-visitor'` (each visitor gets a layer of their own, and `layerName` is `null`), with `keepVisitorLayers` and `visitorIdleSeconds` (an hour to 30 days) for per-visitor links. `shares.create` and `shares.update` take all of them, so a link can switch modes and keep its token. The exchange takes `visitorHandle` and `restart`, and answers `layerMode` and `visitor: { handle, keep }`: send the handle back to stay the same visitor, and keep it for the next visit when `keep` is true.
+
+## 3.0.0-next.16
+
+### Minor Changes
+
+- [#891](https://github.com/embedpdf/embed-pdf-viewer/pull/891) by [@bobsingor](https://github.com/bobsingor) – `doc.changes` takes the attachment ops under `doc.attachments.modify`. New operations: `doc.attachments.list`, `doc.attachments.download` and `doc.annotations.readFile`.
+
+- [#885](https://github.com/embedpdf/embed-pdf-viewer/pull/885) by [@bobsingor](https://github.com/bobsingor) – The contract gains `doc.outline.get`, and `doc.changes` takes the outline ops under the `doc.outline.modify` capability. The outline's models are named once in the OpenAPI document.
+
+- [#890](https://github.com/embedpdf/embed-pdf-viewer/pull/890) by [@bobsingor](https://github.com/bobsingor) – `doc.changes` takes the page ops under `doc.pages.assemble`, with a PDF to insert as a multipart part. The operations `doc.pages.reorder`, `doc.pages.rotate`, `doc.pages.delete`, `doc.pages.insert` and `doc.pages.insertBlank` are removed: page edits are changes.
+
+### Patch Changes
+
+- [#883](https://github.com/embedpdf/embed-pdf-viewer/pull/883) by [@bobsingor](https://github.com/bobsingor) – The `doc.pages.extract` operation describes its flatten options and their permissions.
+
 ## 3.0.0-next.15
 
 ### Minor Changes

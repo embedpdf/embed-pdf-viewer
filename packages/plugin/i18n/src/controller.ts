@@ -30,7 +30,7 @@ import {
   setLocale as setCurrentLocale,
   startLocaleLoad,
   unregisterLocale,
-  type I18nState,
+  type I18nModel,
 } from './model';
 import { createLoaders } from './sync/loaders';
 import { translate, type TranslationSources } from './translate';
@@ -38,7 +38,7 @@ import { translate, type TranslationSources } from './translate';
 const unknownLocale = (code: string) =>
   new PluginError('not-found', 'i18n', `unknown locale '${code}': not loaded and not in loaders`);
 
-export function createI18nController(ctx: PluginContext<I18nState, I18nSettings>) {
+export function createI18nController(ctx: PluginContext<I18nModel, I18nSettings>) {
   const settings = ctx.settings();
   const localeChanged = ctx.events.source<LocaleChangedEvent>();
   const localeLoadFailed = ctx.events.source<LocaleLoadFailedEvent>();

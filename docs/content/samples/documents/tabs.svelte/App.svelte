@@ -11,9 +11,23 @@
   const engine = localEngine();
   const plugins = [stagePlugin(), renderPlugin()];
 
-  // [!doc-source ebook]
-  const ebook = async (): Promise<OpenInput> => {
-    const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
+  // [!doc-source welcome]
+  const welcome = async (): Promise<OpenInput> => {
+    const response = await fetch('/pdfs/welcome.pdf');
+    return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
+  };
+  // [!/doc-source]
+
+  // [!doc-source article]
+  const article = async (): Promise<OpenInput> => {
+    const response = await fetch('/pdfs/article.pdf');
+    return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
+  };
+  // [!/doc-source]
+
+  // [!doc-source sketch]
+  const sketch = async (): Promise<OpenInput> => {
+    const response = await fetch('/pdfs/sketch.pdf');
     return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
   };
   // [!/doc-source]
@@ -23,11 +37,11 @@
   {engine}
   {plugins}
   initialDocuments={[
-    { source: ebook, name: 'Contract' },
-    { source: ebook, name: 'Report' },
+    { source: welcome, name: 'Guide' },
+    { source: article, name: 'Article' },
   ]}
 >
-  <Tabs {ebook} />
+  <Tabs {sketch} />
   <DocumentGate>
     {#snippet fallback()}
       <p class="loading">Opening…</p>

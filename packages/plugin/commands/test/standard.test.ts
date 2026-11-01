@@ -53,6 +53,7 @@ describe('standard commands', () => {
       'view:rotate-counterclockwise': null,
       'tool:pointer': 'V',
       'tool:pan': 'H',
+      'tool:zoom': 'Z',
       'selection:copy': 'Mod+C',
       'annotation:delete': ['Delete', 'Backspace'],
       'document:download': 'Mod+S',
@@ -73,6 +74,14 @@ describe('standard commands', () => {
     command('page:previous').run?.(context);
     expect(stage.previousPage).toHaveBeenCalled();
     expect(command('zoom:in').enabled?.(contextWith(new Map()))).toBe(false);
+  });
+
+  it('zooms only while the zoom is inside its limits', () => {
+    const { command } = standard();
+    const stage = { canZoomIn: () => false, canZoomOut: () => true };
+    const context = contextWith(new Map([[StageToken, stage]]));
+    expect(command('zoom:in').enabled?.(context)).toBe(false);
+    expect(command('zoom:out').enabled?.(context)).toBe(true);
   });
 
   it('has a tool command for every tool the document has', () => {

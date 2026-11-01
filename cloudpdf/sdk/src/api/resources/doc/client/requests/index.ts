@@ -1,4 +1,5 @@
 export type { DocChangesRequest } from "./DocChangesRequest.js";
+export type { DocDownloadLinkRequest } from "./DocDownloadLinkRequest.js";
 export type { DownloadDocRequest } from "./DownloadDocRequest.js";
 export type { HeadDocRequest } from "./HeadDocRequest.js";
 export type { ManifestDocRequest } from "./ManifestDocRequest.js";

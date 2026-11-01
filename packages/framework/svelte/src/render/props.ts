@@ -13,4 +13,9 @@ export interface RenderLayerProps {
    * arithmetic: leave it on, and pass false only for a view that must never tile.
    */
   tiles?: boolean;
+  /**
+   * Draw the page's thumbnail instead: one small picture of the whole page, without tiles, which
+   * needs only `doc.render.thumbnail` (a strip of thumbnails, a page picker).
+   */
+  thumbnail?: boolean;
 }

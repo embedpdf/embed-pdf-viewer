@@ -23,6 +23,7 @@ import {
   useStageState,
   useStageSettings,
   useDocuments,
+  usePageList,
   useDocumentsState,
   useViewManager,
   useViewManagerState,
@@ -1553,6 +1554,7 @@ function ThumbnailSidebar() {
   const currentPage = useStageState((state) => state.currentPageIndex);
   const editor = usePageEdit(); // PERSISTED page edits (document-scoped, shared by lenses)
   const canEdit = editor.canEdit();
+  const pages = usePageList(); // a move names its neighbour by ref
   const pageCount = useStageState((state) => state.pageCount, ThumbsStageToken); // gates move/delete edges
   const [menuPage, setMenuPage] = useState<number | null>(null); // which thumb's action menu is open
   const thumbs = useStage(ThumbsStageToken); // the SIDEBAR lens
@@ -1718,7 +1720,9 @@ function ThumbnailSidebar() {
                       <button
                         style={itemStyle}
                         onClick={(e) =>
-                          act(e, () => editor.reorder([page.ref], { before: page.pageIndex - 1 }))
+                          act(e, () =>
+                            editor.reorder([page.ref], { before: pages[page.pageIndex - 1]!.ref }),
+                          )
                         }
                       >
                         ↑ Move page up
@@ -1728,7 +1732,9 @@ function ThumbnailSidebar() {
                       <button
                         style={itemStyle}
                         onClick={(e) =>
-                          act(e, () => editor.reorder([page.ref], { after: page.pageIndex + 1 }))
+                          act(e, () =>
+                            editor.reorder([page.ref], { after: pages[page.pageIndex + 1]!.ref }),
+                          )
                         }
                       >
                         ↓ Move page down

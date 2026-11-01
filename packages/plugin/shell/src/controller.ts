@@ -25,10 +25,10 @@ import {
   snapshotOf,
   toggleMenu,
   toggleSurface,
-  type ShellState,
+  type ShellModel,
 } from './model';
 
-export function createShellController(ctx: PluginContext<ShellState>) {
+export function createShellController(ctx: PluginContext<ShellModel>) {
   const surfaceOpened = ctx.events.source<SurfaceOpenedEvent>();
   const surfaceClosed = ctx.events.source<SurfaceClosedEvent>();
   const menuOpened = ctx.events.source<MenuOpenedEvent>();

@@ -1,5 +1,6 @@
 import type {
   ChangeResult,
+  PageCoordinates,
   PdfCoordinates,
   SerializedEngineError,
 } from '@embedpdf/engine-core/runtime';
@@ -7,12 +8,19 @@ import type {
 import { recordBytes, type ChangeRecord } from './ChangeRecord';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 
+/**
+ * An applied change's answer, in the space its job answered in: page space
+ * for a change (`doc.apply`), the file's for a single verb's job, whose
+ * boundary converts it.
+ */
+export type KeptResult = ChangeResult<PdfCoordinates> | ChangeResult<PageCoordinates>;
+
 /** What one change answered, kept under its `opId`. */
 export type ChangeOutcome =
   | {
       readonly kind: 'applied';
       readonly fingerprint: string;
-      readonly result: ChangeResult<PdfCoordinates>;
+      readonly result: KeptResult;
     }
   | {
       readonly kind: 'refused';
@@ -76,7 +84,7 @@ export class ChangeLedger {
   keepApplied(
     opId: string,
     fingerprint: string,
-    result: ChangeResult<PdfCoordinates>,
+    result: KeptResult,
     record: ChangeRecord | null,
   ): void {
     const bytes = record ? recordBytes(record) : 0;

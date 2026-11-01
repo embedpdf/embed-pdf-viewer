@@ -11,11 +11,11 @@
   const engine = cloudEngine();
   const plugins = [stagePlugin(), renderPlugin()];
 
-  const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+  const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 </script>
 
-<Viewer {engine} {plugins} initialDocuments={[{ source: ebook, name: 'ebook.pdf' }]}>
-  <Toolbar {ebook} />
+<Viewer {engine} {plugins} initialDocuments={[{ source: welcome, name: 'welcome.pdf' }]}>
+  <Toolbar {welcome} />
   <DocumentGate>
     {#snippet fallback()}
       <Empty />

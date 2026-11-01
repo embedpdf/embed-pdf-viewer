@@ -22,7 +22,7 @@ import {
 import { EpdfRedaction, withRedaction } from '@embedpdf/angular/redaction';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 /** Next to `<epdf-stage #stage="epdfStage">`: `<div demoPendingMarks [stage]="stage"></div>`. */
 @Component({
@@ -89,7 +89,7 @@ export class PendingMarks {
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: welcome }] },
       withStage(),
       withRender(),
       withInteraction(),
@@ -123,13 +123,13 @@ export class App {
   private started = false;
 
   constructor() {
-    // On load: the author's name, and every "commercial" in the document.
+    // On load: the cover's subtitle, and every "Adobe" in the document.
     effect(() => {
       if (this.annotation.status() !== 'ready' || this.started) return;
       this.started = true;
       void this.redaction
-        .markArea(0, { x: 100, y: 508, width: 172, height: 50 })
-        .then(() => this.redaction.markMatches({ text: 'commercial' }));
+        .markArea(0, { x: 44, y: 318, width: 206, height: 50 })
+        .then(() => this.redaction.markMatches({ text: 'Adobe' }));
     });
   }
 }

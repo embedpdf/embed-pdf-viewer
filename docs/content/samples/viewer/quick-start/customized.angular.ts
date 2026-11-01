@@ -1,17 +1,17 @@
 import { Component } from '@angular/core';
 import { EpdfPdfViewer, type ViewerConfig } from '@embedpdf/viewer-angular';
 
-// [!doc-source ebook]
-const ebook = 'https://snippet.embedpdf.com/ebook.pdf';
+// [!doc-source welcome]
+const welcome = '/pdfs/welcome.pdf';
 // [!/doc-source]
 
 @Component({
   selector: 'demo-root',
   imports: [EpdfPdfViewer],
-  template: `<epdf-pdf-viewer [src]="ebook" [config]="config" style="height: 100%" />`,
+  template: `<epdf-pdf-viewer [src]="welcome" [config]="config" style="height: 100%" />`,
 })
 export class App {
-  readonly ebook = ebook;
+  readonly welcome = welcome;
   readonly config: ViewerConfig = {
     theme: { accent: '#7c3aed' },
     disable: ['forms', 'redaction'],

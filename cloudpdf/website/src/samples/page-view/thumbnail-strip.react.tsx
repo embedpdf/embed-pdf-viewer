@@ -30,7 +30,7 @@ const plugins = [
   renderPlugin(),
 ];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 function Thumbnails() {
   const main = useStage();
@@ -60,7 +60,7 @@ function Thumbnails() {
           aria-current={page.pageIndex === currentPageIndex}
           onClick={() => main.goToPage(page.ref)}
         >
-          <RenderLayer />
+          <RenderLayer thumbnail />
         </button>
       )}
     </Stage>
@@ -69,7 +69,7 @@ function Thumbnails() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <div className="reader">
           <Thumbnails />

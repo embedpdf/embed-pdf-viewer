@@ -20,14 +20,14 @@ const plugins = [
   annotationPlugin(),
 ];
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const article = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/article.pdf');
+  return { kind: 'bytes', id: 'article', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 </script>
 
 <template>
-  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: ebook }]">
+  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: article }]">
     <DocumentGate>
       <template #fallback><p class="loading">Loading…</p></template>
       <MarkupToolbar />

@@ -1,6 +1,6 @@
 <!-- The annotations of one kind, in drawing order. A click shows one on its page. -->
 <script setup lang="ts">
-import { shallowRef } from 'vue';
+import { computed, shallowRef } from 'vue';
 import { usePageList } from '@embedpdf/vue/runtime';
 import { useStage } from '@embedpdf/vue/stage';
 import { annotationKey, useAnnotation, useAnnotationList } from '@embedpdf/vue/annotation';
@@ -14,9 +14,11 @@ const KINDS: { label: string; subtype?: AnnotationSubtype }[] = [
 ];
 
 const kind = shallowRef(KINDS[0]!);
-const annotations = useAnnotationList(() =>
+const ofKind = useAnnotationList(() =>
   kind.value.subtype ? { subtype: kind.value.subtype } : undefined,
 );
+// Replies and review states belong to their comment's thread: the list leaves them out.
+const annotations = computed(() => ofKind.value.filter((each) => each.reply?.type !== 'reply'));
 const pages = usePageList();
 const stage = useStage();
 const annotation = useAnnotation();

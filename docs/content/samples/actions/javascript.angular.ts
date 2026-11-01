@@ -18,10 +18,10 @@ import {
 } from '@embedpdf/angular/actions';
 import { localEngine } from '@embedpdf/engine';
 
-// [!doc-source ebook]
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source links]
+const links = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/links.pdf');
+  return { kind: 'bytes', id: 'links', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
@@ -114,7 +114,7 @@ export class ScriptConsole {
   providers: [
     ScriptOutput,
     provideEmbedPdf(
-      { engine: () => localEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => localEngine(), initialDocuments: [{ source: links }] },
       // JavaScript on, and two fields scripts often ask for about the user.
       withActions({
         javascript: { enabled: true, identity: { name: 'Dana Smith', corporation: 'Acme' } },

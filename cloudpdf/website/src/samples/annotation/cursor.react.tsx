@@ -28,7 +28,7 @@ const plugins = [
   annotationPlugin({ tools: [{ id: 'square', cursor: 'cell' }] }),
 ];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const sketch: OpenInput = { kind: 'grant', grant: 'shr_IyOgSdO4AmJqV4BoMv5V0nYU' };
 
 // A pen, 24 × 24, in a color: its tip is the bottom-left corner.
 const penIcon = (color: string) =>
@@ -99,7 +99,7 @@ function Toolbar() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: sketch }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <InkCursor />
         <Toolbar />

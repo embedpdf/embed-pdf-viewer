@@ -6,9 +6,10 @@
  * `stage.plugin.ts`.
  */
 export { stagePlugin } from './stage.plugin';
-export { stageState } from './state';
+export { stageState, type StageState } from './state';
 export * from './contract';
 export { createScrollHandler } from './scroll-handler';
 export type { ScrollHandlerOptions } from './scroll-handler';
+export { createZoomDragHandler } from './zoom-drag-handler';
 export { DEFAULT_SETTINGS, DEFAULT_RESPONSIVE, settingsEqual } from './settings';
 export { boxOf, matchesQuery, resolveResponsive } from './responsive';

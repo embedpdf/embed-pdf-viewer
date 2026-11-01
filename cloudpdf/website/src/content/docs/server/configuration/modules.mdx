@@ -1,0 +1,222 @@
+---
+title: Modules
+description: Add server modules, packages that run inside the CloudPDF server with their own routes and permissions.
+---
+
+import { Callout } from '@/components/docs/callout';
+
+# Modules
+
+A module is a package that runs inside the server and adds to it: routes on a document, and the
+permissions those routes need. The server's own routes stay as they are; a module's routes sit
+beside them, under the module's id.
+
+<Callout type="warn">
+  A module runs in the server's process, with the server's access. Install only modules you would
+  trust as part of the server itself.
+</Callout>
+
+## Install a module
+
+Install the package next to the server, name it in `CLOUDPDF_MODULES`, and give it the settings
+it asks for:
+
+```sh
+npm install @acme/snapshot-module
+
+CLOUDPDF_MODULES=@acme/snapshot-module
+CLOUDPDF_SNAPSHOT_LABEL=fernquill
+```
+
+`CLOUDPDF_MODULES` is a comma-separated list of package names, or of paths (from the working
+directory) to a module's file. A module reads its settings from `CLOUDPDF_<ID>_<KEY>`: its id in
+capitals, with `_` for `-`. So the `AXINOM_COM_KEY` setting of a `protected-display` module is
+`CLOUDPDF_PROTECTED_DISPLAY_AXINOM_COM_KEY`. An empty variable counts as unset.
+
+## What the server checks when it starts
+
+A module that's wrong stops the server before it listens, and the error says why:
+
+- a name in `CLOUDPDF_MODULES` that won't load, or whose default export isn't a module;
+- a required setting that isn't set (the error names the variable);
+- two modules with the same id, or an id that's one of the core's names (`doc`, `pdf`,
+  `annotations`…);
+- a permission outside the module's id, or a route that needs a permission the module doesn't
+  declare;
+- something other than the core's document permissions in `requires.document`.
+
+A module's routes need the document plane, so on a server without its worker pool and database a
+module that adds routes stops the boot. A module that only declares permissions works on any
+server. Each module the server mounts is in the log:
+
+```json
+{
+  "module": "snapshot",
+  "routes": 1,
+  "permissions": 1,
+  "requires": ["doc.render"],
+  "msg": "module mounted"
+}
+```
+
+## Permissions
+
+A module's permissions start with its id, like `snapshot.create`. With the module installed, they
+work like the core's: a token or grant may name them, `*` includes them, and `/access` lists the
+ones a session holds in `effectiveScope`. Issuing a token or saving a grant that names a module
+permission no installed module declares is refused.
+
+A plugin whose permission is checked elsewhere, by a viewer plugin for example, is installed the
+same way: a module that declares the permission and adds no routes. The server needs to know the
+word, so tokens and grants can carry it.
+
+```ts
+export default defineServerModule({
+  id: 'reading-progress',
+  permissions: { track: { level: 'document', label: 'Record reading progress' } },
+  setup() {}, // no routes: the viewer plugin checks the permission
+});
+```
+
+See [Plugins' permissions](/docs/engine/concepts/permissions#plugins-permissions).
+
+## Routes
+
+Every route a module adds is on a document's layer:
+
+```
+/v1/docs/{docId}/layers/{layerName}/{module id}/{path}
+```
+
+Before the module's code runs, the server checks what it checks for its own routes: the token,
+the document and layer it's for, `doc.open`, and the permission the route needs. A response is
+`Cache-Control: no-store` unless the module sets its own.
+
+## Writing a module
+
+A module's default export is `defineServerModule(…)` from `@cloudpdf/server-modules`. Each
+request reaches the document through the engine's own document API, the `DocumentHandle` the SDK
+and the viewer use, in two ways:
+
+- **`req.document()`: as the caller**, with exactly their permissions. What it changes is theirs:
+  checked like any of their changes, shown live in every open viewer, in the change history.
+- **`req.module.document()`: as the module**, with `doc.open` and what `requires.document` lists,
+  nothing more. For what the module does beyond its caller, like reading text a viewer may only
+  look at. Its pages also draw raw pixels, `page(ref).render.raw()`, as on the local engine.
+
+```ts
+import {
+  decodePageKey,
+  defineServerModule,
+  EngineError,
+  EngineErrorCode,
+} from '@cloudpdf/server-modules';
+
+export default defineServerModule({
+  id: 'snapshot',
+  permissions: {
+    create: { level: 'document', label: 'Save a page as an image' },
+  },
+  // Beyond its caller: it draws pages they may not render themselves.
+  requires: { document: ['doc.render'] },
+  config: {
+    MAX_WIDTH: { description: 'The widest snapshot, in pixels', default: '2400' },
+    LABEL: { description: 'Sent with every snapshot' }, // no default: required
+  },
+
+  setup(host, config) {
+    host.docRoute({
+      method: 'GET',
+      path: 'pages/:page',
+      permission: 'create',
+      async handler(req) {
+        const ref = decodePageKey(req.params.page);
+        const width = Number(req.query.width ?? 1600);
+        if (!ref || !(width > 0)) {
+          throw new EngineError(EngineErrorCode.InvalidArg, 'a page key and a width > 0');
+        }
+        // As the module: the viewer may not render, but the module holds doc.render.
+        const doc = await req.module.document();
+        const pixels = await doc.page(ref).render.raw({
+          viewport: { kind: 'width', width: Math.min(width, Number(config.MAX_WIDTH)) },
+        });
+        return {
+          type: 'application/octet-stream',
+          body: new Uint8Array(pixels.data),
+          headers: { 'x-label': config.LABEL },
+        };
+      },
+    });
+
+    host.docRoute({
+      method: 'POST',
+      path: 'mark',
+      permission: 'create',
+      async handler(req) {
+        // As the caller: refused if they may not add annotations.
+        const doc = await req.document();
+        const { pages } = await doc.pages.list();
+        await doc.page(pages[0]!.ref).annotations.create({
+          subtype: 'square',
+          box: { x: 20, y: 20, width: 120, height: 40 },
+        });
+        return { status: 204 };
+      },
+    });
+  },
+});
+```
+
+| Field                 | What it is                                                                                                                                                                                                                                                  |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`                  | The module's namespace: lowercase words joined by `-`. Its permissions, routes and settings all carry it.                                                                                                                                                   |
+| `permissions`         | The permissions its routes need, written without the id: `create` is `snapshot.create`. `level: 'document'` goes in viewer tokens and grants, `level: 'tenant'` in tenant tokens and API keys.                                                              |
+| `requires`            | What it does beyond whoever calls it. `document` lists the core's document permissions the module holds itself (`doc.render`, `doc.text.copy`…): its own token carries these and `doc.open`, and nothing more. This is the list a workspace admin approves. |
+| `config`              | Its settings, each read from `CLOUDPDF_<ID>_<KEY>`. A setting without a `default` is required; `secret: true` keeps it out of the logs.                                                                                                                     |
+| `setup(host, config)` | Runs once while the server starts. `host.docRoute(…)` adds a route; `host.log` writes to the server's log with the module's id on each line.                                                                                                                |
+
+A route's handler gets the request, already checked:
+
+|                                              |                                                                                                                                                                  |
+| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `req.document()`                             | The document as the caller: the engine's document API, with their permissions.                                                                                   |
+| `req.module.document()`                      | The document as the module, with `doc.open` and `requires.document`. Its pages also draw raw pixels: `page(ref).render.raw()`.                                   |
+| `req.session`                                | `sub` and `identity` from the token; `allows(permission)`, whether the caller holds a core permission (`doc.annotate.modify`) or a module's (`snapshot.create`). |
+| `req.tenantId`, `req.docId`, `req.layerName` | The document the request is about.                                                                                                                               |
+| `req.params`, `req.query`                    | The route's path parameters and query.                                                                                                                           |
+| `req.body`                                   | Bytes for `application/octet-stream`, the parsed value for `application/json`.                                                                                   |
+| `req.signal`                                 | Aborts when the caller goes away.                                                                                                                                |
+
+Both documents open on first use and close when the handler returns. Their requests go through
+the server's own routes and checks without leaving its process. They always read from the server
+itself, never through a CDN in front of it, and they have no live event stream. A caller who used
+the deployment's API token has no document session, so `req.document()` is refused for them.
+
+`page(ref).render.raw()` on the module's document is the local engine's: the same options
+(`viewport`, `target`, `rotation`, `background`, `includeAnnotations`, `includeFormFields`) and
+the same result, the RGBA pixels with the transform that maps them to page space. It draws the
+layer as it is now, for the screen, within the deployment's pixel budget, as the module:
+everything the picture draws needs its permission in `requires.document`. The page's content needs
+`doc.render`; annotations need `doc.annotate.read` and form fields `doc.forms.read`, and by default
+it draws them when the module holds those. The caller's document has no `raw()`: over the network
+the cloud API serves images, and the pixels are the module's to draw. `decodePageKey` turns a
+route's page key (`obj:12`) into the `PageRef` that `page()` takes.
+
+To refuse a request, throw an `EngineError`: `InvalidArg` is a 400, `NotFound` a 404, each in the
+server's own error body. Anything else a handler throws is a 500.
+
+## Embedding via `buildApp`
+
+If you embed the server with `buildApp` instead of running the CLI, pass the modules and, if you
+like, where their settings come from (`process.env` by default):
+
+```ts
+import { buildApp } from '@cloudpdf/server';
+import snapshot from '@acme/snapshot-module';
+
+const { app } = await buildApp({
+  workerEntry,
+  modules: [snapshot],
+  moduleEnv: { CLOUDPDF_SNAPSHOT_LABEL: 'fernquill' },
+});
+```

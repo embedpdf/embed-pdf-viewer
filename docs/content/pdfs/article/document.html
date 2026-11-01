@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>How the first page of a large PDF got three times faster</title>
+<link rel="stylesheet" href="../shared/document.css">
+</head>
+<body class="fernquill">
+<section class="page sheet">
+  <div class="letterhead">
+    <img src="../shared/fernquill-logo.svg" alt="Fernquill">
+    <span class="kind">Engineering blog</span>
+  </div>
+
+  <h1 class="title">How the first page of a large PDF<br>got three times faster</h1>
+  <p class="meta">Engineering · 14 October 2026 · 6 minute read</p>
+
+  <p class="lead">Open a 400-page manual in a browser and you want to read page one, not wait for page four hundred. Until this summer, the Fernquill portal made you wait longer than it had to.</p>
+
+  <h2>Where the time went</h2>
+  <p>Opening a document did three things before the first page appeared: it read the whole cross-reference table, it measured every page, and it built the text index for search. On a large file the second step alone took more than a second.</p>
+  <p>None of that is needed to draw one page. The viewer needs the size of the pages it shows, and the size of the rest only roughly, to lay out the scroll bar.</p>
+
+  <h2>Measure what you show</h2>
+  <p>The engine now reads page sizes on demand. The first screen asks for a handful of pages; the rest are measured in the background, a few hundred at a time, while the reader is already looking at the document.</p>
+  <p>Until a page is measured, the layout uses the size of its neighbours. Most documents use one page size throughout, so the guess is almost always right, and when it isn't, the view stays on the page the reader is looking at while the pages above it settle.</p>
+  <p>The cross-reference table is still read in full, because a damaged file can only be repaired from all of it. But it's read once, and both the measuring and the drawing share it.</p>
+
+  <div class="page-footer"><span>Fernquill engineering blog</span><span>1 of 2</span></div>
+</section>
+
+<section class="page sheet">
+  <div class="letterhead">
+    <img src="../shared/fernquill-logo.svg" alt="Fernquill">
+    <span class="kind">Engineering blog</span>
+  </div>
+
+  <h2 style="margin-top:32px;">Search can wait</h2>
+  <p>The text index moved off the opening path as well. It's built the first time someone searches, page by page, and the results come in as each page is done. Most people who open a document never search it, and they no longer pay for the index.</p>
+
+  <h2>The numbers</h2>
+  <p>The time until the first page shows, on a mid-range laptop, before and after the change:</p>
+  <table>
+    <thead>
+      <tr><th>Document</th><th class="number">Pages</th><th class="number">Before</th><th class="number">After</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Product manual</td><td class="number">412</td><td class="number">1,840 ms</td><td class="number">590 ms</td></tr>
+      <tr><td>Annual report</td><td class="number">168</td><td class="number">920 ms</td><td class="number">330 ms</td></tr>
+      <tr><td>Contract</td><td class="number">24</td><td class="number">210 ms</td><td class="number">160 ms</td></tr>
+    </tbody>
+  </table>
+  <p>Small documents gain little, because there was little to skip. The larger the file, the more the change matters.</p>
+
+  <h2>What's next</h2>
+  <p>The same idea comes to thumbnails: a sidebar with a thousand pages should only draw the ones on screen, and measure the rest as it scrolls.</p>
+
+  <div class="page-footer"><span>Fernquill engineering blog</span><span>2 of 2</span></div>
+</section>
+</body>
+</html>

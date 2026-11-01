@@ -9,13 +9,13 @@ import type { PluginContext } from '@embedpdf/core';
 import { ActionsToken, type ActionsHostCapability } from '@embedpdf/plugin-actions/contract/host';
 
 import type { StageHostCapability } from './host-contract';
-import type { StageState } from './model';
+import type { StageModel } from './model';
 import { connectWorkingSet } from './working-set';
 
 /** The id of the main lens; additional lenses register under their own id. */
 export const DEFAULT_LENS_ID = 'stage';
 
-export function connectStage(ctx: PluginContext<StageState>, stage: StageHostCapability): void {
+export function connectStage(ctx: PluginContext<StageModel>, stage: StageHostCapability): void {
   // Rotate, move and delete change the registry revision, so the page geometry
   // under this lens changed: re-resolve the zoom intent and re-place. It
   // reacts to changes only, never to the initial value, so it cannot race the
@@ -42,7 +42,7 @@ export function connectStage(ctx: PluginContext<StageState>, stage: StageHostCap
  * diffs them against what it last emitted, so this side only reports.
  */
 function feedPageState(
-  ctx: PluginContext<StageState>,
+  ctx: PluginContext<StageModel>,
   stage: StageHostCapability,
   actions: ActionsHostCapability,
 ): void {
@@ -89,7 +89,7 @@ function feedPageState(
  * dispatcher owns it (policy and the UI adapter).
  */
 function registerNavigationExecutors(
-  ctx: PluginContext<StageState>,
+  ctx: PluginContext<StageModel>,
   stage: StageHostCapability,
   actions: ActionsHostCapability,
 ): void {

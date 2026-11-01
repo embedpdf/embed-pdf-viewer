@@ -3,35 +3,34 @@
   import { Stage, stagePlugin } from '@embedpdf/svelte/stage';
   import { RenderLayer, renderPlugin } from '@embedpdf/svelte/render';
   import { interactionPlugin } from '@embedpdf/svelte/interaction';
-  import { annotationPlugin } from '@embedpdf/svelte/annotation';
+  import { actionsPlugin } from '@embedpdf/svelte/actions';
   import { LinkLayer, linkPlugin } from '@embedpdf/svelte/link';
   import { cloudEngine } from '@cloudpdf/engine';
-  import AddLinks from './AddLinks.svelte';
+  import BrowserActions from './BrowserActions.svelte';
 
   import '../basic.css';
 
   const engine = cloudEngine();
-  // The annotation plugin is only here to make the links below.
+  // The actions plugin runs a link that names a viewer command, such as the footer's Next.
   const plugins = [
     stagePlugin(),
     renderPlugin(),
     interactionPlugin(),
-    annotationPlugin(),
+    actionsPlugin(),
     linkPlugin(),
   ];
 
-  const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+  const links: OpenInput = { kind: 'grant', grant: 'shr_xs-9Y5qwuYrJ2BKtWzuo_2xy' };
 </script>
 
-<Viewer {engine} {plugins} initialDocuments={[{ source: ebook }]}>
+<Viewer {engine} {plugins} initialDocuments={[{ source: links }]}>
   <DocumentGate>
     {#snippet fallback()}
       <p class="loading">Loading…</p>
     {/snippet}
-    <AddLinks />
+    <BrowserActions />
     <p class="hint">
-      Two links at the top of the first page. Click one, or press Tab to reach it and Enter to
-      follow it.
+      Every blue label is a link. Click one, or press Tab to reach it and Enter to follow it.
     </p>
     <Stage class="stage">
       <RenderLayer />

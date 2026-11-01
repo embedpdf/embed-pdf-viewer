@@ -20,10 +20,10 @@ one has a button, `panel:<id>`, and a side. Move one with `panel(id, changes)`:
 
 | Panel | What's in it | Side | Opens with |
 | :-- | :-- | :-- | :-- |
-| `thumbnails` | A small picture of every page; pick one to go there | `start` | `panel:thumbnails` |
+| `thumbnails` | A small picture of every page; pick one to go there, or [organize the pages](#organize-pages) | `start` | `panel:thumbnails` |
 | `outline` | The document's table of contents (its bookmarks): follow, filter, and with the right to change the outline, add, rename, drag and delete items | `start` | `panel:outline` |
-| `attachments` | Files inside the PDF | `start` | `panel:attachments` |
-| `search` | Find text, and every match in context | `end` | `panel:search`, `search:find` (`Ctrl`/`Cmd`+`F`) |
+| `attachments` | The files inside the PDF, its own and those pinned to its pages: save them, go to a page's file, and with the right to, attach and remove files | `start` | `panel:attachments` |
+| `search` | Find text, and every match in context; [a find bar](#search-without-copying) where copying isn't allowed | `end` | `panel:search`, `search:find` (`Ctrl`/`Cmd`+`F`) |
 | `comments` | Every comment and its replies | `end` | `panel:comments` |
 | `style` | Color, width and font of the selected annotation, or of the tool | `end` | `panel:style` |
 | `stamps` | Stamp libraries; pick one, then click the page | `end` | `panel:stamps` |
@@ -32,7 +32,10 @@ one has a button, `panel:<id>`, and a side. Move one with `panel(id, changes)`:
 | `measurement` | The scale, and every measurement on the page | `end` | `panel:measurement` |
 | `form-design` | The form's fields, and the selected one's settings and buttons; in the Form mode only | `end` | `form:design`, `panel:form-design` |
 
-A panel whose feature you [turn off](../features/turning-off) is gone, with its button.
+A panel whose feature you [turn off](../features/turning-off) is gone, with its button. The
+outline and attachments panels show while they have a job: the document has items or files to
+list, or the user may add some. A read-only viewer on a document without an outline shows no
+outline button; the same for attachments.
 
 ## How a panel opens
 
@@ -64,6 +67,16 @@ every size, or a way for the sizes you name; the other sizes keep the default:
 `panels(changes)` changes every panel the layout has so far, the way `panel(id, changes)` changes
 one. A map of sizes changes only the sizes it names, so the thumbnails above still dock at medium
 widths. The sizes go by the viewer's own width: see [Small screens](small-screens#the-three-sizes).
+
+### Search without copying
+
+Where the document's permissions let people search but not copy text, search opens as a find bar
+instead. The panel would list each match with the words around it, and showing those words is
+copying them, so there would be nothing to list. The bar sits over the top corner of the pages on
+the panel's side, and across them on a phone. It shows which match you're on and how many there
+are. `Enter` goes to the next match, `Shift`+`Enter` to the one before, and its options sit behind
+a button. It has the same button and the same `Ctrl`/`Cmd`+`F`, and keeps the same search, but
+`present` doesn't apply to it.
 
 ## Width
 
@@ -117,6 +130,74 @@ takes the Stage's settings:
 
 From code, `viewer.get('thumbnails')` is that Stage:
 `viewer.get('thumbnails').updateSettings({ columns: 2 })`.
+
+### Organize pages
+
+Where the user may change the pages, the thumbnails panel is where they do it, as in most PDF
+apps:
+
+- **Select pages.** A click selects a page and goes to it; `Ctrl`/`Cmd`+click adds a page or
+  takes it out, `Shift`+click selects a range.
+- **The panel's bar** inserts a blank page, rotates and deletes the selected pages; with room to
+  spare it also inserts a PDF, duplicates and extracts. Undo and redo sit at its end, and in a
+  narrow panel what doesn't fit is in its "More" menu.
+- **Each page has a menu**: its button, a right-click, or a long press. It rotates, inserts a
+  blank page or a PDF after the page, duplicates, extracts and deletes.
+- **Drag pages** to move them: a line shows where they land. Dragging a selected page moves the
+  whole selection. On a phone, hold the page first, so a swipe still scrolls.
+- **Drop a PDF** between two pages to insert its pages there, instead of opening it as a tab.
+- **The keyboard**: the arrows go through the pages, `Shift` extends the selection, `Space` adds a
+  page or takes it out, `Alt`+arrows move the selection one place, `Delete` deletes, and
+  `Ctrl`/`Cmd`+`A` selects every page.
+
+Every edit is one step of the history, so undo puts the pages back as they were, a deleted page
+with its annotations. The buttons are the `page:*` [commands](commands), so `disable` and
+`readOnly` turn editing off and leave a plain list of pages. A user without
+`doc.pages.assemble` in their scope sees the plain list too.
+
+## The attachments
+
+The attachments panel lists the files the PDF carries: its own first, then the files pinned to
+its pages, each with its name, size and description, and its page for a page's file. A name never
+shows the characters that can make one file look like another.
+
+- **Click a file** to save it; click a page's file to go to it on its page.
+- **Each file has a menu**: its button or a right-click. It saves the file, goes to a page's file,
+  and deletes the file.
+- **Attach files** with the button in the panel's bar, beside how many files there are, or drop
+  them on the panel; a file dropped there is attached, not opened as a tab. A name the document has already gets a number,
+  `notes (2).txt`.
+- **A selected file attachment** on the page has Save file in its bar.
+
+Saving a file is a download: it goes with `documents.download` and needs `doc.download` in the
+user's scope. Attaching and deleting are `attachments.adding`, which `readOnly` turns off, and need
+`doc.attachments.modify`; each is one step of the history. From code, `viewer.get('attachment')`
+is the [attachment plugin](/docs/headless/documents/attachments).
+
+## A bar in a panel
+
+The thumbnails, outline and attachments panels each have a bar under their title, named after the
+panel: [`thumbnails`, `outline` and `attachments`](layout#every-built-in-id). The outline's holds
+its filter. They're bars like the toolbar, so the same edits work, and what doesn't fit goes into a
+"More" menu:
+
+```js
+layout
+  .add('acme:print-pages', { to: 'thumbnails' })
+  .remove(['outline:expand-all', 'outline:collapse-all'], { from: 'outline' });
+```
+
+Any panel can have a bar, your own too: its place is `{ panel: id }`.
+
+```js
+layout.addBar('review', {
+  place: { panel: 'comments' },
+  start: [['acme:approve-all', 'acme:export']],
+});
+```
+
+A panel's bars stack under its title in the order you add them. The search panel shows its bars
+over its list of hits, not in the find bar it becomes when the hits come without their text.
 
 ## Panels on the same side
 

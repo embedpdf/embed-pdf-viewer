@@ -4,9 +4,11 @@ import {
   computed,
   effect,
   inject,
+  untracked,
+  viewChild,
   ViewEncapsulation,
 } from '@angular/core';
-import { EpdfDocument, EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
+import { EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
 import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
@@ -19,13 +21,7 @@ import {
 } from '@embedpdf/angular/annotation';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
-
-const COLORS = [
-  { color: '#e5484d', fill: '#ffd1d3' },
-  { color: '#30a46c', fill: '#c9f0da' },
-  { color: '#1e90ff', fill: '#cfe6ff' },
-];
+const layout: OpenInput = { kind: 'grant', grant: 'shr_d2E_LaTuddJbZR00d1CvkqLM' };
 
 // The last annotation on a page is drawn on top.
 @Component({
@@ -86,7 +82,7 @@ export class OrderControls {
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: layout }] },
       withStage(),
       withRender(),
       withInteraction(),
@@ -112,28 +108,20 @@ export class OrderControls {
 })
 export class App {
   private readonly annotation = inject(EpdfAnnotation);
-  private readonly pages = inject(EpdfDocument).pages;
-  private added = false;
+  private readonly stage = viewChild(EpdfStage);
+  private done = false;
 
   constructor() {
-    // On load: three filled rectangles stacked on the cover, the middle one selected.
+    // On load: the middle one of the document's three stacked rectangles, selected.
     effect(() => {
-      const cover = this.pages()[0]?.ref;
-      if (this.annotation.status() !== 'ready' || !cover || this.added) return;
-      this.added = true;
-      COLORS.forEach(({ color, fill }, index) => {
-        void this.annotation.create(
-          cover,
-          {
-            subtype: 'square',
-            box: { x: 300 + index * 50, y: 520 + index * 30, width: 160, height: 90 },
-            color,
-            interiorColor: fill,
-            strokeWidth: 3,
-          },
-          undefined,
-          { select: index === 1 },
-        );
+      const stage = this.stage();
+      if (!stage || this.annotation.status() !== 'ready' || this.done) return;
+      this.done = true;
+      untracked(() => {
+        const stack2 = this.annotation.list().find((each) => each.nm === 'stack-2');
+        if (!stack2) return;
+        this.annotation.selection.set([stack2.ref]);
+        stage.reveal(stack2.page, { rect: stack2.rect });
       });
     });
   }

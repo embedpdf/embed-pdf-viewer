@@ -6,6 +6,7 @@ import {
   barsAt,
   barsFloating,
   barsInMode,
+  barsInPanel,
   barsOnEdge,
   barsWith,
   compileBar,
@@ -16,6 +17,7 @@ import {
   menuOf,
   modesOf,
   omittedCommandsOf,
+  panelOf,
   tabsOf,
   type OmissionCommand,
 } from '../src/layout-compile';
@@ -50,6 +52,8 @@ const data: LayoutData = {
     pager: { place: { float: 'bottom' }, center: [[{ custom: 'page-number' }]] },
     selection: { place: { at: 'selection' }, center: [['selection:copy']] },
     annotation: { place: { at: 'annotation' }, center: [['annotation:delete']] },
+    pages: { place: { panel: 'thumbnails' }, start: [['page:delete']] },
+    pageHistory: { place: { panel: 'thumbnails' }, end: [['history:undo']] },
   },
   menus: {
     document: [['document:download', 'document:print'], [], ['view:fullscreen']],
@@ -108,10 +112,17 @@ describe('places', () => {
     expect(barsOnEdge(stacked, 'top')).toEqual(['main', 'lost']);
   });
 
-  it('lists the bars along a bar, over a selection, and in a mode', () => {
+  it('lists the bars along a bar, over a selection, in a panel, and in a mode', () => {
     expect(barsWith(data, 'main')).toEqual(['annotate', 'shapes']);
     expect(barsAt(data, 'selection')).toEqual(['selection']);
     expect(barsAt(data, 'annotation')).toEqual(['annotation']);
+    expect(barsInPanel(data, 'thumbnails')).toEqual(['pages', 'pageHistory']);
+    expect(barsInPanel(data, 'outline')).toEqual([]);
+    expect(panelOf(data.bars!.pages!.place)).toBe('thumbnails');
+    expect(panelOf(data.bars!.main!.place)).toBeNull();
+    // A panel's bar is on no edge and floats nowhere.
+    expect(edgeOf(data.bars!.pages!.place)).toBeNull();
+    expect(floatOf(data.bars!.pages!.place)).toBeNull();
     expect(modesOf(data)).toEqual(['annotate', 'shapes']);
     expect(barsInMode(data, 'shapes')).toEqual(['shapes']);
   });

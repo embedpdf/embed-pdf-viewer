@@ -1,5 +1,50 @@
 # @embedpdf/core
 
+## 3.0.0-next.19
+
+### Minor Changes
+
+- [#918](https://github.com/embedpdf/embed-pdf-viewer/pull/918) by [@bobsingor](https://github.com/bobsingor) – A document opened with a grant reports what it waits for as `grantRequest`, and
+  `retry()` takes the grant's `passphrase`.
+
+- [#923](https://github.com/embedpdf/embed-pdf-viewer/pull/923) by [@bobsingor](https://github.com/bobsingor) – `createKernel({ fetch })` takes your own `fetch` for `{ kind: 'url' }` documents, to add headers or cookies; it gets the URL and an `init` with the document's cancel signal, and `retry()` calls it again. A `{ kind: 'url' }` source takes an `id` of its own. A download the server refuses with 401 or 403 fails as `permission-denied`, and one that isn't a PDF (a sign-in page, say) as `invalid-input`. New exports: the `HostFetch` type and `isPdf(bytes)`.
+
+## 3.0.0-next.18
+
+### Minor Changes
+
+- [#907](https://github.com/embedpdf/embed-pdf-viewer/pull/907) by [@bobsingor](https://github.com/bobsingor) – A ready document whose share link asks for a passphrase or answers it got after the document opened shows them as `shareRequest`, as a document waiting to open does, and `documents.retry(id, { sharePassword })` or `retry(id, { visitor })` lets it go on as the same visitor instead of opening it again.
+
+### Patch Changes
+
+- [#909](https://github.com/embedpdf/embed-pdf-viewer/pull/909) by [@bobsingor](https://github.com/bobsingor) – `documents.retry(id, { identity })` takes the visitor's answers to what a share link asks (was `{ visitor }`). They join who the page said the user is, the document's `identity` or else the viewer's, and the document opens again with that identity.
+
+- [#910](https://github.com/embedpdf/embed-pdf-viewer/pull/910) by [@bobsingor](https://github.com/bobsingor) – The `StaleBase` engine error is gone, and with it its `conflict` mapping: a signature moves only its own layer, so every layer can sign.
+
+## 3.0.0-next.17
+
+### Minor Changes
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – Documents from share links that wait for something. A failed open says what its share link waits for in `DocumentInfo.shareRequest` (the passphrase, with whether one was tried, or the visitor's answers), and `documents.retry(id, { sharePassword })` or `retry(id, { visitor })` opens it with them; answers add to the ones given before. Once open, a change waiting for the visitor's answers shows as `DocumentInfo.identityRequest` until `documents.identify(id, answers)` sends it or `documents.declineIdentity(id)` lets it fail.
+
+### Patch Changes
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – A `LayerDeleted` refusal from the engine reaches plugins as `not-found`.
+
+## 3.0.0-next.16
+
+### Minor Changes
+
+- [#891](https://github.com/embedpdf/embed-pdf-viewer/pull/891) by [@bobsingor](https://github.com/bobsingor) – `@embedpdf/core/testing` gains `gate(engine)`, an engine whose documents hold every change until a test releases or refuses it, so a plugin's tests can see what the reads show while a change is on its way. A predicted `attachments.restore` op lets a view draw an undone attachment removal before the engine answers.
+
+- [#885](https://github.com/embedpdf/embed-pdf-viewer/pull/885) by [@bobsingor](https://github.com/bobsingor) – `PredictedOp` gains `outline.restore`: the items as they were, at their place, which is how an undo of an outline change is drawn before the engine answers.
+
+- [#883](https://github.com/embedpdf/embed-pdf-viewer/pull/883) by [@bobsingor](https://github.com/bobsingor) – The documents capability prints. `print(id?, { pages, includeAnnotations, onProgress })` makes the pages as they print (layers, annotations and form fields by their print settings) and hands them to the host's print dialog. `preparePrint(id?, options)` does that ahead and resolves `{ quality, pageCount, needsTap, print(), dispose() }`, so a dialog prepares when the user presses Print and then prints; its `print()` prepares again when the document changed since. `needsTap` is the printer's: `true` where printing works only from a tap (Safari), so a dialog asks for another tap once the print is ready. `getPrintQuality(id?)` says how it prints: `{ kind: 'pdf' }` — a copy of the pages as they print (`pages.extract` with `flatten: { usage: 'print' }`), sharp text and lines — with `doc.print.high`, a right to keep the copy (`doc.download` or `doc.download.flattened`) and a printer that prints PDFs; else pictures, `{ kind: 'images', dpi: 300 }` with `doc.print.high` or 150 DPI with `doc.print` only; `null` when it can't. When the printer turns the PDF down, preparing or printing, the same pages print as 300 DPI pictures. Form fields print whenever the user may read the form, with or without the annotations. Printing waits for changes still on their way, as a download does. The host hands the kernel its printer, `createKernel({ printer })` (`HostPrinter`, with `stagePdf` when it prints PDFs and `needsTap` when it prints only from a tap), and `canPrint()` is `doc.print` and a printer. A plugin runs the document's own around the print dialog with `ctx.aroundPrint(wrap)`; the test context's `print(run)` runs those wraps.
+
+### Patch Changes
+
+- [#890](https://github.com/embedpdf/embed-pdf-viewer/pull/890) by [@bobsingor](https://github.com/bobsingor) – The page list follows `pages.restored`: pages an undo brings back show again.
+
 ## 3.0.0-next.15
 
 ### Minor Changes

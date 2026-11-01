@@ -18,9 +18,9 @@ import {
 } from '@embedpdf/angular/actions';
 import { localEngine } from '@embedpdf/engine';
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const links = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/links.pdf');
+  return { kind: 'bytes', id: 'links', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 // A JavaScript action, as a PDF carries it behind a button or a link.
@@ -112,7 +112,7 @@ export class ScriptConsole {
   providers: [
     ScriptOutput,
     provideEmbedPdf(
-      { engine: () => localEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => localEngine(), initialDocuments: [{ source: links }] },
       // JavaScript on, and two fields scripts often ask for about the user.
       withActions({
         javascript: { enabled: true, identity: { name: 'Dana Smith', corporation: 'Acme' } },

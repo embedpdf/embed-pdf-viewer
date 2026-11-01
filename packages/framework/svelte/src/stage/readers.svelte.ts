@@ -8,7 +8,7 @@
 import { shallowEqual } from '@embedpdf/core';
 import type { CapabilityToken, EventHook } from '@embedpdf/core';
 import { DEFAULT_SETTINGS, stageState } from '@embedpdf/plugin-stage';
-import type { StageCapability, StageSettings } from '@embedpdf/plugin-stage';
+import type { StageCapability, StageSettings, StageState } from '@embedpdf/plugin-stage';
 import type { ScrollMetrics, StageHostCapability } from '@embedpdf/plugin-stage/contract/host';
 import { documentScopeOf, useKernelBinding } from '../runtime/binding.svelte';
 import { useCapability, useCapabilityEvent } from '../runtime/readers.svelte';
@@ -20,9 +20,6 @@ import {
   type MaybeGetter,
 } from '../runtime/values.svelte';
 import { stageTokenOf, type StageTokenProp } from './stage-scope';
-
-/** What `useStageState()` gives: the Stage page's State table. */
-export type StageStateValue = (typeof stageState)['empty'];
 
 /** A lens argument: a token, a function that returns one, or none (the scope's, else the main view). */
 type LensArgument = MaybeGetter<StageTokenProp | undefined>;
@@ -61,20 +58,20 @@ function selectorAndLens<Value, Selected>(
  * (`state.zoomLevel`). With a selector, the value it picks as `{ current }`. Without a document
  * it is `stageState.empty`.
  */
-export function useStageState(token?: StageTokenProp): Readonly<StageStateValue>;
+export function useStageState(token?: StageTokenProp): Readonly<StageState>;
 export function useStageState<Selected>(
-  select: (state: StageStateValue) => Selected,
+  select: (state: StageState) => Selected,
   token?: LensArgument,
 ): CurrentValue<Selected>;
 export function useStageState<Selected>(
-  first?: ((state: StageStateValue) => Selected) | StageTokenProp,
+  first?: ((state: StageState) => Selected) | StageTokenProp,
   second?: LensArgument,
 ) {
   const [select, token] = selectorAndLens(first, second);
   const binding = useKernelBinding();
   const lens = lensOf(token);
   const whole = declaredState(binding, lens, stageState.read, stageState.empty);
-  return readRecord(whole, Object.keys(stageState.empty) as (keyof StageStateValue)[], select);
+  return readRecord(whole, Object.keys(stageState.empty) as (keyof StageState)[], select);
 }
 
 /**

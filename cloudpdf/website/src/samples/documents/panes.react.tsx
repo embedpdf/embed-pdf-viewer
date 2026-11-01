@@ -16,7 +16,9 @@ import './panes.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin(), viewManagerPlugin()];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
+
+const article: OpenInput = { kind: 'grant', grant: 'shr_v09cJHOmj3C8vrfUlZNTDyqX' };
 
 function Pane({ pane, canRemove }: { pane: PaneInfo; canRemove: boolean }) {
   const views = useViewManager();
@@ -101,8 +103,8 @@ export default function App() {
       engine={engine}
       plugins={plugins}
       initialDocuments={[
-        { source: ebook, name: 'Contract' },
-        { source: ebook, name: 'Report' },
+        { source: welcome, name: 'Guide' },
+        { source: article, name: 'Article' },
       ]}
     >
       <Panes />

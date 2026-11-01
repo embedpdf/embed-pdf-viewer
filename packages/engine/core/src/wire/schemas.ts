@@ -1,6 +1,5 @@
 import type { Identity } from '../auth/scope/types';
 import { PageRefSchema } from '../identity/PageRef.schema';
-import type { PageRef } from '../identity/PageRef';
 import { z } from 'zod';
 
 import { DateInputSchema, IsoDateTimeSchema } from '../dto/IsoDateTime.schema';
@@ -23,15 +22,17 @@ import {
   type AnnotationAppearancesQuery,
   type WidgetAppearancesQuery,
 } from '../dto/AnnotationRender';
-import { AttachmentRefSchema, AttachmentSchema } from '../dto/Attachment.schema';
 import {
-  AppearanceResourceKeysSchema,
-  ImageResourceKeysSchema,
-  SourceResourceKeysSchema,
-} from './resourceKeys';
+  AttachmentFileBaseSchema,
+  AttachmentFileInfoSchema,
+  AttachmentRefSchema,
+  AttachmentSchema,
+} from '../dto/Attachment.schema';
+import { AppearanceResourceKeysSchema, ImageResourceKeysSchema } from './resourceKeys';
 import {
   PAGE_PRINT_FAMILIES,
   PAGE_RENDER_FAMILIES,
+  PAGE_THUMBNAIL_FAMILIES,
   type PagePrintTier,
   type PageRenderFamily,
   type PageRenderFamilySpec,
@@ -108,6 +109,7 @@ import type {
 import type {
   AttachmentCreateResult,
   AttachmentDeleteResult,
+  AttachmentRestoreResult,
   AttachmentMutationMeta,
 } from '../mutation/AttachmentMutationResults';
 import type { AttachmentList } from '../dto/Attachment';
@@ -129,10 +131,10 @@ import type {
 import type { CustomMetadataUpdateResult } from '../mutation/CustomMetadataUpdateResult';
 import type { MetadataUpdateResult } from '../mutation/MetadataUpdateResult';
 import type { CacheDelta, MutationMeta } from '../mutation/MutationMeta';
-import type { PageDeleteInput } from '../mutation/PageDeleteInput';
 import type { PageDeleteResult } from '../mutation/PageDeleteResult';
 import { PAGE_INSERT_BLANK_MAX_COUNT } from '../mutation/PageInsertBlankInput';
 import type { PageInsertResult } from '../mutation/PageInsertResult';
+import type { PageRestoreResult } from '../mutation/PageRestoreResult';
 import type { PageFlattenInput, PageFlattenResult } from '../mutation/PageFlattenResult';
 import type { PageExtractInput } from '../dto/PageExtract';
 import {
@@ -144,7 +146,6 @@ import {
 import { OutlineItemRefSchema } from '../identity/OutlineItemRef.schema';
 import type { RedactionApplyResult, RedactionApplyScope } from '../mutation/RedactionApplyResult';
 import type { ListPosition } from '../mutation/ListPosition';
-import type { PageReorderInput } from '../mutation/PageReorderInput';
 import type { PageReorderResult } from '../mutation/PageReorderResult';
 import type {
   AnnotationAppearanceExportInput,
@@ -162,7 +163,6 @@ import type {
 } from '../mutation/OutlineMutationResults';
 import type { PageNameInput, PageRemoveNameInput } from '../mutation/PageNameInput';
 import type { PageNameResult } from '../mutation/PageNameResult';
-import type { PageRotateInput } from '../mutation/PageRotateInput';
 import type { PageRotateResult } from '../mutation/PageRotateResult';
 import type {
   AnnotationImportBody,
@@ -846,24 +846,31 @@ const AppearanceModesSchema = z.string().transform((value, ctx) => {
  * A print picture (`PAGE_PRINT_FAMILIES`) takes only its pins and its image
  * format: its path says what it draws and at which DPI, and its size comes
  * from that and the paper, so a page has one print picture per family and
- * tier.
+ * tier. A thumbnail (`PAGE_THUMBNAIL_FAMILIES`) is always the whole page at
+ * the thumbnail size, so it takes no `viewport` or `target`, only `rotation`
+ * and `background` beside its pins and format.
  *
  * The transform stamps what the picture draws (and, for a print picture,
- * `usage` and its `dpi` viewport) onto the parsed options, so the worker
- * options downstream need no family.
+ * `usage` and its `dpi` viewport; for a thumbnail, its `thumbnail` viewport)
+ * onto the parsed options, so the worker options downstream need no family.
  */
 function buildPageRenderQuerySchema(picture: PageRenderFamilySpec): z.ZodType<PageRenderQuery> {
-  const { family, draws, pins, print } = picture;
+  const { family, draws, pins, print, thumbnail } = picture;
   const pinFields: Record<string, z.ZodTypeAny> = {};
   for (const pin of pins) pinFields[pin] = z.coerce.number().int().positive().optional();
+  const turnFields: Record<string, z.ZodTypeAny> = {
+    rotation: RenderRotationSchema.optional(),
+    background: RenderBackgroundSchema.optional(),
+  };
   const screenFields: Record<string, z.ZodTypeAny> = print
     ? {}
-    : {
-        viewport: RenderViewportSchema.optional(),
-        target: RenderTargetSchema.optional(),
-        rotation: RenderRotationSchema.optional(),
-        background: RenderBackgroundSchema.optional(),
-      };
+    : thumbnail
+      ? turnFields
+      : {
+          viewport: RenderViewportSchema.optional(),
+          target: RenderTargetSchema.optional(),
+          ...turnFields,
+        };
   return z
     .object({
       ...pinFields,
@@ -923,6 +930,7 @@ function buildPageRenderQuerySchema(picture: PageRenderFamilySpec): z.ZodType<Pa
         ...(print
           ? { usage: 'print' as const, viewport: { kind: 'dpi' as const, dpi: print.dpi } }
           : {}),
+        ...(thumbnail ? { viewport: { kind: 'thumbnail' as const } } : {}),
       };
       const query: PageRenderQuery = {
         options,
@@ -945,6 +953,16 @@ export const PageRenderQuerySchemas: Readonly<
   all: buildPageRenderQuerySchema(PAGE_RENDER_FAMILIES.all),
 };
 
+/** Query/token schemas of the thumbnails, by family. */
+export const PageThumbnailQuerySchemas: Readonly<
+  Record<PageRenderFamily, z.ZodType<PageRenderQuery>>
+> = {
+  pages: buildPageRenderQuerySchema(PAGE_THUMBNAIL_FAMILIES.pages),
+  annotations: buildPageRenderQuerySchema(PAGE_THUMBNAIL_FAMILIES.annotations),
+  fields: buildPageRenderQuerySchema(PAGE_THUMBNAIL_FAMILIES.fields),
+  all: buildPageRenderQuerySchema(PAGE_THUMBNAIL_FAMILIES.all),
+};
+
 /** Query/token schemas of the print pictures, by tier and family. */
 export const PagePrintQuerySchemas: Readonly<
   Record<PagePrintTier, Readonly<Record<PageRenderFamily, z.ZodType<PageRenderQuery>>>>
@@ -963,10 +981,11 @@ export const PagePrintQuerySchemas: Readonly<
   },
 };
 
-/** The query/token schema of `picture`, screen or print. */
+/** The query/token schema of `picture`: screen, thumbnail or print. */
 export function pagePictureQuerySchema(picture: PageRenderFamilySpec): z.ZodType<PageRenderQuery> {
-  return picture.print
-    ? PagePrintQuerySchemas[picture.print.tier][picture.family]
+  if (picture.print) return PagePrintQuerySchemas[picture.print.tier][picture.family];
+  return picture.thumbnail
+    ? PageThumbnailQuerySchemas[picture.family]
     : PageRenderQuerySchemas[picture.family];
 }
 
@@ -1125,6 +1144,7 @@ export const DocumentWireComponents = {
   MutationMeta: MutationMetaSchema,
   DocumentMetadata: DocumentMetadataSchema,
   MetadataPatch: MetadataPatchSchema,
+  Identity: IdentitySchema,
 } as const satisfies Record<string, z.ZodTypeAny>;
 
 /** Per-page side-effect envelope every annotation mutation returns. Mirrors `AnnotationListMutationMeta`. */
@@ -1627,14 +1647,6 @@ export const PageRemoveNameInputSchema: z.ZodType<PageRemoveNameInput> = z.objec
   name: z.string().min(1),
 });
 
-/** Page reorder input: the pages, in their new order, and where they go. */
-export const PageReorderInputSchema: z.ZodType<PageReorderInput> = z
-  .object({
-    pages: z.array(PageRefSchema).min(1),
-    position: PagePositionSchema,
-  })
-  .strict();
-
 /**
  * Page reorder result. No per-page revision is bumped (they survive a page
  * reorder). The whole new order is returned so callers swap their snapshot.
@@ -1652,15 +1664,6 @@ export const PageNameResultSchema: z.ZodType<PageNameResult> = z.object({
 });
 
 /**
- * Page rotate input. Absolute rotation (idempotent — see `PageRotateInput`),
- * one value applied to every listed page.
- */
-export const PageRotateInputSchema: z.ZodType<PageRotateInput> = z.object({
-  pages: z.array(PageRefSchema),
-  rotation: PdfRotationSchema,
-});
-
-/**
  * Page rotate result. Rotation is presentation metadata over normalized
  * content: nothing per-page invalidates; the new `layout` carries the
  * rotation values (see `PageRotateResult`).
@@ -1668,11 +1671,6 @@ export const PageRotateInputSchema: z.ZodType<PageRotateInput> = z.object({
 export const PageRotateResultSchema: z.ZodType<PageRotateResult> = z.object({
   layout: PageListSnapshotSchema,
   meta: MutationMetaSchema,
-});
-
-/** Page delete input. Deleting every page is rejected server/worker-side. */
-export const PageDeleteInputSchema: z.ZodType<PageDeleteInput> = z.object({
-  pages: z.array(PageRefSchema),
 });
 
 /**
@@ -1685,34 +1683,16 @@ export const PageDeleteResultSchema: z.ZodType<PageDeleteResult> = z.object({
 });
 
 /**
- * Page insert (bytes) input — the `body` part of the multipart envelope;
- * the PDF rides the part `resources.source` names. `position` omitted →
- * `'end'`.
+ * What blank pages to make (`PageInsertBlankSpec`). `size` is in PDF points
+ * (un-rotated); `count` shares the contract cap with the worker so a request
+ * the schema accepts cannot then fail the worker's own guard.
  */
-export const PageInsertInputSchema: z.ZodType<{
-  position?: ListPosition<PageRef>;
-  resources: { source: string };
-}> = z
-  .object({ position: PagePositionSchema.optional(), resources: SourceResourceKeysSchema })
-  .strict();
-
-/**
- * Blank-page insert input — plain JSON, pages.insert minus the bytes.
- * `size` is in PDF points (un-rotated); `count` shares the contract cap
- * with the worker so a request the schema accepts cannot then fail the
- * worker's own guard.
- */
-export const PageInsertBlankInputSchema: z.ZodType<{
-  size: { width: number; height: number };
-  count?: number;
-  position?: ListPosition<PageRef>;
-}> = z.object({
+export const PageInsertBlankSpecSchema = z.object({
   size: z.object({
     width: z.number().positive().finite(),
     height: z.number().positive().finite(),
   }),
   count: z.number().int().min(1).max(PAGE_INSERT_BLANK_MAX_COUNT).optional(),
-  position: PagePositionSchema.optional(),
 });
 
 /**
@@ -1741,6 +1721,13 @@ export const PageInsertResultSchema: z.ZodType<PageInsertResult> = z.object({
   meta: MutationMetaSchema,
 });
 
+/** Page restore result: the pages an undo brought back (see `PageRestoreResult`). */
+export const PageRestoreResultSchema: z.ZodType<PageRestoreResult> = z.object({
+  pages: z.array(PageRefSchema),
+  layout: PageListSnapshotSchema,
+  meta: MutationMetaSchema,
+});
+
 /** See `AttachmentMutationMeta`. */
 export const AttachmentMutationMetaSchema: z.ZodType<AttachmentMutationMeta> = z.object({
   affectedPages: z.array(PageRefSchema),
@@ -1756,6 +1743,11 @@ export const AttachmentCreateResultSchema: z.ZodType<AttachmentCreateResult> = z
   meta: AttachmentMutationMetaSchema,
 });
 
+export const AttachmentRestoreResultSchema: z.ZodType<AttachmentRestoreResult> = z.object({
+  attachment: AttachmentSchema,
+  meta: AttachmentMutationMetaSchema,
+});
+
 export const AttachmentDeleteResultSchema: z.ZodType<AttachmentDeleteResult> = z.object({
   meta: AttachmentMutationMetaSchema,
 });
@@ -1764,6 +1756,16 @@ export const AttachmentDeleteResultSchema: z.ZodType<AttachmentDeleteResult> = z
 export const AttachmentListSchema: z.ZodType<AttachmentList> = z.object({
   attachments: z.array(AttachmentSchema),
 });
+
+/** Embedded files (`doc.attachments`): the models the OpenAPI projection names. */
+export const AttachmentWireComponents = {
+  AttachmentRef: AttachmentRefSchema,
+  AttachmentFileInfo: AttachmentFileInfoSchema,
+  Attachment: AttachmentSchema,
+  AttachmentList: AttachmentListSchema,
+  AttachmentFileBase: AttachmentFileBaseSchema,
+  AttachmentMutationMeta: AttachmentMutationMetaSchema,
+} as const satisfies Record<string, z.ZodTypeAny>;
 
 /**
  * Metadata write result: the re-read `metadata`. On the cloud,
@@ -2240,8 +2242,8 @@ export function analyzeInputFromQuery(
   };
 }
 
-/** One row of the document's version catalog. */
-export const DocumentVersionSchema = z.object({
+/** One of a layer's versions: the upload, or one its signatures made. */
+export const LayerVersionSchema = z.object({
   sha256: z.string().regex(/^[0-9a-f]{64}$/),
   byteLength: z.number().int().nonnegative(),
   number: z.number().int().positive(),
@@ -2250,15 +2252,15 @@ export const DocumentVersionSchema = z.object({
   signingId: z.string().nullable(),
   createdAt: z.number().int(),
 });
-export type DocumentVersion = z.infer<typeof DocumentVersionSchema>;
+export type LayerVersion = z.infer<typeof LayerVersionSchema>;
 
-export const DocumentVersionsSchema = z.object({
-  /** `documents.base_sha`: the version every layer is over, or behind. */
-  head: z.string().regex(/^[0-9a-f]{64}$/),
-  /** Oldest first. */
-  versions: z.array(DocumentVersionSchema),
+export const LayerVersionsSchema = z.object({
+  /** The layer's base: the upload, or the version its last signature made. */
+  baseSha: z.string().regex(/^[0-9a-f]{64}$/),
+  /** Oldest first: the upload, then the versions the layer's signatures made. */
+  versions: z.array(LayerVersionSchema),
 });
-export type DocumentVersions = z.infer<typeof DocumentVersionsSchema>;
+export type LayerVersions = z.infer<typeof LayerVersionsSchema>;
 
 export { DigestAlgorithmSchema, ModificationLevelSchema };
 

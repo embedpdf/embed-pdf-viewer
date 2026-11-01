@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
-import { Viewer, DocumentGate, usePageList } from '@embedpdf/react/runtime';
+import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
-import { Stage, stagePlugin } from '@embedpdf/react/stage';
+import { Stage, stagePlugin, useStage } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
 import { interactionPlugin } from '@embedpdf/react/interaction';
 import {
@@ -17,34 +17,23 @@ import './turn-group.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const layout: OpenInput = { kind: 'grant', grant: 'shr_d2E_LaTuddJbZR00d1CvkqLM' };
 
-// On load: a rectangle and a circle on the cover, both selected.
-function AddShapes() {
+// On load: the document's square and circle, both selected.
+function SelectShapes() {
   const annotation = useAnnotation();
+  const stage = useStage();
   const ready = useAnnotationState((state) => state.status === 'ready');
-  const cover = usePageList()[0]?.ref;
-  const added = useRef(false);
+  const done = useRef(false);
 
   useEffect(() => {
-    if (!ready || !cover || added.current) return;
-    added.current = true;
-    void Promise.all([
-      annotation.create(cover, {
-        subtype: 'square',
-        box: { x: 300, y: 560, width: 140, height: 60 },
-        color: '#e5484d',
-        interiorColor: '#ffe4e1',
-        strokeWidth: 3,
-      }),
-      annotation.create(cover, {
-        subtype: 'circle',
-        box: { x: 460, y: 550, width: 80, height: 80 },
-        color: '#1e90ff',
-        strokeWidth: 3,
-      }),
-    ]).then((created) => annotation.selection.set(created.map((c) => c.annotation.ref)));
-  }, [annotation, ready, cover]);
+    if (!ready || done.current) return;
+    done.current = true;
+    const found = annotation.list().filter((each) => each.nm === 'square' || each.nm === 'circle');
+    if (found.length === 0) return;
+    annotation.selection.set(found.map((each) => each.ref));
+    stage.reveal(found[0].page, { rect: found[0].rect });
+  }, [annotation, stage, ready]);
 
   return null;
 }
@@ -104,9 +93,9 @@ function TurnAndGroup() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: layout }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
-        <AddShapes />
+        <SelectShapes />
         <TurnAndGroup />
         <Stage className="stage">
           {() => (

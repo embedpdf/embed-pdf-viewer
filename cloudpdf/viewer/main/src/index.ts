@@ -5,7 +5,7 @@
  * <embedpdf-viewer id="viewer" style="height: 100vh"></embedpdf-viewer>
  * <script type="module">
  *   import 'https://cdn.jsdelivr.net/npm/@cloudpdf/viewer@3/dist/cloudpdf.js';
- *   document.getElementById('viewer').src = { shareToken: 'shr_…' };
+ *   document.getElementById('viewer').src = { grant: 'grt_…' };
  * </script>
  * ```
  *
@@ -27,8 +27,8 @@ export { CLOUDPDF_SAAS_URL, cloudEngine } from '@cloudpdf/engine';
 export type { CloudEngineOptions } from '@cloudpdf/engine';
 // Share-session primitives for custom flows (pre-exchange to inspect a
 // docId, hand-rolled password prompts, bespoke documents arrays).
-export { exchangeShareToken, shareSessionSource, ShareExchangeError } from '@cloudpdf/engine';
-export type { ShareSession, ShareExchangeOptions } from '@cloudpdf/engine';
+export { exchangeGrant, grantSessionSource, GrantExchangeError } from '@cloudpdf/engine';
+export type { GrantSession, GrantExchangeOptions } from '@cloudpdf/engine';
 // The cloud's `ViewerConfig` and its documents, in place of the engine-agnostic ones `export *`
 // brings: one name per door (docs/conventions/viewer-doors.md).
 export type { DocumentEntry, DocumentSrc, InitOptions, ViewerConfig } from './config';

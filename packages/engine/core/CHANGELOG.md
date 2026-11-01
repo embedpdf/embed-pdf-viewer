@@ -1,5 +1,73 @@
 # @embedpdf/engine-core
 
+## 3.0.0-next.19
+
+### Minor Changes
+
+- [#918](https://github.com/embedpdf/embed-pdf-viewer/pull/918) by [@bobsingor](https://github.com/bobsingor) – The open input for a CloudPDF grant is `{ kind: 'grant', grant, passphrase?,
+restart? }` (`OpenInputGrant`), and a document opened with one has `doc.grant`
+  (`DocumentGrant`), whose `resume()` takes `passphrase`. `ShareOpenRequest` is
+  `GrantOpenRequest`, with `passphraseProvided`, and `SharePasswordRequired` is
+  `GrantPassphraseRequired`.
+
+## 3.0.0-next.18
+
+### Minor Changes
+
+- [#911](https://github.com/embedpdf/embed-pdf-viewer/pull/911) by [@bobsingor](https://github.com/bobsingor) – New `runPageFormFieldsConformance` suite checks that `pages.insert` and `pages.extract` bring form fields, keep same-named fields apart, and survive a save in either mode.
+
+- [#907](https://github.com/embedpdf/embed-pdf-viewer/pull/907) by [@bobsingor](https://github.com/bobsingor) – `DocumentShare` gets `openRequest`, `onOpenRequest()` and `resume()`: a passphrase, or questions asked on open, that a share link gets while a document is open are asked of the visitor, and `resume({ sharePassword })` or `resume({ visitor })` lets the document go on as the same visitor. `ShareOpenRequest` and `shareOpenRequestOf()` move here from `@embedpdf/core`, which re-exports the type.
+
+### Patch Changes
+
+- [#910](https://github.com/embedpdf/embed-pdf-viewer/pull/910) by [@bobsingor](https://github.com/bobsingor) – The version wire paths and resources are the layer's: `wirePaths.layerVersions`, `layerVersionSignatures`, `layerVersionSignatureContents`, `layerVersionSignatureDigest`, `layerVersionAnalysis`, `layerVersionDownload` and `layerVersionRevision` take the layer name. The resources are now `layer-versions` and `layer-version-*`, so a layer's CDN grant covers only its own versions.
+
+  The catalog schema is `LayerVersionsSchema` (`{ baseSha, versions }`, was `DocumentVersionsSchema` with `head`).
+
+- [#909](https://github.com/embedpdf/embed-pdf-viewer/pull/909) by [@bobsingor](https://github.com/bobsingor) – `identity` is the one word for who the user is, on both engines. `OpenOptions.identity` is who your page knows the user is: the local engine's session identity, as before; on the cloud engine a document token decides, and a share link takes it as the visitor's answers to what the link asks. The share input's `visitor` is gone (pass `identity` in the options instead), and `DocumentShare.resume()` takes `{ sharePassword, identity }`. `doc.security.identity` says who a session acts for.
+
+  The runtime entry exports `devWarn`, `isDev` and `resetDevWarnings` for engines: development-only warnings, once per key.
+
+- [#910](https://github.com/embedpdf/embed-pdf-viewer/pull/910) by [@bobsingor](https://github.com/bobsingor) – `EngineErrorCode.StaleBase` is gone. A signature no longer moves the document, so no layer is ever behind it and every layer can sign over its own base.
+
+## 3.0.0-next.17
+
+### Minor Changes
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – Add `wirePaths.layerDownloadLink` and its template, the route that makes a short-lived download URL for a layer's PDF.
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – Add the `LayerDeleted` error code: the cloud layer was deleted, what it held is gone, and its name is refused from then on.
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – `OpenInputShare.restart` starts over on a share link that keeps each visitor's layer, and `DocumentHandle.share` (`layerMode`, `keep`) says how a document opened from a share link reaches its layer.
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – New engine code `VisitorIdentityRequired`: a share link asks who the visitor is, and its `details` (`VisitorIdentityRequest`: `fields`, `missing`, `invalid`, `purpose`, `privacyUrl`) say what; `visitorIdentityRequestOf(error)` reads them. `OpenInputShare.visitor` sends the visitor's answers (`VisitorAnswers`) with the open. `DocumentHandle.share` is now a `DocumentShare`: besides `layerMode` and `keep`, `identityRequest` says what the link asks before the first change, `identify(answers)` answers it, `onIdentityRequest` is called when a change waits for the answers, and `decline()` lets the waiting changes fail.
+
+## 3.0.0-next.16
+
+### Minor Changes
+
+- [#891](https://github.com/embedpdf/embed-pdf-viewer/pull/891) by [@bobsingor](https://github.com/bobsingor) – Attachments are change ops: `attachments.create` (the file's name, type and description, its bytes as the `file` resource) and `attachments.delete`, each recorded with its reverse, so `doc.apply({ undoOf })` undoes and redoes them. An undo of a delete brings the same file back, with its bytes, description and dates, and publishes `attachments.restored`. `attachmentVerbs()` makes `doc.attachments.create()` and `delete()` one-op changes. `doc.attachments.download()` returns the bytes; the name and type are what the listing says, as for an annotation's `downloadResource(ref, 'file')`. `ATTACHMENT_LIMITS.decodedBytes` names the local engine's decode limit, and `AttachmentWireComponents` the attachment models. `wirePaths` no longer lists the attachment write routes; `wireTemplates` gains the current attachment reads.
+
+- [#885](https://github.com/embedpdf/embed-pdf-viewer/pull/885) by [@bobsingor](https://github.com/bobsingor) – Read and edit the document's outline (its bookmarks) with `doc.outline`: `get()` lists every item depth first with its parent, its target in page space (read the way a link's is), its `/A` action tree, its colour, its style and whether it opens; `create`, `update`, `move` and `delete` are change ops (`outline.create`, `outline.update`, `outline.move`, `outline.delete`) that apply through `doc.apply`, undo by reference, and publish `outline.created`, `outline.updated`, `outline.moved`, `outline.deleted` and `outline.restored` events. Items are named by object number and placed by neighbour (`OutlinePosition`); a delete takes the items under an item with it, and its undo brings the same items back. Writing needs the new `doc.outline.modify` capability (granted by the PDF's modify or assemble right, and protected by certifying signatures).
+
+  `outlineItemOfDraft`, `outlineItemAfter` and `outlineItemWithChildren` work out what an outline write leaves before the engine runs it, and `runOutlineConformance` checks both engines against them. `actionTreeOf` gives the action tree a link target is written as. The cloud wire carries the outline plane: `LayerScopes.outline`, `outlineVersion` in the manifest and in `CacheDelta`, and the `outline` and `layer-outline` resources.
+
+- [#890](https://github.com/embedpdf/embed-pdf-viewer/pull/890) by [@bobsingor](https://github.com/bobsingor) – Page structure edits are change ops: `pages.rotate`, `pages.reorder`, `pages.delete`, `pages.insertBlank` and `pages.insert`, each recorded with its reverse, so `doc.apply({ undoOf })` undoes and redoes them. An undo of a delete brings the same pages back under the same refs, with their annotations and names, and publishes `pages.restored`. `pageVerbs()` makes the structure verbs of `doc.pages` one-op changes, so each verb's `opId` undoes it. `wirePaths` and `wireTemplates` no longer list the single page write routes.
+
+- [#883](https://github.com/embedpdf/embed-pdf-viewer/pull/883) by [@bobsingor](https://github.com/bobsingor) – `pages.extract(pages, options)` makes a copy of the pages as they draw: `{ flatten: { usage: 'print' } }` is a print copy, with the annotations and form fields that print painted into the pages, nothing interactive left and layers in their print state; `flatten: {}` is the copy as shown on screen. `includeAnnotations` and `includeFormFields` choose what is painted, with a page picture's defaults, and are refused without `flatten`. A flattened copy needs `doc.download` or `doc.download.flattened`, and paints only what the caller may read; `resolvePageExtract()` is that check, shared by both engines. The wire schema of `POST …/pages/extract` takes the options, and `runPrintCopyConformance` checks a print copy against the print picture on any engine.
+
+- [#883](https://github.com/embedpdf/embed-pdf-viewer/pull/883) by [@bobsingor](https://github.com/bobsingor) – Page pictures can be made for paper. `usage: 'print'` with `viewport: { kind: 'dpi', dpi: 150 | 300 }` draws the page by the print rules: layers in their print state, and only the annotations and form fields with the `print` flag (no-view ones included, hidden ones never). The DPI counts on the paper the page prints on, A4 or Letter: a bigger page gets no more pixels than it needs shrunk to fit. A print picture is the whole page, upright, on white, so it takes no `target`, `rotation` or `background`, and a `dpi` viewport is for print pictures only. It needs `doc.print`, and 300 DPI `doc.print.high`.
+  - **Options:** `PageRenderOptions` gains `usage`, and `PageRenderViewport` the `dpi` kind; `PageScreenViewport` is the screen sizes alone, which appearance renders take. `checkRenderUsage()` checks a render's usage, and the caller's rights when it knows them; `printDpiOf()` reads a print picture's DPI. `PrintDpi` and `PagePrintRights` name them.
+  - **Size:** `renderSize()` and `pageTransform()` size a `dpi` viewport for its paper (`printScale()`, `PRINT_PAPER`).
+  - **Paths:** each picture family has a print family at each tier, `render/print/…` (`doc.print`) and `render/print-high/…` (`doc.print.high`), with the family's planes and pins. The tier is a right, so it is a path of its own, and the CDN signs it only for a session with that right. `PAGE_PRINT_FAMILIES`, `PAGE_PICTURES`, `pagePictureOf()`, `wirePaths.docPagePrint`, `layerPagePrint` and their `…Current` twins, and `PagePrintQuerySchemas`.
+  - **Conformance:** `runPrintRenderConformance` and its fixture `PRINT_RULES_PDF`.
+
+- [#891](https://github.com/embedpdf/embed-pdf-viewer/pull/891) by [@bobsingor](https://github.com/bobsingor) – A change crosses the worker in page space both ways (`DocumentApplyWorkerRequest`, `DocumentApplyChangesWorkerRequest`, `ServerChange`, `ServerChangeOutcome` lose their coordinates parameter): each op is measured on the document as the ops before it left it, so one change can annotate a page and then delete it, or make a page and annotate it. The single page routes' input schemas (`PageReorderInputSchema`, `PageRotateInputSchema`, `PageDeleteInputSchema`, `PageInsertInputSchema`, `PageInsertBlankInputSchema`) are gone with the routes. The change conformance covers the new cases on both engines.
+
+### Patch Changes
+
+- [#895](https://github.com/embedpdf/embed-pdf-viewer/pull/895) by [@bobsingor](https://github.com/bobsingor) – Signature change analysis handles loops of unchanged objects (structure trees, outlines, popups) in one pass. A comment added to a tagged PDF (Chrome, Word) after an approval signature now reads `permitted` instead of `indeterminate`. In `ObjectReferrer` labels, `…` stands for a route inside a loop, as in `StructTreeRoot/…/Pg`.
+
 ## 3.0.0-next.15
 
 ### Minor Changes

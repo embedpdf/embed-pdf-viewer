@@ -8,6 +8,7 @@ import type {
   Engine,
   EngineFactory,
   FailedDocumentInfo,
+  HostFetch,
   Identity,
   InitialDocument,
   Kernel,
@@ -34,8 +35,9 @@ export interface ViewerProps {
   onReady?: (kernel: Kernel) => void;
   /**
    * Who the user is, for every document opened without an `identity` of its own. Documents
-   * opened after a change use the new value; open ones keep theirs. The local engine only: the
-   * cloud engine reads it from the document's token.
+   * opened after a change use the new value; open ones keep theirs. With the cloud engine the
+   * document's token decides, and a share link takes it as the visitor's answers to what the
+   * link asks.
    */
   identity?: Identity;
   /**
@@ -47,6 +49,12 @@ export interface ViewerProps {
   accent?: string;
   /** How pages look: `background` before the picture arrives, and the `shadow` under each page. */
   page?: Partial<ViewerPageSettings>;
+  /**
+   * How a document at a URL downloads: your own `fetch`, to add headers or cookies. It gets the
+   * URL and an `init` with the document's cancel `signal`, to pass on. Each download calls the
+   * latest one.
+   */
+  fetch?: HostFetch;
   /** Shown while the viewer starts. */
   fallback?: Snippet;
   /** Shown when the viewer couldn't start, with why. Without it, a failed start shows nothing. */

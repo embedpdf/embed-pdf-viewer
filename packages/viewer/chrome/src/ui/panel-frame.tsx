@@ -20,6 +20,8 @@
  * list closes from either when one of its items is picked
  * ({@link useCloseOnPick}). The frame is named after its title for assistive
  * technology: a region when docked, a dialog otherwise (modal as a sheet).
+ *
+ * A panel with nothing to list opens as a bar instead ({@link PanelBar}).
  */
 import type { PanelPresentation, PanelPresentationBySize, PanelWidth } from '@embedpdf/core-ui';
 import { useT } from '@embedpdf/react/i18n';
@@ -67,6 +69,8 @@ export interface PanelFrameProps {
   readonly onClose: () => void;
   /** Drawn in the header in place of the title: the switcher between the panels on its side. */
   readonly header?: ReactNode;
+  /** Drawn under the header, outside what scrolls: the bars the layout puts in the panel. */
+  readonly bars?: ReactNode;
   /** It holds a list: in a sheet or an overlay, picking an item closes it ({@link useCloseOnPick}). */
   readonly list?: boolean;
   readonly children: ReactNode;
@@ -154,6 +158,7 @@ function DockedPanel({
   title,
   onClose,
   header,
+  bars,
   children,
 }: PanelFrameProps) {
   const env = useLayoutEnv();
@@ -178,6 +183,7 @@ function DockedPanel({
       style={{ width: shown }}
     >
       <PanelHeader title={title} header={header} onClose={onClose} />
+      {bars}
       <div className="flex min-h-0 flex-1 flex-col">{children}</div>
       {resizable && (
         <PanelEdge
@@ -290,6 +296,7 @@ function OverlayPanel({
   title,
   onClose,
   header,
+  bars,
   list,
   children,
 }: PanelFrameProps) {
@@ -327,6 +334,7 @@ function OverlayPanel({
         style={{ width: overlayWidthOf(clampPanelWidth(wanted, env.width, widths), env.width) }}
       >
         <PanelHeader title={title} header={header} onClose={onClose} />
+        {bars}
         <div className="flex min-h-0 flex-1 flex-col">
           <CloseOnPickProvider value={list ? () => close.current() : () => {}}>
             {children}
@@ -339,7 +347,7 @@ function OverlayPanel({
 
 // ── sheet ────────────────────────────────────────────────────────────────────
 
-function SheetPanel({ id, title, onClose, header, list, children }: PanelFrameProps) {
+function SheetPanel({ id, title, onClose, header, bars, list, children }: PanelFrameProps) {
   return (
     <Sheet
       label={title}
@@ -348,9 +356,69 @@ function SheetPanel({ id, title, onClose, header, list, children }: PanelFramePr
       list={list}
       part="panel"
       data={{ 'epdf-panel': id, present: 'sheet' }}
-      header={<PanelHeader title={title} header={header} onClose={onClose} />}
+      header={
+        <>
+          <PanelHeader title={title} header={header} onClose={onClose} />
+          {bars}
+        </>
+      }
     >
       {children}
     </Sheet>
+  );
+}
+
+// ── bar ──────────────────────────────────────────────────────────────────────
+
+/**
+ * A panel with nothing to list, as a bar over the top corner of the pages on its side, across
+ * them on a phone; the layout's `present` doesn't apply. The pages stay as they are and keep
+ * working under it. It takes focus as it opens, closes on Escape and gives focus back; Tab
+ * moves on from it to the rest of the viewer.
+ */
+export function PanelBar({
+  id,
+  side,
+  title,
+  onClose,
+  children,
+}: Pick<PanelFrameProps, 'id' | 'side' | 'title' | 'onClose' | 'children'>) {
+  const t = useT();
+  const { size } = useLayoutEnv();
+  const bar = useRef<HTMLElement>(null);
+  const close = useRef(onClose);
+  close.current = onClose;
+  useLayoutEffect(() => {
+    const element = bar.current;
+    if (!element) return;
+    const held = holdFocus(element, { onEscape: () => close.current(), trap: false });
+    return () => held.release();
+    // The bar opens once; it closes by unmounting.
+  }, []);
+  const place =
+    size === 'compact'
+      ? 'inset-x-2'
+      : `w-[24rem] max-w-[calc(100%-1rem)] ${side === 'start' ? 'start-2' : 'end-2'}`;
+  return (
+    <section
+      ref={bar}
+      role="dialog"
+      aria-label={title}
+      part="panel"
+      data-epdf-panel={id}
+      data-present="bar"
+      className={`bg-surface border-border-subtle absolute top-2 z-40 flex items-start gap-1 rounded-lg border p-2 shadow-xl ${place}`}
+    >
+      <div className="min-w-0 flex-1">{children}</div>
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label={t('panel.close')}
+        title={t('panel.close')}
+        className="text-fg-muted hover:bg-hover grid h-8 w-8 shrink-0 place-items-center rounded-md"
+      >
+        <Icon name="x" size={16} />
+      </button>
+    </section>
   );
 }

@@ -204,12 +204,36 @@ const { width, height } = pageTransform(pages[0], { viewport: { kind: 'dpi', dpi
 ```
 
 Printing needs `doc.print`, and 300 DPI also `doc.print.high`: the PDF's permission to print at
-full quality. Without them the call fails with `Forbidden`.
+full quality. It doesn't need `doc.render`. Without them the call fails with `Forbidden`.
 
 <Engine cloud>
 
 Each print picture has an address of its own for each DPI, so a CDN only serves the 300 DPI
 pictures to sessions that may print at full quality.
+
+</Engine>
+
+## Thumbnails
+
+A thumbnail is a small picture of the whole page, for a strip or a page picker. Ask for one with a
+`thumbnail` viewport:
+
+```ts
+const thumbnail = await page.render.image({ viewport: { kind: 'thumbnail' }, format: 'webp' });
+```
+
+It's 512 pixels on its long side, whatever the page's size: a US Letter page is 396 × 512. Show it
+smaller with CSS. It follows the screen's rules, like any picture that isn't for print, and takes
+`rotation`, `background`, `includeAnnotations` and `includeFormFields`, but no `target`: a
+thumbnail is always the whole page.
+
+Thumbnails need `doc.render.thumbnail`, which `doc.render` includes. So a user who may not render
+pages can still be given thumbnails, small enough to find their way but not to read the page.
+
+<Engine cloud>
+
+Thumbnails have an address of their own, so a CDN serves them to sessions that may have
+thumbnails and the full pictures only to sessions that may render.
 
 </Engine>
 
@@ -346,23 +370,31 @@ milliseconds, so the renders waiting behind it start right away. See
 
 ## Options
 
-| Option               | What it does                                                                                                    | Default                                                                  |
-| :------------------- | :-------------------------------------------------------------------------------------------------------------- | :----------------------------------------------------------------------- |
-| `viewport`           | `{ kind: 'width', width }` in pixels, or `{ kind: 'scale', scale }`; `{ kind: 'dpi', dpi }` for a print picture | scale `1`                                                                |
-| `rotation`           | Turns the image clockwise: `0`, `90`, `180` or `270`                                                            | `0`                                                                      |
-| `format`             | `'png'` or `'webp'` (see [Format and quality](#format-and-quality))                                             | see above                                                                |
-| `quality`            | WebP quality, from `0` to `1`                                                                                   | encoder default                                                          |
-| `background`         | `'white'` or `'transparent'`                                                                                    | `'white'`                                                                |
-| `includeAnnotations` | Draw the page's annotations                                                                                     | `true` when the user may read them                                       |
-| `includeFormFields`  | Draw the form fields too                                                                                        | `false` without annotations; else `true` when the user may read the form |
-| `target`             | `{ kind: 'page' }`, or `{ kind: 'rect', rect }` for one area                                                    | the whole page                                                           |
-| `usage`              | `'display'`, or `'print'` for a [print picture](#print-pictures)                                                | `'display'`                                                              |
+| Option               | What it does                                                                                                                                                            | Default                                                                  |
+| :------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :----------------------------------------------------------------------- |
+| `viewport`           | `{ kind: 'width', width }` in pixels, or `{ kind: 'scale', scale }`; `{ kind: 'dpi', dpi }` for a print picture, `{ kind: 'thumbnail' }` for a [thumbnail](#thumbnails) | scale `1`                                                                |
+| `rotation`           | Turns the image clockwise: `0`, `90`, `180` or `270`                                                                                                                    | `0`                                                                      |
+| `format`             | `'png'` or `'webp'` (see [Format and quality](#format-and-quality))                                                                                                     | see above                                                                |
+| `quality`            | WebP quality, from `0` to `1`                                                                                                                                           | encoder default                                                          |
+| `background`         | `'white'` or `'transparent'`                                                                                                                                            | `'white'`                                                                |
+| `includeAnnotations` | Draw the page's annotations                                                                                                                                             | `true` when the user may read them                                       |
+| `includeFormFields`  | Draw the form fields too                                                                                                                                                | `false` without annotations; else `true` when the user may read the form |
+| `target`             | `{ kind: 'page' }`, or `{ kind: 'rect', rect }` for one area                                                                                                            | the whole page                                                           |
+| `usage`              | `'display'`, or `'print'` for a [print picture](#print-pictures)                                                                                                        | `'display'`                                                              |
 
 ## Permissions
 
-Rendering needs the `doc.render` permission. Without it, the call fails with `Forbidden`. A
-picture with annotations also needs `doc.annotate.read`, and one with form fields
-`doc.forms.read`. A print picture also needs `doc.print`, and at 300 DPI `doc.print.high`.
+Each kind of picture needs its own permission, and no other:
+
+| Picture                           | Needs                                   |
+| :-------------------------------- | :-------------------------------------- |
+| On screen                         | `doc.render`                            |
+| [Thumbnail](#thumbnails)          | `doc.render.thumbnail`, or `doc.render` |
+| [Print](#print-pictures), 150 DPI | `doc.print`                             |
+| [Print](#print-pictures), 300 DPI | `doc.print` and `doc.print.high`        |
+
+A picture with annotations also needs `doc.annotate.read`, and one with form fields
+`doc.forms.read`. Without them, the call fails with `Forbidden`.
 
 ## Good to know
 

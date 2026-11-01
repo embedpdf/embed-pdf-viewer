@@ -3,27 +3,27 @@
   import { Stage, stagePlugin } from '@embedpdf/svelte/stage';
   import { RenderLayer, renderPlugin } from '@embedpdf/svelte/render';
   import { interactionPlugin } from '@embedpdf/svelte/interaction';
-  import { annotationPlugin } from '@embedpdf/svelte/annotation';
+  import { actionsPlugin } from '@embedpdf/svelte/actions';
   import { LinkLayer, linkPlugin } from '@embedpdf/svelte/link';
   import { localEngine } from '@embedpdf/engine';
-  import AddLinks from './AddLinks.svelte';
+  import BrowserActions from './BrowserActions.svelte';
 
   import '../custom.css';
 
   const engine = localEngine();
-  // The annotation plugin is only here to make the links below.
+  // The actions plugin runs a link that names a viewer command, such as the footer's Next.
   const plugins = [
     stagePlugin(),
     renderPlugin(),
     interactionPlugin(),
-    annotationPlugin(),
+    actionsPlugin(),
     linkPlugin(),
   ];
 
-  // [!doc-source ebook]
-  const ebook = async (): Promise<OpenInput> => {
-    const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-    return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+  // [!doc-source links]
+  const links = async (): Promise<OpenInput> => {
+    const response = await fetch('/pdfs/links.pdf');
+    return { kind: 'bytes', id: 'links', bytes: new Uint8Array(await response.arrayBuffer()) };
   };
   // [!/doc-source]
 </script>
@@ -32,12 +32,12 @@
   let shown = $state(true);
 </script>
 
-<Viewer {engine} {plugins} initialDocuments={[{ source: ebook }]}>
+<Viewer {engine} {plugins} initialDocuments={[{ source: links }]}>
   <DocumentGate>
     {#snippet fallback()}
       <p class="loading">Loading…</p>
     {/snippet}
-    <AddLinks />
+    <BrowserActions />
     <div class="toolbar">
       <div class="segmented" role="group" aria-label="Link areas">
         <button type="button" aria-pressed={shown} onclick={() => (shown = true)}>

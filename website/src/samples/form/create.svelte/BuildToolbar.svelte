@@ -1,13 +1,16 @@
 <script lang="ts">
-  import { untrack } from 'svelte';
   import { usePageList, type PageRef } from '@embedpdf/svelte/runtime';
   import { useStage } from '@embedpdf/svelte/stage';
-  import { useForm, useFormState, type FormCapability } from '@embedpdf/svelte/form';
+  import { useForm, type FormCapability, type FormFieldDTO } from '@embedpdf/svelte/form';
 
-  // How the new fields look: part of the PDF, like the rest of the page.
-  const look = { color: '#94a3b8', interiorColor: '#f8fafc', strokeWidth: 1, fontSize: 11 };
+  // The printed boxes are the fields' look: a new field only sets its text size.
+  const look = { fontSize: 11 };
 
-  /** A dropdown, the next row down the page. */
+  // The printed table of group tickets: a row every 36 points from the top at 470, with a country
+  // box at x 96 and a circle for each ticket at x 330 and 430.
+  const rowTop = (row: number) => 470 + row * 36;
+
+  /** A dropdown in a row's country box. */
   function addDropdown(form: FormCapability, page: PageRef, row: number) {
     return form.create({
       family: 'combobox',
@@ -15,72 +18,74 @@
       options: [
         { label: 'Netherlands', value: 'NL' },
         { label: 'Belgium', value: 'BE' },
+        { label: 'Germany', value: 'DE' },
       ],
-      widgets: [{ page, rect: { x: 72, y: 520 + row * 36, width: 160, height: 24 }, ...look }],
+      widgets: [{ page, rect: { x: 96, y: rowTop(row), width: 160, height: 24 }, ...look }],
     });
   }
 
-  /** A radio group: one field with a widget per button, each with the value it stands for. */
+  /** A radio group in a row's two circles: one field, a widget per circle, each with its value. */
   function addRadioGroup(form: FormCapability, page: PageRef, row: number) {
-    const y = 524 + row * 36;
+    const y = rowTop(row) + 4;
     return form.create({
       family: 'radio',
-      name: `plan_${row + 1}`,
+      name: `ticket_${row + 1}`,
       widgets: [
-        { page, rect: { x: 72, y, width: 16, height: 16 }, exportValue: 'monthly', ...look },
-        { page, rect: { x: 112, y, width: 16, height: 16 }, exportValue: 'yearly', ...look },
+        { page, rect: { x: 330, y, width: 16, height: 16 }, exportValue: 'one-day', ...look },
+        { page, rect: { x: 430, y, width: 16, height: 16 }, exportValue: 'both-days', ...look },
       ],
     });
   }
 
   const form = useForm();
   const stage = useStage();
-  const formState = useFormState();
   const pages = usePageList();
-  const page = $derived(pages.current.at(-1)?.ref);
+  const page = $derived(pages.current[0]?.ref); // the printed form
+  let added = $state.raw<FormFieldDTO[]>([]);
 
-  // The ebook has no form: start with a dropdown on its last page, which has room.
-  let added = false;
-  $effect(() => {
-    const last = page;
-    if (formState.status !== 'ready' || !last || added) return;
-    added = true;
-    untrack(() => {
-      void addDropdown(form, last, 0).then(({ field }) =>
-        stage.reveal(last, { rect: form.getWidget(field.widgets[0])!.rect }),
-      );
-    });
-  });
-
-  // Each new field goes a row further down the page: bring it into view.
-  function add(addField: typeof addDropdown) {
-    const last = page;
-    if (!last) return;
-    void addField(form, last, formState.fields.length).then(({ field }) =>
-      stage.reveal(last, { rect: form.getWidget(field.widgets[0])!.rect }),
-    );
+  // Each kind of field fills its column from the top: the next row that hasn't got one.
+  function rowFor(family: FormFieldDTO['family']) {
+    return added.filter((field) => field.family === family).length;
   }
 
-  const lastField = $derived(formState.fields.at(-1));
-  const full = $derived(formState.fields.length >= 5);
+  async function add(addField: typeof addDropdown, family: FormFieldDTO['family']) {
+    if (!page) return;
+    const { field } = await addField(form, page, rowFor(family));
+    added = [...added, field];
+    stage.reveal(page, { rect: form.getWidget(field.widgets[0])!.rect });
+  }
+
+  async function removeLast() {
+    const field = added.at(-1);
+    if (!field) return;
+    await form.delete(field.ref);
+    added = added.slice(0, -1);
+  }
+
+  const lastField = $derived(added.at(-1));
 </script>
 
 <div class="toolbar">
-  <button type="button" class="button" disabled={!page || full} onclick={() => add(addDropdown)}>
+  <button
+    type="button"
+    class="button"
+    disabled={!page || rowFor('combobox') >= 5}
+    onclick={() => void add(addDropdown, 'combobox')}
+  >
     Add a dropdown
-  </button>
-  <button type="button" class="button" disabled={!page || full} onclick={() => add(addRadioGroup)}>
-    Add a radio group
   </button>
   <button
     type="button"
     class="button"
-    disabled={!lastField}
-    onclick={() => lastField && void form.delete(lastField.ref)}
+    disabled={!page || rowFor('radio') >= 5}
+    onclick={() => void add(addRadioGroup, 'radio')}
   >
+    Add a radio group
+  </button>
+  <button type="button" class="button" disabled={!lastField} onclick={removeLast}>
     Remove the last
   </button>
   <output class="readout">
-    {formState.fields.map((field) => field.name).join(', ') || 'No fields'}
+    {added.map((field) => field.name).join(', ') || 'No fields in the table yet'}
   </output>
 </div>

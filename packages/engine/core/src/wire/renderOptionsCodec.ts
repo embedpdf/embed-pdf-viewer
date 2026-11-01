@@ -31,9 +31,10 @@ export interface RenderVersions {
  * extending `PageImageOptions`, the render query schemas, and
  * `RenderTokenSchema.fields`; this function does not change.
  *
- * What the picture draws, and whether and at which DPI it prints, is never
- * in the token: the caller picks the picture's path (`PAGE_RENDER_FAMILIES`,
- * `PAGE_PRINT_FAMILIES`) and passes that family's pins.
+ * What the picture draws, whether it's a thumbnail, and whether and at which
+ * DPI it prints, is never in the token: the caller picks the picture's path
+ * (`PAGE_RENDER_FAMILIES`, `PAGE_THUMBNAIL_FAMILIES`, `PAGE_PRINT_FAMILIES`)
+ * and passes that family's pins.
  * Each family's query schema checks its own pins when the URL is decoded
  * server-side. Round-tripping (flatten → encode → decode → unflatten →
  * schema parse) recovers the original SDK options.
@@ -49,8 +50,12 @@ export function renderImageOptionsToWire(
     viewport,
     ...wireOptions
   } = options;
-  // A print picture's size is its tier, which is its path too.
-  const sized = usage === 'print' || viewport === undefined ? {} : { viewport };
+  // A print picture's size is its tier, and a thumbnail's is a thumbnail's:
+  // both are their path too.
+  const sized =
+    usage === 'print' || viewport === undefined || viewport.kind === 'thumbnail'
+      ? {}
+      : { viewport };
   return flatten({ ...wireOptions, ...sized, ...versions });
 }
 

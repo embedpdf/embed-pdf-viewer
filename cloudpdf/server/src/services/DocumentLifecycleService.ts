@@ -6,6 +6,7 @@ import type { Kysely } from 'kysely';
 import type { DerivedRenderService } from './DerivedRenderService';
 import { DocumentSecurityProbe } from './DocumentSecurityProbe';
 import type { BaseVersionsRepo } from '../db/repos/base_versions.repo';
+import type { FoldersRepo } from '../db/repos/folders.repo';
 import {
   DocumentImportsRepo,
   type DocumentImportRow,
@@ -16,9 +17,10 @@ import {
   type DocumentListOptions,
   type DocumentRow,
 } from '../db/repos/documents.repo';
-import type { ShareGrantsRepo } from '../db/repos/share_grants.repo';
+import type { GrantsRepo } from '../db/repos/grants.repo';
 import type { TenantUsageRepo } from '../db/repos/tenant_usage.repo';
 import { TenantsRepo } from '../db/repos/tenants.repo';
+import type { UploadTokenUsesRepo } from '../db/repos/upload_token_uses.repo';
 import type { Database as Schema } from '../db/schema';
 import type { ImportPolicy } from '../import/config/ImportPolicySchema';
 import { createImportSource } from '../import/createImportSource';
@@ -57,6 +59,10 @@ export interface ImportInput {
   /** Wire descriptor from the request body (v1: `{ kind: 'url' }`). */
   source: AdminImportSource;
   expected?: ImportExpected | null;
+  /** Defaults to the document id. */
+  name?: string;
+  /** The folder to file it in; null or absent is the top level. */
+  folderId?: string | null;
   metadata?: Record<string, unknown> | null;
   idempotencyKey?: string | null;
   dedupMode?: DedupMode;
@@ -92,6 +98,10 @@ export interface InitInput {
    * bytes at commit time, so a lying customer never wins.
    */
   contentSha256: string;
+  /** Defaults to the document id. */
+  name?: string;
+  /** The folder to file it in; null or absent is the top level. */
+  folderId?: string | null;
   metadata?: Record<string, unknown> | null;
   idempotencyKey?: string | null;
   dedupMode?: DedupMode;
@@ -104,6 +114,12 @@ export interface InitInput {
   uploadTtlSec?: number;
   /** Preferred transfer path. `auto` keeps object storage off the origin. */
   uploadPreference?: UploadPreference;
+  /**
+   * The upload token starting this document, when one is: the row
+   * records its `jti`, and the token starts at most `maxFiles` documents.
+   * `expiresAt` (epoch ms) is when the token runs out.
+   */
+  uploadToken?: { jti: string; maxFiles: number; expiresAt: number };
 }
 
 export type InitResult =
@@ -145,6 +161,8 @@ export interface UploadProxyInput {
 export interface DocumentLifecycleOptions {
   documents: DocumentsRepo;
   tenants: TenantsRepo;
+  /** Needed to file documents in folders; without it, every document stays at the top level. */
+  folders?: FoldersRepo;
   storage: ObjectStoreWithInfo;
   /**
    * If true, the lifecycle service auto-provisions a tenant row on
@@ -167,8 +185,10 @@ export interface DocumentLifecycleOptions {
   usageMeters?: UsageMeters;
   /** When present, fresh commits also move the per-tenant upload fact. */
   tenantUsage?: TenantUsageRepo;
-  /** When present, document delete revokes the document's share grants. */
-  shareGrants?: ShareGrantsRepo;
+  /** When present, document delete revokes the document's grants. */
+  grants?: GrantsRepo;
+  /** Upload tokens' uses; without it, init refuses upload tokens. */
+  uploadTokenUses?: UploadTokenUsesRepo;
   /** Controls whether origin-mediated uploads may be selected. */
   uploadProxyPolicy?: UploadProxyPolicy;
   /**
@@ -216,6 +236,7 @@ export interface DocumentLifecycleOptions {
 export class DocumentLifecycleService {
   private readonly documents: DocumentsRepo;
   private readonly tenants: TenantsRepo;
+  private readonly folders?: FoldersRepo;
   private readonly storage: ObjectStoreWithInfo;
   private readonly autoProvisionTenant: boolean;
   private readonly securityProbe: DocumentSecurityProbe;
@@ -223,7 +244,8 @@ export class DocumentLifecycleService {
   private readonly derivedRenders?: DerivedRenderService;
   private readonly usageMeters?: UsageMeters;
   private readonly tenantUsage?: TenantUsageRepo;
-  private readonly shareGrants?: ShareGrantsRepo;
+  private readonly grants?: GrantsRepo;
+  private readonly uploadTokenUses?: UploadTokenUsesRepo;
   private readonly uploadProxyPolicy: UploadProxyPolicy;
   private readonly importPolicy?: ImportPolicy;
   private readonly importConnections: ImportConnectionRegistry;
@@ -237,6 +259,7 @@ export class DocumentLifecycleService {
   constructor(opts: DocumentLifecycleOptions) {
     this.documents = opts.documents;
     this.tenants = opts.tenants;
+    if (opts.folders) this.folders = opts.folders;
     this.storage = opts.storage;
     this.autoProvisionTenant = opts.autoProvisionTenant ?? false;
     this.securityProbe = opts.securityProbe ?? new DocumentSecurityProbe();
@@ -244,7 +267,8 @@ export class DocumentLifecycleService {
     this.derivedRenders = opts.derivedRenders;
     this.usageMeters = opts.usageMeters;
     this.tenantUsage = opts.tenantUsage;
-    this.shareGrants = opts.shareGrants;
+    this.grants = opts.grants;
+    this.uploadTokenUses = opts.uploadTokenUses;
     this.uploadProxyPolicy = opts.uploadProxyPolicy ?? 'fallback-only';
     if (opts.importPolicy) this.importPolicy = opts.importPolicy;
     this.importConnections = opts.importConnections ?? new ImportConnectionRegistry();
@@ -299,22 +323,54 @@ export class DocumentLifecycleService {
     if (docId.length < 2) {
       throw badRequest(`docId must be at least 2 characters: ${docId}`);
     }
+    await this.requireFolder(input.tenantId, input.folderId);
+    await this.claimUploadTokenUse(input);
 
-    const created = await this.documents.createPending({
-      id: docId,
-      tenantId: input.tenantId,
-      metadata: input.metadata ?? null,
-      idempotencyKey: input.idempotencyKey ?? null,
-      createdBy: input.sub,
-      expectedSha256: input.contentSha256,
-      expectedSizeBytes: input.contentLength,
-    });
+    const created = await this.documents
+      .createPending({
+        id: docId,
+        tenantId: input.tenantId,
+        name: input.name ?? docId,
+        folderId: input.folderId ?? null,
+        metadata: input.metadata ?? null,
+        idempotencyKey: input.idempotencyKey ?? null,
+        createdBy: input.sub,
+        expectedSha256: input.contentSha256,
+        expectedSizeBytes: input.contentLength,
+        uploadTokenJti: input.uploadToken?.jti ?? null,
+      })
+      .catch(async (err: unknown) => {
+        if (input.uploadToken) await this.uploadTokenUses?.release(input.uploadToken.jti);
+        throw err;
+      });
 
     // A concurrent request can win the idempotency-key insert between the
     // lookup and createPending. Validate the row returned from that race too.
     if (!created.created) this.assertSameUploadIntent(created.row, input);
 
     return { tag: created.created ? 'created' : 'resumed', doc: created.row };
+  }
+
+  /**
+   * Takes one of the upload token's uses before its document is made, in
+   * one statement, so no number of racing inits starts more than
+   * `maxFiles` documents.
+   */
+  private async claimUploadTokenUse(input: InitInput): Promise<void> {
+    if (!input.uploadToken) return;
+    if (!this.uploadTokenUses) throw new Error('upload tokens need the upload-token uses repo');
+    const { jti, maxFiles, expiresAt } = input.uploadToken;
+    const claimed = await this.uploadTokenUses.claim({
+      jti,
+      tenantId: input.tenantId,
+      maxFiles,
+      expiresAt,
+    });
+    if (!claimed) {
+      throw forbiddenError(
+        `this upload token uploads at most ${maxFiles} ${maxFiles === 1 ? 'file' : 'files'}`,
+      );
+    }
   }
 
   private buildUploadKey(docId: string, tenantId: string): string {
@@ -473,6 +529,7 @@ export class DocumentLifecycleService {
       );
       if (existing) return this.importOntoExisting(existing, input, pins);
     }
+    await this.requireFolder(input.tenantId, input.folderId);
     if ((input.mode ?? 'sync') === 'async') return this.createQueuedImport(input, pins);
     const docId = input.docId ?? generateDocId();
     if (docId.length < 2) {
@@ -481,6 +538,8 @@ export class DocumentLifecycleService {
     const created = await this.documents.createPending({
       id: docId,
       tenantId: input.tenantId,
+      name: input.name ?? docId,
+      folderId: input.folderId ?? null,
       metadata: input.metadata ?? null,
       idempotencyKey: input.idempotencyKey ?? null,
       createdBy: input.sub,
@@ -585,6 +644,8 @@ export class DocumentLifecycleService {
       const created = await docs.createPending({
         id: docId,
         tenantId: input.tenantId,
+        name: input.name ?? docId,
+        folderId: input.folderId ?? null,
         metadata: input.metadata ?? null,
         idempotencyKey: input.idempotencyKey ?? null,
         createdBy: input.sub,
@@ -1031,11 +1092,47 @@ export class DocumentLifecycleService {
   }
 
   async list(tenantId: string, opts: DocumentListOptions = {}): Promise<DocumentRow[]> {
+    await this.requireFolder(tenantId, opts.folderId);
     return this.documents.listForTenant(tenantId, opts);
+  }
+
+  /** NotFound for a folder that does not exist, Forbidden for another tenant's. */
+  private async requireFolder(
+    tenantId: string,
+    folderId: string | null | undefined,
+  ): Promise<void> {
+    if (folderId === null || folderId === undefined) return;
+    if (!this.folders) throw new Error('filing documents in folders needs the folders repo');
+    await this.folders.requireOwned(folderId, tenantId);
   }
 
   async get(tenantId: string, docId: string): Promise<DocumentRow> {
     return this.documents.requireOwned(docId, tenantId);
+  }
+
+  /**
+   * A document the upload token `jti` started, in its tenant. Any other
+   * document is `NotFound`, as if it didn't exist: the token mustn't
+   * learn about documents it didn't make.
+   */
+  async requireStartedByUploadToken(
+    tenantId: string,
+    docId: string,
+    jti: string,
+  ): Promise<DocumentRow> {
+    const doc = await this.documents.findById(docId);
+    if (!doc || doc.tenantId !== tenantId || doc.uploadTokenJti !== jti) {
+      throw notFound(`document not found: ${docId}`);
+    }
+    return doc;
+  }
+
+  /** Throws `NotFound` for a document that is gone or being deleted, `Forbidden` across tenants. */
+  async rename(tenantId: string, docId: string, name: string): Promise<DocumentRow> {
+    await this.documents.requireOwned(docId, tenantId);
+    const renamed = await this.documents.rename(docId, tenantId, name);
+    if (!renamed) throw notFound(`document not found: ${docId}`);
+    return renamed;
   }
 
   async download(tenantId: string, docId: string): Promise<Uint8Array> {
@@ -1078,10 +1175,52 @@ export class DocumentLifecycleService {
     // because SQLite deployments may run without foreign_keys on and a
     // dangling grant would be a stored 404, not a security hole (the
     // exchange re-checks the document), but still a wart in listings.
-    await this.shareGrants?.deleteByDoc(docId, tenantId);
+    await this.grants?.deleteByDoc(docId, tenantId);
     // Import provenance dies with the document.
     await this.documentImports?.deleteByDoc(docId, tenantId);
     await this.documents.finalizeDelete(docId, tenantId);
+  }
+
+  /**
+   * Finish deletes that were begun, such as every document of a deleted
+   * folder: the stored files, grants, import provenance and row of
+   * each, a few at a time. Each document is attempted; the first failure
+   * is rethrown at the end, and {@link sweepDeleting} retries it later.
+   */
+  async finishDeletes(tenantId: string, docIds: ReadonlyArray<string>): Promise<void> {
+    let failure: unknown;
+    let next = 0;
+    const worker = async () => {
+      while (next < docIds.length) {
+        const docId = docIds[next++]!;
+        try {
+          await this.delete(tenantId, docId);
+        } catch (err) {
+          failure ??= err;
+        }
+      }
+    };
+    await Promise.all(Array.from({ length: FINISH_DELETES_CONCURRENCY }, worker));
+    if (failure !== undefined) throw failure;
+  }
+
+  /**
+   * Finish documents left `deleting` for longer than `olderThanMs`, up to
+   * {@link SWEEP_DELETING_BATCH} a sweep. Safe on every replica at once:
+   * finishing a delete twice leaves the same nothing behind.
+   */
+  async sweepDeleting(opts: { olderThanMs: number }): Promise<number> {
+    const stale = await this.documents.listStaleDeleting(opts.olderThanMs, SWEEP_DELETING_BATCH);
+    let failure: unknown;
+    for (const doc of stale) {
+      try {
+        await this.delete(doc.tenantId, doc.id);
+      } catch (err) {
+        failure ??= err;
+      }
+    }
+    if (failure !== undefined) throw failure;
+    return stale.length;
   }
 
   /**
@@ -1103,6 +1242,11 @@ export class DocumentLifecycleService {
     return swept;
   }
 }
+
+/** Deletes finished at once per {@link DocumentLifecycleService.finishDeletes} call. */
+const FINISH_DELETES_CONCURRENCY = 4;
+/** Documents one sweep finishes; the next sweep takes the rest. */
+const SWEEP_DELETING_BATCH = 200;
 
 function generateDocId(): string {
   // 12 bytes -> 24 hex chars. Fits the 2-char shard naturally.
@@ -1172,6 +1316,13 @@ function badRequest(message: string): Error {
   const e = new Error(message) as Error & { code: string; status: number };
   e.code = 'InvalidArg';
   e.status = 400;
+  return e;
+}
+
+function notFound(message: string): Error {
+  const e = new Error(message) as Error & { code: string; status: number };
+  e.code = 'NotFound';
+  e.status = 404;
   return e;
 }
 

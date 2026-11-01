@@ -1,57 +1,41 @@
+<!-- Two edits after an approval signature: a comment keeps it valid, a new form field breaks it. -->
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { usePageList } from '@embedpdf/vue/runtime';
 import { useStage } from '@embedpdf/vue/stage';
 import { useAnnotation } from '@embedpdf/vue/annotation';
 import { toFieldRef, useForm, useFormState } from '@embedpdf/vue/form';
-import { useStamp } from '@embedpdf/vue/stamp';
 import { useSignature, useSignatureEvent, useSignatureState } from '@embedpdf/vue/signature';
 
-/** On load: a signature field on the last page, signed by Ada with a typed signature. */
-function useSignedDocument() {
-  const form = useForm();
-  const stamp = useStamp();
-  const stage = useStage();
-  const signature = useSignature();
-  const status = useFormState((state) => state.status);
-  const pages = usePageList();
-  const lastPage = computed(() => pages.value.at(-1)?.ref);
-  let done = false;
+// Lanternfield's signature field, signed before the agreement was sent.
+const PROVIDER = toFieldRef('provider');
 
-  watch(
-    [status, lastPage],
-    ([current, page]) => {
-      if (current !== 'ready' || !page || done) return;
-      done = true;
-      void (async () => {
-        await form.create({
-          family: 'signature',
-          name: 'approval',
-          widgets: [{ page, rect: { x: 72, y: 560, width: 220, height: 64 } }],
-        });
-        stage.goToPage(page);
-        const { library } = await stamp.createLibrary('Ada Lovelace', { kind: 'signatures' });
-        const { asset } = await stamp.createAsset({
-          libraryId: library.id,
-          name: 'signature',
-          label: 'Signature',
-          mark: { kind: 'text', text: 'Ada Lovelace', fontFamily: 'times-italic', color: '#1d2b53' },
-        });
-        await signature.sign({ field: toFieldRef('approval'), mark: { assetId: asset.id } });
-      })();
-    },
-    { immediate: true },
-  );
+const annotation = useAnnotation();
+const form = useForm();
+const stage = useStage();
+const signature = useSignature();
+const { signatures } = useSignatureState();
+const status = useFormState((state) => state.status);
+const warning = ref<string | null>(null);
+const made = ref({ comment: false, field: false });
+const signed = computed(() => signatures.value.find((each) => each.signed));
+
+// Where the signature is: the edits go next to it.
+function signatureWidget() {
+  return form.getWidgets(PROVIDER)[0];
 }
 
-useSignedDocument();
-const annotation = useAnnotation();
-const signature = useSignature();
-const pages = usePageList();
-const lastPage = computed(() => pages.value.at(-1)?.ref);
-const { signatures } = useSignatureState();
-const warning = ref<string | null>(null);
-const signed = computed(() => signatures.value[0]);
+// On load: the signatures, in view. Nothing is changed until a button is pressed.
+let revealed = false;
+watch(
+  status,
+  (current) => {
+    if (current !== 'ready' || revealed) return;
+    revealed = true;
+    const widget = signatureWidget();
+    if (widget) stage.reveal(widget.page, { rect: widget.rect });
+  },
+  { immediate: true },
+);
 
 // The moment a change would break a signature once it's saved, as Acrobat warns.
 useSignatureEvent(
@@ -62,27 +46,49 @@ useSignatureEvent(
   },
 );
 
-function drawBox() {
-  if (!lastPage.value) return;
-  void annotation.create(lastPage.value, {
-    subtype: 'square',
-    box: { x: 320, y: 560, width: 140, height: 64 },
-    color: '#e11d48',
-    strokeWidth: 2,
+async function addComment() {
+  const widget = signatureWidget();
+  if (!widget) return;
+  const { rect } = widget;
+  await annotation.create(widget.page, {
+    subtype: 'text',
+    rect: { x: rect.x + rect.width + 6, y: rect.y, width: 20, height: 20 },
+    contents: 'Looks good to us.',
   });
+  made.value.comment = true;
+}
+
+async function addField() {
+  const widget = signatureWidget();
+  if (!widget) return;
+  const { rect } = widget;
+  await form.create({
+    family: 'text',
+    name: 'purchase_order',
+    widgets: [
+      {
+        page: widget.page,
+        rect: { x: rect.x, y: rect.y + rect.height + 36, width: rect.width, height: 24 },
+      },
+    ],
+  });
+  made.value.field = true;
 }
 </script>
 
 <template>
   <div class="toolbar">
-    <button type="button" class="button" :disabled="!signed || !lastPage" @click="drawBox">
-      Draw a box on the page
+    <button type="button" class="button" :disabled="!signed || made.comment" @click="addComment">
+      Add a comment
+    </button>
+    <button type="button" class="button" :disabled="!signed || made.field" @click="addField">
+      Add a form field
     </button>
     <output class="readout">
       {{
         signed
           ? `Signed by ${signed.signer.name}: ${signed.verdict?.summary ?? 'checking…'}`
-          : 'Signing…'
+          : 'Opening…'
       }}
     </output>
     <output v-if="warning" class="warning">{{ warning }}</output>

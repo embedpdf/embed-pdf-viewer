@@ -10,9 +10,9 @@ import './buttons.css';
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin(), commandsPlugin({ commands: standardCommands })];
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/welcome.pdf');
+  return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 // One button, drawn from its command: the label, the shortcut, and whether it can run now.
@@ -37,7 +37,7 @@ function CommandButton({ id }: { id: string }) {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <div className="toolbar">
           <CommandButton id="page:previous" />

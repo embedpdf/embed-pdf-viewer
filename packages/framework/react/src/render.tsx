@@ -72,11 +72,22 @@ export interface RenderLayerProps {
    * never tile even under deep zoom.
    */
   tiles?: boolean;
+  /**
+   * Draw the page's thumbnail instead: one small picture of the whole page,
+   * without tiles, which needs only `doc.render.thumbnail` (a strip of
+   * thumbnails, a page picker).
+   */
+  thumbnail?: boolean;
 }
 
 let warnedTileSize = false;
 
-export function RenderLayer({ annotations, formFields, tiles = true }: RenderLayerProps = {}) {
+export function RenderLayer({
+  annotations,
+  formFields,
+  tiles = true,
+  thumbnail = false,
+}: RenderLayerProps = {}) {
   const page = usePage();
   const render = useCapability(RenderToken);
   // The same object until a setting it reads changes, so a settings change re-renders the layer.
@@ -100,8 +111,10 @@ export function RenderLayer({ annotations, formFields, tiles = true }: RenderLay
   // crossings; under exact mode it tracks the demand and is constant above
   // the budget — so the deep-zoom backdrop never refetches, and the sub-
   // budget range refetches once per settled demand.
+  // A thumbnail asks for one; anything else leaves the option out, as the plugin's default.
+  const asked = thumbnail ? ({ thumbnail: true } as const) : {};
   const sourceKey = useSelector(RenderToken, (render) =>
-    render.getSourceKey(page.ref, { scale: page.transform.renderScale, ...layers }),
+    render.getSourceKey(page.ref, { scale: page.transform.renderScale, ...asked, ...layers }),
   );
 
   useEffect(() => {
@@ -118,6 +131,7 @@ export function RenderLayer({ annotations, formFields, tiles = true }: RenderLay
         // produces this key's canonical request.
         const image = await render.renderSource(page.ref, {
           scale: page.transform.renderScale,
+          ...asked,
           ...layers,
           view: page.view,
           signal: controller.signal,
@@ -159,7 +173,7 @@ export function RenderLayer({ annotations, formFields, tiles = true }: RenderLay
           pointerEvents: 'none',
         }}
       />
-      {tiles && settings.tiles ? <TilePlane parts={parts} /> : null}
+      {tiles && !thumbnail && settings.tiles ? <TilePlane parts={parts} /> : null}
     </>
   );
 }

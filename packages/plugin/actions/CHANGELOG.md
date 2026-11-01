@@ -1,5 +1,21 @@
 # @embedpdf/plugin-actions
 
+## 3.0.0-next.19
+
+## 3.0.0-next.18
+
+## 3.0.0-next.17
+
+## 3.0.0-next.16
+
+### Minor Changes
+
+- [#885](https://github.com/embedpdf/embed-pdf-viewer/pull/885) by [@bobsingor](https://github.com/bobsingor) – An action can come from an outline item: `ActionSource` and `ActionTreeSource` gain `{ kind: 'outline', item }`, and a script an outline item runs sees `event.type` `'Bookmark'`, as in Acrobat.
+
+### Patch Changes
+
+- [#883](https://github.com/embedpdf/embed-pdf-viewer/pull/883) by [@bobsingor](https://github.com/bobsingor) – The document's print actions run around the kernel's print. The plugin registers `ctx.aroundPrint`, so WillPrint and DidPrint run around every print dialog, and a Named Print action or a script's `this.print()` prints through `documents.print()` when the kernel has a printer (a print a script starts without a user's tap stays refused). Without a printer, the UI adapter's `print()` is used as before.
+
 ## 3.0.0-next.15
 
 ### Minor Changes

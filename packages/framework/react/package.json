@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/react",
-  "version": "3.0.0-next.15",
+  "version": "3.0.0-next.19",
   "private": false,
   "description": "React adapter for EmbedPDF v3: one generic reactive binding + structural components (Viewer, Stage, PageView) + headless layers & hooks. The whole framework surface.",
   "type": "module",
@@ -13,6 +13,7 @@
     "./actions": "./src/actions.tsx",
     "./anchored": "./src/anchored.tsx",
     "./annotation": "./src/annotation.tsx",
+    "./attachment": "./src/attachment.ts",
     "./commands": "./src/commands.ts",
     "./fonts": "./src/fonts.ts",
     "./form": "./src/form.tsx",
@@ -58,6 +59,10 @@
       "./annotation": {
         "import": "./dist/annotation.js",
         "require": "./dist/annotation.cjs"
+      },
+      "./attachment": {
+        "import": "./dist/attachment.js",
+        "require": "./dist/attachment.cjs"
       },
       "./commands": {
         "import": "./dist/commands.js",
@@ -168,6 +173,7 @@
     "@embedpdf/core-geometry": "workspace:*",
     "@embedpdf/core": "workspace:*",
     "@embedpdf/plugin-annotation": "workspace:*",
+    "@embedpdf/plugin-attachment": "workspace:*",
     "@embedpdf/plugin-commands": "workspace:*",
     "@embedpdf/plugin-form": "workspace:*",
     "@embedpdf/plugin-i18n": "workspace:*",

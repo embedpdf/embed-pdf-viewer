@@ -37,6 +37,7 @@ export {
   chrome,
   selectedItems,
   textBoxes,
+  textBoxOf,
   selectionBoundsOnPage,
   selectionAnchor,
   selectionKnob,

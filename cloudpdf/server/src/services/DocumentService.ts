@@ -1,8 +1,10 @@
 import type { PageExtractFlatten, PageMeasurementViewport } from '@embedpdf/engine-core/runtime';
 import { randomUUID } from 'node:crypto';
+import { createReadStream } from 'node:fs';
 import { mkdtemp, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { Readable } from 'node:stream';
 
 import {
   EngineError,
@@ -58,6 +60,7 @@ import type { EnginePool } from '../runtime/EnginePool';
 import { signPasswordGrant, verifyPasswordGrant, type PasswordSessionBinding } from '../security';
 import type { BaseFileCache, LocalFileHandle } from '../storage/BaseFileCache';
 import { StorageKeys } from '../storage/keys';
+import { readLayerArtifactHeader } from '../storage/layerArtifact';
 import type { ObjectStore } from '../storage/ObjectStore';
 import type { ServerFonts } from './ServerFonts';
 
@@ -129,6 +132,19 @@ export interface DocumentServiceOptions {
   cdnAccessRequired?: boolean;
   /** The server's fonts: their fingerprint goes in every manifest. */
   serverFonts: ServerFonts;
+  /**
+   * How long a layer's worker session may go unasked before the idle sweep
+   * ({@link DocumentService.closeIdleLayerSessions}) closes it. The next
+   * request reopens it from the durable artifact. Default 10 minutes.
+   */
+  layerSessionIdleMs?: number;
+  /**
+   * Most layer sessions one document keeps open. Opening one more closes the
+   * document's least recently asked-for sessions beyond it — a document with
+   * a layer per visitor would otherwise hold one open PDF per visitor.
+   * Default 32.
+   */
+  maxLayerSessionsPerDoc?: number;
 }
 
 export interface OpenContext {
@@ -154,6 +170,13 @@ export interface OpenContext {
 export interface SavedPdfFile {
   path: string;
   size: number;
+  cleanup(): Promise<void>;
+}
+
+/** A PDF to send: its length, its bytes, and what to release once sent. */
+export interface PdfDownload {
+  size: number;
+  open(): Readable;
   cleanup(): Promise<void>;
 }
 
@@ -230,6 +253,12 @@ export class DocumentService {
    * bytes, so an entry never goes stale.
    */
   private readonly protections = new Map<string, DocumentProtection | null>();
+  /**
+   * Each base version's last object number, by the version's sha, as the
+   * worker reported it on opening the version's bytes: where a layer nobody
+   * changed counts its object numbers from. It belongs to the bytes too.
+   */
+  private readonly baseObjectNumbers = new Map<string, number>();
   private readonly baseHandles = new Map<string, LocalFileHandle>();
   private readonly layerArtifactHandles = new Map<string, LocalFileHandle>();
   /**
@@ -272,6 +301,17 @@ export class DocumentService {
    * engine died.
    */
   private readonly writeAlignGens = new Map<string, number>();
+  /**
+   * When each layer was last asked for (session key → the layer and the
+   * time): what the idle sweep and the per-document cap read to pick the
+   * sessions nobody is using.
+   */
+  private readonly layerTouches = new Map<
+    string,
+    { docId: string; layerName: string; at: number }
+  >();
+  private readonly layerSessionIdleMs: number;
+  private readonly maxLayerSessionsPerDoc: number;
 
   private readonly counters?: EngineCounters;
 
@@ -290,6 +330,8 @@ export class DocumentService {
     this.passwordSessionTtlMs = opts.passwordSessionTtlMs ?? 60 * 60 * 1000;
     this.passwordSessionRenewalTtlMs = opts.passwordSessionRenewalTtlMs ?? 60 * 60 * 1000;
     this.cdnAccessRequired = opts.cdnAccessRequired ?? false;
+    this.layerSessionIdleMs = opts.layerSessionIdleMs ?? 10 * 60 * 1000;
+    this.maxLayerSessionsPerDoc = opts.maxLayerSessionsPerDoc ?? 32;
   }
 
   /**
@@ -512,7 +554,7 @@ export class DocumentService {
       if (result.tag !== 'open') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected open payload: ${result.tag}`);
       }
-      this.recordProtection(baseSha, result);
+      this.recordOpened(baseSha, result);
       const head = buildHead(row, this.cdnAccessRequired);
       this.replaceBaseHandle(docId, baseSha, handle);
       handle = null;
@@ -561,7 +603,19 @@ export class DocumentService {
     // session, so eagerly warming it would resurrect the
     // session-per-visitor explosion this policy avoids.
     if (layer) void this.warmLayerIfOwned(ctx, docId, layerName).catch(() => undefined);
-    return layer ? { ...head, docVersion: layer.docVersion } : head;
+    if (!layer) return head;
+    // A layer's head is over its own base: the upload, or the version its
+    // last signature made.
+    if (layer.baseSha === null || layer.baseSha === head.baseSha) {
+      return { ...head, docVersion: layer.docVersion };
+    }
+    const base = await this.layerState.baseVersionFacts(docId, layer.baseSha, null);
+    return {
+      ...head,
+      baseSha: base.sha256,
+      storageSizeBytes: base.byteLength,
+      docVersion: layer.docVersion,
+    };
   }
 
   /** Fire-and-forget half of the plane-scoped warming policy (see getLayerHead). */
@@ -633,8 +687,8 @@ export class DocumentService {
       this.loadBasePages(ctx, docId),
     );
     const pages = await this.layerState.ensureLayerPagesFromBase({ layerId: layer.id, docId });
-    // The layer's own base version (law 2): behind the head once a sibling
-    // published, until the layer is rebased.
+    // The layer's own base version (law 2): the upload, or the version its
+    // last signature made.
     const layerBaseSha = layer.baseSha ?? head.baseSha;
     const layerVersion =
       layerBaseSha === head.baseSha
@@ -643,11 +697,11 @@ export class DocumentService {
     // Plane scopes: annotation writes own `annotations` only (renders/
     // text/geometry keep sharing); move/rotate own `layout` only (normalized
     // artifacts survive); flatten/redaction/page-set changes own `content`;
-    // a layer behind the head owns everything.
+    // a layer over its own signed version owns everything.
     return this.layerState.buildLayerManifest(
       docId,
       layerVersion,
-      await this.protectionOf(ctx, row, layerBaseSha),
+      await this.protectionOf(ctx, row, layerBaseSha, layerName),
       layerName,
       layer,
       pages,
@@ -754,6 +808,7 @@ export class DocumentService {
     layerName: string,
     password: string | null = null,
   ): Promise<void> {
+    this.touchLayer(docId, layerName);
     // Park behind any in-flight write first: its uncommitted worker state
     // must never be served as a clean materialization, and the layer row
     // must be read after the write settles or the freshness compare would
@@ -783,6 +838,7 @@ export class DocumentService {
     opts: { forWrite?: boolean } = {},
   ): Promise<void> {
     const key = layerSessionKey(docId, layerName);
+    this.touchLayer(docId, layerName);
     // Write alignment records the engine generation the aligned session
     // lives under — the datum advanceLayerSession later compares against
     // the then-current generation to refuse blessing a session that was
@@ -811,6 +867,43 @@ export class DocumentService {
     return this.layerOpenObjectNumbers.get(layerSessionKey(docId, layerName));
   }
 
+  /**
+   * The version a layer nobody changed reads (the head), and its last object
+   * number: as the document's base session reported it on opening, so
+   * nothing opens for the layer. A base session that opened locked reports
+   * none; then the layer's own session opens, still with no row made.
+   */
+  async headObjectNumbers(
+    ctx: OpenContext,
+    docId: string,
+    layerName: string,
+  ): Promise<{ baseSha: string; lastObjectNumber: number }> {
+    const row = await this.requireReadyRow(ctx, docId);
+    const head = await this.openOnPool(ctx, docId, await this.passwordForOpen(ctx, row, layerName));
+    const known = this.baseObjectNumbers.get(head.baseSha);
+    if (known !== undefined) return { baseSha: head.baseSha, lastObjectNumber: known };
+    await this.ensureLayerOnPool(ctx, docId, layerName);
+    const opened = this.lastObjectNumberAtOpen(docId, layerName);
+    if (opened === undefined) {
+      throw new EngineError(EngineErrorCode.Unknown, `layer ${layerName} of ${docId} is not open`);
+    }
+    return { baseSha: head.baseSha, lastObjectNumber: opened };
+  }
+
+  /**
+   * A deleted layer: wait for what is in flight on it, close its worker
+   * session on this replica and forget what was kept for it. Its row
+   * already refuses every later request; another replica's session closes
+   * when it goes idle.
+   */
+  async forgetLayer(docId: string, layerName: string): Promise<void> {
+    const key = layerSessionKey(docId, layerName);
+    await this.awaitLayerWriteSettled(key);
+    await this.layerOpens.get(key)?.catch(() => undefined);
+    this.layerTouches.delete(key);
+    await this.closeLayerOnPool(docId, layerName);
+  }
+
   /** Mark a layer session stale: the next fresh-ensure reloads it. */
   invalidateLayerSession(docId: string, layerName: string): void {
     this.layerSessionVersions.delete(layerSessionKey(docId, layerName));
@@ -827,10 +920,13 @@ export class DocumentService {
     let settle!: () => void;
     const marker = new Promise<void>((resolve) => (settle = resolve));
     this.layerWritesInFlight.set(key, marker);
+    this.touchLayer(docId, layerName);
     return () => {
       if (this.layerWritesInFlight.get(key) === marker) {
         this.layerWritesInFlight.delete(key);
       }
+      // A long write ends as fresh as it started: idle counts from here.
+      this.touchLayer(docId, layerName);
       settle();
     };
   }
@@ -928,6 +1024,81 @@ export class DocumentService {
       }
     }
     this.releaseLayerArtifactHandle(key);
+  }
+
+  /**
+   * The idle sweep: close every layer session nobody asked for in
+   * `layerSessionIdleMs`. A session with a write in flight, or one opening
+   * or closing, stays. A request that races the close finds the session
+   * gone and reopens it: reads through `runReadWithReopen`, writes through
+   * the rebase retry, both on `DocNotOpen`. Returns how many it closed.
+   */
+  async closeIdleLayerSessions(now: number): Promise<number> {
+    const closing: Promise<void>[] = [];
+    for (const [key, touch] of this.layerTouches) {
+      if (now - touch.at < this.layerSessionIdleMs) continue;
+      if (!this.layerSessionVersions.has(key)) {
+        // Asked for once, never (or no longer) open: nothing to close.
+        if (!this.layerOpens.has(key)) this.layerTouches.delete(key);
+        continue;
+      }
+      if (this.canCloseLayerSession(key)) {
+        closing.push(this.closeLayerSession(key, touch.docId, touch.layerName));
+      }
+    }
+    await Promise.all(closing);
+    return closing.length;
+  }
+
+  /**
+   * Mark a layer as just asked for: the idle sweep and the per-document cap
+   * close the longest-unasked first.
+   */
+  private touchLayer(docId: string, layerName: string): void {
+    this.layerTouches.set(layerSessionKey(docId, layerName), { docId, layerName, at: Date.now() });
+  }
+
+  /** A live session nothing is writing, opening or closing. */
+  private canCloseLayerSession(key: string): boolean {
+    return (
+      this.layerSessionVersions.has(key) &&
+      !this.layerWritesInFlight.has(key) &&
+      !this.layerOpens.has(key)
+    );
+  }
+
+  /**
+   * Close one layer session on purpose (idle or over the cap). Registered as
+   * the key's open-in-flight, so a request that arrives meanwhile waits for
+   * the close and then reopens instead of dispatching into a closing session.
+   */
+  private closeLayerSession(key: string, docId: string, layerName: string): Promise<void> {
+    this.layerTouches.delete(key);
+    const closing: Promise<void> = this.closeLayerOnPool(docId, layerName).finally(() => {
+      if (this.layerOpens.get(key) === closing) this.layerOpens.delete(key);
+    });
+    this.layerOpens.set(key, closing);
+    return closing;
+  }
+
+  /**
+   * Keep a document within `maxLayerSessionsPerDoc` after `opened` joined it:
+   * close its longest-unasked sessions beyond the cap. Not awaited — the
+   * request that opened a session doesn't wait for others to close. A close
+   * that fails leaves its worker session to that layer's next reload, which
+   * closes before it opens.
+   */
+  private trimLayerSessions(docId: string, opened: string): void {
+    const live = [...this.layerTouches].filter(
+      ([key, touch]) => touch.docId === docId && this.layerSessionVersions.has(key),
+    );
+    let excess = live.length - this.maxLayerSessionsPerDoc;
+    for (const [key, touch] of live.sort(([, a], [, b]) => a.at - b.at)) {
+      if (excess <= 0) return;
+      if (key === opened || !this.canCloseLayerSession(key)) continue;
+      void this.closeLayerSession(key, docId, touch.layerName).catch(() => undefined);
+      excess -= 1;
+    }
   }
 
   async readPageViewports(
@@ -1764,6 +1935,77 @@ export class DocumentService {
     return new Uint8Array(result.bytes);
   }
 
+  /**
+   * The layer's PDF saved incrementally, without the engine: its base
+   * version's file followed by the delta its artifact stores. A layer opens
+   * exactly so, so this is the document the engine sees, and a signed
+   * file's bytes stay as they were stored. The caller's document password
+   * is checked as an open checks it, unless a download link was made by a
+   * caller who passed that check (`passwordChecked`). `null` when the
+   * artifact is one this server doesn't read: the engine saves the layer
+   * then.
+   */
+  async incrementalLayerDownload(
+    ctx: OpenContext,
+    docId: string,
+    layerName: string,
+    opts: { passwordChecked?: boolean } = {},
+  ): Promise<PdfDownload | null> {
+    const row = await this.requireReadyRow(ctx, docId);
+    if (!opts.passwordChecked) await this.passwordForOpen(ctx, row, layerName);
+    const layer = await this.layerState.repos.layers.findByDocAndName(docId, layerName);
+    const baseSha = layer?.baseSha ?? requireBaseSha(row);
+    const base = await this.acquireBaseFile(row, baseSha);
+    let artifact: LocalFileHandle | null = null;
+    const release = () => {
+      base.release();
+      artifact?.release();
+    };
+    try {
+      const parts: FileRange[] = [{ path: base.path, start: 0, size: base.size }];
+      artifact = layer ? (await this.readLayerOpenSource(layer)).handle : null;
+      if (artifact) {
+        const header = await readLayerArtifactHeader(artifact.path, artifact.size);
+        if (!header) {
+          release();
+          return null;
+        }
+        if (header.baseSha256 !== baseSha || header.baseSize !== base.size) {
+          throw new EngineError(
+            EngineErrorCode.MalformedPdf,
+            `layer artifact ${layer!.currentArtifactKey} is not a delta of base ${baseSha}`,
+          );
+        }
+        parts.push({ path: artifact.path, start: header.deltaOffset, size: header.deltaSize });
+      }
+      let released = false;
+      return {
+        size: parts.reduce((total, part) => total + part.size, 0),
+        open: () => readFileRanges(parts),
+        async cleanup() {
+          if (released) return;
+          released = true;
+          release();
+        },
+      };
+    } catch (err) {
+      release();
+      throw err;
+    }
+  }
+
+  /** Check the caller's document password as an open checks it (`DocPasswordRequired` without it). */
+  async checkOpenPassword(ctx: OpenContext, docId: string, layerName: string): Promise<void> {
+    await this.passwordForOpen(ctx, await this.requireReadyRow(ctx, docId), layerName);
+  }
+
+  /** The layer's current `docVersion` (the head's for a layer nobody wrote), read without opening anything. */
+  async layerDocVersion(ctx: OpenContext, docId: string, layerName: string): Promise<number> {
+    const row = await this.requireReadyRow(ctx, docId);
+    const layer = await this.layerState.repos.layers.findByDocAndName(docId, layerName);
+    return layer?.docVersion ?? row.docVersion;
+  }
+
   async saveLayerDownloadToTemp(
     ctx: OpenContext,
     docId: string,
@@ -2055,12 +2297,14 @@ export class DocumentService {
     inflightOpens: number;
     pinnedBaseFiles: number;
     pinnedLayerArtifacts: number;
+    openLayerSessions: number;
   } {
     return {
       openHeads: this.heads.size,
       inflightOpens: this.opens.size,
       pinnedBaseFiles: this.baseHandles.size,
       pinnedLayerArtifacts: this.layerArtifactHandles.size,
+      openLayerSessions: this.layerSessionVersions.size,
     };
   }
 
@@ -2090,10 +2334,9 @@ export class DocumentService {
 
     const sessionKey = layerSessionKey(docId, layerName);
     const layer = await this.layerState.repos.layers.findByDocAndName(docId, layerName);
-    // Law 2: a layer session materializes over the layer's base version,
-    // which sits behind the head once a sibling published. Its file is
-    // held beside the head's, keyed by sha, until the document closes or
-    // a publish forgets every session over the old base.
+    // Law 2: a layer session materializes over the layer's base version:
+    // the upload, or the version its last signature made. Its file is held
+    // beside the upload's, keyed by sha, until the document closes.
     const layerBaseSha = layer?.baseSha ?? head.baseSha;
     const handle = await this.baseHandleFor(row, layerBaseSha);
     let layerHandle: LocalFileHandle | null = null;
@@ -2137,6 +2380,7 @@ export class DocumentService {
       // The fence entry: this session is a materialization of exactly the
       // layer version whose artifact was just opened (0 = fresh, no row).
       this.layerSessionVersions.set(sessionKey, layer?.currentVersion ?? 0);
+      this.trimLayerSessions(docId, sessionKey);
     } finally {
       layerHandle?.release();
     }
@@ -2239,28 +2483,50 @@ export class DocumentService {
     return this.cache.acquire({ sha, key });
   }
 
-  /** The document's version catalog, oldest first, and its head. */
+  /**
+   * A layer's versions, oldest first: the upload, then the ones its
+   * signatures made; and its base, the latest of them.
+   */
   async listVersions(
     ctx: OpenContext,
     docId: string,
-  ): Promise<{ head: string; versions: BaseVersionRow[] }> {
+    layerName: string,
+  ): Promise<{ baseSha: string; versions: BaseVersionRow[] }> {
     const row = await this.requireReadyRow(ctx, docId);
-    const head = requireBaseSha(row);
-    const versions = await this.baseVersions.listForDocument(docId);
+    const upload = requireBaseSha(row);
+    const layer = await this.layerState.repos.layers.findByDocAndName(docId, layerName);
+    const versions = await this.baseVersions.listForLayer(docId, layer?.id ?? null);
+    const baseSha = layer?.baseSha ?? upload;
     if (versions.length === 0) {
-      // Committed before the catalog existed and never signed: version 1 is the head itself.
-      return { head, versions: [legacyVersionRow(row, head)] };
+      // Committed before the catalog existed and never signed: version 1 is the upload itself.
+      return { baseSha, versions: [legacyVersionRow(row, upload)] };
     }
-    return { head, versions };
+    return { baseSha, versions };
   }
 
-  /** One catalogued version of the document; `NotFound` for a sha that is not one of its versions. */
-  async requireVersion(ctx: OpenContext, docId: string, sha: string): Promise<BaseVersionRow> {
+  /**
+   * One version a layer can read: the upload, or one its own signatures
+   * made. `NotFound` for any other sha, another layer's versions included.
+   */
+  async requireVersion(
+    ctx: OpenContext,
+    docId: string,
+    layerName: string,
+    sha: string,
+  ): Promise<BaseVersionRow> {
     const row = await this.requireReadyRow(ctx, docId);
     const version = await this.baseVersions.find(docId, sha);
-    if (version) return version;
-    if (row.baseSha === sha) return legacyVersionRow(row, sha);
-    throw new EngineError(EngineErrorCode.NotFound, `${sha} is not a version of ${docId}`);
+    if (version?.producerKind === 'upload') return version;
+    if (version) {
+      const layer = await this.layerState.repos.layers.findByDocAndName(docId, layerName);
+      if (layer && version.layerId === layer.id) return version;
+    } else if (row.baseSha === sha) {
+      return legacyVersionRow(row, sha);
+    }
+    throw new EngineError(
+      EngineErrorCode.NotFound,
+      `${sha} is not a version of layer ${layerName} of ${docId}`,
+    );
   }
 
   /**
@@ -2273,26 +2539,28 @@ export class DocumentService {
   async readVersionOnPool(
     ctx: OpenContext,
     docId: string,
+    layerName: string,
     sha: string,
     build: (sessionId: string, jobId: WorkerJobId) => WirePack<WorkerRequest>,
     signal?: AbortSignal,
   ): Promise<WorkerResultPayload> {
-    return this.withVersionSession(ctx, docId, sha, signal, (sessionId) =>
+    return this.withVersionSession(ctx, docId, layerName, sha, signal, (sessionId) =>
       this.pool.run(sessionId, (jobId: WorkerJobId) => build(sessionId, jobId), signal),
     );
   }
 
-  /** `sha`'s bytes opened into a private transient session for `run`, then closed. */
+  /** `sha`'s bytes, a version of `layerName`, opened into a private transient session for `run`, then closed. */
   private async withVersionSession<T>(
     ctx: OpenContext,
     docId: string,
+    layerName: string,
     sha: string,
     signal: AbortSignal | undefined,
     run: (sessionId: string) => Promise<T>,
   ): Promise<T> {
     const row = await this.requireReadyRow(ctx, docId);
-    const version = await this.requireVersion(ctx, docId, sha);
-    const password = await this.passwordForOpen(ctx, row, pinnedLayerName(ctx));
+    const version = await this.requireVersion(ctx, docId, layerName, sha);
+    const password = await this.passwordForOpen(ctx, row, layerName);
     const handle = await this.acquireBaseFile(row, version.sha256);
     const sessionId = `${docId}#${version.sha256}#${randomUUID()}`;
     try {
@@ -2316,7 +2584,7 @@ export class DocumentService {
       if (opened.tag !== 'open') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected open payload: ${opened.tag}`);
       }
-      this.recordProtection(version.sha256, opened);
+      this.recordOpened(version.sha256, opened);
       return await run(sessionId);
     } finally {
       await this.pool.close(sessionId).catch(() => undefined);
@@ -2336,7 +2604,7 @@ export class DocumentService {
   ): Promise<DocumentProtection | null> {
     const row = await this.requireReadyRow(ctx, docId);
     const layer = await this.layerState.repos.layers.findByDocAndName(docId, layerName);
-    return this.protectionOf(ctx, row, layer?.baseSha ?? requireBaseSha(row));
+    return this.protectionOf(ctx, row, layer?.baseSha ?? requireBaseSha(row), layerName);
   }
 
   /** What a version a signing just published forbids, as the signing reported it. */
@@ -2345,29 +2613,36 @@ export class DocumentService {
   }
 
   /**
-   * `sha`'s protection: known once the worker has opened its bytes. The head
-   * is opened as every read opens it; a version behind the head (a layer a
-   * sibling's signature left behind) is opened on its own.
+   * `sha`'s protection: known once the worker has opened its bytes. The
+   * upload is opened as every read opens it; a version a layer's signature
+   * made is opened on its own, as that layer's.
    */
   private async protectionOf(
     ctx: OpenContext,
     row: DocumentRow,
     sha: string,
+    layerName: string = pinnedLayerName(ctx),
   ): Promise<DocumentProtection | null> {
     const known = this.protections.get(sha);
     if (known !== undefined) return known;
     if (sha === row.baseSha) {
       await this.openOnPool(ctx, row.id);
     } else {
-      await this.withVersionSession(ctx, row.id, sha, undefined, async () => undefined);
+      await this.withVersionSession(ctx, row.id, layerName, sha, undefined, async () => undefined);
     }
     // An open that couldn't read the signatures (a locked one) reports none.
     return this.protections.get(sha) ?? null;
   }
 
-  /** Keep what an open of `sha`'s bytes reported its signatures forbid. */
-  private recordProtection(sha: string, opened: { protection?: DocumentProtection | null }): void {
+  /** Keep what an open of `sha`'s bytes reported: what its signatures forbid, its last object number. */
+  private recordOpened(
+    sha: string,
+    opened: { protection?: DocumentProtection | null; lastObjectNumber?: number },
+  ): void {
     if (opened.protection !== undefined) this.protections.set(sha, opened.protection);
+    if (opened.lastObjectNumber !== undefined) {
+      this.baseObjectNumbers.set(sha, opened.lastObjectNumber);
+    }
   }
 
   /** The local file of one base version of a document the caller may read (signing rebuilds a candidate from it). */
@@ -2380,47 +2655,6 @@ export class DocumentService {
   async passwordFor(ctx: OpenContext, docId: string, layerName: string): Promise<string | null> {
     const row = await this.requireReadyRow(ctx, docId);
     return this.passwordForOpen(ctx, row, layerName);
-  }
-
-  /**
-   * The binding and JWT unlock key needed to rebind the caller's session
-   * inside the publishing transaction. This context contains no PDF
-   * password: the repository decrypts and re-encrypts it under the new
-   * version's binding. `null` when the document needs no password session
-   * (unencrypted, or an api token that supplies the password per request).
-   */
-  async sessionRebindContext(
-    ctx: OpenContext,
-    docId: string,
-    layerName: string,
-  ): Promise<{ binding: PasswordSessionBinding; unlockKey: string } | null> {
-    const row = await this.requireReadyRow(ctx, docId);
-    if (!requiresPasswordSession(row) || ctx.sub === 'api-token' || !this.passwordSessions)
-      return null;
-    return {
-      binding: this.passwordSessionBinding(ctx, row, layerName),
-      unlockKey: this.requireUnlockKey(ctx),
-    };
-  }
-
-  /**
-   * After a version was published (a signature completed): every session
-   * over the old base is garbage — the head, the layer sessions, the
-   * held files. The next open routes by the new sha. Other replicas hear
-   * it through the realtime bus; correctness never depends on that (a
-   * stale head only makes a later prepare record a stale fence, which
-   * the completion rejects).
-   */
-  async onBaseVersionPublished(docId: string): Promise<void> {
-    this.heads.delete(docId);
-    this.forgetLayerSessions(docId);
-    try {
-      await this.pool.close(docId);
-    } catch {
-      // Best effort: an evicted document is already gone from the pool.
-    } finally {
-      this.releaseBaseHandles(docId);
-    }
   }
 
   private replaceLayerArtifactHandle(key: string, handle: LocalFileHandle | null): void {
@@ -2485,6 +2719,7 @@ function legacyVersionRow(row: DocumentRow, sha: string): BaseVersionRow {
   return {
     tenantId: row.tenantId,
     docId: row.id,
+    layerId: null,
     sha256: sha,
     byteLength: row.storageSizeBytes ?? 0,
     number: 1,
@@ -2614,3 +2849,21 @@ function safeFilePart(value: string): string {
 }
 
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
+/** A byte range of a local file. */
+interface FileRange {
+  path: string;
+  start: number;
+  size: number;
+}
+
+/** The ranges' bytes, one after the other, as one stream. */
+function readFileRanges(parts: readonly FileRange[]): Readable {
+  return Readable.from(
+    (async function* () {
+      for (const part of parts) {
+        if (part.size === 0) continue;
+        yield* createReadStream(part.path, { start: part.start, end: part.start + part.size - 1 });
+      }
+    })(),
+  );
+}

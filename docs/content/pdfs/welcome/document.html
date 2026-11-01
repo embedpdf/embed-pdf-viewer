@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Documents belong on the web</title>
+<link rel="stylesheet" href="../shared/document.css">
+</head>
+<body>
+<section class="page" id="cover" style="display:flex; flex-direction:column; background:#FFFFFF; position:relative; overflow:hidden;">
+    <div style="flex:none; padding:64px 64px 0;">
+      <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:24px;">
+        <img data-brand="logo" src="../shared/embedpdf-logo.svg" alt="EmbedPDF" style="height:40px; display:block;">
+        <div style="font:700 13px/1.2 var(--font-display); letter-spacing:0.08em; text-transform:uppercase; color:var(--color-fg-muted); text-align:right; padding-top:6px;" data-brand="tagline">Open source<br>PDF solutions</div>
+      </div>
+
+      <div style="position:absolute; top:196px; right:64px; display:grid; grid-template-columns:repeat(4,5px); gap:20px;">
+        <div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div>
+        <div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div>
+        <div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div>
+        <div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div>
+        <div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div>
+        <div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div>
+        <div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div>
+        <div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div>
+        <div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div>
+        <div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div>
+        <div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div>
+        <div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div>
+        <div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div>
+        <div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div>
+        <div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div>
+        <div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div>
+      </div>
+
+      <h1 style="font:800 70px/0.98 var(--font-display); letter-spacing:-0.028em; color:var(--color-ink); margin:64px 0 0; max-width:660px;">Documents<br>belong <span style="display:block; color:var(--color-accent);">on the web.</span></h1>
+      <div style="width:114px; height:10px; border-radius:5px; background:var(--color-accent-strong); margin-top:22px;"></div>
+      <p style="font:400 21px/1.45 var(--font-body); color:var(--color-fg-muted); margin:22px 0 0; max-width:none;">A short field guide to the past,<br>present and future of PDF.</p>
+
+      <div style="font:700 13px/1.2 var(--font-display); letter-spacing:0.08em; text-transform:uppercase; color:var(--color-accent); margin-top:26px;">An editorial demo document for <span data-brand="name">EmbedPDF</span></div>
+    </div>
+
+    <div style="flex:1; min-height:0; position:relative; margin:32px 0 56px; overflow:hidden;">
+      <img data-brand="viewer" src="cover-viewer.svg" alt="The EmbedPDF viewer" style="position:absolute; left:50%; top:-47px; transform:translateX(-50%); width:90%; display:block;">
+    </div>
+  </section>
+
+  <section class="page" id="origins" style="display:flex; flex-direction:column; padding:52px 64px; background:#FFFFFF; position:relative;">
+    <div style="position:absolute; top:104px; right:104px; display:grid; grid-template-columns:repeat(4,5px); gap:20px;">
+      <div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div><div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div><div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div><div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div>
+      <div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div><div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div><div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div><div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div>
+      <div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div><div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div><div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div><div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div>
+      <div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div><div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div><div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div><div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div>
+    </div>
+
+    <div style="flex:none; display:flex; align-items:center; gap:10px; align-self:flex-start; background:var(--color-accent-tint); border-radius:999px; padding:9px 18px 9px 14px;">
+      <div style="display:grid; grid-template-columns:repeat(3,3px); gap:3px;">
+        <div style="width:3px; height:3px; border-radius:50%; background:var(--color-accent);"></div><div style="width:3px; height:3px; border-radius:50%; background:var(--color-accent);"></div><div style="width:3px; height:3px; border-radius:50%; background:var(--color-accent);"></div>
+        <div style="width:3px; height:3px; border-radius:50%; background:var(--color-accent);"></div><div style="width:3px; height:3px; border-radius:50%; background:var(--color-accent);"></div><div style="width:3px; height:3px; border-radius:50%; background:var(--color-accent);"></div>
+        <div style="width:3px; height:3px; border-radius:50%; background:var(--color-accent);"></div><div style="width:3px; height:3px; border-radius:50%; background:var(--color-accent);"></div><div style="width:3px; height:3px; border-radius:50%; background:var(--color-accent);"></div>
+      </div>
+      <div style="font:700 13px/1 var(--font-display); letter-spacing:0.1em; text-transform:uppercase; color:var(--color-accent);">Origins</div>
+    </div>
+
+    <h2 style="font:800 48px/1.04 var(--font-display); letter-spacing:-0.028em; color:var(--color-ink); margin:18px 0 0;">A format<br><span style="white-space:nowrap; color:var(--color-accent);">from another era</span></h2>
+    <div style="flex:none; width:68px; height:8px; border-radius:4px; background:var(--color-accent-strong); margin-top:12px;"></div>
+
+    <div style="flex:none; display:flex; align-items:center; gap:28px; margin-top:14px;">
+      <div style="flex:none; width:320px;">
+        <p style="font:400 21px/1.5 var(--font-body); color:var(--color-fg-muted); margin:0; text-wrap:pretty;">PDF was born out of a simple but stubborn challenge: how do you share a document and keep it looking exactly right, everywhere?</p>
+      </div>
+      <div style="flex:1; min-width:0; margin-right:-40px;">
+        <img src="origins-illustration.svg" alt="A print-era document translated into a browser view" style="width:100%; display:block;">
+      </div>
+    </div>
+
+    <div style="flex:none; display:grid; grid-template-columns:1fr 1fr; gap:32px; margin-top:18px;">
+      <div>
+        <p style="font:400 14px/1.62 var(--font-body); color:var(--color-fg); margin:0; text-wrap:pretty;">In the late 1980s, moving a document between two computers was a gamble. Fonts went missing, layouts shifted, colours drifted. What printed on one machine rarely matched what appeared on another.</p>
+        <p style="font:400 14px/1.62 var(--font-body); color:var(--color-fg); margin:14px 0 0; text-wrap:pretty;">Adobe co-founder John Warnock set out to fix that. The Portable Document Format, introduced in 1993, captured a page as a precise description that was independent of application, operating system and device. It embedded its fonts, carried vector art, and mapped to print with exact fidelity.</p>
+      </div>
+      <div>
+        <p style="font:400 14px/1.62 var(--font-body); color:var(--color-fg); margin:0; text-wrap:pretty;">It worked. PDF became the dependable way to send contracts, manuals, reports and forms: anything that had to look professional and stay that way.</p>
+        <div style="background:var(--color-accent-tint); border-radius:18px; padding:20px 22px; margin-top:28px;">
+          <div style="display:flex; align-items:flex-start; gap:14px;">
+            <div style="flex:none; font:800 58px/0.62 var(--font-display); color:var(--color-accent-soft);">&ldquo;</div>
+            <div>
+              <p style="font:600 17px/1.4 var(--font-display); letter-spacing:-0.012em; color:var(--color-ink); margin:0; text-wrap:pretty;">The goal was simple: create a digital document that looks the same everywhere.</p>
+              <div style="font:400 14px/1.4 var(--font-body); color:var(--color-accent); margin-top:12px;">John Warnock, Adobe co-founder</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:auto; padding-top:26px;">
+      <div style="position:relative; display:flex; align-items:center; gap:18px; background:var(--color-bg-soft); border:1px solid var(--color-border-soft); border-radius:20px; padding:16px 24px; overflow:hidden;">
+        <div style="flex:none; width:44px; height:44px; border-radius:50%; background:var(--color-accent-tint); display:flex; align-items:center; justify-content:center;">
+          <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V4h16v3"></path><path d="M9 20h6"></path><path d="M12 4v16"></path></svg>
+        </div>
+        <div style="max-width:470px;">
+          <div style="font:700 16px/1.3 var(--font-display); color:var(--color-accent);">Real text, not a picture.</div>
+          <div style="font:400 14px/1.5 var(--font-body); color:var(--color-fg-muted); margin-top:3px;">Every word here is text, set in the font it was printed with,<br>so it can be searched and copied.</div>
+        </div>
+        <div style="position:absolute; right:24px; top:50%; transform:translateY(-50%); display:grid; grid-template-columns:repeat(4,4px); gap:9px;">
+          <div style="width:4px; height:4px; border-radius:50%; background:#ABC9FD;"></div><div style="width:4px; height:4px; border-radius:50%; background:#ABC9FD;"></div><div style="width:4px; height:4px; border-radius:50%; background:#ABC9FD;"></div><div style="width:4px; height:4px; border-radius:50%; background:#ABC9FD;"></div>
+          <div style="width:4px; height:4px; border-radius:50%; background:#ABC9FD;"></div><div style="width:4px; height:4px; border-radius:50%; background:#ABC9FD;"></div><div style="width:4px; height:4px; border-radius:50%; background:#ABC9FD;"></div><div style="width:4px; height:4px; border-radius:50%; background:#ABC9FD;"></div>
+          <div style="width:4px; height:4px; border-radius:50%; background:#ABC9FD;"></div><div style="width:4px; height:4px; border-radius:50%; background:#ABC9FD;"></div><div style="width:4px; height:4px; border-radius:50%; background:#ABC9FD;"></div><div style="width:4px; height:4px; border-radius:50%; background:#ABC9FD;"></div>
+        </div>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; align-items:baseline; margin-top:16px; padding-top:14px; border-top:1px solid var(--color-border); font:400 14px/1.4 var(--font-body); color:var(--color-fg-muted);">
+        <span>Inside the PDF</span>
+        <span style="font:800 15px/1.2 var(--font-display); color:var(--color-ink);">02</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="page" id="timeline" style="display:flex; flex-direction:column; padding:52px 64px; background:#FFFFFF; position:relative;">
+    <div style="position:absolute; top:150px; right:104px; display:grid; grid-template-columns:repeat(4,5px); gap:20px;">
+      <div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div>
+      <div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div>
+      <div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div>
+      <div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div>
+      <div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div>
+      <div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div>
+      <div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div>
+      <div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div>
+      <div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div>
+      <div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div>
+      <div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div>
+      <div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div>
+      <div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div>
+      <div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div>
+      <div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div>
+      <div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div>
+    </div>
+
+    <div style="flex:none; display:flex; align-items:center; gap:10px; align-self:flex-start; background:var(--color-accent-tint); border-radius:999px; padding:9px 18px 9px 14px;">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6v6l4 2"></path><circle cx="12" cy="12" r="10"></circle></svg>
+      <div style="font:700 13px/1 var(--font-display); letter-spacing:0.1em; text-transform:uppercase; color:var(--color-accent);">Timeline</div>
+    </div>
+
+    <h2 style="font:800 48px/1.04 var(--font-display); letter-spacing:-0.028em; color:var(--color-ink); margin:18px 0 0;">From paper<br>to <span style="color:var(--color-accent);">pixels.</span></h2>
+    <div style="flex:none; width:68px; height:8px; border-radius:4px; background:var(--color-accent-strong); margin-top:12px;"></div>
+    <p style="font:400 19px/1.5 var(--font-body); color:var(--color-fg-muted); margin:16px 0 0;">Key moments that shaped the way<br>we create, share and experience documents.</p>
+
+    <div style="flex:none; position:relative; display:flex; flex-direction:column; gap:9px; margin-top:30px;">
+      <div style="position:absolute; left:12px; top:24px; bottom:24px; z-index:0; border-left:1.5px dashed var(--color-accent-soft); opacity:0.6;"></div>
+      <div style="display:flex; align-items:center; gap:0;">
+        <div style="flex:none; width:26px; margin-right:16px; position:relative; z-index:1; display:flex; justify-content:center;">
+          <div style="width:26px; height:26px; border-radius:50%; background:#FFFFFF; display:flex; align-items:center; justify-content:center;"><div style="width:13px; height:13px; box-sizing:border-box; border-radius:50%; background:var(--color-accent-soft); border:3px solid #FFFFFF; box-shadow:0 0 0 1.5px var(--color-accent-soft);"></div></div>
+        </div>
+        <div style="flex:none; width:104px; font:700 15px/1.2 var(--font-display); letter-spacing:-0.01em; color:var(--color-accent-soft);">1980s</div>
+        <div style="flex:1; display:flex; align-items:center; gap:14px; background:var(--color-bg-soft); border:1px solid var(--color-border-soft); border-radius:16px; padding:9px 16px;">
+          <div style="flex:none; width:38px; height:38px; border-radius:11px; background:var(--color-accent-tint); display:flex; align-items:center; justify-content:center;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"></path><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"></path><path d="M7 3v4a1 1 0 0 0 1 1h7"></path></svg>
+          </div>
+          <div>
+            <div style="font:700 16px/1.25 var(--font-display); letter-spacing:-0.01em; color:var(--color-ink);">Early digital documents</div>
+            <div style="font:400 12.5px/1.5 var(--font-body); color:var(--color-fg-muted); margin-top:2px; text-wrap:pretty;">Word processors and portable formats emerge, but compatibility remains a challenge.</div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex; align-items:center; gap:0;">
+        <div style="flex:none; width:26px; margin-right:16px; position:relative; z-index:1; display:flex; justify-content:center;">
+          <div style="width:26px; height:26px; border-radius:50%; background:#FFFFFF; display:flex; align-items:center; justify-content:center;"><div style="width:13px; height:13px; box-sizing:border-box; border-radius:50%; background:var(--color-accent-soft); border:3px solid #FFFFFF; box-shadow:0 0 0 1.5px var(--color-accent-soft);"></div></div>
+        </div>
+        <div style="flex:none; width:104px; font:700 15px/1.2 var(--font-display); letter-spacing:-0.01em; color:var(--color-accent-soft);">1993</div>
+        <div style="flex:1; display:flex; align-items:center; gap:14px; background:var(--color-bg-soft); border:1px solid var(--color-border-soft); border-radius:16px; padding:9px 16px;">
+          <div style="flex:none; width:38px; height:38px; border-radius:11px; background:var(--color-accent-tint); display:flex; align-items:center; justify-content:center;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M10 9H8"></path><path d="M16 13H8"></path><path d="M16 17H8"></path></svg>
+          </div>
+          <div>
+            <div style="font:700 16px/1.25 var(--font-display); letter-spacing:-0.01em; color:var(--color-ink);">PDF is born</div>
+            <div style="font:400 12.5px/1.5 var(--font-body); color:var(--color-fg-muted); margin-top:2px; text-wrap:pretty;">Adobe launches PDF, a universal format that preserves layout, fonts and fidelity.</div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex; align-items:center; gap:0;">
+        <div style="flex:none; width:26px; margin-right:16px; position:relative; z-index:1; display:flex; justify-content:center;">
+          <div style="width:26px; height:26px; border-radius:50%; background:#FFFFFF; display:flex; align-items:center; justify-content:center;"><div style="width:13px; height:13px; box-sizing:border-box; border-radius:50%; background:var(--color-accent-soft); border:3px solid #FFFFFF; box-shadow:0 0 0 1.5px var(--color-accent-soft);"></div></div>
+        </div>
+        <div style="flex:none; width:104px; font:700 15px/1.2 var(--font-display); letter-spacing:-0.01em; color:var(--color-accent-soft);">Late 1990s</div>
+        <div style="flex:1; display:flex; align-items:center; gap:14px; background:var(--color-bg-soft); border:1px solid var(--color-border-soft); border-radius:16px; padding:9px 16px;">
+          <div style="flex:none; width:38px; height:38px; border-radius:11px; background:var(--color-accent-tint); display:flex; align-items:center; justify-content:center;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path><path d="M2 12h20"></path></svg>
+          </div>
+          <div>
+            <div style="font:700 16px/1.25 var(--font-display); letter-spacing:-0.01em; color:var(--color-ink);">The web makes it global</div>
+            <div style="font:400 12.5px/1.5 var(--font-body); color:var(--color-fg-muted); margin-top:2px; text-wrap:pretty;">PDF becomes the default format for sharing across email, web and operating systems.</div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex; align-items:center; gap:0;">
+        <div style="flex:none; width:26px; margin-right:16px; position:relative; z-index:1; display:flex; justify-content:center;">
+          <div style="width:26px; height:26px; border-radius:50%; background:#FFFFFF; display:flex; align-items:center; justify-content:center;"><div style="width:13px; height:13px; box-sizing:border-box; border-radius:50%; background:var(--color-accent-soft); border:3px solid #FFFFFF; box-shadow:0 0 0 1.5px var(--color-accent-soft);"></div></div>
+        </div>
+        <div style="flex:none; width:104px; font:700 15px/1.2 var(--font-display); letter-spacing:-0.01em; color:var(--color-accent-soft);">2000s</div>
+        <div style="flex:1; display:flex; align-items:center; gap:14px; background:var(--color-bg-soft); border:1px solid var(--color-border-soft); border-radius:16px; padding:9px 16px;">
+          <div style="flex:none; width:38px; height:38px; border-radius:11px; background:var(--color-accent-tint); display:flex; align-items:center; justify-content:center;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z"></path><path d="m9 12 2 2 4-4"></path></svg>
+          </div>
+          <div>
+            <div style="font:700 16px/1.25 var(--font-display); letter-spacing:-0.01em; color:var(--color-ink);">Standards and accessibility</div>
+            <div style="font:400 12.5px/1.5 var(--font-body); color:var(--color-fg-muted); margin-top:2px; text-wrap:pretty;">ISO standardization and accessibility features make documents more reliable and inclusive.</div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex; align-items:center; gap:0;">
+        <div style="flex:none; width:26px; margin-right:16px; position:relative; z-index:1; display:flex; justify-content:center;">
+          <div style="width:26px; height:26px; border-radius:50%; background:#FFFFFF; display:flex; align-items:center; justify-content:center;"><div style="width:13px; height:13px; box-sizing:border-box; border-radius:50%; background:var(--color-accent-soft); border:3px solid #FFFFFF; box-shadow:0 0 0 1.5px var(--color-accent-soft);"></div></div>
+        </div>
+        <div style="flex:none; width:104px; font:700 15px/1.2 var(--font-display); letter-spacing:-0.01em; color:var(--color-accent-soft);">2010s</div>
+        <div style="flex:1; display:flex; align-items:center; gap:14px; background:var(--color-bg-soft); border:1px solid var(--color-border-soft); border-radius:16px; padding:9px 16px;">
+          <div style="flex:none; width:38px; height:38px; border-radius:11px; background:var(--color-accent-tint); display:flex; align-items:center; justify-content:center;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2"></rect><path d="M8 21h8"></path><path d="M12 17v4"></path></svg>
+          </div>
+          <div>
+            <div style="font:700 16px/1.25 var(--font-display); letter-spacing:-0.01em; color:var(--color-ink);">Browser-native viewing</div>
+            <div style="font:400 12.5px/1.5 var(--font-body); color:var(--color-fg-muted); margin-top:2px; text-wrap:pretty;">PDF viewing goes native in browsers and devices, with no plugins required.</div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex; align-items:center; gap:0;">
+        <div style="flex:none; width:26px; margin-right:16px; position:relative; z-index:1; display:flex; justify-content:center;">
+          <div style="width:26px; height:26px; border-radius:50%; background:#FFFFFF; display:flex; align-items:center; justify-content:center;"><div style="width:13px; height:13px; box-sizing:border-box; border-radius:50%; background:var(--color-accent); border:3px solid #FFFFFF; box-shadow:0 0 0 1.5px var(--color-accent);"></div></div>
+        </div>
+        <div style="flex:none; width:104px; font:700 15px/1.2 var(--font-display); letter-spacing:-0.01em; color:var(--color-accent);">Today</div>
+        <div style="flex:1; display:flex; align-items:center; gap:14px; background:#FFFFFF; border:1px solid var(--color-accent); border-radius:16px; padding:9px 16px;">
+          <div style="flex:none; width:38px; height:38px; border-radius:11px; background:var(--color-accent-tint); display:flex; align-items:center; justify-content:center;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"></path><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"></path><path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"></path></svg>
+          </div>
+          <div>
+            <div style="font:700 16px/1.25 var(--font-display); letter-spacing:-0.01em; color:var(--color-ink);">Component-driven experiences</div>
+            <div style="font:400 12.5px/1.5 var(--font-body); color:var(--color-fg-muted); margin-top:2px; text-wrap:pretty;">APIs and embeddable components bring documents to life inside modern apps.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="flex:none; position:relative; display:flex; align-items:center; gap:16px; background:var(--color-bg-soft); border:1px solid var(--color-border-soft); border-radius:20px; padding:14px 24px; margin-top:24px; overflow:hidden;">
+      <div style="flex:none; width:40px; height:40px; border-radius:50%; background:var(--color-accent); display:flex; align-items:center; justify-content:center;">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path><path d="M11 8v6"></path><path d="M8 11h6"></path></svg>
+      </div>
+      <div style="max-width:470px;">
+        <div style="font:700 16px/1.3 var(--font-display); color:var(--color-accent);">Sharp at any size.</div>
+        <div style="font:400 14px/1.5 var(--font-body); color:var(--color-fg-muted); margin-top:3px;">Text and vectors are drawn live, so nothing here turns into pixels.</div>
+      </div>
+      <div style="position:absolute; right:24px; top:50%; transform:translateY(-50%); display:grid; grid-template-columns:repeat(4,4px); gap:9px;">
+        <div style="width:4px; height:4px; border-radius:50%; background:#ABC9FD;"></div>
+        <div style="width:4px; height:4px; border-radius:50%; background:#ABC9FD;"></div>
+        <div style="width:4px; height:4px; border-radius:50%; background:#ABC9FD;"></div>
+        <div style="width:4px; height:4px; border-radius:50%; background:#ABC9FD;"></div>
+        <div style="width:4px; height:4px; border-radius:50%; background:#ABC9FD;"></div>
+        <div style="width:4px; height:4px; border-radius:50%; background:#ABC9FD;"></div>
+        <div style="width:4px; height:4px; border-radius:50%; background:#ABC9FD;"></div>
+        <div style="width:4px; height:4px; border-radius:50%; background:#ABC9FD;"></div>
+        <div style="width:4px; height:4px; border-radius:50%; background:#ABC9FD;"></div>
+        <div style="width:4px; height:4px; border-radius:50%; background:#ABC9FD;"></div>
+        <div style="width:4px; height:4px; border-radius:50%; background:#ABC9FD;"></div>
+        <div style="width:4px; height:4px; border-radius:50%; background:#ABC9FD;"></div>
+      </div>
+    </div>
+
+    <div style="display:flex; justify-content:space-between; align-items:baseline; margin-top:auto; padding-top:22px; border-top:1px solid var(--color-border); font:400 14px/1.4 var(--font-body); color:var(--color-fg-muted);">
+      <span>Built to be viewed with <span data-brand="name" style="color:var(--color-accent);">EmbedPDF</span></span>
+      <span style="font:800 15px/1.2 var(--font-display); color:var(--color-ink);">03</span>
+    </div>
+  </section>
+
+  <section class="page" id="workflows" style="display:flex; flex-direction:column; padding:52px 64px; background:#FFFFFF; position:relative;">
+    <div style="position:absolute; top:150px; right:104px; display:grid; grid-template-columns:repeat(4,5px); gap:20px;">
+      <div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div><div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div><div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div><div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div>
+      <div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div><div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div><div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div><div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div>
+      <div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div><div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div><div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div><div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div>
+      <div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div><div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div><div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div><div style="width:5px; height:5px; border-radius:50%; background:#ABC9FD;"></div>
+    </div>
+
+    <div style="flex:none; display:flex; align-items:center; gap:10px; align-self:flex-start; background:var(--color-accent-tint); border-radius:999px; padding:9px 18px 9px 14px;">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path></svg>
+      <div style="font:700 13px/1 var(--font-display); letter-spacing:0.1em; text-transform:uppercase; color:var(--color-accent);">Workflows</div>
+    </div>
+
+    <h2 style="font:800 48px/1.04 var(--font-display); letter-spacing:-0.028em; color:var(--color-ink); margin:18px 0 0;">1 document,<br><span style="white-space:nowrap; color:var(--color-accent);">1,000 workflows</span></h2>
+    <div style="flex:none; width:68px; height:8px; border-radius:4px; background:var(--color-accent-strong); margin-top:12px;"></div>
+    <p style="font:400 19px/1.5 var(--font-body); color:var(--color-fg-muted); margin:16px 0 0;">One modern document format.<br>Every team. Every system. Every time.</p>
+
+    <div style="flex:none; position:relative; width:688px; height:400px; margin-top:38px;">
+      <svg width="688" height="400" viewBox="0 0 688 400" style="position:absolute; inset:0;">
+        <circle cx="344" cy="210" r="140" fill="none" stroke="#EDF3FF" stroke-width="1.5"></circle>
+        <circle cx="344" cy="210" r="114" fill="none" stroke="#E4EDFF" stroke-width="1.5"></circle>
+        <circle cx="344" cy="210" r="88" fill="#F4F8FF"></circle>
+        <g fill="none" stroke="#7DB6FF" stroke-width="1.5" stroke-dasharray="5 5">
+          <path d="M344 170 H260 a10 10 0 0 1-10-10 V80 a10 10 0 0 0-10-10 H206"></path>
+          <path d="M344 206 H182"></path>
+          <path d="M344 270 H260 a10 10 0 0 0-10 10 V332 a10 10 0 0 1-10 10 H206"></path>
+          <path d="M344 170 H428 a10 10 0 0 0 10-10 V80 a10 10 0 0 1 10-10 H482"></path>
+          <path d="M344 206 H506"></path>
+          <path d="M344 270 H428 a10 10 0 0 1 10 10 V332 a10 10 0 0 0 10 10 H482"></path>
+        </g>
+        <g fill="#7DB6FF">
+          <polygon points="196,70 206,65 206,75"></polygon>
+          <polygon points="172,206 182,201 182,211"></polygon>
+          <polygon points="196,342 206,337 206,347"></polygon>
+          <polygon points="492,70 482,65 482,75"></polygon>
+          <polygon points="516,206 506,201 506,211"></polygon>
+          <polygon points="492,342 482,337 482,347"></polygon>
+        </g>
+      </svg>
+
+      <div style="position:absolute; left:272px; top:152px; width:88px; height:132px; border-radius:14px; background:var(--color-accent); transform:rotate(12deg);"></div>
+      <div style="position:absolute; left:330px; top:158px; width:88px; height:126px; border-radius:14px; background:var(--color-accent); opacity:0.5; transform:rotate(10deg);"></div>
+
+      <img src="workflows-document.svg" alt="One document at the centre of every workflow" style="position:absolute; left:50%; top:120px; transform:translateX(-50%); width:140px; display:block;">
+
+      <div style="position:absolute; left:50%; top:378px; transform:translateX(-50%); display:flex; align-items:center; gap:10px; background:#FFFFFF; border:1px solid var(--color-border-soft); border-radius:999px; padding:8px 18px 8px 8px; box-shadow:0 2px 10px rgba(10,26,77,0.06);">
+        <div style="flex:none; width:28px; height:28px; border-radius:50%; background:var(--color-accent-tint); display:flex; align-items:center; justify-content:center;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"></path></svg>
+        </div>
+        <div style="font:600 13px/1.35 var(--font-display); color:var(--color-ink);">One document.<br>Limitless potential.</div>
+      </div>
+
+      <div style="position:absolute; left:0; top:22px; width:196px; height:96px; box-sizing:border-box; display:flex; align-items:center; gap:12px; background:#FFFFFF; border:1px solid var(--color-border-soft); border-radius:16px; padding:14px; box-shadow:0 1px 2px rgba(10,26,77,0.04), 0 4px 14px rgba(10,26,77,0.05);">
+        <div style="flex:none; width:38px; height:38px; border-radius:11px; background:#E6F0FF; display:flex; align-items:center; justify-content:center;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1677FF" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.364 13.634a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506l4.013-4.009a1 1 0 0 0-3.004-3.004z"></path><path d="M14.487 7.858A1 1 0 0 1 14 7V2"></path><path d="M20 19.645V20a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l2.516 2.516"></path><path d="M8 18h1"></path></svg>
+        </div>
+        <div>
+          <div style="font:700 16px/1.25 var(--font-display); letter-spacing:-0.01em; color:var(--color-ink);">Contracts</div>
+          <div style="font:400 12.5px/1.45 var(--font-body); color:var(--color-fg-muted); margin-top:3px;">Sign and share binding agreements.</div>
+        </div>
+      </div>
+
+      <div style="position:absolute; left:-24px; top:158px; width:196px; height:96px; box-sizing:border-box; display:flex; align-items:center; gap:12px; background:#FFFFFF; border:1px solid var(--color-border-soft); border-radius:16px; padding:14px; box-shadow:0 1px 2px rgba(10,26,77,0.04), 0 4px 14px rgba(10,26,77,0.05);">
+        <div style="flex:none; width:38px; height:38px; border-radius:11px; background:#E3F5EC; display:flex; align-items:center; justify-content:center;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1E9E6A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14"></path><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"></path></svg>
+        </div>
+        <div>
+          <div style="font:700 16px/1.25 var(--font-display); letter-spacing:-0.01em; color:var(--color-ink);">Manuals</div>
+          <div style="font:400 12.5px/1.45 var(--font-body); color:var(--color-fg-muted); margin-top:3px;">Documentation that stays current.</div>
+        </div>
+      </div>
+
+      <div style="position:absolute; left:0; top:294px; width:196px; height:96px; box-sizing:border-box; display:flex; align-items:center; gap:12px; background:#FFFFFF; border:1px solid var(--color-border-soft); border-radius:16px; padding:14px; box-shadow:0 1px 2px rgba(10,26,77,0.04), 0 4px 14px rgba(10,26,77,0.05);">
+        <div style="flex:none; width:38px; height:38px; border-radius:11px; background:#FDF1DE; display:flex; align-items:center; justify-content:center;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#D98324" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"></path><path d="M14 8H8"></path><path d="M16 12H8"></path><path d="M13 16H8"></path></svg>
+        </div>
+        <div>
+          <div style="font:700 16px/1.25 var(--font-display); letter-spacing:-0.01em; color:var(--color-ink);">Invoices</div>
+          <div style="font:400 12.5px/1.45 var(--font-body); color:var(--color-fg-muted); margin-top:3px;">Invoices that get paid faster.</div>
+        </div>
+      </div>
+
+      <div style="position:absolute; right:0; top:22px; width:196px; height:96px; box-sizing:border-box; display:flex; align-items:center; gap:12px; background:#FFFFFF; border:1px solid var(--color-border-soft); border-radius:16px; padding:14px; box-shadow:0 1px 2px rgba(10,26,77,0.04), 0 4px 14px rgba(10,26,77,0.05);">
+        <div style="flex:none; width:38px; height:38px; border-radius:11px; background:#EDE8FE; display:flex; align-items:center; justify-content:center;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7C4DFF" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"></path><path d="M18 17V9"></path><path d="M13 17V5"></path><path d="M8 17v-3"></path></svg>
+        </div>
+        <div>
+          <div style="font:700 16px/1.25 var(--font-display); letter-spacing:-0.01em; color:var(--color-ink);">Reports</div>
+          <div style="font:400 12.5px/1.45 var(--font-body); color:var(--color-fg-muted); margin-top:3px;">Data-rich, interactive insights.</div>
+        </div>
+      </div>
+
+      <div style="position:absolute; right:-24px; top:158px; width:196px; height:96px; box-sizing:border-box; display:flex; align-items:center; gap:12px; background:#FFFFFF; border:1px solid var(--color-border-soft); border-radius:16px; padding:14px; box-shadow:0 1px 2px rgba(10,26,77,0.04), 0 4px 14px rgba(10,26,77,0.05);">
+        <div style="flex:none; width:38px; height:38px; border-radius:11px; background:#FDE9DE; display:flex; align-items:center; justify-content:center;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#E2761B" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34"></path><circle cx="11" cy="11" r="8"></circle></svg>
+        </div>
+        <div>
+          <div style="font:700 16px/1.25 var(--font-display); letter-spacing:-0.01em; color:var(--color-ink);">Research</div>
+          <div style="font:400 12.5px/1.45 var(--font-body); color:var(--color-fg-muted); margin-top:3px;">Citations and media built in.</div>
+        </div>
+      </div>
+
+      <div style="position:absolute; right:0; top:294px; width:196px; height:96px; box-sizing:border-box; display:flex; align-items:center; gap:12px; background:#FFFFFF; border:1px solid var(--color-border-soft); border-radius:16px; padding:14px; box-shadow:0 1px 2px rgba(10,26,77,0.04), 0 4px 14px rgba(10,26,77,0.05);">
+        <div style="flex:none; width:38px; height:38px; border-radius:11px; background:#E6F0FF; display:flex; align-items:center; justify-content:center;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1677FF" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z"></path><path d="m14.5 12.5 2-2"></path><path d="m11.5 9.5 2-2"></path><path d="m8.5 6.5 2-2"></path><path d="m17.5 15.5 2-2"></path></svg>
+        </div>
+        <div>
+          <div style="font:700 16px/1.25 var(--font-display); letter-spacing:-0.01em; color:var(--color-ink);">Drawings</div>
+          <div style="font:400 12.5px/1.45 var(--font-body); color:var(--color-fg-muted); margin-top:3px;">Schematics with real precision.</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:auto; padding-top:26px;">
+      <div style="display:grid; grid-template-columns:repeat(3, 1fr); background:var(--color-bg-soft); border:1px solid var(--color-border-soft); border-radius:20px; padding:20px 8px;">
+        <div style="display:flex; gap:12px; padding:0 16px;">
+          <svg style="flex:none;" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+          <div>
+            <div style="font:700 14px/1.3 var(--font-display); color:var(--color-ink);">For every team</div>
+            <div style="font:400 13px/1.45 var(--font-body); color:var(--color-fg-muted); margin-top:3px;">Marketing, Sales, Legal, Finance.</div>
+          </div>
+        </div>
+        <div style="display:flex; gap:12px; padding:0 16px; border-left:1px solid var(--color-border-soft);">
+          <svg style="flex:none;" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path><path d="m9 12 2 2 4-4"></path></svg>
+          <div>
+            <div style="font:700 14px/1.3 var(--font-display); color:var(--color-ink);">For every system</div>
+            <div style="font:400 13px/1.45 var(--font-body); color:var(--color-fg-muted); margin-top:3px;">Embed once. Integrate everywhere.</div>
+          </div>
+        </div>
+        <div style="display:flex; gap:12px; padding:0 16px; border-left:1px solid var(--color-border-soft);">
+          <svg style="flex:none;" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path><path d="M2 12h20"></path></svg>
+          <div>
+            <div style="font:700 14px/1.3 var(--font-display); color:var(--color-ink);">For everywhere</div>
+            <div style="font:400 13px/1.45 var(--font-body); color:var(--color-fg-muted); margin-top:3px;">Web, mobile, portal or app.</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; align-items:baseline; margin-top:18px; padding-top:14px; border-top:1px solid var(--color-border); font:400 14px/1.4 var(--font-body); color:var(--color-fg-muted);">
+        <span>Built to be viewed with <span data-brand="name" style="color:var(--color-accent);">EmbedPDF</span></span>
+        <span style="font:800 15px/1.2 var(--font-display); color:var(--color-ink);">04</span>
+      </div>
+    </div>
+  </section>
+<script src="../shared/brand.js"></script>
+</body>
+</html>

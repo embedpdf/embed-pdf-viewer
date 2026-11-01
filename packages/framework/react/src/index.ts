@@ -14,6 +14,7 @@ export * from './page-edit';
 export * from './metadata';
 export * from './fonts';
 export * from './outline';
+export * from './attachment';
 export * from './history';
 export * from './redaction';
 export * from './measurement';

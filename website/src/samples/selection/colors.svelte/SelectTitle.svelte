@@ -8,6 +8,6 @@
   const cover = $derived(pages.current[0]?.ref);
 
   $effect(() => {
-    if (cover) selection.select({ page: cover, start: 10, count: 52 });
+    if (cover) selection.select({ page: cover, start: 28, count: 30 });
   });
 </script>

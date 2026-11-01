@@ -688,13 +688,10 @@ export function useRichTextEditor(annotation: Annotation): RichTextEditor {
   const page = usePage();
   const zoom = page.transform.zoom;
   const rotation = page.transform.rotation;
-  const key = annotationKey(annotation.ref);
+  // Saved and idle too: your element draws its text, no engine picture does.
   const item = useOptionalSelector(
     AnnotationHostToken,
-    (anno) =>
-      anno
-        .listTextItems(page.ref, { zoom, rotation })
-        .find((text) => text.ref !== null && annotationKey(text.ref) === key) ?? null,
+    (anno) => anno.getTextItem(annotation.ref, { zoom, rotation }),
     null,
   );
   // Pixels per point where the element is: inside a scaled look, at the

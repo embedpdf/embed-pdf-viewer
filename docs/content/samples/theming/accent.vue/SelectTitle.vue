@@ -4,7 +4,7 @@ import { usePageList } from '@embedpdf/vue/runtime';
 import { useSelection } from '@embedpdf/vue/selection';
 
 // The characters of the cover's title.
-const TITLE = { start: 10, count: 52 };
+const TITLE = { start: 28, count: 30 };
 
 // The cover's title is selected on load, so the accent shows; drag over any text to see more.
 const selection = useSelection();

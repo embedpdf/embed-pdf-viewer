@@ -21,9 +21,9 @@ import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { EpdfMetadata, withMetadata } from '@embedpdf/angular/metadata';
 import { localEngine } from '@embedpdf/engine';
 
-// [!doc-source ebook]
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
+// [!doc-source welcome]
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/welcome.pdf');
   return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
@@ -55,7 +55,7 @@ export class TitleBar {
 
   constructor() {
     // A change on load: the document gets a new title, so it has something to lose.
-    void this.metadata.update({ title: 'Quarterly report (draft)' });
+    void this.metadata.update({ title: 'Documents belong on the web (draft)' });
 
     // While there's something to lose, the browser asks before the page closes.
     effect((onCleanup) => {
@@ -67,7 +67,7 @@ export class TitleBar {
   }
 
   protected async download() {
-    saveFile(await this.documents.download(), 'report.pdf');
+    saveFile(await this.documents.download(), 'welcome.pdf');
   }
 }
 
@@ -104,7 +104,7 @@ export class ChangeLog {
   imports: [EpdfDocumentGate, EpdfStage, EpdfPageTemplate, EpdfRenderLayer, TitleBar, ChangeLog],
   providers: [
     provideEmbedPdf(
-      { engine: () => localEngine(), initialDocuments: [{ source: ebook, name: 'report.pdf' }] },
+      { engine: () => localEngine(), initialDocuments: [{ source: welcome, name: 'welcome.pdf' }] },
       withStage(),
       withRender(),
       withMetadata(),

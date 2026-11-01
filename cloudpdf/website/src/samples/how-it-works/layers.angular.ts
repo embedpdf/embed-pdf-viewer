@@ -20,7 +20,7 @@ import {
 } from '@embedpdf/angular/selection';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 @Component({
   selector: 'demo-root',
@@ -35,7 +35,7 @@ const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrb
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: welcome }] },
       withStage(),
       withRender(),
       withInteraction(),
@@ -105,7 +105,7 @@ export class App {
       const cover = this.document.pages()[0]?.ref;
       if (!cover) return;
       void this.search.search({ text: 'PDF' });
-      this.selection.select({ page: cover, start: 10, count: 52 });
+      this.selection.select({ page: cover, start: 28, count: 30 });
     });
   }
 

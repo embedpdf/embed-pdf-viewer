@@ -1,53 +1,37 @@
 import {
-  opIdOf,
   AbortablePromise,
   EngineError,
   EngineErrorCode,
-  deletedAttachmentOf,
-  normalizeAttachmentFileSource,
-  type AttachmentContent,
-  type AttachmentCreateResult,
-  type AttachmentDeleteResult,
-  type AttachmentFileSource,
   type AttachmentList,
   type AttachmentRef,
+  type AttachmentWriteVerb,
   type DocumentAttachmentsService,
-  type SessionEventPublisher,
-  type WriteOptions,
 } from '@embedpdf/engine-core/runtime';
-import {
-  AttachmentCreateResultSchema,
-  AttachmentDeleteResultSchema,
-  AttachmentListSchema,
-  wirePaths,
-} from '@embedpdf/engine-core/wire';
+import { AttachmentListSchema, wirePaths } from '@embedpdf/engine-core/wire';
 
-import { buildMutationForm } from './buildMutationForm';
 import type { ManifestAccessor } from './CloudDocumentHandle';
-import type { CloudWrites } from './CloudWrites';
 import { planesInherited } from './planes';
-import { parseAttachmentContent } from './parseAttachmentContent';
 import type { HttpClient } from '../transport/HttpClient';
 
-/** The `/attachments@…` listing leaf is a bare array of name-tree entries. */
 /**
- * Cloud-side document-level attachments (the catalog's `/EmbeddedFiles`
- * name tree). Reads use immutable leaves pinned by the manifest's
- * `attachmentsVersion`: `/attachments@…` for the metadata listing and
- * `/attachment-files/…@…` for one file's decoded bytes — a separate
- * capability tier, so a CDN credential for the listing can never egress
- * content. Mutations use unversioned collection/member URLs and are
- * never cached.
+ * The reads of document-level attachments (the catalog's `/EmbeddedFiles`
+ * name tree) on the cloud engine; `create` and `delete` are changes
+ * (`attachmentVerbs`, through `POST …/changes`). Reads use immutable leaves
+ * pinned by the manifest's `attachmentsVersion`: `/attachments@…` for the
+ * metadata listing and `/attachment-files/…@…` for one file's decoded
+ * bytes — a separate capability tier, so a CDN credential for the listing
+ * can never egress content.
  */
-export class CloudDocumentAttachmentsService implements DocumentAttachmentsService {
+export class CloudDocumentAttachmentsService implements Omit<
+  DocumentAttachmentsService,
+  AttachmentWriteVerb
+> {
   constructor(
     private readonly http: HttpClient,
     private readonly docId: string,
     private readonly layerName: string,
     private readonly isClosed: () => boolean,
     private readonly manifest: ManifestAccessor,
-    private readonly publisher: SessionEventPublisher,
-    private readonly writes: CloudWrites,
   ) {}
 
   /**
@@ -85,18 +69,17 @@ export class CloudDocumentAttachmentsService implements DocumentAttachmentsServi
   }
 
   /**
-   * Decode and return one embedded file's bytes. The body is the decoded
-   * stream; the name and mime type ride as response headers (see
-   * `parseAttachmentContent`). Same versioned-leaf + refresh-retry rails
-   * as {@link list}.
+   * One embedded file's decoded bytes; its name and type are what the
+   * listing says. Same versioned-leaf + refresh-retry rails as
+   * {@link list}. The server's limit on decoded size applies.
    */
-  download(ref: AttachmentRef): AbortablePromise<AttachmentContent> {
+  download(ref: AttachmentRef): AbortablePromise<Uint8Array> {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
       );
     }
-    return AbortablePromise.run<AttachmentContent>(async (signal) => {
+    return AbortablePromise.run<Uint8Array>(async (signal) => {
       const buildPath = async (s: AbortSignal): Promise<string> => {
         const manifest = await this.manifest.get(s);
         // Same plane switch as list(): the byte leaf shares too.
@@ -116,76 +99,7 @@ export class CloudDocumentAttachmentsService implements DocumentAttachmentsServi
         },
         signal,
       );
-      return parseAttachmentContent(file);
-    });
-  }
-
-  /**
-   * Create an embedded file in the name tree: metadata into the `body`
-   * part, naming its file `resources: { file: 'file' }`, and the bytes in
-   * the part `resource:file`.
-   */
-  create(
-    file: AttachmentFileSource,
-    options?: WriteOptions,
-  ): AbortablePromise<AttachmentCreateResult> {
-    if (this.isClosed()) {
-      return AbortablePromise.rejectReason(
-        new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
-      );
-    }
-    return AbortablePromise.run<AttachmentCreateResult>(async (signal) => {
-      const opId = opIdOf(options);
-      return this.writes.run(opId, signal, async (write) => {
-        const { wireFile, resource } = await normalizeAttachmentFileSource(file, 'file');
-        const result = await write.send((sent) =>
-          this.http.postMultipartJson(
-            wirePaths.layerAttachmentsCollection(this.docId, this.layerName),
-            buildMutationForm(wireFile, { file: resource }),
-            (raw) => AttachmentCreateResultSchema.parse(raw),
-            signal,
-            sent,
-          ),
-        );
-        // Patch the cached manifest, then publish (in that order — listeners
-        // reading the manifest in their callback must see post-mutation
-        // state). An attachment write only advances docVersion +
-        // attachmentsVersion (no per-page pin changes, no layoutVersion), so
-        // the cached manifest is patched in place — no refetch.
-        this.manifest.apply(result.meta, ['attachments']);
-        this.publisher.publishWrite(opId, { type: 'attachments.created', ...result });
-        return result;
-      });
-    });
-  }
-
-  /** Delete an embedded file from the name tree by its durable key. */
-  delete(ref: AttachmentRef, options?: WriteOptions): AbortablePromise<AttachmentDeleteResult> {
-    if (this.isClosed()) {
-      return AbortablePromise.rejectReason(
-        new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
-      );
-    }
-    return AbortablePromise.run<AttachmentDeleteResult>(async (signal) => {
-      const opId = opIdOf(options);
-      return this.writes.run(opId, signal, async (write) => {
-        const result = await write.send((sent) =>
-          this.http.deleteJson(
-            wirePaths.layerAttachmentItem(this.docId, this.layerName, ref.key),
-            (raw) => AttachmentDeleteResultSchema.parse(raw),
-            signal,
-            sent,
-          ),
-        );
-        // Same absorb-then-publish rails as create().
-        this.manifest.apply(result.meta, ['attachments']);
-        this.publisher.publishWrite(opId, {
-          type: 'attachments.deleted',
-          deleted: deletedAttachmentOf(result),
-          ...result,
-        });
-        return result;
-      });
+      return file.bytes;
     });
   }
 }

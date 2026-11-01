@@ -28,6 +28,7 @@
     scope,
     accent,
     page,
+    fetch: ownFetch,
     fallback,
     error: renderError,
     children,
@@ -64,6 +65,12 @@
           clock: browserClock(),
           printer: browserPrinter(),
           measurer: browserTextMeasurer(),
+          // Each download calls the latest prop.
+          fetch: (url, init) => {
+            // A plain call: the browser's own `fetch` refuses any other `this`.
+            const download = ownFetch ?? globalThis.fetch;
+            return download(url, init);
+          },
         });
       } catch (error) {
         // A plugin graph that can't be built shows `error`, not an exception mid-render.

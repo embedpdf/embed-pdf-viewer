@@ -12,7 +12,7 @@ import { EpdfOutline, withOutline } from '@embedpdf/angular/outline';
 import type { OutlineItem, OutlineItemRef } from '@embedpdf/angular/outline';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 const same = (left: OutlineItemRef | null, right: OutlineItemRef | null) =>
   left?.objectNumber === right?.objectNumber;
@@ -23,7 +23,7 @@ const same = (left: OutlineItemRef | null, right: OutlineItemRef | null) =>
   imports: [EpdfDocumentGate],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: welcome }] },
       withOutline(),
     ),
   ],

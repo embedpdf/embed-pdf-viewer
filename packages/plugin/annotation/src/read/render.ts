@@ -24,9 +24,9 @@ import {
 
 import type { LinkNavItem, TextItem } from '../contract';
 import type { AnnotationAppearancePicture } from '../host-contract';
-import type { AnnotationState } from '../model';
+import type { AnnotationModel } from '../model';
 import type { AnnotationContext, AnnotationServices } from '../services';
-import { buildTextItems } from '../text-item';
+import { buildTextItem, buildTextItems } from '../text-item';
 import type { Ghost } from '../tools/ghost';
 import type { Stamps } from '../write/stamps';
 
@@ -54,8 +54,8 @@ export function createRenderReads(
     number,
     {
       model: Model;
-      ghostAt: AnnotationState['ghostAt'];
-      placing: AnnotationState['placing'];
+      ghostAt: AnnotationModel['ghostAt'];
+      placing: AnnotationModel['placing'];
       zoom: number | undefined;
       rotation: number | undefined;
       fontsEpoch: number;
@@ -148,6 +148,37 @@ export function createRenderReads(
     return items;
   };
 
+  // One free text's item whatever its state, for a renderer that draws the
+  // box itself: the page list has only live text. Memoized by its page's
+  // slice of the model, like the list.
+  const textCache = new Map<
+    string,
+    {
+      model: Model;
+      zoom: number | undefined;
+      rotation: number | undefined;
+      fonts: object;
+      v: TextItem | null;
+    }
+  >();
+  const textItemOf = (ref: AnnotationRef, view?: ViewEnv): TextItem | null => {
+    const key = annotationKey(ref);
+    const model = pageModel(ref.page.objectNumber);
+    const fonts = textFonts.version();
+    const cached = textCache.get(key);
+    if (
+      cached &&
+      cached.model === model &&
+      cached.zoom === view?.zoom &&
+      cached.rotation === view?.rotation &&
+      cached.fonts === fonts
+    )
+      return cached.v;
+    const item = buildTextItem(model, key, view, { lookup: fontLookup, text: textFonts });
+    textCache.set(key, { model, zoom: view?.zoom, rotation: view?.rotation, fonts, v: item });
+    return item;
+  };
+
   // The navigation plane's feed: clickable link areas per page — standalone
   // links + attached-link segments (rects derived by the reconciler's own
   // rule). Memoized by the page's slice of the model for selector use.
@@ -195,6 +226,7 @@ export function createRenderReads(
   const api = {
     listPageItems: (page: PageRef, view?: ViewEnv) => pageItemsOf(page, view),
     listTextItems: (page: PageRef, view?: ViewEnv) => textItemsOf(page, view),
+    getTextItem: (ref: AnnotationRef, view?: ViewEnv) => textItemOf(ref, view),
     listLinkItems: (page: PageRef) => linkItemsOf(page.objectNumber),
     getAppearanceEpoch: (page: PageRef) => {
       const { engine, placed, lent } = epochOf(page);

@@ -8,12 +8,12 @@ import Readout from './Readout.vue';
 const isMeasurement = (annotation: Annotation) =>
   'intent' in annotation && !!annotation.intent?.endsWith('-dimension');
 
-const onCover = useAnnotationList({ pages: [0] });
-const measurements = computed(() => onCover.value.filter(isMeasurement));
+const onPlan = useAnnotationList({ pages: [0] });
+const measurements = computed(() => onPlan.value.filter(isMeasurement));
 </script>
 
 <template>
-  <ul class="readouts" aria-label="Measurements on the cover">
+  <ul class="readouts" aria-label="Measurements on the plan">
     <Readout
       v-for="annotation in measurements"
       :key="annotationKey(annotation.ref)"

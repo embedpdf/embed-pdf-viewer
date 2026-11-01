@@ -10,16 +10,16 @@ const { pendingCount } = useRedactionState();
 const { hasSelection } = useSelectionState();
 const currentPage = useStageState((state) => state.currentPageIndex);
 const ready = useAnnotationState((state) => state.status === 'ready');
-const text = ref('EmbedPDF');
+const text = ref('John Warnock');
 
-// On load: every "EmbedPDF" in the document.
+// On load: every "John Warnock" in the document.
 let started = false;
 watch(
   ready,
   (isReady) => {
     if (!isReady || started) return;
     started = true;
-    void redaction.markMatches({ text: 'EmbedPDF' });
+    void redaction.markMatches({ text: 'John Warnock' });
   },
   { immediate: true },
 );

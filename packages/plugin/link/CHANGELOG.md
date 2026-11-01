@@ -1,5 +1,17 @@
 # @embedpdf/plugin-link
 
+## 3.0.0-next.19
+
+## 3.0.0-next.18
+
+## 3.0.0-next.17
+
+## 3.0.0-next.16
+
+### Minor Changes
+
+- [#885](https://github.com/embedpdf/embed-pdf-viewer/pull/885) by [@bobsingor](https://github.com/bobsingor) – `resolveLinkTarget(target, hasPage)` from `@embedpdf/plugin-link/contract` is the rule `resolve()` follows, for anything else that follows link targets, such as outline items.
+
 ## 3.0.0-next.15
 
 ### Minor Changes

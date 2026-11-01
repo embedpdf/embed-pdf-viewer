@@ -16,16 +16,22 @@ export { CloudPageHandle } from './document/CloudPageHandle';
 export { CloudPageAnnotationsService } from './document/CloudPageAnnotationsService';
 export { CloudPageRenderService } from './document/CloudPageRenderService';
 export { CLOUDPDF_SAAS_URL, HttpClient } from './transport/HttpClient';
-export type { HttpClientOptions } from './transport/HttpClient';
+export type { HttpClientOptions, RawPageSource } from './transport/HttpClient';
 export { decodeUnverifiedClaims } from './transport/decodeUnverifiedClaims';
 export type { UnverifiedClaims } from './transport/decodeUnverifiedClaims';
 export {
-  exchangeShareToken,
-  shareSessionSource,
-  ShareExchangeError,
-  engineErrorFromShareExchange,
-} from './share';
-export type { ShareSession, ShareExchangeOptions } from './share';
+  browserVisitorStore,
+  exchangeGrant,
+  grantSessionSource,
+  GrantExchangeError,
+  engineErrorFromGrantExchange,
+} from './grant';
+export type {
+  GrantSession,
+  GrantExchangeOptions,
+  GrantSessionOptions,
+  VisitorStore,
+} from './grant';
 
 import { CloudEngine, type CloudEngineOptions } from './CloudEngine';
 

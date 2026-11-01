@@ -3,7 +3,7 @@ import { createCapabilityToken, toPageRef } from '@embedpdf/core';
 import { createTestContext, manualClock } from '@embedpdf/core/testing';
 import type { HostClock } from '@embedpdf/core';
 import { createStageController } from '../src/controller';
-import { initialStageState } from '../src/model';
+import { initialStageModel } from '../src/model';
 import { DEFAULT_SETTINGS, settingsEqual } from '../src/settings';
 import { stagePlugin } from '../src/stage.plugin';
 import type { StageCapability, StageConfig, StageHostCapability } from '../src/host-contract';
@@ -30,7 +30,7 @@ function harness(
     clock: options.clock,
     // Lay out at 1:1 (world units = points) so absolute-size assertions read
     // cleanly; the 96/72 physical factor is covered by the stage-core layout test.
-    state: initialStageState({ viewUnitsPerPoint: 1, ...config }),
+    state: initialStageModel({ viewUnitsPerPoint: 1, ...config }),
     pages: sizes.map((size, index) => ({
       ref: toPageRef(index + 1),
       size: { width: size.width, height: size.height },
@@ -1384,7 +1384,7 @@ describe("columns: 'auto' — the wrapped grid (thumbnail sidebar)", () => {
 
 describe('wrapped + discrete zoom: the scene re-wraps and the camera follows', () => {
   // viewport 1000, padding 24 → line = 952/zoom; cell = 600 + gap 16 = 616 world.
-  // zoom 0.35 → line 2720 → 4 columns; ×1.2 → 0.42 → line 2266 → 3 columns.
+  // zoom 0.35 → line 2720 → 4 columns; zoomIn → 0.5 → line 1904 → 3 columns.
   const WRAPPED = {
     layout: 'grid' as const,
     columns: 'auto' as const,

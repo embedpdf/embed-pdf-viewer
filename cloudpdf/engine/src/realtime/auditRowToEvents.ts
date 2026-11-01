@@ -5,7 +5,6 @@ import {
   formValuesImportFacts,
   annotationImportFacts,
   deletedAnnotationsOf,
-  deletedAttachmentOf,
   deletedFieldOf,
   toPageRef,
   type AnnotationCreateResult,
@@ -13,8 +12,6 @@ import {
   type AnnotationDeleteResult,
   type AnnotationReorderResult,
   type AnnotationUpdateResult,
-  type AttachmentCreateResult,
-  type AttachmentDeleteResult,
   type ChangeResult,
   type DocumentEvent,
   type EventOrigin,
@@ -33,13 +30,10 @@ import {
   type FormCalculationsReorderResult,
   type MetadataUpdateResult,
   type CustomMetadataUpdateResult,
-  type PageDeleteResult,
   type PageFlattenResult,
-  type PageInsertResult,
   type PageReorderResult,
-  type PageRotateResult,
-  type PdfRotation,
   type PageScaleResult,
+  type RedactionApplyResult,
   type FormFieldRef,
   type SignatureCompleteResult,
 } from '@embedpdf/engine-core/runtime';
@@ -80,12 +74,8 @@ export interface AuditEventRow {
  * this engine version doesn't know (a newer server's events degrade to
  * "ignored", never to a crash).
  *
- * Context-field fidelity differs by op, by design of the audit row:
- *   - rotate/delete: `affectedPages` is exactly the op's page set; rotation
- *     is recovered from the layout (it's absolute — every affected page
- *     carries the value).
- *   - reorder: the payload is the result, as the originator got it: the
- *     pages that moved and the new `layout`.
+ * A page name write's row is a `pages.reorder` that moved no page: its
+ * payload is the result, as the originator got it, with the new `layout`.
  *
  * The audit row keys pages by object number (its storage identity); the
  * event carries them as `PageRef` addresses, like every other event.
@@ -182,8 +172,6 @@ function factsOf(row: AuditEventRow, origin: EventOrigin): DocumentEvent[] {
 function eventOf(row: AuditEventRow, origin: EventOrigin): DocumentEvent | null {
   // The row's page: its explicit column, else the first affected page.
   const rowPage = () => toPageRef(row.pageObjectNumber ?? row.affectedPages[0] ?? 0);
-  const affectedPages = () =>
-    row.affectedPages.map((pageObjectNumber) => toPageRef(pageObjectNumber));
 
   switch (row.kind) {
     case 'measure.setScale':
@@ -219,41 +207,17 @@ function eventOf(row: AuditEventRow, origin: EventOrigin): DocumentEvent | null 
       };
     case 'pages.reorder':
       return { type: 'pages.reordered', origin, ...(row.payload as PageReorderResult) };
-    case 'pages.rotate': {
-      const payload = row.payload as PageRotateResult;
-      const rotation = (payload.layout.pages.find(
-        (page) => page.ref.objectNumber === row.affectedPages[0],
-      )?.rotation ?? 0) as PdfRotation;
-      return {
-        type: 'pages.rotated',
-        pages: affectedPages(),
-        rotation,
-        origin,
-        ...payload,
-      };
-    }
-    case 'pages.delete':
-      return {
-        type: 'pages.deleted',
-        pages: affectedPages(),
-        origin,
-        ...(row.payload as PageDeleteResult),
-      };
-    // Two audit kinds share the `pages.inserted` event (bytes-import and
-    // blank creation produce the same result shape) — the audit log keeps
-    // them distinct for history, the event stream cares about effect.
-    case 'pages.insert':
-    case 'pages.insertBlank':
-      return {
-        type: 'pages.inserted',
-        origin,
-        ...(row.payload as PageInsertResult),
-      };
     case 'pages.flatten':
       return {
         type: 'pages.flattened',
         origin,
         ...(row.payload as PageFlattenResult),
+      };
+    case 'redaction.apply':
+      return {
+        type: 'redaction.applied',
+        origin,
+        ...(row.payload as RedactionApplyResult),
       };
     case 'metadata.update':
       return {
@@ -266,19 +230,6 @@ function eventOf(row: AuditEventRow, origin: EventOrigin): DocumentEvent | null 
         type: 'metadata.customUpdated',
         origin,
         ...(row.payload as CustomMetadataUpdateResult),
-      };
-    case 'attachment.create':
-      return {
-        type: 'attachments.created',
-        origin,
-        ...(row.payload as AttachmentCreateResult),
-      };
-    case 'attachment.delete':
-      return {
-        type: 'attachments.deleted',
-        origin,
-        deleted: deletedAttachmentOf(row.payload as AttachmentDeleteResult),
-        ...(row.payload as AttachmentDeleteResult),
       };
     // A value write is one `forms.valueSet`; a reset and an import are one
     // per field they changed (above).

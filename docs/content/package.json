@@ -3,12 +3,22 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "The shared documentation corpus \u2014 authored once, mounted per site with the engine axis resolved at sync time. See docs/conventions/docs-architecture.md.",
+  "description": "The shared documentation corpus — authored once, mounted per site with the engine axis resolved at sync time. See docs/conventions/docs-architecture.md.",
   "scripts": {
     "sync": "node scripts/sync.mjs",
     "reference": "node scripts/reference.mjs",
     "snippets": "node scripts/snippets.mjs",
     "publish-gate": "node scripts/publish-gate.mjs",
-    "samples": "node scripts/samples.mjs"
+    "samples": "node scripts/samples.mjs",
+    "pdfs": "tsx pdfs/build.mjs",
+    "pdfs:cloud": "node pdfs/cloud.mjs"
+  },
+  "devDependencies": {
+    "@cloudpdf/sdk": "workspace:*",
+    "@embedpdf/core-signature": "workspace:*",
+    "@embedpdf/default-stamps": "workspace:*",
+    "@embedpdf/engine": "workspace:*",
+    "playwright-core": "^1.63.0",
+    "tsx": "^4.19.0"
   }
 }

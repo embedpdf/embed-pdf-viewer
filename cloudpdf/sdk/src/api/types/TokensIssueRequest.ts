@@ -2,7 +2,10 @@
 
 import type * as CloudPDF from "../index.js";
 
-export type TokensIssueRequest = CloudPDF.TokensIssueRequest.Doc | CloudPDF.TokensIssueRequest.Tenant;
+export type TokensIssueRequest =
+    | CloudPDF.TokensIssueRequest.Doc
+    | CloudPDF.TokensIssueRequest.Tenant
+    | CloudPDF.TokensIssueRequest.Upload;
 
 export namespace TokensIssueRequest {
     export interface Doc {
@@ -11,44 +14,27 @@ export namespace TokensIssueRequest {
         docId: string;
         layerName?: string | undefined;
         scope: string[];
-        identity?: TokensIssueRequestDoc.Identity | undefined;
+        identity?: CloudPDF.Identity | undefined;
         origins?: string[] | undefined;
         expiresIn: number;
-    }
-
-    export namespace TokensIssueRequestDoc {
-        export interface Identity {
-            userId?: string | undefined;
-            displayName?: string | undefined;
-            email?: string | undefined;
-            title?: string | undefined;
-            organization?: string | undefined;
-            organizationalUnit?: string | undefined;
-            groupId?: string | undefined;
-        }
     }
 
     export interface Tenant {
         kind: "tenant";
         sub: string;
-        scope: TokensIssueRequestTenant.Scope.Item[];
+        scope: string[];
         expiresIn: number;
     }
 
-    export namespace TokensIssueRequestTenant {
-        export type Scope = Scope.Item[];
-
-        export namespace Scope {
-            export type Item =
-                | "*"
-                | (
-                      | "docs.create"
-                      | "docs.read"
-                      | "docs.delete"
-                      | "tokens.issue-doc"
-                      | "tokens.revoke"
-                      | "shares.manage"
-                  );
-        }
+    export interface Upload {
+        kind: "upload";
+        sub: string;
+        /** A folder id, or root for the top level. */
+        folderId?: string | undefined;
+        metadata?: Record<string, unknown> | undefined;
+        maxFiles?: number | undefined;
+        maxBytes?: number | undefined;
+        origins?: string[] | undefined;
+        expiresIn: number;
     }
 }

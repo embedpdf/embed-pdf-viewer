@@ -12,10 +12,10 @@ import { EpdfAnnotation, withAnnotation } from '@embedpdf/angular/annotation';
 import { EpdfFonts, withFonts } from '@embedpdf/angular/fonts';
 import { localEngine } from '@embedpdf/engine';
 
-// [!doc-source ebook]
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source welcome]
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/welcome.pdf');
+  return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
@@ -41,7 +41,7 @@ const WHY: Record<FontRestriction, string> = {
   imports: [EpdfDocumentGate],
   providers: [
     provideEmbedPdf(
-      { engine: () => localEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => localEngine(), initialDocuments: [{ source: welcome }] },
       withInteraction(),
       withAnnotation(),
       withFonts(),

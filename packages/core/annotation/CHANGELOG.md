@@ -1,5 +1,19 @@
 # @embedpdf/core-annotation
 
+## 3.0.0-next.19
+
+## 3.0.0-next.18
+
+## 3.0.0-next.17
+
+## 3.0.0-next.16
+
+### Minor Changes
+
+- [#883](https://github.com/embedpdf/embed-pdf-viewer/pull/883) by [@bobsingor](https://github.com/bobsingor) – `viewable(annotation, engaged)` takes the annotation instead of its flags, and follows ISO 32000-2 12.5.3 for `invisible`: the flag hides only an annotation of a type that isn't standard (an `unsupported` annotation PDFium doesn't know, other than Projection). On a standard annotation it means nothing. The engine's renderer and flatten follow the same rule, so the viewer no longer paints an unknown annotation that printing and flattening leave out.
+
+- [#895](https://github.com/embedpdf/embed-pdf-viewer/pull/895) by [@bobsingor](https://github.com/bobsingor) – New `textBoxOf(model, id, view?)`: one free text's box whether its text is live or saved and idle. `textBoxes` still lists only the live ones, the boxes a viewer draws as elements; a saved, idle box shows its engine picture there.
+
 ## 3.0.0-next.15
 
 ### Minor Changes

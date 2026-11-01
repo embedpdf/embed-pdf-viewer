@@ -3,10 +3,12 @@ import {
   checkAnyCapability,
   checkCapability,
   checkCollab,
+  checkPluginPermission,
   checkSetGroup,
   expandRawScope,
   filterMatches,
   parseScope,
+  pluginPermissionsOf,
   PDF_BITS,
   decodePdfBits,
   type CollabFilter,
@@ -224,6 +226,12 @@ describe('checkAnyCapability', () => {
 // ============================================================================
 
 describe('expandedCapabilities — implications', () => {
+  it('doc.render implies doc.render.thumbnail, and not the other way', () => {
+    expect(expandRawScope(['doc.render'], NO_BITS).has('doc.render.thumbnail')).toBe(true);
+    expect(checkCapability('doc.render.thumbnail', ['doc.render'], NO_BITS)).toBe(true);
+    expect(checkCapability('doc.render', ['doc.render.thumbnail'], NO_BITS)).toBe(false);
+  });
+
   it('doc.annotate.modify implies doc.annotate.read', () => {
     const set = expandRawScope(['doc.annotate.modify'], NO_BITS);
     expect(set.has('doc.annotate.modify')).toBe(true);
@@ -653,5 +661,44 @@ describe('parser + resolver integration', () => {
     expect(parsed[1].kind).toBe('virtual');
     expect(parsed[2].kind).toBe('capability');
     expect(parsed[3].kind).toBe('collab');
+  });
+});
+
+describe('plugin permissions', () => {
+  const installed = new Set(['protected-display.view', 'snapshot.create']);
+  const noBits = decodePdfBits(null);
+
+  it('holds the installed plugin permissions a scope names', () => {
+    expect([...pluginPermissionsOf(['doc.open', 'protected-display.view'], installed)]).toEqual([
+      'protected-display.view',
+    ]);
+    expect(
+      checkPluginPermission('protected-display.view', ['protected-display.view'], installed),
+    ).toBe(true);
+    expect(checkPluginPermission('snapshot.create', ['protected-display.view'], installed)).toBe(
+      false,
+    );
+  });
+
+  it('gives every installed plugin permission under *', () => {
+    expect([...pluginPermissionsOf(['*'], installed)].sort()).toEqual([
+      'protected-display.view',
+      'snapshot.create',
+    ]);
+  });
+
+  it('carries a plugin permission whose plugin is not installed, without effect', () => {
+    expect(() => parseScope('ai-chat.ask')).not.toThrow();
+    expect(pluginPermissionsOf(['ai-chat.ask'], installed).size).toBe(0);
+  });
+
+  it('holds nothing where no plugins run, as in the local engine', () => {
+    expect(pluginPermissionsOf(['*', 'protected-display.view']).size).toBe(0);
+  });
+
+  it('never turns into a core capability, and pdf.permissions never grants one', () => {
+    expect([...expandRawScope(['protected-display.view'], noBits)]).toEqual([]);
+    expect(pluginPermissionsOf(['pdf.permissions'], installed).size).toBe(0);
+    expect(checkCapability('doc.render', ['protected-display.view'], noBits)).toBe(false);
   });
 });

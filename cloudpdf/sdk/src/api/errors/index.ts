@@ -5,4 +5,5 @@ export * from "./ContentTooLargeError.js";
 export * from "./ForbiddenError.js";
 export * from "./GoneError.js";
 export * from "./NotFoundError.js";
+export * from "./NotImplementedError.js";
 export * from "./UnprocessableEntityError.js";

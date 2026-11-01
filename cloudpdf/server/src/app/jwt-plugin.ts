@@ -1,5 +1,6 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 
+import { adminOperations } from '@cloudpdf/contract';
 import {
   allowsSomeFieldWrite,
   checkAnyCapability,
@@ -33,13 +34,17 @@ import {
   hasTenantScope,
   isDocUserClaims,
   isTenantClaims,
+  isUploadClaims,
   type DocScope,
+  type DownloadLinkClaim,
   type JwtClaims,
   type JwtVerifier,
   type JwtVerifierConfig,
   type TenantScope,
+  type UploadClaim,
 } from '../auth/JwtVerifier';
 import { matchesOrigin } from '../auth/origins';
+import { documentScopeOf } from '../auth/tenant-scope';
 import type { SuspendedTenantsGuard } from '../auth/SuspendedTenantsGuard';
 import type { EditRequest } from '../services/LayerWriteObjectNumbers';
 import { MAX_OBJECT_NUMBER_TOP_UP } from '../services/ObjectNumberService';
@@ -47,6 +52,12 @@ import { MAX_OBJECT_NUMBER_TOP_UP } from '../services/ObjectNumberService';
 declare module 'fastify' {
   interface FastifyRequest {
     tenant?: { id: string; sub: string; claims: JwtClaims };
+    /**
+     * Set when the request came in on a download link (`?link=`, see
+     * `DocUserClaims.download`) instead of an Authorization header: what
+     * the link downloads. The download route serves exactly that.
+     */
+    downloadLink?: DownloadLinkClaim;
     /**
      * True when the bearer matched a configured API auth token — the
      * deployment's root credential, valid on every surface. No tenant
@@ -107,6 +118,17 @@ export interface JwtPluginOptions {
   suspendedTenants?: SuspendedTenantsGuard;
 }
 
+/**
+ * The only routes an upload token reaches: starting an upload, the
+ * proxied transfer, and its commit. The auth hook refuses it everywhere
+ * else, before any guard runs.
+ */
+const UPLOAD_TOKEN_ROUTES: ReadonlySet<string> = new Set([
+  adminOperations['documents.init'].path,
+  adminOperations['documents.uploadProxy'].path,
+  adminOperations['documents.commit'].path,
+]);
+
 function asConfig(input: JwtPluginOptions['verifier']): JwtVerifierConfig {
   if ('mode' in input) return input;
   return { mode: 'hs256', secret: input.secret };
@@ -146,6 +168,39 @@ export async function registerJwtAuth(app: FastifyInstance, opts: JwtPluginOptio
     }
 
     const auth = req.headers['authorization'];
+    // A download link stands in for the header, on its download URL only.
+    const link = auth === undefined ? downloadLinkOf(req.url, pathname) : null;
+    if (link) {
+      let claims: JwtClaims;
+      try {
+        claims = await verifier.verify(link.token);
+      } catch (err) {
+        limiter?.recordFailure(req.ip);
+        req.log.info({ err }, 'download link rejected');
+        reply.code(401).send({ error: 'invalid download link' });
+        return;
+      }
+      if (
+        !isDocUserClaims(claims) ||
+        !claims.download ||
+        claims.doc_id !== link.docId ||
+        claims.layer_name !== link.layerName
+      ) {
+        limiter?.recordFailure(req.ip);
+        reply.code(401).send({ error: 'invalid download link' });
+        return;
+      }
+      if (opts.suspendedTenants && (await opts.suspendedTenants.isSuspended(claims.tenant_id))) {
+        reply
+          .code(403)
+          .header('x-cloudpdf-tenant-status', 'suspended')
+          .send({ error: 'tenant suspended' });
+        return;
+      }
+      req.tenant = { id: claims.tenant_id, sub: claims.sub, claims };
+      req.downloadLink = claims.download;
+      return;
+    }
     if (!auth || typeof auth !== 'string' || !auth.startsWith('Bearer ')) {
       limiter?.recordFailure(req.ip);
       reply.code(401).send({ error: 'missing bearer token' });
@@ -169,12 +224,24 @@ export async function registerJwtAuth(app: FastifyInstance, opts: JwtPluginOptio
       reply.code(401).send({ error: 'invalid token' });
       return;
     }
+    // A download link only ever opens its download, from the URL.
+    if (isDocUserClaims(claims) && claims.download) {
+      limiter?.recordFailure(req.ip);
+      reply.code(401).send({ error: 'a download link is not a bearer token' });
+      return;
+    }
+
+    // An upload token uploads, and nothing else.
+    if (isUploadClaims(claims) && !UPLOAD_TOKEN_ROUTES.has(req.routeOptions.url ?? '')) {
+      reply.code(403).send({ error: 'an upload token only uploads' });
+      return;
+    }
 
     // Origin lock: enforced whenever the browser identifies itself.
     // Absent Origin = non-browser caller, governed by the token itself
     // (the lock's threat model is hotlink embedding, which always
     // arrives cross-origin from a browser, which always sends Origin).
-    if (isDocUserClaims(claims) && claims.origins) {
+    if ((isDocUserClaims(claims) || isUploadClaims(claims)) && claims.origins) {
       const origin = req.headers['origin'];
       if (typeof origin === 'string' && !matchesOrigin(origin, claims.origins)) {
         limiter?.recordFailure(req.ip);
@@ -230,6 +297,55 @@ export interface TenantAccessContext {
   via: 'api-token' | 'tenant-jwt';
 }
 
+/** An upload route reached with an upload token: what the token allows. */
+export interface UploadAccessContext {
+  tenantId: string;
+  sub: string;
+  via: 'upload-jwt';
+  /** The token's id: every document it starts records it. */
+  jti: string;
+  /** When the token runs out, epoch ms. */
+  expiresAt: number;
+  upload: UploadClaim;
+}
+
+/**
+ * The upload routes' guard: an upload token for the path's tenant, or
+ * what {@link requireTenantAccess} admits. The route then applies the
+ * token's limits; the auth hook has already kept the token off every
+ * other route.
+ */
+export function requireUploadAccess(
+  req: FastifyRequest,
+  tenantId: string,
+  wanted: ReadonlyArray<TenantScope>,
+): TenantAccessContext | UploadAccessContext {
+  const claims = req.tenant?.claims;
+  if (!req.apiAuth && claims && isUploadClaims(claims)) {
+    if (claims.tenant_id !== tenantId) {
+      throw forbiddenError(
+        `token is for tenant "${claims.tenant_id}", path names tenant "${tenantId}"`,
+      );
+    }
+    return {
+      tenantId,
+      sub: claims.sub,
+      via: 'upload-jwt',
+      jti: claims.jti,
+      expiresAt: claims.exp * 1000,
+      upload: claims.upload,
+    };
+  }
+  return requireTenantAccess(req, tenantId, wanted);
+}
+
+function forbiddenError(message: string): Error & { code: string; status: number } {
+  const err = new Error(message) as Error & { code: string; status: number };
+  err.code = 'Forbidden';
+  err.status = 403;
+  return err;
+}
+
 /**
  * The one-rule auth model for tenant-scoped routes: the API token is
  * valid for any tenant; a tenant JWT only for the tenant its
@@ -255,6 +371,46 @@ export function requireTenantAccess(
     throw err;
   }
   return { tenantId, sub: ctx.sub, via: 'tenant-jwt' };
+}
+
+/**
+ * A collection route that hands out what is inside a document (its
+ * original file, its thumbnail): the path's tenant, as
+ * {@link requireTenantAccess} asks, and then the document permission a doc
+ * token would need for the same content, against the document's own PDF
+ * bits. The API token passes without loading anything.
+ */
+export async function requireTenantContentAccess(
+  req: FastifyRequest,
+  tenantId: string,
+  capability: UnprotectableCapability,
+  pdfBitsOf: () => Promise<PdfBits>,
+): Promise<TenantAccessContext> {
+  if (req.apiAuth) {
+    return { tenantId, sub: 'api-token', via: 'api-token' };
+  }
+  const t = req.tenant;
+  if (!t) {
+    const err = new Error('tenant token required') as Error & { code: string; status: number };
+    err.code = 'Unauthenticated';
+    err.status = 401;
+    throw err;
+  }
+  const forbidden = (message: string) => {
+    const err = new Error(message) as Error & { code: string; status: number };
+    err.code = 'Forbidden';
+    err.status = 403;
+    return err;
+  };
+  if (isUploadClaims(t.claims)) throw forbidden('an upload token only uploads');
+  if (!isTenantClaims(t.claims)) throw forbidden('doc-scoped token cannot access tenant routes');
+  if (t.id !== tenantId) {
+    throw forbidden(`token is for tenant "${t.id}", path names tenant "${tenantId}"`);
+  }
+  if (!checkCapability(capability, documentScopeOf(t.claims.scope), await pdfBitsOf())) {
+    throw forbidden(`document permission required: ${capability}`);
+  }
+  return { tenantId, sub: t.sub, via: 'tenant-jwt' };
 }
 
 /** Deployment-surface guard: the root credential only, never a JWT. */
@@ -292,6 +448,7 @@ export function requireScope(
     err.status = 401;
     throw err;
   }
+  if (isUploadClaims(t.claims)) throw forbiddenError('an upload token only uploads');
   if (isDocUserClaims(t.claims)) {
     const err = new Error('doc-scoped token cannot access tenant routes') as Error & {
       code: string;
@@ -322,11 +479,11 @@ export type DocAccessMode = 'doc' | 'tenant';
  *
  *   1. **Doc-scoped token**: `doc_id` claim matches the URL, and
  *      the token's `DocScope[]` contains one of `needed` (or `*`).
- *   2. **Tenant token**: `scope` contains `docs.read` (or `*`).
- *      The doc-tenant binding is enforced one layer down by
- *      `DocumentsRepo.requireOwned(docId, tenantId)` — the service
- *      layer refuses to load a doc that doesn't belong to the
- *      token's tenant.
+ *   2. **Tenant token**: its document scope ({@link documentScopeOf})
+ *      contains one of `needed` (or `*`). The doc-tenant binding is
+ *      enforced one layer down by `DocumentsRepo.requireOwned(docId,
+ *      tenantId)` — the service layer refuses to load a doc that
+ *      doesn't belong to the token's tenant.
  *
  * Returns the resolved tenant context plus a `mode` flag for audit
  * logging (so we can see whether a request reached a doc via the
@@ -359,6 +516,7 @@ export function requireDocAccess(
     err.status = 401;
     throw err;
   }
+  if (isUploadClaims(t.claims)) throw forbiddenError('an upload token only uploads');
 
   if (isDocUserClaims(t.claims)) {
     if (t.claims.doc_id !== docId) {
@@ -382,12 +540,13 @@ export function requireDocAccess(
     return { tenantId: t.id, sub: t.sub, mode: 'doc', jwt: requestJwtContext(req, t.claims) };
   }
 
-  // TenantClaims path. The tenant owns every doc in their tenant
-  // and the service-layer requireOwned enforces the doc-tenant
-  // match, so we only need to know the bearer is authorised for
-  // tenant-level doc reads.
-  if (!hasTenantScope(t.claims, ['*', 'docs.read'])) {
-    const err = new Error('tenant scope required: one of [*, docs.read]') as Error & {
+  // TenantClaims path: the service-layer requireOwned enforces the
+  // doc-tenant match; the token's document scope answers for `needed`.
+  const jwt = requestJwtContext(req, t.claims);
+  if (!jwt.scope.includes('*') && !needed.some((scope) => jwt.scope.includes(scope))) {
+    const err = new Error(
+      `document permission required: one of [${needed.join(', ')}]`,
+    ) as Error & {
       code: string;
       status: number;
     };
@@ -395,7 +554,7 @@ export function requireDocAccess(
     err.status = 403;
     throw err;
   }
-  return { tenantId: t.id, sub: t.sub, mode: 'tenant', jwt: requestJwtContext(req, t.claims) };
+  return { tenantId: t.id, sub: t.sub, mode: 'tenant', jwt };
 }
 
 export function requireLayerDocAccess(
@@ -421,17 +580,16 @@ export function requireLayerDocAccess(
 //   2. Mutation routes that have collab semantics call `requireCollab(...)`
 //      with the target row's userId/groupId.
 //
-// Tenant tokens still bypass capability checks here — a tenant owns every
-// doc in their tenant, and the service-layer `requireOwned` enforces the
-// doc-tenant binding. This mirrors the existing `requireDocAccess` policy
-// for the tenant branch.
+// A tenant token is checked like a doc token, against its document scope
+// ({@link documentScopeOf}): the document permissions it names, for every
+// document of its tenant. The service-layer `requireOwned` enforces the
+// doc-tenant binding.
 
 /**
  * Doc-scope-only preHandler that performs no capability check. Verifies
  * the JWT is doc-scoped to this `docId` (or that the bearer is a tenant
- * token with `docs.read`). Used by the next-layer capability/collab
- * helpers; the tenant branch they exit through is the same as the legacy
- * `requireDocAccess`.
+ * token whose scope names some document permission). Used by the
+ * next-layer capability/collab helpers, which then check the operation.
  *
  * Reading is implicit only in the sense that having a valid doc-scoped
  * token gets you this far — the capability/collab/resource helper layered
@@ -451,6 +609,7 @@ export function requireDocAccessOnly(
     err.status = 401;
     throw err;
   }
+  if (isUploadClaims(t.claims)) throw forbiddenError('an upload token only uploads');
 
   if (isDocUserClaims(t.claims)) {
     if (t.claims.doc_id !== docId) {
@@ -465,9 +624,13 @@ export function requireDocAccessOnly(
     return { tenantId: t.id, sub: t.sub, mode: 'doc', jwt: requestJwtContext(req, t.claims) };
   }
 
-  // Tenant branch — same policy as the legacy requireDocAccess.
-  if (!hasTenantScope(t.claims, ['*', 'docs.read'])) {
-    const err = new Error('tenant scope required: one of [*, docs.read]') as Error & {
+  // Tenant branch: a token whose scope grants nothing inside documents
+  // (only collection scopes) has no business on the doc plane.
+  const jwt = requestJwtContext(req, t.claims);
+  if (jwt.scope.length === 0) {
+    const err = new Error(
+      'tenant scope names no document permission: add the doc.* permissions it needs, or *',
+    ) as Error & {
       code: string;
       status: number;
     };
@@ -475,7 +638,7 @@ export function requireDocAccessOnly(
     err.status = 403;
     throw err;
   }
-  return { tenantId: t.id, sub: t.sub, mode: 'tenant', jwt: requestJwtContext(req, t.claims) };
+  return { tenantId: t.id, sub: t.sub, mode: 'tenant', jwt };
 }
 
 /** A capability no signature can take away: its check never needs the document's protection. */
@@ -513,10 +676,9 @@ function refuseProtected(capability: DocCapability, protection: DocumentProtecti
  *
  * A capability a signature can take away also takes the document's
  * protection (`DocumentService.getProtection`), checked first, for every
- * caller. Tenant tokens then bypass the scope check (existing policy:
- * tenant owns every doc in the tenant). Doc-scoped tokens evaluate the
- * capability against their JWT scope array + the document's PDF bits
- * (the bits matter for `pdf.permissions` expansion only).
+ * caller. The capability is then evaluated against the token's scope (a
+ * tenant token's document scope) + the document's PDF bits (the bits
+ * matter for `pdf.permissions` expansion only).
  */
 export function requireCapability<C extends DocCapability>(
   req: FastifyRequest,
@@ -527,7 +689,6 @@ export function requireCapability<C extends DocCapability>(
 ): { tenantId: string; sub: string; mode: DocAccessMode; jwt: RequestJwtContext } {
   const ctx = requireDocAccessOnly(req, docId);
   refuseProtected(capability, protectionOf(protection));
-  if (ctx.mode === 'tenant') return ctx;
   if (!checkCapability(capability, ctx.jwt.scope, pdfBits)) {
     throw new PermissionDenied(capability);
   }
@@ -546,7 +707,6 @@ export function requireAnyCapability(
   pdfBits: PdfBits,
 ): { tenantId: string; sub: string; mode: DocAccessMode; jwt: RequestJwtContext } {
   const ctx = requireDocAccessOnly(req, docId);
-  if (ctx.mode === 'tenant') return ctx;
   if (!checkAnyCapability(capabilities, ctx.jwt.scope, pdfBits)) {
     throw new PermissionDenied(capabilities[0] ?? 'doc.open', undefined, capabilities);
   }
@@ -566,7 +726,6 @@ export function requireResource(
   pdfBits: PdfBits,
 ): { tenantId: string; sub: string; mode: DocAccessMode; jwt: RequestJwtContext } {
   const ctx = requireDocAccessOnly(req, docId);
-  if (ctx.mode === 'tenant') return ctx;
   if (!checkResourceAccess(resourceId, ctx.jwt.scope, pdfBits)) {
     throwResourceDenied(resourceId, ctx.jwt.scope, pdfBits);
   }
@@ -591,7 +750,6 @@ export function requireCollabAction(
 ): { tenantId: string; sub: string; mode: DocAccessMode; jwt: RequestJwtContext } {
   const ctx = requireDocAccessOnly(req, docId);
   refuseProtected('doc.annotate.modify', protection);
-  if (ctx.mode === 'tenant') return ctx;
   if (!checkCollab(action, target, ctx.jwt.scope, ctx.jwt.identity, pdfBits)) {
     throw new PermissionDenied(`annotations:${action}`, 'target');
   }
@@ -602,14 +760,13 @@ export function requireCollabAction(
  * Whether the token may make new objects on the document, so its editing
  * session is handed object numbers: create annotations (as itself, in its
  * own group), insert pages, add form fields, or add outline items. What the
- * document's signatures forbid doesn't count. A tenant owns its documents.
+ * document's signatures forbid doesn't count.
  */
 export function mayCreateObjects(
   ctx: { mode: DocAccessMode; jwt: RequestJwtContext },
   pdfBits: PdfBits,
   protection: DocumentProtection | null,
 ): boolean {
-  if (ctx.mode === 'tenant') return true;
   const { scope, identity } = ctx.jwt;
   if (
     checkAnyCapability(
@@ -641,7 +798,7 @@ export function holdsCapability(
   protection: DocumentProtection | null,
 ): boolean {
   if (protection && protectedCapabilities(protection).has(capability)) return false;
-  return ctx.mode === 'tenant' || checkCapability(capability, ctx.jwt.scope, pdfBits);
+  return checkCapability(capability, ctx.jwt.scope, pdfBits);
 }
 
 // Layer-scoped variants — wrap the doc-only versions with the existing
@@ -795,8 +952,7 @@ export function requireLayerCollabAction(
  * An annotation write whose permission the worker checks against what the
  * write finds, inside the write (an update, a delete): the token reaches
  * this document's layer, no signature forbids annotation writes, and the
- * authority the write carries names who it acts for and the token's grants
- * (none to check for a tenant, which owns its documents).
+ * authority the write carries names who it acts for and the token's grants.
  */
 export function requireLayerAnnotationWrite(
   req: FastifyRequest,
@@ -812,7 +968,7 @@ export function requireLayerAnnotationWrite(
     ...writeRequestOf(req),
     authority: {
       identity: ctx.jwt.identity,
-      grants: ctx.mode === 'tenant' ? null : { scope: ctx.jwt.scope, pdfBits },
+      grants: { scope: ctx.jwt.scope, pdfBits },
     },
   };
 }
@@ -820,8 +976,7 @@ export function requireLayerAnnotationWrite(
 /**
  * A request's changes (`POST …/changes`): the token reaches this document's
  * layer, and the authority the changes carry names who they act for, the
- * token's grants (none for a tenant, which owns its documents) and what the
- * document's signatures forbid. The worker checks each op against it inside
+ * token's grants and what the document's signatures forbid. The worker checks each op against it inside
  * the write, the ops of an undo included.
  */
 export function requireLayerChangeWrite(
@@ -837,8 +992,7 @@ export function requireLayerChangeWrite(
 
 /**
  * What a write carries for the worker to check inside it: who it acts for,
- * the token's grants (none for a tenant, which owns its documents), and what
- * the document's signatures forbid.
+ * the token's grants, and what the document's signatures forbid.
  */
 export function changeAuthorityOf(
   ctx: { mode: DocAccessMode; jwt: RequestJwtContext },
@@ -847,7 +1001,7 @@ export function changeAuthorityOf(
 ): ChangeAuthority {
   return {
     identity: ctx.jwt.identity,
-    grants: ctx.mode === 'tenant' ? null : { scope: ctx.jwt.scope, pdfBits },
+    grants: { scope: ctx.jwt.scope, pdfBits },
     protection,
   };
 }
@@ -941,7 +1095,13 @@ function jwtContext(claims: JwtClaims): RequestJwtContext {
     jti: typeof claims.jti === 'string' && claims.jti.length > 0 ? claims.jti : null,
     exp: typeof claims.exp === 'number' ? claims.exp : null,
     unlockKey: readUnlockKey(claims),
-    scope: claims.scope,
+    // Inside documents a tenant token is checked like a doc token, against
+    // the document permissions its scope grants. An upload token grants none.
+    scope: isTenantClaims(claims)
+      ? documentScopeOf(claims.scope)
+      : isDocUserClaims(claims)
+        ? claims.scope
+        : [],
     identity: claims.identity ? { ...claims.identity } : {},
   };
 }
@@ -950,4 +1110,28 @@ function readUnlockKey(claims: JwtClaims): string | null {
   return claims.embedpdf?.unlock_key && claims.embedpdf.unlock_key.length > 0
     ? claims.embedpdf.unlock_key
     : null;
+}
+
+/** The versioned download URL, `/v1/docs/{docId}/layers/{layerName}/download@{token}`. */
+const VERSIONED_DOWNLOAD = /^\/v1\/docs\/([^/]+)\/layers\/([^/]+)\/download@[^/]+$/;
+
+/** The download link a request carries in `?link=`, on a versioned download URL; `null` otherwise. */
+function downloadLinkOf(
+  url: string,
+  pathname: string,
+): { token: string; docId: string; layerName: string } | null {
+  const match = VERSIONED_DOWNLOAD.exec(pathname);
+  if (!match) return null;
+  const query = url.slice(pathname.length + 1);
+  const token = new URLSearchParams(query).get('link');
+  if (!token) return null;
+  try {
+    return {
+      token,
+      docId: decodeURIComponent(match[1]!),
+      layerName: decodeURIComponent(match[2]!),
+    };
+  } catch {
+    return null;
+  }
 }

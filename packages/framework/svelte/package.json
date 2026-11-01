@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/svelte",
-  "version": "3.0.0-next.15",
+  "version": "3.0.0-next.19",
   "private": false,
   "description": "Svelte 5 adapter for EmbedPDF v3: rune-based functions, components with bind: and snippets, headless layers. The whole framework surface, one entry point per feature.",
   "type": "module",
@@ -120,6 +120,11 @@
       "types": "./src/annotation.ts",
       "svelte": "./src/annotation.ts",
       "default": "./src/annotation.ts"
+    },
+    "./attachment": {
+      "types": "./src/attachment.ts",
+      "svelte": "./src/attachment.ts",
+      "default": "./src/attachment.ts"
     },
     "./stamp": {
       "types": "./src/stamp.ts",
@@ -261,6 +266,11 @@
         "svelte": "./dist/annotation.js",
         "default": "./dist/annotation.js"
       },
+      "./attachment": {
+        "types": "./dist/attachment.d.ts",
+        "svelte": "./dist/attachment.js",
+        "default": "./dist/attachment.js"
+      },
       "./stamp": {
         "types": "./dist/stamp.d.ts",
         "svelte": "./dist/stamp.js",
@@ -305,6 +315,7 @@
     "@embedpdf/core-geometry": "workspace:*",
     "@embedpdf/core": "workspace:*",
     "@embedpdf/plugin-annotation": "workspace:*",
+    "@embedpdf/plugin-attachment": "workspace:*",
     "@embedpdf/plugin-commands": "workspace:*",
     "@embedpdf/plugin-fonts": "workspace:*",
     "@embedpdf/plugin-form": "workspace:*",

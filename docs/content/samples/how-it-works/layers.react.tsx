@@ -24,9 +24,9 @@ const plugins = [
   searchPlugin(),
 ];
 
-// [!doc-source ebook]
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
+// [!doc-source welcome]
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/welcome.pdf');
   return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
@@ -41,7 +41,7 @@ function OnLoad() {
     void search.search({ text: 'PDF' });
   }, [search]);
   useEffect(() => {
-    if (cover) selection.select({ page: cover, start: 10, count: 52 });
+    if (cover) selection.select({ page: cover, start: 28, count: 30 });
   }, [selection, cover]);
 
   return null;
@@ -63,7 +63,7 @@ export default function App() {
   const [showSelection, setShowSelection] = useState(true);
 
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">Opening…</p>}>
         <OnLoad />
         <div className="toolbar">

@@ -10,14 +10,14 @@ import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage'
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 @Component({
   selector: 'demo-root',
   imports: [EpdfDocumentGate, EpdfStage, EpdfPageTemplate, EpdfRenderLayer],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook, name: 'ebook.pdf' }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: welcome, name: 'welcome.pdf' }] },
       withStage(),
       withRender(),
     ),
@@ -46,8 +46,8 @@ const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrb
       @if (document.id()) {
         <button type="button" class="button" (click)="documents.close(document.id())">Close</button>
       } @else {
-        <button type="button" class="button" (click)="documents.open(ebook, { name: 'ebook.pdf' })">
-          Open the ebook again
+        <button type="button" class="button" (click)="documents.open(welcome, { name: 'welcome.pdf' })">
+          Open the welcome again
         </button>
       }
     </div>
@@ -69,9 +69,9 @@ const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrb
 export class App {
   protected readonly documents = inject(EpdfDocuments);
   protected readonly document = inject(EpdfDocument);
-  protected readonly ebook = ebook;
+  protected readonly welcome = welcome;
 
-  // A file the user picks opens next to the ebook, and becomes the active document.
+  // A file the user picks opens next to the welcome, and becomes the active document.
   protected async pick(picker: HTMLInputElement) {
     const file = picker.files?.[0];
     picker.value = '';

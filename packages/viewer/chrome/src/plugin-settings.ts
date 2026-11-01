@@ -95,6 +95,7 @@ interface BuiltInSettings {
   readonly metadata: never;
   readonly fonts: never;
   readonly outline: never;
+  readonly attachment: never;
   readonly actions: ConfigOf<typeof actionsPlugin>;
   readonly documents: never;
   readonly interaction: ConfigOf<typeof interactionPlugin>;
@@ -124,6 +125,7 @@ const WITHOUT_SETTINGS: ReadonlySet<string> = new Set<PluginName>([
   'metadata',
   'fonts',
   'outline',
+  'attachment',
   'documents',
   'shell',
 ]);

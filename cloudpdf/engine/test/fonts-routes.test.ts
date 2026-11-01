@@ -102,7 +102,8 @@ describe('the server’s font routes', () => {
     const token = { fontsVersion: current.fontsVersion, serverFonts: current.serverFonts };
     const list = await get(wirePaths.layerFonts(DOC_ID, 'default', token), writer());
     expect(list.status).toBe(200);
-    expect(list.headers.get('cache-control')).toBe('public, max-age=31536000, immutable');
+    // No CDN in front of this server: only the caller's browser may keep it.
+    expect(list.headers.get('cache-control')).toBe('private, max-age=31536000, immutable');
 
     const elsewhere = await get(
       wirePaths.layerFonts(DOC_ID, 'default', { ...token, serverFonts: OTHER_FONTS }),

@@ -4,14 +4,14 @@ import { createTestContext } from '@embedpdf/core/testing';
 import { describe, expect, it } from 'vitest';
 
 import { createViewManagerController } from '../src/controller';
-import { initialViewManagerState } from '../src/model';
+import { initialViewManagerModel } from '../src/model';
 import { viewManagerState } from '../src/state';
 
 function harness(open: string[] = []) {
   const documents = { getOrder: () => open } as unknown as DocumentsCapability;
   const ctx = createTestContext({
     id: 'view-manager',
-    state: initialViewManagerState(),
+    state: initialViewManagerModel(),
     capabilities: [[DocumentsToken, documents]],
     doc: null,
   });
@@ -115,7 +115,7 @@ describe('a document that gets its real id while opening', () => {
     const documents = { getOrder: () => order } as unknown as DocumentsCapability;
     const ctx = createTestContext({
       id: 'view-manager',
-      state: initialViewManagerState(),
+      state: initialViewManagerModel(),
       capabilities: [[DocumentsToken, documents]],
       doc: null,
     });

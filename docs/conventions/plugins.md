@@ -87,7 +87,7 @@ export const formPlugin = (config?: FormConfig) =>
     scope: 'document',
     requires: [InteractionToken],
     optional: [AnnotationToken, ActionsToken],
-    state: initialFormState,
+    state: initialFormModel,
     settings: { defaults: FORM_DEFAULTS, registered: config },
     create: createFormController,
   });
@@ -235,7 +235,7 @@ export function createFormController(ctx: FormContext) {
 `services/` holds what several areas share, built once by
 `createServices(ctx)`: the mirrors, the event sources, resolved siblings,
 queues. A plugin that uses the context in many files names its type once:
-`export type FormContext = PluginContext<FormState, FormSettings>` in
+`export type FormContext = PluginContext<FormModel, FormSettings>` in
 `services/context.ts`.
 
 ## `connect.ts`
@@ -370,14 +370,14 @@ state a UI shows once, next to its contract.
 ```ts
 // search.plugin.ts: the settings, what the app registered over the defaults.
 // SearchConfig is DeepPartial<SearchSettings>. No type arguments: the settings
-// type comes from SEARCH_DEFAULTS, the state from initialSearchState, the
+// type comes from SEARCH_DEFAULTS, the state from initialSearchModel, the
 // capability from SearchToken.
 export const searchPlugin = (config?: SearchConfig) =>
   definePlugin({
     id: 'search',
     token: SearchToken,
     // …
-    state: initialSearchState,
+    state: initialSearchModel,
     settings: { defaults: SEARCH_DEFAULTS, registered: config },
     create: createSearchController,
   });
@@ -386,7 +386,7 @@ export const searchPlugin = (config?: SearchConfig) =>
 // definition is checked against it. The capability spreads the settings calls;
 // the controller reads get() where it uses a setting, so a change is live.
 export function createSearchController(
-  ctx: PluginContext<SearchState, SearchSettings>,
+  ctx: PluginContext<SearchModel, SearchSettings>,
 ) {
   const settings = ctx.settings();
   // …
@@ -401,8 +401,15 @@ export function createSearchController(
 }
 
 // state.ts: the page's State table, as code
+export interface SearchState {
+  /** How many matches the search found so far. */
+  readonly hitCount: number;
+  /** Where the search is: `idle`, `searching`, `complete`, `cancelled` or `error`. */
+  readonly status: SearchStatus;
+}
+
 export const searchState = defineState(SearchToken, {
-  read: (search) => ({
+  read: (search): SearchState => ({
     hitCount: search.getHitCount(),
     status: search.getStatus(),
   }),
@@ -431,6 +438,14 @@ export const searchState = defineState(SearchToken, {
   it reads like progress: Search's `onProgressChanged` fires when `progress`
   changes, including its reset when a new search starts
   ([`events.md`](./events.md#state-change-events)).
+- The State table has a named interface, `XState`, exported with its
+  declaration, and `read` returns it. The plugin's model, the state its
+  controller keeps in `model.ts`, is `XModel` (`initialXModel()`). The name is
+  what the adapters' published types print (`StateHook<SearchState>`): with an
+  inferred object TypeScript writes out every field instead, and may name a
+  field's type through the engine package, which an adapter doesn't depend on,
+  so the build copies the engine's types in and fails
+  ([`tooling/build`](../../tooling/build/README.md), law 6).
 - An adapter turns a state declaration into its framework's form with one
   generic function, and a plugin's settings with another (React:
   `export const useSearchState = stateHook(searchState)` and
@@ -445,6 +460,36 @@ export const searchState = defineState(SearchToken, {
   `@embedpdf/web`, so `--epdf-accent` and the viewer's `accent` reach it. A
   color with its own default (Search's `highlight.color`) is a plain value.
 - The docs' Settings and State tables are checked against these declarations.
+
+### Locking a setting
+
+A setting another part of the viewer must hold for one document, whatever the user or the app
+asks (a plugin that shows one page at a time), is locked by the plugin that owns the setting, never
+by hiding its controls. The convention, with the Stage as its first owner:
+
+- The owner offers `lockSettings(lock)`, which returns the function that lets go, and
+  `getLock(key)`, which gives the holder or `null`. A lock is `{ settings, by, reasonKey? }`:
+  the values it holds, who holds them (a plugin's id, or `'app'`), and the translation key of the
+  sentence its controls show. `SettingLock` (`by`, `reasonKey`) is in `@embedpdf/core`.
+- A lock is the last layer of the owner's resolution, over every writer: the Stage's effective
+  settings are its base (registration and `updateSettings()`), then the matching responsive
+  rules, then the locks. Writes still land underneath, so nothing throws and the user's own choice
+  is back when the lock goes. A setting that something writes outside that resolution (the
+  Stage's `zoom`, which gestures set) isn't lockable until it is held against that writer too.
+- Two locks on one setting with the same value both hold; one with another value is refused
+  (`conflict`), naming the holder. Nothing replaces anything implicitly.
+- Locks are kept in state, so a lock that changes no value still re-resolves the controls.
+- A command that changes a setting declares it with `locked: (context) => owner.getLock(key)`. The
+  commands plugin turns a lock into the third refusal reason, `'locked'`, beside `'turned-off'`
+  and `'not-allowed'`: disabled whatever `notAllowed` says, still `active` for its own value, with
+  the lock's sentence as `disabledReason`.
+- A plugin locks synchronously in `connect()`. Every document plugin connects before the document
+  is `ready` and no view mounts before `ready`, so the first layout is already locked.
+- A lock lasts as long as its document. Letting go is for a lock that ends while the document stays
+  open; a plugin holding one for the document's whole life registers no cleanup for it (state
+  writes after close are dropped). `getViewState()` saves what's under the locks.
+- The kernel's own settings stores are shared by every open document, so a lock there would hold
+  for all of them: they get the same names when a plugin first needs one.
 
 ## Errors
 
@@ -566,16 +611,16 @@ export interface TitleCapability {
 import type { DocumentEvent } from '@embedpdf/core';
 
 /** The session state: whether the title editor is open. */
-export interface TitleState {
+export interface TitleModel {
   readonly editorOpen: boolean;
 }
 
-export const initialTitleState = (): TitleState => ({ editorOpen: false });
+export const initialTitleModel = (): TitleModel => ({ editorOpen: false });
 
-export const openEditor = (state: TitleState): TitleState =>
+export const openEditor = (state: TitleModel): TitleModel =>
   state.editorOpen ? state : { ...state, editorOpen: true };
 
-export const closeEditor = (state: TitleState): TitleState =>
+export const closeEditor = (state: TitleModel): TitleModel =>
   state.editorOpen ? { ...state, editorOpen: false } : state;
 
 /** Apply one confirmed event to the mirrored title. The same for every origin. */
@@ -596,11 +641,11 @@ import type {
   TitleEditorChangedEvent,
   TitleResyncedEvent,
 } from './contract';
-import { closeEditor, foldTitle, openEditor, type TitleState } from './model';
+import { closeEditor, foldTitle, openEditor, type TitleModel } from './model';
 
 const EDIT_SCOPE: DocCapability = 'doc.metadata.modify';
 
-export function createTitleController(ctx: PluginContext<TitleState>) {
+export function createTitleController(ctx: PluginContext<TitleModel>) {
   const titleChanged = ctx.events.source<TitleChangedEvent>();
   const resynced = ctx.events.source<TitleResyncedEvent>();
   const editorChanged = ctx.events.source<TitleEditorChangedEvent>();
@@ -659,7 +704,7 @@ import { definePlugin } from '@embedpdf/core';
 
 import { TitleToken } from './contract';
 import { createTitleController } from './controller';
-import { initialTitleState } from './model';
+import { initialTitleModel } from './model';
 
 /** The document title, mirrored from the engine, and whether its editor is open. */
 export const titlePlugin = () =>
@@ -667,7 +712,7 @@ export const titlePlugin = () =>
     id: 'title',
     token: TitleToken,
     scope: 'document',
-    state: initialTitleState,
+    state: initialTitleModel,
     create: createTitleController,
   });
 ```

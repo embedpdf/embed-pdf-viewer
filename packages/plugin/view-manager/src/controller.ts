@@ -28,13 +28,13 @@ import {
   removePane,
   setActiveDocument,
   setFocusedPane,
-  type ViewManagerState,
+  type ViewManagerModel,
 } from './model';
 
 const sameIds = (left: readonly string[], right: readonly string[]): boolean =>
   left.length === right.length && left.every((id, index) => id === right[index]);
 
-export function createViewManagerController(ctx: PluginContext<ViewManagerState>) {
+export function createViewManagerController(ctx: PluginContext<ViewManagerModel>) {
   const paneCreated = ctx.events.source<PaneCreatedEvent>();
   const paneRemoved = ctx.events.source<PaneRemovedEvent>();
   const focusChanged = ctx.events.source<PaneFocusChangedEvent>();

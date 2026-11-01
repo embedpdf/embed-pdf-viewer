@@ -10,7 +10,7 @@ import type { PluginContext } from '@embedpdf/core';
 import type { StageViewState } from '../contract';
 import type { StageAnimation } from '../camera/animation';
 import type { StageHostCapability } from '../host-contract';
-import { markPlaced, setDpr, setViewport, type StageState } from '../model';
+import { markPlaced, setDpr, setViewport, type StageModel } from '../model';
 import type { StageArrival } from '../navigation/arrive';
 import type { StageServices } from '../services';
 import type { StageSettingsArea } from '../settings/settings';
@@ -21,15 +21,18 @@ interface InitialViewProvider {
 }
 
 export function createViewLifecycle(
-  ctx: PluginContext<StageState>,
+  ctx: PluginContext<StageModel>,
   { scene, placement }: Pick<StageServices, 'scene' | 'placement'>,
   { cancelAnimation }: Pick<StageAnimation, 'cancelAnimation'>,
   arrive: Pick<StageArrival, 'goToTarget' | 'reapply' | 'resetView'>,
-  settings: Pick<StageSettingsArea, 'snapshotSettings' | 'syncResponsive' | 'applyViewState'>,
+  settings: Pick<
+    StageSettingsArea,
+    'snapshotSettings' | 'viewStateSettings' | 'syncResponsive' | 'applyViewState'
+  >,
 ) {
   const { dpr, currentAnchor } = scene;
   const { goToTarget, reapply } = arrive;
-  const { snapshotSettings, syncResponsive } = settings;
+  const { snapshotSettings, viewStateSettings, syncResponsive } = settings;
   const state = () => ctx.state.get();
 
   // Initial-view providers (a storage restore, a deep link, an explicit
@@ -119,7 +122,8 @@ export function createViewLifecycle(
         reapply(currentAnchor());
       },
       getViewState: (): StageViewState => ({
-        ...snapshotSettings(),
+        // A lock is this document's now, not the user's: the saved view keeps what's under it.
+        ...viewStateSettings(),
         cursor: state().cursor,
         anchor: currentAnchor(),
       }),

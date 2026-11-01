@@ -18,7 +18,9 @@ import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { EpdfViewManager, withViewManager, type PaneInfo } from '@embedpdf/angular/view-manager';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
+
+const article: OpenInput = { kind: 'grant', grant: 'shr_v09cJHOmj3C8vrfUlZNTDyqX' };
 
 @Component({
   selector: 'demo-root',
@@ -28,8 +30,8 @@ const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrb
       {
         engine: () => cloudEngine(),
         initialDocuments: [
-          { source: ebook, name: 'Contract' },
-          { source: ebook, name: 'Report' },
+          { source: welcome, name: 'Guide' },
+          { source: article, name: 'Article' },
         ],
       },
       withStage(),

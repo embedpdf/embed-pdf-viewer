@@ -156,8 +156,27 @@ export type Direction = 'ltr' | 'rtl';
  */
 export type SizingMode = 'intrinsic' | 'uniform';
 
+/** The widest zoom range a view can have: 5% to 6400%. */
 export const ZOOM_MIN = 0.05;
 export const ZOOM_MAX = 64;
+/**
+ * The zoom range one view allows: its `minZoom` and `maxZoom` settings, made
+ * safe by {@link resolveZoomLimits}. Every zoom a view chooses (a fit, a
+ * level, a pinch, a reveal) is clamped into it with {@link clampZoom}.
+ */
+export interface ZoomLimits {
+  readonly min: number;
+  readonly max: number;
+}
+const ALL_ZOOMS: ZoomLimits = { min: ZOOM_MIN, max: ZOOM_MAX };
+/** The settings' `minZoom` and `maxZoom` as a range inside [ZOOM_MIN, ZOOM_MAX];
+ *  a `minZoom` above `maxZoom` counts as `maxZoom`. */
+export const resolveZoomLimits = (minZoom: number, maxZoom: number): ZoomLimits => {
+  const max = clamp(maxZoom, ZOOM_MIN, ZOOM_MAX);
+  return { min: clamp(minZoom, ZOOM_MIN, max), max };
+};
+export const clampZoom = (zoom: number, limits: ZoomLimits = ALL_ZOOMS): number =>
+  clamp(zoom, limits.min, limits.max);
 export const ZoomMode = {
   Automatic: 'automatic',
   FitPage: 'fit-page',
@@ -187,8 +206,13 @@ export const cameraWorldRect = (camera: Camera, vp: Size): Rect => ({
 
 // ── Camera operations ────────────────────────────────────────────────────────
 /** Focal zoom: keep the world point under `screenPt` fixed (no bounce). */
-export const zoomAround = (camera: Camera, screenPt: Point, factor: number): Camera => {
-  const zoom = clamp(camera.zoom * factor, ZOOM_MIN, ZOOM_MAX);
+export const zoomAround = (
+  camera: Camera,
+  screenPt: Point,
+  factor: number,
+  limits?: ZoomLimits,
+): Camera => {
+  const zoom = clampZoom(camera.zoom * factor, limits);
   return {
     x: camera.x + screenPt.x / camera.zoom - screenPt.x / zoom,
     y: camera.y + screenPt.y / camera.zoom - screenPt.y / zoom,
@@ -461,25 +485,32 @@ export function revealCamera(cam: Camera, rect: Rect, vp: Size, padding = 0): Ca
 }
 
 // ── Zoom intent — resolved against a fit-box chosen by the caller: the document's
-//    max item (continuous), the current item (paged), or the whole scene (fit-all). ─
-export function resolveZoom(spec: ZoomSpec, box: Size, vp: Size, padding = 0): number {
-  if ('level' in spec) return clamp(spec.level, ZOOM_MIN, ZOOM_MAX);
+//    max item (continuous), the current item (paged), or the whole scene (fit-all).
+//    The limits win over the intent: a fit outside them stops at the nearest one. ─
+export function resolveZoom(
+  spec: ZoomSpec,
+  box: Size,
+  vp: Size,
+  padding = 0,
+  limits?: ZoomLimits,
+): number {
+  if ('level' in spec) return clampZoom(spec.level, limits);
   // absolute pixel targets: box dimension = N screen px (document-independent)
-  if ('pageWidth' in spec) return clamp(spec.pageWidth / box.width, ZOOM_MIN, ZOOM_MAX);
-  if ('pageHeight' in spec) return clamp(spec.pageHeight / box.height, ZOOM_MIN, ZOOM_MAX);
+  if ('pageWidth' in spec) return clampZoom(spec.pageWidth / box.width, limits);
+  if ('pageHeight' in spec) return clampZoom(spec.pageHeight / box.height, limits);
   const fitW = Math.max(1, vp.width - 2 * padding) / box.width;
   const fitH = Math.max(1, vp.height - 2 * padding) / box.height;
   switch (spec.mode) {
     case ZoomMode.FitWidth:
-      return clamp(fitW, ZOOM_MIN, ZOOM_MAX);
+      return clampZoom(fitW, limits);
     case ZoomMode.FitPage:
     case ZoomMode.FitAll: // same fit math; the caller passes the whole-scene box
-      return clamp(Math.min(fitW, fitH), ZOOM_MIN, ZOOM_MAX);
+      return clampZoom(Math.min(fitW, fitH), limits);
     case ZoomMode.Automatic:
     default:
       // fit width, but never upscale past 100% (Adobe's "Automatic"). Height-
       // independent: a portrait page fills the width and you scroll within it.
-      return clamp(Math.min(fitW, 1), ZOOM_MIN, ZOOM_MAX);
+      return clampZoom(Math.min(fitW, 1), limits);
   }
 }
 

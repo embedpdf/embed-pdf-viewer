@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Planned maintenance of the Lanternfield CDN</title>
+<link rel="stylesheet" href="../shared/document.css">
+</head>
+<body class="lanternfield">
+<section class="page sheet">
+  <div class="letterhead">
+    <img src="../shared/lanternfield-logo.svg" alt="Lanternfield">
+    <span class="kind">Notice</span>
+  </div>
+
+  <h1 class="title">CDN maintenance on 4 November</h1>
+  <p class="meta">Sent 20 October 2026 · To teams that load Lanternfield from cdn.lanternfield.example</p>
+
+  <p class="lead">On 4 November we move cdn.lanternfield.example to a new CDN. The toolkit's scripts keep their addresses, so most apps need no change.</p>
+
+  <h2>Schedule</h2>
+  <table>
+    <thead>
+      <tr><th>Step</th><th>Date</th><th>Time (UTC)</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Every version copied to the new CDN</td><td>3 November</td><td>All day</td></tr>
+      <tr data-pdf="switch-row"><td>Traffic switched to the new CDN</td><td>4 November</td><td>07:00 to 08:00</td></tr>
+      <tr><td>Old CDN serves files read-only</td><td>4 to 18 November</td><td>All day</td></tr>
+      <tr><td>Old CDN switched off</td><td>18 November</td><td>09:00</td></tr>
+    </tbody>
+  </table>
+  <div style="flex:none; display:flex; justify-content:flex-end; margin-top:14px;">
+    <div data-pdf="text-box" style="width:300px; height:46px;"></div>
+  </div>
+
+  <h2>What to check</h2>
+  <p>Apps that load a version range, such as <span style="font-family:var(--font-mono); font-size:12.5px;">@3</span>, pick up the copy on the new CDN by themselves. Apps that pin one build by its hash should check that the hash still loads once the copy is done.</p>
+  <p>If your content security policy lists the CDN by its IP addresses rather than its name, add the new addresses from the status page before the switch.</p>
+  <div data-pdf="rich-text" style="flex:none; width:380px; height:46px; margin-top:16px;"></div>
+
+  <h2>Questions</h2>
+  <p>Reply to this notice, or write to support@lanternfield.example. We post every step on status.lanternfield.example as it happens.</p>
+  <p style="margin-top:22px;">The Lanternfield support team</p>
+
+  <div class="page-footer"><span>Lanternfield · Planned maintenance notice</span><span>1 of 1</span></div>
+</section>
+</body>
+</html>

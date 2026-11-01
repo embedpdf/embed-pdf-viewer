@@ -4,5 +4,5 @@
  * state.ts · search.plugin.ts.
  */
 export { searchPlugin } from './search.plugin';
-export { searchState } from './state';
+export { searchState, type SearchState } from './state';
 export * from './contract';

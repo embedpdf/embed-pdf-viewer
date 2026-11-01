@@ -29,6 +29,13 @@ was already invalid before editing; the report keeps this separate from failures
 caused by subsequent mutations. These diagnostics are not promoted policy
 expectations and do not change the 91-case v1/v2/v3 corpus above.
 
+## Tagged documents (2026-10-25)
+
+[TAGGED-DOCUMENTS.md](TAGGED-DOCUMENTS.md) covers commenting on a tagged PDF
+after an approval signature: what Acrobat should report, inferred from v3/88
+and the object-by-object comparison, and the probes that would confirm it. No
+tagged PDF has been observed in Acrobat yet.
+
 ## Start here in Acrobat
 
 1. Open `v1/01-approval-control.pdf` and `v1/22-aes128-control.pdf`. Neither has

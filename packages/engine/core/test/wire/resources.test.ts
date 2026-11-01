@@ -6,6 +6,8 @@ import {
   PAGE_PICTURES,
   PAGE_PRINT_FAMILIES,
   PAGE_RENDER_FAMILIES,
+  PAGE_THUMBNAIL_FAMILIES,
+  pagePictureOf,
 } from '../../src/wire/renderFamilies';
 
 const NO_BITS = decodePdfBits(null);
@@ -218,6 +220,22 @@ describe('cdnCoverageForScope', () => {
     }
   });
 
+  it("a layer's grant covers its own versions, never another layer's", () => {
+    const coverage = cdnCoverageForScope(['*'], NO_BITS, { docId: 'doc_1', layerName: 'bob' });
+    const versionPrefixes = coverage
+      .filter((e) => e.resourceId.startsWith('layer-version-'))
+      .map((e) => e.pathPrefix);
+    expect(versionPrefixes.sort()).toEqual([
+      '/v1/docs/doc_1/layers/bob/versions/analysis/',
+      '/v1/docs/doc_1/layers/bob/versions/download/',
+      '/v1/docs/doc_1/layers/bob/versions/revisions/',
+      '/v1/docs/doc_1/layers/bob/versions/signatures/',
+    ]);
+    expect(coverage.some((e) => e.pathPrefix.includes('/layers/alice/'))).toBe(false);
+    // The list grows with every signature: never signed at the edge.
+    expect(coverage.some((e) => e.resourceId === 'layer-versions')).toBe(false);
+  });
+
   it('never includes head or download-current', () => {
     const coverage = cdnCoverageForScope(['*'], NO_BITS, { docId: 'doc_1' });
     expect(coverage.some((e) => e.resourceId === 'head')).toBe(false);
@@ -406,10 +424,11 @@ describe('cdnCoverageForScope', () => {
   });
 
   it('a single capability scope covers both doc-level and layer-scoped variants gated by that capability', () => {
-    // doc.render → page-render (doc-level) and layer-page-render (layer-scoped).
-    // Both share the same capability gate; both get signed so the CDN
-    // covers whichever variant the SDK actually requests. Pictures with
-    // annotations aren't among them: they also take doc.annotate.read.
+    // doc.render → page-render (doc-level) and layer-page-render (layer-scoped),
+    // and their thumbnails, which doc.render includes. Both variants share the
+    // same capability gate; both get signed so the CDN covers whichever variant
+    // the SDK actually requests. Pictures with annotations aren't among them:
+    // they also take doc.annotate.read.
     const coverage = cdnCoverageForScope(['doc.render'], NO_BITS, { docId: 'doc_1' });
     expect(coverage).toEqual([
       {
@@ -418,9 +437,19 @@ describe('cdnCoverageForScope', () => {
         pathPrefix: '/v1/docs/doc_1/render/pages/',
       },
       {
+        resourceId: 'page-thumbnail',
+        pathPattern: '/v1/docs/doc_1/render/thumbnail/pages/*/data@*',
+        pathPrefix: '/v1/docs/doc_1/render/thumbnail/pages/',
+      },
+      {
         resourceId: 'layer-page-render',
         pathPattern: '/v1/docs/doc_1/layers/default/render/pages/*/data@*',
         pathPrefix: '/v1/docs/doc_1/layers/default/render/pages/',
+      },
+      {
+        resourceId: 'layer-page-thumbnail',
+        pathPattern: '/v1/docs/doc_1/layers/default/render/thumbnail/pages/*/data@*',
+        pathPrefix: '/v1/docs/doc_1/layers/default/render/thumbnail/pages/',
       },
     ]);
   });
@@ -580,6 +609,15 @@ describe('cdnCoverageForScope', () => {
         'layer-page-render-annotations',
         'layer-page-render-fields',
         'layer-page-render-all',
+        // doc.render includes the thumbnails.
+        'page-thumbnail',
+        'page-thumbnail-annotations',
+        'page-thumbnail-fields',
+        'page-thumbnail-all',
+        'layer-page-thumbnail',
+        'layer-page-thumbnail-annotations',
+        'layer-page-thumbnail-fields',
+        'layer-page-thumbnail-all',
         'page-text',
         'layer-page-text',
         'page-geometry',
@@ -612,8 +650,8 @@ describe('cdnCoverageForScope', () => {
         // no download right (contents/digests, history).
         'layer-signatures',
         'layer-signatures-analysis',
-        'version-signatures',
-        'version-analysis',
+        'layer-version-signatures',
+        'layer-version-analysis',
         // ...and the form: its fields and widget rows, and the widget images.
         'form',
         'page-form',
@@ -669,6 +707,81 @@ describe('DOC_RESOURCES — pathPrefix invariants (anti-drift)', () => {
     const unique = new Set(cacheablePrefixes);
     expect(unique.size).toBe(cacheablePrefixes.length);
   });
+
+  it("no cacheable resource's prefix opens another resource's URLs", () => {
+    // A prefix-signed token opens every URL under its prefix, so a cacheable
+    // prefix must not be the start of another resource's prefix: the edge
+    // would serve that resource to a session its own requirement refuses
+    // (a session without doc.download, say, or without doc.render).
+    const resources = Object.values(DOC_RESOURCES);
+    for (const signed of resources.filter((r) => r.cdnCacheable)) {
+      const prefix = signed.resolvePathPrefix('doc_X', 'myLayer');
+      for (const other of resources) {
+        if (other === signed) continue;
+        expect(
+          other.resolvePathPrefix('doc_X', 'myLayer').startsWith(prefix),
+          `${signed.id}'s prefix would open ${other.id}`,
+        ).toBe(false);
+      }
+    }
+  });
+});
+
+describe('thumbnails', () => {
+  const ids = (c: ReturnType<typeof cdnCoverageForScope>) => new Set(c.map((e) => e.resourceId));
+  const THUMBNAIL_IDS = Object.values(PAGE_THUMBNAIL_FAMILIES).map((p) => p.resource);
+  const SCREEN_IDS = Object.values(PAGE_RENDER_FAMILIES).map((p) => p.resource);
+  const READS = ['doc.open', 'doc.annotate.read', 'doc.forms.read'];
+
+  it('a thumbnail needs doc.render.thumbnail and the rights to read what it draws', () => {
+    for (const picture of Object.values(PAGE_THUMBNAIL_FAMILIES)) {
+      const reads = PAGE_RENDER_FAMILIES[picture.family].needs.filter((s) => s !== 'doc.render');
+      const needs = ['doc.render.thumbnail', ...reads];
+      expect([...picture.needs].sort()).toEqual([...needs].sort());
+      for (const id of [picture.resource, picture.layerResource]) {
+        expect(checkResourceAccess(id, needs, NO_BITS)).toBe(true);
+        // doc.render includes the thumbnails.
+        expect(checkResourceAccess(id, ['doc.render', ...reads], NO_BITS)).toBe(true);
+        for (const missing of needs) {
+          expect(
+            checkResourceAccess(
+              id,
+              needs.filter((s) => s !== missing),
+              NO_BITS,
+            ),
+          ).toBe(false);
+        }
+      }
+    }
+  });
+
+  it('the CDN signs thumbnails for the thumbnail right, and screen pictures only for doc.render', () => {
+    const thumbnailsOnly = ids(
+      cdnCoverageForScope([...READS, 'doc.render.thumbnail'], NO_BITS, {
+        docId: 'doc_1',
+        layerName: 'L1',
+      }),
+    );
+    const render = ids(
+      cdnCoverageForScope([...READS, 'doc.render'], NO_BITS, { docId: 'doc_1', layerName: 'L1' }),
+    );
+    for (const id of THUMBNAIL_IDS) expect(thumbnailsOnly.has(id)).toBe(true);
+    for (const id of SCREEN_IDS) expect(thumbnailsOnly.has(id)).toBe(false);
+    for (const id of [...THUMBNAIL_IDS, ...SCREEN_IDS]) expect(render.has(id)).toBe(true);
+  });
+
+  it('a thumbnail is the picture a thumbnail viewport asks for', () => {
+    const layers = { includeAnnotations: true, includeFormFields: false };
+    expect(pagePictureOf(layers, { viewport: { kind: 'thumbnail' } })).toBe(
+      PAGE_THUMBNAIL_FAMILIES.annotations,
+    );
+    expect(pagePictureOf(layers, { viewport: { kind: 'width', width: 512 } })).toBe(
+      PAGE_RENDER_FAMILIES.annotations,
+    );
+    expect(pagePictureOf(layers, { usage: 'print', viewport: { kind: 'dpi', dpi: 150 } })).toBe(
+      PAGE_PRINT_FAMILIES.print.annotations,
+    );
+  });
 });
 
 describe('print pictures', () => {
@@ -692,14 +805,15 @@ describe('print pictures', () => {
     }
   });
 
-  it("a print picture needs its family's rights plus its tier's, at both tiers", () => {
+  it("a print picture needs its tier's rights and the rights to read what it draws, not doc.render", () => {
     for (const picture of PAGE_PICTURES.filter((p) => p.print !== null)) {
-      const screen = PAGE_RENDER_FAMILIES[picture.family];
-      const tier = [...picture.print!.needs];
+      const reads = PAGE_RENDER_FAMILIES[picture.family].needs.filter((s) => s !== 'doc.render');
+      const needs = [...picture.print!.needs, ...reads];
+      expect(picture.needs).not.toContain('doc.render');
       for (const id of [picture.resource, picture.layerResource]) {
-        expect(checkResourceAccess(id, [...screen.needs, ...tier], NO_BITS)).toBe(true);
-        for (const missing of [...screen.needs, ...tier]) {
-          const short = [...screen.needs, ...tier].filter((s) => s !== missing);
+        expect(checkResourceAccess(id, needs, NO_BITS)).toBe(true);
+        for (const missing of needs) {
+          const short = needs.filter((s) => s !== missing);
           expect(checkResourceAccess(id, short, NO_BITS)).toBe(false);
         }
       }

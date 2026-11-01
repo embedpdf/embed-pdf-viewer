@@ -18,7 +18,7 @@
 //     const container = EmbedPDF.init({
 //       type: 'container',
 //       target: this.host.nativeElement,
-//       src: { shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' },
+//       src: { grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' },
 //     });
 //     this.registry = await container?.registry;
 //   }
@@ -38,7 +38,7 @@ import { EpdfPdfViewer, type Viewer } from '@cloudpdf/viewer-angular';
     <button [disabled]="!viewer()" (click)="viewer()?.commands?.execute('document:print')">
       Print
     </button>
-    <epdf-pdf-viewer [src]="{ shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' }" style="height: 80vh" (ready)="viewer.set($event)" />
+    <epdf-pdf-viewer [src]="{ grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' }" style="height: 80vh" (ready)="viewer.set($event)" />
   `,
 })
 export class Review {

@@ -1,5 +1,120 @@
 # @cloudpdf/server
 
+## 3.0.0-next.19
+
+### Minor Changes
+
+- [#918](https://github.com/embedpdf/embed-pdf-viewer/pull/918) by [@bobsingor](https://github.com/bobsingor) – Share links are grants: routes under `/v1/tenants/{tenantId}/grants`, the
+  `grants.manage` scope, and the public exchange at `POST /v1/grant-sessions`,
+  which takes `{ grant, passphrase }`. Migration 047 renames `share_grants` to
+  `grants` and `share_visitors` to `grant_visitors` with their indexes and
+  constraints, renames `password_hash` to `passphrase_hash`, and adds a grant's
+  `name`. New grants are `grt_…`, and `shr_…` grants keep working. Session tokens
+  name `grant:<id>`, and `security_events` records `grant.created`,
+  `grant.updated`, `grant.archived` and `grant.revoked`.
+
+## 3.0.0-next.18
+
+### Minor Changes
+
+- [#917](https://github.com/embedpdf/embed-pdf-viewer/pull/917) by [@bobsingor](https://github.com/bobsingor) – Organize documents in folders. Folders nest up to 100 levels with names
+  unique among siblings, ignoring case. A move takes documents and folders
+  together or not at all and never makes a loop, even when two moves race;
+  only empty folders delete. Documents are filed at upload and listed per
+  folder, and a document being deleted leaves its folder. Migration 046 adds
+  the `folders` table and `documents.folder_id`. Errors thrown with
+  structured context now return it as `details`.
+
+- [#917](https://github.com/embedpdf/embed-pdf-viewer/pull/917) by [@bobsingor](https://github.com/bobsingor) – Store a name for every document, searchable and sortable without regard to
+  case, and rename documents with `PATCH /v1/tenants/:tenantId/documents/:id`
+  under the new `docs.update` scope. The documents list searches by name, sorts
+  by creation time, name or size in either order with stable cursors, and hides
+  documents that are being deleted unless asked for by state. Migration 045 names
+  existing documents from `metadata.name` when it is a non-empty string, otherwise
+  from their id.
+
+- [#917](https://github.com/embedpdf/embed-pdf-viewer/pull/917) by [@bobsingor](https://github.com/bobsingor) – Delete a folder with everything in it via `recursive=true`: the folder and
+  every folder under it go in one transaction, and every document in them stops
+  opening, leaves every list and stops answering its share links at once, while
+  their stored files are removed in the background. The sweeper now also
+  finishes deletes left behind, such as one interrupted by a crash, after
+  `deletingGraceMs` (default one minute). The filesystem object store no longer
+  fails a write when a delete elsewhere in the same tenant prunes the
+  directories the write has just made.
+
+- [#917](https://github.com/embedpdf/embed-pdf-viewer/pull/917) by [@bobsingor](https://github.com/bobsingor) – Tenant scopes act on records and document capabilities act on what is inside
+  documents, on any token. A tenant JWT is checked inside documents the way a
+  document JWT is, against the document capabilities its scope names, which hold
+  for every document of the tenant; `docs.read` lists documents but no longer
+  opens, reads or changes them. Downloading the original file needs
+  `doc.download` and the thumbnail needs `doc.render`. A tenant token whose scope
+  names no document capability is refused on the document routes, and
+  `tokens.issue` validates a tenant token's scope entries.
+
+### Patch Changes
+
+- [#910](https://github.com/embedpdf/embed-pdf-viewer/pull/910) by [@bobsingor](https://github.com/bobsingor) – A layer's versions are read through the layer. The version routes moved from `/v1/docs/:docId/versions…` to `/v1/docs/:docId/layers/:layerName/versions…`, checked like every other layer route.
+  - **The list** gives the layer's versions (the upload, then the ones its signatures made) and its `baseSha`.
+  - **A version's signatures, analysis, download and revisions** answer only for the upload or the layer's own versions: another layer's version is 404, and a token for one layer can't use another layer's path.
+  - **Tenant tokens** read any layer's versions, through that layer.
+
+- [#909](https://github.com/embedpdf/embed-pdf-viewer/pull/909) by [@bobsingor](https://github.com/bobsingor) – A share link can say who its visitors are, for a link made for one person: `identity` on `shares.create` and `shares.update`, the same shape as `tokens.issue`'s (migration 043). Every session the link gives carries it, whoever opens the link: a field it sets is never asked, and a visitor's answer for it is ignored. Its `userId` replaces the visitor's own `visitor_<id>`; each visit still gets its own layer on a per-visitor link. A link that asks a field its identity sets is refused (400), on create and on an update checked against the link as it will be.
+
+- [#907](https://github.com/embedpdf/embed-pdf-viewer/pull/907) by [@bobsingor](https://github.com/bobsingor) – A share link's visitor is remembered on every link except a per-visitor link that doesn't keep visitors' layers: the exchange answers `visitor.keep: true` for shared links too. A visitor who comes back in the same browser keeps their answers to the link's questions and stays the author of what they added, instead of being asked again on every page load and listed as a new visitor each time.
+
+- [#910](https://github.com/embedpdf/embed-pdf-viewer/pull/910) by [@bobsingor](https://github.com/bobsingor) – A signature moves only the layer it was made in. Completing a signature writes the new version as that layer's own: only its `base_sha` moves, and the document (`documents.base_sha`, the upload) and every other layer stay as they were.
+
+  Before, a signature moved the whole document, so on a per-visitor link the next visitor opened the signer's filled-in, signed copy, and layers still on the old version could no longer sign (`StaleBase`).
+  - **Every layer can sign**, over its own base. A layer that signs again signs over its previous version.
+  - **Versions belong to their layer:** a layer's versions are numbered along its own chain and stored under the layer, and they're deleted with it.
+  - **`/layers/:layerName/head`** reports the layer's own base.
+  - **Migration 044** gives each existing signed version its layer, puts a document a signature moved back on its upload, and starts layers that stored nothing on the upload too.
+  - **No document-wide signal any more:** the base-changed bus channel is gone. Other replicas reload the signing layer because its version moved.
+
+## 3.0.0-next.17
+
+### Minor Changes
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – Archive share links instead of losing what their visitors made. Archiving (migration 041) stops a link's exchange for good, like a revoke, but keeps the link and its visitors' layers, still listed with `documents.layers.list?shareId=` and downloadable. Deleting a link is refused with 409 while its visitors have layers; one whose visitors only looked can still be deleted. An archived link refuses updates, is left out of `shares.list` unless `archived=true`, and no longer keeps its shared layer from being deleted. Its visitors' layers keep to the link's idle setting.
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – Incremental downloads no longer go through the engine. A layer's PDF saved incrementally, the default, is now its base file followed by the delta its stored artifact holds, streamed from storage with the same permission and password checks as before; a layer nobody wrote downloads as its base file, and a signed file's bytes stay exactly as stored. A rewrite (`mode=rewrite`) is still saved by the engine.
+
+  Download links: `POST …/layers/{layerName}/download-link` returns a URL that downloads the layer's current PDF without an Authorization header, for services that only take a plain URL. The URL is the layer's versioned download with a `link` token that opens nothing else: it isn't accepted as a bearer token, it works only for the version it was made for (404 once the layer changes), it expires after `expiresIn`, and a password-protected document is checked when the link is made. Deployments that verify tokens with their own keys can mint the same link on their backend, as a doc token with `layer_name` and a `download` claim.
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – Delete a layer with `DELETE /v1/tenants/{tenantId}/documents/{id}/layers/{layerName}`. Its artifacts, renders, change captures, changes, audit rows, signings, password sessions and object numbers go, and its worker session closes. A layer that was written keeps its row as a tombstone (migration 037), and every route then answers its name with `LayerDeleted` (HTTP 410), because its read URLs were cached as immutable and a new layer under the name would restart at the same versions. A layer nobody wrote leaves no tombstone and stays usable. A write in flight on another replica loses its commit to the delete. Deleting a layer a share link uses is refused with 409, and a share link can't be created for a deleted layer.
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – List a document's layers with `GET /v1/tenants/{tenantId}/documents/{id}/layers`: newest first, cursor-paged like documents, tenants and shares, optionally only one share link's visitors' layers (`shareId`). This is how a link's owner finds what visitors filled in and downloads it through the layer's routes. Migration 040 replaces the per-document layer index with one in list order.
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – Share links can ask their visitors who they are. A link's `visitorIdentity` names the fields it asks (`displayName`, `email`, `title`, `organization`, `organizationalUnit`, each required or optional), when it asks (`'on-open'` or `'before-first-change'`), and the owner's `purpose` and `privacyUrl`. The exchange takes the answers as `visitorIdentity`; until the required ones are given, a link that asks on open answers 422 `VisitorIdentityRequired`, and one that asks before the first change issues the session with `visitor.identityRequest` and refuses its writes with 403 `VisitorIdentityRequired`. Answers are stored once per visitor (migration 042, `share_visitors`), with the time they were given, and go into every token issued for them as its `identity`; an answer once given is never replaced, and a visitor who starts over is a new visitor who is asked again. `GET /v1/tenants/{tenantId}/shares/{shareId}/visitors` lists a link's visitors (who answered or made a change) newest first with their layer, and `DELETE …/visitors/{visitorId}` erases a visitor's answers and layer, on archived links too. A link with visitors is archived rather than deleted (409). The idle clock is now the visitor's: `visitorIdleSeconds` (renamed from `visitorLayerIdleSeconds`) deletes the visitor and their layer once unseen that long, only on links that set it.
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – Share links can give each visitor a layer of their own. Every exchange names a visitor: the session token carries them as the author (`identity.userId` `visitor_<id>`), and a handle, an HMAC the link issued, brings them back on renewal. On a per-visitor link the session pins the visitor's layer, `visitor-<id>`, which is made at their first write and stamped with the link, the visitor and when they were last seen (migration 038); each exchange with the handle restarts that idle clock. `restart: true` deletes the visitor's layer and starts a new visitor, and a visitor whose layer was deleted comes back as a new one. Names starting with `visitor-` are refused for a link's shared layer and for issued tokens.
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – Deleting share-link visitors' layers is now the link owner's choice. A link's `visitorIdleSeconds` is null by default, and a visitor's layer then stays until it is deleted on purpose, since what a visitor filled in is often the only copy; migration 039 moves links on the earlier 7-day default to it. A link that sets an idle time, for throwaway layers like examples, has the sweeper delete its visitors' layers nobody has seen for that long; a visitor with the document open renews and stays seen. A visit through a share link now counts as one view however often its session renews: the visitor handle carries the signed time it was issued, and an exchange whose handle is newer than the session lifetime plus five minutes continues the visit.
+
+### Patch Changes
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – Opening a document to edit no longer creates its layer. A layer nobody has changed reads the base document, so `/access` hands its editing session object numbers counted past the base document's last object, without storing the layer or opening a worker session for it. The layer is stored at its first write. Object numbers are now kept by document and layer name (migration 036), and numbers a layer was handed on one base version start over on another. The sweeper forgets the numbers of layers nobody changed once their editing sessions have been expired for a session lifetime, so someone who only looked leaves nothing behind.
+
+  Layer worker sessions no longer stay open for the life of the document. The sweeper closes a layer's session after it goes unused for `layerSessionIdleMs` (default 10 minutes), and a document keeps at most `maxLayerSessionsPerDoc` layer sessions open (default 32), closing the least recently used beyond that. The next request reopens a closed session from the stored layer. Searching a layer whose text and page order are still the base document's now runs on the base, without opening a session for the layer.
+
+  A write retried on two replicas under the same change id now answers what the first one committed, also when that commit spent the write's object numbers while the second was still preparing.
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – Versioned reads without a CDN now answer `Cache-Control: private, max-age=31536000, immutable` instead of `public, …`. Only the caller's browser may keep a response that needed a token; a proxy in front of the engine no longer may. Deployments with a CDN keep `public`, because the edge checks the signature before serving its copy.
+
+## 3.0.0-next.16
+
+### Minor Changes
+
+- [#891](https://github.com/embedpdf/embed-pdf-viewer/pull/891) by [@bobsingor](https://github.com/bobsingor) – Attachments are changes: `POST …/changes` takes `attachments.create` (its file as a `resource:<key>` part) and `attachments.delete` under `doc.attachments.modify`, and undoes them by `opId`. The routes `POST …/attachments` and `DELETE …/attachments/{fileKey}` are removed, and file downloads no longer carry `X-EmbedPDF-File-Name` and `X-EmbedPDF-File-Type`: the listing has both. New current reads: `GET …/attachments`, `GET …/attachment-files/{fileKey}/data` and an annotation's `GET …/items/{annotKey}/resources/file`.
+
+- [#885](https://github.com/embedpdf/embed-pdf-viewer/pull/885) by [@bobsingor](https://github.com/bobsingor) – The document's outline: `GET /v1/docs/:docId/outline@{token}` (shared and cacheable while a layer inherits the outline and the layout) and `GET /v1/docs/:docId/layers/:layerName/outline`, with outline edits through `POST …/changes`. Layers and published versions carry an outline version (migration `035_outline_version`), outline ops move it, and its plane decides when a layer reads the shared outline. A token that may change the outline (`doc.outline.modify`) is handed object numbers for new items, as one that may create annotations is.
+
+- [#890](https://github.com/embedpdf/embed-pdf-viewer/pull/890) by [@bobsingor](https://github.com/bobsingor) – Page edits are changes: `POST …/changes` takes `pages.rotate`, `pages.reorder`, `pages.delete`, `pages.insertBlank` and `pages.insert` (its PDF as a `resource:<key>` part) under `doc.pages.assemble`, and undoes them by `opId`. An undo of a delete brings the same pages back with fresh page pins, so no picture cached before they went is served for them. The routes `POST …/pages/reorder`, `/pages/rotate`, `/pages/delete`, `/pages/insert` and `/pages/insert-blank` are removed.
+
+- [#883](https://github.com/embedpdf/embed-pdf-viewer/pull/883) by [@bobsingor](https://github.com/bobsingor) – `POST /v1/docs/:docId/layers/:layerName/pages/extract` takes `flatten` (`{ usage?: 'display' | 'print' }`), `includeAnnotations` and `includeFormFields`, and returns the pages as they draw for that usage. A flattened copy passes on `doc.download` or `doc.download.flattened` (a signed document refuses the latter), and paints only what the token may read; the include options are refused without `flatten`.
+
+- [#883](https://github.com/embedpdf/embed-pdf-viewer/pull/883) by [@bobsingor](https://github.com/bobsingor) – Serve the print pictures at both tiers: each picture family printed at 150 DPI under `render/print/` (needs `doc.print`) and at 300 DPI under `render/print-high/` (needs `doc.print.high`), on top of the family's own rights. A print picture's token is its pins and its format; the server sizes it from the DPI and the paper. Print pictures are cached at their versioned URLs but never stored or refused by the render lattice.
+
 ## 3.0.0-next.15
 
 ### Minor Changes

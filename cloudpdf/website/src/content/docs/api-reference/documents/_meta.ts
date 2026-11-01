@@ -2,6 +2,7 @@
 export default {
   list: 'List',
   get: 'Get',
+  update: 'Update',
   delete: 'Delete',
   commit: 'Commit',
   download: 'Download',
@@ -9,4 +10,5 @@ export default {
   'upload-proxy': 'Upload Proxy',
   'import-from': 'Import From',
   init: 'Init',
+  layers: 'Layers',
 };

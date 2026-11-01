@@ -1900,7 +1900,7 @@ export namespace Annotation {
         color: string;
         opacity: number;
         icon: AnnotationFileAttachment.Icon;
-        file: AnnotationFileAttachment.File_ | null;
+        file: CloudPDF.AttachmentFileInfo | null;
     }
 
     export namespace AnnotationFileAttachment {
@@ -1951,16 +1951,6 @@ export namespace Annotation {
             Tag: "tag",
         } as const;
         export type Icon = (typeof Icon)[keyof typeof Icon];
-
-        export interface File_ {
-            name: string;
-            mimeType: string | null;
-            description: string | null;
-            size: number | null;
-            checksum: string | null;
-            createdAt: string | null;
-            modifiedAt: string | null;
-        }
     }
 
     export interface Widget extends CloudPDF.WidgetAnnotation {

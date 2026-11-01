@@ -2,12 +2,12 @@
 import { useDocument, useDocuments } from '@embedpdf/vue/runtime';
 import type { OpenSource } from '@embedpdf/vue/runtime';
 
-defineProps<{ ebook: OpenSource }>();
+defineProps<{ welcome: OpenSource }>();
 
 const documents = useDocuments();
 const { id, name, status, pageCount } = useDocument();
 
-// A file the user picks opens next to the ebook, and becomes the active document.
+// A file the user picks opens next to the welcome, and becomes the active document.
 async function openFile(event: Event) {
   const input = event.target as HTMLInputElement;
   const file = input.files?.[0];
@@ -36,9 +36,9 @@ async function openFile(event: Event) {
       v-else
       type="button"
       class="button"
-      @click="documents.open(ebook, { name: 'ebook.pdf' })"
+      @click="documents.open(welcome, { name: 'welcome.pdf' })"
     >
-      Open the ebook again
+      Open the welcome again
     </button>
   </div>
 </template>

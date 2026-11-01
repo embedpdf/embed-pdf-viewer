@@ -70,6 +70,18 @@ export interface SettingsApi<T> {
   readonly onSettingsChanged: EventHook<SettingsChangedEvent<T>>;
 }
 
+/**
+ * Who holds a locked setting, and why. A plugin that owns settings and lets others hold them (the
+ * Stage's `lockSettings()`) answers `getLock(key)` with this, and a command that changes the
+ * setting shows disabled with the sentence under `reasonKey` while it holds.
+ */
+export interface SettingLock {
+  /** Who holds it: a plugin's id, or `'app'`. */
+  readonly by: string;
+  /** The translation key of the sentence its controls show; without one, `commands.locked.default`. */
+  readonly reasonKey?: string;
+}
+
 /** The settings type of a capability that has the settings calls, else `never`. */
 export type SettingsOf<Capability> = Capability extends { getSettings(): infer T } ? T : never;
 

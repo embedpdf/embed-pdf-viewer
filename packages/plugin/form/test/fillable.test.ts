@@ -16,7 +16,7 @@ import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
 
 import { FORM_DEFAULTS, type FormConfig } from '../src/contract';
 import { createFormController } from '../src/controller';
-import { initialFormState } from '../src/model';
+import { initialFormModel } from '../src/model';
 
 const PAGE = toPageRef(1);
 const FIELD = { kind: 'objectNumber' as const, objectNumber: 5 };
@@ -69,7 +69,7 @@ async function loaded(config?: FormConfig) {
   const apply = vi.fn(async () => ({ items: [], meta: { undoable: true } }));
   const ctx = createTestContext({
     id: 'form',
-    state: initialFormState(),
+    state: initialFormModel(),
     settings: { defaults: FORM_DEFAULTS, registered: config },
     pages: [{ ref: PAGE }],
     capabilities: [

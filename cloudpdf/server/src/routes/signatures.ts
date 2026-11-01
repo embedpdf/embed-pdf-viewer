@@ -8,18 +8,19 @@
  *     POST   …/signatures/prepare                 multipart (`body`, naming its artwork's `resource:<key>` part)
  *     POST   …/signatures/:signingId/complete     JSON { cms: base64, expectedVersion }
  *     DELETE …/signatures/:signingId
- *   Version-scoped reads (content-addressed by base sha; immutable; the
- *   resource comes before the sha so each family keeps its own CDN prefix):
- *     GET  /v1/docs/:docId/versions                                   the catalog (no-store)
- *     GET  /v1/docs/:docId/versions/signatures/:sha
- *     GET  /v1/docs/:docId/versions/signatures/:sha/:fieldKey/contents
- *     GET  /v1/docs/:docId/versions/signatures/:sha/:fieldKey/digest/:algorithm
- *     GET  /v1/docs/:docId/versions/analysis/:sha?since.signature=|since.revision=&until=&level=
- *     GET  /v1/docs/:docId/versions/download/:sha
- *     GET  /v1/docs/:docId/versions/revisions/:sha/:index
+ *   A layer's versions (the upload and the ones its signatures made;
+ *   content-addressed by base sha; immutable; the resource comes before the
+ *   sha so each family keeps its own CDN prefix):
+ *     GET  …/layers/:layerName/versions                                   the list (no-store)
+ *     GET  …/layers/:layerName/versions/signatures/:sha
+ *     GET  …/layers/:layerName/versions/signatures/:sha/:fieldKey/contents
+ *     GET  …/layers/:layerName/versions/signatures/:sha/:fieldKey/digest/:algorithm
+ *     GET  …/layers/:layerName/versions/analysis/:sha?since.signature=|since.revision=&until=&level=
+ *     GET  …/layers/:layerName/versions/download/:sha
+ *     GET  …/layers/:layerName/versions/revisions/:sha/:index
  *
- * A version is not a layer: version reads open the version's file into a
- * transient session, never a layer session.
+ * A version is not a layer session: version reads open the version's file
+ * into a transient session. Another layer's versions are 404.
  */
 import { createReadStream } from 'node:fs';
 
@@ -59,12 +60,10 @@ import {
 } from './_helpers';
 import { readMutationEnvelope, resourcesByRole } from './_mutationEnvelope';
 import {
-  requireDocAccessOnly,
   requireLayerCapability,
   requireLayerFieldWrite,
   requireLayerDocAccessOnly,
   requireLayerResource,
-  requireResource,
 } from '../app/jwt-plugin';
 import type { DocumentService, OpenContext } from '../services/DocumentService';
 import type { LayerService } from '../services/LayerService';
@@ -88,8 +87,6 @@ export async function registerSignatureRoutes(
     docId: string,
     layerName: string,
   ) => service.getEffectivePdfBits(accessCtx, docId, layerName);
-  const bitsForDoc = (accessCtx: ReturnType<typeof requireDocAccessOnly>, docId: string) =>
-    service.getEffectivePdfBits(accessCtx, docId);
 
   const readSignatures = (
     ctx: OpenContext,
@@ -285,17 +282,29 @@ export async function registerSignatureRoutes(
     return layerService.cancelSignature(ctx, { docId, layerName, signingId });
   });
 
-  // ---- version-scoped reads -----------------------------------------------
+  // ---- a layer's versions --------------------------------------------------
+  // The upload and the versions the layer's signatures made, read through the
+  // layer like every other layer read: another layer's versions are 404.
 
-  app.get('/v1/docs/:docId/versions', async (req, reply) => {
-    const { docId } = req.params as { docId: string };
-    const accessCtx = requireDocAccessOnly(req, docId);
-    const pdfBits = await bitsForDoc(accessCtx, docId);
-    const ctx = requireResource(req, docId, 'versions', pdfBits);
+  /** The layer route's caller, checked for `resource` on the layer. */
+  const versionCaller = async (
+    req: Parameters<typeof requireLayerDocAccessOnly>[0],
+    docId: string,
+    layerName: string,
+    resource: Parameters<typeof requireLayerResource>[3],
+  ) => {
+    const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
+    const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
+    return requireLayerResource(req, docId, layerName, resource, pdfBits);
+  };
+
+  app.get('/v1/docs/:docId/layers/:layerName/versions', async (req, reply) => {
+    const { docId, layerName } = req.params as { docId: string; layerName: string };
+    const ctx = await versionCaller(req, docId, layerName, 'layer-versions');
     setNoStore(reply);
-    const listed = await service.listVersions(ctx, docId);
+    const listed = await service.listVersions(ctx, docId, layerName);
     return {
-      head: listed.head,
+      baseSha: listed.baseSha,
       versions: listed.versions.map((v) => ({
         sha256: v.sha256,
         byteLength: v.byteLength,
@@ -311,12 +320,14 @@ export async function registerSignatureRoutes(
   const versionSignatures = async (
     ctx: OpenContext,
     docId: string,
+    layerName: string,
     sha: string,
     signal: AbortSignal,
   ) => {
     const payload = await service.readVersionOnPool(
       ctx,
       docId,
+      layerName,
       sha,
       (sessionId, jobId) =>
         wirePack({
@@ -333,60 +344,70 @@ export async function registerSignatureRoutes(
     return payload.snapshot;
   };
 
-  app.get('/v1/docs/:docId/versions/signatures/:sha', async (req, reply) => {
-    const { docId, sha } = req.params as { docId: string; sha: string };
-    const accessCtx = requireDocAccessOnly(req, docId);
-    const pdfBits = await bitsForDoc(accessCtx, docId);
-    const ctx = requireResource(req, docId, 'version-signatures', pdfBits);
-    const snapshot = await versionSignatures(ctx, docId, requireSha(sha), abortSignalOf(reply));
+  app.get('/v1/docs/:docId/layers/:layerName/versions/signatures/:sha', async (req, reply) => {
+    const { docId, layerName, sha } = req.params as {
+      docId: string;
+      layerName: string;
+      sha: string;
+    };
+    const ctx = await versionCaller(req, docId, layerName, 'layer-version-signatures');
+    const snapshot = await versionSignatures(
+      ctx,
+      docId,
+      layerName,
+      requireSha(sha),
+      abortSignalOf(reply),
+    );
     setImmutableCache(reply);
     return snapshot;
   });
 
-  app.get('/v1/docs/:docId/versions/signatures/:sha/:fieldKey/contents', async (req, reply) => {
-    const { docId, sha, fieldKey } = req.params as {
-      docId: string;
-      sha: string;
-      fieldKey: string;
-    };
-    const accessCtx = requireDocAccessOnly(req, docId);
-    const pdfBits = await bitsForDoc(accessCtx, docId);
-    const ctx = requireResource(req, docId, 'version-signatures', pdfBits);
-    const ref = fieldRefFromPath(fieldKey);
-    const payload = await service.readVersionOnPool(
-      ctx,
-      docId,
-      requireSha(sha),
-      (sessionId, jobId) =>
-        wirePack({
-          kind: 'signatures.contents' as const,
-          effect: 'read' as const,
-          jobId,
-          docId: sessionId,
-          ref,
-        }),
-      abortSignalOf(reply),
-    );
-    if (payload.tag !== 'signatures.contents') {
-      throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload: ${payload.tag}`);
-    }
-    setImmutableCache(reply);
-    reply.header('Content-Type', 'application/pkcs7-signature');
-    return reply.send(Buffer.from(payload.bytes));
-  });
+  app.get(
+    '/v1/docs/:docId/layers/:layerName/versions/signatures/:sha/:fieldKey/contents',
+    async (req, reply) => {
+      const { docId, layerName, sha, fieldKey } = req.params as {
+        docId: string;
+        layerName: string;
+        sha: string;
+        fieldKey: string;
+      };
+      const ctx = await versionCaller(req, docId, layerName, 'layer-version-signatures');
+      const ref = fieldRefFromPath(fieldKey);
+      const payload = await service.readVersionOnPool(
+        ctx,
+        docId,
+        layerName,
+        requireSha(sha),
+        (sessionId, jobId) =>
+          wirePack({
+            kind: 'signatures.contents' as const,
+            effect: 'read' as const,
+            jobId,
+            docId: sessionId,
+            ref,
+          }),
+        abortSignalOf(reply),
+      );
+      if (payload.tag !== 'signatures.contents') {
+        throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload: ${payload.tag}`);
+      }
+      setImmutableCache(reply);
+      reply.header('Content-Type', 'application/pkcs7-signature');
+      return reply.send(Buffer.from(payload.bytes));
+    },
+  );
 
   app.get(
-    '/v1/docs/:docId/versions/signatures/:sha/:fieldKey/digest/:algorithm',
+    '/v1/docs/:docId/layers/:layerName/versions/signatures/:sha/:fieldKey/digest/:algorithm',
     async (req, reply) => {
-      const { docId, sha, fieldKey, algorithm } = req.params as {
+      const { docId, layerName, sha, fieldKey, algorithm } = req.params as {
         docId: string;
+        layerName: string;
         sha: string;
         fieldKey: string;
         algorithm: string;
       };
-      const accessCtx = requireDocAccessOnly(req, docId);
-      const pdfBits = await bitsForDoc(accessCtx, docId);
-      const ctx = requireResource(req, docId, 'version-signatures', pdfBits);
+      const ctx = await versionCaller(req, docId, layerName, 'layer-version-signatures');
       if (!(DIGEST_ALGORITHMS as readonly string[]).includes(algorithm)) {
         throw new EngineError(
           EngineErrorCode.InvalidArg,
@@ -397,6 +418,7 @@ export async function registerSignatureRoutes(
       const payload = await service.readVersionOnPool(
         ctx,
         docId,
+        layerName,
         requireSha(sha),
         (sessionId, jobId) =>
           wirePack({
@@ -418,11 +440,13 @@ export async function registerSignatureRoutes(
     },
   );
 
-  app.get('/v1/docs/:docId/versions/analysis/:sha', async (req, reply) => {
-    const { docId, sha } = req.params as { docId: string; sha: string };
-    const accessCtx = requireDocAccessOnly(req, docId);
-    const pdfBits = await bitsForDoc(accessCtx, docId);
-    const ctx = requireResource(req, docId, 'version-analysis', pdfBits);
+  app.get('/v1/docs/:docId/layers/:layerName/versions/analysis/:sha', async (req, reply) => {
+    const { docId, layerName, sha } = req.params as {
+      docId: string;
+      layerName: string;
+      sha: string;
+    };
+    const ctx = await versionCaller(req, docId, layerName, 'layer-version-analysis');
     const query = parseOrInvalidArg(
       VersionAnalysisQuerySchema as unknown as SchemaLike<
         ReturnType<typeof VersionAnalysisQuerySchema.parse>
@@ -438,6 +462,7 @@ export async function registerSignatureRoutes(
     const payload = await service.readVersionOnPool(
       ctx,
       docId,
+      layerName,
       requireSha(sha),
       (sessionId, jobId) =>
         wirePack({
@@ -455,44 +480,58 @@ export async function registerSignatureRoutes(
     return finishAnalysisReply(reply, payload.analysis);
   });
 
-  app.get('/v1/docs/:docId/versions/download/:sha', async (req, reply) => {
-    const { docId, sha } = req.params as { docId: string; sha: string };
-    const accessCtx = requireDocAccessOnly(req, docId);
-    const pdfBits = await bitsForDoc(accessCtx, docId);
-    const ctx = requireResource(req, docId, 'version-download', pdfBits);
-    const version = await service.requireVersion(ctx, docId, requireSha(sha));
+  app.get('/v1/docs/:docId/layers/:layerName/versions/download/:sha', async (req, reply) => {
+    const { docId, layerName, sha } = req.params as {
+      docId: string;
+      layerName: string;
+      sha: string;
+    };
+    const ctx = await versionCaller(req, docId, layerName, 'layer-version-download');
+    const version = await service.requireVersion(ctx, docId, layerName, requireSha(sha));
     const file = await service.acquireBaseFileFor(ctx, docId, version.sha256);
     return sendVersionBytes(reply, file, version.byteLength, `${docId}-v${version.number}.pdf`);
   });
 
-  app.get('/v1/docs/:docId/versions/revisions/:sha/:index', async (req, reply) => {
-    const { docId, sha, index } = req.params as { docId: string; sha: string; index: string };
-    const accessCtx = requireDocAccessOnly(req, docId);
-    const pdfBits = await bitsForDoc(accessCtx, docId);
-    const ctx = requireResource(req, docId, 'version-revisions', pdfBits);
-    if (!/^(0|[1-9][0-9]*)$/.test(index)) {
-      throw new EngineError(
-        EngineErrorCode.InvalidArg,
-        `revision index must be a non-negative integer`,
+  app.get(
+    '/v1/docs/:docId/layers/:layerName/versions/revisions/:sha/:index',
+    async (req, reply) => {
+      const { docId, layerName, sha, index } = req.params as {
+        docId: string;
+        layerName: string;
+        sha: string;
+        index: string;
+      };
+      const ctx = await versionCaller(req, docId, layerName, 'layer-version-revisions');
+      if (!/^(0|[1-9][0-9]*)$/.test(index)) {
+        throw new EngineError(
+          EngineErrorCode.InvalidArg,
+          `revision index must be a non-negative integer`,
+        );
+      }
+      const version = await service.requireVersion(ctx, docId, layerName, requireSha(sha));
+      const snapshot = await versionSignatures(
+        ctx,
+        docId,
+        layerName,
+        version.sha256,
+        abortSignalOf(reply),
       );
-    }
-    const version = await service.requireVersion(ctx, docId, requireSha(sha));
-    const snapshot = await versionSignatures(ctx, docId, version.sha256, abortSignalOf(reply));
-    const revision = snapshot.revisions[Number(index)];
-    if (!revision) {
-      throw new EngineError(
-        EngineErrorCode.NotFound,
-        `no revision ${index} (the version has ${snapshot.revisions.length})`,
+      const revision = snapshot.revisions[Number(index)];
+      if (!revision) {
+        throw new EngineError(
+          EngineErrorCode.NotFound,
+          `no revision ${index} (the version has ${snapshot.revisions.length})`,
+        );
+      }
+      const file = await service.acquireBaseFileFor(ctx, docId, version.sha256);
+      return sendVersionBytes(
+        reply,
+        file,
+        revision.end,
+        `${docId}-v${version.number}-r${revision.index}.pdf`,
       );
-    }
-    const file = await service.acquireBaseFileFor(ctx, docId, version.sha256);
-    return sendVersionBytes(
-      reply,
-      file,
-      revision.end,
-      `${docId}-v${version.number}-r${revision.index}.pdf`,
-    );
-  });
+    },
+  );
 }
 
 function requireSha(raw: string): string {

@@ -9,10 +9,13 @@ import { standardFontCss, standardFontOf } from '@embedpdf/core-fonts';
 import {
   type FontLookup,
   initialTextStyle,
+  type Id,
   type Model,
   refOf,
   richDocOf,
   textBoxes,
+  textBoxOf,
+  type TextBox,
   textPlateInset,
   type ViewEnv,
 } from '@embedpdf/core-annotation';
@@ -34,51 +37,68 @@ export function buildTextItems(
   view?: ViewEnv,
   fonts?: { lookup: FontLookup; text: TextFonts },
 ): TextItem[] {
-  return textBoxes(model, page, view).map((tb) => {
-    const record = model.byId[tb.id];
-    // The text shows the user's pending change (a props edit lands here
-    // before the engine confirms it), so the editor restyles instantly.
-    const style = (record && textOf(record.annotation)) ?? initialTextStyle;
-    // Match the engine's text plate inset. Browser font metrics and line
-    // heights belong to the shared editor binding.
-    const sw = record ? styleOf(record.annotation).strokeWidth : 0;
-    const doc = record ? richDocOf(record.annotation, fonts?.lookup) : null;
-    const face = doc
-      ? { family: doc.body.family, weight: doc.body.weight, italic: doc.body.italic }
-      : { family: 'Helvetica', weight: 400, italic: false };
-    const bodyCss =
-      fonts?.text.bodyCss(tb.id, style, face) ?? standardFontCss(standardFontOf(style.fontFamily));
-    return {
-      id: tb.id,
-      ref: refOf(record),
-      box: tb.box,
-      contents: record?.annotation.contents ?? '',
-      // Paragraph alignment/direction equal to the body's is inherited, not
-      // an override: the element carries the body's (`css.align`), so a
-      // block must not pin itself to a resolved value — or the Align
-      // buttons (which move the body) would stop moving the text.
-      richText: {
-        paragraphs: doc ? stripBodyDefaults(doc.paragraphs, doc.body) : [{ runs: [{ text: '' }] }],
-      },
-      face,
-      programs:
-        fonts && doc
-          ? programsOf(tb.id, doc, face, bodyCss.programs, fonts.text)
-          : bodyCss.programs,
-      editing: tb.editing,
-      ...(tb.rot ? { rot: tb.rot } : {}),
-      css: {
-        fontFamily: bodyCss.fontFamily,
-        fontSize: style.fontSize,
-        color: style.fontColor,
-        fontWeight: style.bold ? 700 : 400,
-        fontStyle: style.italic ? 'italic' : 'normal',
-        textDecoration: style.underline ? 'underline' : 'none',
-        align: style.textAlign,
-        padding: textPlateInset(sw),
-      },
-    };
-  });
+  return textBoxes(model, page, view).map((tb) => textItemOf(model, tb, fonts));
+}
+
+/** One free text's {@link TextItem}, live or baked (`textBoxOf`): what a renderer
+ *  that draws the text box itself edits. `null` for a record that isn't one. */
+export function buildTextItem(
+  model: Model,
+  id: Id,
+  view?: ViewEnv,
+  fonts?: { lookup: FontLookup; text: TextFonts },
+): TextItem | null {
+  const tb = textBoxOf(model, id, view);
+  return tb && textItemOf(model, tb, fonts);
+}
+
+/** A text box joined with its record's text, style, faces and plate inset. */
+function textItemOf(
+  model: Model,
+  tb: TextBox,
+  fonts?: { lookup: FontLookup; text: TextFonts },
+): TextItem {
+  const record = model.byId[tb.id];
+  // The text shows the user's pending change (a props edit lands here
+  // before the engine confirms it), so the editor restyles instantly.
+  const style = (record && textOf(record.annotation)) ?? initialTextStyle;
+  // Match the engine's text plate inset. Browser font metrics and line
+  // heights belong to the shared editor binding.
+  const sw = record ? styleOf(record.annotation).strokeWidth : 0;
+  const doc = record ? richDocOf(record.annotation, fonts?.lookup) : null;
+  const face = doc
+    ? { family: doc.body.family, weight: doc.body.weight, italic: doc.body.italic }
+    : { family: 'Helvetica', weight: 400, italic: false };
+  const bodyCss =
+    fonts?.text.bodyCss(tb.id, style, face) ?? standardFontCss(standardFontOf(style.fontFamily));
+  return {
+    id: tb.id,
+    ref: refOf(record),
+    box: tb.box,
+    contents: record?.annotation.contents ?? '',
+    // Paragraph alignment/direction equal to the body's is inherited, not
+    // an override: the element carries the body's (`css.align`), so a
+    // block must not pin itself to a resolved value — or the Align
+    // buttons (which move the body) would stop moving the text.
+    richText: {
+      paragraphs: doc ? stripBodyDefaults(doc.paragraphs, doc.body) : [{ runs: [{ text: '' }] }],
+    },
+    face,
+    programs:
+      fonts && doc ? programsOf(tb.id, doc, face, bodyCss.programs, fonts.text) : bodyCss.programs,
+    editing: tb.editing,
+    ...(tb.rot ? { rot: tb.rot } : {}),
+    css: {
+      fontFamily: bodyCss.fontFamily,
+      fontSize: style.fontSize,
+      color: style.fontColor,
+      fontWeight: style.bold ? 700 : 400,
+      fontStyle: style.italic ? 'italic' : 'normal',
+      textDecoration: style.underline ? 'underline' : 'none',
+      align: style.textAlign,
+      padding: textPlateInset(sw),
+    },
+  };
 }
 
 /** The programs a box's text is drawn in: the body's, then those of each face a run names. */

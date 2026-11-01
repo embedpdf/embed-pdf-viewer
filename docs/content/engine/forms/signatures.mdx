@@ -210,10 +210,12 @@ Once a field is signed, its look is part of what the signature seals, so
 
 ## On the cloud
 
-- **Signing makes a new version.** A completed signature becomes a new version of the document on
-  the server, and everyone who opens the document from then on gets the signed file.
-- **Copies from before can't sign.** Someone who had the document open, and changed it, before the
-  signature completed can keep editing their copy, but `prepare()` fails with `StaleBase`.
+- **Signing makes a new version of the layer.** A completed signature becomes a new version of the
+  layer it was made in, and everyone who opens that layer from then on gets the signed file. The
+  document itself and every other layer stay as they were, so a new layer starts from the uploaded
+  file.
+- **Every layer can sign,** over its own version. Signing again in the same layer signs over the
+  layer's previous signature.
 - **Signed bytes never change.** `getContents()`, `getDigest()` and `downloadRevision()` read a
   version, and a version is never changed, so the server lets browsers and CDNs cache them.
 

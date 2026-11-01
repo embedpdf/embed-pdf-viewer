@@ -13,7 +13,7 @@
  * `@embedpdf/web` — this package is DOM-free.
  */
 export { selectionPlugin } from './selection.plugin';
-export { selectionState } from './state';
+export { selectionState, type SelectionState } from './state';
 export * from './contract';
 // Selection-handle policy (the touch affordance): pure geometry + the drag
 // session, consumed by the framework adapters' handle views.

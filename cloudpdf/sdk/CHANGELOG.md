@@ -1,5 +1,54 @@
 # @cloudpdf/sdk
 
+## 3.0.0-next.19
+
+### Minor Changes
+
+- [#918](https://github.com/embedpdf/embed-pdf-viewer/pull/918) by [@bobsingor](https://github.com/bobsingor) – `client.shares` is `client.grants`, with a grant's `name` and `passphrase`.
+
+## 3.0.0-next.18
+
+### Minor Changes
+
+- [#917](https://github.com/embedpdf/embed-pdf-viewer/pull/917) by [@bobsingor](https://github.com/bobsingor) – Add the `folders` client (`create`, `list`, `get`, `update`, `moveInto`,
+  `delete`), a `folderId` option on `documents.init`, `documents.importFrom`,
+  `documents.list` and `uploads.create`, and `folderId` on document records.
+
+- [#917](https://github.com/embedpdf/embed-pdf-viewer/pull/917) by [@bobsingor](https://github.com/bobsingor) – Add `documents.update` for renaming documents, a `name` option on
+  `documents.init`, `documents.importFrom` and `uploads.create`, and the `q`,
+  `sort` and `order` options on `documents.list`. Document records now carry
+  `name`.
+
+- [#917](https://github.com/embedpdf/embed-pdf-viewer/pull/917) by [@bobsingor](https://github.com/bobsingor) – Add the `recursive` option to `folders.delete`.
+
+- [#910](https://github.com/embedpdf/embed-pdf-viewer/pull/910) by [@bobsingor](https://github.com/bobsingor) – `doc.versions.*` takes the layer: `list`, `signatures`, `signatureContents`, `signatureDigest`, `analysis`, `download` and `revision` read `/v1/docs/{docId}/layers/{layerName}/versions…`. `list` answers the layer's `baseSha` and its versions (the upload, then the ones its signatures made), and another layer's version is 404.
+
+- [#909](https://github.com/embedpdf/embed-pdf-viewer/pull/909) by [@bobsingor](https://github.com/bobsingor) – `shares.create` and `shares.update` take `identity`, and a share record returns it: who a link's visitors are, for a link made for one person. `Identity` is one shared type, used by `tokens.issue` too.
+
+- [#917](https://github.com/embedpdf/embed-pdf-viewer/pull/917) by [@bobsingor](https://github.com/bobsingor) – A tenant token's `scope` in `tokens.issue` takes document capabilities next to
+  tenant scopes, and the document operations document tenant tokens as a
+  credential.
+
+### Patch Changes
+
+- [#910](https://github.com/embedpdf/embed-pdf-viewer/pull/910) by [@bobsingor](https://github.com/bobsingor) – `StaleBase` is no longer an engine error code, and the signature notes describe the new rule: a signature's new version belongs to its layer, and the document and every other layer stay as they were.
+
+## 3.0.0-next.17
+
+### Minor Changes
+
+- [#902](https://github.com/embedpdf/embed-pdf-viewer/pull/902) by [@bobsingor](https://github.com/bobsingor) – Share links that ask their visitors who they are: `visitorIdentity` on `client.shares.create` and `client.shares.update`, the visitor's answers on `client.shares.exchange`, and `visitor.identityRequest` in its response. `client.shares.visitors.list` lists a link's visitors with their answers and layer, and `client.shares.visitors.delete` erases one. `visitorLayerIdleSeconds` is now `visitorIdleSeconds`.
+
+## 3.0.0-next.16
+
+### Minor Changes
+
+- [#891](https://github.com/embedpdf/embed-pdf-viewer/pull/891) by [@bobsingor](https://github.com/bobsingor) – A new `doc.attachments` resource with `list` and `download`, and `doc.annotations.readFile` for a file attachment annotation's file. `doc.changes` ops include `attachments.create` and `attachments.delete`, each undone by its `opId`.
+
+- [#885](https://github.com/embedpdf/embed-pdf-viewer/pull/885) by [@bobsingor](https://github.com/bobsingor) – `doc.outline.get()` reads a document's outline, and changes take the outline ops.
+
+- [#890](https://github.com/embedpdf/embed-pdf-viewer/pull/890) by [@bobsingor](https://github.com/bobsingor) – `doc.pages` no longer has `reorder`, `rotate`, `delete`, `insert` and `insertBlank`: page edits go through `doc.changes`, whose ops now include `pages.rotate`, `pages.reorder`, `pages.delete`, `pages.insertBlank` and `pages.insert`, and each can be undone by its `opId`.
+
 ## 3.0.0-next.15
 
 ### Minor Changes

@@ -36,6 +36,9 @@ and nothing else changes. Every change returns a new layout, so changes chain:
 | `pager` | Floating at the bottom | The page number |
 | `selection` | Over selected text | Copy, highlight, underline, strike out |
 | `annotation` | Over selected annotations | Comment, style, delete |
+| `thumbnails` | In the thumbnails panel | Insert, rotate and delete pages, and undo and redo |
+| `outline` | In the outline panel | The filter; add, expand all and collapse all |
+| `attachments` | In the attachments panel | How many files there are, and attach a file |
 
 The ids of every bar, group, menu and button are at the [end of this page](#every-built-in-id).
 
@@ -50,6 +53,7 @@ The ids of every bar, group, menu and button are at the [end of this page](#ever
 | `{ float: 'bottom' }` | Floating over the pages: `'top-start'`, `'top'`, `'top-end'`, `'start'`, `'end'`, `'bottom-start'`, `'bottom'` or `'bottom-end'` |
 | `{ with: 'main' }` | Along another bar, on the side of the pages. The mode bars ride along `main` this way, so they follow it wherever it goes. |
 | `{ at: 'selection' }`, `{ at: 'annotation' }` | Over selected text, or over selected annotations |
+| `{ panel: 'thumbnails' }` | At the top of a panel, under its title: any panel's id, your own too. See [A bar in a panel](panels#a-bar-in-a-panel). |
 
 You never say which way a menu opens or where a tooltip goes. A menu opens away from its bar's
 edge, toward the pages, and flips when there's no room. A vertical bar shows icons, with the
@@ -175,7 +179,7 @@ A group is an array of items, or an object when it needs a name or options:
 | `id` | Its name, so `add(item, { group })` can find it | none |
 | `items` | The items | none |
 | `collapse` | Fold into one button with a menu (`'menu'`) or a dropdown (`'select'`) when there's no room | none |
-| `importance` | Who makes room first, `1` to `5` | `3` |
+| `importance` | Who makes room first, `1` to `5`: the group, and each item without its own | `3` |
 | `dependent` | Show only while something in the bar that isn't `dependent` shows, like undo and redo beside a mode's tools | `false` |
 
 A lone item in a section, like `'document:download'` above, is a group of one.
@@ -194,8 +198,9 @@ An item that needs more than a command id is an object:
 { command: 'acme:share', variants: ['icon+label', 'icon'], importance: 5 }
 ```
 
-`importance` goes from `1` (makes room first) to `5` (never leaves the bar). The bar measures what
-it really draws, so a longer translation or a bigger font just works.
+`importance` goes from `1` (makes room first) to `5` (never leaves the bar). An item without one has
+its group's, so `importance` on a group is for each of its items too. The bar measures what it
+really draws, so a longer translation or a bigger font just works.
 
 ## A new mode
 
@@ -258,15 +263,21 @@ That's a reading room: zoom, search and download, nothing else. Which one to cho
 | `pager` | `pages` |
 | `selection` | `selection` |
 | `annotation` | `actions`, `danger` |
+| `thumbnails` | `edit`, `more`, `history` |
+| `outline` | `filter`, `items` |
+| `attachments` | `count`, `files` |
 
-**Menus**: `document`, `view`, `zoom`, and `outline-item` (an outline row's). Their buttons are
-`menu:document`, `menu:view`, `menu:zoom` and `menu:outline-item`. See [Menus](menus).
+**Menus**: `document`, `view`, `zoom`, `outline-item` (an outline row's), `attachment-item` (a
+file's, in the attachments panel), `comment-item` (a card's, in the comments panel) and `page` (a
+page's, in the thumbnails panel). Their buttons are `menu:document`, `menu:view`, `menu:zoom`,
+`menu:outline-item`, `menu:attachment-item`, `menu:comment-item` and `menu:page`. See [Menus](menus).
 
 **Your own components the viewer ships**: `{ custom: 'zoom' }` (the zoom field),
 `{ custom: 'page-number' }` (the page number and count), `{ custom: 'quick-stamps' }` (the stamps
 bar of the Insert mode), `{ custom: 'measurement-scale' }` (the scale of the Measure mode),
 `{ custom: 'view-only' }` (the [View only](../features/turning-off#read-only) label, in the main bar's
-`panels` group).
+`panels` group), `{ custom: 'outline-filter' }` (the outline's filter field, in its panel's bar) and
+`{ custom: 'attachments-count' }` (how many files the document carries).
 
 **Buttons**: every command, listed with what it does on [Buttons & commands](commands#every-built-in-command).
 

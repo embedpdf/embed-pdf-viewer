@@ -122,6 +122,22 @@ if (language === 'typescript') {
   manifest.scripts.test = 'vitest run';
   manifest.scripts['test:unit'] = 'vitest run --project unit';
   manifest.scripts['test:wire'] = 'vitest run --project wire';
+  // The browser upload entry (`src/upload.ts`, handwritten, in .fernignore)
+  // is an entry Fern doesn't know of. Pages import only it, so it gets its
+  // own export, in Fern's shape, before `./package.json`.
+  if (!manifest.exports?.['./package.json']) {
+    throw new Error('TypeScript package exports changed shape; revisit the ./upload export');
+  }
+  const { './package.json': packageJsonExport, ...entries } = manifest.exports;
+  manifest.exports = {
+    ...entries,
+    './upload': {
+      import: { types: './dist/esm/upload.d.mts', default: './dist/esm/upload.mjs' },
+      require: { types: './dist/cjs/upload.d.ts', default: './dist/cjs/upload.js' },
+      default: './dist/cjs/upload.js',
+    },
+    './package.json': packageJsonExport,
+  };
   writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 4)}\n`);
 }
 
@@ -151,6 +167,22 @@ if (language === 'python') {
     .replace('description = ""', 'description = "The official Python SDK for the CloudPDF API."')
     .replace('authors = []', 'authors = ["CloudPDF <hello@cloudpdf.com>"]');
   writeFileSync(projectPath, project);
+
+  // fern-python-sdk 5.26.0 names the environment class from
+  // `environment_class_name` (CloudPDFEnvironment) in the code, but its
+  // README and reference examples import a `CloudPDFClientEnvironment` that
+  // doesn't exist. Use the real name, and fail if the code ever disagrees.
+  const environmentSource = readFileSync(`${outputDirectory}/src/cloudpdf/environment.py`, 'utf8');
+  if (!environmentSource.includes('class CloudPDFEnvironment(enum.Enum):')) {
+    throw new Error('Python environment class changed; revisit the README environment patch');
+  }
+  for (const document of ['README.md', 'reference.md']) {
+    const documentPath = `${outputDirectory}/${document}`;
+    writeFileSync(
+      documentPath,
+      readFileSync(documentPath, 'utf8').replaceAll('CloudPDFClientEnvironment', 'CloudPDFEnvironment'),
+    );
+  }
 }
 
 // The Ruby generator intentionally leaves registry metadata in its generated

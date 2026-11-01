@@ -4,5 +4,5 @@ import { PDFViewer } from '@cloudpdf/viewer-vue';
 </script>
 
 <template>
-  <PDFViewer :src="{ shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' }" style="height: 100vh" />
+  <PDFViewer :src="{ grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' }" style="height: 100vh" />
 </template>

@@ -15,11 +15,17 @@ import './website-links.css';
 const engine = cloudEngine();
 const plugins = [actionsPlugin()];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const links: OpenInput = { kind: 'grant', grant: 'shr_xs-9Y5qwuYrJ2BKtWzuo_2xy' };
 
 // A link to a website, as a PDF carries it: what getActionTree() reads from a link.
 const websiteLink: PdfActionTree = {
-  root: { type: 'uri', subtype: 'URI', uri: 'https://www.embedpdf.com', isMap: false, next: [] },
+  root: {
+    type: 'uri',
+    subtype: 'URI',
+    uri: 'https://www.w3.org/TR/WCAG22/',
+    isMap: false,
+    next: [],
+  },
   incomplete: false,
   warningFlags: 0,
   warnings: [],
@@ -48,7 +54,7 @@ function AskBeforeOpening() {
   return (
     <section className="panel">
       <p className="lead">
-        The document links to <code>https://www.embedpdf.com</code>.
+        The document links to <code>https://www.w3.org/TR/WCAG22/</code>.
       </p>
       <button type="button" className="button" onClick={() => actions.execute(websiteLink, click)}>
         Click the link
@@ -81,7 +87,7 @@ function AskBeforeOpening() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: links }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <AskBeforeOpening />
       </DocumentGate>

@@ -34,7 +34,7 @@
     const stored = layer;
     await documents.close(document.id);
     onReopened();
-    await documents.open(() => withLayer(stored), { name: 'ebook.pdf' });
+    await documents.open(() => withLayer(stored), { name: 'welcome.pdf' });
   }
 </script>
 

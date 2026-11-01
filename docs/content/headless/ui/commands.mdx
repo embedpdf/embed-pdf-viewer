@@ -52,7 +52,7 @@ and says `null` for an id it doesn't have.
 | `zoom:fit-width`, `zoom:fit-page`                    | Fit the page's width, or the whole page      |                  |
 | `page:next`, `page:previous`, `page:first`, `page:last` | Move through pages                        | `→`, `←`, `Home`, `End` |
 | `view:rotate-clockwise`, `view:rotate-counterclockwise` | Turn the view                             |                  |
-| `tool:pointer`, `tool:pan`                           | Switch tools                                 | `V`, `H`         |
+| `tool:pointer`, `tool:pan`, `tool:zoom`              | Switch tools                                 | `V`, `H`, `Z`    |
 | `tool:<id>`                                          | Any registered tool, such as `tool:highlight` |                 |
 | `selection:copy`                                     | Copy the selected text                       | `Mod+C`          |
 | `annotation:delete`                                  | Delete the selected annotations              | `Delete`         |
@@ -117,6 +117,7 @@ A disabled command is still in the results, so show it greyed out.
 | `visible`     | When it shows at all                                                             |
 | `run`         | What it does                                                                     |
 | `requires`    | The [permissions](../concepts/permissions) it needs, such as `'doc.annotate.modify'`. Without them, it's hidden. |
+| `locked`      | The [lock](../viewing/stage#lock-a-setting) on the setting it changes, as a function of the viewer's state: `(context) => context.get(StageToken).getLock('spread')`. While there is one, it shows disabled. |
 | `categories`  | The features it belongs to, so you can [turn them off](#turn-features-off) together, such as `['annotations.highlight']` |
 | `panel`, `menu`, `modal` | A command that opens a [panel, menu or dialog](panels) needs no `run`  |
 
@@ -151,7 +152,7 @@ Everything `useCommands()` gives you.
 | `execute(id, { args?, documentId? })`                                    | Runs a command. Resolves `{ status, reason? }`: `'executed'`, or `'rejected'` with why. A `run` that throws rejects. [Run a command from code](#run-a-command-from-code) |
 | `canExecute(id, documentId?)`                                            | Whether a command can run now: it's registered, enabled and visible                                                                                 |
 | `resolveCommand(id, documentId?)`                                        | A command as a button shows it: label, icon, shortcuts, and whether it's enabled, active and visible. `null` for an unknown id. <Fw only={['react', 'vue', 'svelte']}>In a component, use `useCommand(id)`.</Fw><Fw only="angular">In a template, use the `epdfCommand` directive.</Fw> [Show a command](#show-a-command) |
-| `getRefusal(id, documentId?)`                                           | Why a command won't run whatever the moment, as `{ reason, message }`: `'turned-off'` or `'not-allowed'`, with a sentence for the user. `null` when it may run, or can't only right now, and for an unknown id |
+| `getRefusal(id, documentId?)`                                           | Why a command won't run whatever the moment, as `{ reason, message }`: `'turned-off'`, `'not-allowed'` or `'locked'`, with a sentence for the user. `null` when it may run, or can't only right now, and for an unknown id |
 | `listCommands(documentId?)`                                              | Every command, resolved the same way, in the order they were added                                                                                  |
 | `searchCommands(query, documentId?)`                                     | The visible commands whose label or id contains the query. [A command palette](#a-command-palette)                                                  |
 | `listShortcuts()`                                                        | Every shortcut with its command, as `{ commandId, shortcut }`, for a keyboard help sheet. [Keyboard shortcuts](#keyboard-shortcuts)                 |
@@ -206,3 +207,14 @@ command's `disabledReason` says why, for its tooltip: the i18n string for
 `commands.notAllowed.doc-print`), else `commands.notAllowed.default`. Keep `enabled` for what can't
 run right now, such as **Copy** with nothing selected. The standard commands already say what they
 need.
+
+### Commands and locked settings
+
+A command that changes a setting says which with `locked`: a function that returns the setting's
+lock, or `null`. While a [lock](../viewing/stage#lock-a-setting) holds the setting, the command
+shows disabled, whatever the `notAllowed` setting says, since the setting has a value the user can
+see and the lock is about this document now, not about the user. It stays `active` when the locked
+value is its own, so a menu shows **Single page** checked and greyed. Its `disabledReason`, and
+`getRefusal()`'s `'locked'` message, is the i18n string under the lock's `reasonKey`, else
+`commands.locked.default`. The standard commands for spreads, scroll direction and view rotation
+already say which setting they change.

@@ -7,6 +7,7 @@ import {
   type Engine,
   type OpenInput,
   type OpenOptions,
+  type TokenSource,
 } from '@embedpdf/engine-core/runtime';
 import {
   DEFAULT_LAYER_NAME,
@@ -17,15 +18,31 @@ import {
 
 import { CloudDocumentHandle } from './document/CloudDocumentHandle';
 import { CloudDocumentSecurityService } from './document/CloudDocumentSecurityService';
-import { engineErrorFromShareExchange, ShareExchangeError, shareSessionSource } from './share';
+import {
+  browserVisitorStore,
+  engineErrorFromGrantExchange,
+  GrantExchangeError,
+  GrantSessionSource,
+  type VisitorStore,
+  visitorAnswersOf,
+} from './grant';
 import { decodeUnverifiedClaims } from './transport/decodeUnverifiedClaims';
 import { HttpClient, type HttpClientOptions } from './transport/HttpClient';
+import { warnUnusedOpenOptions } from './unusedOpenOptions';
 
 /**
  * `cloudEngine()`'s options: the HTTP client's, minus the session id, which
  * the engine mints for each document it opens.
  */
-export interface CloudEngineOptions extends Omit<HttpClientOptions, 'sessionId'> {}
+export interface CloudEngineOptions extends Omit<HttpClientOptions, 'sessionId'> {
+  /**
+   * Where a grant's visitor waits for the next visit, when the link
+   * keeps visitors' layers. Default: the browser's `localStorage`; outside
+   * a browser none, since a server's engine opens links for many people.
+   * `null` keeps a visitor for one open only.
+   */
+  visitorStore?: VisitorStore | null;
+}
 
 /**
  * Cloud engine: speaks the same Engine interface as @embedpdf/engine
@@ -34,7 +51,11 @@ export interface CloudEngineOptions extends Omit<HttpClientOptions, 'sessionId'>
  */
 export class CloudEngine implements Engine {
   static fromOptions(opts: CloudEngineOptions): CloudEngine {
-    return new CloudEngine(new HttpClient(opts));
+    const { visitorStore, ...http } = opts;
+    return new CloudEngine(
+      new HttpClient(http),
+      visitorStore === undefined ? browserVisitorStore() : visitorStore,
+    );
   }
 
   /** It opens the documents your server holds, never a file's bytes. */
@@ -43,7 +64,10 @@ export class CloudEngine implements Engine {
   /** The documents this engine opened and nobody closed yet. */
   private readonly handles = new Set<CloudDocumentHandle>();
 
-  private constructor(private readonly http: HttpClient) {}
+  private constructor(
+    private readonly http: HttpClient,
+    private readonly visitorStore: VisitorStore | null,
+  ) {}
 
   open(input: OpenInput, options?: OpenOptions): AbortablePromise<DocumentHandle> {
     if (this.destroyed) {
@@ -51,86 +75,45 @@ export class CloudEngine implements Engine {
         new EngineError(EngineErrorCode.RuntimeUnavailable, 'engine destroyed'),
       );
     }
-    // Cloud reads scope + identity from the doc-scoped JWT — `options.scope`
-    // and `options.identity` are engine-local concepts and are intentionally
-    // ignored here. Same `OpenOptions` type for both engines is what makes
-    // SDK code portable; the JWT is the authority cloud-side.
-    void options?.scope;
-    void options?.identity;
+    // What the session may do and who it acts for come from the document's
+    // token, not from `options`: the same `OpenOptions` on both engines keeps
+    // code portable, and the token is the authority here. `options.identity`
+    // is what the page knows about the user, which a grant takes as the
+    // visitor's answers (only what it asks).
 
     // The PDF's own password is an open option for every input kind, as on
-    // the local engine. A share's passphrase is `input.sharePassword`.
+    // the local engine. A grant's passphrase is `input.passphrase`.
     const effectivePassword = options?.password ?? null;
 
-    if (input.kind === 'share') {
-      // Open by public share token: exchange `shr_…` for a short-lived
-      // doc-scoped session JWT, then delegate to the 'token' arm — the
+    if (input.kind === 'grant') {
+      // Open by grant: exchange its id for a short-lived
+      // doc-scoped session JWT, then open as the 'token' arm does — the
       // handle binds to a self-renewing source, so revoking or editing
-      // the share retargets this open at the next renewal. The exchange
+      // the grant retargets this open at the next renewal. The exchange
       // rides the engine's own transport config (baseUrl + fetch);
       // exchange failures surface as EngineErrors on open and on every
       // later renewal (RPCs, SSE reconnects), never as raw
-      // ShareExchangeErrors.
-      const raw = shareSessionSource(this.http.baseUrl, input.shareToken, {
-        ...(input.sharePassword !== undefined ? { password: input.sharePassword } : {}),
+      // GrantExchangeErrors.
+      const answers = visitorAnswersOf(options?.identity);
+      const grantSession = new GrantSessionSource(this.http.baseUrl, input.grant, {
+        ...(input.passphrase !== undefined ? { passphrase: input.passphrase } : {}),
+        ...(input.restart ? { restart: true } : {}),
+        ...(answers ? { identity: answers } : {}),
+        visitorStore: this.visitorStore,
         fetch: this.http.fetchImpl,
       });
       const token = async () => {
         try {
-          return await raw();
+          return await grantSession.token();
         } catch (error) {
-          throw error instanceof ShareExchangeError ? engineErrorFromShareExchange(error) : error;
+          throw error instanceof GrantExchangeError ? engineErrorFromGrantExchange(error) : error;
         }
       };
-      return this.open({ kind: 'token', token }, options);
+      return this.openWithToken(token, effectivePassword, grantSession, options);
     }
 
     if (input.kind === 'token') {
-      // Open by doc-scoped JWT. We never verify the token SDK-side
-      // (server is the verifier of record); we just decode the
-      // unsigned payload to learn `doc_id`, then route to /head with
-      // the per-open bearer. The resulting handle owns its own
-      // scoped HttpClient — every subsequent RPC carries this
-      // token, not the engine-level one, so one engine can hold
-      // many handles each with a different bearer.
-      const tokenSource = input.token;
-      return AbortablePromise.run<DocumentHandle>(async (signal) => {
-        const docHttp = this.http.forDocument({ sessionId: newSessionId(), token: tokenSource });
-        const token = await docHttp.currentToken();
-        const claims = decodeUnverifiedClaims(token);
-        const docId = claims.doc_id;
-        if (typeof docId !== 'string' || docId.length === 0) {
-          throw new EngineError(
-            EngineErrorCode.InvalidArg,
-            'cloud engine: token has no doc_id claim — mint a doc-scoped JWT',
-          );
-        }
-        const layerName =
-          typeof claims.layer_name === 'string' && claims.layer_name.length > 0
-            ? claims.layer_name
-            : DEFAULT_LAYER_NAME;
-        const head = await docHttp.getJson(
-          wirePaths.layerHead(docId, layerName),
-          (raw) => DocumentHeadSchema.parse(raw),
-          signal,
-        );
-        const handle = new CloudDocumentHandle(
-          docHttp,
-          head.id,
-          layerName,
-          head,
-          token,
-          () => this.handles.delete(handle),
-        );
-        this.handles.add(handle);
-        try {
-          await establishOnOpen(handle, head, signal, effectivePassword, false);
-        } catch (error) {
-          await handle.close();
-          throw error;
-        }
-        return handle;
-      });
+      return this.openWithToken(input.token, effectivePassword, null, options);
     }
 
     if (input.kind === 'id') {
@@ -180,22 +163,84 @@ export class CloudEngine implements Engine {
           resolvedToken !== null &&
           typeof decodeUnverifiedClaims(resolvedToken).doc_id !== 'string';
         try {
-          await establishOnOpen(handle, head, signal, effectivePassword, tenant);
+          await establishOnOpen(handle, head, signal, effectivePassword, tenant, docHttp.usesCdn);
         } catch (error) {
           await handle.close();
           throw error;
         }
+        warnUnusedOpenOptions(options, handle, 'token');
         return handle;
       });
     }
 
-    void options;
     return AbortablePromise.rejectReason(
       new EngineError(
         EngineErrorCode.InvalidArg,
-        `cloud engine supports OpenInput.kind === 'token', 'id', or 'share' (got '${(input as { kind?: string }).kind}')`,
+        `cloud engine supports OpenInput.kind === 'token', 'id', or 'grant' (got '${(input as { kind?: string }).kind}')`,
       ),
     );
+  }
+
+  /**
+   * Open by doc-scoped JWT. We never verify the token SDK-side (server is
+   * the verifier of record); we just decode the unsigned payload to learn
+   * `doc_id`, then route to /head with the per-open bearer. The resulting
+   * handle owns its own scoped HttpClient — every subsequent RPC carries
+   * this token, not the engine-level one, so one engine can hold many
+   * handles each with a different bearer. A grant session also renews on a
+   * timer while the document is open, and tells the handle how it reaches
+   * its layer.
+   */
+  private openWithToken(
+    tokenSource: TokenSource,
+    password: string | null,
+    grantSession: GrantSessionSource | null,
+    options: OpenOptions | undefined,
+  ): AbortablePromise<DocumentHandle> {
+    return AbortablePromise.run<DocumentHandle>(async (signal) => {
+      const docHttp = this.http.forDocument({ sessionId: newSessionId(), token: tokenSource });
+      const token = await docHttp.currentToken();
+      const claims = decodeUnverifiedClaims(token);
+      const docId = claims.doc_id;
+      if (typeof docId !== 'string' || docId.length === 0) {
+        throw new EngineError(
+          EngineErrorCode.InvalidArg,
+          'cloud engine: token has no doc_id claim — mint a doc-scoped JWT',
+        );
+      }
+      const layerName =
+        typeof claims.layer_name === 'string' && claims.layer_name.length > 0
+          ? claims.layer_name
+          : DEFAULT_LAYER_NAME;
+      const head = await docHttp.getJson(
+        wirePaths.layerHead(docId, layerName),
+        (raw) => DocumentHeadSchema.parse(raw),
+        signal,
+      );
+      let stopRenewing = () => {};
+      const handle = new CloudDocumentHandle(
+        docHttp,
+        head.id,
+        layerName,
+        head,
+        token,
+        () => {
+          this.handles.delete(handle);
+          stopRenewing();
+        },
+        grantSession,
+      );
+      this.handles.add(handle);
+      try {
+        await establishOnOpen(handle, head, signal, password, false, docHttp.usesCdn);
+      } catch (error) {
+        await handle.close();
+        throw error;
+      }
+      if (grantSession) stopRenewing = grantSession.keepAlive();
+      warnUnusedOpenOptions(options, handle, grantSession ? 'grant' : 'token');
+      return handle;
+    });
   }
 
   /**
@@ -240,8 +285,9 @@ async function establishOnOpen(
   signal: AbortSignal,
   password: string | null,
   tenant: boolean,
+  usesCdn: boolean,
 ): Promise<void> {
-  const accessed = await maybeAutoEstablishAccess(handle, head, signal, password);
+  const accessed = await maybeAutoEstablishAccess(handle, head, signal, password, usesCdn);
   const security = handle.security as CloudDocumentSecurityService;
   const locked = !accessed && head.access.reasons.includes('password');
   await Promise.all([
@@ -286,7 +332,8 @@ function mayCreateObjects(security: CloudDocumentSecurityService): boolean {
  *
  * 2. **CDN-only** — unchanged: `/access` without a password, transparently.
  *    A required password with no supplied password never auto-calls; the
- *    dev prompts and `unlock()` runs the same POST.
+ *    dev prompts and `unlock()` runs the same POST. Skipped when the engine
+ *    reads no CDN (`cdn: false`): nothing would use the credentials.
  *
  * Non-password /access failures never break `open()` (the first real
  * request still tries origin, where the JWT check produces a regular
@@ -303,6 +350,7 @@ async function maybeAutoEstablishAccess(
   },
   signal: AbortSignal,
   password: string | null,
+  usesCdn: boolean,
 ): Promise<boolean> {
   const reasons = new Set(head.access.reasons);
   // CloudDocumentSecurityService exposes `establishAccess()` — the
@@ -327,6 +375,7 @@ async function maybeAutoEstablishAccess(
   if (!head.access.required) return false;
   if (reasons.has('password')) return false; // wait for explicit unlock()
   if (!reasons.has('cdn')) return false; // nothing actionable for the SDK
+  if (!usesCdn) return false; // CDN credentials nobody would use (`cdn: false`)
   return settleLinked(security.establishAccess(), signal);
 }
 

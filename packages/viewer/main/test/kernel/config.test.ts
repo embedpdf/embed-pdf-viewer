@@ -129,21 +129,17 @@ describe('a src document', () => {
     expect('bytes' in given && (given.bytes as Uint8Array).buffer).toBe(buffer);
   });
 
-  it('says why a URL could not be downloaded: not found, or the download failed', async () => {
-    const respond = (status: number) =>
-      vi.fn(async () => ({ ok: false, status, arrayBuffer: async () => new ArrayBuffer(0) }));
-    const open = (url: string) => {
-      const { source } = documentFromSrc(url, url);
-      if (typeof source !== 'function') throw new Error('expected a lazy source');
-      return source(new AbortController().signal);
-    };
-    vi.stubGlobal('fetch', respond(404));
-    await expect(open('/missing.pdf')).rejects.toMatchObject({
-      name: 'PluginError',
-      code: 'not-found',
+  it("leaves a URL to the viewer's download, with its fetch, under the id it was given", async () => {
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+    const { source } = documentFromSrc('/report.pdf', '/report.pdf#2');
+    if (typeof source !== 'function') throw new Error('expected a lazy source');
+    await expect(source(new AbortController().signal)).resolves.toEqual({
+      kind: 'url',
+      url: '/report.pdf',
+      id: '/report.pdf#2',
     });
-    vi.stubGlobal('fetch', respond(500));
-    await expect(open('/broken.pdf')).rejects.toMatchObject({ code: 'operation-failed' });
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it("says bytes that aren't a PDF's aren't one, as the engine can't", async () => {
@@ -181,8 +177,6 @@ describe('a src document', () => {
 });
 
 describe('documents entries', () => {
-  afterEach(() => vi.unstubAllGlobals());
-
   it('open in order, each under an id of its own, with its name, password and the active one', () => {
     const documents = initialDocumentsOf([
       { src: '/contract.pdf', name: 'Contract' },
@@ -201,14 +195,6 @@ describe('documents entries', () => {
   });
 
   it('give two entries of one URL their own ids', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => ({
-        ok: true,
-        status: 200,
-        arrayBuffer: async () => new TextEncoder().encode('%PDF-1.7').buffer,
-      })),
-    );
     const ids = await Promise.all(
       initialDocumentsOf([{ src: '/a.pdf' }, { src: '/a.pdf' }, { src: '/a.pdf' }]).map(
         async ({ source }) => {
@@ -225,24 +211,24 @@ describe('documents entries', () => {
 describe("a door's documents and plugin settings", () => {
   /** The cloud door's words for a document, as a door of its own would have them. */
   const sourceOf = (src: unknown) =>
-    typeof src === 'object' && src !== null && 'shareToken' in src
-      ? { kind: 'share' as const, shareToken: String(src.shareToken) }
+    typeof src === 'object' && src !== null && 'grant' in src
+      ? { kind: 'grant' as const, grant: String(src.grant) }
       : (src as string);
 
   it('open in the words of the door, which turns them into what its engine opens', () => {
     const documents = initialDocumentsOf(
-      [{ src: { shareToken: 'shr_1' }, name: 'Shared' }, { src: '/report.pdf' }],
+      [{ src: { grant: 'grt_1' }, name: 'Shared' }, { src: '/report.pdf' }],
       sourceOf,
     );
     expect(documents[0]).toEqual({
-      source: { kind: 'share', shareToken: 'shr_1' },
+      source: { kind: 'grant', grant: 'grt_1' },
       name: 'Shared',
     });
     expect(documents[1]!.name).toBe('report');
   });
 
   it("fail as invalid-input when no door said how they open, and aren't a URL, a file or bytes", async () => {
-    const { source } = documentFromSrc({ shareToken: 'shr_1' }, 'document');
+    const { source } = documentFromSrc({ grant: 'grt_1' }, 'document');
     if (typeof source !== 'function') throw new Error('expected a lazy source');
     await expect(source(new AbortController().signal)).rejects.toMatchObject({
       code: 'invalid-input',

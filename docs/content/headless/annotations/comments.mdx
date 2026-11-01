@@ -13,8 +13,8 @@ every thread in the document, ready for a sidebar:
 
 <Example name="annotation/comments" />
 
-> **Try it:** reply to a thread, or press **Show** to go to its comment. Add a note on the page:
-> it gets a thread of its own.
+> **Try it:** you're Dana Smith, reviewing Ada's proposal. Reply to a thread, or press **Show** to
+> go to its comment on the page.
 
 Threads come in reading order: by page, then from the top of the page. The list updates by itself
 when anyone adds, changes or deletes a comment, on this screen or, on a shared document, on
@@ -29,6 +29,20 @@ A thread has:
 | `review`    | The review states people set, such as accepted or rejected (see [Review states](#review-states)). |
 | `page`      | The page it's on.                                                                                 |
 | `pageLabel` | The page's label to show, such as `'iv'` or `'7'`.                                                |
+
+## Read a comment on the page
+
+The annotation layer draws a note's icon and a highlight's color, not the comment: like the
+sidebar, the window that shows it is yours. Build it from what you already have: the selected
+annotation, its thread, and the annotation menu, which keeps your card next to it:
+
+<Example name="annotation/note-card" />
+
+> **Try it:** click the note next to the title, or the highlighted sentence, then reply. Press
+> **Escape** to close the card.
+
+The card shows while the annotation is selected, so a click elsewhere closes it too. Any
+annotation can carry a comment, so the same card opens for a note, a highlight or a shape.
 
 ## Reply, edit and delete
 
@@ -63,6 +77,9 @@ thread.review.markedBy; // who has checked it off
 States are saved as the PDF's own review states, so Acrobat shows them in its comment list.
 
 <Example name="annotation/review" />
+
+> **Try it:** accept or reject a comment, or check it off. Dana has already accepted Ada's note on
+> page 2.
 
 ## Jump to a comment
 

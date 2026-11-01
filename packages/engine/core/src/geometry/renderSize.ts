@@ -1,6 +1,6 @@
 import type { PdfRotation } from './primitives';
 import { printScale } from './printSize';
-import type { PageRenderViewport } from '../dto/PageRender';
+import { PAGE_THUMBNAIL_SIZE, type PageRenderViewport } from '../dto/PageRender';
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 
@@ -8,7 +8,8 @@ import { EngineErrorCode } from '../errors/EngineErrorCode';
  * The pixel size of a render: an area of `width` × `height` points, turned
  * by `rotation` (width and height swap on a quarter turn) and sized by
  * `viewport`. A `dpi` viewport sizes a print picture for its paper
- * ({@link printScale}). The local worker allocates exactly this; the cloud
+ * ({@link printScale}); a `thumbnail` one puts the long side at
+ * {@link PAGE_THUMBNAIL_SIZE}. The local worker allocates exactly this; the cloud
  * client reports it without rendering. `InvalidArg` for a viewport that
  * isn't positive.
  */
@@ -29,7 +30,12 @@ export function renderSize(
     return { width, height: Math.max(1, Math.round((width * baseHeight) / baseWidth)) };
   }
 
-  const scale = viewport.kind === 'dpi' ? printScale(area, viewport.dpi) : (viewport.scale ?? 1);
+  const scale =
+    viewport.kind === 'dpi'
+      ? printScale(area, viewport.dpi)
+      : viewport.kind === 'thumbnail'
+        ? PAGE_THUMBNAIL_SIZE / Math.max(area.width, area.height)
+        : (viewport.scale ?? 1);
   if (!Number.isFinite(scale) || scale <= 0) {
     throw new EngineError(EngineErrorCode.InvalidArg, 'render viewport scale must be positive');
   }

@@ -22,12 +22,12 @@ import { EpdfSelection, EpdfSelectionLayer, withSelection } from '@embedpdf/angu
 import { localEngine } from '@embedpdf/engine';
 
 // The characters of the cover's title.
-const TITLE = { start: 10, count: 52 };
+const TITLE = { start: 28, count: 30 };
 const SWATCHES = ['#3858e9', '#e91e63', '#0f6e56', '#c2410c'];
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/welcome.pdf');
+  return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 // The cover's title is selected on load, so the accent shows; drag over any text to see more.
@@ -59,7 +59,7 @@ export class SelectTitle {
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => localEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => localEngine(), initialDocuments: [{ source: welcome }] },
       withStage(),
       withRender(),
       withInteraction(),

@@ -23,7 +23,7 @@ import { vanillaDemoId, vanillaSamplesPlugin } from './src/lib/vanilla-demo-samp
  *
  * On this site the samples are the cloud emissions: they provision
  * `cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' })` and open the
- * shared demo document with its share grant — the demo a visitor watches is
+ * shared demo document with its grant — the demo a visitor watches is
  * the same HTTPS traffic the code panel tells them to write. No wasm rides
  * along; failures surface loudly in the preview (never a local fallback).
  *

@@ -26,6 +26,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { DEFAULT_LAYOUT } from '../../../chrome/src/config/chrome';
 import { defaultCommands, toolCommandsFor } from '../../../chrome/src/config/commands';
+import { FULLSCREEN_COMMAND } from '../../../chrome/src/config/fullscreen';
 import { panelCommandsFor } from '../../../chrome/src/config/panels';
 import {
   mergeCommand,
@@ -295,14 +296,57 @@ describe('the built-in commands', () => {
         'panel:comments',
         'panel:stamps',
         'panel:redaction',
+        'page:rotate-clockwise',
+        'page:delete',
+        'page:duplicate',
+        'page:insert-blank',
+        'page:insert-file',
+        'page:extract',
+        'menu:page',
       ]),
     ).toEqual([]);
+  });
+
+  it('say which stage setting they change, so a lock on it greys them out', () => {
+    // A stage whose every setting is locked, by the setting's own name.
+    const lockedStage = { getLock: (setting: string) => ({ by: setting }) };
+    const context = {
+      documentId: 'doc',
+      tryGet: (token: CapabilityToken<unknown>) => (token.name === 'stage' ? lockedStage : null),
+      get: (token: CapabilityToken<unknown>) => (token.name === 'stage' ? lockedStage : null),
+    } as unknown as PluginCommandContext;
+    const holderOf = (id: string) =>
+      (defaultCommands.find((command) => command.id === id)?.locked?.(context) ?? null)?.by;
+    expect(
+      Object.fromEntries(
+        [
+          'view:single-page',
+          'view:two-pages',
+          'view:cover-page',
+          'view:scroll-vertical',
+          'view:scroll-horizontal',
+          'view:rotate-clockwise',
+          'view:rotate-counterclockwise',
+        ].map((id) => [id, holderOf(id)]),
+      ),
+    ).toEqual({
+      'view:single-page': 'spread',
+      'view:two-pages': 'spread',
+      'view:cover-page': 'spread',
+      'view:scroll-vertical': 'layout',
+      'view:scroll-horizontal': 'layout',
+      'view:rotate-clockwise': 'viewRotation',
+      'view:rotate-counterclockwise': 'viewRotation',
+    });
+    // The zoom can't be locked: its commands say nothing of locks.
+    expect(defaultCommands.find((command) => command.id === 'zoom:in')?.locked).toBeUndefined();
   });
 
   it('are every one the page lists, with the panels and modes the default layout brings', () => {
     const ids = new Set([
       ...defaultCommands.map((command) => command.id),
       ...panelCommandsFor(DEFAULT_LAYOUT.panels, () => false).map((command) => command.id),
+      FULLSCREEN_COMMAND,
     ]);
     expect(documentedIds.length).toBeGreaterThan(80);
     expect(documentedIds.filter((id) => !ids.has(id))).toEqual([]);

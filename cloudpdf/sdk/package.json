@@ -1,6 +1,6 @@
 {
     "name": "@cloudpdf/sdk",
-    "version": "3.0.0-next.15",
+    "version": "3.0.0-next.19",
     "private": false,
     "license": "Apache-2.0",
     "type": "commonjs",
@@ -41,16 +41,16 @@
             },
             "default": "./dist/cjs/api/resources/doc/exports.js"
         },
-        "./shares": {
+        "./grants": {
             "import": {
-                "types": "./dist/esm/api/resources/shares/exports.d.mts",
-                "default": "./dist/esm/api/resources/shares/exports.mjs"
+                "types": "./dist/esm/api/resources/grants/exports.d.mts",
+                "default": "./dist/esm/api/resources/grants/exports.mjs"
             },
             "require": {
-                "types": "./dist/cjs/api/resources/shares/exports.d.ts",
-                "default": "./dist/cjs/api/resources/shares/exports.js"
+                "types": "./dist/cjs/api/resources/grants/exports.d.ts",
+                "default": "./dist/cjs/api/resources/grants/exports.js"
             },
-            "default": "./dist/cjs/api/resources/shares/exports.js"
+            "default": "./dist/cjs/api/resources/grants/exports.js"
         },
         "./tenants": {
             "import": {
@@ -74,6 +74,17 @@
             },
             "default": "./dist/cjs/api/resources/documents/exports.js"
         },
+        "./folders": {
+            "import": {
+                "types": "./dist/esm/api/resources/folders/exports.d.mts",
+                "default": "./dist/esm/api/resources/folders/exports.mjs"
+            },
+            "require": {
+                "types": "./dist/cjs/api/resources/folders/exports.d.ts",
+                "default": "./dist/cjs/api/resources/folders/exports.js"
+            },
+            "default": "./dist/cjs/api/resources/folders/exports.js"
+        },
         "./tokens": {
             "import": {
                 "types": "./dist/esm/api/resources/tokens/exports.d.mts",
@@ -95,6 +106,17 @@
                 "default": "./dist/cjs/api/resources/doc/resources/annotations/exports.js"
             },
             "default": "./dist/cjs/api/resources/doc/resources/annotations/exports.js"
+        },
+        "./doc/attachments": {
+            "import": {
+                "types": "./dist/esm/api/resources/doc/resources/attachments/exports.d.mts",
+                "default": "./dist/esm/api/resources/doc/resources/attachments/exports.mjs"
+            },
+            "require": {
+                "types": "./dist/cjs/api/resources/doc/resources/attachments/exports.d.ts",
+                "default": "./dist/cjs/api/resources/doc/resources/attachments/exports.js"
+            },
+            "default": "./dist/cjs/api/resources/doc/resources/attachments/exports.js"
         },
         "./doc/fonts": {
             "import": {
@@ -205,6 +227,39 @@
                 "default": "./dist/cjs/api/resources/doc/resources/metadata/resources/custom/exports.js"
             },
             "default": "./dist/cjs/api/resources/doc/resources/metadata/resources/custom/exports.js"
+        },
+        "./documents/layers": {
+            "import": {
+                "types": "./dist/esm/api/resources/documents/resources/layers/exports.d.mts",
+                "default": "./dist/esm/api/resources/documents/resources/layers/exports.mjs"
+            },
+            "require": {
+                "types": "./dist/cjs/api/resources/documents/resources/layers/exports.d.ts",
+                "default": "./dist/cjs/api/resources/documents/resources/layers/exports.js"
+            },
+            "default": "./dist/cjs/api/resources/documents/resources/layers/exports.js"
+        },
+        "./grants/visitors": {
+            "import": {
+                "types": "./dist/esm/api/resources/grants/resources/visitors/exports.d.mts",
+                "default": "./dist/esm/api/resources/grants/resources/visitors/exports.mjs"
+            },
+            "require": {
+                "types": "./dist/cjs/api/resources/grants/resources/visitors/exports.d.ts",
+                "default": "./dist/cjs/api/resources/grants/resources/visitors/exports.js"
+            },
+            "default": "./dist/cjs/api/resources/grants/resources/visitors/exports.js"
+        },
+        "./upload": {
+            "import": {
+                "types": "./dist/esm/upload.d.mts",
+                "default": "./dist/esm/upload.mjs"
+            },
+            "require": {
+                "types": "./dist/cjs/upload.d.ts",
+                "default": "./dist/cjs/upload.js"
+            },
+            "default": "./dist/cjs/upload.js"
         },
         "./package.json": "./package.json"
     },

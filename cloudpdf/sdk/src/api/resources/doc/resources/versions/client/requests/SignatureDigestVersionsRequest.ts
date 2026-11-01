@@ -6,6 +6,7 @@ import type * as CloudPDF from "../../../../../../index.js";
  * @example
  *     {
  *         docId: "docId",
+ *         layerName: "layerName",
  *         sha: "sha",
  *         fieldKey: "fieldKey",
  *         algorithm: "sha1"
@@ -13,6 +14,7 @@ import type * as CloudPDF from "../../../../../../index.js";
  */
 export interface SignatureDigestVersionsRequest {
     docId: string;
+    layerName: string;
     sha: string;
     fieldKey: string;
     algorithm: CloudPDF.doc.SignatureDigestVersionsRequestAlgorithm;

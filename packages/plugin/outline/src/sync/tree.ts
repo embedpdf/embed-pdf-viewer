@@ -108,7 +108,9 @@ export function foldOutline(
   tree: OutlineTree | null,
   event: DocumentEvent,
 ): OutlineTree | null | MirrorReload {
-  if (event.type === 'pages.deleted') return tree ? reload() : tree;
+  if (event.type === 'pages.deleted' || event.type === 'pages.restored') {
+    return tree ? reload() : tree;
+  }
   if (!tree) return tree;
   switch (event.type) {
     case 'outline.created':

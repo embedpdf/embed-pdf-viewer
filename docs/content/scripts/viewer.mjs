@@ -285,7 +285,7 @@ function stageHtml(snippet, source, directory, viewerNames, engine) {
       if (element.tag === 'embedpdf-viewer' && attribute.name === 'src' && engine !== 'local') {
         error(
           attribute,
-          `<embedpdf-viewer src>: on this site a document is { token }, { id } or { shareToken }, ` +
+          `<embedpdf-viewer src>: on this site a document is { token }, { id } or { grant }, ` +
             'which no attribute holds: give it from script (`element.src = …`)',
         );
       } else if (element.tag === 'embedpdf-viewer' && !isGlobalAttribute(attribute.name)) {

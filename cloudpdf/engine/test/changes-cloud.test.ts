@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { CHANGE_FIXTURE_PDF } from '@embedpdf/engine-core/conformance';
 import {
   isSkippedItem,
+  toAttachmentRef,
   type ChangeOp,
   type DocumentEvent,
   type DocumentHandle,
@@ -19,8 +20,9 @@ import {
 /**
  * What only the cloud engine does with changes: changes called together go
  * out as one request, one request at a time; another session sees a change's
- * events, an undo naming what it undid; and gate C2, a burst of actions each
- * undone, at +500 ms a request.
+ * events, an undo naming what it undid; an undo still applies once the layer
+ * was saved and opened again; and gate C2, a burst of actions each undone, at
+ * +500 ms a request.
  */
 
 const TENANT_ID = 'cloud-changes-tenant';
@@ -98,6 +100,26 @@ async function factsOf(doc: DocumentHandle): Promise<string> {
   return JSON.stringify({ annotations, fields, title: metadata.title });
 }
 
+/** `notes.txt`, embedded with `bytes`. */
+const NOTES_REF = toAttachmentRef('notes.txt');
+const embedNotes = (bytes: Uint8Array): ChangeOp => ({
+  type: 'attachments.create',
+  file: { name: 'notes.txt', mimeType: 'text/plain' },
+  resources: { file: bytes },
+});
+
+/** A fetch that records each answer's URL and status. */
+function watchingFetch() {
+  const answers: { url: string; status: number }[] = [];
+  const fetchFn: typeof fetch = async (input, init) => {
+    const response = await fetch(input, init);
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+    answers.push({ url, status: response.status });
+    return response;
+  };
+  return { fetchFn, answers };
+}
+
 const waitFor = async (predicate: () => boolean, what: string, timeoutMs = 10_000) => {
   const deadline = Date.now() + timeoutMs;
   while (!predicate()) {
@@ -123,6 +145,138 @@ describe('changes on the cloud engine', () => {
       expect(await factsOf(doc)).toEqual(before);
     } finally {
       await doc.close();
+    }
+  });
+
+  test('changes sent together meet the pages as the ones before them left them', async () => {
+    const recording = recordingFetch();
+    const doc = await openFresh(recording.fetchFn);
+    try {
+      const { page, square } = await landmarks(doc);
+      // A change on the page, then the page's delete, in one request.
+      const [updated, deleted] = await Promise.all([
+        doc.apply(
+          { ops: [{ type: 'annotations.update', ref: square.ref, patch: { color: '#e11d48' } }] },
+          { opId: 'update-1' },
+        ),
+        doc.apply({ ops: [{ type: 'pages.delete', pages: [page] }] }, { opId: 'delete-1' }),
+      ]);
+      expect(recording.requests).toEqual([['update-1', 'delete-1']]);
+      expect(updated.items.map((item) => item.type)).toEqual(['annotations.update']);
+      expect(deleted.items.map((item) => item.type)).toEqual(['pages.delete']);
+
+      // The page's return, then a change on it, in one request.
+      const [restored, recolored] = await Promise.all([
+        doc.apply({ undoOf: 'delete-1' }, { opId: 'undo-1' }),
+        doc.apply(
+          { ops: [{ type: 'annotations.update', ref: square.ref, patch: { color: '#0000ff' } }] },
+          { opId: 'update-2' },
+        ),
+      ]);
+      expect(recording.requests[1]).toEqual(['undo-1', 'update-2']);
+      expect(restored.items.map((item) => item.type)).toEqual(['pages.restore']);
+      expect(recolored.items.map((item) => item.type)).toEqual(['annotations.update']);
+    } finally {
+      await doc.close();
+    }
+  });
+
+  test('another session reads an outline change without asking for the old one', async () => {
+    const docA = await openFresh();
+    const answers: { url: string; status: number }[] = [];
+    const watching: typeof fetch = async (input, init) => {
+      const response = await fetch(input, init);
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+      answers.push({ url, status: response.status });
+      return response;
+    };
+    const docB = await openAgain(docA.id, watching);
+    try {
+      expect((await docB.outline.get()).items).toEqual([]);
+      const eventsB: DocumentEvent[] = [];
+      docB.events.subscribe((event) => eventsB.push(event));
+      // Give B's lazy stream a beat to connect before A writes.
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      await docA.apply({
+        ops: [{ type: 'outline.create', parent: null, data: { title: 'From A' } }],
+      });
+      await waitFor(() => eventsB.some((event) => event.type === 'outline.created'), 'the event');
+      answers.length = 0;
+      const { items } = await docB.outline.get();
+      expect(items.map((item) => item.title)).toEqual(['From A']);
+      // B's manifest took the event's pins: no stale read that a CDN could have answered.
+      expect(answers.filter(({ url }) => url.includes('/outline'))).toHaveLength(1);
+      expect(answers.every(({ status }) => status === 200)).toBe(true);
+    } finally {
+      await docB.close();
+      await docA.close();
+    }
+  });
+
+  test('another session sees a file added, removed and brought back, and reads it fresh', async () => {
+    const docA = await openFresh();
+    const { fetchFn, answers } = watchingFetch();
+    const docB = await openAgain(docA.id, fetchFn);
+    try {
+      expect((await docB.attachments.list()).attachments).toEqual([]);
+      const eventsB: DocumentEvent[] = [];
+      docB.events.subscribe((event) => eventsB.push(event));
+      // Give B's lazy stream a beat to connect before A writes.
+      await new Promise((resolve) => setTimeout(resolve, 300));
+
+      const notes = new TextEncoder().encode('Notes from A.');
+      await docA.apply({ ops: [embedNotes(notes)] });
+      await docA.apply(
+        { ops: [{ type: 'attachments.delete', ref: NOTES_REF }] },
+        { opId: 'delete-notes' },
+      );
+      await docA.apply({ undoOf: 'delete-notes' }, { opId: 'undo-delete-notes' });
+      await waitFor(() => eventsB.length >= 3, "B's remote events");
+      expect(eventsB.map((event) => event.type)).toEqual([
+        'attachments.created',
+        'attachments.deleted',
+        'attachments.restored',
+      ]);
+      expect(eventsB[2]).toMatchObject({
+        origin: { kind: 'remote', undoOf: 'delete-notes' },
+        attachment: { ref: NOTES_REF, name: 'notes.txt', mimeType: 'text/plain' },
+      });
+
+      answers.length = 0;
+      const { attachments } = await docB.attachments.list();
+      expect(attachments.map((attachment) => attachment.name)).toEqual(['notes.txt']);
+      expect(await docB.attachments.download(NOTES_REF)).toEqual(notes);
+      // B's manifest took the events' pins: no stale read that a CDN could have answered.
+      expect(answers.filter(({ url }) => url.includes('/attachments@'))).toHaveLength(1);
+      expect(answers.every(({ status }) => status === 200)).toBe(true);
+    } finally {
+      await docB.close();
+      await docA.close();
+    }
+  });
+
+  test('a removed file comes back with its undo after the layer was saved and opened again', async () => {
+    const docA = await openFresh();
+    const notes = new TextEncoder().encode('Notes kept by the capture.');
+    await docA.apply({ ops: [embedNotes(notes)] });
+    await docA.apply(
+      { ops: [{ type: 'attachments.delete', ref: NOTES_REF }] },
+      { opId: 'delete-notes' },
+    );
+    await docA.close();
+    // The server opens the layer again from its saved artifact, which has
+    // dropped the file nothing reached any more.
+    fixture().bundle.documentService!.invalidateLayerSession(docA.id, 'default');
+
+    const again = await openAgain(docA.id);
+    try {
+      const undo = await again.apply({ undoOf: 'delete-notes' });
+      expect(undo.items.map((item) => (isSkippedItem(item) ? 'skipped' : item.type))).toEqual([
+        'attachments.restore',
+      ]);
+      expect(await again.attachments.download(NOTES_REF)).toEqual(notes);
+    } finally {
+      await again.close();
     }
   });
 

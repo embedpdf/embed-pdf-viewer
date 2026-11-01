@@ -20,6 +20,7 @@ import {
 import { buildAppForTesting } from '../src/app/buildApp';
 import type { CdnSigner, SignInput } from '../src/cdn/CdnSigner';
 import { createValidTestLicenseGate } from '../src/licensing/testing';
+import { appliedResult, postChange, type ChangeTarget } from './_helpers/changes';
 import { serverFontsFingerprint } from '../src/services/ServerFonts';
 
 /** The stub worker's server fonts: it registers none. */
@@ -212,12 +213,11 @@ describe('plane-scoped view sharing', () => {
     const docId = 'docrotate0001';
     await seedDocument(fx, tenantId, docId);
 
-    const rotated = await fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/alice/pages/rotate`, {
-      method: 'POST',
-      headers: { ...auth(docToken(tenantId, docId, 'alice')), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pages: [1].map(toPageRef), rotation: 90 }),
-    });
-    expect(rotated.status).toBe(200);
+    appliedResult(
+      await postChange(aliceTarget(fx, tenantId, docId), [
+        { type: 'pages.rotate', pages: [1].map(toPageRef), rotation: 90 },
+      ]),
+    );
 
     // Rotation is presentation metadata over normalized artifacts (the
     // SDK's own absorbPageStructure law): only the layout plane flips.
@@ -276,12 +276,11 @@ describe('plane-scoped view sharing', () => {
     const docId = 'docdelete0001';
     await seedDocument(fx, tenantId, docId);
 
-    const deleted = await fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/alice/pages/delete`, {
-      method: 'POST',
-      headers: { ...auth(docToken(tenantId, docId, 'alice')), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pages: [2].map(toPageRef) }),
-    });
-    expect(deleted.status, await deleted.clone().text()).toBe(200);
+    appliedResult(
+      await postChange(aliceTarget(fx, tenantId, docId), [
+        { type: 'pages.delete', pages: [2].map(toPageRef) },
+      ]),
+    );
 
     const alice = await fetchLayerManifest(fx, tenantId, docId, 'alice');
     expect(alice.scopes).toEqual({
@@ -383,11 +382,11 @@ describe('plane-scoped view sharing', () => {
     );
 
     // Page delete: the content trio + layout follow.
-    await fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/alice/pages/delete`, {
-      method: 'POST',
-      headers: { ...auth(docToken(tenantId, docId, 'alice')), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pages: [2].map(toPageRef) }),
-    });
+    appliedResult(
+      await postChange(aliceTarget(fx, tenantId, docId), [
+        { type: 'pages.delete', pages: [2].map(toPageRef) },
+      ]),
+    );
     const afterDelete = await accessFor('alice');
     for (const gone of ['page-render', 'page-text', 'page-geometry', 'layout']) {
       expect(afterDelete.resourceIds, gone).not.toEqual(expect.arrayContaining([gone]));
@@ -468,7 +467,8 @@ describe('attachments plane (independent axis)', () => {
     const b = await fetch(url, { headers: auth(docToken(tenantId, docId, 'bob')) });
     expect(a.status).toBe(200);
     expect(b.status).toBe(200);
-    expect(a.headers.get('cache-control')).toContain('immutable');
+    // This fixture's signer fronts the engine with a CDN, so shared caches may keep it.
+    expect(a.headers.get('cache-control')).toBe('public, max-age=31536000, immutable');
     // The sidebar-on-open economics: base session only, no layer sessions.
     expect(spy.count('open.layerFileBase')).toBe(0);
   });
@@ -647,12 +647,11 @@ describe('attachments plane (independent axis)', () => {
 
     // Delete = a real content op under the plane model (rotate no longer
     // is — it owns layout only).
-    const deleted = await fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/alice/pages/delete`, {
-      method: 'POST',
-      headers: { ...auth(docToken(tenantId, docId, 'alice')), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pages: [2].map(toPageRef) }),
-    });
-    expect(deleted.status).toBe(200);
+    appliedResult(
+      await postChange(aliceTarget(fx, tenantId, docId), [
+        { type: 'pages.delete', pages: [2].map(toPageRef) },
+      ]),
+    );
 
     const alice = await fetchLayerManifest(fx, tenantId, docId, 'alice');
     // Content flipped, attachments did not — a redacted/edited layer still
@@ -753,6 +752,16 @@ function docToken(tenantId: string, docId: string, layerName: string): string {
 
 function adminToken(tenantId: string): string {
   return signDevToken(SECRET, { sub: 'admin-1', tenant_id: tenantId, scope: ['*'] });
+}
+
+/** Alice's layer, where a test's change goes. */
+function aliceTarget(fx: Fixture, tenantId: string, docId: string): ChangeTarget {
+  return {
+    baseUrl: fx.baseUrl,
+    docId,
+    layerName: 'alice',
+    token: docToken(tenantId, docId, 'alice'),
+  };
 }
 
 /** Stub-PDF bytes: byte0 = pageCount. */

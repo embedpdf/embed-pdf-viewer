@@ -13,7 +13,7 @@ import {
 } from '@embedpdf/core-stage';
 import type { Cancel, PluginContext } from '@embedpdf/core';
 
-import { setCamera, setCameraResting, setCursor, setMotionCause, type StageState } from '../model';
+import { setCamera, setCameraResting, setCursor, setMotionCause, type StageModel } from '../model';
 import { rubberIn, rubberOut } from '../motion';
 import type { StageServices } from '../services';
 
@@ -21,7 +21,7 @@ import type { StageServices } from '../services';
 const REST_MS = 150;
 
 export function createCameraWrite(
-  ctx: PluginContext<StageState>,
+  ctx: PluginContext<StageModel>,
   { clock, placement, scene }: Pick<StageServices, 'clock' | 'placement' | 'scene'>,
 ) {
   const { camera, viewport, paged, buildScene, stayBounds, constraint } = scene;
@@ -35,7 +35,7 @@ export function createCameraWrite(
   const gesture = { depth: 0, zoomed: false, elastic: false, raw: null as Camera | null };
 
   // ── the camera-rest detector ──
-  // Origin snapping is gated on rest (see `StageState.cameraResting`): pages
+  // Origin snapping is gated on rest (see `StageModel.cameraResting`): pages
   // place fractionally while the zoom moves and snap once it has held still
   // for REST_MS.
   let cancelRest: Cancel | null = null;
@@ -176,8 +176,8 @@ export function createCameraWrite(
     ctx.state.update(setCursor, anchorFromCamera(camera(), scene, viewport()).pageIndex);
   };
 
-  /** Tag what drives the next camera or cursor change (see `StageState.motionCause`). */
-  const markCause = (cause: StageState['motionCause']): void =>
+  /** Tag what drives the next camera or cursor change (see `StageModel.motionCause`). */
+  const markCause = (cause: StageModel['motionCause']): void =>
     ctx.state.update(setMotionCause, cause);
 
   return {

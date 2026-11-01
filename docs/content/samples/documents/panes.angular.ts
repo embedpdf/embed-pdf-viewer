@@ -18,9 +18,16 @@ import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { EpdfViewManager, withViewManager, type PaneInfo } from '@embedpdf/angular/view-manager';
 import { localEngine } from '@embedpdf/engine';
 
-// [!doc-source ebook]
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
+// [!doc-source welcome]
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/welcome.pdf');
+  return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
+};
+// [!/doc-source]
+
+// [!doc-source article]
+const article = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/article.pdf');
   return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
@@ -33,8 +40,8 @@ const ebook = async (): Promise<OpenInput> => {
       {
         engine: () => localEngine(),
         initialDocuments: [
-          { source: ebook, name: 'Contract' },
-          { source: ebook, name: 'Report' },
+          { source: welcome, name: 'Guide' },
+          { source: article, name: 'Article' },
         ],
       },
       withStage(),

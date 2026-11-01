@@ -1,6 +1,6 @@
 {
   "name": "@cloudpdf/viewer-angular",
-  "version": "3.0.0-next.15",
+  "version": "3.0.0-next.19",
   "private": false,
   "description": "The full viewer as an Angular component with the CloudPDF engine as its default: the same <epdf-pdf-viewer> as @embedpdf/viewer-angular, rendering on CloudPDF SaaS or your own @cloudpdf/server over HTTPS, the local engine loaded only when stamps need it.",
   "type": "module",

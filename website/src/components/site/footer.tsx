@@ -3,6 +3,7 @@ import Link from 'next/link';
 
 import { DiscordIcon, GitHubIcon } from './icons';
 import { PRO_LAUNCHED } from './launch';
+import { TOOLS } from '../tools/content';
 
 const COLUMNS: { head: string; links: { label: string; href: string }[] }[] = [
   {
@@ -118,7 +119,29 @@ export function Footer() {
           ))}
         </div>
 
-        <div className="mt-[clamp(40px,5vw,64px)] flex flex-wrap items-center justify-between gap-4 border-t border-white/10 pt-6">
+        {/* The free tools get a row of their own: the full name fits, and the columns keep their width. */}
+        <nav
+          aria-label="Open source PDF tools"
+          className="mt-[clamp(40px,5vw,64px)] flex flex-wrap items-center gap-x-6 gap-y-3 border-t border-white/10 pt-6"
+        >
+          <Link
+            href="/tools"
+            className="font-display w-full text-xs font-bold uppercase tracking-[0.08em] text-[#7BB2FF] transition-colors duration-150 hover:text-white min-[761px]:w-auto"
+          >
+            Open source PDF tools
+          </Link>
+          {TOOLS.map((tool) => (
+            <Link
+              key={tool.slug}
+              href={tool.href}
+              className="font-sans text-sm text-[#C7D3EE] transition-colors duration-150 hover:text-white"
+            >
+              {tool.name}
+            </Link>
+          ))}
+        </nav>
+
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-white/10 pt-6">
           <span className="font-sans text-[13px] text-[#9FB0D8]">
             © {new Date().getFullYear()} EmbedPDF. Apache-2.0 licensed core — you own the code. No
             black boxes.

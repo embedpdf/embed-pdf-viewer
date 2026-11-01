@@ -4,5 +4,5 @@
  * Layout: contract.ts · model.ts · controller.ts · state.ts · history.plugin.ts.
  */
 export { historyPlugin } from './history.plugin';
-export { historyState } from './state';
+export { historyState, type HistoryState } from './state';
 export * from './contract';

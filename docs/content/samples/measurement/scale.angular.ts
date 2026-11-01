@@ -23,18 +23,18 @@ import {
 } from '@embedpdf/angular/measurement';
 import { localEngine } from '@embedpdf/engine';
 
-// [!doc-source ebook]
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source sketch]
+const sketch = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/sketch.pdf');
+  return { kind: 'bytes', id: 'sketch', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
 // Precision is steps per unit: 100 shows two decimals.
 const PRECISIONS = [1, 10, 100, 1000];
 
-// The cover's empty lower half, where the measurements go.
-const LOWER_HALF = { x: 40, y: 560, width: 532, height: 210 };
+// The floor plan's lower half, where the measurements go.
+const LOWER_HALF = { x: 50, y: 500, width: 512, height: 240 };
 
 @Component({
   selector: 'demo-scale-toolbar',
@@ -155,7 +155,7 @@ export class ScaleToolbar {
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => localEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => localEngine(), initialDocuments: [{ source: sketch }] },
       withStage(),
       withRender(),
       withInteraction(),
@@ -182,39 +182,39 @@ export class ScaleToolbar {
 })
 export class App {
   private readonly measurement = inject(EpdfMeasurement);
-  private readonly coverScale = this.measurement.scaleOf(0);
+  private readonly planScale = this.measurement.scaleOf(0);
   private readonly stage = viewChild(EpdfStage);
   private started = false;
 
   constructor() {
-    // On load: a distance and an area on the cover, at 1:100, scrolled into view.
+    // On load: a distance and an area on the floor plan, at 1:100, scrolled into view.
     effect(() => {
       const stage = this.stage();
-      if (!stage || !this.coverScale().ready || this.started) return;
+      if (!stage || !this.planScale().ready || this.started) return;
       this.started = true;
-      untracked(() => this.measureCover(stage));
+      untracked(() => this.measurePlan(stage));
     });
   }
 
-  private measureCover(stage: EpdfStage) {
+  private measurePlan(stage: EpdfStage) {
     void this.measurement.setPreset(0, 'metric-100').then(() =>
       Promise.all([
         this.measurement.createMeasurement({
           kind: 'distance',
           page: 0,
           points: [
-            { x: 60, y: 740 },
-            { x: 550, y: 740 },
+            { x: 62, y: 723 },
+            { x: 550, y: 723 },
           ],
         }),
         this.measurement.createMeasurement({
           kind: 'area',
           page: 0,
           points: [
-            { x: 60, y: 580 },
-            { x: 260, y: 580 },
-            { x: 260, y: 700 },
-            { x: 60, y: 700 },
+            { x: 382, y: 516 },
+            { x: 550, y: 516 },
+            { x: 550, y: 723 },
+            { x: 382, y: 723 },
           ],
         }),
       ]).then(() => stage.reveal(0, { rect: LOWER_HALF })),

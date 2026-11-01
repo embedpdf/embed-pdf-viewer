@@ -13,13 +13,13 @@ const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), selectionPlugin()];
 
 // The characters of the cover's title.
-const TITLE = { start: 10, count: 52 };
+const TITLE = { start: 28, count: 30 };
 const SWATCHES = ['#3858e9', '#e91e63', '#0f6e56', '#c2410c'];
 
-// [!doc-source ebook]
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+// [!doc-source welcome]
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/welcome.pdf');
+  return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 
@@ -56,7 +56,7 @@ export default function App() {
         ))}
         <code className="value">--epdf-accent: {accent}</code>
       </div>
-      <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+      <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
         <DocumentGate fallback={<p className="loading">Loading…</p>}>
           <SelectTitle />
           <Stage className="stage">

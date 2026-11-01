@@ -1,6 +1,6 @@
 {
   "name": "@cloudpdf/server",
-  "version": "3.0.0-next.15",
+  "version": "3.0.0-next.19",
   "private": false,
   "description": "Self-hostable CloudPDF document engine server: Fastify-based HTTP/REST API in front of a Node worker_thread pool running the native EmbedPDF Runtime (PDFium fork) via @embedpdf/engine-runtime. Uses the same engine-services code as the local browser engine.",
   "type": "module",
@@ -10,6 +10,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./modules": {
+      "types": "./dist/modules/index.d.ts",
+      "default": "./dist/modules/index.js"
     },
     "./bin": {
       "default": "./dist/bin/cloudpdf-server.js"

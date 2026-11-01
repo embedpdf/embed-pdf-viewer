@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/angular",
-  "version": "3.0.0-next.15",
+  "version": "3.0.0-next.19",
   "private": false,
   "description": "Angular adapter for EmbedPDF: provideEmbedPdf() with one feature per plugin, one service per plugin with signals and RxJS streams, and standalone components (<epdf-stage>, layers). One secondary entry point per feature.",
   "sideEffects": false,
@@ -34,6 +34,10 @@
     "./annotation": {
       "types": "./dist/annotation/index.d.ts",
       "default": "./dist/fesm2022/embedpdf-angular-annotation.mjs"
+    },
+    "./attachment": {
+      "types": "./dist/attachment/index.d.ts",
+      "default": "./dist/fesm2022/embedpdf-angular-attachment.mjs"
     },
     "./interaction": {
       "types": "./dist/interaction/index.d.ts",
@@ -141,6 +145,7 @@
     "@embedpdf/web": "workspace:*",
     "@embedpdf/core-annotation": "workspace:*",
     "@embedpdf/plugin-annotation": "workspace:*",
+    "@embedpdf/plugin-attachment": "workspace:*",
     "@embedpdf/plugin-commands": "workspace:*",
     "@embedpdf/plugin-form": "workspace:*",
     "@embedpdf/plugin-i18n": "workspace:*",

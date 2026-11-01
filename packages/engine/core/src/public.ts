@@ -11,6 +11,7 @@ export { AbortablePromise } from './promise/AbortablePromise';
 export { AbortError, isAbortError } from './promise/AbortError';
 export { EngineError } from './errors/EngineError';
 export { EngineErrorCode } from './errors/EngineErrorCode';
+export { grantOpenRequestOf, visitorIdentityRequestOf } from './dto/GrantVisitor';
 
 // Local engine.
 export { isLocalEngine } from './engine/LocalEngine';
@@ -86,6 +87,7 @@ export type {
   Engine,
   EngineFactory,
   DocumentHandle,
+  DocumentGrant,
   PageHandle,
   LocalEngine,
   LocalDocumentHandle,
@@ -96,7 +98,11 @@ export type {
   OpenInputLayerFile,
   OpenInputById,
   OpenInputToken,
-  OpenInputShare,
+  OpenInputGrant,
+  GrantOpenRequest,
+  VisitorAnswers,
+  VisitorIdentityField,
+  VisitorIdentityRequest,
   OpenOptions,
   TokenSource,
   Identity,
@@ -116,7 +122,7 @@ export type {
   LocalPageAnnotationsService,
   PageTextService,
   PageRenderService,
-  LocalPageRenderService,
+  RawPageRenderService,
   DocumentSecurityService,
   DocumentSecurityState,
   DocumentUnlockInput,

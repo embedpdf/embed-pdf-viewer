@@ -35,7 +35,7 @@ import {
   pagesWithHits,
   setActiveHit,
   startSession,
-  type SearchState,
+  type SearchModel,
 } from './model';
 
 const EMPTY: readonly SearchHit[] = Object.freeze([]);
@@ -64,7 +64,7 @@ interface CollectSink {
  * The settings are read where they're used, never copied, so
  * `updateSettings({ reveal })` applies to the next move at once.
  */
-export function createSearchController(ctx: PluginContext<SearchState, SearchSettings>) {
+export function createSearchController(ctx: PluginContext<SearchModel, SearchSettings>) {
   const settings = ctx.settings();
   const session = ctx.latest('session');
   const started = ctx.events.source<SearchStartedEvent>();

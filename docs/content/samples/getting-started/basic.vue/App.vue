@@ -11,17 +11,17 @@ import { localEngine } from '@embedpdf/engine';
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin()];
 
-// [!doc-source ebook]
+// [!doc-source welcome]
 // The local engine opens bytes: fetch lazily, under the loading tab.
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/welcome.pdf');
+  return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 // [!/doc-source]
 </script>
 
 <template>
-  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: ebook }]">
+  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: welcome }]">
     <div style="height: 500px">
       <!-- Document UI is defined over a document: gate it on having one. -->
       <DocumentGate>

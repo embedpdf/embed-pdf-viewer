@@ -58,6 +58,15 @@ export class OutlineTree {
     return items;
   }
 
+  /** How deep the item sits: 0 at the top level; `undefined` when it isn't in the outline. */
+  levelOf(item: number): number | undefined {
+    let level = -1;
+    for (let current: number | undefined = item; current; current = this.parentOf(current)) {
+      level += 1;
+    }
+    return this.has(item) ? level : undefined;
+  }
+
   /** Whether `node` is `item` or one of the items under it. */
   isAtOrUnder(node: number, item: number): boolean {
     for (let current: number | undefined = node; current; current = this.parentOf(current)) {

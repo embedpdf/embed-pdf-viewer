@@ -101,12 +101,14 @@ describe('validateLayout', () => {
         loopA: { place: { with: 'loopB' } },
         loopB: { place: { with: 'loopA' } },
         selected: { place: { at: 'everything' as never } },
+        paneled: { place: { panel: 'coments' } },
         unknown: { place: { near: 'main' } as never },
       },
+      panels: { comments: { side: 'end' } },
     };
     expect(validateLayout(places, { commands })).toEqual([
       'bar "none" has no place',
-      'bar "sideways": "sideways" is not a place (an edge, { edge, before | after }, { float }, { with } or { at })',
+      'bar "sideways": "sideways" is not a place (an edge, { edge, before | after }, { float }, { with }, { at } or { panel })',
       'bar "odd": "middle" is not an edge',
       'bar "lost" goes after "mian": no such bar (did you mean "main"?)',
       'bar "wrongEdge" goes before "rail", which is not on the top edge',
@@ -116,7 +118,8 @@ describe('validateLayout', () => {
       'bar "loopA" rides along a bar that rides along it',
       'bar "loopB" rides along a bar that rides along it',
       'bar "selected": "everything" is not selection or annotation',
-      'bar "unknown": {"near":"main"} is not a place (an edge, { edge, before | after }, { float }, { with } or { at })',
+      'bar "paneled" goes in "coments": no such panel (did you mean "comments"?)',
+      'bar "unknown": {"near":"main"} is not a place (an edge, { edge, before | after }, { float }, { with }, { at } or { panel })',
     ]);
   });
 

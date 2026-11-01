@@ -25,9 +25,9 @@ const plugins = [
   }),
 ];
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const sketch = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/sketch.pdf');
+  return { kind: 'bytes', id: 'sketch', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 // `--epdf-ghost-opacity` from CSS wins over each tool's own opacity, for every tool.
@@ -38,7 +38,7 @@ const ghostOpacity = computed(() =>
 </script>
 
 <template>
-  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: ebook }]">
+  <Viewer :engine="engine" :plugins="plugins" :initial-documents="[{ source: sketch }]">
     <DocumentGate>
       <template #fallback><p class="loading">Loading…</p></template>
       <Toolbar v-model:opacity="opacity" />

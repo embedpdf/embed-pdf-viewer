@@ -33,11 +33,25 @@ export interface TenantsTable {
   auto_provisioned: number;
   /**
    * `suspended` fails the namespace closed: every tenant JWT, doc JWT,
-   * and share exchange is refused (403) until resume. The API token is
+   * and grant exchange is refused (403) until resume. The API token is
    * exempt so the operator can always inspect, resume, or delete.
    */
   status: TenantStatus;
   suspended_at: number | null;
+}
+
+/** A folder stores only its parent; see migration 046 for the tree model. */
+export interface FoldersTable {
+  id: string;
+  tenant_id: string;
+  /** Null at the top level. */
+  parent_id: string | null;
+  name: string;
+  /** `name` in the form sibling uniqueness and the name order compare (NFC, lowercased). */
+  name_key: string;
+  created_at: number;
+  updated_at: number;
+  created_by: string | null;
 }
 
 export interface DocumentsTable {
@@ -61,6 +75,12 @@ export interface DocumentsTable {
   pdf_permissions_all_allowed: boolean | number | null;
   pdf_opened_as: DocumentPdfOpenedAs | null;
   security_probed_at: number | null;
+  /** Always written: the document id when the caller names nothing. */
+  name: string;
+  /** `name` in the form search and the name sort compare (NFC, lowercased). */
+  name_key: string;
+  /** The folder the document is in; null at the top level. */
+  folder_id: string | null;
   doc_version: Generated<number>;
   metadata_json: string | null;
   /** Customer-supplied retry key; unique per `(tenant_id, idempotency_key)`. */
@@ -82,6 +102,8 @@ export interface DocumentsTable {
   created_at: number;
   updated_at: number;
   created_by: string | null;
+  /** The upload token that started this document (migration 048); null otherwise. */
+  upload_token_jti: string | null;
 }
 
 export interface DocumentPagesTable {
@@ -148,7 +170,7 @@ export interface LayersTable {
   outline_version: number;
   /**
    * Font list pointer epoch for `/fonts@{fontsVersion, serverFonts}`
-   * (migration 036): bumps on a write that changes the fonts the list shows.
+   * (migration 049): bumps on a write that changes the fonts the list shows.
    */
   fonts_version: number;
   /** Audit-log head at this layer's current state — advanced in the same
@@ -160,16 +182,19 @@ export interface LayersTable {
   current_artifact_sha: string | null;
   current_artifact_size: number | null;
   /**
-   * The layer's object number counter (migration 032): every number below it
-   * was handed out, to an editing session or to a write. NULL until the
-   * layer first needs one.
-   */
-  next_object_number: number | null;
-  /**
    * The audit id of the layer's last final change (migration 033): no change
    * before it can be undone. NULL until the first.
    */
   undo_horizon: number | null;
+  /**
+   * When the layer was deleted (migration 037): the row stays as a tombstone
+   * so its name is never used again. NULL for a live layer.
+   */
+  deleted_at: number | null;
+  /** A visitor's layer (migration 038): the grant that made it; NULL otherwise. */
+  grant_id: string | null;
+  /** A visitor's layer: the visitor (its name is `visitor-<visitor_id>`); see `grant_visitors`. */
+  visitor_id: string | null;
   created_at: number;
   updated_at: number;
 }
@@ -290,27 +315,80 @@ export interface SecurityEventsTable {
 }
 
 /**
- * Share grants: standing, revocable authorization decisions for the
- * no-backend embed flow. The row id is the public share token — a
- * reference evaluated at exchange time, never a bearer credential,
- * which is what makes grants long-lived, editable, and revocable while
- * every credential that reaches a browser stays a short-lived doc JWT.
+ * A grant's visitor who answered its questions or wrote (migration 042):
+ * the answers, given once and the server's from then on, and the visitor's
+ * idle clock.
  */
-export interface ShareGrantsTable {
-  /** `shr_` + 24 url-safe random chars; doubles as the public share token. */
+export interface GrantVisitorsTable {
+  grant_id: string;
+  visitor_id: string;
+  doc_id: string;
+  display_name: string | null;
+  email: string | null;
+  title: string | null;
+  organization: string | null;
+  organizational_unit: string | null;
+  email_verified_at: number | null;
+  /** When the visitor gave their answers; NULL for one who only wrote. */
+  consented_at: number | null;
+  first_seen_at: number;
+  last_seen_at: number;
+}
+
+/**
+ * Grants: standing, revocable authorization decisions for the
+ * no-backend embed flow (migrations 021, 047). The row id is what a page
+ * holds — a reference evaluated at exchange time, never a bearer
+ * credential, which is what makes grants long-lived, editable, and
+ * revocable while every credential that reaches a browser stays a
+ * short-lived doc JWT.
+ */
+export interface GrantsTable {
+  /** `grt_` + 24 url-safe random chars (`shr_` before migration 047). */
   id: string;
   tenant_id: string;
   doc_id: string;
-  layer_name: string;
+  /** What the grant is called (migration 047); NULL when unnamed. */
+  name: string | null;
+  /**
+   * Whose layer visitors write into (migration 038): one shared layer, the
+   * grant's `layer_name`, or a layer per visitor (`visitor-<id>`).
+   */
+  layer_mode: 'shared' | 'per-visitor';
+  /** The shared layer; NULL for a per-visitor grant. */
+  layer_name: string | null;
+  /** 1 = a visitor's browser keeps its layer for the next visit (per-visitor grants). */
+  keep_visitor_layers: number;
+  /**
+   * Delete a visitor (their answers and their layer) after this long unseen
+   * (migrations 039, 042: NULL, the default, keeps them until deleted on
+   * purpose).
+   */
+  visitor_idle_seconds: number | null;
+  /**
+   * What the grant asks its visitors (migration 042): JSON
+   * `{ fields, ask, purpose?, privacyUrl? }`; NULL asks nothing.
+   */
+  visitor_identity_json: string | null;
+  /**
+   * Who the grant's visitors are, when the grant says so (migration 043): JSON
+   * `Identity`, the shape of `tokens.issue`'s. NULL: whoever they answer.
+   */
+  identity_json: string | null;
   /** Doc capability scopes the exchanged session carries (JSON array). */
   scope_json: string;
   /** Origin allowlist (JSON array); NULL = any origin. */
   origins_json: string | null;
   /** scrypt envelope (`scrypt$N$r$p$salt$hash`); NULL = no passphrase. */
-  password_hash: string | null;
+  passphrase_hash: string | null;
   session_ttl_seconds: number;
   /** 1 = paused: exchange refuses (404) but configuration is kept. */
   disabled: number;
+  /**
+   * When the grant was archived (migration 041): it exchanges no more, for
+   * good, and keeps what its visitors made. NULL while it works.
+   */
+  archived_at: number | null;
   /** Unix epoch ms; NULL = no expiry. */
   expires_at: number | null;
   /** Successful exchanges — dashboard convenience, not the usage meter. */
@@ -379,6 +457,21 @@ export interface SchemaMigrationsTable {
  * request. Fronted by `RevokedJtisGuard`'s in-memory LRU so the DB
  * round-trip happens only on cache misses.
  */
+/**
+ * An upload token's uses (migration 048): how many documents it has
+ * started. Init takes one atomically before it makes the document, so
+ * concurrent inits can't start more than the token's `max_files`.
+ */
+export interface UploadTokenUsesTable {
+  /** The upload token's id; PK. */
+  jti: string;
+  tenant_id: string;
+  /** Documents the token has started. */
+  files: number;
+  /** When the token runs out, epoch ms: after it, the row is only history. */
+  expires_at: number;
+}
+
 export interface RevokedJtisTable {
   /** Opaque token id; PK. */
   jti: string;
@@ -496,13 +589,15 @@ export interface EngineQuarantineAuditTable {
   reason: string;
 }
 
-/** One immutable base PDF of a document (migration 030). */
+/** One immutable base PDF of a document (migrations 030, 044). */
 export interface BaseVersionsTable {
   tenant_id: string;
   doc_id: string;
+  /** The layer whose signature made it; NULL for the upload (migration 044). */
+  layer_id: string | null;
   sha256: string;
   byte_length: number;
-  /** 1-based, gapless per document: parent's number + 1. */
+  /** 1-based, gapless along a layer's chain: parent's number + 1 (the upload is 1). */
   number: number;
   parent_sha256: string | null;
   producer_kind: 'upload' | 'signature';
@@ -521,12 +616,26 @@ export interface BaseVersionsTable {
 }
 
 /**
- * An editing session (migration 032): one open document (its
+ * A layer's object number counter (migration 036), by the layer's document
+ * and name: a layer nobody changed has no row, and is numbered all the
+ * same. Every number below `next_object_number` was handed out, to an
+ * editing session or to a write, on base version `base_sha`.
+ */
+export interface ObjectNumberCountersTable {
+  doc_id: string;
+  layer_name: string;
+  base_sha: string | null;
+  next_object_number: number;
+}
+
+/**
+ * An editing session (migrations 032, 036): one open document (its
  * `X-Engine-Session-Id`) acting for one token subject on one layer. Its
  * blocks of object numbers stay its own while its expiry keeps moving.
  */
 export interface EditSessionsTable {
-  layer_id: string;
+  doc_id: string;
+  layer_name: string;
   session_id: string;
   sub: string;
   expires_at: number;
@@ -534,12 +643,13 @@ export interface EditSessionsTable {
 }
 
 /**
- * Up to 32 consecutive object numbers from `first` (migration 032): bit i of
+ * Up to 32 consecutive object numbers from `first` (migrations 032, 036): bit i of
  * `available` is set while `first + i` is unspent. `session_id` NULL: a
  * write returned them, for any session.
  */
 export interface ObjectNumberBlocksTable {
-  layer_id: string;
+  doc_id: string;
+  layer_name: string;
   first: number;
   available: number;
   session_id: string | null;
@@ -618,11 +728,13 @@ export interface Database {
     created_at: Generated<number>;
     updated_at: Generated<number>;
   };
+  folders: FoldersTable;
   document_pages: DocumentPagesTable;
   layers: LayersTable;
   layer_pages: LayerPagesTable;
   base_versions: BaseVersionsTable;
   document_signings: DocumentSigningsTable;
+  object_number_counters: ObjectNumberCountersTable;
   edit_sessions: EditSessionsTable;
   object_number_blocks: ObjectNumberBlocksTable;
   change_outcomes: ChangeOutcomesTable;
@@ -631,7 +743,8 @@ export interface Database {
   pdf_password_verifications: PdfPasswordVerificationsTable;
   pdf_password_sessions: PdfPasswordSessionsTable;
   security_events: SecurityEventsTable & { id: Generated<number> };
-  share_grants: ShareGrantsTable;
+  grants: GrantsTable;
+  grant_visitors: GrantVisitorsTable;
   document_imports: DocumentImportsTable;
   tenant_usage_counter: TenantUsageCounterTable;
   engine_crashes: EngineCrashesTable;
@@ -640,6 +753,7 @@ export interface Database {
   engine_quarantine_audit: EngineQuarantineAuditTable;
   schema_migrations: SchemaMigrationsTable;
   revoked_jtis: RevokedJtisTable;
+  upload_token_uses: UploadTokenUsesTable;
   jwks_cache: JwksCacheTable;
   license_runtime_state: LicenseRuntimeStateTable;
   license_usage_counter: LicenseUsageCounterTable;

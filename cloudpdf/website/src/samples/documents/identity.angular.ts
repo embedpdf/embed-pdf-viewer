@@ -18,7 +18,7 @@ import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage'
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 const dana = { userId: 'u_381', displayName: 'Dana Smith' };
 
@@ -45,7 +45,7 @@ type Role = keyof typeof roles;
         engine: () => cloudEngine(),
         identity: dana,
         scope: roles.reader,
-        initialDocuments: [{ source: ebook, name: 'ebook.pdf' }],
+        initialDocuments: [{ source: welcome, name: 'welcome.pdf' }],
       },
       withStage(),
       withRender(),
@@ -106,7 +106,7 @@ export class App {
   protected async openAgain() {
     const role = this.role();
     await this.documents.close(this.document.id());
-    await this.documents.open(ebook, { name: 'ebook.pdf' });
+    await this.documents.open(welcome, { name: 'welcome.pdf' });
     this.openedAs.set(role);
   }
 }

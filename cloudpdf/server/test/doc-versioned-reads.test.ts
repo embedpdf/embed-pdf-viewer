@@ -25,7 +25,8 @@ const SERVER_FONTS = serverFontsFingerprint([], []);
 
 const STUB_ENTRY = new URL('./_helpers/stub-worker-entry.cjs', import.meta.url);
 const SECRET = 'doc-versioned-secret';
-const IMMUTABLE_CACHE = 'public, max-age=31536000, immutable';
+// No CDN in this fixture: only the caller's browser may keep versioned reads.
+const IMMUTABLE_CACHE = 'private, max-age=31536000, immutable';
 const NO_STORE = 'private, no-store';
 
 interface Fixture {
@@ -86,8 +87,8 @@ function tenantAdminToken(tenantId: string): string {
   return signDevToken(SECRET, { sub: 'admin-1', tenant_id: tenantId, scope: ['*'] });
 }
 
-function tenantReadToken(tenantId: string): string {
-  return signDevToken(SECRET, { sub: 'user-1', tenant_id: tenantId, scope: ['docs.read'] });
+function tenantToken(tenantId: string, scope: string[]): string {
+  return signDevToken(SECRET, { sub: 'user-1', tenant_id: tenantId, scope });
 }
 
 async function seedDocument(
@@ -152,7 +153,7 @@ describe('Phase 4 versioned reads — cache headers', () => {
     expect(res.headers.get('cache-control')).toBe(NO_STORE);
   });
 
-  test('/manifest@dN sets public, immutable', async () => {
+  test('/manifest@dN sets private, immutable', async () => {
     const tenantId = 'tenant-cache-m';
     const docId = 'doccch002';
     await seedDocument(fx, tenantId, docId);
@@ -164,7 +165,7 @@ describe('Phase 4 versioned reads — cache headers', () => {
     expect(res.headers.get('cache-control')).toBe(IMMUTABLE_CACHE);
   });
 
-  test('/text@cN sets public, immutable', async () => {
+  test('/text@cN sets private, immutable', async () => {
     const tenantId = 'tenant-cache-t';
     const docId = 'doccch003';
     await seedDocument(fx, tenantId, docId);
@@ -179,7 +180,7 @@ describe('Phase 4 versioned reads — cache headers', () => {
     expect(res.headers.get('cache-control')).toBe(IMMUTABLE_CACHE);
   });
 
-  test('/annotations@aN sets public, immutable', async () => {
+  test('/annotations@aN sets private, immutable', async () => {
     const tenantId = 'tenant-cache-a';
     const docId = 'doccch004';
     await seedDocument(fx, tenantId, docId);
@@ -268,18 +269,17 @@ describe('Phase 4 versioned reads — GET /pages/:pageKey/text@cN', () => {
     expect(res.status).toBe(200);
   });
 
-  test('tenant token with docs.read scope (Model B) reads doc text', async () => {
+  test('a tenant token reads doc text with doc.text.copy, never with docs.read alone', async () => {
     const tenantId = 'tenant-tdocsread';
     const docId = 'doctxx005';
     await seedDocument(fx, tenantId, docId);
 
-    const res = await fetch(
-      `${fx.baseUrl}/v1/docs/${docId}/text/pages/obj:1/data@contentVersion=1`,
-      {
-        headers: { Authorization: `Bearer ${tenantReadToken(tenantId)}` },
-      },
-    );
-    expect(res.status).toBe(200);
+    const read = (scope: string[]) =>
+      fetch(`${fx.baseUrl}/v1/docs/${docId}/text/pages/obj:1/data@contentVersion=1`, {
+        headers: { Authorization: `Bearer ${tenantToken(tenantId, scope)}` },
+      });
+    expect((await read(['doc.text.copy'])).status).toBe(200);
+    expect((await read(['docs.read'])).status).toBe(403);
   });
 
   test('cross-tenant doc token is rejected with 403', async () => {

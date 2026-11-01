@@ -6,7 +6,7 @@ import { DocumentStatus } from './document-status';
   selector: 'app-root',
   imports: [EpdfPdfViewer, EpdfToolbarItem, DocumentStatus],
   template: `
-    <epdf-pdf-viewer [src]="{ shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' }" [layout]="layout" style="height: 100vh">
+    <epdf-pdf-viewer [src]="{ grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' }" [layout]="layout" style="height: 100vh">
       <ng-template epdfToolbarItem="status">
         <app-document-status />
       </ng-template>

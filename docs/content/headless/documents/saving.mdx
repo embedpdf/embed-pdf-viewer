@@ -183,6 +183,9 @@ active one. Every method that returns a promise also takes a `signal` in its opt
 
 Hide the buttons when the check says no. The engine refuses the call anyway.
 
+Printing doesn't need `doc.render`: the pages print from print pictures, which need only the print
+permissions. So a user who may not see the pages rendered can still be allowed to print.
+
 ## Good to know
 
 <Engine local>

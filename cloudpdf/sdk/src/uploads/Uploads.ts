@@ -1,5 +1,4 @@
-import { prepareUploadSource } from "./source.js";
-import type { UploadCreateInput, UploadCreateResult, UploadProtocol } from "./types.js";
+import type { PrepareUploadSource, UploadCreateInput, UploadCreateResult, UploadProtocol } from "./types.js";
 
 interface InitResponse {
     tag: "created" | "resumed" | "deduped";
@@ -20,18 +19,27 @@ interface CommitResponse<Document> {
     document: Document;
 }
 
-/** High-level, integrity-pinned `init -> transfer -> commit` workflow. */
+/**
+ * High-level, integrity-pinned `init -> transfer -> commit` workflow. The
+ * protocol says how each step reaches CloudPDF (with an API key on a server,
+ * with an upload token in a browser), and `prepare` how a source is read.
+ */
 export class Uploads<Document = unknown> {
-    public constructor(private readonly protocol: UploadProtocol) {}
+    public constructor(
+        private readonly protocol: UploadProtocol,
+        private readonly prepare: PrepareUploadSource,
+    ) {}
 
     public async create(input: UploadCreateInput): Promise<UploadCreateResult<Document>> {
-        const source = await prepareUploadSource(input.source);
+        const source = await this.prepare(input.source);
         const requestOptions = { abortSignal: input.signal };
         const init = (await this.protocol.init(
             {
                 tenantId: input.tenantId,
                 contentLength: source.size,
                 contentSha256: source.sha256,
+                name: input.name,
+                folderId: input.folderId,
                 metadata: input.metadata,
                 idempotencyKey: input.idempotencyKey,
                 dedupMode: input.dedupMode,
@@ -48,17 +56,21 @@ export class Uploads<Document = unknown> {
         }
         if (!init.upload) throw new Error("CloudPDF init response omitted upload access");
 
-        input.onProgress?.(0, source.size);
+        const onProgress = input.onProgress;
+        const progress = onProgress
+            ? (loaded: number): void => onProgress(Math.min(loaded, source.size), source.size)
+            : undefined;
+        progress?.(0);
         if (init.upload.kind === "presigned") {
-            const body = await source.open();
             const response = await this.protocol.presigned(init.upload.presigned.url, {
                 method: init.upload.presigned.method,
                 // These are the exact signed headers. In particular, no SDK
                 // Authorization header is added to an object-store request.
                 headers: init.upload.presigned.headers,
-                body,
+                body: await source.open(),
+                size: source.size,
                 signal: input.signal,
-                ...(isStreamBody(body) ? ({ duplex: "half" } as Record<string, unknown>) : {}),
+                onProgress: progress,
             });
             if (!response.ok) {
                 const detail = await response.text().catch(() => "");
@@ -70,13 +82,14 @@ export class Uploads<Document = unknown> {
             const response = await this.protocol.proxy(init.upload.url, form, {
                 abortSignal: input.signal,
                 maxRetries: 0,
+                onProgress: progress,
             });
             if (!response.ok) {
                 const detail = await response.text().catch(() => "");
                 throw new Error(`proxy upload failed: ${response.status} ${response.statusText} ${detail}`.trim());
             }
         }
-        input.onProgress?.(source.size, source.size);
+        progress?.(source.size);
 
         const committed = (await this.protocol.commit(
             {
@@ -88,8 +101,4 @@ export class Uploads<Document = unknown> {
         )) as CommitResponse<Document>;
         return { tag: init.tag, document: committed.document };
     }
-}
-
-function isStreamBody(body: BodyInit): boolean {
-    return typeof body === "object" && body !== null && ("pipe" in body || "getReader" in body);
 }

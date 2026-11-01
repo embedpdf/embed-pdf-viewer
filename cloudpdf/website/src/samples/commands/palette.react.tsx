@@ -22,7 +22,7 @@ const plugins = [
   commandsPlugin({ commands: standardCommands }),
 ];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 // A result: its row follows the command, so it greys out the moment the command can't run.
 function Result({ id }: { id: string }) {
@@ -71,7 +71,7 @@ function CommandPalette() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: welcome }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <div className="layout">
           <CommandPalette />

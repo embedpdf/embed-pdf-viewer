@@ -9,13 +9,13 @@ import { createTestContext } from '@embedpdf/core/testing';
 
 import { createStageController } from '../src/controller';
 import type { StageHostCapability } from '../src/host-contract';
-import { initialStageState } from '../src/model';
+import { initialStageModel } from '../src/model';
 
 function lens(id: string) {
   const told: Array<{ view: string; pages: WorkingSetPage[] }> = [];
   const ctx = createTestContext({
     id,
-    state: initialStageState({ viewUnitsPerPoint: 1 }),
+    state: initialStageModel({ viewUnitsPerPoint: 1 }),
     pages: Array.from({ length: 6 }, (_, index) => ({
       ref: toPageRef(index + 1),
       size: { width: 600, height: 800 },

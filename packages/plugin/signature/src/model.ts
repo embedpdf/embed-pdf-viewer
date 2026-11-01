@@ -16,7 +16,7 @@ import type {
 
 import type { SignaturePending } from './contract';
 
-export interface SignatureState {
+export interface SignatureModel {
   /** The last validation; null until one ran. */
   readonly verdicts: readonly SignatureVerdict[] | null;
   /** The field the user chose to sign next ("select the field, then pick a mark"). */
@@ -25,7 +25,7 @@ export interface SignatureState {
   readonly busy: boolean;
 }
 
-export const initialSignatureState = (): SignatureState => ({
+export const initialSignatureModel = (): SignatureModel => ({
   verdicts: null,
   target: null,
   busy: false,
@@ -41,20 +41,20 @@ export const sameFieldRef = (left: FormFieldRef, right: FormFieldRef): boolean =
 // ── transitions ──
 
 export function setVerdicts(
-  state: SignatureState,
+  state: SignatureModel,
   verdicts: readonly SignatureVerdict[] | null,
-): SignatureState {
+): SignatureModel {
   return state.verdicts === verdicts ? state : { ...state, verdicts };
 }
 
 /** Name the sign-here target; the same field (by ref) changes nothing. */
-export function setTarget(state: SignatureState, field: FormFieldRef | null): SignatureState {
+export function setTarget(state: SignatureModel, field: FormFieldRef | null): SignatureModel {
   const current = state.target;
   if (current === field || (current && field && sameFieldRef(current, field))) return state;
   return { ...state, target: field };
 }
 
-export function setBusy(state: SignatureState, busy: boolean): SignatureState {
+export function setBusy(state: SignatureModel, busy: boolean): SignatureModel {
   return state.busy === busy ? state : { ...state, busy };
 }
 

@@ -5,12 +5,14 @@ import {
   effect,
   inject,
   untracked,
+  viewChild,
   ViewEncapsulation,
 } from '@angular/core';
-import { EpdfDocument, EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
+import { EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
 import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
+import { EpdfSelectionLayer, withSelection } from '@embedpdf/angular/selection';
 import { withInteraction } from '@embedpdf/angular/interaction';
 import {
   EpdfAnnotation,
@@ -22,7 +24,7 @@ import {
 } from '@embedpdf/angular/annotation';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const notice: OpenInput = { kind: 'grant', grant: 'shr_LfeeUer1ogBI9mz8eYkWXa0d' };
 
 const FORMATS = ['bold', 'italic', 'underline'] as const;
 
@@ -60,6 +62,7 @@ export class FormatButtons {
     EpdfStage,
     EpdfPageTemplate,
     EpdfRenderLayer,
+    EpdfSelectionLayer,
     EpdfAnnotationLayer,
     EpdfAnnotationTemplate,
     EpdfRichTextEditor,
@@ -67,10 +70,11 @@ export class FormatButtons {
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: notice }] },
       withStage(),
       withRender(),
       withInteraction(),
+      withSelection(),
       withAnnotation(),
     ),
   ],
@@ -83,6 +87,7 @@ export class FormatButtons {
       <epdf-stage class="stage">
         <ng-template epdfPage>
           <epdf-render-layer />
+          <epdf-selection-layer />
           <epdf-annotation-layer>
             <!-- Your own text box, in your app's look: it fills its frame, which the layer
                  places and turns like the text box. The element inside is the editor and
@@ -102,31 +107,23 @@ export class FormatButtons {
 })
 export class App {
   private readonly annotation = inject(EpdfAnnotation);
-  private readonly document = inject(EpdfDocument);
-  private added = false;
+  private readonly stage = viewChild(EpdfStage);
+  private done = false;
 
   // Kept in a field, the same function on every page: the layer registers the look once.
   protected readonly isTextBox = (annotation: Annotation) => annotation.subtype === 'free-text';
 
   constructor() {
-    // On load: a text box on the cover, selected.
+    // On load: the document's text box, selected, drawn by your component.
     effect(() => {
-      const cover = this.document.pages()[0]?.ref;
-      if (this.annotation.status() !== 'ready' || !cover || this.added) return;
-      this.added = true;
+      const stage = this.stage();
+      if (!stage || this.annotation.status() !== 'ready' || this.done) return;
+      this.done = true;
       untracked(() => {
-        void this.annotation.create(
-          cover,
-          {
-            subtype: 'free-text',
-            box: { x: 106, y: 570, width: 380, height: 60 },
-            contents: 'Double-click to type in your own text box',
-            fontSize: 16,
-            fontColor: '#1a2748',
-          },
-          undefined,
-          { select: true },
-        );
+        const textBox = this.annotation.list().find((each) => each.nm === 'text-box');
+        if (!textBox) return;
+        this.annotation.selection.set([textBox.ref]);
+        stage.reveal(textBox.page, { rect: textBox.rect });
       });
     });
   }

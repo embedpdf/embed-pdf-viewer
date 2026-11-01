@@ -22,7 +22,7 @@ import { localEngine } from '@embedpdf/engine';
 
 // The original stays as it is: the document opens with a layer over it, and the changes go there.
 const withLayer = async (layer?: Uint8Array): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
+  const response = await fetch('/pdfs/welcome.pdf');
   return {
     kind: 'layerBytes',
     baseBytes: new Uint8Array(await response.arrayBuffer()),
@@ -84,7 +84,7 @@ export class LayerBar implements OnInit {
     // Said first: closing the document removes this bar, and then it can't say anything.
     this.reopened.set(true);
     await this.documents.close(this.document.id());
-    await this.documents.open(() => withLayer(layer), { name: 'ebook.pdf' });
+    await this.documents.open(() => withLayer(layer), { name: 'welcome.pdf' });
   }
 }
 
@@ -95,7 +95,7 @@ export class LayerBar implements OnInit {
     provideEmbedPdf(
       {
         engine: () => localEngine(),
-        initialDocuments: [{ source: () => withLayer(), name: 'ebook.pdf' }],
+        initialDocuments: [{ source: () => withLayer(), name: 'welcome.pdf' }],
       },
       withStage(),
       withRender(),

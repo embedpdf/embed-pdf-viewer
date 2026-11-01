@@ -7,6 +7,7 @@ import type {
   PageDestination,
   PageInfo,
   PageRef,
+  SettingLock,
 } from '@embedpdf/core';
 import type { PageRotation, PageTransform, Rect } from '@embedpdf/core-geometry';
 import type {
@@ -237,6 +238,15 @@ export interface StageSettings {
   viewRotation: PageRotation;
   /** Zoom intent: a fit-mode (automatic/fit-page/fit-width/fit-all) or a fixed level. */
   zoom: ZoomSpec;
+  /**
+   * The zoom range this view allows, as levels like `camera.zoom` (1 = 100%).
+   * Every zoom stays inside it: the buttons, a pinch or wheel, `zoomTo`, a
+   * reveal, and the fit modes, which stop at a limit rather than fit. Within
+   * 0.05 to 64; a `minZoom` above `maxZoom` counts as `maxZoom`.
+   */
+  minZoom: number;
+  /** See {@link StageSettings.minZoom}. */
+  maxZoom: number;
   /** Default behavior for goToPage, nextPage and previousPage. */
   scrollBehavior: ScrollBehaviorKind;
   /**
@@ -260,6 +270,12 @@ export interface StageSettings {
    */
   zoomGestures: boolean;
   /**
+   * The look of the box you drag with the `zoom` tool. A color left `null`
+   * follows the viewer's accent (the fill at 8%); CSS `--epdf-zoom-box-fill`
+   * and `--epdf-zoom-box-stroke` win over both.
+   */
+  zoomBox: ZoomBoxLook;
+  /**
    * View pixels per PDF point — the platform's physical unit factor, folded into
    * the layout so 100% (zoom 1) is physically accurate. Web = 96/72 (1 pt = 1/72",
    * 1 CSS px = 1/96"); a native platform injects its own (iOS pt, Android dp). It
@@ -270,13 +286,35 @@ export interface StageSettings {
   viewUnitsPerPoint: number;
 }
 
+/** The colors of the zoom tool's box: see {@link StageSettings.zoomBox}. */
+export interface ZoomBoxLook {
+  /** Inside the box; `null` is the viewer's accent at 8%. */
+  readonly fill: string | null;
+  /** Its dashed edge; `null` is the viewer's accent. */
+  readonly stroke: string | null;
+}
+
 /**
  * A change to the settings: any of them, each replacing the current value
  * whole. A `pageFrame` names only the sides it reserves (`{ bottom: 20 }`);
- * the sides it leaves out are 0.
+ * the sides it leaves out are 0. A `zoomBox` names only the colors it sets;
+ * the ones it leaves out follow the accent.
  */
-export interface StageSettingsPatch extends Partial<Omit<StageSettings, 'pageFrame'>> {
+export interface StageSettingsPatch extends Partial<Omit<StageSettings, 'pageFrame' | 'zoomBox'>> {
   pageFrame?: Partial<PageFrame>;
+  zoomBox?: Partial<ZoomBoxLook>;
+}
+
+/**
+ * Settings held at a value for one document: they keep it over every other
+ * writer (`updateSettings()`, the responsive rules, a restored view state,
+ * `resetSettings()`) until the function `lockSettings()` returns is called.
+ * Those still change the settings underneath, so the user's own choice is back
+ * when the lock goes. Every setting but `zoom`, which gestures set too.
+ */
+export interface StageSettingsLock extends SettingLock {
+  /** The settings it holds, at these values. */
+  readonly settings: Omit<StageSettingsPatch, 'zoom'>;
 }
 
 /**
@@ -501,10 +539,21 @@ export interface StageCapability {
   zoomTo(zoom: number | ZoomSpec, options?: ZoomToOptions): void;
   /** Multiply the zoom, holding a viewport point fixed (default: the `zoomAlign` point). */
   zoomBy(factor: number, options?: ZoomToOptions): void;
-  /** Zoom in one step around the `zoomAlign` point. */
-  zoomIn(): void;
-  /** Zoom out one step around the `zoomAlign` point. */
-  zoomOut(): void;
+  /**
+   * Zoom in one step to the next round level (100%, 125%, 150%, 200%, …), or
+   * `maxZoom` when that comes first, holding a viewport point fixed (default:
+   * the `zoomAlign` point).
+   */
+  zoomIn(options?: ZoomToOptions): void;
+  /**
+   * Zoom out one step: the round levels down, to `minZoom`, holding a viewport
+   * point fixed (default: the `zoomAlign` point).
+   */
+  zoomOut(options?: ZoomToOptions): void;
+  /** The zoom is below `maxZoom`, so `zoomIn()` moves. */
+  canZoomIn(): boolean;
+  /** The zoom is above `minZoom`, so `zoomOut()` moves. */
+  canZoomOut(): boolean;
   /** Zoom so the page width fills the viewport. */
   fitWidth(): void;
   /** Zoom so the whole page fits the viewport. */
@@ -572,6 +621,17 @@ export interface StageCapability {
   resetSettings(): void;
   /** Replace the container-query rules (see {@link ResponsiveRule}). */
   setResponsiveRules(rules: readonly ResponsiveRule[]): void;
+  /**
+   * Hold settings at a value for this document until the returned function is
+   * called, or the document closes (see {@link StageSettingsLock}). Call it
+   * only to let go while the document stays open. A lock on a setting another
+   * lock holds at a different value is refused (`conflict`), naming the
+   * holder; at the same value both hold, until both let go. `getViewState()`
+   * keeps the locked settings as they are underneath.
+   */
+  lockSettings(lock: StageSettingsLock): () => void;
+  /** Who holds a setting and why, or `null` when it isn't locked. */
+  getLock(setting: keyof StageSettings): SettingLock | null;
   /** Names of the responsive rules matching the current box, in source order. */
   listActiveRules(): readonly string[];
   /** Whether the named responsive rule matches the current box. */

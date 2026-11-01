@@ -16,7 +16,7 @@ import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage'
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 // Read and select, but no downloading.
 const scope = ['doc.open', 'doc.render', 'doc.text.select'];
@@ -71,7 +71,7 @@ export class DownloadAnyway {
   imports: [EpdfDocumentGate, EpdfStage, EpdfPageTemplate, EpdfRenderLayer, DownloadAnyway],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), scope, initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), scope, initialDocuments: [{ source: welcome }] },
       withStage(),
       withRender(),
     ),

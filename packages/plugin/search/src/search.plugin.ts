@@ -3,7 +3,7 @@ import { StageToken } from '@embedpdf/plugin-stage/contract';
 
 import { SEARCH_DEFAULTS, SearchToken, type SearchConfig } from './contract';
 import { createSearchController } from './controller';
-import { initialSearchState } from './model';
+import { initialSearchModel } from './model';
 
 /**
  * Document text search over the engine's budgeted, resumable slices.
@@ -17,7 +17,7 @@ export const searchPlugin = (config?: SearchConfig) =>
     token: SearchToken,
     scope: 'document',
     optional: [StageToken],
-    state: initialSearchState,
+    state: initialSearchModel,
     settings: { defaults: SEARCH_DEFAULTS, registered: config },
     create: createSearchController,
   });

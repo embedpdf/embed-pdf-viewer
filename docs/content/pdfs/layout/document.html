@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Website redesign: wireframes</title>
+<link rel="stylesheet" href="../shared/document.css">
+<style>
+  /* A wireframe: grey blocks for what a screen holds, in a browser-like frame. */
+  .sheet .title.screen { margin-top: 22px; font-size: 24px; }
+  .wire {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-top: 18px;
+    padding: 14px;
+    border: 1.5px solid var(--color-border);
+    border-radius: 10px;
+    background: var(--color-bg-soft);
+  }
+  .wire .bar { display: flex; align-items: center; justify-content: space-between; height: 30px; }
+  .wire .links { display: flex; align-items: center; gap: 14px; }
+  .wire .row { display: flex; gap: 14px; }
+  .wire .stack { display: flex; flex-direction: column; gap: 10px; }
+  .block {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    background: #e8edf6;
+    font: 600 10.5px/1.2 var(--font-body);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #8a95b3;
+  }
+  .block.empty { background: none; border: 1.5px dashed #c3cce0; }
+  .line { height: 10px; border-radius: 3px; background: #e1e7f2; }
+  .line.heading { height: 18px; background: #d3dbea; }
+  .btn {
+    display: inline-block;
+    padding: 9px 16px;
+    border: 1.5px solid #9aa7c4;
+    border-radius: 6px;
+    font: 600 12px/1 var(--font-body);
+    color: var(--color-fg-muted);
+  }
+  .btn.primary { border-color: #6f7fa6; background: #dfe5f1; color: var(--color-fg); }
+  .card { flex: 1; display: flex; flex-direction: column; gap: 9px; padding: 12px; border-radius: 8px; background: #f0f3f9; }
+  .icon { width: 30px; height: 30px; border-radius: 8px; background: #d3dbea; }
+</style>
+</head>
+<body class="fernquill">
+<section class="page sheet">
+  <div class="letterhead">
+    <img src="../shared/fernquill-logo.svg" alt="Fernquill">
+    <span class="kind">Wireframes</span>
+  </div>
+  <h1 class="title screen">Website redesign: home page</h1>
+  <p class="meta">Wireframe 1 of 3 · Review by Dana Smith · 20 October 2026</p>
+
+  <div class="wire">
+    <div class="bar">
+      <div class="block" style="width:96px; height:24px;">Logo</div>
+      <div class="links">
+        <span class="line" style="width:46px;"></span>
+        <span class="line" style="width:52px;"></span>
+        <span class="line" style="width:40px;"></span>
+        <span class="btn">Sign in</span>
+      </div>
+    </div>
+    <div class="row" style="align-items:center; gap:26px;">
+      <div class="block" data-pdf="square" style="flex:none; width:290px; height:220px;">Product image</div>
+      <div class="stack" style="flex:1;">
+        <div class="line heading" style="width:92%;"></div>
+        <div class="line heading" style="width:68%;"></div>
+        <div class="line" style="width:96%; margin-top:6px;"></div>
+        <div class="line" style="width:84%;"></div>
+        <div class="line" style="width:58%;"></div>
+        <div class="row" style="margin-top:12px; gap:10px;">
+          <span class="btn primary" data-pdf="circle">Start free</span>
+          <span class="btn">Read the docs</span>
+        </div>
+      </div>
+    </div>
+    <div class="row" style="height:40px;">
+      <div class="block" style="flex:1;">Logo</div>
+      <div class="block" style="flex:1;">Logo</div>
+      <div class="block" style="flex:1;">Logo</div>
+      <div class="block" style="flex:1;">Logo</div>
+      <div class="block" style="flex:1;">Logo</div>
+    </div>
+    <div class="row" style="height:120px;">
+      <div class="card"><div class="icon"></div><div class="line heading" style="width:70%;"></div><div class="line"></div><div class="line" style="width:80%;"></div></div>
+      <div class="card"><div class="icon"></div><div class="line heading" style="width:62%;"></div><div class="line"></div><div class="line" style="width:74%;"></div></div>
+      <div class="block empty" data-pdf="arrow" style="flex:1;">Feature</div>
+    </div>
+    <div class="block" data-pdf="stack" style="height:150px;">Product screenshot</div>
+    <div class="row" style="height:80px;">
+      <div class="block" data-pdf="ink" style="flex:1;">Newsletter sign-up</div>
+      <div class="block" data-pdf="polygon" style="flex:1;">Testimonials</div>
+    </div>
+  </div>
+
+  <div class="page-footer"><span>Website redesign · Wireframes</span><span>1 of 3</span></div>
+</section>
+
+<section class="page sheet">
+  <div class="letterhead">
+    <img src="../shared/fernquill-logo.svg" alt="Fernquill">
+    <span class="kind">Wireframes</span>
+  </div>
+  <h1 class="title screen">Website redesign: pricing</h1>
+  <p class="meta">Wireframe 2 of 3 · Review by Dana Smith · 20 October 2026</p>
+
+  <div class="wire">
+    <div class="bar">
+      <div class="block" style="width:96px; height:24px;">Logo</div>
+      <div class="links">
+        <span class="line" style="width:46px;"></span>
+        <span class="line" style="width:52px;"></span>
+        <span class="line" style="width:40px;"></span>
+        <span class="btn">Sign in</span>
+      </div>
+    </div>
+    <div class="stack" style="align-items:center; padding:18px 0 8px;">
+      <div class="line heading" style="width:46%;"></div>
+      <div class="line" style="width:62%; margin-top:4px;"></div>
+    </div>
+    <div class="row" style="height:330px;">
+      <div class="card"><div class="line heading" style="width:50%;"></div><div class="block" style="height:46px;">Price</div><div class="line"></div><div class="line" style="width:86%;"></div><div class="line" style="width:72%;"></div><div class="line" style="width:80%;"></div><span class="btn" style="margin-top:auto; text-align:center;">Start free</span></div>
+      <div class="card"><div class="line heading" style="width:56%;"></div><div class="block" style="height:46px;">Price</div><div class="line"></div><div class="line" style="width:82%;"></div><div class="line" style="width:76%;"></div><div class="line" style="width:88%;"></div><span class="btn primary" style="margin-top:auto; text-align:center;">Buy now</span></div>
+      <div class="card"><div class="line heading" style="width:44%;"></div><div class="block" style="height:46px;">Price</div><div class="line"></div><div class="line" style="width:78%;"></div><div class="line" style="width:84%;"></div><div class="line" style="width:70%;"></div><span class="btn" style="margin-top:auto; text-align:center;">Talk to us</span></div>
+    </div>
+    <div class="stack" style="padding:6px 4px;">
+      <div class="line heading" style="width:30%;"></div>
+      <div class="line" style="width:90%; margin-top:6px;"></div>
+      <div class="line" style="width:82%;"></div>
+      <div class="line heading" style="width:34%; margin-top:10px;"></div>
+      <div class="line" style="width:88%; margin-top:6px;"></div>
+      <div class="line" style="width:64%;"></div>
+    </div>
+  </div>
+
+  <div class="page-footer"><span>Website redesign · Wireframes</span><span>2 of 3</span></div>
+</section>
+
+<section class="page sheet">
+  <div class="letterhead">
+    <img src="../shared/fernquill-logo.svg" alt="Fernquill">
+    <span class="kind">Wireframes</span>
+  </div>
+  <h1 class="title screen">Website redesign: documentation</h1>
+  <p class="meta">Wireframe 3 of 3 · Review by Dana Smith · 20 October 2026</p>
+
+  <div class="wire">
+    <div class="bar">
+      <div class="block" style="width:96px; height:24px;">Logo</div>
+      <div class="links">
+        <div class="block" style="width:180px; height:24px;">Search</div>
+        <span class="btn">Sign in</span>
+      </div>
+    </div>
+    <div class="row" style="height:560px;">
+      <div class="stack" style="flex:none; width:150px; padding:6px 0;">
+        <div class="line heading" style="width:70%;"></div>
+        <div class="line" style="width:86%;"></div>
+        <div class="line" style="width:64%;"></div>
+        <div class="line" style="width:78%;"></div>
+        <div class="line heading" style="width:60%; margin-top:10px;"></div>
+        <div class="line" style="width:82%;"></div>
+        <div class="line" style="width:70%;"></div>
+        <div class="line" style="width:88%;"></div>
+        <div class="line" style="width:56%;"></div>
+      </div>
+      <div class="stack" style="flex:1; padding:6px 0;">
+        <div class="line heading" style="width:52%;"></div>
+        <div class="line" style="width:96%; margin-top:6px;"></div>
+        <div class="line" style="width:90%;"></div>
+        <div class="line" style="width:72%;"></div>
+        <div class="block" style="height:120px; margin-top:8px;">Code example</div>
+        <div class="line" style="width:94%; margin-top:6px;"></div>
+        <div class="line" style="width:86%;"></div>
+        <div class="line" style="width:60%;"></div>
+        <div class="block" style="height:150px; margin-top:8px;">Live example</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-footer"><span>Website redesign · Wireframes</span><span>3 of 3</span></div>
+</section>
+</body>
+</html>

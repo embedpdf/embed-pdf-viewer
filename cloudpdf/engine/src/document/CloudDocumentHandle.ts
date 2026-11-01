@@ -6,7 +6,9 @@ import {
   EngineErrorCode,
   EventHub,
   SessionEventPublisher,
+  attachmentVerbs,
   outlineVerbs,
+  pageVerbs,
   subscribeToType,
   type DocumentAnnotationsService,
   type DocumentActionsService,
@@ -16,7 +18,9 @@ import {
   type DocumentEventStream,
   type DocumentFontsService,
   type DocumentFormsService,
+  type DocumentPagesService,
   type DocumentHandle,
+  type DocumentGrant,
   type DocumentOutlineService,
   type DocumentRedactionService,
   CONTINUOUS_RENDER_POLICY,
@@ -60,6 +64,7 @@ import { CloudMetadataService } from './CloudMetadataService';
 import { CloudObjectNumberPool } from './CloudObjectNumberPool';
 import { CloudPageHandle } from './CloudPageHandle';
 import { CloudWrites } from './CloudWrites';
+import type { GrantSessionSource } from '../grant';
 import { auditRowToEvents } from '../realtime/auditRowToEvents';
 import { SseClient } from '../realtime/SseClient';
 import { awaitSignal } from '../shared/awaitSignal';
@@ -105,7 +110,9 @@ export class CloudDocumentHandle implements DocumentHandle {
   readonly forms: DocumentFormsService;
   readonly fonts: DocumentFontsService;
   readonly search: CloudDocumentSearchService;
-  readonly pages: CloudDocumentPagesService;
+  readonly pages: DocumentPagesService;
+  /** The page reads behind `pages`, the layout per page among them. */
+  private readonly pageReads: CloudDocumentPagesService;
   readonly redaction: DocumentRedactionService;
   readonly security: DocumentSecurityService;
   readonly render: DocumentRenderService;
@@ -155,6 +162,8 @@ export class CloudDocumentHandle implements DocumentHandle {
     initialToken: string | null = null,
     /** Called once, when the handle closes (the engine forgets it). */
     private readonly onClose: () => void = () => {},
+    /** A grant session's: the document's `grant`, and the gate its writes pass. */
+    private readonly grantSession: Pick<GrantSessionSource, 'grant' | 'writeGate'> | null = null,
   ) {
     this.id = id;
     this.pendingInitialHead = initialHead ?? null;
@@ -172,7 +181,11 @@ export class CloudDocumentHandle implements DocumentHandle {
     });
     this.pool = pool;
     this.objectNumbers = pool;
-    this.writes = new CloudWrites(pool, changeSender(http, id, layerName));
+    this.writes = new CloudWrites(
+      pool,
+      changeSender(http, id, layerName),
+      grantSession?.writeGate ?? null,
+    );
     const security = new CloudDocumentSecurityService(
       http,
       id,
@@ -313,14 +326,15 @@ export class CloudDocumentHandle implements DocumentHandle {
       () => this.closed,
       this.manifestAccessor,
     );
-    this.attachments = new CloudDocumentAttachmentsService(
-      http,
-      id,
-      layerName,
-      () => this.closed,
-      this.manifestAccessor,
-      this.publisher,
-      this.writes,
+    this.attachments = attachmentVerbs(
+      new CloudDocumentAttachmentsService(
+        http,
+        id,
+        layerName,
+        () => this.closed,
+        this.manifestAccessor,
+      ),
+      (change, options) => this.apply(change, options),
     );
     this.signatures = new CloudDocumentSignaturesService(
       http,
@@ -348,7 +362,7 @@ export class CloudDocumentHandle implements DocumentHandle {
       () => this.closed,
       this.manifestAccessor,
     );
-    this.pages = new CloudDocumentPagesService(
+    this.pageReads = new CloudDocumentPagesService(
       http,
       id,
       layerName,
@@ -357,6 +371,7 @@ export class CloudDocumentHandle implements DocumentHandle {
       this.publisher,
       this.writes,
     );
+    this.pages = pageVerbs(this.pageReads, (change, options) => this.apply(change, options));
     this.redaction = new CloudDocumentRedactionService(
       http,
       id,
@@ -378,9 +393,9 @@ export class CloudDocumentHandle implements DocumentHandle {
       this.manifestAccessor,
       this.publisher,
       this.writes,
-      (signal) => this.pages.pageLayout(ref, signal),
+      (signal) => this.pageReads.pageLayout(ref, signal),
       () => this.cloudSecurity.pageLayerRights(),
-      () => this.cloudSecurity.pagePrintRights(),
+      () => this.cloudSecurity.pagePictureRights(),
     );
   }
 
@@ -396,6 +411,10 @@ export class CloudDocumentHandle implements DocumentHandle {
   /** One change as one transaction, or the undo of one (see `DocumentHandle.apply`). */
   apply(change: Change, options?: WriteOptions): AbortablePromise<ChangeResult> {
     return this.changes.apply(change, options);
+  }
+
+  get grant(): DocumentGrant | undefined {
+    return this.grantSession?.grant;
   }
 
   /** Ignored: the server learns what's needed from what is asked of it. */
@@ -747,7 +766,9 @@ export class CloudDocumentHandle implements DocumentHandle {
 
   /** Patch the cached manifest from a remote event's coherence pins — the
    *  same absorb rails local mutations use, so reads stay warm no matter
-   *  whose hand caused the change. */
+   *  whose hand caused the change. Every event kind is named below, so a new
+   *  one can't be forgotten: a missed one leaves this client reading the
+   *  old version from an immutable, cached URL. */
   private absorbRemoteEvent(event: DocumentEvent): void {
     switch (event.type) {
       case 'pages.scaleSet':
@@ -756,8 +777,16 @@ export class CloudDocumentHandle implements DocumentHandle {
       case 'annotations.created':
       case 'annotations.updated':
       case 'annotations.deleted':
+      case 'annotations.restored':
       case 'annotations.reordered':
         this.absorbMutation(event.meta, ['annotations']);
+        return;
+      case 'outline.created':
+      case 'outline.updated':
+      case 'outline.moved':
+      case 'outline.deleted':
+      case 'outline.restored':
+        this.absorbMutation(event.meta, ['outline']);
         return;
       case 'pages.reordered':
       case 'pages.rotated':
@@ -768,6 +797,7 @@ export class CloudDocumentHandle implements DocumentHandle {
         this.absorbPageDelete(event.meta, event.pages);
         return;
       case 'pages.inserted':
+      case 'pages.restored':
         this.absorbPageInsert(event.meta);
         return;
       case 'metadata.updated':
@@ -776,6 +806,7 @@ export class CloudDocumentHandle implements DocumentHandle {
         return;
       case 'attachments.created':
       case 'attachments.deleted':
+      case 'attachments.restored':
         this.absorbMutation(event.meta, ['attachments']);
         return;
       case 'forms.valueSet':
@@ -813,6 +844,17 @@ export class CloudDocumentHandle implements DocumentHandle {
         // so a remote apply must stop this client's base reads immediately.
         this.absorbMutation(event.meta, ['content', 'annotations', 'forms']);
         return;
+      case 'signatures.completed':
+        // Arrives with `document.versioned`, which drops the manifest.
+        return;
+      case 'signatures.cancelled':
+        // Moves no pin a read uses, as an own cancel absorbs nothing.
+        return;
+      case 'stream.desynced':
+        // The stream's own handler dropped the manifest already.
+        return;
+      default:
+        event satisfies never;
     }
   }
 }

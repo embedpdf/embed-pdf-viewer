@@ -13,9 +13,9 @@ const TOOLS = [
 const interaction = useInteraction();
 const { activeToolId } = useInteractionState();
 const measurement = useMeasurement();
-const scale = usePageScale(0); // the cover's scale
+const scale = usePageScale(0); // the floor plan's scale
 
-// On load: the cover at 1:100, its width measured along the top, and the distance tool on.
+// On load: the floor plan at 1:100, the building's width measured, and the distance tool on.
 let started = false;
 watch(
   () => scale.value.ready,
@@ -29,8 +29,8 @@ watch(
           kind: 'distance',
           page: 0,
           points: [
-            { x: 30, y: 28 },
-            { x: 582, y: 28 },
+            { x: 62, y: 150 },
+            { x: 550, y: 150 },
           ],
         }),
       )

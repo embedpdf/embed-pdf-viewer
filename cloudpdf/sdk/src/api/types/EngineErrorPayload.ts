@@ -19,7 +19,7 @@ export namespace EngineErrorPayload {
         DocOpenFailed: "DocOpenFailed",
         DocPasswordRequired: "DocPasswordRequired",
         DocPasswordIncorrect: "DocPasswordIncorrect",
-        SharePasswordRequired: "SharePasswordRequired",
+        GrantPassphraseRequired: "GrantPassphraseRequired",
         Aborted: "Aborted",
         Network: "Network",
         Unauthenticated: "Unauthenticated",
@@ -35,13 +35,14 @@ export namespace EngineErrorPayload {
         SigningVersionMismatch: "SigningVersionMismatch",
         SignatureRefused: "SignatureRefused",
         ProtectedDocument: "ProtectedDocument",
-        StaleBase: "StaleBase",
         PayloadTooLarge: "PayloadTooLarge",
         ObjectNumberUnavailable: "ObjectNumberUnavailable",
         LayerFull: "LayerFull",
         ChangeConflict: "ChangeConflict",
         UndoUnavailable: "UndoUnavailable",
         IdempotencyKeyReused: "IdempotencyKeyReused",
+        LayerDeleted: "LayerDeleted",
+        VisitorIdentityRequired: "VisitorIdentityRequired",
     } as const;
     export type Code = (typeof Code)[keyof typeof Code];
 }

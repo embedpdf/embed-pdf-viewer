@@ -23,6 +23,7 @@ import {
   MAX_OBJECT_NUMBER_TOP_UP,
   objectNumberNotHeld,
   type EditSessionKey,
+  type NumberedLayer,
   type ObjectNumberService,
   type WriteObjectNumberRange,
 } from './ObjectNumberService';
@@ -30,7 +31,7 @@ import type { Database as Schema } from '../db/schema';
 
 /** How many object numbers a write's own objects are expected to need, by kind of write. */
 export const OBJECT_NUMBER_ESTIMATES = {
-  /** Annotation writes, metadata, attachments, flattening, redaction, page structure. */
+  /** Annotation writes, metadata, flattening, redaction, page structure; an embedded file's tree. */
   default: 64,
   /** Form writes regenerate many widget appearances. */
   forms: 256,
@@ -38,6 +39,8 @@ export const OBJECT_NUMBER_ESTIMATES = {
   blankPages: (count: number) => 64 + 16 * count,
   /** Pages copied from another file: about one object per 512 bytes of it. */
   insertedPages: (byteLength: number) => 1_024 + Math.ceil(byteLength / 512),
+  /** Embedded files: a file specification and its stream each. */
+  embeddedFiles: (count: number) => 2 * count,
 } as const;
 
 /**
@@ -68,7 +71,6 @@ export class LayerWriteObjectNumbers {
   constructor(
     private readonly service: ObjectNumberService,
     private readonly db: Kysely<Schema>,
-    readonly layerId: string,
     readonly docId: string,
     readonly layerName: string,
     /** The editing session acting, when the request named one. */
@@ -77,6 +79,10 @@ export class LayerWriteObjectNumbers {
     /** How many numbers to top the session up by at the commit. */
     private readonly topUp: number,
   ) {}
+
+  private get layer(): NumberedLayer {
+    return { docId: this.docId, layerName: this.layerName };
+  }
 
   /** The first number the write's own objects may take. */
   get floor(): number {
@@ -98,7 +104,7 @@ export class LayerWriteObjectNumbers {
       await this.service.assertHeld(this.db, this.session, this.named);
     }
     this.current = await this.service.reserveForWrite(
-      this.layerId,
+      this.layer,
       baseSha,
       input.estimate ?? OBJECT_NUMBER_ESTIMATES.default,
     );
@@ -129,7 +135,7 @@ export class LayerWriteObjectNumbers {
     if (this.current && this.lastObjectNumber !== null) {
       const settled = await this.service.settleWrite(
         trx,
-        this.layerId,
+        this.layer,
         this.current,
         this.lastObjectNumber,
       );
@@ -158,7 +164,7 @@ export class LayerWriteObjectNumbers {
   /** After the write, won or lost: every range that didn't settle goes back. */
   async release(): Promise<void> {
     for (const range of this.open.splice(0)) {
-      await this.service.releaseWrite(this.layerId, range);
+      await this.service.releaseWrite(this.layer, range);
     }
   }
 }

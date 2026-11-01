@@ -7,6 +7,7 @@ import type { Provider, Type } from '@angular/core';
 import type {
   AnyPlugin,
   Engine,
+  HostFetch,
   Identity,
   InitialDocument,
   Kernel,
@@ -34,8 +35,9 @@ export interface EmbedPdfConfig {
    */
   readonly initialDocuments?: readonly InitialDocument[];
   /**
-   * Who the user is, for every document opened without an `identity` of its own. The local
-   * engine only: the cloud engine reads it from the document's token. Change it later with
+   * Who the user is, for every document opened without an `identity` of its own. With the
+   * cloud engine the document's token decides, and a share link takes it as the visitor's
+   * answers to what the link asks. Change it later with
    * `inject(EpdfViewer).updateSettings({ identity })`.
    */
   readonly identity?: Identity;
@@ -48,6 +50,11 @@ export interface EmbedPdfConfig {
   readonly accent?: string;
   /** How pages look: `background` before the picture arrives, and the `shadow` under each page. */
   readonly page?: Partial<ViewerPageSettings>;
+  /**
+   * How a document at a URL downloads: your own `fetch`, to add headers or cookies. It gets the
+   * URL and an `init` with the document's cancel `signal`, to pass on.
+   */
+  readonly fetch?: HostFetch;
 }
 
 /**

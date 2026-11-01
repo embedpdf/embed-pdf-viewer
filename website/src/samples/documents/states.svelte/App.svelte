@@ -12,8 +12,8 @@
   const engine = localEngine();
   const plugins = [stagePlugin(), renderPlugin()];
 
-  const ebook = async (): Promise<OpenInput> => {
-    const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
+  const welcome = async (): Promise<OpenInput> => {
+    const response = await fetch('/pdfs/welcome.pdf');
     return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
   };
 
@@ -25,7 +25,7 @@
   {engine}
   {plugins}
   initialDocuments={[
-    { source: ebook, name: 'ebook.pdf' },
+    { source: welcome, name: 'welcome.pdf' },
     { source: broken, name: 'broken.pdf', active: true },
   ]}
 >

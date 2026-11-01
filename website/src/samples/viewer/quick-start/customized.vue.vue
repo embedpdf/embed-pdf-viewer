@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { PDFViewer, type ViewerConfig } from '@embedpdf/viewer-vue';
 
-const ebook = 'https://snippet.embedpdf.com/ebook.pdf';
+const welcome = '/pdfs/welcome.pdf';
 
 const config: ViewerConfig = {
   theme: { accent: '#7c3aed' },
@@ -22,5 +22,5 @@ const config: ViewerConfig = {
 </script>
 
 <template>
-  <PDFViewer :src="ebook" v-bind="config" style="height: 100%" />
+  <PDFViewer :src="welcome" v-bind="config" style="height: 100%" />
 </template>

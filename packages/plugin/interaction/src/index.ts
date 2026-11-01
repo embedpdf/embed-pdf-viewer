@@ -6,6 +6,6 @@
  * interaction.plugin.ts. Zero framework code.
  */
 export { interactionPlugin } from './interaction.plugin';
-export { interactionState } from './state';
+export { interactionState, type InteractionState } from './state';
 export * from './contract';
 export { feedbackPlugin } from './feedback';

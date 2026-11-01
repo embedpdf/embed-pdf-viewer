@@ -41,7 +41,6 @@ import {
   type AnnotationPatch,
   type WireAnnotationBundle,
   type WireAnnotationResources,
-  type WireResourceMap,
   type AnnotationRef,
   type AnnotationUpdateResult,
   type FormFieldCreateResult,
@@ -73,29 +72,19 @@ import {
   type CustomMetadataUpdateResult,
   type CacheDelta,
   type MutationMeta,
-  type PageDeleteResult,
   type PageFlattenResult,
   type PageFlattenUsage,
-  type PageInsertResult,
-  type PdfSize,
   type RedactionApplyResult,
   type RedactionApplyScope,
   type PageListSnapshot,
-  type PagePosition,
   type PageReorderResult,
   type PageNameResult,
   type PageObjectNumber,
   type PageRef,
-  type PageRotateResult,
-  type PdfRotation,
   type WirePack,
   type WorkerJobId,
   type WorkerRequest,
   type WorkerResultPayload,
-  type WireAttachmentFile,
-  type AttachmentRef,
-  type AttachmentCreateResult,
-  type AttachmentDeleteResult,
   type DocumentVersionRef,
   type SignatureCancelResult,
   type SignatureCompleteResult,
@@ -109,8 +98,9 @@ import {
   encodePrepared,
 } from '@embedpdf/engine-core/wire';
 import { packChangeRecord, unpackChangeRecord } from '@embedpdf/engine-services';
-import { sql, type Kysely, type Transaction } from 'kysely';
+import type { Kysely, Transaction } from 'kysely';
 
+import { deleteStoredLayer } from './deleteStoredLayer';
 import type { DocumentService, OpenContext } from './DocumentService';
 import type { AuditEvent, EventLogService } from './EventLogService';
 import {
@@ -127,6 +117,7 @@ import {
   withCacheDelta,
   wrote,
   type ChangeFacts,
+  type PageSetStep,
   type ChangePlan,
   type RequestedChange,
   type SingleOpAudit,
@@ -144,45 +135,28 @@ import {
   MAX_OBJECT_NUMBER_TOP_UP,
   objectNumberNotHeld,
   type EditSessionKey,
+  type NumberedLayer,
   type ObjectNumberService,
 } from './ObjectNumberService';
 import type { EngineCounters } from '../app/engine-counters';
 import { RequestRateLimiter } from '../app/request-rate-limiter';
+import { visitorLayerOf } from '../auth/visitor-handle';
 import { AuditLogRepo, type AuditMutationKind } from '../db/repos/audit_log.repo';
 import { ChangeOutcomesRepo, type ChangeOutcomeRow } from '../db/repos/change_outcomes.repo';
 import type { DocumentSigningsRepo, SigningRow } from '../db/repos/document_signings.repo';
 import type { DocumentsRepo } from '../db/repos/documents.repo';
 import type { DurablePageRow, LayerRow } from '../db/repos/page_state.repo';
-import type { PdfPasswordSessionsRepo } from '../db/repos/pdf_password_sessions.repo';
+import { GrantVisitorsRepo } from '../db/repos/grant_visitors.repo';
 import type { Database as Schema } from '../db/schema';
 import { isUniqueViolation } from '../db/uniqueViolation';
 import type { RealtimeBus } from '../realtime/RealtimeBus';
 import type { BuildPack, EnginePool } from '../runtime/EnginePool';
 import { signingCandidatePath } from '../runtime/signing-paths';
-import type { PasswordSessionBinding } from '../security/password-session';
 import type { LocalFileHandle } from '../storage/BaseFileCache';
 import { StorageKeys } from '../storage/keys';
 import type { ObjectStore } from '../storage/ObjectStore';
 
 type LayerArtifactInput = { bytes: ArrayBuffer; size: number } | { path: string };
-
-/**
- * Page addresses arrive on the wire as `PageRef`s (one kind: the canonical
- * `objectNumber`); everything this service persists — `layer_pages` rows,
- * audit rows — is keyed by the number. Unwrap once at
- * the entry point; the worker request carries the refs as received.
- */
-function pageObjectNumbersOf(pages: readonly PageRef[]): PageObjectNumber[] {
-  return pages.map((page) => {
-    if (page.kind !== 'objectNumber') {
-      throw new EngineError(
-        EngineErrorCode.InvalidArg,
-        `unsupported page address kind '${String((page as { kind: unknown }).kind)}'`,
-      );
-    }
-    return page.objectNumber;
-  });
-}
 
 /**
  * The commit-time version CAS lost: `layers.current_version` moved between
@@ -252,8 +226,6 @@ export interface LayerServiceOptions {
   counters?: EngineCounters;
   /** Durable signings (migration 030); the signing verbs need it. */
   signings?: DocumentSigningsRepo;
-  /** Password sessions, for rebinding the completer's session to the published version. */
-  passwordSessions?: PdfPasswordSessionsRepo;
   /** Where the engine writes signing candidates (the same root the workers boot with). */
   signingRoot?: string;
   /** How long a prepared signing may wait for its CMS. Default 15 minutes. */
@@ -289,15 +261,20 @@ function writeOpIdOf(ctx: LayerWriteContext): string {
   return ctx.idempotencyKey ?? randomUUID();
 }
 
-/** The editing session a request acts as, on `layerId`. */
-function editSessionKey(ctx: LayerWriteContext, layerId: string): EditSessionKey {
+/** The editing session a request acts as, on `layer`. */
+function editSessionKey(ctx: LayerWriteContext, layer: NumberedLayer): EditSessionKey {
   if (!ctx.originSessionId) {
     throw new EngineError(
       EngineErrorCode.InvalidArg,
       'object numbers need an editing session: send X-Engine-Session-Id',
     );
   }
-  return { layerId, sessionId: ctx.originSessionId, sub: ctx.sub };
+  return {
+    docId: layer.docId,
+    layerName: layer.layerName,
+    sessionId: ctx.originSessionId,
+    sub: ctx.sub,
+  };
 }
 
 export interface MaterializedLayer {
@@ -323,7 +300,6 @@ export class LayerService {
   private readonly storage?: ObjectStore;
   private readonly realtime?: RealtimeBus;
   private readonly signings?: DocumentSigningsRepo;
-  private readonly passwordSessions?: PdfPasswordSessionsRepo;
   private readonly signingRoot?: string;
   private readonly signingTtlMs: number;
   private readonly layerWriteQueues = new Map<string, Promise<unknown>>();
@@ -361,7 +337,6 @@ export class LayerService {
     this.documents = opts.documents;
     this.layerState = opts.layerState;
     this.signings = opts.signings;
-    this.passwordSessions = opts.passwordSessions;
     this.signingRoot = opts.signingRoot;
     this.signingTtlMs = opts.signingTtlMs ?? DEFAULT_SIGNING_TTL_MS;
     this.documentService = opts.documentService;
@@ -413,12 +388,15 @@ export class LayerService {
     const base = doc.baseSha
       ? await this.layerState.baseVersionFacts(docId, doc.baseSha, doc.storageSizeBytes)
       : null;
+    // A grant session's own layer is stamped with its link and visitor.
+    const visitor = visitorLayerOf(ctx.sub, layerName);
     const layer = await this.layerState.repos.layers.createEmpty({
       id: `layer_${randomUUID()}`,
       docId,
       tenantId: ctx.tenantId,
       name: layerName,
       baseSha: doc.baseSha,
+      ...(visitor ? { visitor } : {}),
       docVersion: doc.docVersion,
       ...(base
         ? {
@@ -432,6 +410,10 @@ export class LayerService {
           }
         : {}),
     });
+    // Their layer's first write makes a visitor of them, if answering didn't.
+    if (visitor && layer.currentVersion === 0) {
+      await new GrantVisitorsRepo(this.requireDb()).record({ ...visitor, docId, now: Date.now() });
+    }
     const pages = await this.layerState.ensureLayerPagesFromBase({ layerId: layer.id, docId });
     return { layer, pages };
   }
@@ -586,48 +568,6 @@ export class LayerService {
       'annot.reorder',
       signal,
     );
-  }
-
-  async reorderPages(
-    ctx: LayerWriteContext,
-    input: {
-      docId: string;
-      layerName: string;
-      pages: PageRef[];
-      position: PagePosition;
-    },
-    signal?: AbortSignal,
-  ): Promise<PageReorderResult> {
-    const opId = writeOpIdOf(ctx);
-    return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
-      const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
-      return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
-        const build = (jobId: WorkerJobId) =>
-          wirePack({
-            kind: 'pages.reorder' as const,
-            effect: 'contentWrite' as const,
-            jobId,
-            opId,
-            docId: input.docId,
-            layerName: input.layerName,
-            pages: input.pages,
-            position: input.position,
-            artifactPath,
-          });
-        const payload = await this.runLayerWrite(input.docId, build, signal);
-        if (payload.tag !== 'pages.reorder') {
-          throw new EngineError(
-            EngineErrorCode.WireFormat,
-            `unexpected pages.reorder payload: ${payload.tag}`,
-          );
-        }
-        return this.persistPageLayout(ctx, input.docId, input.layerName, layer, {
-          result: payload.result,
-          pages: payload.result.pages,
-          artifact: requireLayerArtifact(payload as unknown),
-        });
-      });
-    });
   }
 
   /**
@@ -823,188 +763,6 @@ export class LayerService {
     });
   }
 
-  async rotatePages(
-    ctx: LayerWriteContext,
-    input: {
-      docId: string;
-      layerName: string;
-      pages: PageRef[];
-      rotation: PdfRotation;
-    },
-    signal?: AbortSignal,
-  ): Promise<PageRotateResult> {
-    const opId = writeOpIdOf(ctx);
-    const pageObjectNumbers = pageObjectNumbersOf(input.pages);
-    return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
-      const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
-      return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
-        const build = (jobId: WorkerJobId) =>
-          wirePack({
-            kind: 'pages.rotate' as const,
-            effect: 'contentWrite' as const,
-            jobId,
-            opId,
-            docId: input.docId,
-            layerName: input.layerName,
-            pages: input.pages,
-            rotation: input.rotation,
-            artifactPath,
-          });
-        const payload = await this.runLayerWrite(input.docId, build, signal);
-        if (payload.tag !== 'pages.rotate') {
-          throw new EngineError(
-            EngineErrorCode.WireFormat,
-            `unexpected pages.rotate payload: ${payload.tag}`,
-          );
-        }
-        return this.persistPageRotate(ctx, input.docId, input.layerName, layer, {
-          result: payload.result,
-          affectedPages: pageObjectNumbers,
-          artifact: requireLayerArtifact(payload as unknown),
-        });
-      });
-    });
-  }
-
-  async deletePages(
-    ctx: LayerWriteContext,
-    input: {
-      docId: string;
-      layerName: string;
-      pages: PageRef[];
-    },
-    signal?: AbortSignal,
-  ): Promise<PageDeleteResult> {
-    const opId = writeOpIdOf(ctx);
-    const pageObjectNumbers = pageObjectNumbersOf(input.pages);
-    return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
-      const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
-      return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
-        const build = (jobId: WorkerJobId) =>
-          wirePack({
-            kind: 'pages.delete' as const,
-            effect: 'contentWrite' as const,
-            jobId,
-            opId,
-            docId: input.docId,
-            layerName: input.layerName,
-            pages: input.pages,
-            artifactPath,
-          });
-        const payload = await this.runLayerWrite(input.docId, build, signal);
-        if (payload.tag !== 'pages.delete') {
-          throw new EngineError(
-            EngineErrorCode.WireFormat,
-            `unexpected pages.delete payload: ${payload.tag}`,
-          );
-        }
-        return this.persistPageDelete(ctx, input.docId, input.layerName, layer, {
-          result: payload.result,
-          deletedPages: pageObjectNumbers,
-          artifact: requireLayerArtifact(payload as unknown),
-        });
-      });
-    });
-  }
-
-  async insertPages(
-    ctx: LayerWriteContext,
-    input: {
-      docId: string;
-      layerName: string;
-      /** The standalone source PDF whose pages are copied in. Never put on
-       *  a postMessage transfer list — the fence-conflict rebase re-runs
-       *  this op, and a transferred (detached) buffer would corrupt the
-       *  retry. Structured clone copies it, like annotation resources. */
-      bytes: ArrayBuffer;
-      position?: PagePosition;
-    },
-    signal?: AbortSignal,
-  ): Promise<PageInsertResult> {
-    const opId = writeOpIdOf(ctx);
-    return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
-      const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName, {
-        estimate: OBJECT_NUMBER_ESTIMATES.insertedPages(input.bytes.byteLength),
-      });
-      return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
-        const build = (jobId: WorkerJobId) =>
-          wirePack({
-            kind: 'pages.insert' as const,
-            effect: 'contentWrite' as const,
-            jobId,
-            opId,
-            docId: input.docId,
-            layerName: input.layerName,
-            bytes: input.bytes,
-            ...(input.position !== undefined ? { position: input.position } : {}),
-            artifactPath,
-          });
-        const payload = await this.runLayerWrite(input.docId, build, signal);
-        if (payload.tag !== 'pages.insert') {
-          throw new EngineError(
-            EngineErrorCode.WireFormat,
-            `unexpected pages.insert payload: ${payload.tag}`,
-          );
-        }
-        return this.persistPageInsert(ctx, input.docId, input.layerName, layer, {
-          kind: 'pages.insert',
-          result: payload.result,
-          artifact: requireLayerArtifact(payload as unknown),
-        });
-      });
-    });
-  }
-
-  async insertBlankPages(
-    ctx: LayerWriteContext,
-    input: {
-      docId: string;
-      layerName: string;
-      size: PdfSize;
-      count?: number;
-      position?: PagePosition;
-      /** The new pages' object numbers, one per page: ones the editing session holds. */
-      objectNumbers?: readonly number[];
-    },
-    signal?: AbortSignal,
-  ): Promise<PageInsertResult> {
-    const opId = writeOpIdOf(ctx);
-    return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
-      const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName, {
-        estimate: OBJECT_NUMBER_ESTIMATES.blankPages(input.count ?? 1),
-        ...(input.objectNumbers ? { named: input.objectNumbers } : {}),
-      });
-      return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
-        const build = (jobId: WorkerJobId) =>
-          wirePack({
-            kind: 'pages.insertBlank' as const,
-            effect: 'contentWrite' as const,
-            jobId,
-            opId,
-            docId: input.docId,
-            layerName: input.layerName,
-            size: input.size,
-            ...(input.count !== undefined ? { count: input.count } : {}),
-            ...(input.position !== undefined ? { position: input.position } : {}),
-            ...(input.objectNumbers ? { objectNumbers: [...input.objectNumbers] } : {}),
-            artifactPath,
-          });
-        const payload = await this.runLayerWrite(input.docId, build, signal);
-        if (payload.tag !== 'pages.insertBlank') {
-          throw new EngineError(
-            EngineErrorCode.WireFormat,
-            `unexpected pages.insertBlank payload: ${payload.tag}`,
-          );
-        }
-        return this.persistPageInsert(ctx, input.docId, input.layerName, layer, {
-          kind: 'pages.insertBlank',
-          result: payload.result,
-          artifact: requireLayerArtifact(payload as unknown),
-        });
-      });
-    });
-  }
-
   async flattenPages(
     ctx: LayerWriteContext,
     input: {
@@ -1130,98 +888,6 @@ export class LayerService {
       'metadata.updateCustom',
       signal,
     );
-  }
-
-  // ── Attachments ──────────────────────────────────────────────────────
-  //
-  // Document-scoped like metadata: the /EmbeddedFiles name tree lives on
-  // the catalog, so mutations touch no page rows — they advance the layer
-  // doc version plus the dedicated `attachments_version` pin that keys
-  // the immutable /attachments@… and /attachment-files/…@… leaves.
-  // Identity is the name-tree key (unique by construction).
-
-  /** Create a document-level embedded file (multipart mutation envelope). */
-  async createAttachment(
-    ctx: LayerWriteContext,
-    input: {
-      docId: string;
-      layerName: string;
-      file: WireAttachmentFile;
-      resources: WireResourceMap;
-    },
-    signal?: AbortSignal,
-  ): Promise<AttachmentCreateResult> {
-    const opId = writeOpIdOf(ctx);
-    return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
-      const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
-      return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
-        const build = (jobId: WorkerJobId) =>
-          wirePack({
-            kind: 'attachments.create' as const,
-            effect: 'write' as const,
-            jobId,
-            opId,
-            docId: input.docId,
-            layerName: input.layerName,
-            file: input.file,
-            resources: input.resources,
-            artifactPath,
-          });
-        const payload = await this.runLayerWrite(input.docId, build, signal);
-        if (payload.tag !== 'attachments.create') {
-          throw new EngineError(
-            EngineErrorCode.WireFormat,
-            `unexpected attachments.create payload: ${payload.tag}`,
-          );
-        }
-        return this.persistAttachmentMutation(ctx, input.docId, input.layerName, layer, {
-          kind: 'attachment.create',
-          result: payload.result,
-          artifact: requireLayerArtifact(payload as unknown),
-        });
-      });
-    });
-  }
-
-  /** Delete a document-level embedded file by name-tree key. */
-  async deleteAttachment(
-    ctx: LayerWriteContext,
-    input: {
-      docId: string;
-      layerName: string;
-      ref: AttachmentRef;
-    },
-    signal?: AbortSignal,
-  ): Promise<AttachmentDeleteResult> {
-    const opId = writeOpIdOf(ctx);
-    return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
-      const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
-      return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
-        const build = (jobId: WorkerJobId) =>
-          wirePack({
-            kind: 'attachments.delete' as const,
-            effect: 'write' as const,
-            jobId,
-            opId,
-            docId: input.docId,
-            layerName: input.layerName,
-            ref: input.ref,
-            artifactPath,
-          });
-        const payload = await this.runLayerWrite(input.docId, build, signal);
-        if (payload.tag !== 'attachments.delete') {
-          throw new EngineError(
-            EngineErrorCode.WireFormat,
-            `unexpected attachments.delete payload: ${payload.tag}`,
-          );
-        }
-        return this.persistAttachmentMutation(ctx, input.docId, input.layerName, layer, {
-          kind: 'attachment.delete',
-          result: payload.result,
-          artifact: requireLayerArtifact(payload as unknown),
-        });
-      });
-    });
   }
 
   // ── Forms ────────────────────────────────────────────────────────────
@@ -1905,11 +1571,24 @@ export class LayerService {
       // session blessed with the committed version (advanceLayerSession).
       { forWrite: true },
     );
-    await this.prepareObjectNumbers(
-      ctx,
-      materialized.layer,
-      typeof numbers === 'function' ? numbers() : numbers,
-    );
+    try {
+      await this.prepareObjectNumbers(
+        ctx,
+        materialized.layer,
+        typeof numbers === 'function' ? numbers() : numbers,
+      );
+    } catch (err) {
+      // The same write may have committed on another replica since the check
+      // above: its commit spent the numbers this attempt names.
+      const late =
+        err instanceof EngineError &&
+        err.code === EngineErrorCode.ObjectNumberUnavailable &&
+        answered
+          ? await answered(materialized.layer)
+          : undefined;
+      if (late !== undefined) throw new CommittedWrite(late);
+      throw err;
+    }
     return materialized;
   }
 
@@ -1935,11 +1614,10 @@ export class LayerService {
       write = new LayerWriteObjectNumbers(
         this.objectNumbers,
         db,
-        layer.id,
         layer.docId,
         layer.name,
         ctx.originSessionId
-          ? { layerId: layer.id, sessionId: ctx.originSessionId, sub: ctx.sub }
+          ? editSessionKey(ctx, { docId: layer.docId, layerName: layer.name })
           : null,
         ctx.edit,
         ctx.edit && ctx.edit.topUp > 0 && this.takeIssueTurn(ctx) ? ctx.edit.topUp : 0,
@@ -2224,6 +1902,12 @@ export class LayerService {
           if (bumped.versions.outline_version !== undefined) {
             cacheDelta = { ...cacheDelta, outlineVersion: bumped.versions.outline_version };
           }
+          if (bumped.versions.attachments_version !== undefined) {
+            cacheDelta = { ...cacheDelta, attachmentsVersion: bumped.versions.attachments_version };
+          }
+          if (bumped.versions.layout_version !== undefined) {
+            cacheDelta = { ...cacheDelta, layoutVersion: bumped.versions.layout_version };
+          }
           const artifactFields = {
             layer,
             nextVersion,
@@ -2346,8 +2030,9 @@ export class LayerService {
    * The version bumps a commit's facts call for, read inside its transaction:
    * the document version always; each touched page's pin of the family that
    * changed on it (`annotation_version`, `widget_version`); the annotation
-   * list and the form when they changed; the metadata and the outline when
-   * they changed.
+   * list and the form when they changed; the metadata, the outline, the
+   * embedded files and the layout when they changed. The page set's changes are written here, in
+   * the order the changes made them, before the pins are read.
    */
   private async bumpChangeVersions(
     trx: Transaction<Schema>,
@@ -2364,6 +2049,8 @@ export class LayerService {
       forms_version?: number;
       metadata_version?: number;
       outline_version?: number;
+      attachments_version?: number;
+      layout_version?: number;
       fonts_version?: number;
     };
     pages: DurablePageRow[];
@@ -2376,15 +2063,21 @@ export class LayerService {
         'forms_version',
         'metadata_version',
         'outline_version',
+        'attachments_version',
+        'layout_version',
         'fonts_version',
       ])
       .where('id', '=', layer.id)
       .executeTakeFirst();
     if (!current) throw new EngineError(EngineErrorCode.NotFound, `layer not found: ${layer.id}`);
+    const previousDocVersion = Number(current.doc_version);
+    const gone = await this.writePageSet(trx, layer, facts.pageSet, previousDocVersion + 1, now);
     const annotationPages = new Set(facts.annotationPages);
     const widgetPages = new Set(facts.widgetPages);
     const pages: DurablePageRow[] = [];
     for (const pageObjectNumber of new Set([...annotationPages, ...widgetPages])) {
+      // A page the same commit took has no pins left to move.
+      if (gone.has(pageObjectNumber)) continue;
       const page = await trx
         .selectFrom('layer_pages')
         .selectAll()
@@ -2406,7 +2099,6 @@ export class LayerService {
         updatedAt: now,
       });
     }
-    const previousDocVersion = Number(current.doc_version);
     return {
       previousDocVersion,
       versions: {
@@ -2417,10 +2109,59 @@ export class LayerService {
         ...(facts.form ? { forms_version: Number(current.forms_version ?? 1) + 1 } : {}),
         ...(facts.metadata ? { metadata_version: Number(current.metadata_version) + 1 } : {}),
         ...(facts.outline ? { outline_version: Number(current.outline_version ?? 1) + 1 } : {}),
+        ...(facts.attachments
+          ? { attachments_version: Number(current.attachments_version) + 1 }
+          : {}),
+        ...(facts.layout ? { layout_version: Number(current.layout_version) + 1 } : {}),
         ...(written.fonts ? { fonts_version: Number(current.fonts_version ?? 1) + 1 } : {}),
       },
       pages,
     };
+  }
+
+  /**
+   * Replays a commit's page-set steps on `layer_pages`: a page that went
+   * loses its row; a page an insert made gets one at the first epoch; a page
+   * an undo brought back gets one at `epoch` (the commit's document version,
+   * above every pin the page had), so no picture cached before it went is
+   * served for it. Returns the pages left without a row.
+   */
+  private async writePageSet(
+    trx: Transaction<Schema>,
+    layer: LayerRow,
+    steps: readonly PageSetStep[],
+    epoch: number,
+    now: number,
+  ): Promise<Set<number>> {
+    const gone = new Set<number>();
+    for (const { kind, pages } of steps) {
+      if (pages.length === 0) continue;
+      await trx
+        .deleteFrom('layer_pages')
+        .where('layer_id', '=', layer.id)
+        .where('page_object_number', 'in', [...pages])
+        .execute();
+      if (kind === 'remove') {
+        for (const page of pages) gone.add(page);
+        continue;
+      }
+      const version = kind === 'insert' ? 1 : epoch;
+      await trx
+        .insertInto('layer_pages')
+        .values(
+          pages.map((page) => ({
+            layer_id: layer.id,
+            page_object_number: page,
+            content_version: version,
+            annotation_version: version,
+            widget_version: version,
+            updated_at: now,
+          })),
+        )
+        .execute();
+      for (const page of pages) gone.delete(page);
+    }
+    return gone;
   }
 
   /**
@@ -2529,15 +2270,16 @@ export class LayerService {
    * `/access` for a client that may create: make, revive or keep alive its
    * editing session (`ctx.originSessionId` with the token's subject) and
    * hand it `wanted` numbers (`FIRST_OBJECT_NUMBERS` for a new session when
-   * the client names no count). The layer becomes real here if it wasn't.
+   * the client names no count). A layer nobody changed stays that way: its
+   * row comes with its first write.
    */
   async openEditSession(
     ctx: LayerWriteContext,
     input: { docId: string; layerName: string; wanted?: number },
   ): Promise<EditSessionAccess> {
     const objectNumbers = this.requireObjectNumbers();
-    const layer = await this.prepareEditLayer(ctx, input.docId, input.layerName);
-    const key = editSessionKey(ctx, layer.id);
+    const layer = await this.prepareEditNumbers(ctx, input.docId, input.layerName);
+    const key = editSessionKey(ctx, layer);
     return this.requireDb()
       .transaction()
       .execute(async (trx) => {
@@ -2578,8 +2320,8 @@ export class LayerService {
         { details: { field: 'count' } },
       );
     }
-    const layer = await this.prepareEditLayer(ctx, input.docId, input.layerName);
-    const key = editSessionKey(ctx, layer.id);
+    const layer = await this.prepareEditNumbers(ctx, input.docId, input.layerName);
+    const key = editSessionKey(ctx, layer);
     return this.requireDb()
       .transaction()
       .execute(async (trx) => {
@@ -2605,17 +2347,20 @@ export class LayerService {
   ): Promise<EditSessionStatus | null> {
     if (!this.objectNumbers || !this.db || !ctx.originSessionId) return null;
     const objectNumbers = this.objectNumbers;
-    const layer = await this.layerState.repos.layers.findByDocAndName(input.docId, input.layerName);
-    if (!layer || layer.tenantId !== ctx.tenantId) return null;
-    const key = editSessionKey(ctx, layer.id);
+    const doc = await this.documents.findById(input.docId);
+    if (!doc || doc.tenantId !== ctx.tenantId) return null;
+    const key = editSessionKey(ctx, input);
     if (!(await objectNumbers.findSession(this.db, key))) return null;
+    // Numbers count on the layer's base version: the head while it has no row.
+    const layer = await this.layerState.repos.layers.findByDocAndName(input.docId, input.layerName);
+    const baseSha = layer ? layer.baseSha : doc.baseSha;
     return this.db.transaction().execute(async (trx) => {
       const touched = await objectNumbers.touchSession(trx, key);
       let held = await objectNumbers.held(trx, key);
       if (
         held.length === 0 &&
         input.mayCreate &&
-        (await objectNumbers.hasCounter(trx, layer.id)) &&
+        (await objectNumbers.hasCounter(trx, key, baseSha)) &&
         this.takeIssueTurn(ctx)
       ) {
         await objectNumbers.issue(trx, key, FIRST_OBJECT_NUMBERS);
@@ -2626,32 +2371,43 @@ export class LayerService {
   }
 
   /**
-   * The layer an editing session hands numbers out on: real (its row made),
-   * open on the engine, and with its counter started.
+   * The layer an editing session hands numbers out on, with its counter
+   * started. A layer nobody changed has no row: it reads the head version,
+   * so its numbers count past the head's last one, and nothing is made or
+   * opened for it. Its row comes with its first write.
    */
-  private async prepareEditLayer(
+  private async prepareEditNumbers(
     ctx: LayerWriteContext,
     docId: string,
     layerName: string,
-  ): Promise<LayerRow> {
+  ): Promise<NumberedLayer> {
     const documentService = this.requireDocumentService();
     await documentService.getLayerManifest(ctx, docId, layerName);
-    const { layer } = await this.materializeLayerForWrite(ctx, docId, layerName);
-    await documentService.ensureLayerFreshOnPool(ctx, docId, layerName, layer.currentVersion);
-    await this.startObjectCounter(layer);
-    return layer;
+    const layer = await this.layerState.repos.layers.findByDocAndName(docId, layerName);
+    if (layer) {
+      await documentService.ensureLayerFreshOnPool(ctx, docId, layerName, layer.currentVersion);
+      await this.startObjectCounter(layer);
+    } else {
+      const head = await documentService.headObjectNumbers(ctx, docId, layerName);
+      await this.requireObjectNumbers().startCounter(
+        { docId, layerName },
+        head.baseSha,
+        head.lastObjectNumber,
+      );
+    }
+    return { docId, layerName };
   }
 
-  /** Start the layer's counter the first time, past what the engine reported on opening it. */
+  /** Start the layer's counter on its base version, past what the engine reported on opening it. */
   private async startObjectCounter(layer: LayerRow): Promise<void> {
     const objectNumbers = this.requireObjectNumbers();
-    const db = this.requireDb();
-    if (await objectNumbers.hasCounter(db, layer.id)) return;
+    const numbered = { docId: layer.docId, layerName: layer.name };
+    if (await objectNumbers.hasCounter(this.requireDb(), numbered, layer.baseSha)) return;
     const last = this.requireDocumentService().lastObjectNumberAtOpen(layer.docId, layer.name);
     if (last === undefined) {
       throw new EngineError(EngineErrorCode.Unknown, `layer ${layer.id} is not open`);
     }
-    await objectNumbers.startCounter(db, layer.id, last);
+    await objectNumbers.startCounter(numbered, layer.baseSha, last);
   }
 
   /**
@@ -2731,44 +2487,6 @@ export class LayerService {
     return { ...committed.result, pages: input.pages };
   }
 
-  /**
-   * Rotate shares the reorder commit exactly (the corrected model: rotation is
-   * presentation metadata — `doc_version` + `layout_version` bump, no
-   * `layer_pages` touch, every per-page cache stays warm). Only the audit
-   * kind and the affected-page set differ.
-   */
-  private async persistPageRotate(
-    ctx: LayerWriteContext,
-    docId: string,
-    layerName: string,
-    layer: LayerRow,
-    input: {
-      result: PageRotateResult;
-      affectedPages: PageObjectNumber[];
-      artifact: LayerArtifactInput;
-    },
-  ): Promise<PageRotateResult> {
-    const nextVersion = layer.currentVersion + 1;
-    const artifactKey = this.nextArtifactKey(ctx, docId, layerName, nextVersion);
-    const uploaded = await this.uploadLayerArtifact(artifactKey, input.artifact);
-    const committed = await this.commitPageStructure({
-      ctx,
-      docId,
-      layerName,
-      layer,
-      kind: 'pages.rotate',
-      layout: input.result.layout,
-      stamp: input.result.meta,
-      affectedPages: input.affectedPages,
-      artifactKey,
-      artifactSha: uploaded.sha256,
-      artifactSize: uploaded.size,
-      nextVersion,
-    });
-    this.finishLayerCommit(ctx, docId, layerName, nextVersion, artifactKey, committed.auditId);
-    return committed.result;
-  }
-
   private async persistPageFlatten<T extends { meta: MutationMeta }>(
     ctx: LayerWriteContext,
     docId: string,
@@ -2816,69 +2534,6 @@ export class LayerService {
       layerName,
       layer,
       raw: input.result,
-      artifactKey,
-      artifactSha: uploaded.sha256,
-      artifactSize: uploaded.size,
-      nextVersion,
-    });
-    this.finishLayerCommit(ctx, docId, layerName, nextVersion, artifactKey, committed.auditId);
-    return committed.result;
-  }
-
-  private async persistPageDelete(
-    ctx: LayerWriteContext,
-    docId: string,
-    layerName: string,
-    layer: LayerRow,
-    input: {
-      result: PageDeleteResult;
-      deletedPages: PageObjectNumber[];
-      artifact: LayerArtifactInput;
-    },
-  ): Promise<PageDeleteResult> {
-    const nextVersion = layer.currentVersion + 1;
-    const artifactKey = this.nextArtifactKey(ctx, docId, layerName, nextVersion);
-    const uploaded = await this.uploadLayerArtifact(artifactKey, input.artifact);
-    const committed = await this.commitPageDelete({
-      ctx,
-      docId,
-      layerName,
-      layer,
-      layout: input.result.layout,
-      stamp: input.result.meta,
-      deletedPages: input.deletedPages,
-      artifactKey,
-      artifactSha: uploaded.sha256,
-      artifactSize: uploaded.size,
-      nextVersion,
-    });
-    this.finishLayerCommit(ctx, docId, layerName, nextVersion, artifactKey, committed.auditId);
-    return committed.result;
-  }
-
-  private async persistPageInsert(
-    ctx: LayerWriteContext,
-    docId: string,
-    layerName: string,
-    layer: LayerRow,
-    input: {
-      kind: 'pages.insert' | 'pages.insertBlank';
-      result: PageInsertResult;
-      artifact: LayerArtifactInput;
-    },
-  ): Promise<PageInsertResult> {
-    const nextVersion = layer.currentVersion + 1;
-    const artifactKey = this.nextArtifactKey(ctx, docId, layerName, nextVersion);
-    const uploaded = await this.uploadLayerArtifact(artifactKey, input.artifact);
-    const committed = await this.commitPageInsert({
-      ctx,
-      docId,
-      layerName,
-      layer,
-      kind: input.kind,
-      layout: input.result.layout,
-      stamp: input.result.meta,
-      insertedPages: input.result.insertedPages.map((page) => page.objectNumber),
       artifactKey,
       artifactSha: uploaded.sha256,
       artifactSize: uploaded.size,
@@ -2938,18 +2593,18 @@ export class LayerService {
   }
 
   /**
-   * Shared commit for the page-structure ops that keep the page set intact
-   * (reorder + rotate). Both have the same shape: the layer's `doc_version` and
-   * `layout_version` advance, `layer_pages` rows are left entirely untouched
-   * (display order and rotation live in the artifact, read back via /layout),
-   * and every per-page content/annotation cache stays warm.
+   * The commit of a page-name write, which keeps the page set intact: the
+   * layer's `doc_version` and `layout_version` advance, `layer_pages` rows are
+   * left entirely untouched (the names live in the artifact, read back via
+   * /layout), and every per-page content/annotation cache stays warm. The
+   * page changes (`doc.changes`) commit through `bumpChangeVersions`.
    */
   private async commitPageStructure(input: {
     ctx: LayerWriteContext;
     docId: string;
     layerName: string;
     layer: LayerRow;
-    kind: 'pages.reorder' | 'pages.rotate';
+    kind: 'pages.reorder';
     /** A reorder's moved pages, in their new order: `result.pages`. */
     pages?: PageRef[];
     /** The worker's post-mutation layout — becomes `result.layout`. */
@@ -3031,262 +2686,6 @@ export class LayerService {
           trx,
           input,
           { doc_version: versions.docVersion, layout_version: versions.layoutVersion },
-          auditId,
-          now,
-        );
-
-        return { result, auditId };
-      });
-  }
-
-  /**
-   * Delete commit: the only page-structure op that mutates the page set. On
-   * top of the shared version bumps it removes the deleted pages'
-   * `layer_pages` rows. Surviving pages' rows are untouched, so their pins
-   * stay warm.
-   */
-  private async commitPageDelete(input: {
-    ctx: LayerWriteContext;
-    docId: string;
-    layerName: string;
-    layer: LayerRow;
-    /** The worker's post-delete layout (survivors) — becomes `result.layout`. */
-    layout: PageListSnapshot;
-    /** The write's id and whether it can be undone, as the worker stamped them. */
-    stamp: WriteStamp;
-    deletedPages: PageObjectNumber[];
-    artifactKey: string;
-    artifactSha: string;
-    artifactSize: number;
-    nextVersion: number;
-  }): Promise<{
-    result: { layout: PageListSnapshot; meta: MutationMeta };
-    auditId: number;
-  }> {
-    return this.requireDb()
-      .transaction()
-      .execute(async (trx) => {
-        const now = Date.now();
-        const currentLayer = await this.readLayerForCommit(trx, input.layer);
-
-        const rows = await trx
-          .selectFrom('layer_pages')
-          .select('page_object_number')
-          .where('layer_id', '=', input.layer.id)
-          .execute();
-        const known = new Set(rows.map((row) => Number(row.page_object_number)));
-        const deleted = new Set(input.deletedPages);
-        const survivorOrder = input.layout.pages.map((page) => page.ref.objectNumber);
-        if (rows.length !== survivorOrder.length + input.deletedPages.length) {
-          throw new EngineError(
-            EngineErrorCode.WireFormat,
-            `pages.delete returned ${survivorOrder.length} survivors for ${rows.length} layer page rows minus ${input.deletedPages.length} deleted`,
-          );
-        }
-        for (const pageObjectNumber of input.deletedPages) {
-          if (!known.has(pageObjectNumber)) {
-            throw new EngineError(
-              EngineErrorCode.WireFormat,
-              `pages.delete removed unknown page object number ${pageObjectNumber}`,
-            );
-          }
-        }
-        for (const pageObjectNumber of survivorOrder) {
-          if (!known.has(pageObjectNumber) || deleted.has(pageObjectNumber)) {
-            throw new EngineError(
-              EngineErrorCode.WireFormat,
-              `pages.delete returned unexpected surviving page object number ${pageObjectNumber}`,
-            );
-          }
-        }
-
-        await trx
-          .deleteFrom('layer_pages')
-          .where('layer_id', '=', input.layer.id)
-          .where('page_object_number', 'in', input.deletedPages)
-          .execute();
-
-        const previousDocVersion = Number(currentLayer.doc_version);
-        const fontsVersion = this.fontsVersionAfter(input.docId, input.layerName, currentLayer);
-        const versions: LayoutVersions = {
-          previousDocVersion,
-          docVersion: previousDocVersion + 1,
-          layoutVersion: Number(currentLayer.layout_version) + 1,
-          ...(fontsVersion !== undefined ? { fontsVersion } : {}),
-        };
-
-        // The finalized result — audited and returned identically: what we
-        // tell the caller is what we tell history (and remote subscribers).
-        const result = { layout: input.layout, meta: planeMeta(input.stamp, versions) };
-
-        const auditEvent = makeAuditEvent({
-          ctx: input.ctx,
-          docId: input.docId,
-          layer: input.layer,
-          layerName: input.layerName,
-          kind: 'pages.delete',
-          pageObjectNumber: null,
-          affectedPages: input.deletedPages,
-          artifactVersion: input.nextVersion,
-          artifactKey: input.artifactKey,
-          artifactSha: input.artifactSha,
-          artifactSize: input.artifactSize,
-          payload: result,
-          ts: now,
-        });
-        const auditId = (await this.eventLog?.appendDb(trx, auditEvent)) ?? 0;
-
-        await this.writeLayerAdvance(
-          trx,
-          input,
-          {
-            doc_version: versions.docVersion,
-            layout_version: versions.layoutVersion,
-            // The page set shrank — the bulk annotation corpus changed.
-            // Clients re-pin via the 404-refresh rail (the layout delta
-            // carries no annotationsVersion).
-            annotations_version: Number(currentLayer.annotations_version ?? 1) + 1,
-            ...(fontsVersion !== undefined ? { fonts_version: fontsVersion } : {}),
-          },
-          auditId,
-          now,
-        );
-
-        return { result, auditId };
-      });
-  }
-
-  /**
-   * Insert commit: the other page-structure op that mutates the page set —
-   * the mirror of {@link commitPageDelete}. On top of the shared version
-   * bumps it adds `layer_pages` rows for the fresh page object numbers at the initial
-   * epoch (`content_version` 1, `annotation_version` 1 — exactly what the
-   * base snapshot would have written had the pages always existed).
-   * Pre-existing rows are untouched, so their pins stay warm.
-   */
-  private async commitPageInsert(input: {
-    ctx: LayerWriteContext;
-    docId: string;
-    layerName: string;
-    layer: LayerRow;
-    kind: 'pages.insert' | 'pages.insertBlank';
-    /** The worker's post-insert layout — becomes `result.layout`. */
-    layout: PageListSnapshot;
-    /** The write's id and whether it can be undone, as the worker stamped them. */
-    stamp: WriteStamp;
-    insertedPages: PageObjectNumber[];
-    artifactKey: string;
-    artifactSha: string;
-    artifactSize: number;
-    nextVersion: number;
-  }): Promise<{
-    result: PageInsertResult;
-    auditId: number;
-  }> {
-    return this.requireDb()
-      .transaction()
-      .execute(async (trx) => {
-        const now = Date.now();
-        const currentLayer = await this.readLayerForCommit(trx, input.layer);
-
-        const rows = await trx
-          .selectFrom('layer_pages')
-          .select('page_object_number')
-          .where('layer_id', '=', input.layer.id)
-          .execute();
-        const known = new Set(rows.map((row) => Number(row.page_object_number)));
-        const inserted = new Set(input.insertedPages);
-        const pageOrder = input.layout.pages.map((page) => page.ref.objectNumber);
-        if (inserted.size !== input.insertedPages.length) {
-          throw new EngineError(
-            EngineErrorCode.WireFormat,
-            `${input.kind} returned duplicate inserted page object numbers`,
-          );
-        }
-        if (rows.length + input.insertedPages.length !== pageOrder.length) {
-          throw new EngineError(
-            EngineErrorCode.WireFormat,
-            `${input.kind} returned ${pageOrder.length} pages for ${rows.length} layer page rows plus ${input.insertedPages.length} inserted`,
-          );
-        }
-        for (const pageObjectNumber of input.insertedPages) {
-          if (known.has(pageObjectNumber)) {
-            throw new EngineError(
-              EngineErrorCode.WireFormat,
-              `${input.kind} claims fresh page object number ${pageObjectNumber} but a row already exists`,
-            );
-          }
-        }
-        for (const pageObjectNumber of pageOrder) {
-          if (!known.has(pageObjectNumber) && !inserted.has(pageObjectNumber)) {
-            throw new EngineError(
-              EngineErrorCode.WireFormat,
-              `${input.kind} returned unknown page object number ${pageObjectNumber}`,
-            );
-          }
-        }
-
-        await trx
-          .insertInto('layer_pages')
-          .values(
-            input.insertedPages.map((pageObjectNumber) => ({
-              layer_id: input.layer.id,
-              page_object_number: pageObjectNumber,
-              content_version: 1,
-              annotation_version: 1,
-              widget_version: 1,
-              updated_at: now,
-            })),
-          )
-          .execute();
-
-        const previousDocVersion = Number(currentLayer.doc_version);
-        const fontsVersion = this.fontsVersionAfter(input.docId, input.layerName, currentLayer);
-        const versions: LayoutVersions = {
-          previousDocVersion,
-          docVersion: previousDocVersion + 1,
-          layoutVersion: Number(currentLayer.layout_version) + 1,
-          ...(fontsVersion !== undefined ? { fontsVersion } : {}),
-        };
-
-        // The finalized result — audited and returned identically: what we
-        // tell the caller is what we tell history (and remote subscribers).
-        const result: PageInsertResult = {
-          insertedPages: input.insertedPages.map(toPageRef),
-          layout: input.layout,
-          meta: planeMeta(input.stamp, versions),
-        };
-
-        const auditEvent = makeAuditEvent({
-          ctx: input.ctx,
-          docId: input.docId,
-          layer: input.layer,
-          layerName: input.layerName,
-          kind: input.kind,
-          pageObjectNumber: null,
-          affectedPages: input.insertedPages,
-          artifactVersion: input.nextVersion,
-          artifactKey: input.artifactKey,
-          artifactSha: input.artifactSha,
-          artifactSize: input.artifactSize,
-          payload: result,
-          ts: now,
-        });
-        const auditId = (await this.eventLog?.appendDb(trx, auditEvent)) ?? 0;
-
-        await this.writeLayerAdvance(
-          trx,
-          input,
-          {
-            doc_version: versions.docVersion,
-            layout_version: versions.layoutVersion,
-            // The page set grew — the annotation list and the form changed.
-            // Clients re-pin via the 404-refresh rail (the layout delta
-            // carries neither pin).
-            annotations_version: Number(currentLayer.annotations_version ?? 1) + 1,
-            forms_version: Number(currentLayer.forms_version ?? 1) + 1,
-            ...(fontsVersion !== undefined ? { fonts_version: fontsVersion } : {}),
-          },
           auditId,
           now,
         );
@@ -3622,17 +3021,13 @@ export class LayerService {
   ): Promise<SignaturePrepared> {
     return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
       const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
-      const documentService = this.requireDocumentService();
-      const head = await documentService.getHead(ctx, input.docId);
-      if (layer.baseSha !== null && layer.baseSha !== head.baseSha) {
-        throw new EngineError(
-          EngineErrorCode.StaleBase,
-          'this layer is behind the document head; rebase it before signing',
-        );
-      }
-      const headVersion = await this.layerState.baseVersionFacts(
+      // The layer signs over its own base: the upload, or the version its
+      // last signature made. Other layers' signatures never move it.
+      const head = await this.requireDocumentService().getHead(ctx, input.docId);
+      const baseSha = layer.baseSha ?? head.baseSha;
+      const baseVersion = await this.layerState.baseVersionFacts(
         input.docId,
-        head.baseSha,
+        baseSha,
         head.storageSizeBytes,
       );
       const fieldObjectNumber = await this.resolveSignatureField(
@@ -3665,13 +3060,13 @@ export class LayerService {
           ctx,
           input.docId,
           prepared.signingId,
-          headVersion.byteLength,
+          baseVersion.byteLength,
         );
         const now = Date.now();
         const expiresAt = now + this.signingTtlMs;
         const nextVersion = layer.currentVersion + 1;
         const expectedVersion: DocumentVersionRef = {
-          baseSha256: head.baseSha,
+          baseSha256: baseSha,
           editsVersion: nextVersion,
         };
         const answer: SignaturePrepared = {
@@ -3705,9 +3100,9 @@ export class LayerService {
                 docId: input.docId,
                 layerId: layer.id,
                 layerName: input.layerName,
-                expectedBaseSha: head.baseSha,
+                expectedBaseSha: baseSha,
                 expectedLayerVersion: nextVersion,
-                baseByteLength: headVersion.byteLength,
+                baseByteLength: baseVersion.byteLength,
                 tailKey: tail.key,
                 tailSha: tail.sha256,
                 tailSize: tail.size,
@@ -3875,21 +3270,18 @@ export class LayerService {
             }
             const finalized = finalizedPayload;
 
-            // 3. The new immutable version, uploaded before the fences: the key
-            //    is the content, so a losing attempt leaves only a harmless object.
-            const versionKey = StorageKeys.baseVersionPdf(
+            // 3. The new immutable version, uploaded before the fences under
+            //    the layer it belongs to: the key is the content, so a losing
+            //    attempt leaves only a harmless object, and it goes with the layer.
+            const versionKey = StorageKeys.layerVersionPdf(
               ctx.tenantId,
               input.docId,
+              input.layerName,
               finalized.version.sha256,
             );
             await this.uploadVersionObject(versionKey, candidatePath, finalized.version);
 
-            // 4. Publish: one transaction, two fences, one audit row.
-            const sessionRebindContext = await documentService.sessionRebindContext(
-              ctx,
-              input.docId,
-              input.layerName,
-            );
+            // 4. Commit: one transaction, the layer's fences, one audit row.
             let committed: { result: SignatureCompleteResult; auditId: number };
             try {
               committed = await this.commitSignature(ctx, {
@@ -3900,7 +3292,6 @@ export class LayerService {
                 finalized,
                 versionKey,
                 cms: input.cms,
-                sessionRebindContext,
               });
             } catch (err) {
               if (err instanceof AlreadyCompleted) {
@@ -3911,26 +3302,26 @@ export class LayerService {
                 (err instanceof EngineError && err.code === EngineErrorCode.SigningVersionMismatch)
               ) {
                 // A CMS signs the exact bytes its digest covers; those bytes
-                // are no longer publishable. End the signing so the layer is
-                // writable again; the client prepares anew.
+                // can't be the layer's version any more. End the signing so the
+                // layer is writable again; the client prepares anew.
                 await this.discardSigning(signing);
                 throw new EngineError(
                   EngineErrorCode.SigningVersionMismatch,
-                  'the document or layer moved since prepare; prepare again',
+                  'the layer moved since prepare; prepare again',
                 );
               }
               throw err;
             }
 
-            // 5. Sessions over the old base are garbage, here and everywhere;
-            //    the new version's protection is the signing's own.
+            // 5. The layer's session is over its old base: it reopens over the
+            //    new version at its next request, here and on every replica (its
+            //    version moved). The new version's protection is the signing's own.
             documentService.rememberProtection(
               committed.result.version.sha256,
               committed.result.protection,
             );
-            await documentService.onBaseVersionPublished(input.docId);
+            documentService.invalidateLayerSession(input.docId, input.layerName);
             this.publishMutation(ctx, input.docId, committed.auditId);
-            this.publishBaseChanged(ctx, input.docId);
             return committed.result;
           },
         );
@@ -3986,6 +3377,31 @@ export class LayerService {
         .catch(() => undefined);
     }
     return expired.length;
+  }
+
+  // ── deleting a layer ──────────────────────────────────────────────────────
+
+  /**
+   * Delete a layer and what it stored (see `deleteStoredLayer`), once this
+   * replica's writes queued on it have ended, and close its worker session
+   * here. Writes that arrive after it find the name deleted.
+   */
+  async deleteLayer(tenantId: string, input: { docId: string; layerName: string }): Promise<void> {
+    const { docId, layerName } = input;
+    const deps = {
+      db: this.requireDb(),
+      storage: this.requireStorage(),
+      documents: this.documents,
+    };
+    await this.queueOnLayer(`${tenantId}::${docId}::${layerName}`, async () => {
+      await deleteStoredLayer(deps, tenantId, input);
+      await this.requireDocumentService().forgetLayer(docId, layerName);
+    });
+  }
+
+  /** The sweep tick for object numbers: what layers nobody changed were handed goes, once long expired. */
+  async sweepObjectNumbers(): Promise<number> {
+    return this.objectNumbers ? this.objectNumbers.sweepUntouched() : 0;
   }
 
   /**
@@ -4235,9 +3651,9 @@ export class LayerService {
   }
 
   /**
-   * The publish transaction. Lock order for a transaction touching more
-   * than one row of a document (law 9d): the signing row, the document
-   * row, then layers in id order.
+   * The commit transaction: the signing row, then the layer. A signature
+   * moves only its layer's base; the document (`documents.base_sha`, the
+   * upload) and every other layer stay as they are.
    */
   private async commitSignature(
     ctx: LayerWriteContext,
@@ -4255,7 +3671,6 @@ export class LayerService {
       };
       versionKey: string;
       cms: Uint8Array;
-      sessionRebindContext: { binding: PasswordSessionBinding; unlockKey: string } | null;
     },
   ): Promise<{ result: SignatureCompleteResult; auditId: number }> {
     const signings = this.requireSignings();
@@ -4297,28 +3712,9 @@ export class LayerService {
           );
         }
 
-        // (2) Fence two: the head did not move since prepare. Its docVersion
-        //     advances so every doc-level pinned family re-resolves.
-        const moved = await trx
-          .updateTable('documents')
-          .set({
-            base_sha: finalized.version.sha256,
-            storage_size_bytes: finalized.version.byteLength,
-            doc_version: sql`doc_version + 1`,
-            updated_at: now,
-          })
-          .where('id', '=', input.docId)
-          .where('base_sha', '=', signing.expectedBaseSha)
-          .executeTakeFirst();
-        if (Number(moved?.numUpdatedRows ?? 0) !== 1) {
-          throw new EngineError(
-            EngineErrorCode.SigningVersionMismatch,
-            'the document head moved since prepare',
-          );
-        }
-
-        // (3) Fence one: the layer is exactly what the candidate consumed.
-        //     It becomes an empty workspace over the new version.
+        // (2) The fence: the layer is exactly what the candidate consumed (its
+        //     base moves only with its own versions). It becomes an empty
+        //     workspace over the new version.
         const currentLayer = await trx
           .selectFrom('layers')
           .select(['current_version', 'doc_version'])
@@ -4348,13 +3744,17 @@ export class LayerService {
         );
         // The new version numbers its objects anew: every number handed out
         // on the layer is dropped, and new ones start past the version's.
-        await this.objectNumbers?.publish(trx, layer.id, finalized.lastObjectNumber);
+        await this.objectNumbers?.publish(
+          trx,
+          { docId: layer.docId, layerName: layer.name },
+          finalized.version.sha256,
+          finalized.lastObjectNumber,
+        );
 
-        // (4) The version row, numbered after the fenced parent; carries
-        //     the layer's plane pointers (law 9). A document committed
-        //     before the catalog existed has no row for its upload: this
-        //     first publish materializes version 1 for it (the fence above
-        //     proved the sha is the head).
+        // (3) The version row, the layer's own, numbered after its parent (the
+        //     layer's base); carries the layer's plane pointers (law 9). A
+        //     document committed before the catalog existed has no row for its
+        //     upload: the first signature over it materializes version 1.
         let parent = await this.layerState.repos.baseVersions.find(
           input.docId,
           signing.expectedBaseSha,
@@ -4380,6 +3780,7 @@ export class LayerService {
         await this.layerState.repos.baseVersions.insertPublished(trx, {
           tenantId: ctx.tenantId,
           docId: input.docId,
+          layerId: layer.id,
           sha256: finalized.version.sha256,
           byteLength: finalized.version.byteLength,
           parent,
@@ -4396,42 +3797,15 @@ export class LayerService {
           createdAt: now,
         });
 
-        // (5) Promote the whole layer into the base catalog; every sibling's
-        //     manifest body changes too (scopes flip), so their docVersion
-        //     advances — in id order.
-        const promoted = await this.layerState.promoteLayerToBase(trx, {
+        // (4) The layer's pages over its new version.
+        const signedPages = await this.layerState.signLayerPages(trx, {
           docId: input.docId,
           layerId: layer.id,
           signedPage: widgetPage,
           now,
         });
-        const siblings = await trx
-          .selectFrom('layers')
-          .select('id')
-          .where('doc_id', '=', input.docId)
-          .where('id', '!=', layer.id)
-          .orderBy('id')
-          .execute();
-        for (const sibling of siblings) {
-          await trx
-            .updateTable('layers')
-            .set({ doc_version: sql`doc_version + 1`, updated_at: now })
-            .where('id', '=', sibling.id)
-            .execute();
-        }
 
-        // (6) The completer's password session follows the version.
-        if (input.sessionRebindContext && this.passwordSessions) {
-          await this.passwordSessions.rebind(
-            trx,
-            input.sessionRebindContext.binding,
-            { ...input.sessionRebindContext.binding, baseSha: finalized.version.sha256 },
-            input.sessionRebindContext.unlockKey,
-            now,
-          );
-        }
-
-        // (7) The response, complete before it is audited.
+        // (5) The response, complete before it is audited.
         const result: SignatureCompleteResult = {
           status: 'completed',
           signature: finalized.signature,
@@ -4442,8 +3816,8 @@ export class LayerService {
           },
           protection: finalized.protection,
           meta: {
-            affectedPages: promoted.map((page) => toPageRef(page.pageObjectNumber)),
-            // No delta: a publish changes more of the manifest than a delta
+            affectedPages: signedPages.map((page) => toPageRef(page.pageObjectNumber)),
+            // No delta: a new base changes more of the manifest than a delta
             // carries; the client refreshes its manifest on completion.
             cacheDelta: null,
             // Signing is final: it ends undo for every write before it.
@@ -4484,12 +3858,6 @@ export class LayerService {
         });
         return { result, auditId };
       });
-  }
-
-  private publishBaseChanged(ctx: LayerWriteContext, docId: string): void {
-    void this.realtime
-      ?.publishBaseChanged({ tenantId: ctx.tenantId, docId })
-      .catch(() => undefined);
   }
 
   private requireSignings(): DocumentSigningsRepo {
@@ -4626,102 +3994,33 @@ export class LayerService {
     return key;
   }
 
-  private async persistAttachmentMutation<
-    R extends AttachmentCreateResult | AttachmentDeleteResult,
-  >(
-    ctx: LayerWriteContext,
-    docId: string,
-    layerName: string,
-    layer: LayerRow,
-    input: {
-      kind: 'attachment.create' | 'attachment.delete';
-      result: R;
-      artifact: LayerArtifactInput;
-    },
-  ): Promise<R> {
-    const nextVersion = layer.currentVersion + 1;
-    const artifactKey = this.nextArtifactKey(ctx, docId, layerName, nextVersion);
-    const uploaded = await this.uploadLayerArtifact(artifactKey, input.artifact);
-    const committed = await this.requireDb()
-      .transaction()
-      .execute(async (trx) => {
-        const now = Date.now();
-        const currentLayer = await trx
-          .selectFrom('layers')
-          .select(['current_version', 'doc_version', 'attachments_version'])
-          .where('id', '=', layer.id)
-          .executeTakeFirst();
-        if (!currentLayer) {
-          throw new EngineError(EngineErrorCode.NotFound, `layer not found: ${layer.id}`);
-        }
-        // No SELECT-check here — the fence is writeLayerAdvance's guarded
-        // UPDATE (atomic with the write; see guardedVersionBump).
-
-        // Attachment writes touch only the catalog's name tree — no page
-        // rows, no per-page versions. Advance the layer doc version plus
-        // the dedicated attachments pin (the metadata_version design).
-        const previousDocVersion = Number(currentLayer.doc_version);
-        const docVersion = previousDocVersion + 1;
-        const attachmentsVersion = Number(currentLayer.attachments_version) + 1;
-
-        // The finalized result — audited and returned identically: what we
-        // tell the caller is what we tell history (and remote subscribers).
-        const result = {
-          ...input.result,
-          meta: {
-            ...input.result.meta,
-            ...planeMeta(input.result.meta, { previousDocVersion, docVersion, attachmentsVersion }),
-          },
-        } as R;
-
-        const auditEvent = makeAuditEvent({
-          ctx,
-          docId,
-          layer,
-          layerName,
-          kind: input.kind,
-          pageObjectNumber: null,
-          affectedPages: [],
-          artifactVersion: nextVersion,
-          artifactKey,
-          artifactSha: uploaded.sha256,
-          artifactSize: uploaded.size,
-          payload: result,
-          ts: now,
-        });
-        const auditId = (await this.eventLog?.appendDb(trx, auditEvent)) ?? 0;
-
-        await this.writeLayerAdvance(
-          trx,
-          {
-            layer,
-            nextVersion,
-            artifactKey,
-            artifactSha: uploaded.sha256,
-            artifactSize: uploaded.size,
-          },
-          { doc_version: docVersion, attachments_version: attachmentsVersion },
-          auditId,
-          now,
-        );
-
-        return { result, auditId };
-      });
-    this.finishLayerCommit(ctx, docId, layerName, nextVersion, artifactKey, committed.auditId);
-    return committed.result;
-  }
-
   private enqueueLayerWrite<T>(
     ctx: LayerWriteContext,
     docId: string,
     layerName: string,
     op: () => Promise<T>,
   ): Promise<T> {
-    const key = layerWriteKey(ctx, docId, layerName);
+    // A grant visitor answers the link's questions before their first
+    // change: decided from the token alone, before anything runs.
+    const pending = ctx.jwt?.claims.identity_pending;
+    if (pending) {
+      return Promise.reject(
+        new EngineError(
+          EngineErrorCode.VisitorIdentityRequired,
+          "answer the grant's questions before making changes",
+          { details: { ...pending } },
+        ),
+      );
+    }
+    return this.queueOnLayer(layerWriteKey(ctx, docId, layerName), () =>
+      this.runWithRebase(ctx, docId, layerName, op),
+    );
+  }
+
+  /** Run `op` once every operation queued before it on the layer, on this replica, has ended. */
+  private queueOnLayer<T>(key: string, op: () => Promise<T>): Promise<T> {
     const previous = this.layerWriteQueues.get(key) ?? Promise.resolve();
-    const operation = previous
-      .catch(() => undefined)
-      .then(() => this.runWithRebase(ctx, docId, layerName, op));
+    const operation = previous.catch(() => undefined).then(op);
 
     const queueEntry = operation
       .catch(() => undefined)

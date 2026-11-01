@@ -4,7 +4,7 @@ import { watch } from 'vue';
 import { useDocument, useDocuments } from '@embedpdf/vue/runtime';
 import type { OpenSource } from '@embedpdf/vue/runtime';
 
-const props = defineProps<{ role: string; ebook: OpenSource }>();
+const props = defineProps<{ role: string; welcome: OpenSource }>();
 
 const documents = useDocuments();
 const { id } = useDocument();
@@ -13,7 +13,7 @@ let opened = props.role;
 watch([() => props.role, id], ([role, current]) => {
   if (role === opened || !current) return;
   opened = role;
-  void documents.close(current).then(() => documents.open(props.ebook, { name: 'ebook.pdf' }));
+  void documents.close(current).then(() => documents.open(props.welcome, { name: 'welcome.pdf' }));
 });
 </script>
 

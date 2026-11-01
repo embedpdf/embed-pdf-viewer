@@ -18,10 +18,10 @@
     formPlugin({ fields: { border: '#ea580c' } }),
   ];
 
-  const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+  const forms: OpenInput = { kind: 'grant', grant: 'shr_eBRW5E3MpolzD8G36Alp30EF' };
 </script>
 
-<Viewer {engine} {plugins} initialDocuments={[{ source: ebook }]}>
+<Viewer {engine} {plugins} initialDocuments={[{ source: forms }]}>
   <DocumentGate>
     {#snippet fallback()}
       <p class="loading">Loading…</p>

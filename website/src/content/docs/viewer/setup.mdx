@@ -60,6 +60,7 @@ Everything the viewer can do is one config object. In a framework, every key is 
 | :-- | :-- | :-- |
 | `src` | One document: a URL, a `File`, or bytes | [Documents](documents) |
 | `documents` | Several documents, shown as tabs | [Documents](documents#several-documents) |
+| `fetch` | Your own `fetch` for documents at a URL, to add headers or cookies | [Documents](documents#files-that-need-a-sign-in) |
 | `layout` | Where every toolbar, button, menu and panel goes | [Layout](customize/layout) |
 | `commands` | Your own actions | [Buttons & commands](customize/commands) |
 | `icons` | Your own icons | [Buttons & commands](customize/commands#icons) |
@@ -84,7 +85,7 @@ Everything the viewer can do is one config object. In a framework, every key is 
 
 | Key | What it is | Page |
 | :-- | :-- | :-- |
-| `src` | One document: `{ token }`, `{ id }` or `{ shareToken }` | [Documents](documents) |
+| `src` | One document: `{ token }`, `{ id }` or `{ grant }` | [Documents](documents) |
 | `documents` | Several documents, shown as tabs | [Documents](documents#several-documents) |
 | `layout` | Where every toolbar, button, menu and panel goes | [Layout](customize/layout) |
 | `commands` | Your own actions | [Buttons & commands](customize/commands) |
@@ -161,9 +162,16 @@ carries.
 
 Five keys follow their prop while the viewer runs: `src` opens the new document in place of the
 old one; `theme` and `locale` switch the look and the language; `disable` and `readOnly` take tools
-away or bring them back. Any plugin's settings change
-through the `viewer` (see [The viewer in code](code/viewer)). Everything else is read once, when the
-viewer starts. To change it, mount a new viewer:
+away or bring them back.
+
+<Engine local>
+
+`fetch` follows its prop too: the next document at a URL downloads with the new one.
+
+</Engine>
+
+Any plugin's settings change through the `viewer` (see [The viewer in code](code/viewer)).
+Everything else is read once, when the viewer starts. To change it, mount a new viewer:
 
 <Snippet name="viewer/setup/remount" />
 

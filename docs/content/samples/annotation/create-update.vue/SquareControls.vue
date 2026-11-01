@@ -1,14 +1,15 @@
 <!-- Create a rectangle, then change, move and delete it, all from code. -->
 <script setup lang="ts">
-import { computed, shallowRef, watch } from 'vue';
+import { computed, shallowRef } from 'vue';
 import { usePageList } from '@embedpdf/vue/runtime';
-import { useAnnotation, useAnnotationList, useAnnotationState } from '@embedpdf/vue/annotation';
+import { useStage } from '@embedpdf/vue/stage';
+import { useAnnotation, useAnnotationList } from '@embedpdf/vue/annotation';
 import type { AnnotationRef } from '@embedpdf/vue/annotation';
 
 const annotation = useAnnotation();
-const ready = useAnnotationState((state) => state.status === 'ready');
+const stage = useStage();
 const pages = usePageList();
-const cover = computed(() => pages.value[0]?.ref);
+const page = computed(() => pages.value[1]?.ref); // page 2, which has room at the bottom
 const squareRef = shallowRef<AnnotationRef | null>(null);
 const annotations = useAnnotationList(); // follows the annotations as they change, for the reads below
 
@@ -24,27 +25,16 @@ const status = computed(() => {
 });
 
 async function add() {
-  if (!cover.value) return;
-  const { annotation: made } = await annotation.create(cover.value, {
+  if (!page.value) return;
+  const { annotation: made } = await annotation.create(page.value, {
     subtype: 'square',
     box: { x: 72, y: 592, width: 200, height: 100 },
     color: '#0078ff',
     strokeWidth: 3,
   });
   squareRef.value = made.ref;
+  stage.reveal(page.value, { rect: made.rect });
 }
-
-// On load: one rectangle, to change.
-let started = false;
-watch(
-  ready,
-  (isReady) => {
-    if (!isReady || started) return;
-    started = true;
-    void add();
-  },
-  { immediate: true },
-);
 
 function makeRed() {
   if (square.value) void annotation.update(square.value.ref, { color: '#dc143c' });

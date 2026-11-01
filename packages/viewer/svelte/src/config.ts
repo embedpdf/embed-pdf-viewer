@@ -11,6 +11,7 @@ const LIVE_KEYS: Readonly<Record<LiveConfigKey, true>> = {
   locale: true,
   disable: true,
   readOnly: true,
+  fetch: true,
 };
 
 /** The live keys of `config`, as the element's properties of the same names take them. */
@@ -21,6 +22,7 @@ export function liveConfigOf(config: Partial<Record<LiveConfigKey, unknown>>) {
     locale: config.locale,
     disable: config.disable,
     readOnly: config.readOnly,
+    fetch: config.fetch,
   };
 }
 

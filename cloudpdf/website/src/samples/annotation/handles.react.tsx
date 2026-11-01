@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { Viewer, DocumentGate, usePageList } from '@embedpdf/react/runtime';
+import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
-import { Stage, stagePlugin } from '@embedpdf/react/stage';
+import { Stage, stagePlugin, useStage } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
 import { interactionPlugin } from '@embedpdf/react/interaction';
 import {
@@ -21,30 +21,23 @@ import './handles.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const layout: OpenInput = { kind: 'grant', grant: 'shr_d2E_LaTuddJbZR00d1CvkqLM' };
 
-// On load: a rectangle on the cover, selected so its handles show.
-function AddRectangle() {
+// On load: the document's square, selected, on its page.
+function SelectSquare() {
   const annotation = useAnnotation();
+  const stage = useStage();
   const ready = useAnnotationState((state) => state.status === 'ready');
-  const cover = usePageList()[0]?.ref;
-  const added = useRef(false);
+  const done = useRef(false);
 
   useEffect(() => {
-    if (!ready || !cover || added.current) return;
-    added.current = true;
-    void annotation.create(
-      cover,
-      {
-        subtype: 'square',
-        box: { x: 96, y: 506, width: 178, height: 54 },
-        color: '#1a2748',
-        strokeWidth: 2,
-      },
-      undefined,
-      { select: true },
-    );
-  }, [annotation, ready, cover]);
+    if (!ready || done.current) return;
+    done.current = true;
+    const square = annotation.list().find((each) => each.nm === 'square');
+    if (!square) return;
+    annotation.selection.set([square.ref]);
+    stage.reveal(square.page, { rect: square.rect });
+  }, [annotation, stage, ready]);
 
   return null;
 }
@@ -137,9 +130,9 @@ export default function App() {
   const [own, setOwn] = useState(false);
 
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: layout }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
-        <AddRectangle />
+        <SelectSquare />
         <ChromeControls own={own} onOwn={setOwn} />
         <Stage className="stage">
           {() => (

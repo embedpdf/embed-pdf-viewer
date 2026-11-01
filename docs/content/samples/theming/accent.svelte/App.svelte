@@ -14,10 +14,10 @@
 
   const SWATCHES = ['#3858e9', '#e91e63', '#0f6e56', '#c2410c'];
 
-  // [!doc-source ebook]
-  const ebook = async (): Promise<OpenInput> => {
-    const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-    return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+  // [!doc-source welcome]
+  const welcome = async (): Promise<OpenInput> => {
+    const response = await fetch('/pdfs/welcome.pdf');
+    return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
   };
   // [!/doc-source]
 </script>
@@ -44,7 +44,7 @@
     {/each}
     <code class="value">--epdf-accent: {accent}</code>
   </div>
-  <Viewer {engine} {plugins} initialDocuments={[{ source: ebook }]}>
+  <Viewer {engine} {plugins} initialDocuments={[{ source: welcome }]}>
     <DocumentGate>
       {#snippet fallback()}
         <p class="loading">Loading…</p>

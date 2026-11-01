@@ -3,20 +3,26 @@ import { DocumentGate, Viewer } from '@embedpdf/vue/runtime';
 import type { OpenInput } from '@embedpdf/vue/runtime';
 import { Stage, stagePlugin } from '@embedpdf/vue/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/vue/render';
+import { SelectionLayer, selectionPlugin } from '@embedpdf/vue/selection';
 import { interactionPlugin } from '@embedpdf/vue/interaction';
 import { AnnotationLayer, annotationPlugin } from '@embedpdf/vue/annotation';
 import { localEngine } from '@embedpdf/engine';
-import AddAnnotations from './AddAnnotations.vue';
 import HoverCard from './HoverCard.vue';
 
 import '../hover-card.css';
 
 const engine = localEngine();
-const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
+const plugins = [
+  stagePlugin(),
+  renderPlugin(),
+  interactionPlugin(),
+  selectionPlugin(),
+  annotationPlugin(),
+];
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const proposal = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/proposal.pdf');
+  return { kind: 'bytes', id: 'proposal', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 </script>
 
@@ -25,15 +31,15 @@ const ebook = async (): Promise<OpenInput> => {
     :engine="engine"
     :plugins="plugins"
     :identity="{ userId: 'u_381', displayName: 'Dana Smith' }"
-    :initial-documents="[{ source: ebook }]"
+    :initial-documents="[{ source: proposal }]"
   >
     <DocumentGate>
       <template #fallback><p class="loading">Loading…</p></template>
-      <AddAnnotations />
-      <p class="hint">Point at a note or the green rectangle</p>
+      <p class="hint">Point at a note or a marked sentence</p>
       <Stage class="stage">
         <template #page>
           <RenderLayer />
+          <SelectionLayer />
           <AnnotationLayer />
         </template>
         <template #overlay><HoverCard /></template>

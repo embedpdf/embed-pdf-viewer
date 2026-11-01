@@ -21,7 +21,7 @@ const plugins = [
   }),
 ];
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const links: OpenInput = { kind: 'grant', grant: 'shr_xs-9Y5qwuYrJ2BKtWzuo_2xy' };
 
 // A JavaScript action, as a PDF carries it behind a button or a link.
 const script = (code: string): PdfActionTree => ({
@@ -99,7 +99,7 @@ function ScriptConsole() {
 
 export default function App() {
   return (
-    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: links }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
         <ScriptConsole />
       </DocumentGate>

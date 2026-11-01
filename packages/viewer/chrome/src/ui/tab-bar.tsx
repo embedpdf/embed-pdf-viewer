@@ -78,7 +78,10 @@ export function TabBar({
               {document.status === 'locked' && (
                 <Icon name="lock" size={13} className="text-fg-muted flex-shrink-0" />
               )}
-              {document.status === 'error' && (
+              {document.status === 'error' && document.grantRequest && (
+                <Icon name="lock" size={13} className="text-fg-muted flex-shrink-0" />
+              )}
+              {document.status === 'error' && !document.grantRequest && (
                 <span
                   className="flex flex-shrink-0"
                   role="img"

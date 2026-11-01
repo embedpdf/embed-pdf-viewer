@@ -57,10 +57,16 @@ import type {
   FontResolveRequest,
   FontRestriction,
   FontSource,
+  GrantOpenRequest,
+  VisitorAnswers,
+  VisitorIdentityRequest,
 } from '@embedpdf/engine-core/runtime';
 
 // re-export the engine contracts so consumers import them from @embedpdf/core
 export type {
+  GrantOpenRequest,
+  VisitorAnswers,
+  VisitorIdentityRequest,
   DocumentHandle,
   Engine,
   EngineFactory,
@@ -242,6 +248,16 @@ export interface DocumentMeta {
    * as it's made.
    */
   readonly hasUnsavedChanges: boolean;
+  /**
+   * A change waits for the visitor's answers to what the grant asks before the first
+   * change: answer with `documents.identify()`, or `declineIdentity()`.
+   */
+  readonly identityRequest?: VisitorIdentityRequest;
+  /**
+   * The grant asks before the document goes on (a passphrase, or questions on open, it got
+   * after the document opened): give it with `documents.retry()`.
+   */
+  readonly grantRequest?: GrantOpenRequest;
 }
 
 /**
@@ -260,6 +276,8 @@ export interface PendingMeta {
   readonly passwordProvided?: boolean;
   /** `error` only: what the open rejected with. Never carries a password. */
   readonly error?: unknown;
+  /** `error` only: the grant's passphrase or questions the open waits for. */
+  readonly grantRequest?: GrantOpenRequest;
 }
 
 /** The document registry — what document scope is built on. */
@@ -585,6 +603,16 @@ export interface DocumentInfo {
   readonly passwordProvided?: boolean;
   /** `error` only: why it couldn't be opened, in the plugin error vocabulary. */
   readonly error?: PluginErrorInfo;
+  /**
+   * The grant's passphrase or questions the document waits for (`retry` with them): `error`,
+   * before it opens; `ready`, when the grant got them after it opened.
+   */
+  readonly grantRequest?: GrantOpenRequest;
+  /**
+   * `ready` only: a change waits for the visitor's answers to what the grant asks before
+   * the first change. Show the questions, then `identify()` or `declineIdentity()`.
+   */
+  readonly identityRequest?: VisitorIdentityRequest;
 }
 
 /** A document waiting for its password. */
@@ -599,11 +627,30 @@ export interface FailedDocumentInfo extends DocumentInfo {
   readonly error: PluginErrorInfo;
 }
 
-/** A file the viewer downloads itself, with the document's cancel signal: relative to the page, or absolute. */
+/**
+ * A file the viewer downloads itself, with its `fetch` (`createKernel({ fetch })`) and the
+ * document's cancel signal: relative to the page, or absolute.
+ */
 export interface UrlSource {
   readonly kind: 'url';
   readonly url: string;
+  /** A stable id of your own for the document, as `{ kind: 'bytes' }` takes one. Generated when omitted. */
+  readonly id?: string;
 }
+
+/**
+ * How the viewer downloads a URL: `fetch`'s own shape, so the browser's `fetch` is one. `init`
+ * carries the document's cancel `signal`, to pass on. Yours adds headers or cookies, or answers
+ * from somewhere else (`new Response(blob)`).
+ */
+export type HostFetch = (
+  url: string,
+  init: { readonly signal: AbortSignal },
+) => Promise<{
+  readonly ok: boolean;
+  readonly status: number;
+  arrayBuffer(): Promise<ArrayBuffer>;
+}>;
 
 /** Options for opening a document: the tab (`name`, `activate`), the engine's `OpenOptions`, and a `signal`. */
 export type OpenDocumentOptions = OpenOptions & {
@@ -634,6 +681,17 @@ export interface OpenDocumentResult {
 /** Options for `unlock()`: the password, and a `signal` that stops trying it. */
 export interface UnlockOptions extends OperationOptions {
   readonly password: string;
+}
+
+/** Options for `retry()`: what a document from a grant waited for (`grantRequest`). */
+export interface RetryOptions extends OperationOptions {
+  /** The grant's passphrase. */
+  readonly passphrase?: string;
+  /**
+   * The visitor's answers to what the grant asks, added to who the page said the user is
+   * (`identity`); ones given before stay.
+   */
+  readonly identity?: VisitorAnswers;
 }
 
 /** Options for `download()`. */
@@ -818,10 +876,23 @@ export interface DocumentsCapability {
   canOpenFiles(): boolean;
   /**
    * Open a failed document (`status: 'error'`) again, with the same source and options, in its
-   * own tab: it keeps its id and its place, and the active document stays the active one.
-   * Resolves like `open()`. Rejects `invalid-input` for a document that didn't fail.
+   * own tab: it keeps its id and its place, and the active document stays the active one. A
+   * document from a grant that waited for its passphrase or the visitor's answers
+   * (`grantRequest`) opens with `passphrase` or `identity`; a ready one the grant asks again
+   * (`grantRequest`) goes on with them, as the same visitor. Resolves like `open()`. Rejects
+   * `invalid-input` for a document that didn't fail and isn't asked, or answers for one not from
+   * a grant; `permission-denied` while the grant still asks, and `grantRequest` says what.
    */
-  retry(id: string, options?: OperationOptions): Promise<OpenDocumentResult>;
+  retry(id: string, options?: RetryOptions): Promise<OpenDocumentResult>;
+  /**
+   * Answer what the document's grant asks before the first change (`identityRequest`):
+   * the changes waiting go out. An answer once given stays. Rejects `permission-denied` while
+   * something required is missing or an answer can't be taken (its details say which), and the
+   * changes keep waiting.
+   */
+  identify(id: string, answers: VisitorAnswers): Promise<void>;
+  /** Not now: the changes waiting for the visitor's answers fail, and the next change asks again. */
+  declineIdentity(id: string): void;
   /** Change the name its tab shows; the file doesn't change. */
   rename(id: string, name: string): void;
   /**

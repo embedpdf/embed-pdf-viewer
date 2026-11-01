@@ -8,13 +8,13 @@
  * `footer`, `tabs`, `empty`); the viewer's own components among them
  * (`<epdf-button>`, `<epdf-menu>`) are drawn by the viewer (./components).
  *
- * Five keys follow their value while the viewer runs, from `.config`, their
- * own properties (`.src`, `.theme`, `.locale`, `.disable`, `.readOnly`) or the
- * attributes: `src` opens the new document in place of the old one, `theme`
- * swaps the token sheet and the mode, and `locale`, `disable` and `readOnly`
- * reach their plugins. Changing any other key re-creates the viewer from
- * scratch — documents and all — which is the honest semantic for a
- * workspace-owning embed.
+ * Six keys follow their value while the viewer runs, from `.config`, their
+ * own properties (`.src`, `.theme`, `.locale`, `.disable`, `.readOnly`,
+ * `.fetch`) or the attributes: `src` opens the new document in place of the
+ * old one, `theme` swaps the token sheet and the mode, `locale`, `disable` and
+ * `readOnly` reach their plugins, and the next download uses the new `fetch`.
+ * Changing any other key re-creates the viewer from scratch — documents and
+ * all — which is the honest semantic for a workspace-owning embed.
  */
 import { createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -27,6 +27,7 @@ import {
   type Viewer,
   type ViewerPluginsConfig,
 } from '@embedpdf/viewer-chrome';
+import type { HostFetch } from '@embedpdf/core';
 import type { Engine, EngineFactory } from '@embedpdf/engine-core/runtime';
 import {
   changedConfigKeys,
@@ -163,7 +164,7 @@ const ElementBase: typeof HTMLElement =
   typeof HTMLElement === 'undefined' ? (class {} as unknown as typeof HTMLElement) : HTMLElement;
 
 /** The properties a framework may set before the element is defined (see `connectedCallback`). */
-const PROPERTIES = ['config', 'src', 'theme', 'locale', 'disable', 'readOnly'] as const;
+const PROPERTIES = ['config', 'src', 'theme', 'locale', 'disable', 'readOnly', 'fetch'] as const;
 
 /**
  * What a framework wrapper puts on the element it renders: it sets `.config` itself, so the
@@ -208,10 +209,19 @@ export class EmbedPdfViewerElement extends ElementBase {
   #srcDocument: SrcDocument | null = null;
   /** The ids of `src` documents still closing, which a new one must not take. */
   #closing = new Set<string>();
+  /**
+   * How the viewer downloads a URL: the shown config's `fetch`, read at each download, so a new
+   * one needs no new viewer.
+   */
+  #fetch: HostFetch = (url, init) => {
+    // A plain call: the browser's own `fetch` refuses any other `this`.
+    const download = this.#shown?.fetch ?? globalThis.fetch;
+    return download(url, init);
+  };
 
   /**
    * The config, over the declarative attributes. Set on a running viewer, the
-   * five live keys change in place and any other change builds a new viewer.
+   * live keys change in place and any other change builds a new viewer.
    */
   set config(config: ElementConfig) {
     this.#config = config;
@@ -262,6 +272,14 @@ export class EmbedPdfViewerElement extends ElementBase {
   }
   get readOnly(): ElementConfig['readOnly'] {
     return this.config.readOnly;
+  }
+
+  /** How a document at a URL downloads: your own `fetch`. The next download uses a new one. */
+  set fetch(fetch: ElementConfig['fetch']) {
+    this.#change({ fetch });
+  }
+  get fetch(): ElementConfig['fetch'] {
+    return this.config.fetch;
   }
 
   /**
@@ -323,7 +341,8 @@ export class EmbedPdfViewerElement extends ElementBase {
     }
     this.#shown = next;
     if (changed.includes('theme')) this.#adoptSheets(next.theme);
-    if (changed.some((key) => key !== 'src')) {
+    // `src` opens below, and `#fetch` reads the new `fetch` at the next download.
+    if (changed.some((key) => key !== 'src' && key !== 'fetch')) {
       const { theme, locale, disable, readOnly } = next;
       this.#props = { ...this.#props!, theme, locale, disable, readOnly };
       this.#root.render(createElement(FullViewer, this.#props));
@@ -446,7 +465,14 @@ export class EmbedPdfViewerElement extends ElementBase {
 
     const config = this.config;
     warnInvalidConfig(config);
-    const { src: _src, documents, engine: _engine, theme, ...customization } = config;
+    const {
+      src: _src,
+      documents,
+      engine: _engine,
+      theme,
+      fetch: _fetch,
+      ...customization
+    } = config;
     this.#adoptSheets(theme);
     this.#shown = config;
     const { engine, sourceOf = (src) => src, plugins } = engineOf(config);
@@ -454,6 +480,7 @@ export class EmbedPdfViewerElement extends ElementBase {
     this.#props = {
       engine,
       initialDocuments: documents && initialDocumentsOf(documents, sourceOf),
+      fetch: this.#fetch,
       theme,
       themeTarget: this.#wrapper,
       // The viewer's own components among the children (`<epdf-button>`, `<epdf-menu>`).

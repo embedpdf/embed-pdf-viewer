@@ -16,10 +16,10 @@ import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { EpdfPageEdit, withPageEdit } from '@embedpdf/angular/page-edit';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
+const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
 /** Another PDF's bytes, to insert pages from. */
-const otherPdf = async () => (await fetch('https://snippet.embedpdf.com/ebook.pdf')).arrayBuffer();
+const otherPdf = async () => (await fetch('/pdfs/welcome.pdf')).arrayBuffer();
 
 // Inserts next to the page you're on, then goes to the first new page.
 @Component({
@@ -87,7 +87,7 @@ export class InsertToolbar {
   }
 
   protected async insertBlankAfter(page: PageRef) {
-    this.show(await this.pageEdit.insertBlank({ placement: { after: page } }));
+    this.show(await this.pageEdit.insertBlank({ position: { after: page } }));
   }
 
   protected async duplicate(page: PageRef) {
@@ -98,7 +98,7 @@ export class InsertToolbar {
     this.show(
       await this.pageEdit.insertFromBytes(await otherPdf(), {
         pageIndexes: [0, 2],
-        placement: { after: page },
+        position: { after: page },
       }),
     );
   }
@@ -115,7 +115,7 @@ export class InsertToolbar {
   imports: [EpdfDocumentGate, EpdfStage, EpdfPageTemplate, EpdfRenderLayer, InsertToolbar],
   providers: [
     provideEmbedPdf(
-      { engine: () => cloudEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => cloudEngine(), initialDocuments: [{ source: welcome }] },
       withStage(),
       withRender(),
       withPageEdit(),

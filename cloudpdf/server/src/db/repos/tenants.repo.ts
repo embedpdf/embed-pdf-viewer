@@ -8,7 +8,7 @@ export interface TenantRow {
   config: Record<string, unknown> | null;
   /** True when the namespace materialized on first use rather than via explicit create. */
   autoProvisioned: boolean;
-  /** `suspended` fails the namespace closed for every JWT and share exchange. */
+  /** `suspended` fails the namespace closed for every JWT and grant exchange. */
   status: TenantStatus;
   suspendedAt: number | null;
   createdAt: number;
@@ -138,7 +138,7 @@ export class TenantsRepo {
     // Grants reference both tenants and documents — they go before
     // documents. Usage facts are ours to drop with the namespace; the
     // security-events trail deliberately survives (no FK, by design).
-    await this.db.deleteFrom('share_grants').where('tenant_id', '=', tenantId).execute();
+    await this.db.deleteFrom('grants').where('tenant_id', '=', tenantId).execute();
     await this.db.deleteFrom('tenant_usage_counter').where('tenant_id', '=', tenantId).execute();
 
     await this.db
@@ -162,7 +162,9 @@ export class TenantsRepo {
       .where('tenant_id', '=', tenantId)
       .execute();
     await this.db.deleteFrom('revoked_jtis').where('tenant_id', '=', tenantId).execute();
+    await this.db.deleteFrom('upload_token_uses').where('tenant_id', '=', tenantId).execute();
     await this.db.deleteFrom('documents').where('tenant_id', '=', tenantId).execute();
+    await this.db.deleteFrom('folders').where('tenant_id', '=', tenantId).execute();
     await this.db.deleteFrom('tenants').where('id', '=', tenantId).execute();
 
     return existing !== null;

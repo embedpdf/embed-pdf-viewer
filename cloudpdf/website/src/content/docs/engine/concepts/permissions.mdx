@@ -61,11 +61,13 @@ To list what the user was given (for a "you can…" panel), read `doc.security.s
 | :----------------------- | :--------------------------------------------------------------------------------------------------------- |
 | `doc.open`               | Open the document and list its pages.                                                                      |
 | `doc.render`             | Render pages as images.                                                                                    |
+| `doc.render.thumbnail`   | Render [thumbnails](/docs/engine/documents/rendering#thumbnails): small pictures of whole pages.           |
 | `doc.text.select`        | Where text is: selecting it and the text layout.                                                           |
 | `doc.text.search`        | Search, with where each match is.                                                                          |
 | `doc.text.copy`          | The text itself: reading it, copying it, search snippets.                                                  |
 | `doc.download`           | Download the file, attached files and stamp drawings, signed revisions; export annotations; extract pages. |
-| `doc.print`              | Print, in the viewer.                                                                                      |
+| `doc.print`              | Print, in the viewer: pictures of the pages at 150 DPI.                                                    |
+| `doc.print.high`         | Print at full quality: 300 DPI.                                                                            |
 | `doc.pages.assemble`     | Rotate, move, delete, insert and name pages.                                                               |
 | `doc.pages.modify`       | Change page content: flatten, redact (with the permissions below).                                         |
 | `doc.annotate.read`      | See annotations.                                                                                           |
@@ -85,15 +87,34 @@ To list what the user was given (for a "you can…" panel), read `doc.security.s
 | `pdf.permissions`        | What the PDF file itself allows (its permission flags); see [below](#the-pdfs-own-restrictions).           |
 | `*`                      | Everything.                                                                                                |
 
-Some permissions include others: `doc.annotate.modify` includes `doc.annotate.read`,
-`doc.forms.fill` includes `doc.forms.read`, and `doc.forms.modify` includes `doc.forms.fill` and
-`doc.forms.read`. Each page of these docs says which permission its calls
-need.
+Some permissions include others: `doc.render` includes `doc.render.thumbnail`,
+`doc.annotate.modify` includes `doc.annotate.read`, `doc.forms.fill` includes `doc.forms.read`,
+and `doc.forms.modify` includes `doc.forms.fill` and `doc.forms.read`. Each page of these docs says
+which permission its calls need.
+
+Each kind of page picture needs its own permission and no other: `doc.render` for pictures on
+screen, `doc.render.thumbnail` for thumbnails, `doc.print` for printing. So a scope can allow
+thumbnails, or printing, without `doc.render`. What a picture draws besides the page needs the
+permission to read it, whatever the picture: annotations need `doc.annotate.read`, form fields
+`doc.forms.read`.
 
 `doc.annotate.import`, `doc.forms.import` and `doc.forms.script` come only from a scope that names
 them (or `*`): no other permission, and not `pdf.permissions`, includes them. `doc.forms.script`
 is about writing code into the form, never running it. Scripts run in each viewer, for everyone
 who fills the form in, so putting one in is a separate decision from designing fields.
+
+<Engine cloud>
+
+### Plugins' permissions
+
+A plugin on your server adds its own permissions, named after the plugin: `protected-display.view`,
+say. They travel in tokens like the ones above, and the plugin checks them; the engine only passes
+them on, so they show up in `doc.security.scope`. A plugin permission works only where its plugin
+is installed: the server refuses to issue a token or a grant that names one it doesn't know, and
+`*` includes every installed plugin's permissions. The first part of a permission says whose it is,
+so `doc.`, `docs.`, `pdf.`, `tokens.`, `grants.` and the other core prefixes are never a plugin's.
+
+</Engine>
 
 ## Annotations
 

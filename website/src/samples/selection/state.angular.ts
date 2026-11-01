@@ -13,9 +13,9 @@ import { withInteraction } from '@embedpdf/angular/interaction';
 import { EpdfSelection, EpdfSelectionLayer, withSelection } from '@embedpdf/angular/selection';
 import { localEngine } from '@embedpdf/engine';
 
-const ebook = async (): Promise<OpenInput> => {
-  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
-  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+const welcome = async (): Promise<OpenInput> => {
+  const response = await fetch('/pdfs/welcome.pdf');
+  return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
 // Every field of the selection's state, as it changes.
@@ -67,7 +67,7 @@ export class SelectionStatus {
   ],
   providers: [
     provideEmbedPdf(
-      { engine: () => localEngine(), initialDocuments: [{ source: ebook }] },
+      { engine: () => localEngine(), initialDocuments: [{ source: welcome }] },
       withStage(),
       withRender(),
       withInteraction(),
@@ -99,7 +99,7 @@ export class App {
     // Something selected on load: the title on the cover.
     effect(() => {
       const cover = this.document.pages()[0]?.ref;
-      if (cover) this.selection.select({ page: cover, start: 10, count: 52 });
+      if (cover) this.selection.select({ page: cover, start: 28, count: 30 });
     });
   }
 }
