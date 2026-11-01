@@ -80,6 +80,9 @@ function tenantToken(scope: string[] = ['*']): string {
   return signDevToken(SECRET, { sub: 'backend-1', tenant_id: TENANT, scope });
 }
 
+/** A key that manages grants and reads documents: what this suite's grants give. */
+const GRANT_MANAGER = ['grants.manage', 'doc.open', 'doc.render', 'doc.text.select'];
+
 async function seedDocument(docId: string): Promise<void> {
   const padding = randomBytes(4095);
   const bytes = new Uint8Array(4096);
@@ -116,7 +119,7 @@ async function seedDocument(docId: string): Promise<void> {
 
 async function createGrant(
   body: Record<string, unknown>,
-  auth: string = tenantToken(['grants.manage']),
+  auth: string = tenantToken(GRANT_MANAGER),
 ): Promise<{ status: number; grant?: Record<string, any> }> {
   const res = await fetch(`${fx.baseUrl}/v1/tenants/${TENANT}/grants`, {
     method: 'POST',
@@ -324,6 +327,47 @@ describe('grants', () => {
     expect((await createGrant({ docId: 'doc-named', scope: ['doc.open'], name: '' })).status).toBe(
       400,
     );
+  });
+
+  test('a grant gives only what its maker holds', async () => {
+    await seedDocument('doc-held');
+    const reader = tenantToken(['grants.manage', 'doc.open', 'doc.render']);
+
+    const beyond = await fetch(`${fx.baseUrl}/v1/tenants/${TENANT}/grants`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${reader}`, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        docId: 'doc-held',
+        scope: ['doc.open', 'doc.render.thumbnail', 'doc.annotate.modify'],
+      }),
+    });
+    expect(beyond.status).toBe(403);
+    const refusal = (await beyond.json()) as { error: { code: string; message: string } };
+    expect(refusal.error.code).toBe('Forbidden');
+    expect(refusal.error.message).toContain('doc.annotate.modify');
+    expect(refusal.error.message).not.toContain('doc.render.thumbnail');
+
+    const held = await createGrant({ docId: 'doc-held', scope: ['doc.open'] }, reader);
+    expect(held.status).toBe(200);
+
+    // Changing the scope later follows the same rule; other edits don't ask.
+    const patch = async (auth: string, body: Record<string, unknown>) =>
+      fetch(`${fx.baseUrl}/v1/tenants/${TENANT}/grants/${held.grant!.id}`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${auth}`, 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    expect((await patch(reader, { scope: ['doc.open', 'doc.print'] })).status).toBe(403);
+    expect((await patch(reader, { scope: ['doc.open', 'doc.render'] })).status).toBe(200);
+    expect((await patch(tenantToken(['grants.manage']), { name: 'Reading' })).status).toBe(200);
+
+    // The API token and `*` hold everything.
+    expect((await patch(API_TOKEN, { scope: ['doc.open', 'doc.print'] })).status).toBe(200);
+    const everything = await createGrant(
+      { docId: 'doc-held', scope: ['doc.open', 'doc.annotate.modify'] },
+      tenantToken(['*']),
+    );
+    expect(everything.status).toBe(200);
   });
 
   test('grants made before the rename keep their shr_ id', async () => {
