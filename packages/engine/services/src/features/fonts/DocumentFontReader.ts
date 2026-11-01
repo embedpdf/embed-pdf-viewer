@@ -3,18 +3,20 @@ import {
   EngineError,
   EngineErrorCode,
   STANDARD_FACES,
+  canChooseProgram,
   faceForFontName,
   fontListOf,
   isStandardFontName,
   type AnnotationRef,
   type CodePointRange,
   type DocumentFaceFacts,
+  type DocumentFontFacts,
   type FontFormat,
   type FontListFacts,
   type FontProgramFacts,
   type FontResolveRun,
   type ResolvedRunFacts,
-  documentFontNameOf,
+  documentFontsOf,
   documentProgramForName,
 } from '@embedpdf/engine-core/runtime';
 import { NULL_PTR, type PdfRuntimeModule, type Ptr } from '@embedpdf/engine-runtime';
@@ -114,14 +116,20 @@ export class DocumentFontReader {
                 mem,
                 faces.map((face) => (face.italic ? 1 : 0)),
                 (italics) =>
-                  fn.EPDFDoc_ResolveFonts(
-                    this.session.requireDocPtr(),
-                    annotPtr,
-                    runs.length,
-                    textTable,
-                    familyTable,
-                    weights,
-                    italics,
+                  withI32Array(
+                    mem,
+                    faces.map((face) => face.program),
+                    (programs) =>
+                      fn.EPDFDoc_ResolveFonts(
+                        this.session.requireDocPtr(),
+                        annotPtr,
+                        runs.length,
+                        textTable,
+                        familyTable,
+                        weights,
+                        italics,
+                        programs,
+                      ),
                   ),
               ),
           ),
@@ -189,25 +197,42 @@ export class DocumentFontReader {
     return { runs, missingCharacters };
   }
 
-  /** The face a run asks for: a standard name's, an engine font's, a document font's, or a family. */
+  /**
+   * The face a run asks for, found as a write finds it: a standard name's, an
+   * engine font's, a document font's (with the program a write would name,
+   * when new text can be written in it), or a family.
+   */
   private faceOfRun(
     run: FontResolveRun,
     facts: FontListFacts,
-  ): { family: string; weight: number; italic: boolean } {
+  ): { family: string; weight: number; italic: boolean; program: number } {
     if (!('fontFamily' in run)) {
-      return { family: run.family, weight: run.weight, italic: run.italic };
+      return { family: run.family, weight: run.weight, italic: run.italic, program: 0 };
     }
     const name = run.fontFamily;
     if (isStandardFontName(name)) {
       const face = STANDARD_FACES[name];
-      return { family: face.family, weight: face.weight, italic: face.italic };
+      return { family: face.family, weight: face.weight, italic: face.italic, program: 0 };
     }
-    const document = facts.faces.find((face) => documentFontNameOf(face) === name);
+    const registered = this.fonts.describeOrUndefined(name);
+    if (registered) {
+      const { familyName, weight, italic } = registered;
+      return { family: familyName, weight, italic, program: 0 };
+    }
+    const document = documentFontsOf(facts.faces).find((font) => font.name === name);
     if (document) {
-      return { family: document.familyName, weight: document.weight, italic: document.italic };
+      const { familyName, weight, italic } = document.face;
+      const choice = documentProgramForName(facts, name);
+      const program = choice?.choosable ? choice.objectNumber : 0;
+      return { family: familyName, weight, italic, program };
     }
-    const face = faceForFontName(name, (key) => this.fonts.describeOrUndefined(key));
-    return { family: face.family, weight: face.weight ?? 400, italic: face.italic ?? false };
+    const face = faceForFontName(name);
+    return {
+      family: face.family,
+      weight: face.weight ?? 400,
+      italic: face.italic ?? false,
+      program: 0,
+    };
   }
 
   private openAnnotation(ref: AnnotationRef): Ptr {
@@ -244,24 +269,30 @@ export class DocumentFontReader {
     }
     const { fn, mem } = this.runtime;
     const docPtr = this.session.requireDocPtr();
-    const covers = readRanges(this.runtime, (out, capacity) =>
-      fn.EPDFDoc_GetFontProgramCoverage(docPtr, program.objectNumber, out, capacity),
-    );
-    let bytes: Uint8Array | null = null;
-    if (data) {
-      const length = fn.EPDFDoc_GetFontDisplayProgramData(
-        docPtr,
-        program.objectNumber,
-        NULL_PTR,
-        0,
+    // By the hash: a stream two font dictionaries read differently is two programs.
+    return withScratch(mem, 32, (hash) => {
+      mem.writeBytes(hash, bytesOfHex(displayHash));
+      const covers = readRanges(this.runtime, (out, capacity) =>
+        fn.EPDFDoc_GetFontDisplayProgramCoverage(docPtr, hash, out, capacity),
       );
-      bytes = withScratch(mem, Math.max(1, length), (out) => {
-        fn.EPDFDoc_GetFontDisplayProgramData(docPtr, program.objectNumber, out, length);
-        return mem.readBytes(out, length);
-      });
-    }
-    return { covers, ascent: program.ascent, descent: program.descent, bytes };
+      let bytes: Uint8Array | null = null;
+      if (data) {
+        const length = fn.EPDFDoc_GetFontDisplayProgramData(docPtr, hash, NULL_PTR, 0);
+        bytes = withScratch(mem, Math.max(1, length), (out) => {
+          fn.EPDFDoc_GetFontDisplayProgramData(docPtr, hash, out, length);
+          return mem.readBytes(out, length);
+        });
+      }
+      return { covers, ascent: program.ascent, descent: program.descent, bytes };
+    });
   }
+}
+
+/** The bytes a SHA-256's hex names. */
+function bytesOfHex(hex: string): Uint8Array {
+  return Uint8Array.from({ length: hex.length / 2 }, (_, at) =>
+    parseInt(hex.slice(at * 2, at * 2 + 2), 16),
+  );
 }
 
 /** The faces a document's fonts are, with the facts about each program (the fork's walk). */
@@ -358,7 +389,7 @@ function fontsFingerprintOf(runtime: PdfRuntimeModule, session: DocumentSession)
 }
 
 /** The document fonts a list shows, as JSON: the engine's fonts don't change with a write. */
-function documentFontsOf(runtime: PdfRuntimeModule, session: DocumentSession): string {
+function listedDocumentFontsOf(runtime: PdfRuntimeModule, session: DocumentSession): string {
   const list = fontListOf(
     { faces: readDocumentFaces(runtime, session), engineFonts: [], fallbacks: [] },
     BUILT_IN_PROGRAMS,
@@ -371,7 +402,7 @@ export function trackFontChanges(runtime: PdfRuntimeModule, session: DocumentSes
   if (fontsSeen.has(session)) return;
   fontsSeen.set(session, {
     fingerprint: fontsFingerprintOf(runtime, session),
-    documentFonts: documentFontsOf(runtime, session),
+    documentFonts: listedDocumentFontsOf(runtime, session),
   });
 }
 
@@ -387,7 +418,7 @@ export function fontsChangedSince(runtime: PdfRuntimeModule, session: DocumentSe
   if (!before) return false;
   const fingerprint = fontsFingerprintOf(runtime, session);
   if (fingerprint === before.fingerprint) return false;
-  const documentFonts = documentFontsOf(runtime, session);
+  const documentFonts = listedDocumentFontsOf(runtime, session);
   fontsSeen.set(session, { fingerprint, documentFonts });
   return documentFonts !== before.documentFonts;
 }
@@ -420,8 +451,18 @@ export function fontWriteContext(
   fonts: FontRegistrar | undefined,
 ): Pick<
   AnnotationWriteContext,
-  'resolveRegisteredFontId' | 'describeRegisteredFont' | 'resolveDocumentFont'
+  | 'resolveRegisteredFontId'
+  | 'describeRegisteredFont'
+  | 'describeFont'
+  | 'documentProgramOf'
+  | 'resolveDocumentFont'
 > {
+  // The document's fonts, read once per write the first time a name needs them.
+  let documentFonts: DocumentFontFacts[] | undefined;
+  const documentFontNamed = (name: string) =>
+    (documentFonts ??= documentFontsOf(readDocumentFaces(runtime, session))).find(
+      (font) => font.name === name,
+    );
   return {
     ...(fonts
       ? {
@@ -429,6 +470,20 @@ export function fontWriteContext(
           describeRegisteredFont: (key: string) => fonts.describeOrUndefined(key),
         }
       : {}),
+    describeFont: (name: string) => {
+      const registered = fonts?.describeOrUndefined(name);
+      if (registered) return registered;
+      const face = documentFontNamed(name)?.face;
+      return face && { familyName: face.familyName, weight: face.weight, italic: face.italic };
+    },
+    documentProgramOf: (name: string) => {
+      // A standard name or an engine font's key names that font first.
+      if (isStandardFontName(name) || fonts?.describeOrUndefined(name)) return undefined;
+      const program = documentFontNamed(name)?.programs[0];
+      return program && canChooseProgram(program) && program.objectNumber > 0
+        ? program.objectNumber
+        : undefined;
+    },
     resolveDocumentFont: (name: string) => documentFontChoice(runtime, session, name),
   };
 }

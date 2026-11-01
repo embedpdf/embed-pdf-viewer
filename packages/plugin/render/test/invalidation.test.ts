@@ -121,6 +121,17 @@ describe('pixelChangeOf — the built-in event → pixels map', () => {
     });
   });
 
+  it('fonts.changed with no write behind it repaints the content of every page', () => {
+    // The engine's fonts changed: a page's missing glyphs may now draw from another fallback.
+    expect(changeOf({ type: 'fonts.changed', origin: { kind: 'local' } })).toEqual({
+      pages: PAGE_OBJECT_NUMBERS,
+      scope: 'content',
+    });
+    // A write's: the write's own events repaint what it changed.
+    const tx = { id: 'op-1', index: 1, count: 2 };
+    expect(changeOf({ type: 'fonts.changed', origin: { kind: 'local', tx } })).toBeNull();
+  });
+
   it.each([
     'pages.rotated',
     'pages.reordered',

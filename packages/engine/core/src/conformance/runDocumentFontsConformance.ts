@@ -1,3 +1,5 @@
+import { pdfWithFontDictionaries } from './documentFontFixtures';
+import { drawnTextOf } from './drawnText';
 import type { ConformanceTestRunner } from './runMetadataConformance';
 import type { Font } from '../dto/DocumentFonts';
 import type { DocumentHandle } from '../engine/DocumentHandle';
@@ -26,6 +28,16 @@ export interface DocumentFontsConformanceOptions {
     keptFonts: Uint8Array;
     /** A free text box in a Helvetica subset the document embeds. */
     documentSubset: Uint8Array;
+    /**
+     * A form whose /DR holds two Type 1 dictionaries that read one bare CFF
+     * program (FoxitFixed) with other widths, 600 and 900.
+     */
+    sharedProgram: Uint8Array;
+    /**
+     * A whole TrueType program that maps Unicode and allows editing (Noto Sans
+     * Hebrew Regular): the font the name fixtures embed under other names.
+     */
+    fontProgram: Uint8Array;
   };
 }
 
@@ -70,6 +82,9 @@ const HEX_SHA256 = /^[0-9a-f]{64}$/;
  * - Programs download by display hash, for a token that may write text: the
  *   built-in ones, the served font, a document's whole program, and the
  *   display program of a form font a browser can't load.
+ * - A document font is everything the PDF draws under one name, however the
+ *   editors that wrote it described it: no two share a name, and a box reads
+ *   back the name of the font it is drawn in.
  */
 export function runDocumentFontsConformance(
   runner: ConformanceTestRunner,
@@ -290,6 +305,23 @@ export function runDocumentFontsConformance(
       await doc.close();
     });
 
+    test('one program two dictionaries read differently is two display programs, each served by its hash', async () => {
+      const doc = await open(fixtures.sharedProgram);
+      const font = (await doc.fonts.list()).fonts.find(
+        (candidate) => candidate.source === 'document' && candidate.name === 'FoxitFixed',
+      )!;
+      expect(font.programs).toHaveLength(2);
+      expect(new Set(font.programs.map((program) => program.sourceHash)).size).toBe(1);
+      const hashes = font.programs.map((program) => program.displayHash!);
+      expect(new Set(hashes).size).toBe(2);
+      for (const hash of hashes) {
+        expect(await sha256(await doc.fonts.downloadProgram(hash))).toBe(hash);
+        const info = await doc.fonts.getProgram(hash);
+        expect(covers(info.covers, 'A')).toBe(true);
+      }
+      await doc.close();
+    });
+
     test('downloads the built-in programs and the served font, and refuses a hash it doesn’t name', async () => {
       const doc = await open(fixtures.page);
       const list = await doc.fonts.list();
@@ -393,6 +425,133 @@ export function runDocumentFontsConformance(
       expect(refused.code).toBe(EngineErrorCode.InvalidArg);
       expect((refused.details as { restrictions?: string[] }).restrictions).toContain('subset');
       await subsetDoc.close();
+    });
+
+    describe('a document font is everything the PDF draws under one name', () => {
+      const documentFonts = async (doc: DocumentHandle) =>
+        (await doc.fonts.list()).fonts.filter((font) => font.source === 'document');
+      const namesOf = (fonts: readonly Font[]) => fonts.map((font) => font.name);
+      const expectUnique = (fonts: readonly Font[]) =>
+        expect(new Set(namesOf(fonts)).size).toBe(fonts.length);
+
+      test('copies of one font under one name are one font, however each editor described it', async () => {
+        const doc = await open(
+          pdfWithFontDictionaries(fixtures.fontProgram, [
+            // Both editors describe it alike.
+            { baseFont: 'Same-Regular', family: 'Same', weight: 400 },
+            { baseFont: 'Same-Regular', family: 'Same', weight: 400 },
+            // One writes /FontFamily (Arial); the other doesn't, and the name reads as Helvetica.
+            { baseFont: 'ArialMT', family: 'Arial', weight: 400 },
+            { baseFont: 'ArialMT' },
+            // One writes /FontWeight 600; the other doesn't, and "Bold" in the name reads 700.
+            { baseFont: 'Grotesk-SemiBold', family: 'Grotesk', weight: 600 },
+            { baseFont: 'Grotesk-SemiBold' },
+            // One writes /FontWeight 100; the other doesn't, and the name has no weight it reads.
+            { baseFont: 'Grotesk-Thin', family: 'Grotesk', weight: 100 },
+            { baseFont: 'Grotesk-Thin' },
+          ]),
+        );
+        const fonts = await documentFonts(doc);
+        expectUnique(fonts);
+        expect(namesOf(fonts).sort()).toEqual([
+          'ArialMT',
+          'Grotesk-SemiBold',
+          'Grotesk-Thin',
+          'Same-Regular',
+        ]);
+        for (const font of fonts) {
+          expect(font.programs).toHaveLength(2);
+          expect(font).toMatchObject({ canChoose: true, restrictions: [] });
+        }
+        await doc.close();
+      });
+
+      /**
+       * A free text box written in `fontFamily` on `doc`'s first page: what it
+       * reads back as, its body's family and weight, the fonts its appearance
+       * draws with, and what `resolve` says a write in that font draws with.
+       */
+      async function boxIn(doc: DocumentHandle, fontFamily: string) {
+        const page = await firstPage(doc);
+        const { meta } = await doc.page(page).annotations.create({
+          subtype: 'free-text',
+          box: { x: 20, y: 20, width: 200, height: 40 },
+          contents: 'שלום',
+          fontFamily,
+        });
+        const { annotations } = await doc.page(page).annotations.list();
+        const box = annotations.find((candidate) => candidate.subtype === 'free-text');
+        if (box?.subtype !== 'free-text') throw new Error('no free text box');
+        const drawn = await drawnTextOf(await doc.download());
+        const resolved = await doc.fonts.resolve({
+          annotation: box.ref,
+          runs: [{ text: 'שלום', fontFamily }],
+        });
+        return {
+          fontFamily: box.fontFamily,
+          body: box.richText?.body,
+          drawnIn: [...new Set(drawn.flatMap((form) => form.runs.map((run) => run.font)))],
+          resolvedTo: resolved.runs[0]!.font,
+          missingCharacters: meta.missingCharacters,
+        };
+      }
+
+      test('a box written in a document font is drawn in it, its family and weight its own', async () => {
+        const doc = await open(
+          pdfWithFontDictionaries(fixtures.fontProgram, [
+            { baseFont: 'BrandSans-SemiBold', family: 'Brand Sans', weight: 600 },
+          ]),
+        );
+        const box = await boxIn(doc, 'BrandSans-SemiBold');
+        expect(box.fontFamily).toBe('BrandSans-SemiBold');
+        // The style a PDF keeps names the family, not the name the list gives the font.
+        expect(box.body).toMatchObject({ family: 'Brand Sans', weight: 600, italic: false });
+        expect(box.drawnIn).toEqual(['BrandSans-SemiBold']);
+        expect(box.resolvedTo).toBe('BrandSans-SemiBold');
+        expect(box.missingCharacters).toBe(undefined);
+        await doc.close();
+      });
+
+      test('two fonts described alike keep their own names, and a box in one is drawn in that one', async () => {
+        // Neither writes /FontWeight, and "Thin" isn't a weight the name is read for: one face.
+        const doc = await open(
+          pdfWithFontDictionaries(fixtures.fontProgram, [
+            { baseFont: 'Mono-Regular' },
+            { baseFont: 'Mono-Thin' },
+          ]),
+        );
+        expect(namesOf(await documentFonts(doc))).toEqual(['Mono-Regular', 'Mono-Thin']);
+
+        const box = await boxIn(doc, 'Mono-Thin');
+        expect(box.fontFamily).toBe('Mono-Thin');
+        expect(box.body).toMatchObject({ family: 'Mono', weight: 400 });
+        expect(box.drawnIn).toEqual(['Mono-Thin']);
+        expect(box.resolvedTo).toBe('Mono-Thin');
+        const after = await documentFonts(doc);
+        expectUnique(after);
+        expect(namesOf(after).sort()).toEqual(['Mono-Regular', 'Mono-Thin']);
+        await doc.close();
+      });
+
+      test('a font without a PostScript name is named by its family and exact style', async () => {
+        const doc = await open(
+          pdfWithFontDictionaries(fixtures.fontProgram, [
+            { family: 'Inter', weight: 400 },
+            { family: 'Inter', weight: 500 },
+            { family: 'Inter', weight: 800 },
+            { family: 'Inter', weight: 400, italic: true },
+          ]),
+        );
+        const fonts = await documentFonts(doc);
+        expect(namesOf(fonts)).toEqual([
+          'Inter',
+          'Inter,Medium',
+          'Inter,ExtraBold',
+          'Inter,Italic',
+        ]);
+        expect(fonts.every((font) => !font.canChoose)).toBe(true);
+        await doc.close();
+      });
     });
   });
 }

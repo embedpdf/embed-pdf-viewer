@@ -4,6 +4,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { LAST_RESORT_HASH, standardFontProgram } from '@embedpdf/core-fonts';
+import { loadFallbackFont } from '@embedpdf/default-fallback-fonts/library';
 import {
   runDocumentFontsConformance,
   type ConformanceTestRunner,
@@ -81,6 +82,8 @@ runDocumentFontsConformance(runner, {
     page: helloWorld,
     keptFonts: await fixture('kept_fonts_form.pdf'),
     documentSubset: await fixture('freetext_document_subset_helvetica.pdf'),
+    sharedProgram: await fixture('kept_font_shared_program.pdf'),
+    fontProgram: await loadFallbackFont('noto-sans-hebrew'),
   },
 });
 
@@ -191,5 +194,33 @@ describe('doc.fonts (local engine)', () => {
     expect(info.covers.some((range) => range.start <= 65 && 65 < range.start + range.count)).toBe(
       true,
     );
+  });
+});
+
+describe('doc.fonts names in documents editors wrote (local engine)', () => {
+  let engine: LocalEngine;
+
+  beforeAll(async () => {
+    engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
+  });
+
+  afterAll(async () => {
+    await engine.destroy();
+  });
+
+  // Each holds one font twice: Acrobat's whole AdobeHebrew beside a subset it
+  // cut, and a form's Times New Roman subset beside a dictionary that only
+  // names it. Copies of one font are one font, and no two fonts share a name.
+  test.each([
+    ['freetext-rotated-acrobat.pdf', 'AdobeHebrew-Regular'],
+    ['uscis-i-140-protected.pdf', 'TimesNewRomanPSMT'],
+  ])('%s lists %s once, with both of its programs', async (file, name) => {
+    const doc = await engine.open({ kind: 'bytes', id: file, bytes: await fixture(file) });
+    const fonts = (await doc.fonts.list()).fonts.filter((font) => font.source === 'document');
+    expect(new Set(fonts.map((font) => font.name)).size).toBe(fonts.length);
+    const named = fonts.filter((font) => font.name === name);
+    expect(named).toHaveLength(1);
+    expect(named[0]!.programs).toHaveLength(2);
+    await doc.close();
   });
 });

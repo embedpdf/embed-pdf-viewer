@@ -1,4 +1,5 @@
 import type {
+  DescribeFont,
   FontIdentityInfo,
   FontRestriction,
   WireAnnotationResources,
@@ -31,6 +32,19 @@ export interface AnnotationWriteContext {
    * family; this is how a key is told apart.
    */
   describeRegisteredFont?: (fontKey: string) => FontIdentityInfo | undefined;
+  /**
+   * The face a box's font name stands for: a registered key's identity, or a
+   * document font's family, weight and italic as the font list gives them;
+   * undefined for any other name. Rich text names fonts by face, so this is
+   * how a `fontFamily` (or a run's `family`) becomes one.
+   */
+  describeFont?: DescribeFont;
+  /**
+   * The document program a font name names, when new text can be written with
+   * it: its stream's object number. A face can't tell two programs that
+   * describe themselves alike apart; the program can.
+   */
+  documentProgramOf?: (name: string) => number | undefined;
   /**
    * The document program a `fontFamily` names, when it names one of the
    * document's fonts: its stream's object number, and whether new text may be

@@ -167,7 +167,7 @@ function namesCurrentFace(
   if (!current) return false;
   // The name a read gives the box's font (a document font's PostScript name).
   if (boxFontName(fn, mem, annotPtr, current) === font) return true;
-  const named = faceForFontName(font, ctx?.describeRegisteredFont);
+  const named = faceForFontName(font, ctx?.describeFont);
   return (
     familyKey(named.family) === familyKey(current.family) &&
     (named.weight === undefined || named.weight === current.weight) &&

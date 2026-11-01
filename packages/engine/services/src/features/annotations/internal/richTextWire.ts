@@ -1,6 +1,6 @@
 import {
   faceForFontName,
-  type FontIdentityInfo,
+  type DescribeFont,
   type RichTextBody,
   type RichTextDocument,
   type RichTextDocumentInput,
@@ -20,31 +20,48 @@ import { readUtf8String } from '../../../runtime/memory/strings';
  * a PDF does (family, weight, italic). Both directions map here.
  */
 
-/** A run style or body with its `family` (and the weight/italic a key or
- *  standard name implies) rewritten to what the engine resolves by. */
+/** How a write's font names become what the engine draws with. */
+export interface RichTextFonts {
+  /** The face a name stands for: a registered key's, a document font's. */
+  describe?: DescribeFont;
+  /** The document program a name names, when new text can be written with it. */
+  programOf?: (name: string) => number | undefined;
+  /** The body's program: the one the box's `fontFamily` names. */
+  bodyProgram?: number;
+}
+
+/**
+ * A run style or body with its `family` (and the weight/italic a key, a
+ * standard name or a document font's name implies) rewritten to what the
+ * engine resolves by, and the program a document font's name names: two
+ * programs that describe themselves alike are one face, never one program.
+ */
 function withEngineFace<T extends Partial<RichTextRunStyle>>(
   style: T,
-  describe?: (fontKey: string) => FontIdentityInfo | undefined,
-): T {
+  fonts: RichTextFonts,
+): T & { program?: number } {
   if (style.family === undefined) return style;
-  const face = faceForFontName(style.family, describe);
-  const out: T = { ...style, family: face.family };
-  // A key or a standard name carries its weight and italic; an explicit
-  // `weight`/`italic` in the style still wins.
+  const program = fonts.programOf?.(style.family);
+  const face = faceForFontName(style.family, fonts.describe);
+  const out: T & { program?: number } = { ...style, family: face.family };
+  // A name carries its weight and italic; an explicit `weight`/`italic` in
+  // the style still wins.
   if (face.weight !== undefined && style.weight === undefined) out.weight = face.weight;
   if (face.italic !== undefined && style.italic === undefined) out.italic = face.italic;
+  if (program !== undefined) out.program = program;
   return out;
 }
 
 /** The engine's JSON for a write: the input shape with faces resolved. */
 export function engineRichTextJson(
   input: RichTextDocumentInput,
-  describe?: (fontKey: string) => FontIdentityInfo | undefined,
+  fonts: RichTextFonts = {},
 ): string {
-  const body = input.body ? withEngineFace(input.body, describe) : undefined;
+  const body = input.body ? withEngineFace(input.body, fonts) : undefined;
+  if (body && fonts.bodyProgram !== undefined) body.program = fonts.bodyProgram;
   const paragraphs = input.paragraphs.map((p) => ({
     ...p,
-    runs: p.runs.map((r) => (r.style ? { ...r, style: withEngineFace(r.style, describe) } : r)),
+    runs: p.runs.map((r) => (r.style ? { ...r, style: withEngineFace(r.style, fonts) } : r)),
   }));
   return JSON.stringify(body ? { body, paragraphs } : { paragraphs });
 }

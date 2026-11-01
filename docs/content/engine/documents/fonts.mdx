@@ -43,6 +43,10 @@ for (const font of fonts) {
 | `'engine'`   | The engine's fonts: the ones you [register](#register-a-font) locally, your server's on the cloud. | the `key` they were given          |
 | `'document'` | Fonts the PDF already has.                                                                    | its PostScript name, such as `'MinionPro-Regular'`; without one, its family and style, such as `'Inter,Medium'` |
 
+A PDF can hold one font several times: each editor that wrote text in it may have added its own
+copy. Every copy under one name is one entry, with the copies in its `programs`, so no two fonts in
+the list share a name.
+
 Pass a font's `name` as `fontFamily` to write with it. A font with `canChoose: false` can't be
 named for new text; `restrictions` says why (see [What a font allows](#what-a-font-allows)). A
 name that isn't in the list fails with `InvalidArg`: the engine doesn't quietly swap in another

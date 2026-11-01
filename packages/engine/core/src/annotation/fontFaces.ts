@@ -48,8 +48,9 @@ export const isStandardFontName = (font: string): font is StandardFont =>
 
 /**
  * The face a free text's `fontFamily` (or a rich run's `family`) asks for: a
- * standard font's family, weight and italic; a registered key's identity; or,
- * for anything else, the string itself as a family name (a face the document
+ * standard font's family, weight and italic; the face `describe` knows the
+ * name by (a registered key's identity, a document font's face); or, for
+ * anything else, the string itself as a family name (a face the document
  * embeds, or one the engine will substitute).
  */
 export function faceForFontName(font: FontName, describe?: DescribeFont): FaceRequest {

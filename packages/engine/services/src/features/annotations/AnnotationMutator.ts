@@ -208,7 +208,7 @@ export class AnnotationMutator {
       // exactly this.
       assertCaptionMetadataWritable(fn, annotPtr, currentDto, patch);
       patch = pdfResolveAnnotationPatch(currentDto, patch, {
-        describeFont: writeCtx.describeRegisteredFont,
+        describeFont: writeCtx.describeFont,
       });
       assertAnnotationResources(currentDto.subtype, resources, 'update');
       preflightPatch(patch, writeCtx);

@@ -239,6 +239,7 @@ export type {
 export {
   canChooseProgram,
   documentFontNameOf,
+  documentFontsOf,
   documentProgramForName,
   downloadableProgram,
   FALLBACK_TIERS,
@@ -249,7 +250,9 @@ export {
   standardFontOfBaseFont,
   TEXT_WRITING_CAPABILITIES,
   type BuiltInPrograms,
+  type DocumentFace,
   type DocumentFaceFacts,
+  type DocumentFontFacts,
   type EngineFontFacts,
   type FallbackTier,
   type FontListFacts,

@@ -83,5 +83,11 @@ runDocumentFontsConformance(runner, {
     page: await fixture('hello_world.pdf'),
     keptFonts: await fixture('kept_fonts_form.pdf'),
     documentSubset: await fixture('freetext_document_subset_helvetica.pdf'),
+    sharedProgram: await fixture('kept_font_shared_program.pdf'),
+    fontProgram: new Uint8Array(
+      await readFile(
+        resolve(here, '../../../packages/default-fallback-fonts/fonts/NotoSansHebrew-Regular.ttf'),
+      ),
+    ),
   },
 });

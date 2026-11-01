@@ -39,10 +39,8 @@ export function boxFontName(
     );
     if (postScriptName) return postScriptName;
   }
-  return documentFontNameOf({
-    familyName: face.family,
-    weight: face.weight,
-    italic: face.italic,
-    programs: [],
-  });
+  return documentFontNameOf(
+    { familyName: face.family, weight: face.weight, italic: face.italic },
+    null,
+  );
 }

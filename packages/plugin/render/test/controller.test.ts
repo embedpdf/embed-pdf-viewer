@@ -250,6 +250,25 @@ describe('the ledger — confirmed events and the invalidate verb', () => {
     await fixture.kernel.destroy();
   });
 
+  it('the engine’s fonts changing repaints the content of every page; a write’s font change, only its own facts', async () => {
+    const fixture = await boot();
+    const contentEpochs = () =>
+      [11, 22, 33].map((page) =>
+        fixture.render.getRenderEpoch(toPageRef(page), { includeAnnotations: false }),
+      );
+    // A font registered after the first pages were drawn: no write behind it.
+    fixture.emit(documentEvent({ type: 'fonts.changed', origin: { kind: 'local' } }));
+    expect(contentEpochs()).toEqual([1, 1, 1]);
+    fixture.emit(
+      documentEvent({
+        type: 'fonts.changed',
+        origin: { kind: 'local', tx: { id: 'op-1', index: 1, count: 2 } },
+      }),
+    );
+    expect(contentEpochs()).toEqual([1, 1, 1]);
+    await fixture.kernel.destroy();
+  });
+
   it('a redaction apply is a content fact for the applied pages', async () => {
     const fixture = await boot();
     fixture.emit(

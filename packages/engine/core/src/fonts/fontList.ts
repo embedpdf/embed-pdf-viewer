@@ -177,19 +177,74 @@ const WEIGHT_WORDS: Readonly<Record<number, string>> = {
   900: 'Black',
 };
 
+/** A face as a font dictionary describes it. */
+export type DocumentFace = Pick<DocumentFaceFacts, 'familyName' | 'weight' | 'italic'>;
+
 /**
- * The name `fontFamily` takes for a document face: its PostScript name, which
- * says the style the family alone doesn't, else the family with a style suffix
- * in PDF's form that names the exact weight (`'Inter'`, `'Inter,Medium'`,
- * `'Inter,BoldItalic'`; `'Inter,450'` off the hundreds). The document's faces
- * differ in family, weight or italic, so no two share a name this way.
+ * The name a document program goes by, the name `fontFamily` takes: its
+ * PostScript name, which says the style the family alone doesn't, else its
+ * face's family with a style suffix in PDF's form that names the exact weight
+ * (`'Inter'`, `'Inter,Medium'`, `'Inter,BoldItalic'`; `'Inter,450'` off the
+ * hundreds).
  */
-export function documentFontNameOf(face: DocumentFaceFacts): FontName {
-  const named = face.programs.find((program) => program.postScriptName);
-  if (named?.postScriptName) return named.postScriptName;
+export function documentFontNameOf(face: DocumentFace, postScriptName: string | null): FontName {
+  if (postScriptName) return postScriptName;
   const weight = WEIGHT_WORDS[face.weight] ?? String(face.weight);
   const style = `${weight}${face.italic ? 'Italic' : ''}`;
   return style ? `${face.familyName},${style}` : face.familyName;
+}
+
+/** A document font: every program the PDF draws under one name. */
+export interface DocumentFontFacts {
+  name: FontName;
+  /** How its first program's font dictionary describes it. */
+  face: DocumentFace;
+  /** The program new text uses first, then the rest. */
+  programs: FontProgramFacts[];
+}
+
+/**
+ * The document's fonts, one per name. Editors describe one font differently
+ * (one writes `/FontFamily` and `/FontWeight`, another leaves them out and the
+ * engine reads them from the name), so the faces found can split one font in
+ * two or hide one inside another; the name can't. Every program the PDF draws
+ * under one name is one font, in the order first found, described by the face
+ * of the program new text uses first. A program with neither a PostScript name
+ * nor a family can't be named, so it isn't one.
+ */
+export function documentFontsOf(faces: readonly DocumentFaceFacts[]): DocumentFontFacts[] {
+  const named = new Map<FontName, { face: DocumentFace; program: FontProgramFacts }[]>();
+  for (const face of faces) {
+    for (const program of face.programs) {
+      if (!program.postScriptName && face.familyName === '') continue;
+      const name = documentFontNameOf(face, program.postScriptName);
+      const entries = named.get(name) ?? [];
+      // The same program found under two faces is one program; one stream two
+      // font dictionaries read differently (other encodings or widths) is two.
+      const known = entries.some(({ program: other }) =>
+        program.objectNumber > 0
+          ? other.objectNumber === program.objectNumber &&
+            other.displaySha256 === program.displaySha256
+          : other.objectNumber === 0 &&
+            other.embedded === program.embedded &&
+            other.format === program.format &&
+            other.sha256 === program.sha256,
+      );
+      if (!known) entries.push({ face, program });
+      named.set(name, entries);
+    }
+  }
+  return [...named].map(([name, entries]) => {
+    const ranked = [...entries].sort(
+      (left, right) => programRank(left.program) - programRank(right.program),
+    );
+    const { familyName, weight, italic } = ranked[0]!.face;
+    return {
+      name,
+      face: { familyName, weight, italic },
+      programs: ranked.map(({ program }) => program),
+    };
+  });
 }
 
 /** The standard font a /BaseFont names (`'Helvetica-Bold'`), if it is one. */
@@ -213,27 +268,26 @@ function faceOfStandardBaseFont(baseFont: string): {
 
 // ── the list ───────────────────────────────────────────────────────────────
 
-/** A document face that is in fact a standard font the PDF only names: the standard font stands for it. */
-function isStandardStandIn(face: DocumentFaceFacts): boolean {
+/** A document font that is in fact a standard font the PDF only names: the standard font stands for it. */
+function isStandardStandIn(font: DocumentFontFacts): boolean {
   return (
-    standardFamilyOf(face.familyName) !== undefined &&
-    face.programs.every((program) => program.embedded === 'none')
+    standardFamilyOf(font.face.familyName) !== undefined &&
+    font.programs.every((program) => program.embedded === 'none')
   );
 }
 
-function documentFontOf(face: DocumentFaceFacts): Font {
-  const programs = [...face.programs].sort((left, right) => programRank(left) - programRank(right));
-  const first = programs[0];
+function documentFontOf(font: DocumentFontFacts): Font {
+  const first = font.programs[0];
   return {
-    name: documentFontNameOf(face),
+    name: font.name,
     source: 'document',
-    familyName: face.familyName,
-    weight: face.weight,
-    italic: face.italic,
+    familyName: font.face.familyName,
+    weight: font.face.weight,
+    italic: font.face.italic,
     postScriptName: first?.postScriptName ?? null,
     canChoose: first ? canChooseProgram(first) : false,
     restrictions: first ? restrictionsOfProgram(first) : ['not-embedded'],
-    programs: programs.map(documentProgramOf),
+    programs: font.programs.map(documentProgramOf),
   };
 }
 
@@ -292,10 +346,10 @@ function standardFontOf(name: StandardFont, builtIn: BuiltInPrograms): Font {
 export function fontListOf(facts: FontListFacts, builtIn: BuiltInPrograms): FontList {
   // A document that drew a box for a missing character holds the last
   // resort: it is the list's `lastResort`, not a font to write with.
-  const isLastResort = (face: DocumentFaceFacts) =>
-    face.programs.some((program) => program.sha256 === builtIn.lastResortDisplayHash);
-  const documentFonts = facts.faces
-    .filter((face) => face.familyName !== '' && !isStandardStandIn(face) && !isLastResort(face))
+  const isLastResort = (font: DocumentFontFacts) =>
+    font.programs.some((program) => program.sha256 === builtIn.lastResortDisplayHash);
+  const documentFonts = documentFontsOf(facts.faces)
+    .filter((font) => !isStandardStandIn(font) && !isLastResort(font))
     .map(documentFontOf);
   return {
     fonts: [
@@ -356,21 +410,19 @@ export function downloadableProgram(list: FontList, displayHash: string): FontPr
 }
 
 /**
- * The document program a write names by `fontFamily`: the face whose name it
- * is, and the program new text uses there. `undefined` when no document font
- * has that name; `choosable: false` when it has one that can't be chosen.
+ * The document program a write names by `fontFamily`: the program new text
+ * uses first in the document font of that name. `undefined` when no document
+ * font has that name; `choosable: false` when it has one that can't be chosen.
  */
 export function documentProgramForName(
   facts: FontListFacts,
   name: string,
 ): { objectNumber: number; choosable: boolean; restrictions: FontRestriction[] } | undefined {
-  const face = facts.faces.find(
-    (candidate) => !isStandardStandIn(candidate) && documentFontNameOf(candidate) === name,
+  const font = documentFontsOf(facts.faces).find(
+    (candidate) => candidate.name === name && !isStandardStandIn(candidate),
   );
-  if (!face) return undefined;
-  const program = [...face.programs].sort(
-    (left, right) => programRank(left) - programRank(right),
-  )[0];
+  if (!font) return undefined;
+  const program = font.programs[0];
   if (!program) return { objectNumber: 0, choosable: false, restrictions: ['not-embedded'] };
   return {
     objectNumber: program.objectNumber,
@@ -433,7 +485,7 @@ export function fontResolutionOf(
     if (found) {
       return {
         ...base,
-        font: documentFontNameOf(found.face),
+        font: documentFontNameOf(found.face, found.program.postScriptName),
         program: isDisplayable(found.program) ? found.program.displaySha256 : null,
       };
     }
