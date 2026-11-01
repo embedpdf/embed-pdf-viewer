@@ -20,6 +20,6 @@ function PageLoading() {
   if (status === 'loading' && slow) {
     return <div className="page-loading" role="status" aria-label="Loading page" />;
   }
-  if (status === 'error') return <p className="page-error">This page couldn't load.</p>;
+  if (status === 'error') return <p className="page-error">This page couldn’t load.</p>;
   return null;
 }
