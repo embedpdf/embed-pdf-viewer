@@ -130,3 +130,45 @@ test('rejects implementation modules reachable from a contract entry', (t) => {
   assert.equal(violations.length, 1);
   assert.match(violations[0].message, /contract runtime graph reaches implementation module/);
 });
+
+/** A plugin in CloudPDF's tree: `cloudpdf/plugin/<name>`, `@cloudpdf/plugin-<name>`. */
+function cloudPluginFiles(name, extra = {}) {
+  const files = {};
+  for (const [file, content] of Object.entries(pluginFiles(name))) {
+    files[file.replace('packages/plugin/', 'cloudpdf/plugin/')] = content.replace(
+      '@embedpdf/plugin-',
+      '@cloudpdf/plugin-',
+    );
+  }
+  return { ...files, ...extra };
+}
+
+test('checks CloudPDF’s plugin and framework groups as EmbedPDF’s', (t) => {
+  const root = fixture({
+    ...pluginFiles('alpha'),
+    ...cloudPluginFiles('gamma', {
+      'cloudpdf/plugin/gamma/src/gamma.plugin.ts':
+        `import { alphaToken } from '@embedpdf/plugin-alpha';\n` +
+        `export const gammaPlugin = () => alphaToken;\n`,
+    }),
+    ...cloudPluginFiles('delta', {
+      'cloudpdf/plugin/delta/package.json': JSON.stringify({
+        name: '@cloudpdf/plugin-delta',
+        exports: { '.': './src/index.ts' },
+      }),
+    }),
+    'cloudpdf/framework/web/src/player.ts':
+      `import { gammaToken } from '@cloudpdf/plugin-gamma';\n` +
+      `export const token = gammaToken;\n`,
+    'cloudpdf/viewer/main/src/register.ts':
+      `import { gammaPlugin } from '@cloudpdf/plugin-gamma';\n` +
+      `export const plugins = [gammaPlugin()];\n`,
+  });
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const violations = checkPluginBoundaries({ repoRoot: root });
+  const shown = violations.map((item) => `${path.relative(root, item.file)}: ${item.message}`);
+  assert.equal(shown.length, 3, shown.join('\n'));
+  assert(shown.some((line) => line.startsWith('cloudpdf/plugin/delta/package.json: plugin packages must export "./contract"')));
+  assert(shown.some((line) => line.startsWith('cloudpdf/plugin/gamma/src/gamma.plugin.ts: plugin source imports implementation entry "@embedpdf/plugin-alpha"')));
+  assert(shown.some((line) => line.startsWith('cloudpdf/framework/web/src/player.ts: framework source imports sibling implementation entry "@cloudpdf/plugin-gamma"')));
+});

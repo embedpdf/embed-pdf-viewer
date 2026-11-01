@@ -8,13 +8,13 @@ import { Buffer } from 'node:buffer';
 import { randomUUID } from 'node:crypto';
 
 import {
-  CORE_NAMESPACES,
   EngineError,
   EngineErrorCode,
   InvalidScope,
   PermissionDenied,
   checkCapability,
   checkPluginPermission,
+  isPluginId,
   isProtectableCapability,
   parseScope,
   renderTransform,
@@ -73,7 +73,6 @@ export interface DeclaredModule {
   readonly config: Readonly<Record<string, string>>;
 }
 
-const MODULE_ID = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
 const CONFIG_KEY = /^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$/;
 const ROUTE_SEGMENT = /^(:[a-zA-Z][a-zA-Z0-9]*|[a-z0-9][a-z0-9._-]*)$/;
 /** How long a module's own token lives, and how much of that is left when a new one is made. */
@@ -97,7 +96,7 @@ export function declareModules(
   return modules.map((module) => {
     if (ids.has(module.id)) throw moduleError(module.id, 'is installed twice');
     ids.add(module.id);
-    if (!MODULE_ID.test(module.id) || CORE_NAMESPACES.has(module.id)) {
+    if (!isPluginId(module.id)) {
       throw moduleError(
         module.id,
         "isn't a module id: lowercase words joined by '-', not a core name",

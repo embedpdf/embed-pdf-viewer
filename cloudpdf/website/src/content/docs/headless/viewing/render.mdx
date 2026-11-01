@@ -128,6 +128,37 @@ whenever the page's pixels do.
 
 <Example name="render/redraws" />
 
+## Paint the pictures another way
+
+A plugin that shows the pages some other way, as protected video or on a canvas of its own, takes
+the pictures over from the render plugin:
+
+```ts
+const giveBack = render.handOverPictures({
+  paints: (view) => view === mainView, // the views it paints; the others keep the render plugin's
+  paint(host, page) {
+    // host: an empty box over the page's content, page: the page as the layers see it
+    const picture = drawInto(host, page);
+    return {
+      update: (page) => picture.follow(page.transform), // the zoom or the turn changed
+      destroy: () => picture.remove(),
+    };
+  },
+});
+```
+
+While it holds them, every `<RenderLayer>` in a view it paints lends it its box instead of drawing:
+no picture, no tiles, no renders for that view. Everything above stays as it is: selection, search
+highlights, links, annotations and form fields still sit on the page, in page space. A view it
+doesn't paint, such as a strip of thumbnails, keeps the render plugin's pictures.
+
+- **`page`** has the page's `ref`, `pageIndex`, `view`, `transform` (its size, zoom and turn on
+  screen) and `getViewDemand()` (the part of it on screen), the same in every framework.
+- **One painter at a time.** A second one is refused (`conflict`) until the first is given back.
+- **Take them over in your plugin's `connect()`**, and the pages never show the render plugin's
+  picture first: every plugin connects before the document shows. The hand-over lasts until the
+  document closes, or until you call the function it returns.
+
 ## Methods
 
 Everything `useRender()` gives you.
@@ -142,6 +173,7 @@ Everything `useRender()` gives you.
 | `getRenderPolicy()`                        | The sizes the engine renders best at: any size on the local engine, a short list of widths on a CloudPDF server. See [Render policy](/docs/engine/documents/rendering#render-policy). |
 | `canRender()`                              | Whether page images are allowed. [Permissions](#permissions)                                                                                     |
 | `canRenderThumbnail()`                     | Whether thumbnails are allowed. [Permissions](#permissions)                                                                                      |
+| `handOverPictures(painter)`, `getPicturePainter()` | Lets another plugin paint the pages' pictures until the function it returns is called, and which one does, or `null`. [Paint the pictures another way](#paint-the-pictures-another-way) |
 | `getSettings()`, `updateSettings(changes)`, `resetSettings()` | Reads the settings, changes them while the app runs, or goes back to what you registered. In a component, use `useRenderSettings()`. [Settings](#settings) |
 
 Every method that returns a promise also takes a `signal` in its options, to cancel it.
