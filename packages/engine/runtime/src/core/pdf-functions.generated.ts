@@ -136,6 +136,7 @@ export interface PdfFunctions {
   EPDFAnnot_GetRotate: (arg0: Ptr, arg1: Ptr) => boolean;
   EPDFAnnot_GetShapeCaption: (arg0: Ptr, arg1: Ptr, arg2: Ptr, arg3: Ptr) => boolean;
   EPDFAnnot_GetStampDrawing: (arg0: Ptr) => number;
+  EPDFAnnot_GetStructurePosition: (arg0: Ptr, arg1: Ptr, arg2: number) => number;
   EPDFAnnot_GetTextAlignment: (arg0: Ptr) => number;
   EPDFAnnot_HasAppearanceStream: (arg0: Ptr, arg1: number) => boolean;
   EPDFAnnot_HasEmbedMetadata: (arg0: Ptr) => boolean;
@@ -1209,6 +1210,7 @@ export const pdfFunctionSignatures = {
   EPDFAnnot_GetRotate: { params: [{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}},{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}}], result: {"ts":"boolean","wasm":{"kind":"bool","cwrap":"boolean"},"native":{"kind":"bool","cwrap":"boolean"}} },
   EPDFAnnot_GetShapeCaption: { params: [{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}},{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}},{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}},{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}}], result: {"ts":"boolean","wasm":{"kind":"bool","cwrap":"boolean"},"native":{"kind":"bool","cwrap":"boolean"}} },
   EPDFAnnot_GetStampDrawing: { params: [{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}}], result: {"ts":"number","wasm":{"kind":"i32","cwrap":"number"},"native":{"kind":"i32","cwrap":"number"}} },
+  EPDFAnnot_GetStructurePosition: { params: [{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}},{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}},{"ts":"number","wasm":{"kind":"i32","cwrap":"number"},"native":{"kind":"i32","cwrap":"number"}}], result: {"ts":"number","wasm":{"kind":"i32","cwrap":"number"},"native":{"kind":"i32","cwrap":"number"}} },
   EPDFAnnot_GetTextAlignment: { params: [{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}}], result: {"ts":"number","wasm":{"kind":"i32","cwrap":"number"},"native":{"kind":"i32","cwrap":"number"}} },
   EPDFAnnot_HasAppearanceStream: { params: [{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}},{"ts":"number","wasm":{"kind":"i32","cwrap":"number"},"native":{"kind":"i32","cwrap":"number"}}], result: {"ts":"boolean","wasm":{"kind":"bool","cwrap":"boolean"},"native":{"kind":"bool","cwrap":"boolean"}} },
   EPDFAnnot_HasEmbedMetadata: { params: [{"ts":"Ptr","wasm":{"kind":"pointer","cwrap":"number"},"native":{"kind":"pointer","cwrap":"bigint"}}], result: {"ts":"boolean","wasm":{"kind":"bool","cwrap":"boolean"},"native":{"kind":"bool","cwrap":"boolean"}} },

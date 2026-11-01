@@ -60,6 +60,14 @@ export const annotationBaseFields = {
    * names, so this picks the one to show.
    */
   appearanceState: field.engine(z.string()).nullable(),
+  /**
+   * Where the annotation sits in the document's logical structure (its tags,
+   * ISO 32000-2 §14.7): from the structure tree's root down, the index of each
+   * step among its parent's kids. Compared index by index, positions give the
+   * reading order the tags say, the order a page's `/Tabs /S` gives its
+   * annotations focus in. `null` for an annotation that isn't tagged.
+   */
+  structurePosition: field.engine(z.array(z.number().int().nonnegative())).nullable(),
   nm: field.data(z.string()).nullable().optional().createOnly(),
   rect: field.data(PdfRectSchema).space('box'),
   contents: field.data(z.string()).nullable().optional(),

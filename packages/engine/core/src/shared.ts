@@ -44,6 +44,12 @@ export type { PageLabelSection, PageLabelStyle } from './dto/PageLabelSection';
 export type { NamedPageEntry, NamedPageTarget } from './dto/NamedPage';
 export type { PageLayout, PageBoxes, PageTabOrder } from './dto/PageLayout';
 export {
+  compareStructurePositions,
+  tabOrderOf,
+  type TabOrderItem,
+  type TabOrderPage,
+} from './pages/tabOrder';
+export {
   pagesAfter,
   pagesAfterRestore,
   pagesRelabelled,

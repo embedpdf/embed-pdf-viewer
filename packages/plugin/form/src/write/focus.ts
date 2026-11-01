@@ -1,15 +1,16 @@
 /**
  * Moving the cursor between fields: `focus()`, `focusNext()` (what Tab does), the arrow keys in a
  * radio group, and the field the cursor is in. This area decides where the cursor goes: which
- * field, which of its boxes, in Tab's order (`read/tab-order.ts`); the cursor service
+ * field, which of its boxes, in Tab's order (the engine's `tabOrderOf()`); the cursor service
  * (`services/cursor.ts`) brings the box into view and hands it to its control.
  */
 import { memo } from '@embedpdf/core';
-import type {
-  AnnotationRef,
-  FormFieldDTO,
-  FormFieldRef,
-  WidgetAnnotation,
+import {
+  tabOrderOf,
+  type AnnotationRef,
+  type FormFieldDTO,
+  type FormFieldRef,
+  type WidgetAnnotation,
 } from '@embedpdf/engine-core/runtime';
 
 import type { FormCapability, FormFocusNextOptions, FormFocusOptions } from '../contract';
@@ -23,7 +24,6 @@ import {
   widgetRowOf,
 } from '../model';
 import { isEmpty, widgetObjectOf } from '../read/fields';
-import { tabOrderOf } from '../read/tab-order';
 import type { FormContext, FormServices } from '../services';
 
 /** A place Tab stops at: a box, the field it belongs to, and where it comes in Tab's order. */
