@@ -585,6 +585,9 @@ export const pl: Locale = {
     demo: {
       starting: 'Uruchamianie przeglądarki…',
       opening: 'Otwieranie dokumentu…',
+      pageLoading: 'Wczytywanie strony {page}…',
+      pageError: 'Nie można wczytać tej strony.',
+      pageForbidden: 'Nie masz dostępu do tej strony.',
       more: 'Więcej',
       searchPlaceholder: 'Szukaj w dokumencie…',
       searchCaseSensitive: 'Uwzględniaj wielkość liter',

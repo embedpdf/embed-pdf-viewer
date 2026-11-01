@@ -311,6 +311,14 @@ once, without the browser downloading the whole PDF.
 
 </Engine>
 
+### Pages that take a moment
+
+A page whose picture takes more than 400 milliseconds to arrive shows a spinner, in the main view
+and in the thumbnails, until it's there; a page that shows quickly shows none. Getting sharper as
+you zoom in isn't loading, so it never spins. A page that can't load says so. Change the wait with
+`plugins: { render: { slowAfterMs: 200 } }`, and restyle the spinner or hide it with its
+[part](customize/theming#restyle-a-part), `page-loading`.
+
 ### Where the bytes go
 
 <Engine local>

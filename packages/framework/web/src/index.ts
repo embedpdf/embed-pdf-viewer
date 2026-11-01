@@ -78,7 +78,7 @@ export type {
   ActionsUiOrigin,
   DefaultActionsUiAdapterOptions,
 } from './actions-ui';
-export { bindPaintedImage } from './painted-image';
+export { afterPresented, bindPaintedImage, whenPresented } from './painted-image';
 export type { ObjectUrlImageSource, PaintedImageCallbacks } from './painted-image';
 export { vibrationFeedback, wkFeedback } from './feedback';
 export type { WebPlatformFeedback } from './feedback';

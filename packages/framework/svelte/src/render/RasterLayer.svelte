@@ -13,8 +13,8 @@
 -->
 <script lang="ts">
   import { untrack } from 'svelte';
-  import { RenderToken } from '@embedpdf/plugin-render/contract/host';
-  import { partsDrawnTwice, pictureLayerOptionsOf } from '@embedpdf/web';
+  import { RenderToken, type OpenPictureReport } from '@embedpdf/plugin-render/contract/host';
+  import { partsDrawnTwice, pictureLayerOptionsOf, whenPresented } from '@embedpdf/web';
   import { devWarn } from '../runtime/dev';
   import { usePage } from '../runtime/page';
   import { usePaintedParts } from '../runtime/page-layers.svelte';
@@ -73,10 +73,35 @@
 
   let image: HTMLImageElement | undefined;
 
+  // Which page and which view the layer reports on: the page context is a new value whenever the
+  // camera changes it, and these change only when the page or the view does.
+  const pageRef = $derived(page.ref);
+  const viewId = $derived(page.view);
+  /** The open report on this page, for the fetch to say it failed. */
+  let report: OpenPictureReport | null = null;
+
+  // The page is loading in this view until the base picture is on screen; the tiles only sharpen.
+  $effect(() => {
+    const renderer = render.current;
+    const ref = pageRef;
+    const view = viewId;
+    const element = image;
+    if (!renderer || !element) return;
+    const opened = untrack(() => renderer.reportPicture(view, ref));
+    report = opened;
+    const stop = whenPresented(element, () => opened.shown());
+    return () => {
+      stop();
+      opened.close();
+      if (report === opened) report = null;
+    };
+  });
+
   $effect(() => {
     const renderer = render.current;
     const key = sourceKey.current;
-    const ref = page.ref;
+    // The derived ref, not the page context: the camera moving is no new picture to fetch.
+    const ref = pageRef;
     const drawn = layers;
     if (!renderer || key === null || !drawn) return;
     const controller = new AbortController();
@@ -100,8 +125,10 @@
         // The source is set on a stable element: the browser keeps the old picture until the new
         // one decodes, and never asks for the old URL again, so revoking it on cleanup is safe.
         if (image) image.src = objectUrl.url;
-      } catch {
-        // Cancelled (the camera moved, the layer unmounted) or the render failed.
+      } catch (error) {
+        // Cancelled (the camera moved, the layer unmounted), or the render failed: the page
+        // can't show.
+        if (!controller.signal.aborted) report?.failed(error);
       }
     })();
     return () => {

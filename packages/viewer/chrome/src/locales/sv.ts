@@ -586,6 +586,9 @@ export const sv: Locale = {
     demo: {
       starting: 'Startar visaren…',
       opening: 'Öppnar dokumentet…',
+      pageLoading: 'Läser in sida {page}…',
+      pageError: 'Sidan kunde inte läsas in.',
+      pageForbidden: 'Du har inte åtkomst till den här sidan.',
       more: 'Mer',
       searchPlaceholder: 'Sök i dokumentet…',
       searchCaseSensitive: 'Skiftlägeskänslig',

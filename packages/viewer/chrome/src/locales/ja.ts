@@ -585,6 +585,9 @@ export const ja: Locale = {
     demo: {
       starting: 'ビューアーを起動しています…',
       opening: '文書を開いています…',
+      pageLoading: 'ページ {page} を読み込み中…',
+      pageError: 'このページを読み込めませんでした。',
+      pageForbidden: 'このページにはアクセスできません。',
       more: 'その他',
       searchPlaceholder: '文書を検索…',
       searchCaseSensitive: '大文字と小文字を区別',

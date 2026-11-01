@@ -583,6 +583,9 @@ export const zhCN: Locale = {
     demo: {
       starting: '正在启动查看器…',
       opening: '正在打开文档…',
+      pageLoading: '正在加载第 {page} 页…',
+      pageError: '无法加载此页面。',
+      pageForbidden: '您无权访问此页面。',
       more: '更多',
       searchPlaceholder: '搜索文档…',
       searchCaseSensitive: '区分大小写',
