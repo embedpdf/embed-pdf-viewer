@@ -14,7 +14,7 @@
  * for a protected user.
  */
 import { cloudEngine, type CloudEngineOptions } from '@cloudpdf/engine';
-import { protectedDisplayPlugin } from '@cloudpdf/protected-display';
+import { protectedDisplayPlugin } from '@cloudpdf/plugin-protected-display';
 import { EmbedPdfViewerElement } from '@embedpdf/viewer/core';
 
 import { openInputOf } from './config';

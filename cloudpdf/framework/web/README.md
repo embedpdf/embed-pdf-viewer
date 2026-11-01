@@ -6,12 +6,12 @@ and take what they need from the host through a port.
 
 ## The protected display player
 
-`browserProtectedPlayer()` plays the frames of `@cloudpdf/protected-display`: the page as
+`browserProtectedPlayer()` plays the frames of `@cloudpdf/plugin-protected-display`: the page as
 DRM-protected video, in two videos with the keys of one viewing session, through Encrypted Media
 Extensions and Media Source. FairPlay in Safari, Widevine in Chrome, Edge and Firefox.
 
 ```ts
-import { protectedDisplayPlugin } from '@cloudpdf/protected-display';
+import { protectedDisplayPlugin } from '@cloudpdf/plugin-protected-display';
 
 protectedDisplayPlugin({
   // Loaded only for a user who sees the pages as protected video.

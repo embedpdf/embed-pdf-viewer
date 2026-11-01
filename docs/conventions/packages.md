@@ -62,6 +62,16 @@ sit flat: a group level over a lone package carries no information.
 sibling it regroups then — repo paths are internal, so unlike npm names a move
 costs nothing but the churn.
 
+The one exception is a group that carries rules. A plugin is a kind of package:
+it has an anatomy ([`plugins.md`](./plugins.md)), a `/contract` entry, and it
+stays DOM-free, and the tools that hold it to that (the lint rules,
+`pnpm check:plugin-boundaries`) find plugins by their folder. The browser code
+those plugins leave out has its own group in the same way. So **`plugin/` and
+`framework/` exist in both trees, even over one package**:
+`cloudpdf/plugin/protected-display` → `@cloudpdf/plugin-protected-display`, and
+`cloudpdf/framework/web` → `@cloudpdf/web`, the CloudPDF tree's `@embedpdf/web`.
+A CloudPDF plugin never sits flat.
+
 Two consequences worth stating, because both have already caught us:
 
 - **Nothing may reconstruct a package's directory from its npm name.** Clause 1
@@ -70,8 +80,9 @@ Two consequences worth stating, because both have already caught us:
   the release workflows do.
 - **Cross-scope names collide on their last segment.** `@embedpdf/viewer-react`
   and `@cloudpdf/viewer-react` are the two doors of one product — deliberately
-  parallel — so anything keyed on the short name (release assets, cache keys,
-  directories) must carry the scope.
+  parallel — and `@embedpdf/web` and `@cloudpdf/web` both live in a
+  `framework/web`, so anything keyed on the short name (release assets, cache
+  keys, directories) must carry the scope.
 
 Viewer wrappers keep the `viewer-` prefix in both scopes; clause 3's bare
 naming is for `framework/` adapters only. `@cloudpdf/react` is free on npm but

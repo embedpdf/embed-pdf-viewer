@@ -6,13 +6,13 @@
  * through Encrypted Media Extensions and Media Source. The plugin decides which DRM system, which
  * frames and where they sit, and speaks to the server.
  *
- * Structurally `ProtectedPlayer` from `@cloudpdf/protected-display`, declared here so this package
- * stays dependency-free.
+ * Structurally `ProtectedPlayer` from `@cloudpdf/plugin-protected-display`, declared here so
+ * this package stays dependency-free.
  */
 import { accessTo, codecFor } from './protected-keys';
 import { openScreen } from './protected-screen';
 
-/** Structural twin of `KeySystemName` (`@cloudpdf/protected-display`). */
+/** Structural twin of `KeySystemName` (`@cloudpdf/plugin-protected-display`). */
 export type WebKeySystemName = 'fairplay' | 'widevine' | 'clearkey';
 
 /** Structural twin of `FrameCodec`. */

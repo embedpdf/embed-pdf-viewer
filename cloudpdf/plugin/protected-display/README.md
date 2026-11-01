@@ -1,4 +1,4 @@
-# @cloudpdf/protected-display
+# @cloudpdf/plugin-protected-display
 
 Screenshot protection for the CloudPDF viewer. For a user who may see a document's pages as
 protected video (`protected-display.view`) but not render them (no `doc.render`), the plugin shows
@@ -9,7 +9,7 @@ form fields stay the viewer's, on top.
 The CloudPDF viewer (`@cloudpdf/viewer`) includes it. In a headless viewer, add it with a player:
 
 ```ts
-import { protectedDisplayPlugin } from '@cloudpdf/protected-display';
+import { protectedDisplayPlugin } from '@cloudpdf/plugin-protected-display';
 
 const plugins = [
   /* the render and stage plugins, … */

@@ -34,8 +34,8 @@ const hostOnlyGlobals = [
   })),
 ];
 
-/** Every plugin's source: EmbedPDF's, and CloudPDF's (the protected display plugin). */
-const pluginSources = ['packages/plugin/*/src/**/*.ts', 'cloudpdf/protected-display/src/**/*.ts'];
+/** Every plugin's source, in both trees' `plugin/` groups (docs/conventions/packages.md). */
+const pluginSources = ['{packages,cloudpdf}/plugin/*/src/**/*.ts'];
 
 /** @type {import("eslint").Linter.FlatConfig[]} */
 module.exports = [
@@ -116,7 +116,7 @@ module.exports = [
     files: [
       'packages/{core,plugin,framework,viewer}/*/src/**/*.{ts,tsx}',
       'packages/framework/angular/*/src/**/*.ts',
-      'cloudpdf/{protected-display,web}/src/**/*.ts',
+      'cloudpdf/{plugin,framework}/*/src/**/*.ts',
     ],
     rules: {
       'id-length': [

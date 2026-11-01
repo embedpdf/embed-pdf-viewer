@@ -12,7 +12,7 @@
       "@cloudpdf/contract",
       "@cloudpdf/sdk",
       "@cloudpdf/engine",
-      "@cloudpdf/protected-display",
+      "@cloudpdf/plugin-protected-display",
       "@cloudpdf/server",
       "@cloudpdf/server-modules",
       "@cloudpdf/viewer",
