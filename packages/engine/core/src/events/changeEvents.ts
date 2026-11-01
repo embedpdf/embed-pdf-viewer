@@ -156,7 +156,8 @@ function itemEvents(item: ChangeItem): DocumentEventInit[] {
       return [{ type: 'pages.deleted', ...result }];
     }
     case 'pages.insertBlank':
-    case 'pages.insert': {
+    case 'pages.insert':
+    case 'pages.copy': {
       const { type: _type, ...result } = item;
       return [{ type: 'pages.inserted', ...result }];
     }

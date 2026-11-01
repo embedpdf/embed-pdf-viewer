@@ -16,7 +16,7 @@ const engine = {
     Promise.resolve({
       id: input.id,
       events: { subscribe: () => () => {}, lastServerId: () => null },
-      pages: { list: () => Promise.resolve({ pageCount: 0, pages: [] }) },
+      pages: { list: () => Promise.resolve({ pageCount: 0, labels: [], pages: [] }) },
       security: { allows: () => true },
       close: () => Promise.resolve(),
     } as unknown as DocumentHandle),

@@ -121,7 +121,9 @@ async function boot(fixtures: PageFixture[], allow = ALL, config?: SelectionConf
       },
       lastServerId: () => null,
     },
-    pages: { list: () => Promise.resolve({ pageCount: pages.length, pages: layout() }) },
+    pages: {
+      list: () => Promise.resolve({ pageCount: pages.length, labels: [], pages: layout() }),
+    },
     security: { allows: (scope: string) => allow.has(scope) },
     page: (ref: { objectNumber: number }) => ({
       text: {
@@ -171,11 +173,14 @@ async function boot(fixtures: PageFixture[], allow = ALL, config?: SelectionConf
       emit({
         type: 'pages.deleted',
         pages: [toPageRef(pageObjectNumber)],
-        layout: { pageCount: pages.length, pages: layout() },
+        layout: { pageCount: pages.length, labels: [], pages: layout() },
       });
     },
     rotateAll: () =>
-      emit({ type: 'pages.rotated', layout: { pageCount: pages.length, pages: layout(90) } }),
+      emit({
+        type: 'pages.rotated',
+        layout: { pageCount: pages.length, labels: [], pages: layout(90) },
+      }),
   };
 }
 

@@ -8,12 +8,13 @@
  *   of just the part on screen. Any movement hides it at once, and the page layer under it never
  *   changed.
  * - A page whose content changed keeps showing until its new frame is on screen.
+ * - A lent box's page is loading (its `report`) until its first frame is on screen.
  * - Graphics may drop a paused video when it changes size (a size the chip can't hold, a reset
  *   after sleep), and it stays black until it draws again: when the view rests at a new size, the
  *   page layer draws its frame again.
  */
 import { encodePageKey, type Cancel, type PageRef, type PluginClock } from '@embedpdf/core';
-import type { PicturePage } from '@embedpdf/plugin-render/contract';
+import type { PicturePage, PictureReport } from '@embedpdf/plugin-render/contract';
 import type { Rect } from '@embedpdf/plugin-stage/contract/host';
 
 import type { ProtectedScreen } from '../contract';
@@ -23,10 +24,12 @@ import { messageOf } from './routes';
 /** How long the view stays still before the sharp frame is asked for. */
 const REST_MS = 250;
 
-/** A box a page layer lent the plugin, and the page as the layer shows it now. */
+/** A box a page layer lent the plugin, the page as the layer shows it now, and its report. */
 export interface LentPage {
   readonly host: unknown;
   page: PicturePage;
+  /** The page's loading state: `shown()` once a frame of it is on screen. */
+  readonly report: PictureReport;
 }
 
 export interface DisplayOptions {
@@ -95,9 +98,11 @@ export function createDisplay(options: DisplayOptions): Display {
       await screen.page.show(frame.key);
       if (mine !== turns) return;
       shown = frame;
+      lent.report.shown();
       drawnSize = shownSizeOf(lent.page.transform);
       rest();
     } catch (error) {
+      if (mine === turns && !signal.aborted) lent.report.failed(error);
       report(error);
     }
   }

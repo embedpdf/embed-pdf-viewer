@@ -62,8 +62,8 @@ export interface AnnotationUpdateOptions extends WriteOptions {
 /** `page.annotations.flatten(refs, options)` and `pages.flatten(pages, options)`. */
 export interface FlattenWriteOptions extends FlattenOptions, WriteOptions {}
 
-/** `pages.insertBlank(spec, position, options)`. */
-export interface PageInsertBlankOptions extends WriteOptions {
+/** `pages.insertBlank(spec, position, options)`, `pages.insert` and `pages.copy`. */
+export interface PageInsertOptions extends WriteOptions {
   /**
    * The object numbers the new pages get, in order, one per page: numbers
    * this document's `objectNumbers` pool handed out. Without them the engine

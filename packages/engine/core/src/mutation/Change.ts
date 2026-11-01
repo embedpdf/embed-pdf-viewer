@@ -291,10 +291,28 @@ export type ChangeOp<C extends Coordinates = PageCoordinates, R = AnnotationReso
       readonly objectNumbers?: readonly number[];
     }
   | {
-      /** Every page of the PDF `source`, copied in at `position` (the end when left out). */
+      /**
+       * Every page of the PDF `source`, copied in at `position` (the end when
+       * left out), each at the number `objectNumbers` gives it, in order, when
+       * it gives one.
+       */
       readonly type: 'pages.insert';
       readonly source: Uint8Array;
       readonly position?: PagePosition;
+      readonly objectNumbers?: readonly number[];
+    }
+  | {
+      /**
+       * A copy of each of `pages`, in the order given, at `position` (the end
+       * when left out), each at the number `objectNumbers` gives it, in order,
+       * when it gives one. The copies bring the pages' annotations, and their
+       * form fields as fields of their own (a name the document uses gets a
+       * free one, as an insert's do).
+       */
+      readonly type: 'pages.copy';
+      readonly pages: readonly PageRef[];
+      readonly position?: PagePosition;
+      readonly objectNumbers?: readonly number[];
     }
   | {
       /**
@@ -483,6 +501,7 @@ export type ChangeItem<C extends Coordinates = PageCoordinates> =
     } & PageDeleteResult<C>)
   | ({ type: 'pages.insertBlank' } & PageInsertResult<C>)
   | ({ type: 'pages.insert' } & PageInsertResult<C>)
+  | ({ type: 'pages.copy' } & PageInsertResult<C>)
   /** An undo of a delete, or a redo of an insert: the pages it brought back. */
   | ({ type: 'pages.restore' } & PageRestoreResult<C>)
   | ({ type: 'attachments.create' } & AttachmentCreateResult)
@@ -569,6 +588,8 @@ export function objectNumbersNamedBy<C extends Coordinates, R>(
         if (op.objectNumber !== undefined) named.push(op.objectNumber);
         break;
       case 'pages.insertBlank':
+      case 'pages.insert':
+      case 'pages.copy':
         named.push(...(op.objectNumbers ?? []));
         break;
       default:

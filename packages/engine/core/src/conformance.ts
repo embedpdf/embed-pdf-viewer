@@ -120,6 +120,10 @@ export { runPageFormFieldsConformance } from './conformance/runPageFormFieldsCon
 export type { PageFormFieldsConformanceOptions } from './conformance/runPageFormFieldsConformance';
 export { runPageInsertBlankConformance } from './conformance/runPageInsertBlankConformance';
 export {
+  runPageCopyConformance,
+  type PageCopyConformanceOptions,
+} from './conformance/runPageCopyConformance';
+export {
   OBJECT_NUMBER_FIXTURE_PDF,
   runObjectNumberConformance,
   type ObjectNumberConformanceOptions,
@@ -211,6 +215,11 @@ export {
   runFormPredictionConformance,
   type FormPredictionConformanceOptions,
 } from './conformance/runFormPredictionConformance';
+export {
+  PAGE_PREDICTION_FIXTURE_PDF,
+  runPagePredictionConformance,
+  type PagePredictionConformanceOptions,
+} from './conformance/runPagePredictionConformance';
 export {
   FIELD_GROUP_TOKENS,
   FIELD_GROUPS_PDF,

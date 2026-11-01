@@ -67,6 +67,37 @@ out, `true` draws it. A clean preview without the annotations:
 
 <Snippet name="viewing/render-without-annotations" />
 
+## Show that a page is loading
+
+The first picture of a page can take a moment: a heavy page, a slow connection, a server that's
+just starting. Until it's on screen, the page shows its background, which looks like a blank page.
+Put a layer of your own in each page, after the render layer, that shows an indicator while its
+page waits:
+
+<Snippet name="viewing/page-loading" />
+
+<Fw only={['react', 'vue', 'svelte']}>`usePictureState()`</Fw><Fw only="angular">`injectPictureState()`</Fw>
+reads the page it's in. `status` is `'loading'` until a picture of the page is on screen, then
+`'ready'`. `slow` turns on once the page has waited 400 milliseconds, so a page that shows quickly
+never flashes an indicator. Getting sharper isn't loading: tiles arriving as you zoom, and a page
+redrawing after a change, keep the old picture on screen, so the page stays `'ready'`.
+
+| `status`      | What it means                                                                         |
+| :------------ | :------------------------------------------------------------------------------------ |
+| `'idle'`      | The view doesn't show this page                                                       |
+| `'loading'`   | The page is in the view, and no picture of it is on screen yet                        |
+| `'ready'`     | A picture of it is on screen                                                          |
+| `'forbidden'` | The user may not see it: no [`doc.render`](#permissions)                              |
+| `'error'`     | It couldn't be drawn, for example after a network failure                             |
+
+Each view has its own: a page can be `'ready'` in the main view while its thumbnail still loads.
+Outside a page, `render.getPictureState(page, view)` reads the same, and `onPictureStateChanged`
+fires on every change. Change the wait with `slowAfterMs`; `0` turns `slow` on at once:
+
+```ts
+renderPlugin({ slowAfterMs: 200 });
+```
+
 ## Render a page yourself
 
 For your own preview, an export or a page picker, render any page on demand:
@@ -136,9 +167,13 @@ the pictures over from the render plugin:
 ```ts
 const giveBack = render.handOverPictures({
   paints: (view) => view === mainView, // the views it paints; the others keep the render plugin's
-  paint(host, page) {
+  paint(host, page, report) {
     // host: an empty box over the page's content, page: the page as the layers see it
     const picture = drawInto(host, page);
+    picture.ready.then(
+      () => report.shown(), // its picture is on screen
+      (error) => report.failed(error), // it can't paint this page
+    );
     return {
       update: (page) => picture.follow(page.transform), // the zoom or the turn changed
       destroy: () => picture.remove(),
@@ -154,6 +189,10 @@ doesn't paint, such as a strip of thumbnails, keeps the render plugin's pictures
 
 - **`page`** has the page's `ref`, `pageIndex`, `view`, `transform` (its size, zoom and turn on
   screen) and `getViewDemand()` (the part of it on screen), the same in every framework.
+- **`report`** is how the page's [loading state](#show-that-a-page-is-loading) knows: the page is
+  `'loading'` until you call `report.shown()`, once its first picture is on screen.
+  `report.failed(error)` makes it `'error'`, or `'forbidden'` for a `permission-denied` error.
+  Later pictures of the same page don't report: the page keeps showing until they're there.
 - **One painter at a time.** A second one is refused (`conflict`) until the first is given back.
 - **Take them over in your plugin's `connect()`**, and the pages never show the render plugin's
   picture first: every plugin connects before the document shows. The hand-over lasts until the
@@ -171,6 +210,7 @@ Everything `useRender()` gives you.
 | `invalidate({ pages?, scope? })`           | Redraws pages after a change the plugin can't see; without `pages`, every page. [When a page changes](#when-a-page-changes)                      |
 | `getRenderEpoch(page, layers?)`            | A number that changes whenever the page's pixels do, for a picture that draws what `layers` says (`includeAnnotations`, `includeFormFields`, as above). Key your own long-lived renders on it. |
 | `getRenderPolicy()`                        | The sizes the engine renders best at: any size on the local engine, a short list of widths on a CloudPDF server. See [Render policy](/docs/engine/documents/rendering#render-policy). |
+| `getPictureState(page, view)`              | Whether a picture of the page is on screen in a view: `{ status, slow }`. [Show that a page is loading](#show-that-a-page-is-loading) |
 | `canRender()`                              | Whether page images are allowed. [Permissions](#permissions)                                                                                     |
 | `canRenderThumbnail()`                     | Whether thumbnails are allowed. [Permissions](#permissions)                                                                                      |
 | `handOverPictures(painter)`, `getPicturePainter()` | Lets another plugin paint the pages' pictures until the function it returns is called, and which one does, or `null`. [Paint the pictures another way](#paint-the-pictures-another-way) |
@@ -194,6 +234,7 @@ Set them when you register the plugin, and change them while the app runs with
 | `tiles.prefetch.margin`       | How far around the view to load tiles, as a share of the view         | `0.5`            |
 | `tiles.prefetch.velocityBias` | Load further ahead in the direction you're scrolling                  | `true`           |
 | `tiles.settleMs`              | How long a zoom rests before tiles redraw                             | `150`            |
+| `slowAfterMs`                 | How long a page waits for its picture before it counts as `slow`      | `400`            |
 | `format`                      | `'png'`, `'webp'`, or `'bmp'` (fastest, local engine only)            | per engine       |
 | `quality`                     | WebP quality, from `0` to `1`                                         | per engine       |
 | `debug`                       | Log what the plugin renders, and why, to the console                  | `false`          |
@@ -211,6 +252,7 @@ which needs only `doc.render.thumbnail`.
 | Event           | Fires when                                  | Carries                      |
 | :-------------- | :------------------------------------------ | :--------------------------- |
 | `onInvalidated` | Pages' pixels changed and they will redraw  | `pages`, `scope`, `origin`   |
+| `onPictureStateChanged` | A page's picture came on screen, failed, went slow, or left its view | `page`, `view`, `status`, `slow` |
 | `onSettingsChanged` | The settings changed | `settings`, `changed` |
 
 ## Permissions
@@ -221,7 +263,8 @@ which needs only `doc.render.thumbnail`.
 | `doc.render.thumbnail` | Thumbnails only (`<RenderLayer thumbnail />`, `renderThumbnail`) | `render.canRenderThumbnail()` |
 
 Without `doc.render`, pages keep their size and place, so the Stage still scrolls and the other
-plugins still work, but nothing is painted. A strip of thumbnails still draws with
+plugins still work, but nothing is painted: each page's [state](#show-that-a-page-is-loading) is
+`'forbidden'`. A strip of thumbnails still draws with
 `doc.render.thumbnail`.
 
 ## Good to know

@@ -1,7 +1,7 @@
 import { manualClock } from '@embedpdf/core/testing';
 import type { PicturePage } from '@embedpdf/plugin-render/contract';
 import type { Rect } from '@embedpdf/plugin-stage/contract/host';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { createDisplay, type LentPage } from '../../src/services/display';
 import { pageFrameOf } from '../../src/services/frames';
@@ -22,7 +22,11 @@ function displayed() {
     onProblem: (message) => problems.push(message),
     signal: new AbortController().signal,
   });
-  const lend = (page: PicturePage): LentPage => ({ host: { box: page.pageIndex }, page });
+  const lend = (page: PicturePage): LentPage => ({
+    host: { box: page.pageIndex },
+    page,
+    report: { shown: vi.fn(), failed: vi.fn() },
+  });
   return {
     display,
     screen,
@@ -211,5 +215,25 @@ describe('the display', () => {
     display.show(lent);
     await settle();
     expect(problems).toEqual(['a frame was refused (403): no']);
+    expect(lent.report.failed).toHaveBeenCalledTimes(1);
+    expect(lent.report.shown).not.toHaveBeenCalled();
+  });
+
+  it('reports a page shown once its frame is on screen, and never a page passed by', async () => {
+    const { display, frames, lend } = displayed();
+    frames.holding = true;
+    const passed = lend(pictureOf(1));
+    const current = lend(pictureOf(2));
+    display.show(passed);
+    display.show(current);
+    frames.requests[0].arrive();
+    await settle();
+    expect(passed.report.shown).not.toHaveBeenCalled();
+    expect(current.report.shown).not.toHaveBeenCalled();
+
+    frames.requests[1].arrive();
+    await settle();
+    expect(current.report.shown).toHaveBeenCalledTimes(1);
+    expect(passed.report.shown).not.toHaveBeenCalled();
   });
 });

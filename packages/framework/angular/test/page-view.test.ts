@@ -163,7 +163,7 @@ describe('<epdf-page-view>', () => {
       open: () =>
         Promise.resolve({
           ...handle,
-          pages: { list: () => Promise.resolve({ pageCount: 1, pages: [turned] }) },
+          pages: { list: () => Promise.resolve({ pageCount: 1, labels: [], pages: [turned] }) },
         }),
       destroy: () => Promise.resolve(),
     } as unknown as Engine;

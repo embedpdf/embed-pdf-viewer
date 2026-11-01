@@ -566,6 +566,9 @@ export const it: Locale = {
     demo: {
       starting: 'Avvio del visualizzatore…',
       opening: 'Apertura del documento…',
+      pageLoading: 'Caricamento della pagina {page}…',
+      pageError: 'Impossibile caricare questa pagina.',
+      pageForbidden: 'Non hai accesso a questa pagina.',
       more: 'Altro',
       searchPlaceholder: 'Cerca nel documento…',
       searchCaseSensitive: 'Maiuscole/minuscole',

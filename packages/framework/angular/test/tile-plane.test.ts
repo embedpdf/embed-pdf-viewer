@@ -3,16 +3,23 @@
  * are the same, holds its page's claim on it while the page is the same, and only sends a new
  * demand when the camera moves; a tile tells its view when its picture is painted and when it
  * goes, the second also as the element is destroyed (an output emitted then would be dropped).
+ * The page's picture state: the layer reports its page loading until the base picture is on
+ * screen, a painter is handed the report, and `injectPictureState()` reads it back.
  */
-import { Component, provideZonelessChangeDetection, signal } from '@angular/core';
+import { Component, input, provideZonelessChangeDetection, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { EPDF_PAGE } from '@embedpdf/angular/runtime';
 import { EpdfPageView } from '@embedpdf/angular/page-view';
-import { EpdfRenderLayer } from '@embedpdf/angular/render';
+import { EpdfRenderLayer, injectPictureState } from '@embedpdf/angular/render';
 import { EpdfPageTemplate, EpdfStage, StageToken, withStage } from '@embedpdf/angular/stage';
 import { toPageRef, type AnyPlugin, type CapabilityToken, type PageRef } from '@embedpdf/core';
-import { RenderToken } from '@embedpdf/plugin-render';
+import {
+  RenderToken,
+  type PicturePainter,
+  type PictureReport,
+  type PictureState,
+} from '@embedpdf/plugin-render';
 import type {
   RenderHostCapability,
   TilePaintPlan,
@@ -56,6 +63,8 @@ const tile = {
   },
 } as unknown as TilePaintSource;
 
+const IDLE: PictureState = { status: 'idle', slow: false };
+
 /** A render plugin whose view's handle records what the tile plane does with it. */
 function fakeRender() {
   /** Every demand the plane sends: the page and how wide it wants it. */
@@ -80,23 +89,72 @@ function fakeRender() {
   };
   const createViewDemand = vi.fn(() => view);
   const paint = { tiles: true };
+  let painter: PicturePainter | null = null;
+  let notify = () => {};
+  /** Every report a layer opened: on which page and view, and what it said. */
+  const reports: {
+    view: string;
+    page: number;
+    shown: number;
+    failed: unknown[];
+    closed: boolean;
+  }[] = [];
+  /** Make every whole-page render fail with this, or succeed again with `null`. */
+  let failure: unknown = null;
+  const failWith = (error: unknown) => {
+    failure = error;
+  };
+  /** The picture states the fake answers, by `view:page`. */
+  const states = new Map<string, PictureState>();
+  const setPictureState = (view: string, page: number, state: PictureState) => {
+    states.set(`${view}:${page}`, state);
+    notify();
+  };
+  /** Hand the pictures to a painter, as `handOverPictures` does; `null` gives them back. */
+  const handOver = (next: PicturePainter | null) => {
+    painter = next;
+    notify();
+  };
   const task = <T>(value: T) =>
     Object.assign(Promise.resolve(value), { abortWith: () => Promise.resolve(value) });
   const api = {
+    getPicturePainter: () => painter,
     getPaintSettings: () => paint,
     getLayerRights: () => ({ annotations: true, formFields: true }),
     getSourceKey: (page: PageRef) => `page-${page.objectNumber}`,
     renderSource: (page: PageRef) =>
-      Promise.resolve({
-        objectUrl: () => task({ url: `blob:page-${page.objectNumber}`, revoke: () => {} }),
-      }),
+      failure
+        ? Promise.reject(failure)
+        : Promise.resolve({
+            objectUrl: () => task({ url: `blob:page-${page.objectNumber}`, revoke: () => {} }),
+          }),
     createViewDemand,
+    reportPicture: (view: string, page: PageRef) => {
+      const entry = {
+        view,
+        page: page.objectNumber,
+        shown: 0,
+        failed: [] as unknown[],
+        closed: false,
+      };
+      reports.push(entry);
+      return {
+        shown: () => void (entry.shown += 1),
+        failed: (error: unknown) => void entry.failed.push(error),
+        close: () => void (entry.closed = true),
+      };
+    },
+    getPictureState: (page: PageRef, view: string) =>
+      states.get(`${view}:${page.objectNumber}`) ?? IDLE, // the same object while the same, as the plugin's
   } as unknown as RenderHostCapability;
   const plugin: AnyPlugin = {
     id: 'render',
     scope: 'document',
     token: RenderToken,
-    create: () => ({ api }),
+    create: (ctx) => {
+      notify = () => ctx.notify();
+      return { api };
+    },
   };
   /** How often the tile's picture has been asked for: once per binding. */
   const pictureAsks = () =>
@@ -108,6 +166,10 @@ function fakeRender() {
     createViewDemand,
     replan,
     pictureAsks,
+    handOver,
+    reports,
+    failWith,
+    setPictureState,
   };
 }
 
@@ -262,5 +324,135 @@ describe('a tile', () => {
     fixture.componentInstance.shown.set(false);
     await fixture.whenStable();
     expect(view.markUnpainted).toHaveBeenCalledWith(toPageRef(1), 'tile-1');
+  });
+});
+
+/** The page's state as text: `loading slow`, `ready`, … */
+@Component({
+  selector: 'test-picture-state',
+  template: `{{ picture().status }}{{ picture().slow ? ' slow' : '' }}`,
+})
+class PictureStateProbe {
+  protected readonly picture = injectPictureState();
+}
+
+/** One page in a page view, with its state shown when `probe`; `shown` takes the page away. */
+@Component({
+  selector: 'test-one-page',
+  imports: [EpdfPageView, EpdfRenderLayer, PictureStateProbe],
+  template: `
+    @if (shown()) {
+      <epdf-page-view [page]="0" [width]="300">
+        <epdf-render-layer />
+        @if (probe()) {
+          <test-picture-state />
+        }
+      </epdf-page-view>
+    }
+  `,
+})
+class OnePage {
+  readonly probe = input(false);
+  readonly shown = signal(true);
+}
+
+/** The page's whole-page picture: the layer's own <img>, the one tiles sit over. */
+const basePicture = (root: HTMLElement) =>
+  root.querySelector('epdf-render-layer > img') as HTMLImageElement | null;
+
+async function onePage(render: ReturnType<typeof fakeRender>, probe = false) {
+  const fixture = await mount(
+    viewerHost({
+      imports: [OnePage],
+      config: { engine: fakeEngine(1).engine },
+      features: [render.feature],
+      template: `<test-one-page [probe]="${probe}" />`,
+    }),
+  );
+  await kernelOf(fixture).documents.open(bytesInput('a'));
+  const page = fixture.debugElement.children[0]!.componentInstance as OnePage;
+  return { fixture, page };
+}
+
+describe("the page's picture state", () => {
+  it('reports the page loading in its view until the base picture presented, and closes with the layer', async () => {
+    const render = fakeRender();
+    const { fixture, page } = await onePage(render);
+    await vi.waitFor(async () => {
+      await fixture.whenStable();
+      expect(basePicture(fixture.nativeElement)?.getAttribute('src')).toBe('blob:page-1');
+    });
+    expect(render.reports).toHaveLength(1);
+    const report = render.reports[0]!;
+    expect(report.page).toBe(1);
+    expect(report.shown).toBe(0); // not loaded yet
+
+    basePicture(fixture.nativeElement)!.dispatchEvent(new Event('load'));
+    await vi.waitFor(() => expect(report.shown).toBe(1)); // after a frame presented it
+
+    page.shown.set(false);
+    await fixture.whenStable();
+    expect(report.closed).toBe(true);
+  });
+
+  it('reports a render that fails', async () => {
+    const render = fakeRender();
+    const refused = new Error('refused');
+    render.failWith(refused);
+    const { fixture } = await onePage(render);
+    await vi.waitFor(async () => {
+      await fixture.whenStable();
+      expect(render.reports[0]?.failed).toEqual([refused]);
+    });
+    expect(render.reports[0]!.shown).toBe(0);
+  });
+
+  it("hands a painter the page's report, and closes it when the painter is given back", async () => {
+    const render = fakeRender();
+    const { fixture } = await onePage(render);
+    await vi.waitFor(async () => {
+      await fixture.whenStable();
+      expect(render.reports).toHaveLength(1);
+    });
+    const handed: PictureReport[] = [];
+    render.handOver({
+      paints: () => true,
+      paint: (_host, _page, report) => {
+        handed.push(report);
+        return { update: () => {}, destroy: () => {} };
+      },
+    });
+    await vi.waitFor(async () => {
+      await fixture.whenStable();
+      expect(handed).toHaveLength(1);
+    });
+    expect(render.reports[0]!.closed).toBe(true); // the base went, and its report with it
+    const report = render.reports.find((entry) => !entry.closed)!;
+
+    handed[0]!.shown();
+    expect(report.shown).toBe(1);
+
+    render.handOver(null);
+    await fixture.whenStable();
+    expect(report.closed).toBe(true);
+  });
+
+  it('reads the state of the page it is drawn on, in its view', async () => {
+    const render = fakeRender();
+    const { fixture } = await onePage(render, true);
+    const probe = () => fixture.nativeElement.querySelector('test-picture-state')?.textContent;
+    await vi.waitFor(async () => {
+      await fixture.whenStable();
+      expect(probe()).toBe('idle');
+      expect(render.reports).toHaveLength(1);
+    });
+    const view = render.reports[0]!.view;
+
+    render.setPictureState(view, 1, { status: 'loading', slow: true });
+    await fixture.whenStable();
+    expect(probe()).toBe('loading slow');
+    render.setPictureState('another view', 1, { status: 'ready', slow: false });
+    await fixture.whenStable();
+    expect(probe()).toBe('loading slow');
   });
 });

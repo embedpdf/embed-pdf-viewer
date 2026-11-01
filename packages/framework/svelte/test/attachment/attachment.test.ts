@@ -39,7 +39,7 @@ const attachmentEngine = {
     Promise.resolve({
       id: input.id ?? 'doc',
       events: { subscribe: () => () => {}, lastServerId: () => null },
-      pages: { list: () => Promise.resolve({ pageCount: 1, pages: [testPage] }) },
+      pages: { list: () => Promise.resolve({ pageCount: 1, labels: [], pages: [testPage] }) },
       security: { allows: () => true, allowsAnnotation: () => true },
       attachments: { list: () => Promise.resolve({ attachments: files }) },
       close: () => Promise.resolve(),

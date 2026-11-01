@@ -13,7 +13,7 @@ import type { PageRotateResult } from '../mutation/PageRotateResult';
 import type { PageFlattenResult } from '../mutation/PageFlattenResult';
 import type {
   FlattenWriteOptions,
-  PageInsertBlankOptions,
+  PageInsertOptions,
   WriteOptions,
 } from '../mutation/WriteOptions';
 import { AbortablePromise } from '../promise/AbortablePromise';
@@ -23,7 +23,7 @@ import { AbortablePromise } from '../promise/AbortablePromise';
  *
  * Mirrors the shape of `DocumentAnnotationsService` so that anything
  * touching "many things at the document level" lives in one place: the
- * structure verbs (`reorder`, `rotate`, `delete`, `insert`, `insertBlank`),
+ * structure verbs (`reorder`, `rotate`, `delete`, `insert`, `insertBlank`, `copy`),
  * `extract`, `flatten` and the page names.
  *
  * Identity rule: pages are addressed by `PageRef` (the durable object
@@ -133,6 +133,10 @@ export interface DocumentPagesService {
    * transfers them to its worker, the cloud engine ships them as a part of
    * its change request.
    *
+   * `options.objectNumbers` names the new pages, one number per page of
+   * `bytes` in order, as `insertBlank`'s do; a count other than the PDF's
+   * page count is refused.
+   *
    * Required-parity, delivered — a cloud viewer must be able to add pages,
    * so this is a mandatory member: any engine implements it or is not a
    * conforming engine.
@@ -140,7 +144,7 @@ export interface DocumentPagesService {
   insert(
     bytes: Uint8Array | ArrayBuffer,
     position?: PagePosition,
-    options?: WriteOptions,
+    options?: PageInsertOptions,
   ): AbortablePromise<PageInsertResult>;
 
   /**
@@ -161,6 +165,24 @@ export interface DocumentPagesService {
   insertBlank(
     spec: PageInsertBlankSpec,
     position?: PagePosition,
-    options?: PageInsertBlankOptions,
+    options?: PageInsertOptions,
+  ): AbortablePromise<PageInsertResult>;
+
+  /**
+   * Copy `pages`, in the order given, to `position` (default `'end'`): the
+   * copies draw as the pages do and bring their annotations, and their form
+   * fields as fields of their own (a name the document already uses gets the
+   * first free `name_2`, `name_3`, as an insert's do). The same gate
+   * (`doc.pages.assemble`), result shape and `pages.inserted` event as
+   * `insert`, without the pages' bytes leaving the engine. A page named twice
+   * is copied twice. Mandatory, like `insert`.
+   *
+   * `options.objectNumbers` names the copies, one number per page in order,
+   * as `insertBlank`'s do.
+   */
+  copy(
+    pages: PageRef[],
+    position?: PagePosition,
+    options?: PageInsertOptions,
   ): AbortablePromise<PageInsertResult>;
 }

@@ -38,6 +38,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from 'react';
 
+import { PageLoading } from './page-loading';
 import { useCloseOnPick } from './panel-frame';
 import { slotMove, thumbDropAt, columnsOf, type ThumbBox, type ThumbDrop } from './thumbnail-drop';
 import { CommandButton } from './toolbar';
@@ -557,7 +558,12 @@ export function ThumbnailList() {
           }}
         >
           {/* page-space content: the bitmap, which rotates with the page */}
-          {() => <RenderLayer thumbnail />}
+          {() => (
+            <>
+              <RenderLayer thumbnail />
+              <PageLoading small />
+            </>
+          )}
         </Stage>
       </div>
     </div>

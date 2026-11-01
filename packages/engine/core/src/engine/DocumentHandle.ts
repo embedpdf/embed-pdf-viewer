@@ -140,9 +140,9 @@ export interface DocumentHandle {
   /**
    * This session's reserved object numbers: take one to name an object
    * before creating it (`page.annotations.create(data, { objectNumber })`,
-   * `pages.insertBlank(spec, position, { objectNumbers })`, `forms.create`,
-   * `forms.addWidget`). Its ref is then known at once and stays its name
-   * for life. Creates without a number still work; the engine picks one.
+   * `pages.insertBlank(spec, position, { objectNumbers })`, `pages.copy`,
+   * `pages.insert`, `forms.create`, `forms.addWidget`). Its ref is then known
+   * at once and stays its name for life. Creates without a number still work; the engine picks one.
    */
   readonly objectNumbers: ObjectNumberPool;
   /**

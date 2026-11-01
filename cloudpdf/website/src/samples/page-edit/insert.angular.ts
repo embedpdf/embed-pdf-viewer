@@ -39,7 +39,7 @@ const otherPdf = async () => (await fetch('/pdfs/welcome.pdf')).arrayBuffer();
         <button
           type="button"
           class="button"
-          [disabled]="!pageEdit.canEdit() || !pageEdit.canExtract()"
+          [disabled]="!pageEdit.canEdit()"
           (click)="duplicate(page.ref)"
         >
           Duplicate page

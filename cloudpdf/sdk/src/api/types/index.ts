@@ -28,6 +28,7 @@ export * from "./AttachmentList.js";
 export * from "./AttachmentMutationMeta.js";
 export * from "./CacheDelta.js";
 export * from "./ChangeItem.js";
+export * from "./ChangeItemPagesCopyLayoutNamedPagesItemTarget.js";
 export * from "./ChangeItemPagesDeleteLayoutNamedPagesItemTarget.js";
 export * from "./ChangeItemPagesInsertBlankLayoutNamedPagesItemTarget.js";
 export * from "./ChangeItemPagesInsertLayoutNamedPagesItemTarget.js";

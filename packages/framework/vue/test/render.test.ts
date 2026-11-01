@@ -1,9 +1,16 @@
 import { computed, h, ref } from 'vue';
+import type { VNodeChild } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { enableAutoUnmount } from '@vue/test-utils';
 import { toPageRef } from '@embedpdf/core';
 import type { AnyPlugin, CapabilityToken, DocumentHandle, Engine, PageRef } from '@embedpdf/core';
-import { RenderToken, type PicturePage, type PicturePainter } from '@embedpdf/plugin-render';
+import {
+  RenderToken,
+  type PicturePage,
+  type PicturePainter,
+  type PictureReport,
+  type PictureState,
+} from '@embedpdf/plugin-render';
 import type {
   PageLayerOptions,
   RenderHostCapability,
@@ -15,7 +22,7 @@ import type { StageHostCapability } from '@embedpdf/plugin-stage/contract/host';
 import { usePaintsPagePart } from '../src/page-layers';
 import { DocumentGate, usePage } from '../src/runtime';
 import { PageView } from '../src/page-view';
-import { RenderLayer } from '../src/render';
+import { RenderLayer, usePictureState } from '../src/render';
 import { Stage, StageToken, stagePlugin } from '../src/stage';
 import { bytesInput, probe, settle, until, viewerWith } from './counter-plugin';
 
@@ -39,6 +46,8 @@ const tile = {
     })),
   } as never,
 };
+
+const IDLE: PictureState = { status: 'idle', slow: false };
 
 /** A render plugin that answers every page with a picture named after its key, and one tile. */
 function fakeRender({ tiles }: { tiles: boolean }) {
@@ -69,6 +78,25 @@ function fakeRender({ tiles }: { tiles: boolean }) {
   const rights = { annotations: true, formFields: true };
   let painter: PicturePainter | null = null;
   let notify = () => {};
+  /** Every report a layer opened: on which page and view, and what it said. */
+  const reports: {
+    view: string;
+    page: number;
+    shown: number;
+    failed: unknown[];
+    closed: boolean;
+  }[] = [];
+  /** Make every whole-page render fail with this, or succeed again with `null`. */
+  let failure: unknown = null;
+  const failWith = (error: unknown) => {
+    failure = error;
+  };
+  /** The picture states the fake answers, by `view:page`. */
+  const states = new Map<string, PictureState>();
+  const setPictureState = (view: string, page: number, state: PictureState) => {
+    states.set(`${view}:${page}`, state);
+    notify();
+  };
   /** Hand the pictures to a painter, as `handOverPictures` does; `null` gives them back. */
   const handOver = (next: PicturePainter | null) => {
     painter = next;
@@ -90,12 +118,30 @@ function fakeRender({ tiles }: { tiles: boolean }) {
         ...parts
       } = options as RenderSourceOptions & { signal?: AbortSignal };
       asked.push({ page, parts });
+      if (failure) return Promise.reject(failure);
       const url = `blob:${keyOf(page, options.includeAnnotations)}`;
       return Promise.resolve({
         objectUrl: () => ({ abortWith: () => Promise.resolve({ url, revoke: () => {} }) }),
       });
     },
     createViewDemand,
+    reportPicture: (view: string, page: PageRef) => {
+      const entry = {
+        view,
+        page: page.objectNumber,
+        shown: 0,
+        failed: [] as unknown[],
+        closed: false,
+      };
+      reports.push(entry);
+      return {
+        shown: () => void (entry.shown += 1),
+        failed: (error: unknown) => void entry.failed.push(error),
+        close: () => void (entry.closed = true),
+      };
+    },
+    getPictureState: (page: PageRef, view: string) =>
+      states.get(`${view}:${page.objectNumber}`) ?? IDLE, // the same object while the same, as the plugin's
   } as unknown as RenderHostCapability;
   const plugin: AnyPlugin = {
     id: 'render',
@@ -109,7 +155,19 @@ function fakeRender({ tiles }: { tiles: boolean }) {
   /** How often the tile's picture has been asked for: once per binding. */
   const pictureAsks = () =>
     (tile.handle as unknown as { objectUrl: { mock: { calls: unknown[] } } }).objectUrl.mock.calls.length;
-  return { plugin, asked, demands, view, createViewDemand, replan, pictureAsks, handOver };
+  return {
+    plugin,
+    asked,
+    demands,
+    view,
+    createViewDemand,
+    replan,
+    pictureAsks,
+    handOver,
+    reports,
+    failWith,
+    setPictureState,
+  };
 }
 
 const box = { x: 0, y: 0, width: 600, height: 800 };
@@ -124,6 +182,7 @@ const engineWith = (pageCount: number) =>
           list: () =>
             Promise.resolve({
               pageCount,
+              labels: [],
               pages: Array.from({ length: pageCount }, (_, index) => ({
                 index,
                 ref: toPageRef(index + 1),
@@ -362,5 +421,107 @@ describe('a plugin that paints the pictures', () => {
     render.handOver(recording.painter);
     await until(() => render.asked.length > 0);
     expect(recording.painted).toEqual([]);
+  });
+});
+
+describe("the page's picture state", () => {
+  /** A page view of the first page with a render layer, and what else is given. */
+  const pageView =
+    (...rest: (() => VNodeChild)[]) =>
+    () =>
+      h(PageView, { page: 0, width: 300 }, () => [h(RenderLayer), ...rest.map((child) => child())]);
+
+  it('reports the page loading in its view until the base picture presented, and closes with the layer', async () => {
+    const render = fakeRender({ tiles: false });
+    const shown = ref(true);
+    const page = pageView();
+    const { wrapper, kernel } = await viewerWith(
+      [render.plugin],
+      () => (shown.value ? page() : null),
+      engine,
+    );
+    await kernel.documents.open(bytesInput('a'));
+    await until(() => wrapper.find('img').attributes('src') === 'blob:page-1-with');
+    expect(render.reports).toHaveLength(1);
+    const report = render.reports[0]!;
+    expect(report.page).toBe(1);
+    expect(report.shown).toBe(0); // not loaded yet
+
+    wrapper.find('img').element.dispatchEvent(new Event('load'));
+    await until(() => report.shown === 1); // after a frame presented it
+
+    shown.value = false;
+    await settle();
+    expect(report.closed).toBe(true);
+  });
+
+  it('reports a render that fails', async () => {
+    const render = fakeRender({ tiles: false });
+    const refused = new Error('refused');
+    render.failWith(refused);
+    const { kernel } = await viewerWith([render.plugin], pageView(), engine);
+    await kernel.documents.open(bytesInput('a'));
+    await until(() => render.reports[0]?.failed.length === 1);
+    expect(render.reports[0]!.failed).toEqual([refused]);
+    expect(render.reports[0]!.shown).toBe(0);
+  });
+
+  it("hands a painter the page's report, and closes it when the painter is given back", async () => {
+    const render = fakeRender({ tiles: false });
+    const viewer = await viewerWith(
+      [stagePlugin(), render.plugin],
+      () => h(DocumentGate, null, () => h(Stage, null, { page: () => [h(RenderLayer)] })),
+      engine,
+    );
+    await viewer.kernel.documents.open(bytesInput('a'));
+    const handed: PictureReport[] = [];
+    render.handOver({
+      paints: () => true,
+      paint: (_host, _page, report) => {
+        handed.push(report);
+        return { update: () => {}, destroy: () => {} };
+      },
+    });
+    viewer.kernel
+      .capability(StageToken as unknown as CapabilityToken<StageHostCapability>)
+      .setViewportSize({ width: 800, height: 600 });
+    await until(() => handed.length === 1);
+    const report = render.reports.find((entry) => !entry.closed)!;
+
+    handed[0]!.shown();
+    expect(report.shown).toBe(1);
+
+    render.handOver(null);
+    await settle();
+    expect(report.closed).toBe(true);
+  });
+
+  it('reads the state of the page it is drawn on, in its view', async () => {
+    const render = fakeRender({ tiles: false });
+    const Indicator = probe(() => {
+      const picture = usePictureState();
+      return () =>
+        h(
+          'span',
+          { 'data-testid': 'picture' },
+          `${picture.value.status}${picture.value.slow ? ' slow' : ''}`,
+        );
+    });
+    const { kernel } = await viewerWith(
+      [render.plugin],
+      pageView(() => h(Indicator)),
+      engine,
+    );
+    await kernel.documents.open(bytesInput('a'));
+    const indicator = () => document.querySelector('[data-testid="picture"]')?.textContent;
+    await until(() => indicator() === 'idle' && render.reports.length > 0);
+    const view = render.reports[0]!.view;
+
+    render.setPictureState(view, 1, { status: 'loading', slow: true });
+    await settle();
+    expect(indicator()).toBe('loading slow');
+    render.setPictureState('another view', 1, { status: 'ready', slow: false });
+    await settle();
+    expect(indicator()).toBe('loading slow');
   });
 });
