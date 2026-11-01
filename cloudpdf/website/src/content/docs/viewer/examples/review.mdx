@@ -1,0 +1,47 @@
+---
+title: Contract review
+description: A viewer for reviewing a document someone sent you, with its own app bar, a review status, Approve and Request changes, the tools on a rail, the notes docked open and a checklist.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+# Contract review
+
+For a legal or sales team reviewing a document someone sent them. The viewer gets an app bar of its
+own with the document's name, the review status and the verdict; the review tools sit on a rail,
+the notes stay docked on the right, and a checklist of its own opens beside the rail. Its colors,
+font and words are the review's.
+
+<Example name="viewer/examples/review" size="wide" />
+
+> **Try it:** read the thread on Dana Smith's note next to the title in **Review notes**, then tick
+> the items in the **Checklist** at the bottom of the rail. **Approve** turns the status next to the
+> document's name green; **Request changes** turns it red and picks the note tool, so your next
+> click on the page leaves a note.
+
+## What it uses
+
+- [Bars of its own](../customize/layout#several-toolbars): the review bar on top and the tools
+  rail, in place of the main toolbar and the mode bars, which it
+  [removes](../customize/layout#remove-buttons).
+- [Its own components](../customize/components) in the review bar: the document's name and its
+  status.
+- [Its own commands](../customize/commands), with [their own icons](../customize/commands#icons)
+  and a shortcut: **Approve** and **Request changes**, with their labels while there's
+  [room](../customize/layout#when-theres-no-room).
+- [A panel of its own](../customize/panels#your-own-panel), the checklist, with search and style
+  [moved](../customize/panels) to its side, so the right side stays the notes'.
+- [How the panels open](../customize/panels#how-a-panel-opens): docked at medium widths too, and the
+  notes 340 px wide.
+- [A floating bar](../customize/layout#a-floating-toolbar): the zoom field beside the page number.
+- [Small screens](../customize/small-screens): on a phone the rail moves to the bottom and the
+  document's name leaves the bar.
+- [The theme's tokens](../customize/theming#every-color), with a dark canvas and its own `font`.
+- [Its own words](../customize/translations#change-a-word) for the tools, and a
+  [`titleKey`](../customize/translations#translate-your-own-buttons) that renames Comments to
+  Review notes.
+- [Features turned off](../features/turning-off) that a review doesn't need.
+- [The tools' defaults](../features/annotations#the-tools): red for deletions, the review's color
+  for suggestions.
+- [The viewer in code](../code/viewer#react-to-what-happens): once the document opens, the notes
+  open and the name comes from the [metadata plugin](../code/plugins#every-plugin).

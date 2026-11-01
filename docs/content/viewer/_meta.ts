@@ -6,6 +6,7 @@ export default {
   customize: 'Make it yours',
   features: 'Features',
   code: 'From code',
+  examples: 'Examples',
   concepts: 'Good to know',
   'self-hosting': 'Self-hosting',
   migrate: 'Moving from 2.x',

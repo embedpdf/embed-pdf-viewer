@@ -1,0 +1,48 @@
+---
+title: A front-desk kiosk
+description: A tablet viewer for filling in one form at a front desk, with a header of its own, three big buttons, a check of the required answers, and nothing else to tap.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+# A front-desk kiosk
+
+For a tablet on a counter: someone fills in an application and hands it back. The form is all
+there is, under a header with the desk's name and how many required answers are in. Three big
+buttons at the bottom take them to the next empty box, clear the form for the next person, and
+check it: **Done** lists what's still missing, or locks the finished form and says thank you.
+
+<Example name="viewer/examples/kiosk" size="wide" />
+
+> **Try it:** tap **Next field** to go to Full name and fill it in, then tap **Done**: the sheet
+> lists Email and the membership terms, and a tap on one takes you there. Answer both, tap **Done**
+> again, then **Clear** for the next person.
+
+## What it uses
+
+- [A whole layout](../customize/layout#your-whole-layout): one bar at the bottom, and a panel.
+- [Its own commands](../customize/commands), with [their own icons](../customize/commands#icons):
+  **Next field**, **Clear** and **Done**, with Clear
+  [greyed out](../customize/commands#enabled-active-and-visible) while the form is empty.
+- [Its own component](../customize/components#use-the-viewers-commands-and-state) in that bar,
+  which draws the three commands as big buttons, and fits a phone through
+  [where it sits](../customize/components#know-where-it-sits).
+- [The header region](../customize/components#above-below-and-when-nothing-is-open), with the
+  desk's name, a line that says what just happened, and the count of required answers.
+- [A panel of its own](../customize/panels#your-own-panel) that opens as a
+  [sheet](../customize/panels#how-a-panel-opens) at every size, opened and closed
+  [from code](../customize/panels#open-a-panel-from-code).
+- [The theme's tokens](../customize/theming#every-color) for warm paper, round corners and a rounded
+  `font`, which the kiosk's own parts [use too](../customize/theming#in-your-own-components).
+- [Read-only, except filling in the form](../features/turning-off#read-only), and
+  [read-only](../setup#change-the-config-later) once the form is done, until Clear.
+- [Features turned off](../features/turning-off): opening, downloading and printing files, search,
+  and selecting text.
+- [Plugin settings](../code/plugins#settings): the pages fit the width, and the fields have a tint
+  of their own, as [Form settings](../features/forms-and-signatures#form-settings) shows.
+- [The form plugin from code](../features/forms-and-signatures#read-and-fill-in-values-from-code):
+  the empty fields, [the required ones](/docs/headless/forms#check-required-fields) and
+  [a reset](/docs/headless/forms#reset-the-form), with the Stage's
+  [`reveal()`](/docs/headless/viewing/stage#jump-to-an-exact-spot) to go to a field.
+- [`watch()`](../code/viewer#follow-a-value) on the form, from when
+  [the document opens](../code/viewer#react-to-what-happens), for the header and the sheet.

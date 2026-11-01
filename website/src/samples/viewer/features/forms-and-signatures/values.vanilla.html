@@ -1,0 +1,29 @@
+<link rel="stylesheet" href="./values.css" />
+
+<div class="app">
+  <embedpdf-viewer id="viewer" class="viewer"></embedpdf-viewer>
+  <footer class="values">
+    <span class="label">exportValues()</span>
+    <code class="code" id="values">{}</code>
+  </footer>
+</div>
+
+<script type="module">
+  import 'https://cdn.jsdelivr.net/npm/@embedpdf/viewer@3/dist/embedpdf.js';
+
+  const forms = '/pdfs/forms.pdf';
+
+  const element = document.getElementById('viewer');
+  const output = document.getElementById('values');
+
+  // Once the form is open: show its values as they change, and fill in what the app knows.
+  element.addEventListener('epdf:ready', () => {
+    const { viewer } = element;
+    viewer.documents.onOpened(async () => {
+      const form = viewer.get('form');
+      form.onValueChanged(() => (output.textContent = JSON.stringify(form.exportValues())));
+      await form.importValues({ name: 'Ada Lovelace', email: 'ada@example.com' });
+    });
+  });
+  element.config = { src: forms };
+</script>

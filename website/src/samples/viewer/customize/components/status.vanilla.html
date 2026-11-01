@@ -1,0 +1,27 @@
+<link rel="stylesheet" href="./status.css" />
+
+<embedpdf-viewer id="viewer" style="height: 100%">
+  <label slot="item:status" class="status" id="status" data-status="review">
+    <span class="dot"></span>
+    <select id="status-picker" aria-label="Review status">
+      <option value="draft">Draft</option>
+      <option value="review" selected>In review</option>
+      <option value="approved">Approved</option>
+    </select>
+  </label>
+</embedpdf-viewer>
+
+<script type="module">
+  import 'https://cdn.jsdelivr.net/npm/@embedpdf/viewer@3/dist/embedpdf.js';
+
+  const proposal = '/pdfs/proposal.pdf';
+
+  const status = document.getElementById('status');
+  const picker = document.getElementById('status-picker');
+  picker.addEventListener('change', () => (status.dataset.status = picker.value));
+
+  document.getElementById('viewer').config = {
+    src: proposal,
+    layout: (layout) => layout.add({ custom: 'status' }, { to: 'main', section: 'end' }),
+  };
+</script>

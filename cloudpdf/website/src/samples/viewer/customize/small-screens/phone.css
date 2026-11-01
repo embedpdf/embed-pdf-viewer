@@ -1,0 +1,11 @@
+/* A box as wide as a phone: the viewer measures its own width, so it takes a phone's layout */
+.phone {
+  box-sizing: border-box;
+  width: 375px;
+  max-width: 100%;
+  height: 100%;
+  margin: 0 auto;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  overflow: hidden;
+}

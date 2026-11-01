@@ -1,0 +1,17 @@
+<embedpdf-viewer id="viewer" style="height: 100%"></embedpdf-viewer>
+
+<script type="module">
+  import 'https://cdn.jsdelivr.net/npm/@embedpdf/viewer@3/dist/embedpdf.js';
+
+  const welcome = '/pdfs/welcome.pdf';
+  const article = '/pdfs/article.pdf';
+  const report = '/pdfs/report.pdf';
+
+  document.getElementById('viewer').config = {
+    documents: [
+      { src: welcome, name: 'Welcome' },
+      { src: article, name: 'Engineering blog' },
+      { src: report, name: 'Q3 report', active: true },
+    ],
+  };
+</script>

@@ -1,0 +1,25 @@
+<link rel="stylesheet" href="./notes.css" />
+
+<embedpdf-viewer id="viewer" style="height: 100%">
+  <textarea slot="panel:notes" class="notes" placeholder="Your notes"></textarea>
+</embedpdf-viewer>
+
+<script type="module">
+  import 'https://cdn.jsdelivr.net/npm/@cloudpdf/viewer@3/dist/cloudpdf.js';
+
+  const welcome = { grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
+
+  document.getElementById('viewer').config = {
+    src: welcome,
+    layout: (layout) =>
+      layout
+        .addPanel('notes', {
+          side: 'end',
+          title: 'Notes',
+          icon: 'book',
+          present: { medium: 'dock' },
+          width: { initial: 320, min: 240, max: 480 },
+        })
+        .add('panel:notes', { to: 'main', section: 'end' }),
+  };
+</script>

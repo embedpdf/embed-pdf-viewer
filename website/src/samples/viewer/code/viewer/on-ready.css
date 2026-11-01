@@ -1,0 +1,82 @@
+/* Colors, for light and dark */
+:root {
+  --ink: #1a2748;
+  --line: #e6eaf2;
+  --line-strong: #dce8fc;
+  --surface: #ffffff;
+  --tint: #f3f7fe;
+  --focus: #7db6ff;
+  --shadow: rgb(7 32 76 / 0.04);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink: #e6ecfa;
+    --line: #27365f;
+    --line-strong: #34467a;
+    --surface: #131d3b;
+    --tint: #1a2750;
+    --shadow: rgb(0 0 0 / 0.3);
+  }
+}
+
+/* The app's own bar, then the viewer in the rest of the height */
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+
+.page {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.button {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 550;
+  line-height: 1;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 8px 12px;
+  cursor: pointer;
+  box-shadow: 0 1px 2px var(--shadow);
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.button:hover {
+  background: var(--tint);
+  border-color: var(--line-strong);
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.viewer {
+  flex: 1;
+  min-height: 0;
+}

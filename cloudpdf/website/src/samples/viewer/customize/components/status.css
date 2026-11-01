@@ -1,0 +1,34 @@
+/* The review status in the toolbar: your own element, in the viewer's colors */
+.status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 6px 0 10px;
+  border: 1px solid var(--epdf-border);
+  border-radius: 999px;
+  font-size: 13px;
+}
+
+.status select {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #9ca3af;
+}
+
+.status[data-status='review'] .dot {
+  background: #f59e0b;
+}
+
+.status[data-status='approved'] .dot {
+  background: #16a34a;
+}

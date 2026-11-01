@@ -1,0 +1,42 @@
+/* Colors, light and dark, as the viewer follows the system's */
+:root {
+  --ink: #111827;
+  --muted: #6b7280;
+  --line: #d1d5db;
+  --tint: #f3f4f6;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink: #f9fafb;
+    --muted: #9ca3af;
+    --line: #4b5563;
+    --tint: #111827;
+  }
+}
+
+/* The app: your status line above the viewer */
+.app {
+  display: flex;
+  flex-direction: column;
+}
+
+.status {
+  margin: 0;
+  padding: 8px 14px;
+  font:
+    13px/1.4 system-ui,
+    sans-serif;
+  color: var(--muted);
+  background: var(--tint);
+  border-bottom: 1px solid var(--line);
+}
+
+.status strong {
+  color: var(--ink);
+}
+
+.viewer {
+  flex: 1;
+  min-height: 0;
+}

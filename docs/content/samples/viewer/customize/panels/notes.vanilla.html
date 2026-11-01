@@ -1,0 +1,27 @@
+<link rel="stylesheet" href="./notes.css" />
+
+<embedpdf-viewer id="viewer" style="height: 100%">
+  <textarea slot="panel:notes" class="notes" placeholder="Your notes"></textarea>
+</embedpdf-viewer>
+
+<script type="module">
+  import 'https://cdn.jsdelivr.net/npm/@embedpdf/viewer@3/dist/embedpdf.js';
+
+  // [!doc-source welcome]
+  const welcome = '/pdfs/welcome.pdf';
+  // [!/doc-source]
+
+  document.getElementById('viewer').config = {
+    src: welcome,
+    layout: (layout) =>
+      layout
+        .addPanel('notes', {
+          side: 'end',
+          title: 'Notes',
+          icon: 'book',
+          present: { medium: 'dock' },
+          width: { initial: 320, min: 240, max: 480 },
+        })
+        .add('panel:notes', { to: 'main', section: 'end' }),
+  };
+</script>
