@@ -25,20 +25,36 @@ import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 // The layer is a host of the render plugin: it paints conformed sources and
 // drives a view's tile demand. The host lens is the same runtime token.
 import { RenderToken } from '@embedpdf/plugin-render/contract/host';
-import type { PageViewDemand, TilePaintSource } from '@embedpdf/plugin-render/contract/host';
+import type {
+  OpenPictureReport,
+  PageViewDemand,
+  TilePaintSource,
+} from '@embedpdf/plugin-render/contract/host';
 import { RenderToken as RenderPublicToken } from '@embedpdf/plugin-render';
-import type { PaintedPicture, PicturePainter, RenderCapability } from '@embedpdf/plugin-render';
+import type {
+  PaintedPicture,
+  PicturePainter,
+  PictureState,
+  RenderCapability,
+} from '@embedpdf/plugin-render';
 import type { EventHook } from '@embedpdf/core';
 import {
   bindPaintedImage,
   pageLayersOf,
   partsDrawnTwice,
   pictureLayerOptionsOf,
+  whenPresented,
   type PicturePartProps,
 } from '@embedpdf/web';
 import { devWarn } from './dev';
 import { usePaintedParts } from './page-layers';
-import { useCapability, useCapabilityEvent, usePage, useSelector } from './runtime';
+import {
+  useCapability,
+  useCapabilityEvent,
+  useOptionalSelector,
+  usePage,
+  useSelector,
+} from './runtime';
 import { settingsHook } from './state';
 
 /** The render capability (renderPage / renderThumbnail / invalidation / settings) for app code. */
@@ -55,6 +71,22 @@ export function useRenderEvent<T>(
   handler: (event: T) => void,
 ): void {
   useCapabilityEvent(RenderPublicToken, select, handler);
+}
+
+const NO_PICTURE: PictureState = Object.freeze({ status: 'idle', slow: false });
+
+/**
+ * Whether the picture of the page this component is drawn on is on screen in its view:
+ * `{ status, slow }`. `status` is `'loading'` until it is, and `slow` turns on once it waited
+ * `slowAfterMs` (400 ms): the moment to show a loading indicator. Use it in a layer of the page.
+ */
+export function usePictureState(): PictureState {
+  const page = usePage();
+  return useOptionalSelector(
+    RenderPublicToken,
+    (render) => render.getPictureState(page.ref, page.view),
+    NO_PICTURE,
+  );
 }
 
 export interface RenderLayerProps {
@@ -99,16 +131,20 @@ export function RenderLayer(props: RenderLayerProps = {}) {
 function PainterBox({ painter }: { painter: PicturePainter<HTMLElement> }) {
   const page = usePage();
   const host = useRef<HTMLDivElement>(null);
+  const render = useCapability(RenderToken);
   const painted = useRef<{ picture: PaintedPicture; page: typeof page } | null>(null);
   useLayoutEffect(() => {
-    painted.current = { picture: painter.paint(host.current!, page), page };
+    // The page is loading until the painter reports its picture on screen.
+    const report = render.reportPicture(page.view, page.ref);
+    painted.current = { picture: painter.paint(host.current!, page, report), page };
     return () => {
       painted.current?.picture.destroy();
       painted.current = null;
+      report.close();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- a new page context is an
     // update of the same picture, below; only another painter or page paints anew.
-  }, [painter, page.ref]);
+  }, [render, painter, page.ref]);
   useLayoutEffect(() => {
     const current = painted.current;
     if (!current || current.page === page) return;
@@ -141,6 +177,7 @@ function RasterLayer({
   // The same object until a setting it reads changes, so a settings change re-renders the layer.
   const settings = useSelector(RenderToken, (render) => render.getPaintSettings());
   const ref = useRef<HTMLImageElement>(null);
+  const report = useRef<OpenPictureReport | null>(null);
   const parts: PicturePartProps = { annotations, formFields };
   const painted = usePaintedParts(page.ref);
   const may = useSelector(RenderToken, (render) => render.getLayerRights());
@@ -164,6 +201,18 @@ function RasterLayer({
   const sourceKey = useSelector(RenderToken, (render) =>
     render.getSourceKey(page.ref, { scale: page.transform.renderScale, ...asked, ...layers }),
   );
+
+  // The page is loading in this view until the base picture is on screen; the tiles only sharpen.
+  useLayoutEffect(() => {
+    const opened = render.reportPicture(page.view, page.ref);
+    report.current = opened;
+    const stop = whenPresented(ref.current!, () => opened.shown());
+    return () => {
+      stop();
+      opened.close();
+      if (report.current === opened) report.current = null;
+    };
+  }, [render, page.view, page.ref]);
 
   useEffect(() => {
     // A layer that paints part of the page arrived in this commit, after this
@@ -194,8 +243,9 @@ function RasterLayer({
         // bitmap until the new one decodes, and nothing ever re-requests the
         // old URL — so revoke-on-cleanup is safe here by construction.
         if (ref.current) ref.current.src = obj.url;
-      } catch {
-        /* aborted (camera moved / unmounted) or render failed */
+      } catch (error) {
+        // Aborted (camera moved / unmounted), or the render failed: the page can't show.
+        if (!controller.signal.aborted) report.current?.failed(error);
       }
     })();
     return () => {

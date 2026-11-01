@@ -15,6 +15,43 @@ export interface PaintedImageCallbacks {
 }
 
 /**
+ * Run `run` once the browser has had a frame to present what's visible now. rAF callbacks run
+ * before a frame paints: the first frame presents it, and the second's callback runs after that
+ * presentation opportunity. Returns the cancel.
+ */
+export function afterPresented(run: () => void): () => void {
+  let frame = requestAnimationFrame(() => {
+    frame = requestAnimationFrame(() => {
+      frame = 0;
+      run();
+    });
+  });
+  return () => {
+    if (frame) cancelAnimationFrame(frame);
+    frame = 0;
+  };
+}
+
+/**
+ * Run `run` once `image` has presented the next picture it loads, after a frame to present it;
+ * once, however often its `src` changes after that. A picture it holds already doesn't count: a
+ * layer that shows another page in the same element still holds the last page's. A page layer's
+ * base picture reports its page `shown()` this way. Returns the cancel.
+ */
+export function whenPresented(image: HTMLImageElement, run: () => void): () => void {
+  let cancelFrames: (() => void) | undefined;
+  const onLoad = () => {
+    image.removeEventListener('load', onLoad);
+    cancelFrames = afterPresented(run);
+  };
+  image.addEventListener('load', onLoad);
+  return () => {
+    image.removeEventListener('load', onLoad);
+    cancelFrames?.();
+  };
+}
+
+/**
  * Bind a raster source to an <img> without ever painting its incomplete-image
  * placeholder. The source becomes visible on load; retained coverage is
  * released only after the browser has had one full frame to present it.
@@ -30,7 +67,7 @@ export function bindPaintedImage(
 ): () => void {
   const controller = new AbortController();
   let revoke: (() => void) | undefined;
-  let frame = 0;
+  let cancelFrames: (() => void) | undefined;
   let painted = false;
 
   // The element is already committed when a mount hook runs. Hide it before
@@ -40,15 +77,11 @@ export function bindPaintedImage(
   const onLoad = () => {
     image.style.visibility = 'visible';
 
-    // rAF callbacks run before a frame paints. The first frame presents the
-    // newly visible image while retained coverage remains; the second reports
-    // that presentation opportunity and permits the retained source to leave.
-    frame = requestAnimationFrame(() => {
-      frame = requestAnimationFrame(() => {
-        frame = 0;
-        painted = true;
-        callbacks.onPainted();
-      });
+    // The first frame presents the newly visible image while retained coverage
+    // remains; after it, the retained source may leave.
+    cancelFrames = afterPresented(() => {
+      painted = true;
+      callbacks.onPainted();
     });
   };
 
@@ -73,7 +106,7 @@ export function bindPaintedImage(
 
   return () => {
     controller.abort();
-    if (frame) cancelAnimationFrame(frame);
+    cancelFrames?.();
     image.removeEventListener('load', onLoad);
     image.style.visibility = 'hidden';
     image.removeAttribute('src');

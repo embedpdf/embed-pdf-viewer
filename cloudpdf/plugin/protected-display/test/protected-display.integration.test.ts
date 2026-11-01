@@ -5,7 +5,8 @@
  */
 import type { ModuleChannel } from '@cloudpdf/engine';
 import { createKernel, toPageRef, type DocumentHandle, type Engine } from '@embedpdf/core';
-import { renderPlugin, RenderToken } from '@embedpdf/plugin-render';
+import { renderPlugin, RenderToken, type PicturePage } from '@embedpdf/plugin-render';
+import { RenderToken as RenderHostToken } from '@embedpdf/plugin-render/contract/host';
 import { stagePlugin } from '@embedpdf/plugin-stage';
 import { StageToken } from '@embedpdf/plugin-stage/contract/host';
 import { describe, expect, it } from 'vitest';
@@ -194,6 +195,29 @@ describe('the protected display plugin', () => {
     await expect.poll(() => status().kind).toBe('failed');
     expect(requests.map((request) => request.path)).toEqual(['sessions']);
     expect(status()).toMatchObject({ message: expect.stringMatching(/403.*no viewing sessions/) });
+    await kernel.destroy();
+  });
+
+  it('tells the render plugin a page waiting for its frame failed, so no indicator spins forever', async () => {
+    const { player } = fakePlayer();
+    const { channel } = fakeChannel({ refuse: { status: 403, body: 'no viewing sessions' } });
+    const { kernel, status, stage } = await opened({
+      channel,
+      allowed: PROTECTED,
+      config: { player },
+    });
+    const render = kernel.capability(RenderHostToken, 'doc');
+    const view = stage.getLensId();
+    const page = toPageRef(1);
+    // The main view's page layer lends its box, with the page's report.
+    const report = render.reportPicture(view, page);
+    render
+      .getPicturePainter()!
+      .paint({}, { ref: page, pageIndex: 0, view } as unknown as PicturePage, report);
+    expect(['loading', 'error']).toContain(render.getPictureState(page, view).status);
+
+    await expect.poll(() => status().kind).toBe('failed');
+    expect(render.getPictureState(page, view).status).toBe('error');
     await kernel.destroy();
   });
 });

@@ -566,6 +566,9 @@ export const zhTW: Locale = {
     demo: {
       starting: '正在啟動檢視器…',
       opening: '正在開啟文件…',
+      pageLoading: '正在載入第 {page} 頁…',
+      pageError: '無法載入此頁面。',
+      pageForbidden: '您沒有存取此頁面的權限。',
       more: '更多',
       searchPlaceholder: '搜尋文件…',
       searchCaseSensitive: '區分大小寫',

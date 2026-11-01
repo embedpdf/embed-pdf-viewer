@@ -51,6 +51,7 @@ import { DocumentError, PasswordPrompt } from './ui/document-boot';
 import { DropToOpen } from './ui/drop-to-open';
 import { GoToPageDialog } from './ui/go-to-page';
 import { FeaturePrefetch, lazyComponent } from './ui/lazy';
+import { PageLoading } from './ui/page-loading';
 import { SidePanel } from './ui/panels';
 import { PlacedComponentsHost, type PlacedComponents } from './ui/placed-components';
 import { useRefusalNotice } from './ui/refusal-notice';
@@ -276,6 +277,9 @@ export function Shell({ components }: { components?: PlacedComponents }) {
                       the base budget supplies — the thumbnail rail's demand
                       never does, so it mounts the same layer for free. */}
                       <RenderLayer />
+                      {/* a spinner while the page's picture is slow to come, a sentence
+                      when it can't */}
+                      <PageLoading />
                       <SelectionLayer />
                       <SearchLayer />
                       {/* Clickable links (nav plane): anchors under the default

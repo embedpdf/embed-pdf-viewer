@@ -67,13 +67,16 @@ function protect(
     return page === null ? null : (lent.get(encodePageKey(page)) ?? null);
   };
   const follow = () => display?.show(onScreen());
+  // Why the pages can't show, once they can't: every box lent from then on says so too.
+  let failure: Error | null = null;
 
   const mainView = stage.getLensId();
   ctx.cleanup(
     render.handOverPictures({
       paints: (view) => view === mainView,
-      paint(host, page) {
-        const box: LentPage = { host, page };
+      paint(host, page, report) {
+        const box: LentPage = { host, page, report };
+        if (failure) report.failed(failure);
         lent.set(encodePageKey(page.ref), box);
         follow();
         return {
@@ -108,6 +111,9 @@ function protect(
     if (closed) return;
     console.warn(`[protected-display] ${message}`);
     ctx.state.update(() => fail(message));
+    // A page waiting for its frame stops waiting; one on screen keeps showing.
+    failure = new Error(message);
+    for (const box of lent.values()) box.report.failed(failure);
   };
 
   ctx

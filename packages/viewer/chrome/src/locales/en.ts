@@ -571,6 +571,9 @@ export const en: Locale = {
     demo: {
       starting: 'Starting viewer…',
       opening: 'Opening document…',
+      pageLoading: 'Loading page {page}…',
+      pageError: 'This page couldn\u2019t load.',
+      pageForbidden: 'You don\u2019t have access to this page.',
       more: 'More',
       searchPlaceholder: 'Search document…',
       searchCaseSensitive: 'Case sensitive',

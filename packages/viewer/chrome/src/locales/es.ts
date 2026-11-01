@@ -565,6 +565,9 @@ export const es: Locale = {
     demo: {
       starting: 'Iniciando el visor…',
       opening: 'Abriendo el documento…',
+      pageLoading: 'Cargando la página {page}…',
+      pageError: 'No se pudo cargar esta página.',
+      pageForbidden: 'No tienes acceso a esta página.',
       more: 'Más',
       searchPlaceholder: 'Buscar en el documento…',
       searchCaseSensitive: 'Distinguir mayúsculas',

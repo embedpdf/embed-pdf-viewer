@@ -569,6 +569,9 @@ export const fr: Locale = {
     demo: {
       starting: 'Démarrage de la visionneuse…',
       opening: 'Ouverture du document…',
+      pageLoading: 'Chargement de la page {page}…',
+      pageError: 'Impossible de charger cette page.',
+      pageForbidden: 'Vous n’avez pas accès à cette page.',
       more: 'Plus',
       searchPlaceholder: 'Rechercher dans le document…',
       searchCaseSensitive: 'Respecter la casse',

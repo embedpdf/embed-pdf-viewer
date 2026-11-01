@@ -567,6 +567,9 @@ export const pt: Locale = {
     demo: {
       starting: 'Iniciando o visualizador…',
       opening: 'Abrindo o documento…',
+      pageLoading: 'Carregando a página {page}…',
+      pageError: 'Não foi possível carregar esta página.',
+      pageForbidden: 'Você não tem acesso a esta página.',
       more: 'Mais',
       searchPlaceholder: 'Pesquisar no documento…',
       searchCaseSensitive: 'Diferenciar maiúsculas',
