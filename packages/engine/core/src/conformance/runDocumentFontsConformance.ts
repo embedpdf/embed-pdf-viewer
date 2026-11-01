@@ -57,6 +57,22 @@ async function rejection(
   throw new Error('expected a rejection');
 }
 
+/** The advance widths an sfnt's `hmtx` table gives its glyphs. */
+function advancesOf(font: Uint8Array): Set<number> {
+  const view = new DataView(font.buffer, font.byteOffset, font.byteLength);
+  const tableAt = (tag: string): number => {
+    for (let record = 12; record < 12 + view.getUint16(4) * 16; record += 16) {
+      if (String.fromCharCode(...font.subarray(record, record + 4)) === tag) {
+        return view.getUint32(record + 8);
+      }
+    }
+    throw new Error(`no ${tag} table`);
+  };
+  const metrics = view.getUint16(tableAt('hhea') + 34);
+  const hmtx = tableAt('hmtx');
+  return new Set(Array.from({ length: metrics }, (_, glyph) => view.getUint16(hmtx + glyph * 4)));
+}
+
 const fontNamed = (fonts: readonly Font[], name: string): Font | undefined =>
   fonts.find((font) => font.name === name);
 
@@ -319,6 +335,29 @@ export function runDocumentFontsConformance(
         const info = await doc.fonts.getProgram(hash);
         expect(covers(info.covers, 'A')).toBe(true);
       }
+      await doc.close();
+    });
+
+    test('a field in a program two dictionaries read differently resolves to the one its own reads', async () => {
+      const doc = await open(fixtures.sharedProgram);
+      // In /Annots order: the field in the 600-wide dictionary, then the 900-wide one.
+      const { widgets } = await doc.forms.list();
+      const programs: (string | null)[] = [];
+      for (const [index, width] of [600, 900].entries()) {
+        const widget = widgets[index]!;
+        expect(widget.fontFamily).toBe('FoxitFixed');
+        const answer = await doc.fonts.resolve({
+          annotation: widget.ref!,
+          runs: [{ text: 'HELLO', fontFamily: widget.fontFamily! }],
+        });
+        const run = answer.runs[0]!;
+        expect(run).toMatchObject({ font: 'FoxitFixed', substituted: false });
+        // Its glyphs advance by its own dictionary's width, never the other's.
+        const advances = advancesOf(await doc.fonts.downloadProgram(run.program!));
+        expect([600, 900].filter((advance) => advances.has(advance))).toEqual([width]);
+        programs.push(run.program);
+      }
+      expect(new Set(programs).size).toBe(2);
       await doc.close();
     });
 

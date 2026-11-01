@@ -415,6 +415,10 @@ those the engine builds a program a browser can load, with the same letters, the
 the same characters, and `displayHash` names it. That's why a program has two hashes: they're the
 same for a TrueType or OpenType font and differ for these.
 
+Two of a PDF's fonts can read one such file with other widths or character codes. Each gets a
+program of its own, so the font lists the file twice under one `sourceHash`, and `resolve()` gives a
+box the program its own font reads.
+
 ### A hash is not a permission
 
 The same file in two documents has the same hash, but each document decides what may be done with

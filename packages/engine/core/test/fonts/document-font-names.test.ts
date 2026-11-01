@@ -125,6 +125,7 @@ describe('the document fonts: one per name', () => {
           source: 'document-program',
           engineFont: null,
           objectNumber: 11,
+          displaySha256: hashOf('a'),
           baseFontName: 'Roboto-Thin',
           familyName: 'Roboto',
           weight: 400,
@@ -166,6 +167,29 @@ describe('the document fonts: one per name', () => {
       ]),
     ]);
     expect(font!.programs.map((found) => found.displaySha256)).toEqual([hashOf('n'), hashOf('w')]);
+    // A field in either dictionary resolves to the display program its own reads.
+    const facts = {
+      faces: [face('FoxitFixed', 400, font!.programs)],
+      engineFonts: [],
+      fallbacks: [],
+    };
+    const run = (displaySha256: string) => ({
+      source: 'document-font' as const,
+      engineFont: null,
+      objectNumber: 4,
+      displaySha256,
+      baseFontName: 'FoxitFixed',
+      familyName: 'FoxitFixed',
+      weight: 400,
+      italic: false,
+      degraded: false,
+      fallbacks: [],
+    });
+    const resolved = fontResolutionOf([run(hashOf('n')), run(hashOf('w'))], [], facts, builtIn);
+    expect(resolved.runs.map((found) => [found.font, found.program])).toEqual([
+      ['FoxitFixed', hashOf('n')],
+      ['FoxitFixed', hashOf('w')],
+    ]);
   });
 
   test('holds a program found under two faces once', () => {

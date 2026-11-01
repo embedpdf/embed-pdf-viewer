@@ -169,6 +169,11 @@ export class DocumentFontReader {
         source: SOURCES[fn.EPDFFontResolution_GetSource(resolution, run)] ?? 'standard',
         engineFont: registered ? (this.fonts.keyForId(registered) ?? null) : null,
         objectNumber: fn.EPDFFontResolution_GetProgramObjNum(resolution, run),
+        displaySha256: withScratch(mem, 32, (out) =>
+          fn.EPDFFontResolution_GetProgramDisplayHash(resolution, run, out)
+            ? hex(mem.readBytes(out, 32))
+            : null,
+        ),
         baseFontName:
           readUtf8String(mem, (buf, cap) =>
             fn.EPDFFontResolution_GetBaseFontName(resolution, run, buf, cap),

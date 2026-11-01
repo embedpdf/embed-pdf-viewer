@@ -440,6 +440,11 @@ export interface ResolvedRunFacts {
   engineFont: string | null;
   /** The program stream's object number, for document programs and a box's embedded font. */
   objectNumber: number;
+  /**
+   * What a browser loads for that program, as the font dictionary the run
+   * draws with reads it (a program's `displaySha256`); `null` without one.
+   */
+  displaySha256: string | null;
   /** The font's /BaseFont: the standard name for `'standard'`. */
   baseFontName: string | null;
   familyName: string;
@@ -458,10 +463,16 @@ export function fontResolutionOf(
   builtIn: BuiltInPrograms,
 ): FontResolution {
   const engineHash = new Map(facts.engineFonts.map((font) => [font.key, font.sha256]));
-  const programFace = new Map<number, { face: DocumentFaceFacts; program: FontProgramFacts }>();
+  // One stream two font dictionaries read differently is two programs: a run
+  // names its own by both.
+  const programKey = (objectNumber: number, displaySha256: string | null) =>
+    `${objectNumber}:${displaySha256 ?? ''}`;
+  const programFace = new Map<string, { face: DocumentFaceFacts; program: FontProgramFacts }>();
   for (const face of facts.faces) {
     for (const program of face.programs) {
-      if (program.objectNumber > 0) programFace.set(program.objectNumber, { face, program });
+      if (program.objectNumber > 0) {
+        programFace.set(programKey(program.objectNumber, program.displaySha256), { face, program });
+      }
     }
   }
   const resolvedRun = (run: ResolvedRunFacts): ResolvedFontRun => {
@@ -481,7 +492,7 @@ export function fontResolutionOf(
     if (run.source === 'engine' && run.engineFont) {
       return { ...base, font: run.engineFont, program: engineHash.get(run.engineFont) ?? null };
     }
-    const found = programFace.get(run.objectNumber);
+    const found = programFace.get(programKey(run.objectNumber, run.displaySha256));
     if (found) {
       return {
         ...base,
