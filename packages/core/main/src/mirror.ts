@@ -36,6 +36,7 @@
 import type { DocumentEvent, DocumentHandle, PageRef } from '@embedpdf/engine-core/runtime';
 import type { ChangeViews, PredictedOp, QueuedChange } from './changes';
 import { isPluginError } from './errors';
+import type { PageViewReads } from './page-view';
 import type { SliceLease } from './store';
 import type { ResourceStatus } from './types';
 
@@ -146,6 +147,8 @@ export interface MirrorEnvironment {
   onDocumentEvent(listener: (event: DocumentEvent) => void): void;
   /** The document's pending changes, which `view()` shows. */
   readonly changes: ChangeViews;
+  /** The document's pages as the user sees them: a page mirror reads a page once the engine has it. */
+  readonly pages: PageViewReads;
   /** Wake the store's readers: what `view()` shows changed outside a store write. */
   notify(): void;
   report(error: unknown): void;

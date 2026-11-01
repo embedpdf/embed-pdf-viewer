@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  createCapabilityToken,
   createKernel,
+  definePlugin,
   toPageRef,
+  type ChangeQueue,
   type DocumentEvent,
   type CallFacts,
   type DocumentHandle,
@@ -62,6 +65,15 @@ function makeTask() {
 
 const image = (key = 'handle') =>
   ({ source: { kind: 'bytes', bytes: new Uint8Array(4) }, format: 'png', key }) as unknown;
+
+/** A plugin that hands the test the document's change queue. */
+const StagerToken = createCapabilityToken<ChangeQueue>('stager');
+const stagerPlugin = definePlugin({
+  id: 'stager',
+  scope: 'document',
+  token: StagerToken,
+  create: (ctx) => ({ api: ctx.changes }),
+});
 
 async function boot(
   options: {
@@ -156,18 +168,29 @@ async function boot(
       allows: (capability: string) => options.allows?.(capability) ?? options.allow ?? true,
     },
     render: { getPolicy: () => Promise.resolve(options.policy ?? { kind: 'continuous' }) },
+    // Changes the test stages wait for the test's answer.
+    apply: () => applied.at(-1)!.task,
     close: () => Promise.resolve(),
   };
+  const applied: Array<ReturnType<typeof makeTask>> = [];
   const handle = documentWith({});
   const engine = {
     open: () => Promise.resolve(handle),
     destroy: () => Promise.resolve(),
   } as unknown as Engine;
-  const kernel = createKernel({ engine, plugins: [renderPlugin(options.config)] });
+  const kernel = createKernel({ engine, plugins: [renderPlugin(options.config), stagerPlugin] });
   await kernel.start();
   await kernel.documents.open({ kind: 'bytes', id: 'd', bytes: new Uint8Array() });
+  const changes = kernel.capability(StagerToken, 'd');
   return {
     kernel,
+    /** Stage a change on the document's queue; `answer` is the engine's. */
+    stage: (change: Parameters<ChangeQueue['stage']>[0]) => {
+      const answer = makeTask();
+      applied.push(answer);
+      changes.stage(change);
+      return answer;
+    },
     render: kernel.capability(RenderToken, 'd'),
     imageCalls,
     tasks,
@@ -309,6 +332,45 @@ describe('policy conformance — the host door', () => {
     expect(fixture.render.getSourceKey(toPageRef(11), { scale: 2.2 })).toBe('11|w2560|a1f1|e0');
     fixture.render.invalidate({ pages: [toPageRef(11)], scope: 'content' });
     expect(fixture.render.getSourceKey(toPageRef(11), { scale: 1.2 })).not.toBe(at12);
+    await fixture.kernel.destroy();
+  });
+
+  it('asks for a page a pending change makes once the engine has it, and never for one that went first', async () => {
+    const fixture = await boot();
+    const blank = (objectNumber: number) => ({
+      label: { key: 'pages.insertBlank' },
+      ops: [
+        {
+          type: 'pages.insertBlank' as const,
+          spec: { size: { width: 612, height: 792 } },
+          objectNumbers: [objectNumber],
+        },
+      ],
+    });
+    fixture.stage(blank(44));
+    const picture = fixture.render.renderSource(toPageRef(44), { scale: 1 });
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(fixture.imageCalls).toHaveLength(0);
+
+    // The engine has the page once its event lands.
+    const shown = fixture.kernel.documents.listPages('d');
+    fixture.emit(
+      documentEvent({
+        type: 'pages.inserted',
+        layout: { pageCount: shown.length, pages: shown, namedPages: [] },
+        origin: { kind: 'local' },
+      }),
+    );
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(fixture.imageCalls.map((call) => call.pageObjectNumber)).toEqual([44]);
+    fixture.tasks[0]!.resolve(image());
+    await picture;
+
+    const refused = fixture.stage(blank(45));
+    const never = fixture.render.renderSource(toPageRef(45), { scale: 1 });
+    refused.reject(new Error('refused'));
+    await expect(never).rejects.toMatchObject({ code: 'not-found' });
+    expect(fixture.imageCalls).toHaveLength(1);
     await fixture.kernel.destroy();
   });
 

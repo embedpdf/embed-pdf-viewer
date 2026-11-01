@@ -212,6 +212,11 @@ export {
   type FormPredictionConformanceOptions,
 } from './conformance/runFormPredictionConformance';
 export {
+  PAGE_PREDICTION_FIXTURE_PDF,
+  runPagePredictionConformance,
+  type PagePredictionConformanceOptions,
+} from './conformance/runPagePredictionConformance';
+export {
   FIELD_GROUP_TOKENS,
   FIELD_GROUPS_PDF,
   runFieldGroupsConformance,

@@ -127,6 +127,7 @@ const documentMeta = (): DocumentMeta => ({
   revision: 0,
   hasUnsavedChanges: false,
   renderPolicy: { kind: 'continuous' },
+  pendingPages: new Map(),
 });
 
 function harness(snapshot: FormSnapshot, sandbox: ScriptSandbox = new NodeSandbox()) {

@@ -188,10 +188,17 @@ export type PromiseMemberOf<Capability> =
 export type PromiseMembers<Capability> = { readonly [Path in PromiseMemberOf<Capability>]: true };
 
 /**
- * What the kernel knows about an open document — the page registry captured at open.
- * `pages` is the engine's own snapshot (`PageLayout`: index, ref, size,
- * rotation, label, boxes). `ref` (the page's `PageRef`) is the durable
- * per-page identity; the array index is only display order.
+ * Where a page the engine doesn't have yet gets its look until the engine has
+ * it: a blank insert is a white page of its size (`blank`); a deleted page an
+ * undo brings back has the pictures it had (`own`).
+ */
+export type PendingPage = { readonly look: 'blank' } | { readonly look: 'own' };
+
+/**
+ * What the kernel knows about an open document: its pages as the user sees
+ * them (`PageLayout`: index, ref, size, rotation, label, boxes). `ref` (the
+ * page's `PageRef`) is the durable per-page identity; the array index is only
+ * display order.
  */
 export interface DocumentMeta {
   readonly id: string;
@@ -203,12 +210,24 @@ export interface DocumentMeta {
   readonly instanceId: string;
   readonly name?: string;
   readonly pageCount: number;
+  /**
+   * The pages as the user sees them: the engine's, with this session's page
+   * changes that are on their way on top (a rotate, a move, a delete, a blank
+   * insert, an undo of one), so an edit shows before the engine answers. An
+   * index a verb takes names a page of this list.
+   */
   readonly pages: readonly PageLayout[];
   /**
-   * Bumps every time the page registry is replaced by a document mutation
-   * event (rotate/move/delete). The registry's monotonic version: anything
-   * caching a derivation of `pages` (e.g. the Stage's laid-out scene) keys
-   * on it so a same-`pageCount` change — like a rotation — still invalidates.
+   * The pages of `pages` the engine doesn't have yet, by object number: a
+   * change on its way makes them. Code that asks the engine about a page
+   * (render, page mirrors) waits for these; everything else reads `pages`.
+   */
+  readonly pendingPages: ReadonlyMap<PageObjectNumber, PendingPage>;
+  /**
+   * Moves every time `pages` does: an edit shown, or the engine's pages
+   * changing other than shown. Anything caching a derivation of `pages` (the
+   * Stage's laid-out scene) keys on it, so a change that keeps the page count
+   * (a rotation) still invalidates.
    */
   readonly revision: number;
   /**

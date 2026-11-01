@@ -128,6 +128,47 @@ describe('page edits are steps of the history', () => {
     await kernel.destroy();
   });
 
+  it('every edit and every undo shows before the engine answers, and its answer moves nothing', async () => {
+    const { kernel, pageEdit, history } = await boot();
+    const { documents } = kernel;
+
+    const moved = pageEdit.reorder([FIRST], 'end');
+    expect(orderOf(kernel)).toEqual([4, 3]);
+    let revision = documents.getRevision();
+    await moved;
+    expect(documents.getRevision()).toBe(revision);
+
+    const turned = pageEdit.rotateBy([FIRST], 90);
+    expect(rotationsOf(kernel)).toEqual([0, 90]);
+    await turned;
+
+    const undone = step(history);
+    expect(rotationsOf(kernel)).toEqual([0, 0]);
+    await undone;
+    const unmoved = step(history);
+    expect(orderOf(kernel)).toEqual([3, 4]);
+    await unmoved;
+
+    const deleted = pageEdit.delete([SECOND]);
+    expect(orderOf(kernel)).toEqual([3]);
+    await deleted;
+    const restored = step(history);
+    expect(orderOf(kernel)).toEqual([3, 4]);
+    revision = documents.getRevision();
+    await restored;
+    expect(documents.getRevision()).toBe(revision);
+
+    const inserted = pageEdit.insertBlank({ position: 'start' });
+    const [shown] = documents.listPages();
+    expect(orderOf(kernel)).toEqual([shown!.ref.objectNumber, 3, 4]);
+    expect(shown!.size).toEqual({ width: 300, height: 300 });
+    // The page is named at birth: the engine's answer names the same page.
+    const { pages } = await inserted;
+    expect(pages).toEqual([shown!.ref]);
+    expect(documents.listPages()[0]).toBe(shown);
+    await kernel.destroy();
+  });
+
   it('a session without doc.pages.assemble reads the pages but cannot edit them', async () => {
     const { kernel, pageEdit, history } = await boot(['doc.open', 'doc.render']);
     expect(pageEdit.canEdit()).toBe(false);

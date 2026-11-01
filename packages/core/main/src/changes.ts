@@ -33,6 +33,7 @@ import {
   type DocumentHandle,
   type FormFieldDTO,
   type OutlineItem,
+  type RestoredPage,
   type WidgetAnnotation,
 } from '@embedpdf/engine-core/runtime';
 
@@ -78,6 +79,11 @@ export type PredictedOp =
       readonly type: 'attachments.restore';
       /** The embedded file as it was, under the key it had. */
       readonly attachment: Attachment;
+    }
+  | {
+      readonly type: 'pages.restore';
+      /** The pages a delete took, in display order, each with the page it followed (`restoredPagesOf`). */
+      readonly pages: readonly RestoredPage[];
     };
 
 /** One user action, as a plugin stages it. */

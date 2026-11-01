@@ -6,9 +6,20 @@
  * A verb refuses before anything starts (permission, pages, position), then
  * stages its edit as one change on the document's queue (`ctx.changes`): one
  * step of the history, sent after everything staged before it. The page list
- * shows it once the engine answers; nothing predicts pages yet.
+ * shows a rotate, a move, a delete or a blank insert at once (the kernel's
+ * page view), with what undoing it shows; an insert of another PDF's pages
+ * shows once the engine answers.
  */
-import { memo, PluginError, toPluginError, DocumentsToken } from '@embedpdf/core';
+import {
+  memo,
+  PluginError,
+  reorderBackOf,
+  restoredPagesOf,
+  rotateBackOf,
+  toPageRef,
+  toPluginError,
+  DocumentsToken,
+} from '@embedpdf/core';
 import type {
   ChangeLabel,
   DocCapability,
@@ -37,8 +48,10 @@ const LETTER_SIZE: PdfSize = { width: 612, height: 792 };
 const NO_PAGES: readonly PageRef[] = Object.freeze([]);
 const NO_LAYOUTS: readonly PageLayout[] = Object.freeze([]);
 
+/** What undoing a page op looks like: page ops, and the pages a delete took coming back. */
+type PageUndo = Extract<PredictedOp, { type: `pages.${string}` }>;
 /** A page op, as a verb stages it. */
-type PageOp = Extract<PredictedOp, { type: `pages.${string}` }>;
+type PageOp = Exclude<PageUndo, { type: 'pages.restore' }>;
 
 /** What a change is called in history and refusals. */
 type PageVerb = 'rotate' | 'reorder' | 'delete' | 'insertBlank' | 'insert' | 'duplicate';
@@ -123,7 +136,7 @@ export function createPageEditController(ctx: PluginContext<PageEditModel>) {
     verb: PageVerb,
     count: number | null,
     ops: readonly PageOp[],
-    undo?: readonly PageOp[],
+    undo?: readonly PageUndo[],
   ): PendingChange => {
     const label: ChangeLabel =
       count === null ? { key: `pages.${verb}` } : { key: `pages.${verb}`, count };
@@ -150,40 +163,53 @@ export function createPageEditController(ctx: PluginContext<PageEditModel>) {
   };
 
   /**
-   * A page's rotation once this session's changes on their way apply: the
-   * last rotation one of them gives it, else the page's own. What a turn
-   * starts from, so two quick quarter turns are a half turn.
-   */
-  const rotationOf = (ref: PageRef): PdfRotation => {
-    let rotation = ctx.pageOf(ref).rotation;
-    for (const change of ctx.changes.pending()) {
-      for (const op of change.shows) {
-        if (op.type !== 'pages.rotate') continue;
-        if (op.pages.some((page) => page.objectNumber === ref.objectNumber)) {
-          rotation = op.rotation;
-        }
-      }
-    }
-    return rotation;
-  };
-
-  /**
-   * Rotate pages as one change: one op per rotation they end up with. What
-   * undoing it looks like is each page turned back, so a turn right after an
-   * undo starts from where the undo leaves the page.
+   * Rotate pages as one change: one op per rotation they end up with. A turn
+   * starts from the rotation the page shows, so two quick quarter turns are a
+   * half turn; undoing it turns each page back.
    */
   const rotate = (refs: readonly PageRef[], rotationAfter: (ref: PageRef) => PdfRotation) => {
     const after = new Map<PdfRotation, PageRef[]>();
-    const before = new Map<PdfRotation, PageRef[]>();
     for (const ref of refs) {
-      const add = (groups: Map<PdfRotation, PageRef[]>, rotation: PdfRotation) =>
-        groups.set(rotation, [...(groups.get(rotation) ?? []), ref]);
-      add(before, rotationOf(ref));
-      add(after, rotationAfter(ref));
+      const rotation = rotationAfter(ref);
+      after.set(rotation, [...(after.get(rotation) ?? []), ref]);
     }
-    const opsOf = (groups: Map<PdfRotation, PageRef[]>): PageOp[] =>
-      [...groups].map(([rotation, pages]) => ({ type: 'pages.rotate', pages, rotation }));
-    return stageChange('rotate', refs.length, opsOf(after), opsOf(before));
+    const ops: PageOp[] = [...after].map(([rotation, pages]) => ({
+      type: 'pages.rotate',
+      pages,
+      rotation,
+    }));
+    return stageChange('rotate', refs.length, ops, rotateBackOf(registry(), refs));
+  };
+
+  /**
+   * Names for new pages from the session's pool, as many as it holds up to
+   * `count`: final at birth, so the pages show before the engine answers and
+   * later edits can name them.
+   */
+  const takeNumbers = (count: number): number[] => {
+    const numbers: number[] = [];
+    while (numbers.length < count) {
+      const number = ctx.changes.takeObjectNumber();
+      if (number === null) break;
+      numbers.push(number);
+    }
+    return numbers;
+  };
+
+  /** `count` more names, once the pool reserved them. */
+  const reservedNumbers = async (
+    count: number,
+    options: OperationOptions | undefined,
+  ): Promise<number[]> => {
+    const numbers: number[] = [];
+    while (numbers.length < count) {
+      await ctx.cancellable(
+        options?.signal,
+        ctx.changes.reserveObjectNumbers(count - numbers.length),
+      );
+      numbers.push(...takeNumbers(count - numbers.length));
+    }
+    return numbers;
   };
 
   /**
@@ -261,7 +287,7 @@ export function createPageEditController(ctx: PluginContext<PageEditModel>) {
       // The double modulo keeps -90 from 0 at 270.
       const change = rotate(
         refs,
-        (ref) => ((((rotationOf(ref) + delta) % 360) + 360) % 360) as PdfRotation,
+        (ref) => ((((ctx.pageOf(ref).rotation + delta) % 360) + 360) % 360) as PdfRotation,
       );
       await answer(change, options);
     },
@@ -275,9 +301,12 @@ export function createPageEditController(ctx: PluginContext<PageEditModel>) {
     reorder: async (pages, position, options) => {
       refuse(ASSEMBLE, 'pageEdit.reorder', options);
       const refs = refsOf(pages);
-      const change = stageChange('reorder', refs.length, [
-        { type: 'pages.reorder', pages: refs, position: positionOf(position) },
-      ]);
+      const change = stageChange(
+        'reorder',
+        refs.length,
+        [{ type: 'pages.reorder', pages: refs, position: positionOf(position) }],
+        reorderBackOf(registry(), refs),
+      );
       await answer(change, options);
     },
 
@@ -288,7 +317,12 @@ export function createPageEditController(ctx: PluginContext<PageEditModel>) {
       if (registry().every((page) => deleting.has(page.ref.objectNumber))) {
         throw new PluginError('invalid-input', 'page-edit', 'a document keeps at least one page');
       }
-      const change = stageChange('delete', refs.length, [{ type: 'pages.delete', pages: refs }]);
+      const change = stageChange(
+        'delete',
+        refs.length,
+        [{ type: 'pages.delete', pages: refs }],
+        [{ type: 'pages.restore', pages: restoredPagesOf(registry(), refs) }],
+      );
       await answer(change, options);
     },
 
@@ -297,9 +331,18 @@ export function createPageEditController(ctx: PluginContext<PageEditModel>) {
       const position = positionOf(options.position);
       const count = options.count ?? 1;
       const size = options.size ?? sizeAt(position);
-      const change = stageChange('insertBlank', count, [
-        { type: 'pages.insertBlank', spec: { size, count }, position },
-      ]);
+      // Staged at once when the pool holds the names, so verbs stage in the order they're called.
+      const held = takeNumbers(count);
+      const objectNumbers =
+        held.length === count
+          ? held
+          : [...held, ...(await reservedNumbers(count - held.length, options))];
+      const change = stageChange(
+        'insertBlank',
+        count,
+        [{ type: 'pages.insertBlank', spec: { size, count }, position, objectNumbers }],
+        [{ type: 'pages.delete', pages: objectNumbers.map(toPageRef) }],
+      );
       return inserted(change, options);
     },
 

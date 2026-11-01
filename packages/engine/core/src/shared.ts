@@ -42,6 +42,15 @@ export type { CustomMetadataPatch } from './dto/CustomMetadataPatch';
 export type { PageListSnapshot } from './dto/PageListSnapshot';
 export type { NamedPageEntry, NamedPageTarget } from './dto/NamedPage';
 export type { PageLayout, PageBoxes, PageTabOrder } from './dto/PageLayout';
+export {
+  pagesAfter,
+  pagesAfterRestore,
+  reorderBackOf,
+  restoredPagesOf,
+  rotateBackOf,
+  type PredictablePageOp,
+  type RestoredPage,
+} from './pages/predict';
 export type {
   PdfActionType,
   PdfActionNode,

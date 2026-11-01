@@ -33,6 +33,7 @@ describe('plugin-form dynamic-stamp acceptance', () => {
       revision: 0,
       hasUnsavedChanges: false,
       renderPolicy: { kind: 'continuous' },
+      pendingPages: new Map(),
     });
     const realm = standaloneRealm(doc, document, {
       identity: {

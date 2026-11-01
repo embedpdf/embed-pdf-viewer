@@ -49,10 +49,12 @@ export interface PagePositionOptions extends OperationOptions {
 /**
  * Every edit is one change: one step of the history, so undo brings the
  * pages back as they were, a deleted page with its annotations under its old
- * ref. It shows once the engine answers. Edits apply in the order they were
- * called, except that the verbs that copy pages first (`duplicate()`,
- * `insertFromDocument()`, `insertFromBytes()` with `pageIndexes`) take their
- * place once the copy is made.
+ * ref. A rotate, a move, a delete and a blank insert show in the page list at
+ * once, and so does undoing one; when the engine refuses the edit, the pages
+ * go back. Pages copied in show once the engine answers. Edits apply in the
+ * order they were called, except that the verbs that copy pages first
+ * (`duplicate()`, `insertFromDocument()`, `insertFromBytes()` with
+ * `pageIndexes`) take their place once the copy is made.
  *
  * Every verb rejects `permission-denied` (with `error.permission`) when the
  * session may not do it, `not-found` for a page the document doesn't have and
