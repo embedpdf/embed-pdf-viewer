@@ -191,7 +191,7 @@ export class GrantsClient {
     }
 
     /**
-     * The returned id is what a link page or an embed opens. Mounted only when the deployment can sign (HS256 mode) — exchange mints session JWTs, so grants exist only where minting does.
+     * The returned id is what a link page or an embed opens. Its scope gives only document permissions the caller holds itself, as tokens.issue does. Mounted only when the deployment can sign (HS256 mode) — exchange mints session JWTs, so grants exist only where minting does.
      *
      * @param {CloudPDF.GrantsCreateRequest} request
      * @param {GrantsClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -429,6 +429,7 @@ export class GrantsClient {
      * @param {GrantsClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link CloudPDF.BadRequestError}
+     * @throws {@link CloudPDF.ForbiddenError}
      * @throws {@link CloudPDF.NotFoundError}
      * @throws {@link CloudPDF.ConflictError}
      * @throws {@link errors.CloudPDFError}
@@ -485,6 +486,8 @@ export class GrantsClient {
             switch (_response.error.statusCode) {
                 case 400:
                     throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                case 403:
+                    throw new CloudPDF.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
                 case 404:
                     throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
                 case 409:

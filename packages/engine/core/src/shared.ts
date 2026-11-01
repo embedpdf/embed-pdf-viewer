@@ -980,6 +980,7 @@ export {
   expandRawScope,
   filterMatches,
   pluginPermissionsOf,
+  scopeNotCovered,
 } from './auth/scope';
 export { caps, collab, materializePdfPermissions, pdfPermissions } from './auth/scope';
 

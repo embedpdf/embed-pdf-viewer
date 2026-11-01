@@ -12,5 +12,5 @@ const picture = usePictureState();
     role="status"
     aria-label="Loading page"
   />
-  <p v-else-if="picture.status === 'error'" class="page-error">This page couldn't load.</p>
+  <p v-else-if="picture.status === 'error'" class="page-error">This page couldn’t load.</p>
 </template>

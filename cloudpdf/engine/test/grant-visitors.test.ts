@@ -115,10 +115,11 @@ async function seedDocument(): Promise<void> {
 }
 
 async function createGrant(body: Record<string, unknown>): Promise<string> {
+  // A grant gives only what its maker holds, and these give everything.
   const token = signDevToken(SECRET, {
     sub: 'dash-1',
     tenant_id: TENANT,
-    scope: ['grants.manage'],
+    scope: ['*'],
   });
   const res = await fetch(`${fx.baseUrl}/v1/tenants/${TENANT}/grants`, {
     method: 'POST',
@@ -202,7 +203,7 @@ async function updateGrant(grant: string, body: Record<string, unknown>): Promis
   const token = signDevToken(SECRET, {
     sub: 'dash-1',
     tenant_id: TENANT,
-    scope: ['grants.manage'],
+    scope: ['*'],
   });
   const res = await fetch(`${fx.baseUrl}/v1/tenants/${TENANT}/grants/${grant}`, {
     method: 'PATCH',
