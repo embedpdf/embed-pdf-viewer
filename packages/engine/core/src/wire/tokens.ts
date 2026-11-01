@@ -108,8 +108,17 @@ export const encodeContentToken = (contentVersion: number): string =>
 export const decodeContentToken = (raw: string): number =>
   decodePositiveInteger(decodeToken(ContentTokenSchema, raw).contentVersion, 'contentVersion');
 
+/**
+ * The shape of the page list a layout read answers with, in its token: an
+ * answer is cached for good under its URL, so a client asks for the shape it
+ * reads, and an answer cached before the shape changed is never read as this
+ * one. 2: with the page label sections (`labels`). The server answers every
+ * format with the current shape.
+ */
+export const LAYOUT_FORMAT = 2;
+
 export const encodeLayoutToken = (layoutVersion: number): string =>
-  encodeToken(LayoutTokenSchema, { layoutVersion });
+  encodeToken(LayoutTokenSchema, { layoutVersion, format: LAYOUT_FORMAT });
 export const decodeLayoutToken = (raw: string): number =>
   decodePositiveInteger(decodeToken(LayoutTokenSchema, raw).layoutVersion, 'layoutVersion');
 

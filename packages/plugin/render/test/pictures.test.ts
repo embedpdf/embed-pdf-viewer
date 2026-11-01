@@ -38,7 +38,7 @@ async function boot(config?: RenderConfig) {
     with: () => handle,
     setWorkingSet: () => {},
     events: { subscribe: () => () => {}, lastServerId: () => null },
-    pages: { list: () => Promise.resolve({ pageCount: pages.length, pages }) },
+    pages: { list: () => Promise.resolve({ pageCount: pages.length, labels: [], pages }) },
     security: { allows: () => true },
     render: { getPolicy: () => Promise.resolve({ kind: 'continuous' }) },
     close: () => Promise.resolve(),

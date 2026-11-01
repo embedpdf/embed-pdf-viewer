@@ -220,6 +220,26 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
   const allPageObjectNumbers = (): PageObjectNumber[] =>
     (ctx.document()?.pages ?? []).map((info) => info.ref.objectNumber);
 
+  /**
+   * A page a change on its way makes (a blank insert, a copy, an undone
+   * delete) is in the page list before the engine has it. Until it lands
+   * nothing asks the engine for its pictures: a blank page shows its
+   * background, a page coming back the pictures still kept under its keys,
+   * and a copy the pictures of the page it copies.
+   */
+  const isPending = (page: PageRef): boolean =>
+    ctx.document()?.pendingPages.has(page.objectNumber) ?? false;
+  /** The page a pending copy copies; null for any other page. */
+  const copiedFrom = (page: PageRef): PageRef | null => {
+    const pending = ctx.document()?.pendingPages.get(page.objectNumber);
+    return pending?.look === 'copy' ? pending.of : null;
+  };
+  /** Resolves once the engine has a pending page; rejects `not-found` when it went first. */
+  const whenHeld = async (page: PageRef, signal: AbortSignal | undefined): Promise<void> => {
+    await ctx.waitFor(() => !isPending(page), signal ? { signal } : undefined);
+    if (!ctx.getPage(page)) ctx.assertPageRef(page);
+  };
+
   // The one base-sizing path: renderSource, getSourceKey, conformViewport,
   // and (through the tile manager) engagement all go through baseAskWidth.
   const conformViewport = (page: PageRef, scale: number): PageRenderViewport => {
@@ -273,22 +293,28 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
     const result = store.acquire(
       key,
       (storeSignal) => {
-        const doc = ctx.doc.with({
-          priority: 'high',
-          ...(request.view !== undefined ? { view: request.view } : {}),
-        });
-        const task = doc.page(page).render.image({
-          viewport: request.viewport,
-          ...request.layers,
-          ...(request.format !== undefined ? { format: request.format } : {}),
-          ...(request.quality !== undefined ? { quality: request.quality } : {}),
-        });
-        if (storeSignal.aborted) task.abort(reasonOf(storeSignal));
-        else
-          storeSignal.addEventListener('abort', () => task.abort(reasonOf(storeSignal)), {
-            once: true,
+        const draw = (drawn: PageRef): Promise<PageImageHandle> => {
+          const doc = ctx.doc.with({
+            priority: 'high',
+            ...(request.view !== undefined ? { view: request.view } : {}),
           });
-        return task; // AbortablePromise<PageImageHandle> is a Promise<PageImageHandle>
+          const task = doc.page(drawn).render.image({
+            viewport: request.viewport,
+            ...request.layers,
+            ...(request.format !== undefined ? { format: request.format } : {}),
+            ...(request.quality !== undefined ? { quality: request.quality } : {}),
+          });
+          if (storeSignal.aborted) task.abort(reasonOf(storeSignal));
+          else
+            storeSignal.addEventListener('abort', () => task.abort(reasonOf(storeSignal)), {
+              once: true,
+            });
+          return task; // AbortablePromise<PageImageHandle> is a Promise<PageImageHandle>
+        };
+        const drawnWhenHeld = (drawn: PageRef) =>
+          isPending(drawn) ? whenHeld(drawn, storeSignal).then(() => draw(drawn)) : draw(drawn);
+        // A copy draws as the page it copies, which the engine may not have yet either.
+        return drawnWhenHeld(copiedFrom(page) ?? page);
       },
       signal,
     );
@@ -452,6 +478,7 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
       group,
       `${group}|s${scale}|${asked.join(',')}`,
       async (fetchSignal) => {
+        if (isPending(page)) await whenHeld(page, fetchSignal);
         // The look at rest only, in every state: a check box keeps both its
         // pictures, and the looks under the pointer and pressed aren't drawn.
         const pageHandle = ctx.doc.page(toPageRef(pageObjectNumber));
@@ -535,6 +562,7 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
       // denied session's viewport would otherwise be refused once per tile.
       ctx.assertAllowed(RENDER_SCOPE, 'render.tile');
       const page = toPageRef(pageObjectNumber);
+      if (isPending(page)) await whenHeld(page, signal);
       const strategy = currentStrategy();
       const task = ctx.doc
         .with({ priority: 'high', view })

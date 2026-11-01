@@ -90,6 +90,8 @@ interface PageEntry<V> {
 type PageCells<V> = Readonly<Record<string, PageEntry<V>>>;
 
 const IDLE = 'idle' as const;
+/** A load of a page that went before the engine had it: nothing to read. */
+const GONE = Symbol('page-mirror.gone');
 
 export function createPageMirror<V>(
   spec: PageMirrorSpec<V>,
@@ -167,6 +169,29 @@ export function createPageMirror<V>(
     }
   };
 
+  /** Resolves once the engine has a pending page (true), or once the user no longer sees it (false). */
+  const whenHeld = (page: PageRef): Promise<boolean> =>
+    new Promise((resolve) => {
+      const done = (held: boolean) => {
+        off();
+        env.lifetime.removeEventListener('abort', closed);
+        resolve(held);
+      };
+      const closed = () => done(false);
+      const off = env.pages.onChange(() => {
+        if (!env.pages.pending(page)) done(env.pages.has(page));
+      });
+      env.lifetime.addEventListener('abort', closed, { once: true });
+    });
+
+  /** Read the page; one a pending change makes once the engine has it. */
+  const read = (page: PageRef): Promise<V | typeof GONE> =>
+    env.pages.pending(page)
+      ? whenHeld(page).then<V | typeof GONE>((held) =>
+          held ? spec.load(env.doc, page, env.lifetime) : GONE,
+        )
+      : spec.load(env.doc, page, env.lifetime);
+
   const load = (page: PageRef): Promise<void> => {
     const key = encodePageKey(page);
     const epoch = (epochs.get(key) ?? 0) + 1;
@@ -175,11 +200,14 @@ export function createPageMirror<V>(
     if (before?.status !== 'ready')
       setEntry(key, { page, status: 'loading', value: before?.value });
     const isCurrent = () => cell.live && epochs.get(key) === epoch;
-    const request = spec
-      .load(env.doc, page, env.lifetime)
+    const request = read(page)
       .then(
         (value) => {
           if (!isCurrent()) return;
+          if (value === GONE) {
+            setEntry(key, null);
+            return;
+          }
           const previous = entryOf(key)?.value;
           setEntry(key, { page, status: 'ready', value });
           announce({ page, cause: 'load', event: null, previous, next: value });

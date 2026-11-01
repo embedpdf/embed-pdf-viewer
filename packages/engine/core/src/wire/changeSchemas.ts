@@ -246,6 +246,13 @@ export const ChangeOpWireSchema = z.discriminatedUnion('type', [
     /** The PDF whose pages come in, as the key of its multipart part. */
     resources: SourceResourceKeysSchema,
     position: PagePositionSchema.optional(),
+    objectNumbers: z.array(z.number().int().positive()).optional(),
+  }),
+  z.object({
+    type: z.literal('pages.copy'),
+    pages: z.array(PageRefSchema).min(1),
+    position: PagePositionSchema.optional(),
+    objectNumbers: z.array(z.number().int().positive()).optional(),
   }),
   z.object({
     type: z.literal('attachments.create'),
@@ -373,6 +380,7 @@ export const ChangeItemSchema = z.union([
   itemOf('pages.delete', PageDeleteResultSchema, { pages: z.array(PageRefSchema) }),
   itemOf('pages.insertBlank', PageInsertResultSchema),
   itemOf('pages.insert', PageInsertResultSchema),
+  itemOf('pages.copy', PageInsertResultSchema),
   itemOf('pages.restore', PageRestoreResultSchema),
   itemOf('attachments.create', AttachmentCreateResultSchema),
   itemOf('attachments.delete', AttachmentDeleteResultSchema),

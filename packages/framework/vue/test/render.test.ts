@@ -182,6 +182,7 @@ const engineWith = (pageCount: number) =>
           list: () =>
             Promise.resolve({
               pageCount,
+              labels: [],
               pages: Array.from({ length: pageCount }, (_, index) => ({
                 index,
                 ref: toPageRef(index + 1),

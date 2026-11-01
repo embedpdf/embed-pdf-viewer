@@ -47,7 +47,12 @@ describe('pages in page space', () => {
 
   test('a page in page space keeps where it sits in PDF space, for PDF tools', () => {
     const page = { ...layout(4, media), boxes, pdfCropBox: crop };
-    const [converted] = pageListOf({ pageCount: 1, pages: [page], namedPages: [] }).pages;
+    const [converted] = pageListOf({
+      pageCount: 1,
+      pages: [page],
+      labels: [],
+      namedPages: [],
+    }).pages;
     expect(converted!.pdfCropBox).toEqual(crop);
     expect(converted!.boxes.crop).toEqual({ x: 0, y: 0, width: 512, height: 672 });
     expect(pdfRectOf({ x: 50, y: 82, width: 50, height: 50 }, converted!.pdfCropBox)).toEqual({
@@ -79,6 +84,7 @@ describe('pages in page space', () => {
     const { pages } = pageListOf({
       pageCount: 2,
       pages: [page, { ...layout(6, other), index: 1 }],
+      labels: [],
       namedPages: [],
     });
     expect(pages[0]!.actions?.open?.root).toMatchObject({

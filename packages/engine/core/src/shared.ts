@@ -40,8 +40,27 @@ export type { MetadataPatch } from './dto/MetadataPatch';
 export type { CustomMetadata } from './dto/CustomMetadata';
 export type { CustomMetadataPatch } from './dto/CustomMetadataPatch';
 export type { PageListSnapshot } from './dto/PageListSnapshot';
+export type { PageLabelSection, PageLabelStyle } from './dto/PageLabelSection';
 export type { NamedPageEntry, NamedPageTarget } from './dto/NamedPage';
 export type { PageLayout, PageBoxes, PageTabOrder } from './dto/PageLayout';
+export {
+  pagesAfter,
+  pagesAfterRestore,
+  pagesRelabelled,
+  reorderBackOf,
+  restoredPagesOf,
+  rotateBackOf,
+  type PageList,
+  type PredictablePageOp,
+  type RestoredPage,
+} from './pages/predict';
+export {
+  labelAt,
+  sameSections,
+  sectionsAfterDelete,
+  sectionsAfterInsert,
+  sectionsAfterMove,
+} from './pages/labels';
 export type {
   PdfActionType,
   PdfActionNode,
@@ -869,7 +888,7 @@ export type {
   AnnotationCreateOptions,
   AnnotationUpdateOptions,
   FlattenWriteOptions,
-  PageInsertBlankOptions,
+  PageInsertOptions,
   FormFieldCreateOptions,
   FormWidgetAddOptions,
 } from './mutation/WriteOptions';

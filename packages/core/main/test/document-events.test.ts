@@ -68,7 +68,11 @@ function fakeEngine(initialPages: PageLayout[]): { engine: Engine; events: FakeE
     events,
     pages: {
       list: () =>
-        AbortablePromise.resolveValue({ pageCount: initialPages.length, pages: initialPages }),
+        AbortablePromise.resolveValue({
+          pageCount: initialPages.length,
+          labels: [],
+          pages: initialPages,
+        }),
     },
     close: () => AbortablePromise.resolveValue<void>(undefined),
   } as unknown as DocumentHandle;
@@ -113,7 +117,7 @@ function rotatedEvent(
     type: 'pages.rotated',
     pages: pageObjectNumbers.map((pageObjectNumber) => toPageRef(pageObjectNumber)),
     rotation,
-    layout: { pageCount: pages.length, pages, namedPages: [] },
+    layout: { pageCount: pages.length, pages, labels: [], namedPages: [] },
     meta: { affectedPages: [], cacheDelta: null, opId: 'op-1', undoable: true },
     origin: { kind: 'local', sessionId: 's', sub: null, ts: 1, serverId: null },
   };
@@ -150,7 +154,7 @@ describe('kernel: document events → page registry', () => {
     events.emit({
       type: 'pages.deleted',
       pages: [toPageRef(2)],
-      layout: { pageCount: 2, pages: [page(1, 0), page(3, 1)], namedPages: [] },
+      layout: { pageCount: 2, pages: [page(1, 0), page(3, 1)], labels: [], namedPages: [] },
       meta: { affectedPages: [], cacheDelta: null, opId: 'op-1', undoable: true },
       origin: { kind: 'remote', sessionId: 'other', sub: 'alice', ts: 1, serverId: 7 },
     } as DocumentEvent);

@@ -125,7 +125,8 @@ function createFakeRuntime(): PdfRuntimeModule & {
       EPDF_GetPageRotateByIndex: () => 0,
       EPDF_GetPageUserUnitByIndex: () => 0,
       EPDF_GetPageTabOrderByIndex: () => 0,
-      FPDF_GetPageLabel: () => 0,
+      // No page label sections.
+      EPDFDoc_GetPageLabelSectionCount: () => 0,
       // No page-level actions in this ownership/routing fixture.
       EPDFDoc_GetPageActionModel: () => ptr(0),
       // No named pages either: `pages.list` reads both catalog name trees.

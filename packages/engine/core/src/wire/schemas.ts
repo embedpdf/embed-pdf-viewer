@@ -61,6 +61,7 @@ import type {
 } from '../signature/types';
 import type { PageGeometryRun, PageGeometrySnapshot } from '../dto/PageGeometrySnapshot';
 import { charMapViolation } from '../text/charmap';
+import type { PageLabelSection } from '../dto/PageLabelSection';
 import type { PageBoxes, PageLayout } from '../dto/PageLayout';
 import type { PageListSnapshot } from '../dto/PageListSnapshot';
 import type { NamedPageEntry } from '../dto/NamedPage';
@@ -1587,9 +1588,18 @@ export const NamedPageEntrySchema: z.ZodType<NamedPageEntry> = z.object({
   ]),
 });
 
+/** See `PageLabelSection`: pages numbered together. */
+export const PageLabelSectionSchema: z.ZodType<PageLabelSection> = z.object({
+  firstPage: z.number().int().nonnegative(),
+  style: z.enum(['decimal', 'upperRoman', 'lowerRoman', 'upperLetters', 'lowerLetters']).nullable(),
+  firstNumber: z.number().int(),
+  prefix: z.string(),
+});
+
 export const PageListSnapshotSchema: z.ZodType<PageListSnapshot> = z.object({
   pageCount: z.number().int().nonnegative(),
   pages: z.array(PageLayoutSchema),
+  labels: z.array(PageLabelSectionSchema),
   namedPages: z.array(NamedPageEntrySchema),
 });
 

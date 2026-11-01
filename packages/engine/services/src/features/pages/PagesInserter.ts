@@ -20,16 +20,17 @@ import {
   type DocumentSession,
 } from '../../document-session/DocumentSession';
 import { loadFailure } from '../../runtime/loadError';
+import { withI32Array } from '../../runtime/memory/scratch';
 import { throwIfAborted } from '../../shared/abort';
 
 /**
- * Insert every page of a standalone PDF into the session document. A
- * structural mutation (like move/delete): the source bytes are loaded as a
- * throwaway PDFium document, `EPDFDoc_ImportPages` deep-copies its pages in
- * at `position` with the form fields of their widgets, and the page registry
- * is rebuilt. Pre-existing pages keep their identity and `RevisionToken`s;
- * the inserted copies get fresh object numbers, resolved from the post-insert
- * registry.
+ * Insert pages into the session document: every page of a standalone PDF,
+ * copies of the document's own pages, or blank pages. A structural mutation
+ * (like move/delete): `EPDFDoc_ImportPages` deep-copies pages in at
+ * `position` with the form fields of their widgets, and the page registry is
+ * rebuilt. Pre-existing pages keep their identity and `RevisionToken`s; the
+ * new pages get the numbers the caller gives (`objectNumbers`, numbers the
+ * session holds) or fresh ones, resolved from the post-insert registry.
  */
 export class PagesInserter {
   constructor(
@@ -41,6 +42,7 @@ export class PagesInserter {
     bytes: ArrayBuffer,
     position: PagePosition,
     signal: AbortSignal,
+    objectNumbers?: readonly number[],
   ): PageInsertResult<PdfCoordinates> {
     throwIfAborted(signal);
     if (bytes.byteLength === 0) {
@@ -59,7 +61,6 @@ export class PagesInserter {
     // deep-detaching import in the runtime would let them close eagerly.
     const dataPtr = mem.alloc(bytes.byteLength);
     let srcPtr: Ptr | null = null;
-    let insertedCount = 0;
     try {
       mem.writeBytes(dataPtr, new Uint8Array(bytes));
       srcPtr = fn.FPDF_LoadMemDocument(dataPtr, bytes.byteLength, '');
@@ -75,38 +76,127 @@ export class PagesInserter {
           ),
         );
       }
-      insertedCount = fn.FPDF_GetPageCount(srcPtr);
-      if (insertedCount <= 0) {
+      const count = fn.FPDF_GetPageCount(srcPtr);
+      if (count <= 0) {
         throw new EngineError(EngineErrorCode.InvalidArg, 'pages.insert source PDF has no pages');
       }
       keepFieldNamesApart(this.runtime, this.session, srcPtr);
-      // Null index array + count 0 = "import every page", in order.
-      if (!fn.EPDFDoc_ImportPages(destPtr, srcPtr, NULL_PTR, 0, at)) {
-        throw new EngineError(
-          EngineErrorCode.Unknown,
-          `EPDFDoc_ImportPages rejected the insert at index ${at}`,
-        );
-      }
+      const result = this.importInto(srcPtr, at, count, objectNumbers, 'pages.insert', signal);
       const retainedSrc = srcPtr;
       this.session.retainUntilClose(() => {
         fn.FPDF_CloseDocument(retainedSrc);
         mem.free(dataPtr);
       });
+      return result;
     } catch (error) {
       if (srcPtr) fn.FPDF_CloseDocument(srcPtr);
       mem.free(dataPtr);
       throw error;
+    }
+  }
+
+  /**
+   * Copy the document's pages `refs`, in that order, to `position`. The pages
+   * are copied out into a scratch document with the form fields of their
+   * widgets, those fields' names are kept apart from the document's there, as
+   * an insert's are (`keepFieldNamesApart`), and the copies are copied in.
+   * The scratch document stays open until the session closes: the copies may
+   * still read streams through it, as an insert's do through its source.
+   */
+  copy(
+    refs: readonly PageRef[],
+    position: PagePosition,
+    signal: AbortSignal,
+    objectNumbers?: readonly number[],
+  ): PageInsertResult<PdfCoordinates> {
+    throwIfAborted(signal);
+    if (refs.length === 0) {
+      throw new EngineError(EngineErrorCode.InvalidArg, 'pages.copy requires at least one page');
+    }
+    // NotFound for a page the document doesn't have; a page named twice is copied twice.
+    const indices = this.session
+      .resolvePageRefs([...refs])
+      .map((pageObjectNumber) => this.session.recordByObjectNumber(pageObjectNumber).pageIndex);
+
+    const { fn } = this.runtime;
+    const destPtr = this.session.requireDocPtr();
+    const at = pageIndexAt(this.session, position, fn.FPDF_GetPageCount(destPtr));
+
+    const scratchPtr = fn.FPDF_CreateNewDocument();
+    if (!scratchPtr) {
+      throw new EngineError(EngineErrorCode.Unknown, 'FPDF_CreateNewDocument failed');
+    }
+    try {
+      const copied = withI32Array(this.runtime.mem, indices, (indicesPtr, count) =>
+        fn.EPDFDoc_ImportPages(scratchPtr, destPtr, indicesPtr, count, 0, NULL_PTR),
+      );
+      if (!copied) {
+        throw new EngineError(
+          EngineErrorCode.Unknown,
+          `EPDFDoc_ImportPages rejected copying pages [${indices.join(',')}] out`,
+        );
+      }
+      keepFieldNamesApart(this.runtime, this.session, scratchPtr);
+      const result = this.importInto(
+        scratchPtr,
+        at,
+        indices.length,
+        objectNumbers,
+        'pages.copy',
+        signal,
+      );
+      this.session.retainUntilClose(() => fn.FPDF_CloseDocument(scratchPtr));
+      return result;
+    } catch (error) {
+      fn.FPDF_CloseDocument(scratchPtr);
+      throw error;
+    }
+  }
+
+  /**
+   * Copies every page of `srcPtr` (`count` of them) in at `at`, each at the
+   * number `objectNumbers` gives it, and reads the pages as they are now. A
+   * failure takes back what it copied: the job's layer transaction aborts.
+   */
+  private importInto(
+    srcPtr: Ptr,
+    at: number,
+    count: number,
+    objectNumbers: readonly number[] | undefined,
+    op: 'pages.insert' | 'pages.copy',
+    signal: AbortSignal,
+  ): PageInsertResult<PdfCoordinates> {
+    const { fn, mem } = this.runtime;
+    const destPtr = this.session.requireDocPtr();
+    if (objectNumbers && objectNumbers.length !== count) {
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        `${op} needs one object number per page: ${objectNumbers.length} for ${count}`,
+        { details: { field: 'objectNumbers' } },
+      );
+    }
+    for (const objectNumber of objectNumbers ?? []) this.session.claimObjectNumber(objectNumber);
+
+    // Null index array + count 0 = "import every page", in order.
+    const imported = objectNumbers
+      ? withI32Array(mem, objectNumbers, (numbersPtr) =>
+          fn.EPDFDoc_ImportPages(destPtr, srcPtr, NULL_PTR, 0, at, numbersPtr),
+        )
+      : fn.EPDFDoc_ImportPages(destPtr, srcPtr, NULL_PTR, 0, at, NULL_PTR);
+    if (!imported) {
+      throw new EngineError(
+        EngineErrorCode.Unknown,
+        `EPDFDoc_ImportPages rejected the ${op} at index ${at}`,
+      );
     }
 
     // Page count and order changed; rebuild the index<->pon map.
     this.session.refreshPageRegistry();
 
     const layout = new PagesReader(this.runtime, this.session).read(signal);
-    const insertedPages: PageRef[] = layout.pages
-      .slice(at, at + insertedCount)
-      .map((page) => page.ref);
-    // An inserted page is born in this document, not in its file, so its
-    // inline annotations are born as objects here, named by their numbers.
+    const insertedPages: PageRef[] = layout.pages.slice(at, at + count).map((page) => page.ref);
+    // A copied page is born in this document, not in its file, so its inline
+    // annotations are born as objects here, named by their numbers.
     for (const page of insertedPages) {
       promoteInlineAnnotations(this.runtime, this.session, page.objectNumber);
     }

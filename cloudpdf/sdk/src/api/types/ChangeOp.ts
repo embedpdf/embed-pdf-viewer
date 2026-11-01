@@ -32,6 +32,7 @@ export type ChangeOp =
     | CloudPDF.ChangeOp.PagesDelete
     | CloudPDF.ChangeOp.PagesInsertBlank
     | CloudPDF.ChangeOp.PagesInsert
+    | CloudPDF.ChangeOp.PagesCopy
     | CloudPDF.ChangeOp.AttachmentsCreate
     | CloudPDF.ChangeOp.AttachmentsDelete;
 
@@ -266,12 +267,20 @@ export namespace ChangeOp {
         type: "pages.insert";
         resources: ChangeOpPagesInsert.Resources;
         position?: CloudPDF.PagePosition | undefined;
+        objectNumbers?: number[] | undefined;
     }
 
     export namespace ChangeOpPagesInsert {
         export interface Resources {
             source: string;
         }
+    }
+
+    export interface PagesCopy {
+        type: "pages.copy";
+        pages: CloudPDF.PageRef[];
+        position?: CloudPDF.PagePosition | undefined;
+        objectNumbers?: number[] | undefined;
     }
 
     export interface AttachmentsCreate {
