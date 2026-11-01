@@ -22,6 +22,14 @@ room, `command` takes its place in the "More" menu: here, a command of yours tha
 choice in a dialog. Leave `command` out, and your component stays in the toolbar while other items
 make room.
 
+Here a review status from your app sits at the end of the toolbar, with `{ custom: 'status' }` and
+no `command`:
+
+<Example name="viewer/customize/components/status" />
+
+> **Try it:** pick **Approved** from the status at the top right of the toolbar: the dot beside it
+> turns green.
+
 ## Know where it sits
 
 The same component can sit in a top bar, a vertical rail or a floating bar. `useToolbarItem()` tells

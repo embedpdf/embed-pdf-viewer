@@ -16,6 +16,14 @@ feature's plugin, and follow what happens. Inside the viewer, any component of y
 `onReady` fires once the viewer is live, before any document has opened. Until then there's no
 `viewer`.
 
+The bar above this viewer is the app's own. Its **Print** button waits for `onReady`, and its page
+number starts when the document opens, since `stage` belongs to the document:
+
+<Example name="viewer/code/viewer/on-ready" />
+
+> **Try it:** scroll to the second page, and the page number in the bar follows. **Print** opens
+> the viewer's print dialog.
+
 ## What it gives you
 
 | Member | What it is |

@@ -1,0 +1,33 @@
+<link rel="stylesheet" href="./on-ready.css" />
+
+<div class="app">
+  <header class="bar">
+    <span class="page" id="page">Opening…</span>
+    <button type="button" class="button" id="print" disabled>Print</button>
+  </header>
+  <embedpdf-viewer id="viewer" class="viewer"></embedpdf-viewer>
+</div>
+
+<script type="module">
+  import 'https://cdn.jsdelivr.net/npm/@cloudpdf/viewer@3/dist/cloudpdf.js';
+
+  const article = { grant: 'shr_v09cJHOmj3C8vrfUlZNTDyqX' };
+
+  const element = document.getElementById('viewer');
+  const page = document.getElementById('page');
+  const print = document.getElementById('print');
+
+  element.addEventListener('epdf:ready', () => {
+    const { viewer } = element;
+    print.disabled = false;
+    print.onclick = () => viewer.commands.execute('document:print');
+    // The pages are the document's: follow the current one once it has opened.
+    viewer.documents.onOpened(() => {
+      const stage = viewer.get('stage');
+      const show = (index) => (page.textContent = `Page ${index + 1}`);
+      show(stage.getCurrentPageIndex());
+      viewer.watch(() => stage.getCurrentPageIndex(), show);
+    });
+  });
+  element.config = { src: article };
+</script>

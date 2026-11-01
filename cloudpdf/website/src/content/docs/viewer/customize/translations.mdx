@@ -39,6 +39,15 @@ A built-in button's label has the command's id as its key. Give a new one, per l
 }
 ```
 
+A mode tab is a button too, with the command `mode:annotate` for **Annotate**. Here a picker in your
+app sets `locale`, and `strings` gives two labels your own words in each language it offers:
+
+<Example name="viewer/customize/translations/languages" />
+
+> **Try it:** the second tab reads **Review** instead of Annotate, and the menu at the top left has
+> **Save a copy**. Pick Deutsch above the viewer: every word changes, yours too. Pick العربية and
+> the bars mirror.
+
 ## Translate your own buttons
 
 Give a command a `labelKey` instead of a `label`, and its words per language:

@@ -29,6 +29,15 @@ const READ_ONLY_GRANT = 'shr_WGj1goAtlNN_fQ5OswPrbJQM';
 /** A document's grant on CloudPDF SaaS. */
 const grantOf = (key) => CLOUD_GRANTS[key]?.grant ?? READ_ONLY_GRANT;
 
+/**
+ * A document as the ready-made viewer's samples give it: the cloud viewer's `src` on cloudpdf.com,
+ * and the URL embedpdf.com's copy gives it at (see `welcome`).
+ */
+const viewerForms = (key) => ({
+  viewerCloud: `{ grant: '${grantOf(key)}' }`,
+  viewerUrls: [`/pdfs/${key}.pdf`],
+});
+
 /** `const <name> = …` emitted for the cloud flavor of a headless sample: an engine open input. */
 const cloudSource = (key) => (name) =>
   `const ${name}: OpenInput = { kind: 'grant', grant: '${grantOf(key)}' };`;
@@ -48,16 +57,16 @@ export const DEMO_DOCUMENTS = {
     /** The demo file itself, and `/report.pdf`, the path the snippets give for a reader's own PDF. */
     viewerUrls: ['/pdfs/welcome.pdf', '/report.pdf'],
   },
-  links: { cloudSource: cloudSource('links') },
-  forms: { cloudSource: cloudSource('forms') },
-  report: { cloudSource: cloudSource('report') },
-  proposal: { cloudSource: cloudSource('proposal') },
-  layout: { cloudSource: cloudSource('layout') },
-  notice: { cloudSource: cloudSource('notice') },
-  approvals: { cloudSource: cloudSource('approvals') },
-  article: { cloudSource: cloudSource('article') },
-  sketch: { cloudSource: cloudSource('sketch') },
-  invoice: { cloudSource: cloudSource('invoice') },
-  registration: { cloudSource: cloudSource('registration') },
-  agreement: { cloudSource: cloudSource('agreement') },
+  links: { cloudSource: cloudSource('links'), ...viewerForms('links') },
+  forms: { cloudSource: cloudSource('forms'), ...viewerForms('forms') },
+  report: { cloudSource: cloudSource('report'), ...viewerForms('report') },
+  proposal: { cloudSource: cloudSource('proposal'), ...viewerForms('proposal') },
+  layout: { cloudSource: cloudSource('layout'), ...viewerForms('layout') },
+  notice: { cloudSource: cloudSource('notice'), ...viewerForms('notice') },
+  approvals: { cloudSource: cloudSource('approvals'), ...viewerForms('approvals') },
+  article: { cloudSource: cloudSource('article'), ...viewerForms('article') },
+  sketch: { cloudSource: cloudSource('sketch'), ...viewerForms('sketch') },
+  invoice: { cloudSource: cloudSource('invoice'), ...viewerForms('invoice') },
+  registration: { cloudSource: cloudSource('registration'), ...viewerForms('registration') },
+  agreement: { cloudSource: cloudSource('agreement'), ...viewerForms('agreement') },
 };

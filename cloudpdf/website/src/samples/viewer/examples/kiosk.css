@@ -1,0 +1,187 @@
+/* The kiosk's own parts, in the viewer's places: the header, the three big buttons in the bottom
+   bar, and what's in the check sheet. They use the viewer's colors (its theme's tokens), so one
+   theme colors both. */
+
+/* The header */
+.kiosk-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 24px;
+  padding: 16px 28px;
+  background: var(--epdf-surface);
+  border-bottom: 1px solid var(--epdf-border);
+}
+
+.kiosk-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--epdf-text);
+}
+
+/* A lantern: the body, with a cap at each end and the flame inside. */
+.kiosk-brand::before {
+  content: '';
+  width: 24px;
+  height: 22px;
+  border-block: 5px solid var(--epdf-text);
+  border-radius: 7px;
+  background:
+    radial-gradient(circle at 50% 55%, #f2b27c 0 4px, transparent 5px), var(--epdf-accent);
+}
+
+.kiosk-brand small {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--epdf-text-muted);
+}
+
+.kiosk-line {
+  flex: 1 1 240px;
+  margin: 0;
+  font-size: 18px;
+  text-align: center;
+  color: var(--epdf-text);
+}
+
+.kiosk-progress {
+  margin: 0;
+  padding: 8px 16px;
+  font-size: 16px;
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--epdf-accent);
+  background: var(--epdf-hover);
+  border-radius: 999px;
+}
+
+.kiosk-progress.complete {
+  color: var(--epdf-surface);
+  background: var(--epdf-accent);
+}
+
+/* The three big buttons */
+.kiosk-actions {
+  display: flex;
+  gap: 16px;
+  padding: 8px 0;
+}
+
+.kiosk-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-width: 184px;
+  height: 72px;
+  padding: 0 28px;
+  font: inherit;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--epdf-text);
+  background: var(--epdf-surface);
+  border: 2px solid var(--epdf-border);
+  border-radius: 999px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.kiosk-button svg {
+  width: 28px;
+  height: 28px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.kiosk-button:active:not(:disabled) {
+  background: var(--epdf-hover);
+}
+
+.kiosk-button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.kiosk-button:focus-visible {
+  outline: 3px solid var(--epdf-accent);
+  outline-offset: 3px;
+}
+
+.kiosk-button.primary {
+  color: var(--epdf-surface);
+  background: var(--epdf-accent);
+  border-color: var(--epdf-accent);
+}
+
+/* On a phone, the viewer marks the item `data-size="compact"`: three buttons still fit. */
+[data-size='compact'] .kiosk-actions {
+  gap: 8px;
+}
+
+[data-size='compact'] .kiosk-button {
+  min-width: 0;
+  height: 60px;
+  padding: 0 16px;
+  font-size: 16px;
+}
+
+/* The check, in its sheet */
+.kiosk-check {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 4px 20px 24px;
+  text-align: center;
+}
+
+.kiosk-check h2 {
+  margin: 4px 0 8px;
+  font-size: 28px;
+  color: var(--epdf-text);
+}
+
+.kiosk-check p {
+  margin: 0 0 20px;
+  font-size: 18px;
+  color: var(--epdf-text-muted);
+}
+
+.kiosk-check ul {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.kiosk-check li button {
+  width: 100%;
+  min-height: 64px;
+  padding: 0 24px;
+  font: inherit;
+  font-size: 19px;
+  font-weight: 600;
+  text-align: start;
+  color: var(--epdf-text);
+  background: var(--epdf-hover);
+  border: 2px solid transparent;
+  border-radius: var(--epdf-radius);
+  cursor: pointer;
+}
+
+.kiosk-check li button::after {
+  content: '→';
+  float: inline-end;
+  color: var(--epdf-accent);
+}
+
+.kiosk-check li button:focus-visible {
+  border-color: var(--epdf-accent);
+  outline: none;
+}
