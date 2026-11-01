@@ -47,13 +47,19 @@ async function boot(config?: RenderConfig) {
     open: () => Promise.resolve(handle),
     destroy: () => Promise.resolve(),
   } as unknown as Engine;
-  const kernel = createKernel({ engine, plugins: [renderPlugin(config)], clock: time.clock });
+  const reported: unknown[] = [];
+  const kernel = createKernel({
+    engine,
+    plugins: [renderPlugin(config)],
+    clock: time.clock,
+    report: (error) => reported.push(error),
+  });
   await kernel.start();
   await kernel.documents.open({ kind: 'bytes', id: 'd', bytes: new Uint8Array() });
   const render = kernel.capability(RenderToken, 'd');
   const events: PictureStateChangedEvent[] = [];
   render.onPictureStateChanged((event) => events.push(event));
-  return { kernel, render, time, events };
+  return { kernel, render, time, events, reported };
 }
 
 describe('a page picture state', () => {
@@ -150,6 +156,18 @@ describe('a page picture state', () => {
     const read = render.getPictureState(PAGE, 'main');
     expect(render.getPictureState(0, 'main')).toBe(read);
     expect(render.getPictureState(toPageRef(99), 'main')).toEqual({ status: 'idle', slow: false });
+  });
+
+  it('takes a layer going while the document closes, before its cleanups ran, without an error', async () => {
+    // Closing unpublishes the document (its layers unmount) and ends its state's writes at once;
+    // the cleanups run after that.
+    const { kernel, render, reported } = await boot();
+    const report = render.reportPicture('main', PAGE);
+    report.shown();
+    const closing = kernel.documents.close('d');
+    report.close();
+    await closing;
+    expect(reported).toEqual([]);
   });
 
   it('ignores reports after the document closed', async () => {

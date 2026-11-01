@@ -1,6 +1,6 @@
 /**
- * Whether each page's picture is on screen: the reports the page layers keep, folded into the
- * `pictures` state.
+ * Whether each page's picture is on screen: the reports the page layers keep, folded into one
+ * state per page and view.
  *
  * A layer that paints a page opens a report on it when it mounts (`reportPicture`), and the page
  * is `loading` in that view from then on. It turns `ready` once a report says `shown()`, and
@@ -8,6 +8,10 @@
  * failure before that makes it `forbidden` or `error`. `slow` turns on when it has been loading
  * for `slowAfterMs`, on the plugin's clock, and the page goes back to `idle` once every report on
  * it closed (its layers unmounted).
+ *
+ * Like the tile plans, the states live here and not in the plugin's state: they follow the
+ * layers, which unmount while the document closes, after the plugin's state stopped taking
+ * writes. A change wakes the readers with `ctx.notify()`, which does nothing by then.
  */
 import {
   isPluginError,
@@ -19,7 +23,20 @@ import {
 } from '@embedpdf/core';
 import type { PictureState, PictureStateChangedEvent, RenderSettings } from './contract';
 import type { OpenPictureReport } from './host-contract';
-import { PICTURE_STATES, pictureStateOf, setPictureState, type RenderState } from './model';
+import type { RenderState } from './model';
+
+const pictureState = (status: ResourceStatus, slow = false): PictureState =>
+  Object.freeze({ status, slow });
+
+/** Every picture state there is, one object each, so the same state is the same object. */
+export const PICTURE_STATES = {
+  idle: pictureState('idle'),
+  loading: pictureState('loading'),
+  slow: pictureState('loading', true),
+  ready: pictureState('ready'),
+  forbidden: pictureState('forbidden'),
+  error: pictureState('error'),
+} as const;
 
 /** What one report said: its picture showed, or why it can't. */
 interface Report {
@@ -34,6 +51,8 @@ interface ShownPage {
   slow: boolean;
   /** The pending turn to `slow`, while it waits. */
   cancelSlow: Cancel | null;
+  /** What it reads now. */
+  state: PictureState;
 }
 
 /** A refusal for want of a permission, as a `PluginError` or its plain info. */
@@ -91,10 +110,15 @@ export function createPictureReports(
       }
     }
     const next = stateOf(status, shown.slow);
-    const pageObjectNumber = shown.page.objectNumber;
-    if (pictureStateOf(ctx.state.get(), view, pageObjectNumber) === next) return;
-    ctx.state.update(setPictureState, view, pageObjectNumber, next);
+    if (shown.state === next) return;
+    shown.state = next;
+    ctx.notify();
     changed({ page: shown.page, view, ...next });
+  }
+
+  /** A page's state in a view: `idle` when the view doesn't show it. */
+  function stateIn(view: string, pageObjectNumber: PageObjectNumber): PictureState {
+    return views.get(view)?.get(pageObjectNumber)?.state ?? PICTURE_STATES.idle;
   }
 
   function open(view: string, page: PageRef): OpenPictureReport {
@@ -104,7 +128,13 @@ export function createPictureReports(
     if (!pages) views.set(view, (pages = new Map()));
     let shown = pages.get(page.objectNumber);
     if (!shown) {
-      shown = { page, reports: new Set(), slow: false, cancelSlow: null };
+      shown = {
+        page,
+        reports: new Set(),
+        slow: false,
+        cancelSlow: null,
+        state: PICTURE_STATES.idle,
+      };
       pages.set(page.objectNumber, shown);
     }
     const target = shown;
@@ -135,5 +165,5 @@ export function createPictureReports(
     };
   }
 
-  return { open };
+  return { open, stateIn };
 }

@@ -49,14 +49,7 @@ import type {
   ViewDemand,
 } from './host-contract';
 import { pixelChangeOf } from './invalidation';
-import {
-  invalidatePages,
-  layersKeyOf,
-  PICTURE_STATES,
-  pictureStateOf,
-  renderEpochOf,
-  type RenderState,
-} from './model';
+import { invalidatePages, layersKeyOf, renderEpochOf, type RenderState } from './model';
 import {
   EMPTY_TILE_PLAN,
   resolveRenderOptions,
@@ -64,7 +57,7 @@ import {
   type ResolvedRenderOptions,
   type TilePaintPlan,
 } from './paint-plan';
-import { createPictureReports } from './pictures';
+import { createPictureReports, PICTURE_STATES } from './pictures';
 import { RasterStore } from './raster-store';
 import { baseAskWidth, resolveStrategy, type ResolvedStrategy } from './strategy';
 import { TileManager } from './tile-manager';
@@ -662,9 +655,7 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
     onInvalidated: invalidated.on,
     getPictureState: (page, view) => {
       const info = ctx.getPage(page);
-      return info
-        ? pictureStateOf(ctx.state.get(), view, info.ref.objectNumber)
-        : PICTURE_STATES.idle;
+      return info ? pictures.stateIn(view, info.ref.objectNumber) : PICTURE_STATES.idle;
     },
     onPictureStateChanged: pictureStateChanged.on,
 
