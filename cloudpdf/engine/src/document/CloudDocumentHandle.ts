@@ -7,6 +7,7 @@ import {
   EventHub,
   SessionEventPublisher,
   attachmentVerbs,
+  isPluginId,
   outlineVerbs,
   pageVerbs,
   subscribeToType,
@@ -48,6 +49,7 @@ import {
   type LayerScopePlane,
 } from '@embedpdf/engine-core/wire';
 
+import { CLOUD_DOCUMENT, type CloudDocument } from './cloudDocument';
 import { CloudDocumentActionsService } from './CloudDocumentActionsService';
 import { CloudDocumentAnnotationsService } from './CloudDocumentAnnotationsService';
 import { CloudDocumentAttachmentsService } from './CloudDocumentAttachmentsService';
@@ -101,6 +103,21 @@ export interface ManifestAccessor {
 
 export class CloudDocumentHandle implements DocumentHandle {
   readonly id: string;
+  /** The cloud side, read with `cloudDocument()`: the server modules' routes on this layer. */
+  readonly [CLOUD_DOCUMENT]: CloudDocument = {
+    module: (id) => {
+      if (!isPluginId(id)) {
+        throw new EngineError(
+          EngineErrorCode.InvalidArg,
+          `"${id}" can't be a module's id: lowercase words joined by '-', not a core name`,
+        );
+      }
+      const base = `/v1/docs/${encodeURIComponent(this.id)}/layers/${encodeURIComponent(this.layerName)}/${id}/`;
+      return {
+        fetch: (path, init) => this.http.fetchRoute(`${base}${path.replace(/^\/+/, '')}`, init),
+      };
+    },
+  };
   readonly metadata: CloudMetadataService;
   readonly annotations: DocumentAnnotationsService;
   readonly actions: DocumentActionsService;

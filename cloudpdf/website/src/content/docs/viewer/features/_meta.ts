@@ -5,4 +5,5 @@ export default {
   annotations: 'Annotations',
   'forms-and-signatures': 'Forms & signatures',
   fonts: 'Fonts',
+  'screenshot-protection': 'Screenshot protection',
 };

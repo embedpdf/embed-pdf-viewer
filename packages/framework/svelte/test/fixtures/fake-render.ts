@@ -52,6 +52,7 @@ export function fakeRender() {
   const rights = { annotations: true, formFields: true };
   const keyOf = (page: PageRef) => `page-${page.objectNumber}`;
   const api = {
+    getPicturePainter: () => null,
     getPaintSettings: () => paint,
     getLayerRights: () => rights,
     getSourceKey: (page: PageRef) => keyOf(page),

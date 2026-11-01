@@ -19,6 +19,7 @@ import {
   type PageRef,
   type SettingsApi,
 } from '@embedpdf/core';
+import type { PageTransform } from '@embedpdf/core-geometry';
 import type { FullPageOptions, PageViewDemand, TilesOptions } from './paint-plan';
 
 export type { FullPageOptions, PageViewDemand, TilesOptions } from './paint-plan';
@@ -160,6 +161,45 @@ export interface RenderInvalidatedEvent {
   readonly origin: EventOrigin | null;
 }
 
+// ── another plugin painting the pictures ────────────────────────────────────
+
+/**
+ * The page a painter paints, as every framework's page layer knows it: a
+ * subset of `@embedpdf/web`'s page context, the same in each framework.
+ */
+export interface PicturePage {
+  /** The page's address, the same for as long as the page is shown. */
+  readonly ref: PageRef;
+  /** Its place in the document, from 0. */
+  readonly pageIndex: number;
+  /** The view that shows it: a Stage's lens id. */
+  readonly view: string;
+  /** Its size, zoom and turn on screen, and its device pixels. */
+  readonly transform: PageTransform;
+  /** The part of it on screen, read when asked; absent for a view without a camera. */
+  readonly getViewDemand?: () => PageViewDemand;
+}
+
+/** A picture a painter is painting: follow the page as it changes, and stop. */
+export interface PaintedPicture {
+  /** The page's geometry changed (a zoom, a turn, a resize): `page` is how it is now. */
+  update(page: PicturePage): void;
+  /** The page left its view, or the painter was given back: take the picture away. */
+  destroy(): void;
+}
+
+/**
+ * Something that paints the pages' pictures instead of the render plugin
+ * ({@link RenderCapability.handOverPictures}). `Host` is the box a page layer
+ * lends it: an `HTMLElement` on the web.
+ */
+export interface PicturePainter<Host = unknown> {
+  /** Whether it paints the pictures of this view; a view it doesn't paint keeps the render plugin's. */
+  paints(view: string): boolean;
+  /** Paint `page`'s picture into `host`, an empty box over the page's content, until `destroy()`. */
+  paint(host: Host, page: PicturePage): PaintedPicture;
+}
+
 // ── the public capability ───────────────────────────────────────────────────
 
 export interface RenderCapability extends SettingsApi<RenderSettings> {
@@ -220,6 +260,17 @@ export interface RenderCapability extends SettingsApi<RenderSettings> {
   invalidate(options?: InvalidateOptions): void;
   /** Pages' pixels changed and they will redraw. */
   readonly onInvalidated: EventHook<RenderInvalidatedEvent>;
+  /**
+   * Let another plugin paint the pages' pictures until the returned function
+   * is called, or the document closes. While it holds them, every page layer
+   * in a view it paints lends it its box instead of drawing: no picture, no
+   * tiles, no renders. One painter at a time: a second is refused
+   * (`conflict`) until the first is given back. Take them over in a plugin's
+   * `connect()`, and no page shows this plugin's picture first.
+   */
+  handOverPictures<Host>(painter: PicturePainter<Host>): () => void;
+  /** The plugin painting the pictures now, or `null` while this one does. */
+  getPicturePainter(): PicturePainter | null;
 }
 
 export { RenderToken } from './token';
