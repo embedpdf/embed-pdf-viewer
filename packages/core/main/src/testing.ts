@@ -29,6 +29,7 @@ import type {
   DocumentEvent,
   DocumentHandle,
   Engine,
+  PageLabelSection,
   PageLayout,
   PageRef,
   PdfRect,
@@ -48,6 +49,7 @@ import { createLatestLane, type LatestLane } from './lanes';
 import { instanceMeasurer, type HostTextMeasurer } from './measurer';
 import { createMirror, type MirrorController, type MirrorEnvironment } from './mirror';
 import { createPageMirror } from './page-mirror';
+import { createPageView, layoutFromEvent, NO_PENDING_PAGES } from './page-view';
 import { createSerialQueue, type SerialQueue } from './serial-queue';
 import { cancellable } from './cancellable';
 import { findPage, pageOf } from './page-of';
@@ -89,6 +91,8 @@ export interface TestContextOptions<S, T extends object = NoSettings> {
   readonly settings?: SettingsDeclaration<T>;
   /** The document's pages; `document()` and `geometry` derive from them. */
   readonly pages?: readonly TestPage[];
+  /** Their label sections (`DocumentMeta.pageLabels`); none when left out. */
+  readonly pageLabels?: readonly PageLabelSection[];
   readonly documentId?: string;
   /** Capabilities `get`/`tryGet` resolve, by token. `DocumentsToken` defaults to a
    *  registry holding this one document. */
@@ -160,8 +164,9 @@ const layoutOf = (page: TestPage, index: number): PageLayout => {
   };
 };
 
-/** A read-only document registry holding the test's one document. */
-function testDocuments(meta: DocumentMeta): DocumentsCapability {
+/** A read-only document registry holding the test's one document, its pages as they show. */
+function testDocuments(metaOf: () => DocumentMeta): DocumentsCapability {
+  const meta = metaOf();
   const info: DocumentInfo = {
     id: meta.id,
     status: 'ready',
@@ -169,7 +174,7 @@ function testDocuments(meta: DocumentMeta): DocumentsCapability {
     hasUnsavedChanges: false,
   };
   const known = (id?: string) => id === undefined || id === meta.id;
-  const pagesOf = (id?: string) => (known(id) ? meta.pages : []);
+  const pagesOf = (id?: string) => (known(id) ? metaOf().pages : []);
   const unsupported = (verb: string) => () => {
     throw new PluginError('unsupported', 'documents', `${verb} is not available in a test context`);
   };
@@ -185,7 +190,7 @@ function testDocuments(meta: DocumentMeta): DocumentsCapability {
     listPages: pagesOf,
     getPage: (page, id) => findPage(pagesOf(id), page),
     getPageIndex: (ref, id) => pagesOf(id).findIndex((page) => pageRefsEqual(page.ref, ref)),
-    getRevision: (id) => (known(id) ? meta.revision : -1),
+    getRevision: (id) => (known(id) ? metaOf().revision : -1),
     canDownload: () => true,
     // A test context has no printer.
     canPrint: () => false,
@@ -260,10 +265,21 @@ export function createTestContext<S = void, T extends object = NoSettings>(
     if (!doc) throw new PluginError('not-ready', id, 'the test context has no document');
     return doc;
   };
-  // The document's change queue, as the kernel keeps one: `doc.apply` sends its changes.
-  const changes = createDocumentChanges({ handle: () => doc, notify: store.notify, report });
+  // The document's change queue, as the kernel keeps one: `doc.apply` sends its changes, and
+  // the pages show its page changes before the engine answers.
+  const changes = createDocumentChanges({
+    handle: () => doc,
+    notify: () => {
+      showPages();
+      store.notify();
+    },
+    report,
+  });
   settleFlushes.add(() => changes.settle());
   cleanups.push(() => changes.close());
+  const pageView = createPageView({ changes, report });
+  pageView.setEnginePages({ pages, labels: options.pageLabels ?? [] });
+  pageView.refresh();
   const bursts = createBurstGate(store);
   const mirrors: MirrorController<unknown>[] = [];
   const mirrorEnvironment = (): MirrorEnvironment => ({
@@ -279,19 +295,49 @@ export function createTestContext<S = void, T extends object = NoSettings>(
     onDocumentEvent(listener) {
       cleanups.push(requireDoc().events.subscribe(listener));
     },
+    pages: pageView,
     report,
   });
-  const meta: DocumentMeta = {
+  let meta: DocumentMeta = {
     id: documentId,
     instanceId,
     pageCount: pages.length,
-    pages,
+    pages: pageView.current().pages,
+    pageLabels: pageView.current().labels,
+    pendingPages: NO_PENDING_PAGES,
     revision: 1,
     renderPolicy: { kind: 'continuous' },
     hasUnsavedChanges: false,
   };
+  /** The pages as they show now: the document's events and the queue's changes move them. */
+  function showPages(): void {
+    const view = pageView.refresh();
+    if (!view) return;
+    const moved = view.pages !== meta.pages;
+    meta = {
+      ...meta,
+      pageCount: view.pages.length,
+      pages: view.pages,
+      pageLabels: view.labels,
+      pendingPages: view.pending,
+      revision: moved ? meta.revision + 1 : meta.revision,
+    };
+  }
+  if (doc) {
+    cleanups.push(
+      doc.events.subscribe((event) => {
+        const layout = layoutFromEvent(event);
+        if (layout) pageView.setEnginePages(layout);
+        pageView.fold(event);
+        showPages();
+      }),
+    );
+  }
   if (!capabilities.has(DocumentsToken as CapabilityToken<unknown>)) {
-    capabilities.set(DocumentsToken as CapabilityToken<unknown>, testDocuments(meta));
+    capabilities.set(
+      DocumentsToken as CapabilityToken<unknown>,
+      testDocuments(() => meta),
+    );
   }
   const notFound = (ref: PageRef) =>
     new PluginError('not-found', id, `page ${ref.objectNumber} is not in this document`);
@@ -438,10 +484,10 @@ export function createTestContext<S = void, T extends object = NoSettings>(
       return resource;
     },
     assertPageRef: (ref) => {
-      if (!pages.some((pageInfo) => pageRefsEqual(pageInfo.ref, ref))) throw notFound(ref);
+      if (!meta.pages.some((pageInfo) => pageRefsEqual(pageInfo.ref, ref))) throw notFound(ref);
     },
-    getPage: (page) => findPage(pages, page),
-    pageOf: (page) => pageOf(pages, page, id),
+    getPage: (page) => findPage(meta.pages, page),
+    pageOf: (page) => pageOf(meta.pages, page, id),
     allows: (permission) => sessionAllows(requireDoc().security, permission),
     assertAllowed: (permission, operation) => {
       if (!sessionAllows(requireDoc().security, permission)) {

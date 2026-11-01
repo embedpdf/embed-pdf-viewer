@@ -130,7 +130,7 @@ function makeAssetEngine(
       target: { kind: 'template' as const, objectNumber },
     })),
   ];
-  const layout = () => ({ pageCount: pages.length, pages, namedPages: namedPages() });
+  const layout = () => ({ pageCount: pages.length, labels: [], pages, namedPages: namedPages() });
   const setName = vi.fn(async (input: { name: string; page: PageRef; replace?: string }) => {
     if (input.replace !== undefined) names.delete(input.replace);
     names.delete(input.name);

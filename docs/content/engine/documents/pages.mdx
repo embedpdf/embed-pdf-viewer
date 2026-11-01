@@ -1,6 +1,6 @@
 ---
 title: Pages
-description: List a document's pages, then rotate, reorder, delete, insert, extract and flatten them.
+description: List a document's pages, then rotate, reorder, delete, insert, copy, extract and flatten them.
 ---
 
 # Pages
@@ -31,7 +31,7 @@ for (const page of pages) {
 | :----------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `index`      | Position in the document, from 0. Changes when pages move.                                                                                                                |
 | `ref`        | The page's address. Stays the same when pages move; pass it to every page call.                                                                                           |
-| `label`      | The page's label from the PDF (`'iii'`, `'A-1'`), or `null` when the file has none.                                                                                       |
+| `label`      | The page's label from the PDF (`'iii'`, `'A-1'`), or `null` when the file has none. See [Page labels](#page-labels).                                                      |
 | `size`       | `{ width, height }` of the visible area (the crop box) in points, before rotation.                                                                                        |
 | `rotation`   | `0`, `90`, `180` or `270`: how far the page is turned clockwise when shown.                                                                                               |
 | `userUnit`   | How large one point is, in multiples of 1/72 inch. `1` for almost every file.                                                                                             |
@@ -82,6 +82,42 @@ const { size, rotation } = pages[0];
 const turned = rotation === 90 || rotation === 270;
 const shown = turned ? { width: size.height, height: size.width } : size;
 ```
+
+## Page labels
+
+A PDF can number its pages its own way: the front matter `i`, `ii`, `iii`, the body from `1`,
+an appendix `A-1`, `A-2`. Each page's `label` is its label, and `labels` in the page list holds
+the numbering as sections, in page order:
+
+```ts
+const { labels } = await doc.pages.list();
+// [
+//   { firstPage: 0, style: 'lowerRoman', firstNumber: 1, prefix: '' },
+//   { firstPage: 3, style: 'decimal', firstNumber: 1, prefix: '' },
+//   { firstPage: 20, style: 'decimal', firstNumber: 1, prefix: 'A-' },
+// ]
+```
+
+| Field         | What it is                                                                                                      |
+| :------------ | :-------------------------------------------------------------------------------------------------------------- |
+| `firstPage`   | The index of the section's first page. A section runs up to the next one's first page.                          |
+| `style`       | `'decimal'`, `'upperRoman'`, `'lowerRoman'`, `'upperLetters'` or `'lowerLetters'`; `null` for no number at all. |
+| `firstNumber` | The number of its first page.                                                                                   |
+| `prefix`      | What every label of the section starts with; `''` for none.                                                     |
+
+The first section always starts at page 0. A file without labels has no sections, and every
+page's `label` is `null`.
+
+When pages move, come or go, the sections follow the pages, so a label stays where it belongs:
+
+- A section stays with the page it starts at, and a page takes the numbering of the section it
+  lands in. A page inserted between the front matter and the body is numbered as front matter.
+- When a section's first page is deleted, the section starts on its next page, which becomes
+  `1`. A section with no pages left goes.
+- Pages put before every page join the first section.
+- A move is a delete followed by an insert.
+
+An undo puts the labels back as they were.
 
 ## Refs, not positions
 
@@ -187,6 +223,21 @@ await doc.pages.insertBlank({ size: letter, count: 2 }, { after: pages[0].ref })
 
 A4 is `{ width: 595, height: 842 }`. `count` is 1 by default and at most 100 per call.
 
+## Copy pages
+
+`copy(refs, position?)` copies pages of the document, in the order you pass them, to `position`.
+Without a position, the copies go at the end:
+
+```ts
+const { insertedPages } = await doc.pages.copy([page.ref], { after: page.ref }); // duplicate a page
+```
+
+A copy looks like its page and brings the page's annotations. Its form fields come as fields of
+their own, with their values: a name the document already uses gets the first free `name_2`, as an
+[insert's](#form-fields) do, so filling in the copy leaves the original alone. Name a page twice to
+copy it twice. Unlike `extract()` then `insert()`, the pages never leave the document, so `copy()`
+needs only `doc.pages.assemble`.
+
 ## Extract pages to a new PDF
 
 `extract(refs)` returns a new PDF with copies of those pages, in the order you pass them. The
@@ -271,13 +322,13 @@ To flatten only some annotations, see
 
 ## Permissions
 
-| Call                                                             | Needs                                        |
-| :--------------------------------------------------------------- | :------------------------------------------- |
-| `list()`                                                         | `doc.open`                                   |
-| `rotate()`, `reorder()`, `delete()`, `insert()`, `insertBlank()` | `doc.pages.assemble`                         |
-| `extract()`                                                      | `doc.download`: the pages leave the document |
-| `extract()` with `flatten`                                       | `doc.download` or `doc.download.flattened`   |
-| `flatten()`                                                      | `doc.pages.modify` and `doc.annotate.modify` |
+| Call                                                                       | Needs                                        |
+| :------------------------------------------------------------------------- | :------------------------------------------- |
+| `list()`                                                                   | `doc.open`                                   |
+| `rotate()`, `reorder()`, `delete()`, `insert()`, `insertBlank()`, `copy()` | `doc.pages.assemble`                         |
+| `extract()`                                                                | `doc.download`: the pages leave the document |
+| `extract()` with `flatten`                                                 | `doc.download` or `doc.download.flattened`   |
+| `flatten()`                                                                | `doc.pages.modify` and `doc.annotate.modify` |
 
 See [Permissions](/docs/engine/concepts/permissions).
 
@@ -285,8 +336,8 @@ See [Permissions](/docs/engine/concepts/permissions).
 
 ### What a change returns
 
-`rotate()`, `reorder()`, `delete()`, `insert()`, `insertBlank()`, `setName()` and `removeName()`
-return the new page list as `layout`, the same shape `list()` returns, so you can replace the list
+`rotate()`, `reorder()`, `delete()`, `insert()`, `insertBlank()`, `copy()`, `setName()` and
+`removeName()` return the new page list as `layout`, the same shape `list()` returns, so you can replace the list
 you hold without asking again:
 
 ```ts
@@ -300,10 +351,10 @@ Other code that shows pages can listen for `pages.reordered`, `pages.rotated`, `
 
 ### Undo
 
-`rotate()`, `reorder()`, `delete()`, `insert()` and `insertBlank()` are changes: each returns its
-`opId` in `meta`, and `doc.apply({ undoOf: opId })` undoes it. An undo of a delete brings the same
-pages back, under the same refs, with their annotations and names, and fires `pages.restored`. To
-make several page edits one step, apply them as one change. See
+`rotate()`, `reorder()`, `delete()`, `insert()`, `insertBlank()` and `copy()` are changes: each
+returns its `opId` in `meta`, and `doc.apply({ undoOf: opId })` undoes it. An undo of a delete
+brings the same pages back, under the same refs, with their annotations and names, and fires
+`pages.restored`. To make several page edits one step, apply them as one change. See
 [Changes & undo](/docs/engine/documents/changes).
 
 ```ts
@@ -311,14 +362,26 @@ const { meta } = await doc.pages.delete([ref]);
 await doc.apply({ undoOf: meta.opId }); // the page is back where it was
 ```
 
-An undo of an insert deletes the pages it copied in. The form fields they brought stay in the
-form, on no page, as after a delete.
+An undo of an insert or a copy deletes the pages it brought and the form fields that came with
+them; a redo brings both back.
 
 ### Inserting
 
 A password-protected PDF can't be inserted: `insert()` fails with `DocPasswordRequired`. Open it,
 unlock it, and `extract()` its pages instead. Pages you insert get new refs; the pages already in
 the document keep theirs.
+
+To know the new refs before the engine answers, name the pages yourself with numbers from
+[`doc.objectNumbers`](/docs/engine/concepts/identity), one per new page: `insertBlank()`,
+`insert()` and `copy()` all take them as `objectNumbers`. A count other than the number of new
+pages, or a number the session doesn't hold, is refused.
+
+```ts
+await doc.objectNumbers.reserve(1);
+const number = doc.objectNumbers.take()!;
+const copy = doc.pages.copy([page.ref], 'end', { objectNumbers: [number] });
+const ref = toPageRef(number); // known now, the same ref the answer names
+```
 
 <Engine local>
 

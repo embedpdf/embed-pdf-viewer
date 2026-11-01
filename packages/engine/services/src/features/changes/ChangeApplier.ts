@@ -67,6 +67,7 @@ import {
 } from './internal/outlineChanges';
 import {
   changingPageTree,
+  copyPages,
   deletePages,
   insertBlankPages,
   insertPages,
@@ -286,6 +287,8 @@ function runOp(
       return changingPageTree(ctx, () => insertBlankPages(ctx, op));
     case 'pages.insert':
       return changingPageTree(ctx, () => insertPages(ctx, op));
+    case 'pages.copy':
+      return changingPageTree(ctx, () => copyPages(ctx, op));
     case 'attachments.create':
       return createAttachment(ctx, op);
     case 'attachments.delete':

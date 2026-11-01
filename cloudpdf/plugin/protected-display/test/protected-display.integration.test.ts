@@ -31,6 +31,7 @@ function engineFor({
       list: () =>
         Promise.resolve({
           pageCount: 3,
+          labels: [],
           pages: [0, 1, 2].map((index) => ({
             index,
             ref: toPageRef(index + 1),

@@ -1,6 +1,6 @@
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
-import { withPointerTable } from '../../../runtime/memory/pointers';
+import { withPointerTable } from './pointers';
 
 /**
  * Marshal a `const FPDF_WIDESTRING*` array: encode every string into the

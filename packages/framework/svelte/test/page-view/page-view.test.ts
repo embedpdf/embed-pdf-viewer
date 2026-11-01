@@ -51,7 +51,7 @@ describe('PageView', () => {
         Promise.resolve({
           id: input.id ?? 'doc',
           events: { subscribe: () => () => {}, lastServerId: () => null },
-          pages: { list: () => Promise.resolve({ pageCount: 1, pages: [turned] }) },
+          pages: { list: () => Promise.resolve({ pageCount: 1, labels: [], pages: [turned] }) },
           security: { allows: () => true, allowsAnnotation: () => true },
           close: () => Promise.resolve(),
         }),

@@ -10,6 +10,7 @@ import { createLatestLane, type LatestLane } from './lanes';
 import { instanceMeasurer, type HostTextMeasurer } from './measurer';
 import { createMirror, type MirrorEnvironment } from './mirror';
 import { createPageMirror } from './page-mirror';
+import type { PageViewController } from './page-view';
 import type { Scope } from './scope';
 import { createSerialQueue, type SerialQueue } from './serial-queue';
 import { cancellable } from './cancellable';
@@ -58,6 +59,8 @@ export interface SessionRef {
   readonly printWraps: PrintWrap[];
   /** The document's change queue, shared by its plugins (`ctx.changes`). */
   readonly changes: DocumentChanges;
+  /** The document's pages as the user sees them: the engine's, with the pending page changes on top. */
+  readonly pageView: PageViewController;
 }
 
 /** Something of the document's own that runs around a download: it gets the read and returns its bytes. */
@@ -206,6 +209,7 @@ export function createPluginContext(
   const mirrorEnvironment = (): MirrorEnvironment => ({
     doc: doc(),
     changes: session!.changes,
+    pages: session!.pageView,
     notify: () => {
       if (lease.live) store.notify();
     },

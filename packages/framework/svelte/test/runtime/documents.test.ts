@@ -169,7 +169,7 @@ describe('the Viewer’s own settings', () => {
         Promise.resolve({
           id: input.id,
           events: { subscribe: () => () => {}, lastServerId: () => null },
-          pages: { list: () => Promise.resolve({ pageCount: 0, pages: [] }) },
+          pages: { list: () => Promise.resolve({ pageCount: 0, labels: [], pages: [] }) },
           security: { allows: () => true },
           // Calls' facts and working sets change nothing here: the same document.
           with() {

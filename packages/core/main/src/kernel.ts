@@ -1,5 +1,6 @@
 import { createBurstGate } from './bursts';
 import { createDocumentChanges } from './changes';
+import { createPageView, layoutFromEvent, NO_PENDING_PAGES, type PageView } from './page-view';
 import { timerClock, type HostClock } from './clock';
 import type { HostTextMeasurer } from './measurer';
 import { createStore } from './store';
@@ -85,22 +86,6 @@ import {
 } from '@embedpdf/engine-core/runtime';
 
 const EMPTY_PAGES: readonly PageLayout[] = Object.freeze([]);
-
-/** The new page registry a document mutation carries, or null for events that
- *  don't change page structure (annotations, metadata). The snapshot is the
- *  same shape `pages.list()` returns, so callers swap it in directly. */
-function layoutFromEvent(event: DocumentEvent) {
-  switch (event.type) {
-    case 'pages.reordered':
-    case 'pages.rotated':
-    case 'pages.deleted':
-    case 'pages.inserted':
-    case 'pages.restored':
-      return event.layout;
-    default:
-      return null;
-  }
-}
 
 /** Kernel lifecycle. Monotonic: created → starting → started, then destroying →
  *  destroyed; `failed` is a terminal branch off starting. */
@@ -544,6 +529,15 @@ export function createKernel(config: {
 
   function createSession(id: string, name: string | undefined): DocumentSession {
     const cancel = new AbortController();
+    // What the queue stages shows in the page list before anything else hears of it.
+    const changes = createDocumentChanges({
+      handle: () => session.handle,
+      notify: () => {
+        refreshPages(session);
+        store.notify();
+      },
+      report,
+    });
     const session: DocumentSession = {
       id,
       instanceId: `${id}#${++instanceCounter}`,
@@ -567,11 +561,8 @@ export function createKernel(config: {
       settleFlushes: new Set(),
       downloadWraps: [],
       printWraps: [],
-      changes: createDocumentChanges({
-        handle: () => session.handle,
-        notify: () => store.notify(),
-        report,
-      }),
+      changes,
+      pageView: createPageView({ changes, report }),
       changeCount: 0,
       changesSeen: 0,
       close: () => closeSession(session),
@@ -716,7 +707,8 @@ export function createKernel(config: {
    *  back by disposing the session scope; nothing after this can fail. */
   function commitReady(session: DocumentSession): void {
     session.phase = 'ready';
-    const meta = session.stagedMeta!;
+    session.pageView.refresh();
+    const meta = pageMetaOf(session.stagedMeta!, session.pageView.current());
     const core = store.getCore();
     const { [session.id]: _resolved, ...pending } = core.pending;
     setCore({ documents: { ...core.documents, [session.id]: meta }, pending });
@@ -731,6 +723,41 @@ export function createKernel(config: {
       session.scope.defer(grant.onOpenRequest((request) => setGrantRequest(session, request)));
     }
     opened.emit({ documentId: session.id, info: documentInfoOf(meta) });
+  }
+
+  /** `meta` with the pages a page view shows: its revision moves when the pages do. */
+  function pageMetaOf(meta: DocumentMeta, view: PageView): DocumentMeta {
+    const { pages, labels, pending } = view;
+    if (meta.pages === pages && meta.pageLabels === labels && meta.pendingPages === pending) {
+      return meta;
+    }
+    return {
+      ...meta,
+      pageCount: pages.length,
+      pages,
+      pageLabels: labels,
+      pendingPages: pending,
+      revision: meta.pages === pages ? meta.revision : meta.revision + 1,
+    };
+  }
+
+  /**
+   * Show the document's pages as its page view has them now: after each of
+   * the engine's events, and each time a change is staged or answered.
+   * `onPagesChanged` tells when the pages moved, not when only which of them
+   * the engine has did.
+   */
+  function refreshPages(session: DocumentSession): void {
+    const view = session.pageView.refresh();
+    if (!view) return;
+    const now = store.getCore();
+    const existing = now.documents[session.id];
+    if (!existing) return; // not published yet (commitReady publishes the view), or closed
+    const updated = pageMetaOf(existing, view);
+    if (updated === existing) return;
+    setCore({ documents: { ...now.documents, [session.id]: updated } });
+    if (updated.pages === existing.pages) return;
+    pagesChanged.emit({ documentId: session.id, revision: updated.revision, pages: updated.pages });
   }
 
   /** Show, or stop showing, that the grant asks before the document goes on. */
@@ -1290,7 +1317,11 @@ export function createKernel(config: {
    *  document was never `ready`. */
   async function bringUp(
     session: DocumentSession,
-    snapshot: { pageCount: number; pages: DocumentMeta['pages'] },
+    snapshot: {
+      pageCount: number;
+      pages: DocumentMeta['pages'];
+      labels: DocumentMeta['pageLabels'];
+    },
   ): Promise<void> {
     session.phase = 'bringup';
     // The render policy is a document fact (Pattern A, like the page
@@ -1306,12 +1337,16 @@ export function createKernel(config: {
       /* unreachable policy = continuous */
     }
     checkpoint(session);
+    session.pageView.setEnginePages(snapshot);
+    session.pageView.refresh();
     session.stagedMeta = {
       id: session.id,
       instanceId: session.instanceId,
       name: session.name,
       pageCount: snapshot.pageCount,
-      pages: snapshot.pages,
+      pages: session.pageView.current().pages,
+      pageLabels: session.pageView.current().labels,
+      pendingPages: NO_PENDING_PAGES,
       revision: 0,
       renderPolicy,
       hasUnsavedChanges: false,
@@ -1320,10 +1355,10 @@ export function createKernel(config: {
     // Changes are unsaved only where they live in this tab until a download (the local
     // engine); the cloud engine stores each one as it's made.
     const tracksChanges = isLocalDocument(session.handle!);
-    // Document mutation events (rotate/move/delete) replace the page
-    // registry in place — the snapshot they carry is byte-identical to
-    // pages.list(), so this is a direct swap, no merge. Own mutations and
-    // remote (collaborator) mutations arrive identically; the handler is
+    // Page mutation events (rotate, move, delete, insert, restore) carry the
+    // engine's pages, the same list pages.list() returns, so they replace the
+    // engine's pages whole; the page view replays the pending changes on top.
+    // Own and remote (collaborator) mutations arrive alike: the handler is
     // origin-agnostic, as the event model intends.
     // The kernel listens first and last, so a change's events land as one store update.
     const bursts = createBurstGate(store);
@@ -1338,22 +1373,9 @@ export function createKernel(config: {
         }
       }
       const layout = layoutFromEvent(event);
-      if (!layout) return;
-      const now = store.getCore();
-      const existing = now.documents[session.id];
-      if (!existing) return; // pre-commit or closed — registry not published
-      const updated: DocumentMeta = {
-        ...existing,
-        pageCount: layout.pageCount,
-        pages: layout.pages,
-        revision: existing.revision + 1,
-      };
-      setCore({ documents: { ...now.documents, [session.id]: updated } });
-      pagesChanged.emit({
-        documentId: session.id,
-        revision: updated.revision,
-        pages: updated.pages,
-      });
+      if (layout) session.pageView.setEnginePages(layout);
+      session.pageView.fold(event);
+      refreshPages(session);
     });
     session.scope.defer(unsubscribeEvents);
 

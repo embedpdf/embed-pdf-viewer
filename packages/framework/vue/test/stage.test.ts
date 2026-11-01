@@ -56,7 +56,9 @@ const threePages = {
     Promise.resolve({
       id: input.id ?? 'doc',
       events: { subscribe: () => () => {}, lastServerId: () => null },
-      pages: { list: () => Promise.resolve({ pageCount: 3, pages: [0, 1, 2].map(pageAt) }) },
+      pages: {
+        list: () => Promise.resolve({ pageCount: 3, labels: [], pages: [0, 1, 2].map(pageAt) }),
+      },
       security: { allows: () => true, allowsAnnotation: () => true },
       close: () => Promise.resolve(),
     } as unknown as DocumentHandle),

@@ -100,7 +100,9 @@ function fakeDocument(
       },
       lastServerId: () => null,
     },
-    pages: { list: () => Promise.resolve({ pageCount: 2, pages: [page(5, 0), page(7, 1)] }) },
+    pages: {
+      list: () => Promise.resolve({ pageCount: 2, labels: [], pages: [page(5, 0), page(7, 1)] }),
+    },
     security: { allows },
     search: {
       query: (request: SearchRequest) => {

@@ -23858,9 +23858,46 @@
               },
               "position": {
                 "$ref": "#/components/schemas/PagePosition"
+              },
+              "objectNumbers": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "exclusiveMinimum": true,
+                  "minimum": 0
+                }
               }
             },
             "required": ["type", "resources"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["pages.copy"]
+              },
+              "pages": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/PageRef"
+                },
+                "minItems": 1
+              },
+              "position": {
+                "$ref": "#/components/schemas/PagePosition"
+              },
+              "objectNumbers": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "exclusiveMinimum": true,
+                  "minimum": 0
+                }
+              }
+            },
+            "required": ["type", "pages"],
             "additionalProperties": false
           },
           {
@@ -23944,6 +23981,7 @@
                   "pages.delete",
                   "pages.insertBlank",
                   "pages.insert",
+                  "pages.copy",
                   "attachments.create",
                   "attachments.delete",
                   "annotations.restore",
@@ -24775,6 +24813,37 @@
                       "additionalProperties": false
                     }
                   },
+                  "labels": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "firstPage": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "style": {
+                          "type": "string",
+                          "enum": [
+                            "decimal",
+                            "upperRoman",
+                            "lowerRoman",
+                            "upperLetters",
+                            "lowerLetters"
+                          ],
+                          "nullable": true
+                        },
+                        "firstNumber": {
+                          "type": "integer"
+                        },
+                        "prefix": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["firstPage", "style", "firstNumber", "prefix"],
+                      "additionalProperties": false
+                    }
+                  },
                   "namedPages": {
                     "type": "array",
                     "items": {
@@ -24834,7 +24903,7 @@
                     }
                   }
                 },
-                "required": ["pageCount", "pages", "namedPages"],
+                "required": ["pageCount", "pages", "labels", "namedPages"],
                 "additionalProperties": false
               },
               "meta": {
@@ -24919,6 +24988,26 @@
               "type": {
                 "type": "string",
                 "enum": ["pages.insert"]
+              },
+              "insertedPages": {
+                "$ref": "#/components/schemas/ChangeItem/anyOf/32/properties/insertedPages"
+              },
+              "layout": {
+                "$ref": "#/components/schemas/ChangeItem/anyOf/29/properties/layout"
+              },
+              "meta": {
+                "$ref": "#/components/schemas/MutationMeta"
+              }
+            },
+            "required": ["type", "insertedPages", "layout", "meta"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["pages.copy"]
               },
               "insertedPages": {
                 "$ref": "#/components/schemas/ChangeItem/anyOf/32/properties/insertedPages"
@@ -31546,6 +31635,37 @@
                   "additionalProperties": false
                 }
               },
+              "labels": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "firstPage": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "style": {
+                      "type": "string",
+                      "enum": [
+                        "decimal",
+                        "upperRoman",
+                        "lowerRoman",
+                        "upperLetters",
+                        "lowerLetters"
+                      ],
+                      "nullable": true
+                    },
+                    "firstNumber": {
+                      "type": "integer"
+                    },
+                    "prefix": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["firstPage", "style", "firstNumber", "prefix"],
+                  "additionalProperties": false
+                }
+              },
               "namedPages": {
                 "type": "array",
                 "items": {
@@ -31605,7 +31725,7 @@
                 }
               }
             },
-            "required": ["pageCount", "pages", "namedPages"],
+            "required": ["pageCount", "pages", "labels", "namedPages"],
             "additionalProperties": false
           },
           "meta": {
@@ -31773,6 +31893,37 @@
                   "additionalProperties": false
                 }
               },
+              "labels": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "firstPage": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "style": {
+                      "type": "string",
+                      "enum": [
+                        "decimal",
+                        "upperRoman",
+                        "lowerRoman",
+                        "upperLetters",
+                        "lowerLetters"
+                      ],
+                      "nullable": true
+                    },
+                    "firstNumber": {
+                      "type": "integer"
+                    },
+                    "prefix": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["firstPage", "style", "firstNumber", "prefix"],
+                  "additionalProperties": false
+                }
+              },
               "namedPages": {
                 "type": "array",
                 "items": {
@@ -31832,7 +31983,7 @@
                 }
               }
             },
-            "required": ["pageCount", "pages", "namedPages"],
+            "required": ["pageCount", "pages", "labels", "namedPages"],
             "additionalProperties": false
           },
           "meta": {

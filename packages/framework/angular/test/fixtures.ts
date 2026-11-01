@@ -133,6 +133,7 @@ export const handleFor = (id: string, pageCount = 1) =>
       list: () =>
         Promise.resolve({
           pageCount,
+          labels: [],
           pages: Array.from({ length: pageCount }, (_, index) => pageLayout(index + 1, index)),
         }),
     },

@@ -67,6 +67,10 @@ export {
   annotationKey,
   // Local-only members (warmup, fonts) are reached through this check.
   isLocalEngine,
+  // What undoing a page edit shows: a change's `undo` (the page list predicts with these).
+  reorderBackOf,
+  restoredPagesOf,
+  rotateBackOf,
 } from '@embedpdf/engine-core/runtime';
 export type {
   AnnotationAppearanceImage,
@@ -85,6 +89,7 @@ export type {
   PageImageOptions,
   PageImageObjectUrl,
   PdfRect,
+  RestoredPage,
   CallFacts,
   CallPriority,
   WorkingSetPage,

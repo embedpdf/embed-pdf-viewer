@@ -371,6 +371,7 @@ export function itemInPageSpace(item: ChangeItem<PdfCoordinates>, boxOf: Visible
     case 'pages.delete':
     case 'pages.insertBlank':
     case 'pages.insert':
+    case 'pages.copy':
     case 'pages.restore':
       return { ...item, layout: pageListOf(item.layout) } as ChangeItem;
     default:
