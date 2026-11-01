@@ -1,0 +1,90 @@
+---
+title: Screenshot protection
+description: Show a document's pages as protected video, so a screenshot, a screen recording or a shared screen shows them black, while people still select, search and comment.
+engines: [cloud]
+---
+
+# Screenshot protection
+
+For a document people may read but must not capture, the viewer can show its pages as protected
+video, the way streaming services show films. A screenshot, a screen recording or a shared screen
+then shows the page black, while it stays sharp on the reader's own screen.
+
+Everything on top of the page works as always: selecting text, search, links, comments and other
+annotations, form fields.
+
+## Turn it on
+
+It's a permission, so it's per user. Give the user's [token](/docs/engine/authentication) or
+grant `protected-display.view`, and leave out `doc.render`:
+
+```js
+const scope = [
+  'doc.open',
+  'protected-display.view',
+  'doc.text.select',
+  'doc.text.search',
+  'doc.annotate.read',
+  'doc.forms.read',
+];
+```
+
+Without `doc.render` the server sends no page pictures at all, and with `protected-display.view` it
+sends protected video frames instead. The viewer sees both and switches by itself: there's nothing
+to set in the viewer. A user who may render pages sees them the usual way.
+
+Leave out what would let the page out another way too: `doc.render.thumbnail` (the thumbnails are
+plain pictures), `doc.download`, `doc.print` and `doc.text.copy`, unless this user may have them.
+
+Your CloudPDF server needs the protected display module, with a DRM account to issue the licenses.
+See [Server modules](/docs/server/configuration/modules).
+
+## What the reader sees
+
+- **One page at a time.** Scrolling through every page at once would take a video player per
+  page. The page layout options show turned off, with a sentence that says why.
+- **Sharp at every zoom, up to 500%.** Up to about twice the size that fits the screen, the page
+  is one video frame. Zoom in further and stop: a moment later, a sharp frame of just the part on
+  screen replaces it. Moving shows the whole page again at once. A video is drawn as one piece
+  the size it shows, and past 500% a page's is more than many computers' graphics can hold.
+- **A white page for a moment** when a page first shows, while its frame arrives.
+
+## Browsers
+
+The viewer picks the protection the browser has:
+
+| Browser | Protection | A screenshot shows |
+| :-- | :-- | :-- |
+| Chrome, on Mac, Windows and Linux | Widevine | Black |
+| Edge, on Windows and Mac | Widevine | Black |
+| Firefox, on Mac and Windows | Widevine | Black |
+| Safari, on Mac, iPhone and iPad | FairPlay | Black |
+
+Rounded corners, transparency and effects on the page are left off: they would take the video off
+the screen's protected layer.
+
+## What it doesn't stop
+
+A camera pointed at the screen. And what the user may do otherwise: someone who may print or
+download the document, or copy its text, can take it out that way.
+
+## In a viewer you build yourself
+
+The CloudPDF viewer includes it. With the headless viewer, add the plugin with the browser's
+player:
+
+```ts
+import { protectedDisplayPlugin } from '@cloudpdf/protected-display';
+
+const plugins = [
+  /* … */
+  protectedDisplayPlugin({
+    player: () => import('@cloudpdf/web').then((web) => web.browserProtectedPlayer()),
+  }),
+];
+```
+
+The plugin decides what shows and speaks to your server; the player plays the frames. As a
+function, the player is imported only for a protected user. The plugin needs the render and stage
+plugins, and does nothing on the local engine or for a user who may render pages. Without a
+player it stays off, and a protected user sees no pages.

@@ -29,9 +29,13 @@ const hostOnlyGlobals = [
   })),
   ...['window', 'document', 'navigator'].map((name) => ({
     name,
-    message: 'Plugins and cores stay DOM-free: browser code lives in @embedpdf/web.',
+    message:
+      'Plugins and cores stay DOM-free: browser code lives in @embedpdf/web (in the CloudPDF tree, @cloudpdf/web).',
   })),
 ];
+
+/** Every plugin's source: EmbedPDF's, and CloudPDF's (the protected display plugin). */
+const pluginSources = ['packages/plugin/*/src/**/*.ts', 'cloudpdf/protected-display/src/**/*.ts'];
 
 /** @type {import("eslint").Linter.FlatConfig[]} */
 module.exports = [
@@ -99,7 +103,7 @@ module.exports = [
   {
     // Plugin sources stay readable one file at a time: a concern is a folder,
     // a file is one area of it. Types-only entries and tests are exempt.
-    files: ['packages/plugin/*/src/**/*.ts'],
+    files: pluginSources,
     ignores: ['**/contract.ts', '**/host-contract.ts', '**/*.test.ts'],
     rules: {
       'max-lines': ['warn', { max: 400, skipBlankLines: true, skipComments: true }],
@@ -112,6 +116,7 @@ module.exports = [
     files: [
       'packages/{core,plugin,framework,viewer}/*/src/**/*.{ts,tsx}',
       'packages/framework/angular/*/src/**/*.ts',
+      'cloudpdf/{protected-display,web}/src/**/*.ts',
     ],
     rules: {
       'id-length': [
@@ -172,7 +177,7 @@ module.exports = [
   {
     // Plugins, the kernel and the pure cores never touch the environment's
     // timers or the DOM. `clock.ts` is the kernel's one door to timers.
-    files: ['packages/plugin/*/src/**/*.ts', 'packages/core/*/src/**/*.ts'],
+    files: [...pluginSources, 'packages/core/*/src/**/*.ts'],
     ignores: ['packages/core/main/src/clock.ts'],
     rules: {
       'no-restricted-globals': ['error', ...hostOnlyGlobals],
@@ -181,7 +186,7 @@ module.exports = [
   {
     // Inside a plugin, events and write queues come from the context, so the
     // kernel owns their lifetime (docs/conventions/plugins.md).
-    files: ['packages/plugin/*/src/**/*.ts'],
+    files: pluginSources,
     rules: {
       'no-restricted-imports': [
         'error',

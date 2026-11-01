@@ -1,0 +1,62 @@
+{
+  "name": "@cloudpdf/web",
+  "version": "3.0.0-next.19",
+  "private": false,
+  "description": "Framework-free browser code for CloudPDF's plugins: the one home in the CloudPDF tree for code that touches the DOM, as @embedpdf/web is for EmbedPDF's. Today the protected display player: Encrypted Media Extensions and Media Source behind @cloudpdf/protected-display's player port. Never imported by a plugin, which stays DOM-free.",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.cts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public",
+    "main": "./dist/index.js",
+    "module": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "import": "./dist/index.js",
+        "require": "./dist/index.cjs"
+      },
+      "./package.json": "./package.json"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "epdf-build",
+    "clean": "rimraf dist",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@embedpdf/tooling-build": "workspace:*",
+    "happy-dom": "^20.11.0",
+    "rimraf": "^5.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^2.1.9"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/embedpdf/embed-pdf-viewer.git",
+    "directory": "cloudpdf/web"
+  },
+  "homepage": "https://www.cloudpdf.com",
+  "bugs": {
+    "url": "https://github.com/embedpdf/embed-pdf-viewer/issues"
+  },
+  "keywords": [
+    "pdf",
+    "cloudpdf",
+    "drm",
+    "screenshot protection"
+  ],
+  "license": "Apache-2.0"
+}

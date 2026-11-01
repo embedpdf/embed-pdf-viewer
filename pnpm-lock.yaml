@@ -145,6 +145,37 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@22.19.11)(happy-dom@20.11.0)(less@4.6.7)(lightningcss@1.30.2)(msw@2.11.2(@types/node@22.19.11)(typescript@5.9.3))(sass-embedded@1.97.3)(sass@1.97.3)(terser@5.46.0)
 
+  cloudpdf/protected-display:
+    dependencies:
+      '@cloudpdf/engine':
+        specifier: workspace:*
+        version: link:../engine
+      '@embedpdf/core':
+        specifier: workspace:*
+        version: link:../../packages/core/main
+      '@embedpdf/plugin-render':
+        specifier: workspace:*
+        version: link:../../packages/plugin/render
+      '@embedpdf/plugin-stage':
+        specifier: workspace:*
+        version: link:../../packages/plugin/stage
+    devDependencies:
+      '@embedpdf/core-geometry':
+        specifier: workspace:*
+        version: link:../../packages/core/geometry
+      '@embedpdf/tooling-build':
+        specifier: workspace:*
+        version: link:../../tooling/build
+      rimraf:
+        specifier: ^5.0.0
+        version: 5.0.10
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.9
+        version: 2.1.9(@types/node@22.19.11)(happy-dom@20.11.0)(less@4.6.7)(lightningcss@1.30.2)(msw@2.11.2(@types/node@22.19.11)(typescript@5.9.3))(sass-embedded@1.97.3)(sass@1.97.3)(terser@5.46.0)
+
   cloudpdf/sdk:
     devDependencies:
       '@biomejs/biome':
@@ -367,6 +398,12 @@ importers:
       '@cloudpdf/engine':
         specifier: workspace:*
         version: link:../../engine
+      '@cloudpdf/protected-display':
+        specifier: workspace:*
+        version: link:../../protected-display
+      '@cloudpdf/web':
+        specifier: workspace:*
+        version: link:../../web
       '@embedpdf/engine':
         specifier: workspace:*
         version: link:../../../packages/engine/main
@@ -476,6 +513,24 @@ importers:
       vue-tsc:
         specifier: ^3.2.4
         version: 3.2.4(typescript@5.8.3)
+
+  cloudpdf/web:
+    devDependencies:
+      '@embedpdf/tooling-build':
+        specifier: workspace:*
+        version: link:../../tooling/build
+      happy-dom:
+        specifier: ^20.11.0
+        version: 20.11.0
+      rimraf:
+        specifier: ^5.0.0
+        version: 5.0.10
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.9
+        version: 2.1.9(@types/node@22.19.11)(happy-dom@20.11.0)(less@4.6.7)(lightningcss@1.30.2)(msw@2.11.2(@types/node@22.19.11)(typescript@5.9.3))(sass-embedded@1.97.3)(sass@1.97.3)(terser@5.46.0)
 
   cloudpdf/website:
     dependencies:

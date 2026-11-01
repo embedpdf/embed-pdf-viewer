@@ -4,4 +4,5 @@ export default {
   'turning-off': 'Turn features off',
   annotations: 'Annotations',
   'forms-and-signatures': 'Forms & signatures',
+  'screenshot-protection': 'Screenshot protection',
 };
