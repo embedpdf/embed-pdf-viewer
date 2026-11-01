@@ -7262,7 +7262,7 @@
         "x-fern-sdk-method-name": "create",
         "x-docs-title": "Create grant",
         "summary": "Create a standing grant for one document — the no-backend embed credential.",
-        "description": "The returned id is what a link page or an embed opens. Mounted only when the deployment can sign (HS256 mode) — exchange mints session JWTs, so grants exist only where minting does.",
+        "description": "The returned id is what a link page or an embed opens. Its scope gives only document permissions the caller holds itself, as tokens.issue does. Mounted only when the deployment can sign (HS256 mode) — exchange mints session JWTs, so grants exist only where minting does.",
         "security": [
           {
             "apiToken": []
@@ -7574,6 +7574,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/GrantsUpdate400Response"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GrantsUpdate403Response"
                 }
               }
             }
@@ -8047,7 +8057,7 @@
         "x-fern-sdk-method-name": "issue",
         "x-docs-title": "Issue token",
         "summary": "Mint a delegated JWT: a doc token, an upload token for a browser, or (API token only) a tenant token.",
-        "description": "Authority mints only downward: kind \"tenant\" requires the API token, and kind \"upload\" requires docs.create instead of tokens.issue-doc, since an upload token can do only what docs.create allows. Mounted only when the deployment can sign (HS256 mode); asymmetric deployments mint with their own private key.",
+        "description": "Authority mints only downward: kind \"doc\" gives only document permissions the caller holds itself, kind \"tenant\" requires the API token, and kind \"upload\" requires docs.create instead of tokens.issue-doc, since an upload token can do only what docs.create allows. Mounted only when the deployment can sign (HS256 mode); asymmetric deployments mint with their own private key.",
         "security": [
           {
             "apiToken": []
@@ -27347,6 +27357,9 @@
         "additionalProperties": false
       },
       "GrantsUpdate400Response": {
+        "$ref": "#/components/schemas/AdminErrorPayload"
+      },
+      "GrantsUpdate403Response": {
         "$ref": "#/components/schemas/AdminErrorPayload"
       },
       "GrantsUpdate404Response": {

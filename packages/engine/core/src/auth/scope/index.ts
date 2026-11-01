@@ -74,4 +74,6 @@ export {
   pluginPermissionsOf,
 } from './resolver';
 
+export { scopeNotCovered } from './coverage';
+
 export { caps, collab, materializePdfPermissions, pdfPermissions } from './builders';
