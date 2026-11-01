@@ -1,0 +1,73 @@
+{
+  "name": "@cloudpdf/plugin-protected-display",
+  "version": "3.0.0-next.19",
+  "private": false,
+  "description": "Screenshot protection for the CloudPDF viewer: for a user who may read a document but not render its pages, it shows them as DRM-protected video frames from the protected display server module, so screenshots, recordings and shared screens show them black. DOM-free: the host gives the player (browserProtectedPlayer() from @cloudpdf/web in a browser), loaded only for a protected user.",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.cts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./contract": "./src/contract.ts",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "epdf-build",
+    "clean": "rimraf dist",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/embedpdf/embed-pdf-viewer.git",
+    "directory": "cloudpdf/plugin/protected-display"
+  },
+  "homepage": "https://www.cloudpdf.com",
+  "bugs": {
+    "url": "https://github.com/embedpdf/embed-pdf-viewer/issues"
+  },
+  "keywords": [
+    "pdf",
+    "cloudpdf",
+    "drm",
+    "screenshot protection"
+  ],
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@cloudpdf/engine": "workspace:*",
+    "@embedpdf/core": "workspace:*",
+    "@embedpdf/plugin-render": "workspace:*",
+    "@embedpdf/plugin-stage": "workspace:*"
+  },
+  "devDependencies": {
+    "@embedpdf/core-geometry": "workspace:*",
+    "@embedpdf/tooling-build": "workspace:*",
+    "rimraf": "^5.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^2.1.9"
+  },
+  "publishConfig": {
+    "access": "public",
+    "main": "./dist/index.js",
+    "module": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "import": "./dist/index.js",
+        "require": "./dist/index.cjs"
+      },
+      "./contract": {
+        "import": "./dist/contract.js",
+        "require": "./dist/contract.cjs"
+      },
+      "./package.json": "./package.json"
+    }
+  },
+  "sideEffects": false
+}

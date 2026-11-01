@@ -2,6 +2,7 @@ import {
   annotationKey,
   CONTINUOUS_RENDER_POLICY,
   isPluginError,
+  PluginError,
   memo,
   resolvePageLayers,
   snapAppearanceScale,
@@ -33,6 +34,7 @@ import type {
   RenderPageOptions,
   RenderPagesOptions,
   RenderSettings,
+  PicturePainter,
   RenderThumbnailOptions,
 } from './contract';
 import type {
@@ -120,6 +122,27 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
 
   const canRender = (): boolean => ctx.allows(RENDER_SCOPE);
   const canRenderThumbnail = (): boolean => ctx.allows(THUMBNAIL_SCOPE);
+
+  // ── another plugin painting the pictures ──
+  // Kept out of state (a painter is behaviour, not data); `notify` tells the
+  // page layers, which read it through the capability.
+  let picturePainter: PicturePainter | null = null;
+  const handOverPictures = <Host>(painter: PicturePainter<Host>): (() => void) => {
+    if (picturePainter) {
+      throw new PluginError('conflict', 'render', 'another plugin paints the pictures already');
+    }
+    const held = painter as PicturePainter;
+    picturePainter = held;
+    ctx.notify();
+    let givenBack = false;
+    return () => {
+      if (givenBack) return;
+      givenBack = true;
+      if (picturePainter !== held) return;
+      picturePainter = null;
+      ctx.notify();
+    };
+  };
 
   // ── what a picture draws ──
   // The engine's rule (`resolvePageLayers`): each option as given, and one
@@ -638,6 +661,8 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
     ...settings.api,
     canRender,
     canRenderThumbnail,
+    handOverPictures,
+    getPicturePainter: () => picturePainter,
     renderPage,
     renderThumbnail: async (pageArgument, options = {}) =>
       ctx.cancellable(

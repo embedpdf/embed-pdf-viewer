@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { enableAutoUnmount } from '@vue/test-utils';
 import { toPageRef } from '@embedpdf/core';
 import type { AnyPlugin, CapabilityToken, DocumentHandle, Engine, PageRef } from '@embedpdf/core';
-import { RenderToken } from '@embedpdf/plugin-render';
+import { RenderToken, type PicturePage, type PicturePainter } from '@embedpdf/plugin-render';
 import type {
   PageLayerOptions,
   RenderHostCapability,
@@ -67,9 +67,17 @@ function fakeRender({ tiles }: { tiles: boolean }) {
   };
   const createViewDemand = vi.fn(() => view);
   const rights = { annotations: true, formFields: true };
+  let painter: PicturePainter | null = null;
+  let notify = () => {};
+  /** Hand the pictures to a painter, as `handOverPictures` does; `null` gives them back. */
+  const handOver = (next: PicturePainter | null) => {
+    painter = next;
+    notify();
+  };
   const keyOf = (page: PageRef, includeAnnotations = true) =>
     `page-${page.objectNumber}-${includeAnnotations ? 'with' : 'without'}`;
   const api = {
+    getPicturePainter: () => painter,
     getPaintSettings: () => ({ tiles }),
     getLayerRights: () => rights,
     getSourceKey: (page: PageRef, options: { includeAnnotations?: boolean }) =>
@@ -93,13 +101,15 @@ function fakeRender({ tiles }: { tiles: boolean }) {
     id: 'render',
     scope: 'document',
     token: RenderToken,
-    create: () => ({ api }),
+    create: (ctx) => {
+      notify = () => ctx.notify();
+      return { api };
+    },
   };
   /** How often the tile's picture has been asked for: once per binding. */
   const pictureAsks = () =>
-    (tile.handle as unknown as { objectUrl: { mock: { calls: unknown[] } } }).objectUrl.mock.calls
-      .length;
-  return { plugin, asked, demands, view, createViewDemand, replan, pictureAsks };
+    (tile.handle as unknown as { objectUrl: { mock: { calls: unknown[] } } }).objectUrl.mock.calls.length;
+  return { plugin, asked, demands, view, createViewDemand, replan, pictureAsks, handOver };
 }
 
 const box = { x: 0, y: 0, width: 600, height: 800 };
@@ -286,5 +296,72 @@ describe('RenderLayer', () => {
     expect(render.view.dispose).not.toHaveBeenCalled();
     expect(render.createViewDemand).toHaveBeenCalledTimes(1);
     expect(wrapper.findAll('img')).toHaveLength(2);
+  });
+});
+
+/** A painter that records what it's lent: the box and page it paints, its updates, its end. */
+function recordingPainter(paints: (view: string) => boolean = () => true) {
+  const painted: { host: HTMLElement; page: number; scale: number }[] = [];
+  const updates: PicturePage[] = [];
+  const destroyed = vi.fn();
+  const painter: PicturePainter<HTMLElement> = {
+    paints,
+    paint: (host, page) => {
+      painted.push({ host, page: page.ref.objectNumber, scale: page.transform.viewScale });
+      return { update: (next) => updates.push(next), destroy: destroyed };
+    },
+  };
+  return { painter: painter as PicturePainter, painted, updates, destroyed };
+}
+
+describe('a plugin that paints the pictures', () => {
+  it('is lent the page box, follows the zoom, and never lets the raster be fetched', async () => {
+    const render = fakeRender({ tiles: true });
+    const recording = recordingPainter();
+    const viewer = await viewerWith(
+      [stagePlugin(), render.plugin],
+      () => h(DocumentGate, null, () => h(Stage, null, { page: () => [h(RenderLayer)] })),
+      engine,
+    );
+    await viewer.kernel.documents.open(bytesInput('a'));
+    render.handOver(recording.painter);
+    const stage = viewer.kernel.capability(
+      StageToken as unknown as CapabilityToken<StageHostCapability>,
+    );
+    stage.setViewportSize({ width: 800, height: 600 });
+    await until(() => recording.painted.length === 1);
+
+    expect(recording.painted[0]!.page).toBe(1);
+    expect(recording.painted[0]!.host.isConnected).toBe(true);
+    expect(viewer.wrapper.findAll('img')).toHaveLength(0);
+    expect(render.asked).toEqual([]);
+    expect(render.createViewDemand).not.toHaveBeenCalled();
+
+    stage.zoomTo(2);
+    await settle();
+    expect(recording.updates.at(-1)!.transform.viewScale).toBeGreaterThan(
+      recording.painted[0]!.scale,
+    );
+    expect(recording.painted).toHaveLength(1); // the same picture, updated
+
+    // Given back, the render plugin draws the page again.
+    render.handOver(null);
+    await settle();
+    expect(recording.destroyed).toHaveBeenCalledTimes(1);
+    await until(() => render.asked.length > 0);
+  });
+
+  it('leaves the views it doesn’t paint to the render plugin', async () => {
+    const render = fakeRender({ tiles: false });
+    const recording = recordingPainter(() => false);
+    const { kernel } = await viewerWith(
+      [render.plugin],
+      () => h(PageView, { page: 0, width: 300 }, () => h(RenderLayer)),
+      engine,
+    );
+    await kernel.documents.open(bytesInput('a'));
+    render.handOver(recording.painter);
+    await until(() => render.asked.length > 0);
+    expect(recording.painted).toEqual([]);
   });
 });
