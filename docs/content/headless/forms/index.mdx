@@ -95,15 +95,41 @@ A form marks some fields as required. Check them before you submit or download:
 
 ```ts
 const { valid, missing } = form.validate();
-
-const widget = !valid && form.getWidget(missing[0].widgets[0]);
-if (widget) stage.reveal(widget.page, { rect: widget.rect });
+if (!valid) form.focus(missing[0].ref);
 ```
 
 `missing` lists the required fields that are empty, in page order, so you can take the user to the
-first one. Only the fields the user may fill in count: another signer's are theirs to fill.
+first one: `focus()` brings it into view and puts the cursor in it. Only the fields the user may fill
+in count: another signer's are theirs to fill.
 
 <Example name="form/validate" />
+
+## Move between fields
+
+Tab and Shift+Tab move through the fields in the document's order, from page to page, including
+pages that aren't on screen: the view follows the field. On each page the fields come in the order
+the PDF gives, by rows, by columns or as they were added. Fields the user can't fill in are skipped,
+and a group of radio buttons is one stop, whose buttons the arrow keys move between. Tab on the last
+field, or Shift+Tab on the first, leaves the form, as it does on a web page.
+
+Your code moves the cursor too. `focus(ref)` brings a field into view, on whatever page it is, and
+puts the cursor in it; `focusNext()` goes on from the field the cursor is in, or was in last:
+
+```ts
+form.focus(email.ref); // the cursor in a field
+form.focus(email.ref, { select: true }); // with its text selected, so typing replaces it
+form.focusNext(); // the next field, as Tab does
+form.focusNext({ backward: true }); // the one before
+form.focusNext({ empty: true, wrap: true }); // the next empty field, starting over at the end
+```
+
+Both return `false` when there is no such field, or none the user can fill in. A field takes the
+cursor as soon as it's on screen; on iPhone and iPad, the keyboard opens for a field that was already
+showing, and one that had to come into view opens it on a tap.
+
+<Fw only={['react', 'vue', 'svelte']}>`focusedField`</Fw><Fw only="angular">`form.focusedField()`</Fw> is the field the cursor is in, or `null`, and
+<Fw only={['react', 'vue', 'svelte']}>`onFocusChanged`</Fw><Fw only="angular">`focusChanged$`</Fw> tells you each time it moves, for a help text next to the
+form or a step counter.
 
 ## Calculations, formatting and validation
 
@@ -181,6 +207,9 @@ on [Building forms](forms/building#methods).
 | `import(bundle, options?)` | Adds a bundle's fields, as one change. Resolves `{ fields, refMap, dropped }`. Needs `canDesign()`. [Move form data in and out](#move-form-data-in-and-out) |
 | `reset(refs?)`             | Puts back each field's default, for every field the user may fill in or the fields you pass. Resolves `{ fields }`, the fields it changed. [Reset the form](#reset-the-form) |
 | `validate()`               | Checks the required fields the user may fill in. Returns `{ valid, missing }`, the empty ones in page order. [Check required fields](#check-required-fields) |
+| `focus(ref, options?)`     | Brings a field into view and puts the cursor in it; `{ select: true }` selects its text. Returns `false` for a field the user can't fill in. [Move between fields](#move-between-fields) |
+| `focusNext(options?)`      | Moves the cursor to the next field, as Tab does: `{ backward, empty, wrap }`. Returns `false` when there's none. [Move between fields](#move-between-fields) |
+| `getFocusedField()`        | The field the cursor is in, or `null`                                                                                                          |
 | `activateWidget(widget)`   | Does what a click on a field box does, such as running a button's action                                                                       |
 | `getSnapshot()`            | Everything at once, as the user sees it: what the engine's `list()` returns, with the values still on their way. `fields`, `widgets`, `formKind`, `needsAppearances` and `calculationOrder` |
 | `refresh()`                | Reads the whole form again, and <Fw only={['react', 'vue', 'svelte']}>`onResynced`</Fw><Fw only="angular">`resynced$`</Fw> fires. You rarely need it: the plugin follows every change, whoever made it.                      |
@@ -199,6 +228,7 @@ Every method that returns a promise also takes a `signal` in its options, to can
 | `status`        | Whether the form is read: `'idle'`, `'loading'`, `'ready'`, `'forbidden'` or `'error'`           | `getStatus()`                                        |
 | `formKind`      | What the document has: `'none'`, `'acroform'` (a regular PDF form) or `'xfa'`                   | `getFormKind()`                                      |
 | `selectedField` | In design mode, the field of the selected box, or `null`; see [Building forms](forms/building#change-a-fields-settings) | `getSelectedField()`          |
+| `focusedField`  | The field the cursor is in, or `null`; see [Move between fields](#move-between-fields)            | `getFocusedField()`                                  |
 
 For one field, `useFormValue(ref)` <Word of="rerenders" /> only when that field's value changes.
 
@@ -248,6 +278,7 @@ The colors are what the viewer draws around fields; a field's own colors are sav
 | :--------------------- | :------------------------------------------------------------------------ | :---------------- |
 | `onValueChanged`       | A field's value changed                                                   | `field`, `origin` |
 | `onValidationRejected` | The form's validation refused a value                                     | `field`, `issues` |
+| `onFocusChanged`       | The cursor moved into a field, to another one, or out of the fields       | `field`, `widget` |
 | `onResynced`           | The whole form was read, as when it opens, after `refresh()` or a repair  | `snapshot`        |
 | `onSettingsChanged` | The settings changed | `settings`, `changed` |
 
@@ -276,8 +307,9 @@ A field's widgets are the form's: the annotation plugin never lists them. With t
 
 ### Keyboard
 
-Tab moves to the next field in the page's order. In a text box, Enter confirms and Escape puts back
-the value it had.
+Tab and Shift+Tab move between fields in the document's order (see [Move between
+fields](#move-between-fields)), and the arrow keys between the buttons of a radio group. In a text
+box, Enter confirms and Escape puts back the value it had.
 
 ### Collecting responses
 

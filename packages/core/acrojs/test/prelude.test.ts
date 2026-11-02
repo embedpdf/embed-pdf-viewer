@@ -112,6 +112,22 @@ describe('AcroJS prelude', () => {
     ]);
   });
 
+  it("asks for the cursor in a field with setFocus(), by the field's full name", () => {
+    const vm = createVm();
+    const out = plain(
+      vm.__acrojsRun(
+        `if (event.value === '') this.getField('email').setFocus();`,
+        input([field('email', ''), field('name', '')], {
+          kind: 'field-validate',
+          target: ref('name'),
+          value: '',
+        }),
+      ),
+    );
+    expect(out.uiEffects).toEqual([{ kind: 'focusField', field: 'email' }]);
+    expect(out.diagnostics).toEqual([]);
+  });
+
   it('uses only the injected identity, clock and timezone for dynamic text', () => {
     const vm = createVm();
     const out = plain(

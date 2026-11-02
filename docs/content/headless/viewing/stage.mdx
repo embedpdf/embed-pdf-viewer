@@ -624,6 +624,13 @@ the view exactly, and `stage.motionEnded$` for anything expensive.
 
 </Fw>
 
+### When the browser scrolls
+
+The Stage scrolls the pages itself, so the browser never does. When the browser would scroll to
+show something inside it, such as a field reached with Tab, an element your code calls `focus()` or
+`scrollIntoView()` on, or the cursor at the edge of a text box, the Stage scrolls that far instead:
+the pages, the scrollbar and the current page stay in step.
+
 ### Page coordinates
 
 Positions you pass to `reveal()` and `goToDestination()` are in points from the top-left of the page,

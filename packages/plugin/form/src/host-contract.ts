@@ -36,6 +36,17 @@ export type { WidgetPainting } from './services/looks';
 export type { TextEditorLayout } from '@embedpdf/core-form';
 
 /**
+ * A field box's control, as the host shows it: what the cursor goes into. The form layer lends
+ * one for each box on screen (`attachFocusTarget`); in a browser it focuses the control's
+ * element without scrolling (`@embedpdf/web`'s `bindFieldFocus`), and the Stage brings the box
+ * into view.
+ */
+export interface FormFocusTarget {
+  /** Take the cursor; `select` selects a text box's text, so typing replaces it. */
+  focus(options: { readonly select: boolean }): void;
+}
+
+/**
  * The host lens: members for the framework layers and sibling plugins (the
  * widget event feed, the text being typed, and the actions plugin's
  * executors and sinks). Application code uses the public capability.
@@ -92,6 +103,18 @@ export interface FormHostCapability extends FormCapability {
   getWidgetFontCss(widget: AnnotationRef): FontCss | null;
   /** The page box in page space, for keeping a placement on the page; `null` for a page that isn't there. */
   getPageBox(page: PageRef): Box | null;
+  /**
+   * Lend the plugin a box's control while it's on screen, so `focus()` and `focusNext()` can put
+   * the cursor in it; a box `focus()` asked for before its page came in takes the cursor now.
+   * Returns the call that takes it back.
+   */
+  attachFocusTarget(widget: AnnotationRef, target: FormFocusTarget): () => void;
+  /**
+   * The arrow keys in a radio group: move the cursor to the group's next button (the one before,
+   * `backward`), going round, and pick it, as a click on it does. `false` for a widget that isn't a
+   * radio button the user can pick, or a group of one.
+   */
+  moveInGroup(widget: AnnotationRef, backward: boolean): boolean;
   /** Send a widget's pointer or focus event to the actions plugin, which runs its `/AA` actions. */
   notifyWidgetEvent(
     field: FormFieldRef,

@@ -60,7 +60,8 @@
     "@embedpdf/plugin-annotation": "workspace:*",
     "@embedpdf/plugin-interaction": "workspace:*",
     "@embedpdf/plugin-render": "workspace:*",
-    "@embedpdf/plugin-fonts": "workspace:*"
+    "@embedpdf/plugin-fonts": "workspace:*",
+    "@embedpdf/plugin-stage": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.0.0",

@@ -17,6 +17,7 @@ import { createServices, type FormContext } from './services';
 import { createActivation } from './write/activation';
 import { createFieldWrites } from './write/fields';
 import { createFill } from './write/fill';
+import { createFocus } from './write/focus';
 import { createInterchange } from './write/interchange';
 import { createWidgetLender } from './write/lending';
 import { createResetWrites } from './write/reset';
@@ -41,6 +42,10 @@ export function createFormController(ctx: FormContext) {
   const interchange = createInterchange(ctx, services);
   const activation = createActivation(ctx, services, fills);
   const scripts = createScriptEffects(ctx, services, fills);
+  const focus = createFocus(ctx, services, {
+    setValue: values.api.setValue,
+    activateWidget: activation.api.activateWidget,
+  });
 
   const api: FormHostCapability = composeApi('form', [
     settings.api,
@@ -54,6 +59,7 @@ export function createFormController(ctx: FormContext) {
     interchange.api,
     activation.api,
     scripts.api,
+    focus.api,
     {
       canRead: () => ctx.allows('doc.forms.read'),
       canFill: (ref: FormFieldRef) => {

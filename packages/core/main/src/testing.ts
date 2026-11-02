@@ -77,6 +77,8 @@ export interface TestPage {
   readonly rotation?: PageLayout['rotation'];
   readonly userUnit?: number;
   readonly label?: string | null;
+  /** The order its annotations take keyboard focus in (`/Tabs`); default none. */
+  readonly tabOrder?: PageLayout['tabOrder'];
 }
 
 export interface TestContextOptions<S, T extends object = NoSettings> {
@@ -152,7 +154,7 @@ const layoutOf = (page: TestPage, index: number): PageLayout => {
     size,
     rotation: page.rotation ?? 0,
     userUnit: page.userUnit ?? 1,
-    tabOrder: null,
+    tabOrder: page.tabOrder ?? null,
     boxes: {
       media: { ...visible },
       crop: { ...visible },

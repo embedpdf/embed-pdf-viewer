@@ -163,11 +163,26 @@ describe('createStageSurface', () => {
     expect(harness.dispatched[0].source).toBeUndefined();
   });
 
+  it('turns a scroll the browser made into a camera pan, and puts the viewport back', () => {
+    const harness = surfaceHarness();
+    const viewport = harness.el as unknown as { scrollLeft: number; scrollTop: number };
+    // The browser shows a field below the fold that Tab reached: it scrolls the viewport.
+    viewport.scrollLeft = 0;
+    viewport.scrollTop = 257;
+    harness.elListeners.get('scroll')!({});
+    expect(viewport.scrollTop).toBe(0);
+    expect(harness.host.panBy).toHaveBeenCalledWith(-0, -257);
+    // Putting it back fires the event again: nothing more moves.
+    harness.elListeners.get('scroll')!({});
+    expect(harness.host.panBy).toHaveBeenCalledTimes(1);
+  });
+
   it('detach tears the whole binding down', () => {
     const harness = surfaceHarness({ hub: true, source: 'stage-main' });
     harness.detach();
     expect(harness.roDisconnectedRef()).toBe(true);
     expect(harness.mqListeners).toHaveLength(0);
     expect(harness.elListeners.has('pointerdown')).toBe(false); // controller detached
+    expect(harness.elListeners.has('scroll')).toBe(false);
   });
 });

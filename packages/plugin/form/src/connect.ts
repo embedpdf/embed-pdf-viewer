@@ -5,6 +5,7 @@
  * reader and submit resolver on the actions plugin. Every registration is released with
  * the document.
  */
+import { toFieldRef } from '@embedpdf/engine-core/runtime';
 import { ActionsToken as ActionsHostToken } from '@embedpdf/plugin-actions/contract/host';
 import {
   AnnotationToken as AnnotationHostToken,
@@ -87,6 +88,8 @@ export function connectForm(
   // read the form as the user sees it, with the fills still on their way.
   ctx.cleanup(actions.registerFormCommitSink((effects) => form.commitScriptFormEffects(effects)));
   ctx.cleanup(actions.registerFormReader(() => form.getSnapshot()));
+  // A script's `field.setFocus()` puts the cursor in the field, as `focus()` does.
+  ctx.cleanup(actions.registerFormFocus((name) => form.focus(toFieldRef(name))));
   ctx.cleanup(
     actions.registerSubmitResolver((intent, actionContext, diagnose) =>
       form.resolveSubmitDataset(intent, actionContext, diagnose),

@@ -74,19 +74,22 @@ export class App {
       untracked(() => {
         void this.form
           .setValue(toFieldRef('name'), { value: 'Ada Lovelace' })
-          .then(() => this.submit());
+          .then(() => this.validate());
       });
     });
   }
 
-  /** Check the required fields, and take the reader to the first empty one. */
-  protected submit() {
+  /** Check the required fields. */
+  private validate() {
     const result = this.form.validate();
     this.check.set(result);
-    // Where a field shows is its widget's row in the form.
-    const first = result.missing[0]?.widgets[0];
-    const widget = first ? this.form.getWidget(first) : null;
-    if (widget) this.stage()?.reveal(widget.page, { rect: widget.rect });
+    return result;
+  }
+
+  /** Submit: check, and put the cursor in the first empty field. */
+  protected submit() {
+    const first = this.validate().missing[0];
+    if (first) this.form.focus(first.ref);
   }
 
   protected missingNames(check: FormValidation) {

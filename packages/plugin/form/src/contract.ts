@@ -314,6 +314,26 @@ export type FormUiEffect = ScriptUiEffect & {
   origin?: ActionOrigin;
 };
 
+/** How `focus()` puts the cursor in a field. */
+export interface FormFocusOptions {
+  /** Which of the field's boxes: a radio button, or a field shown on several pages. Default: the first in Tab's order (a radio group's checked button). */
+  widget?: WidgetAddress;
+  /** Select a text box's text, so typing replaces it. */
+  select?: boolean;
+}
+
+/** Where `focusNext()` moves the cursor. */
+export interface FormFocusNextOptions {
+  /** The field it goes on from. Default: the field the cursor is in, or was in last; with none, the start of the form. */
+  from?: FormFieldRef;
+  /** The field before, as Shift+Tab goes. */
+  backward?: boolean;
+  /** Only a field that is still empty. */
+  empty?: boolean;
+  /** Past the last field, start over at the first (the last, going backward). */
+  wrap?: boolean;
+}
+
 // ── events ────────────────────────────────────────────────────────────────
 
 /** A field's value changed, whoever changed it: you, the form's scripts, or another session. */
@@ -340,6 +360,12 @@ export interface FormFieldDeletedEvent {
 export interface FormValidationRejectedEvent {
   readonly field: FormFieldDTO;
   readonly issues: readonly ScriptDiagnostic[];
+}
+/** The cursor moved into a field, to another one, or out of the fields (`field` is then `null`). */
+export interface FormFocusChangedEvent {
+  readonly field: FormFieldDTO | null;
+  /** The box the cursor is in. */
+  readonly widget: AnnotationRef | null;
 }
 /** The whole form was read. */
 export interface FormResyncedEvent {
@@ -393,6 +419,8 @@ export interface FormCapability extends SettingsApi<FormSettings> {
   getWidgetAt(page: PageRef | number, point: { x: number; y: number }): WidgetHit | null;
   /** The field of the selected widget while one widget is selected (in design mode), or `null`. */
   getSelectedField(): FormFieldDTO | null;
+  /** The field the cursor is in, or `null`. */
+  getFocusedField(): FormFieldDTO | null;
   /**
    * A field's settings, described for a settings panel, which writes them
    * with `update()`; `null` for a field the form doesn't have. Every setting
@@ -408,6 +436,19 @@ export interface FormCapability extends SettingsApi<FormSettings> {
   exportValues(): Readonly<Record<string, FormPlainValue>>;
 
   // ── filling ──
+  /**
+   * Put the cursor in a field: bring its box into view, on whatever page it is, and focus its
+   * control, at once when its page is on screen, else as soon as the page comes in. `false` for a
+   * field the user can't fill in, a box that doesn't show, or one off screen with no Stage to bring
+   * it in.
+   */
+  focus(ref: FormFieldRef, options?: FormFocusOptions): boolean;
+  /**
+   * Move the cursor to the next field, as Tab does: in the document's order, from page to page,
+   * skipping the fields the user can't fill in, a radio group being one stop. `false` when there's
+   * no such field: Tab then leaves the form.
+   */
+  focusNext(options?: FormFocusNextOptions): boolean;
   /**
    * Fill in a field with `{ value }`, `{ checked }` or `{ selectedValues }`,
    * running the form's checks and scripts when the `validation` setting says
@@ -594,4 +635,6 @@ export interface FormCapability extends SettingsApi<FormSettings> {
   readonly onValidationRejected: EventHook<FormValidationRejectedEvent>;
   /** The whole form was read, as when it opens, after `refresh()` or a repair. */
   readonly onResynced: EventHook<FormResyncedEvent>;
+  /** The cursor moved into a field, to another one, or out of the fields. */
+  readonly onFocusChanged: EventHook<FormFocusChangedEvent>;
 }

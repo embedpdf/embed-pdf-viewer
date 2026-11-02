@@ -501,7 +501,15 @@ export function widgetAt(
 
 // ── session state ────────────────────────────────────────────────────────────
 
-/** The plugin's session state: nothing yet; a write in flight shows in the mirror's view. */
-export type FormModel = Readonly<Record<string, never>>;
+/** The box the cursor is in: its field and its annotation object number. */
+export interface FocusedWidget {
+  readonly field: FieldKey;
+  readonly widget: number;
+}
 
-export const initialFormModel = (): FormModel => ({});
+/** The plugin's session state: the box the cursor is in; a write in flight shows in the mirror's view. */
+export interface FormModel {
+  readonly focused: FocusedWidget | null;
+}
+
+export const initialFormModel = (): FormModel => ({ focused: null });

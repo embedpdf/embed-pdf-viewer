@@ -89,6 +89,12 @@ export interface FormCommitSinkResult {
 export type FormCommitSink = (effects: FormEffect[]) => Promise<FormCommitSinkResult>;
 
 /**
+ * The form plugin's cursor: put it in the field with this full name, as a script's
+ * `field.setFocus()` asks. `false` when the form can't (no such field, or one the user can't fill in).
+ */
+export type FormFocus = (field: string) => boolean;
+
+/**
  * The form as the user sees it: the form plugin's fields and widgets with this session's pending
  * fills, or `null` before it has read the form. What scripts and dispatch read instead of the
  * engine, so they see a fill before the engine answers it.
@@ -178,6 +184,8 @@ export interface ActionsHostCapability extends ActionsCapability {
   registerFormCommitSink(sink: FormCommitSink): Unsubscribe;
   /** The form plugin's form, which scripts and dispatch read; without one they read the engine. Identity-safe. */
   registerFormReader(reader: FormReader): Unsubscribe;
+  /** The form plugin's cursor, for a script's `field.setFocus()`. Identity-safe. */
+  registerFormFocus(focus: FormFocus): Unsubscribe;
   /**
    * This document's realm, present only when `javascript.enabled` (its
    * presence is the form plugin's "scripting on" signal).

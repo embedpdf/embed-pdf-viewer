@@ -137,7 +137,9 @@ export function installAcroJs(globalObject: Record<string, unknown>): void {
       },
       source: { enumerable: false, get: () => doc },
     });
-    wrapper.setFocus = () => diagnostic('unsupported-api', 'Field.setFocus is not supported in v1');
+    wrapper.setFocus = () => {
+      state?.uiEffects.push({ kind: 'focusField', field: String(input.name) });
+    };
     return wrapper;
   };
 

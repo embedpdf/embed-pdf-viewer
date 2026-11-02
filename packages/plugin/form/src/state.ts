@@ -9,7 +9,7 @@ import type { FormFieldDTO, FormKind } from '@embedpdf/engine-core/runtime';
 
 import { FormToken } from './contract';
 
-/** Every field, whether the form is read, what kind of form it is, and the selected widget's field. */
+/** Every field, whether the form is read, what kind of form it is, the selected widget's field, and the field the cursor is in. */
 export interface FormState {
   /** Every field. The same array while nothing changes. */
   readonly fields: readonly FormFieldDTO[];
@@ -19,6 +19,8 @@ export interface FormState {
   readonly formKind: FormKind;
   /** The field of the selected widget while one widget is selected (in design mode), or `null`. */
   readonly selectedField: FormFieldDTO | null;
+  /** The field the cursor is in, or `null`. */
+  readonly focusedField: FormFieldDTO | null;
 }
 
 const NO_FIELDS: readonly FormFieldDTO[] = Object.freeze([]);
@@ -29,11 +31,13 @@ export const formState = defineState(FormToken, {
     status: form.getStatus(),
     formKind: form.getFormKind(),
     selectedField: form.getSelectedField(),
+    focusedField: form.getFocusedField(),
   }),
   empty: {
     fields: NO_FIELDS,
     status: 'idle',
     formKind: 'none',
     selectedField: null,
+    focusedField: null,
   },
 });
