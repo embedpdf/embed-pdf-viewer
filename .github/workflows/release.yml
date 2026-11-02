@@ -437,6 +437,7 @@ jobs:
     if: ${{ !cancelled() && needs.publish-image.result == 'success' }}
     outputs:
       source_sha: ${{ needs.publish-image.outputs.source_sha }}
+      version: ${{ steps.ver.outputs.version }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -540,3 +541,42 @@ jobs:
     secrets:
       SDK_RELEASE_APP_ID: ${{ secrets.SDK_RELEASE_APP_ID }}
       SDK_RELEASE_APP_PRIVATE_KEY: ${{ secrets.SDK_RELEASE_APP_PRIVATE_KEY }}
+
+  # The commercial engine image (the open image above plus ffmpeg and
+  # CloudPDF's own server modules, such as protected display) is built in the
+  # private platform repository, which holds the modules' source. This job
+  # only tells it a version is out, once the exact image is verified: the
+  # platform moves its modules' pins, tests them, and builds the commercial
+  # image FROM this version's image. No private code runs here. The App's
+  # token is limited to starting workflows in that one repository.
+  # One-time setup: an App installed on embedpdf/cloudpdf-platform with
+  # Actions: write, its id and key as the two secrets below, and the variable
+  # PLATFORM_RELEASE_NOTIFY_ENABLED=true.
+  notify-platform:
+    needs: merge-image
+    if: ${{ !cancelled() && needs.merge-image.result == 'success' && vars.PLATFORM_RELEASE_NOTIFY_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Create platform repository token
+        id: platform-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.PLATFORM_RELEASE_APP_ID }}
+          private-key: ${{ secrets.PLATFORM_RELEASE_APP_PRIVATE_KEY }}
+          owner: embedpdf
+          repositories: cloudpdf-platform
+          permission-actions: write
+
+      - name: Start the platform's release workflow
+        env:
+          GH_TOKEN: ${{ steps.platform-token.outputs.token }}
+          VERSION: ${{ needs.merge-image.outputs.version }}
+          SOURCE_SHA: ${{ needs.merge-image.outputs.source_sha }}
+        run: |
+          gh workflow run oss-release.yml \
+            --repo embedpdf/cloudpdf-platform \
+            --ref main \
+            -f version="$VERSION" \
+            -f source_sha="$SOURCE_SHA"
+          echo "Asked embedpdf/cloudpdf-platform to move to $VERSION." >> "$GITHUB_STEP_SUMMARY"
