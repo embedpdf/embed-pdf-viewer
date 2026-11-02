@@ -1,5 +1,11 @@
 # @embedpdf/plugin-stamp
 
+## 3.0.0-next.20
+
+### Minor Changes
+
+- [#941](https://github.com/embedpdf/embed-pdf-viewer/pull/941) by [@bobsingor](https://github.com/bobsingor) – A `fonts` setting (`StampFont`: `{ key, load }`): the fonts typed marks can be written in, each registered on the asset engine the first time a mark names it, so a typed signature is written in its font whichever engine the viewer draws with.
+
 ## 3.0.0-next.19
 
 ## 3.0.0-next.18

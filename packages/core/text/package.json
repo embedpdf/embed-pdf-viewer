@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/core-text",
-  "version": "3.0.0-next.15",
+  "version": "3.0.0-next.20",
   "private": false,
   "description": "Text laid out as the engine lays it out: the font each character is drawn in, the Unicode bidirectional order, and a form field's lines, sizes and runs. Pure TypeScript, DOM-free.",
   "type": "module",

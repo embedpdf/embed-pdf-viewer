@@ -1,5 +1,27 @@
 # @embedpdf/web
 
+## 3.0.0-next.20
+
+### Minor Changes
+
+- [#941](https://github.com/embedpdf/embed-pdf-viewer/pull/941) by [@bobsingor](https://github.com/bobsingor) – The rich text editor draws each run in its whole face (`RichTextEditorFace`: family, weight and italic over the body's), so a bold run draws in the bold program instead of a faked bold. `RichTextEditorHost.cssFontFamily(face)` takes the face, `RichTextEditorProps.body` the box's body face, and `familyOfCss` reads back a family for a span the browser made itself. A drawn span keeps its run's family as data (`data-family`), so a program's CSS family never reads back as a family. `restyleFaces()` draws the spans again when the fonts change, without touching the text or the caret. `TextBoxEditorItem.face` is the box's body face. Text box and text field editors draw with `font-synthesis: none`.
+
+  Add `browserTextMeasurer()`, the browser's text measuring for the kernel (`createKernel({ measurer: browserTextMeasurer() })`): canvas `measureText` in a font program, mounted the first time it's asked about. A program the browser refuses is never ready, and the measurer says it's refused. `mountFontProgram` rejects when the browser refuses a font, instead of resolving with nothing mounted.
+
+  `svgShapesOf` draws a `textRun` scene node as one `<text>` at its left edge, shaped by the browser in its direction (`unicode-bidi: bidi-override`; a right-to-left run anchored by its end), with its spaces kept (`white-space: pre`) and kerning and ligatures off for a plain run. `SvgShape.style` replaces `blend`: the CSS a shape needs that has no attribute, `mix-blend-mode` among it; `styleText(style)` writes it as one attribute.
+
+  A text field's editor reads its line in the engine's direction (`direction` from the layout's `rtl`): text that starts in Hebrew or Arabic is ordered right to left as the engine orders it, and typing at the end of a right-to-left word continues it. The field's alignment is unchanged.
+
+  `svgShapesOf` draws a `textRun` that joins its neighbours (`joinsPrevious`, `joinsNext`) with a joiner (U+200D) on each side it joins, embedded rather than overridden (`unicode-bidi: embed`; Firefox ignores a joiner at the edge of an overridden run), so an Arabic letter in a comb's cell takes its joined form, as the engine draws it.
+
+- [#941](https://github.com/embedpdf/embed-pdf-viewer/pull/941) by [@bobsingor](https://github.com/bobsingor) – One way to mount fonts: by program (`mountFontProgram`, `createFontMounts`). `mountWebFont`, `webFontFamily` and `fontKeyOfWebFamily` are gone, and so is `cssFontOf`: `textFieldStyleOf` names no font (the editor's layout does), and `listBoxStyleOf` and `listBoxControlStyleOf` take the widget's font as the form plugin gives it. The free text line model keeps the engine's metrics for the standard families by the family a CSS family stands for (`lineModelFor` and `firstLineShiftFor` take `familyOf`, `FamilyOfCss`; the rich text editor passes its host's `familyOfCss`); `styleDeltaOf` reads a family back as it is by default. A `text` scene node's `program` is mounted like a `textRun`'s.
+
+- [#942](https://github.com/embedpdf/embed-pdf-viewer/pull/942) by [@bobsingor](https://github.com/bobsingor) – The Stage keeps the pages where it put them when the browser scrolls inside it: a field reached with Tab, an element your code calls `focus()` or `scrollIntoView()` on, or the cursor at the edge of a text box now moves the Stage's view that far, instead of shifting the pages under it so the top of the document could no longer be reached. `bindFieldFocus()` binds a form field's box to the form's cursor: `focus()` and `focusNext()` put the cursor in its control, Tab and Shift+Tab go through the form in the document's order, and the arrow keys move between a radio group's buttons.
+
+- [#939](https://github.com/embedpdf/embed-pdf-viewer/pull/939) by [@bobsingor](https://github.com/bobsingor) – `whenPresented(image, run)` runs once an `<img>` has loaded and the browser had a frame to present it, and `afterPresented(run)` runs after the next presentation opportunity; `bindPaintedImage` uses the same rule. The page layers report their page's picture on screen with it.
+
+- [#933](https://github.com/embedpdf/embed-pdf-viewer/pull/933) by [@bobsingor](https://github.com/bobsingor) – A keyboard shortcut's refusal can now say `'locked'`: its command changes a setting a lock holds for the document.
+
 ## 3.0.0-next.19
 
 ### Minor Changes
