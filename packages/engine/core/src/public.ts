@@ -82,6 +82,9 @@ export {
 } from './geometry/pageSpace';
 export { pageDestinationOf, pdfDestinationOf } from './pageSpace/destinations';
 
+// Pages: the order Tab visits their annotations in.
+export { compareStructurePositions, tabOrderOf } from './pages/tabOrder';
+
 export type {
   // Engine and handles.
   Engine,
@@ -151,6 +154,9 @@ export type {
   // Data.
   PageRef,
   PageLayout,
+  PageTabOrder,
+  TabOrderItem,
+  TabOrderPage,
   PageListSnapshot,
   PageDestination,
   PdfDestination,

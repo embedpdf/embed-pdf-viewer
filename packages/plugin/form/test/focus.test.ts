@@ -82,22 +82,29 @@ const PLAN = {
 } as unknown as FormFieldDTO;
 
 /** A box's row: on `page`, at `y` (page space, y down). */
-const row = (objectNumber: number, page: typeof P1, y: number) =>
+const row = (
+  objectNumber: number,
+  page: typeof P1,
+  y: number,
+  structurePosition: number[] | null = null,
+) =>
   ({
     subtype: 'widget',
     ref: { kind: 'objectNumber', page, objectNumber },
     page,
     rect: { x: 50, y, width: 200, height: 20 },
+    structurePosition,
   }) as unknown as WidgetAnnotation;
 
 // Page 1 lists its boxes bottom first, and reads in rows: name (top), email, then the locked id.
+// Its tags read email, name, then the locked id.
 const snapshot: FormSnapshot = {
   formKind: 'acroform',
   needsAppearances: false,
   widgets: [
-    row(13, P1, 300),
-    row(12, P1, 200),
-    row(11, P1, 100),
+    row(13, P1, 300, [0, 0, 2]),
+    row(12, P1, 200, [0, 0, 0]),
+    row(11, P1, 100, [0, 0, 1]),
     row(14, P2, 100),
     row(15, P2, 200),
     row(16, P2, 250),
@@ -109,7 +116,10 @@ const snapshot: FormSnapshot = {
 const widgetRef = (objectNumber: number, page: typeof P1): AnnotationRef =>
   ({ kind: 'objectNumber', page, objectNumber }) as AnnotationRef;
 
-async function form({ stage = true } = {}) {
+async function form({
+  stage = true,
+  tabs = 'rows' as 'rows' | 'structure',
+}: { stage?: boolean; tabs?: 'rows' | 'structure' } = {}) {
   const time = manualClock();
   const reveal = vi.fn();
   const apply = vi.fn(async () => ({ items: [], meta: { undoable: true } }));
@@ -117,7 +127,7 @@ async function form({ stage = true } = {}) {
     id: 'form',
     state: initialFormModel(),
     settings: { defaults: FORM_DEFAULTS },
-    pages: [{ ref: P1, tabOrder: 'rows' }, { ref: P2 }],
+    pages: [{ ref: P1, tabOrder: tabs }, { ref: P2 }],
     clock: time.clock,
     capabilities: [
       [
@@ -231,6 +241,16 @@ describe('focusNext()', () => {
     expect(capability.focusNext()).toBe(false);
     expect(capability.focusNext({ wrap: true })).toBe(true);
     expect(focused.at(-1)).toBe(11);
+  });
+
+  it("follows a page's tags when its /Tabs says structure", async () => {
+    const { capability, focused, show } = await form({ tabs: 'structure' });
+    show(14, P2);
+    expect(capability.focusNext()).toBe(true);
+    expect(capability.focusNext()).toBe(true);
+    expect(capability.focusNext()).toBe(true);
+    // Page 1's tags read email, then name; page 2 says nothing, so its own order.
+    expect(focused).toEqual([12, 11, 14]);
   });
 
   it('goes backward as Shift+Tab does, into a radio group at its checked button', async () => {

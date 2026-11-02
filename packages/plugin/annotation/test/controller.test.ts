@@ -38,6 +38,7 @@ const base = (annotObjectNumber: number) => ({
   page: PAGE,
   hasAppearance: true,
   appearanceState: null,
+  structurePosition: null,
   nm: null,
   ...NO_FLAGS,
   contents: null,

@@ -37,7 +37,7 @@ for (const page of pages) {
 | `size`       | `{ width, height }` of the visible area (the crop box) in points, before rotation.                                                                                        |
 | `rotation`   | `0`, `90`, `180` or `270`: how far the page is turned clockwise when shown.                                                                                               |
 | `userUnit`   | How large one point is, in multiples of 1/72 inch. `1` for almost every file.                                                                                             |
-| `tabOrder`   | The order its annotations and form fields take keyboard focus in: `'rows'`, `'columns'`, `'structure'`, `'annotations'` or `'widgets'`; `null` when the page doesn't say. |
+| `tabOrder`   | The order its annotations and form fields take keyboard focus in: `'rows'`, `'columns'`, `'structure'`, `'annotations'` or `'widgets'`; `null` when the page doesn't say. See [Keyboard order](#keyboard-order). |
 | `boxes`      | The page's five boxes: `media`, `crop`, `bleed`, `trim` and `art`. See below.                                                                                             |
 | `pdfCropBox` | Where the page sits in the PDF file's own numbers, for tools that use those. See below.                                                                                   |
 
@@ -120,6 +120,32 @@ When pages move, come or go, the sections follow the pages, so a label stays whe
 - A move is a delete followed by an insert.
 
 An undo puts the labels back as they were.
+
+## Keyboard order
+
+Each page says in what order its annotations and form fields take keyboard focus: its `tabOrder`.
+`tabOrderOf()` puts annotations in that order, page by page, as Tab visits them:
+
+```ts
+import { tabOrderOf } from '@embedpdf/engine';
+
+const { pages } = await doc.pages.list();
+const { widgets } = await doc.forms.list();
+const order = tabOrderOf(widgets, pages); // every field box, in the order Tab visits them
+```
+
+| `tabOrder`              | The order on the page                                                                        |
+| :---------------------- | :------------------------------------------------------------------------------------------- |
+| `'rows'`                | Top to bottom, each row left to right                                                        |
+| `'columns'`             | Left to right, each column top to bottom                                                     |
+| `'structure'`           | As the document's tags read: by each annotation's `structurePosition`. Those that aren't tagged come after them, in the order the page lists them. |
+| `'annotations'`, `null` | The order the page lists them                                                                |
+| `'widgets'`             | The form fields first, then the other annotations, each in the order the page lists them     |
+
+Most tagged PDFs, from Acrobat, Word or a browser's print, say `'structure'`: their order is the
+reading order their author tagged. `structurePosition` is where an annotation sits in those tags,
+from the root down, the index of each step among its parent's kids; compared index by index, two
+positions give the reading order.
 
 ## Refs, not positions
 
