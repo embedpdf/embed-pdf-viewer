@@ -37,6 +37,9 @@ A built-in button's label has the command's id as its key. Give a new one, per l
 }
 ```
 
+A panel's button and the title in its header are one word, under the button's command id:
+`'panel:comments'` renames both. See [Panels](panels#a-panels-title).
+
 ## Translate your own buttons
 
 Give a command a `labelKey` instead of a `label`, and its words per language:
@@ -51,7 +54,8 @@ Give a command a `labelKey` instead of a `label`, and its words per language:
 }
 ```
 
-Panels and mode bars take a `titleKey` the same way, for their title.
+Panels and mode bars take a `titleKey` the same way, for their title. A panel's title is its
+button's label too.
 
 The style panel's words have keys too: each property and option by what it says
 (`annotation.style.stroke`, `annotation.flags.noView`, `annotation.lineEndings.openArrow`), and a
@@ -59,6 +63,25 @@ form field's settings by theirs (`form.settings.tooltip`). Change one like any o
 
 ```js
 { strings: { en: { 'annotation.style.stroke': 'Line' } } }
+```
+
+So do the page number's words, under `pageNumber.`, and the comments panel's, under `comments.`.
+The ones you're most likely to change:
+
+| Key | What it says |
+| :-- | :-- |
+| `pageNumber.page` | `Page {current} of {total}` |
+| `pageNumber.pages` | `Pages {first}–{last} of {total}`, with two pages side by side (`spread`) |
+| `pageNumber.goToPage` | The label of the field the number turns into |
+| `comments.empty`, `comments.emptyReadOnly` | What the panel says while the document has no comments, when the user can add some and when not |
+| `comments.addPlaceholder`, `comments.replyPlaceholder`, `comments.reply` | The field for a new comment, and for a reply |
+| `comments.statusAccepted`, `comments.statusRejected`, `comments.statusCancelled`, `comments.statusCompleted`, `comments.statusNone` | A thread's status |
+
+A word in braces is filled in as the viewer writes it: keep it in your words. The number you click
+to type a page is `{current}`, or `{first}`:
+
+```js
+{ strings: { en: { 'pageNumber.page': '{current} / {total}', 'comments.empty': 'No notes yet.' } } }
 ```
 
 ## A language of your own

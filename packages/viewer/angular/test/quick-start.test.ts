@@ -17,7 +17,7 @@ describe('Quick start in <epdf-pdf-viewer>', () => {
   let seen: ReturnType<typeof watchPage>;
 
   /**
-   * The element with focus, inside the shadow roots too: its `data-check`, else its title, and
+   * The element with focus, inside the shadow roots too: its `data-check`, else its label, and
    * the bar it's in, through the slot a control of yours shows in.
    */
   const focused = () =>
@@ -33,7 +33,8 @@ describe('Quick start in <epdf-pdf-viewer>', () => {
           (node as Partial<ShadowRoot>).host ??
           null;
       }
-      const name = (active as HTMLElement | null)?.dataset?.check ?? active?.getAttribute('title');
+      const name =
+        (active as HTMLElement | null)?.dataset?.check ?? active?.getAttribute('aria-label');
       return { name: name ?? null, bar };
     });
 

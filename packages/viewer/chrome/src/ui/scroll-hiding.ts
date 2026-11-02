@@ -1,8 +1,10 @@
 /**
  * Which bar gets out of the way while the pages scroll, and what a scroll is.
- * On a phone (a compact viewer), a floating bar that holds the page number
- * hides while the pages move and comes back once they have been still for a
- * moment. Only a move at the same zoom is a scroll: a zoom keeps it.
+ * A floating bar whose place says `hideWhileScrolling: true` hides while the
+ * pages move and comes back once they have been still for a moment, at every
+ * size; one that says `false` stays. A place that says neither hides a bar
+ * with the page number on a phone (a compact viewer). Only a move at the same
+ * zoom is a scroll: a zoom keeps it.
  */
 import type { BarSchema, ViewerSize } from '@embedpdf/core-ui';
 
@@ -34,7 +36,15 @@ export function holdsSlot(bar: BarSchema, slot: string): boolean {
   );
 }
 
-/** Whether a floating bar hides while the pages scroll: on a phone, when it holds the page number. */
-export function hidesWhileScrolling(bar: BarSchema | null, size: ViewerSize): boolean {
-  return size === 'compact' && bar !== null && holdsSlot(bar, PAGE_NUMBER_SLOT);
+/**
+ * Whether a floating bar hides while the pages scroll: as its place's `hideWhileScrolling` says
+ * (`hideWhileScrollingOf`), else on a phone when it holds the page number.
+ */
+export function hidesWhileScrolling(
+  hideWhileScrolling: boolean | undefined,
+  bar: BarSchema | null,
+  size: ViewerSize,
+): boolean {
+  if (bar === null) return false;
+  return hideWhileScrolling ?? (size === 'compact' && holdsSlot(bar, PAGE_NUMBER_SLOT));
 }

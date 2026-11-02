@@ -10,10 +10,11 @@
 
   const element = document.getElementById('viewer');
   element.addEventListener('epdf:ready', () => {
-    const search = element.viewer.get('search');
-    document.getElementById('query').oninput = (event) => search.search({ text: event.target.value });
-    element.viewer.watch(
-      () => search.getHitCount(),
+    const { viewer } = element;
+    document.getElementById('query').oninput = (event) =>
+      viewer.get('search').search({ text: event.target.value });
+    viewer.watch(
+      () => viewer.get('search').getHitCount(),
       (count) => (document.getElementById('count').textContent = count ? `${count} matches` : ''),
     );
   });

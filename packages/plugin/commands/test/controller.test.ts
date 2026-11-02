@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   COMMANDS_DEFAULTS,
+  type CommandContext,
   type CommandDef,
   type CommandFamily,
   type CommandsConfig,
@@ -60,6 +61,33 @@ describe('resolution carries iconAccent', () => {
     const resolved = commands.resolveCommand('tool:ink');
     expect(resolved).not.toBeNull(); // the button still renders…
     expect(resolved?.iconAccent).toBeUndefined(); // …just untinted
+  });
+});
+
+describe('enabled, active and visible', () => {
+  it('count as false when they throw, and as their default when they are not given', async () => {
+    const MissingToken = createCapabilityToken<{ ready(): boolean }>('missing');
+    const reads = (context: CommandContext) => context.get(MissingToken).ready();
+    const { commands } = harness({
+      commands: [
+        { id: 'acme:thrown', label: 'thrown', enabled: reads, active: reads, run: () => {} },
+        { id: 'acme:hidden', label: 'hidden', visible: reads },
+        { id: 'acme:plain', label: 'plain' },
+      ],
+    });
+    expect(commands.resolveCommand('acme:thrown')).toMatchObject({
+      enabled: false,
+      active: false,
+      visible: true,
+    });
+    expect(commands.resolveCommand('acme:hidden')).toMatchObject({ visible: false });
+    expect(commands.resolveCommand('acme:plain')).toMatchObject({
+      enabled: true,
+      active: false,
+      visible: true,
+    });
+    expect(commands.canExecute('acme:thrown')).toBe(false);
+    expect(await commands.execute('acme:thrown')).toMatchObject({ status: 'rejected' });
   });
 });
 

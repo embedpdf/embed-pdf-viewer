@@ -4,6 +4,10 @@
   const stage = useStage();
   const settings = useStageSettings();
   const state = useStageState();
+  // A number is every side, as this slider sets it; { top, right, bottom, left } is each side's.
+  const paddingSize = $derived(
+    typeof settings.padding === 'number' ? settings.padding : settings.padding.top,
+  );
   // A number grows with the zoom; { px } stays the same on screen.
   const onScreen = $derived(typeof settings.gap !== 'number');
   const gapSize = $derived(typeof settings.gap === 'number' ? settings.gap : settings.gap.px);
@@ -17,10 +21,10 @@
       type="range"
       min={0}
       max={64}
-      value={settings.padding}
+      value={paddingSize}
       oninput={(event) => stage.updateSettings({ padding: Number(event.currentTarget.value) })}
     />
-    <output class="value">{settings.padding}</output>
+    <output class="value">{paddingSize}</output>
   </label>
   <label class="label">
     Gap

@@ -5,8 +5,11 @@
  * socket is measured where it renders; the toolbar's measurement layer can't
  * hold it. It tells what's slotted where it sits (`item-context.ts`), and the
  * viewer's own components inside it learn the bar's edge from it, so their
- * menus open away from the bar.
+ * menus open away from the bar. A socket that grows fills the box the toolbar
+ * grows it in (`{ custom, grow: true }`), and reports its own length, without
+ * the growth.
  */
+import { ownLengthOf } from '@embedpdf/web';
 import { useLayoutEffect, useRef, type ReactNode } from 'react';
 
 import { useLayoutEnv } from '../config-context';
@@ -17,10 +20,14 @@ import { useSlottedEdges } from './slotted-edges';
 /** The socket's box: a row of what's slotted, at its own size along the bar. */
 const SOCKET_STYLE = { display: 'inline-flex', alignItems: 'center', flexShrink: 0 } as const;
 
+/** A growing socket's box: at least its own size, filling the box the toolbar grows. */
+const GROWING_SOCKET_STYLE = { ...SOCKET_STYLE, flexGrow: 1 } as const;
+
 export function ItemSocket({
   id,
   variant,
   orientation,
+  grow = false,
   measure,
   children,
 }: {
@@ -29,6 +36,8 @@ export function ItemSocket({
   /** The variant the toolbar picked, or null for an item without variants of its own. */
   variant: string | null;
   orientation: 'horizontal' | 'vertical';
+  /** Takes the room the bar has left: `{ custom, grow: true }`. */
+  grow?: boolean;
   /** Reports the socket's length along the bar. */
   measure: (length: number) => void;
   /** What shows while nothing is slotted. */
@@ -48,7 +57,10 @@ export function ItemSocket({
     const element = slot.current;
     if (!element) return;
     const side = orientation === 'vertical' ? 'height' : 'width';
-    const measureNow = () => report.current(element.getBoundingClientRect()[side]);
+    const measureNow = () =>
+      report.current(
+        grow ? ownLengthOf(element, orientation) : element.getBoundingClientRect()[side],
+      );
     // Measured before the first paint, unless what's slotted is about to draw its variant.
     if (!hasVariants) measureNow();
     const observer = new ResizeObserver(measureNow);
@@ -58,7 +70,7 @@ export function ItemSocket({
       observer.disconnect();
       resizes.current = null;
     };
-  }, [orientation, hasVariants]);
+  }, [orientation, hasVariants, grow]);
   // At another variant, what's slotted draws itself again first: its length is taken once the
   // browser has laid that out (an observer's first call), and counts for the new variant.
   useLayoutEffect(() => {
@@ -85,7 +97,7 @@ export function ItemSocket({
   }, [orientation, edge, variant, size, edges]);
 
   return (
-    <slot ref={slot} name={`item:${id}`} style={SOCKET_STYLE}>
+    <slot ref={slot} name={`item:${id}`} style={grow ? GROWING_SOCKET_STYLE : SOCKET_STYLE}>
       {children}
     </slot>
   );

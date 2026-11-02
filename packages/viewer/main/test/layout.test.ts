@@ -2,8 +2,9 @@
  * The `layout` config in a running viewer: edits of the default layout take
  * buttons out of one bar, a bar with a new mode adds its tab and shows while
  * the mode is open, a mode or a bar with nothing visible has no tab and draws
- * nothing, an open mode whose tab goes falls back to View, and the layout
- * function runs again when the viewer's size changes.
+ * nothing, an open mode whose tab goes falls back to View, removing a bar
+ * takes the bars that ride along it, and the layout function runs again when
+ * the viewer's size changes.
  *
  * Runs against the built snippet (`pnpm build` first).
  */
@@ -73,6 +74,8 @@ const PAGES = {
         .addBar('second', { place: { edge: 'top', after: 'main' }, center: [['acme:approve']] })
         .remove('tool:pann', { from: 'main' }),
   }`),
+  '/no-main.html': page(`{ layout: (layout) => layout.removeBar('main') }`),
+  '/removed-bars.html': page(`{ layout: (layout) => layout.removeBar(['measure', 'redact']) }`),
   '/sized.html': page(`{
     layout: (layout, env) => (env.size === 'compact' ? layout.place('main', 'bottom') : layout),
   }`),
@@ -203,7 +206,10 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('the layout config', () 
 
   it('falls back to View when the open mode is turned off with its feature', async () => {
     const tab = await open('/removed.html');
-    await tab.locator('embedpdf-viewer [part~="mode-tab"]', { hasText: 'Annotate' }).first().click();
+    await tab
+      .locator('embedpdf-viewer [part~="mode-tab"]', { hasText: 'Annotate' })
+      .first()
+      .click();
     await frames(tab);
     expect((await drawn(tab)).bars).toContain('annotate');
 
@@ -236,6 +242,31 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('the layout config', () 
       '[embedpdf] layout: remove: "tool:pann" is not in "main" (did you mean "tool:pan"?)',
     );
     await tab.close();
+  });
+
+  it('takes the mode bars with main, without a warning, and removes a list of bars', async () => {
+    const tab = await open('/no-main.html');
+    const { bars, tabs } = await drawn(tab);
+    expect(bars).not.toContain('main');
+    expect(tabs).toEqual([]);
+    // The mode bars rode along main: none is left to show when a mode opens.
+    await tab.evaluate(() =>
+      (window as unknown as { commands: { execute(id: string): Promise<unknown> } }).commands
+        .execute('mode:annotate')
+        .catch(() => {}),
+    );
+    await frames(tab);
+    expect((await drawn(tab)).bars).not.toContain('annotate');
+    const warnings = await tab.evaluate(() => (window as { warnings?: string[] }).warnings ?? []);
+    expect(warnings.filter((warning) => warning.includes('layout'))).toEqual([]);
+    await tab.close();
+
+    const list = await open('/removed-bars.html');
+    const { tabs: left } = await drawn(list);
+    expect(left).not.toContain('Measure');
+    expect(left).not.toContain('Redact');
+    expect(left).toContain('Annotate');
+    await list.close();
   });
 
   it('runs the layout function again when the viewer gets narrow', async () => {

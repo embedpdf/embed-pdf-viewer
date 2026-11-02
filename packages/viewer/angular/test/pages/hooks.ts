@@ -1,11 +1,16 @@
 /**
  * Headless services inside the viewer: a search box of the app's own, in a toolbar item, that
- * uses `inject(EpdfSearch)` from the app's own `@embedpdf/angular` against the viewer's kernel.
- * `hooks.test.ts` drives it.
+ * uses `inject(EpdfSearch)` from the app's own `@embedpdf/angular` against the viewer's kernel,
+ * and the metadata, outline, attachment and fonts services read beside it. `hooks.test.ts`
+ * drives it.
  */
 import { boot } from './boot';
 
 import { Component, inject } from '@angular/core';
+import { EpdfAttachment } from '@embedpdf/angular/attachment';
+import { EpdfFonts } from '@embedpdf/angular/fonts';
+import { EpdfMetadata } from '@embedpdf/angular/metadata';
+import { EpdfOutline } from '@embedpdf/angular/outline';
 import { EpdfSearch, SearchToken } from '@embedpdf/angular/search';
 import {
   EpdfPdfViewer,
@@ -48,6 +53,25 @@ export class AppSearch {
   }
 }
 
+/** The services of the plugins that read a document on demand, from inside the viewer. */
+@Component({
+  selector: 'app-document-reads',
+  template: `
+    <span hidden>
+      <output data-check="metadata">{{ metadata.status() }}</output>
+      <output data-check="outline">{{ outline.status() }}</output>
+      <output data-check="attachment">{{ attachment.status() }}</output>
+      <output data-check="fonts">{{ fonts.status() }}</output>
+    </span>
+  `,
+})
+export class AppDocumentReads {
+  protected readonly metadata = inject(EpdfMetadata);
+  protected readonly outline = inject(EpdfOutline);
+  protected readonly attachment = inject(EpdfAttachment);
+  protected readonly fonts = inject(EpdfFonts);
+}
+
 const layout: LayoutFunction = (base) =>
   base.add(
     { custom: 'app-search', command: 'panel:search', importance: 5 },
@@ -56,7 +80,7 @@ const layout: LayoutFunction = (base) =>
 
 @Component({
   selector: 'app-root',
-  imports: [EpdfPdfViewer, EpdfToolbarItem, AppSearch],
+  imports: [EpdfPdfViewer, EpdfToolbarItem, AppSearch, AppDocumentReads],
   template: `
     <epdf-pdf-viewer
       src="/sample.pdf"
@@ -64,7 +88,7 @@ const layout: LayoutFunction = (base) =>
       style="height: 100vh"
       (ready)="ready($event)"
     >
-      <ng-template epdfToolbarItem="app-search"><app-search /></ng-template>
+      <ng-template epdfToolbarItem="app-search"><app-search /><app-document-reads /></ng-template>
     </epdf-pdf-viewer>
   `,
 })

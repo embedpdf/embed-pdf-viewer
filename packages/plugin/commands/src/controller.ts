@@ -184,19 +184,20 @@ export function createCommandsController(ctx: PluginContext<void, CommandsSettin
     },
   );
 
-  // Derivations run against live state; one that throws (it needs a document
-  // and none is open, say) falls back to a safe default, so the button renders
-  // disabled instead of breaking.
+  // Derivations run against live state: without one, the command is what
+  // `absent` says; one that throws (it needs a document and none is open, say)
+  // says no, so the button renders disabled, not pressed or hidden instead of
+  // breaking.
   const derive = (
     derivation: ((context: CommandContext) => boolean) | undefined,
     context: CommandContext,
-    fallback: boolean,
+    absent: boolean,
   ): boolean => {
-    if (!derivation) return fallback;
+    if (!derivation) return absent;
     try {
       return derivation(context);
     } catch {
-      return fallback;
+      return false;
     }
   };
   const deriveAccent = (

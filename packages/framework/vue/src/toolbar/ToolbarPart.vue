@@ -75,6 +75,7 @@ const measure = (length: number) => {
     :name="part.name"
     :measure-key="part.measureKey"
     :orientation="orientation"
+    :grow="part.grow"
     @length="(key, length) => emit('length', key, length)"
   >
     <slot

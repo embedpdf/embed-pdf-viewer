@@ -422,8 +422,8 @@ describe('icons', () => {
   it('are every one the page lists, and every one a built-in command names', () => {
     const listed = COMMANDS_PAGE.split("### The viewer's icons")[1]!.split('\n### ')[0]!;
     const names = [...listed.matchAll(/`([a-zA-Z0-9]+)`/g)].map((match) => match[1]!);
-    expect(names.length).toBeGreaterThan(40);
     expect(names.filter((name) => !hasIcon(name))).toEqual([]);
+    expect([...names].sort()).toEqual(Object.keys(ICON_PATHS).sort());
     expect(
       defaultCommands.filter((command) => command.icon && !hasIcon(command.icon)).map((c) => c.id),
     ).toEqual([]);

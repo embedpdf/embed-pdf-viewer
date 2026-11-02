@@ -14,11 +14,15 @@
  * Which panels are open is each document's own (the shell plugin keeps them
  * per document), so switching documents brings back that document's panels.
  * A panel whose button no longer shows (its feature turned off, or not
- * allowed) closes.
+ * allowed) closes. A side with nothing open opens what the layout says opens
+ * by itself where it docks (`panelOpeningOnSide`): a panel that can't close,
+ * and in a new document a panel that opens from the start.
+ *
+ * The title in a panel's header is its button's label, its `panel:<id>`
+ * command's, so one string or one `title` renames both.
  */
 import { panelCommandOf } from '@embedpdf/core-ui';
 import { useCommands } from '@embedpdf/react/commands';
-import { useT } from '@embedpdf/react/i18n';
 import {
   useDocumentId,
   useKernelValue,
@@ -29,13 +33,13 @@ import { SearchToken } from '@embedpdf/react/search';
 import { ShellToken, useShellEvent } from '@embedpdf/react/shell';
 import { Fragment, useLayoutEffect, useMemo, type ReactNode } from 'react';
 
-import { panelsOnSide } from '../config/panels';
-import { useResolvedLayout } from '../config-context';
+import { panelOpeningOnSide, panelsOnSide } from '../config/panels';
+import { DEFAULT_ENV, useResolvedLayout } from '../config-context';
 import { PanelBars } from '../places';
 import { lazyComponent } from './lazy';
 import { OutlineFilterScope } from './outline-filter';
 import { PanelBar, PanelFrame } from './panel-frame';
-import type { PanelSide } from './panel-layout';
+import { docksAt, type PanelSide } from './panel-layout';
 import { PanelSwitcher } from './panel-switcher';
 import { ThumbnailList } from './thumbnail-list';
 
@@ -127,26 +131,46 @@ const NONE: readonly string[] = [];
 const sameStrings = (left: readonly string[], right: readonly string[]): boolean =>
   left.length === right.length && left.every((value, i) => value === right[i]);
 
-/** One side's panels: which show (their buttons do), which are turned off, which are open. */
+/**
+ * One side's panels: which show (their buttons do), which are turned off, which are open, and
+ * which would open as a bar now ({@link BuiltInContent.bar}).
+ */
 interface SideState {
   readonly shown: readonly string[];
   readonly off: readonly string[];
   readonly open: readonly string[];
+  readonly bars: readonly string[];
 }
 
 const sameSide = (left: SideState, right: SideState): boolean =>
   sameStrings(left.shown, right.shown) &&
   sameStrings(left.off, right.off) &&
-  sameStrings(left.open, right.open);
+  sameStrings(left.open, right.open) &&
+  sameStrings(left.bars, right.bars);
+
+/**
+ * Each document's panels that opened from the start or had their turn to, per side, by the
+ * document's shell: gone with the document.
+ */
+const startedPanels = new WeakMap<object, Record<PanelSide, Set<string>>>();
+
+function startedPanelsOf(shell: object, side: PanelSide): Set<string> {
+  let sides = startedPanels.get(shell);
+  if (!sides) {
+    sides = { start: new Set(), end: new Set() };
+    startedPanels.set(shell, sides);
+  }
+  return sides[side];
+}
 
 /** The panel open on one side of the pages, if any, of the layout's panels on that side. */
 export function SidePanel({ side }: { side: PanelSide }) {
-  const { data } = useResolvedLayout();
+  const { data, env } = useResolvedLayout();
   const commands = useCommands();
   const shell = useOptionalCapability(ShellToken);
   const documentId = useDocumentId();
   const ids = useMemo(() => panelsOnSide(data, side), [data, side]);
-  const { shown, off, open } = useKernelValue((): SideState => {
+  const { shown, off, open, bars } = useKernelValue((kernel): SideState => {
     const visibleOf = (id: string) =>
       commands.resolveCommand(panelCommandOf(id), documentId ?? undefined)?.visible;
     return {
@@ -154,6 +178,7 @@ export function SidePanel({ side }: { side: PanelSide }) {
       // A panel whose command isn't registered is neither: it isn't drawn, and it isn't closed.
       off: ids.filter((id) => visibleOf(id) === false),
       open: shell ? ids.filter((id) => shell.isOpen(id)) : NONE,
+      bars: ids.filter((id) => BUILT_IN_CONTENT.get(id)?.bar?.when(kernel, documentId) === true),
     };
   }, sameSide);
 
@@ -167,14 +192,31 @@ export function SidePanel({ side }: { side: PanelSide }) {
   );
 
   // The first open panel that shows is drawn. A turned-off one closes, and so does any other
-  // open on this side (opened while another document showed).
+  // open on this side (opened while another document showed). With none open, the side opens
+  // what opens by itself where it docks; before the viewer is measured, where that is isn't known.
   const current = open.find((id) => shown.includes(id)) ?? null;
   useLayoutEffect(() => {
     if (!shell) return;
     for (const id of open) {
       if (id !== current && (current !== null || off.includes(id))) shell.close(id);
     }
-  }, [shell, open, off, current]);
+    if (env === DEFAULT_ENV) return;
+    const panels = data.panels ?? {};
+    const started = startedPanelsOf(shell, side);
+    const opening = panelOpeningOnSide(
+      panels,
+      {
+        ids,
+        shown,
+        current,
+        // A panel drawn as a bar doesn't dock, whatever its `present` says.
+        docks: (id) => docksAt(env.size, panels[id]?.present) && !bars.includes(id),
+      },
+      started,
+    );
+    for (const id of opening.started) started.add(id);
+    if (opening.open !== null) shell.open(opening.open);
+  }, [shell, side, data, env, ids, shown, open, off, bars, current]);
 
   if (current === null) return null;
   return <OpenPanel key={current} id={current} side={side} siblings={shown} />;
@@ -190,14 +232,18 @@ function OpenPanel({
   side: PanelSide;
   siblings: readonly string[];
 }) {
-  const t = useT();
   const panel = useResolvedLayout().data.panels?.[id];
+  const commands = useCommands();
   const shell = useOptionalCapability(ShellToken);
   const documentId = useDocumentId();
   const content = BUILT_IN_CONTENT.get(id);
   const bar = useKernelValue((kernel) => content?.bar?.when(kernel, documentId) === true);
+  // Its button's label: the string under `panel:<id>`, else the layout's title, else the built-in.
+  const label = useKernelValue(
+    () => commands.resolveCommand(panelCommandOf(id), documentId ?? undefined)?.label ?? null,
+  );
   if (!panel) return null;
-  const title = panel.title ?? (panel.titleKey !== undefined ? t(panel.titleKey) : id);
+  const title = label ?? panel.title ?? id;
   if (bar) {
     return (
       <PanelBar id={id} side={side} title={title} onClose={() => shell?.close(id)}>
@@ -214,6 +260,7 @@ function OpenPanel({
         present={panel.present}
         width={panel.width}
         resizable={panel.resizable}
+        closable={panel.closable !== false}
         title={title}
         header={
           siblings.length > 1 ? (

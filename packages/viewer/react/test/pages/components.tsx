@@ -1,13 +1,14 @@
 /**
  * Your own components in <PDFViewer>: `ToolbarItem`, `Panel` and `Region` put them in the
  * viewer, `useToolbarItem()` says where an item sits (and follows the bar to a rail when the
- * viewer narrows), and `Button`, `Menu` and `MenuItem` are the viewer's own.
+ * viewer narrows), and `Button`, `Menu`, `MenuItem` and `Icon` are the viewer's own, `active` too.
  * `components.test.ts` drives it.
  */
 import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   Button,
+  Icon,
   Menu,
   MenuItem,
   PDFViewer,
@@ -71,6 +72,7 @@ const layout: LayoutFunction = (base, env) => {
     )
     .add({ custom: 'zoom-in' }, { to: 'main', section: 'start' })
     .add({ custom: 'share' }, { to: 'main', section: 'start' })
+    .add({ custom: 'toggle' }, { to: 'main', section: 'end' })
     .addPanel('notes', { side: 'end', title: 'Notes', icon: 'book' })
     .add('panel:notes', { to: 'main', section: 'end' });
   return env.width < 900 ? placed.place('main', 'start') : placed;
@@ -78,6 +80,7 @@ const layout: LayoutFunction = (base, env) => {
 
 function App() {
   const [width, setWidth] = useState('100%');
+  const [night, setNight] = useState(false);
   record.setWidth = setWidth;
   return (
     <PDFViewer
@@ -108,7 +111,12 @@ function App() {
           <MenuItem icon="message" onSelect={() => record.picked.push('email')}>
             Email a link
           </MenuItem>
+          <MenuItem active>Show notes</MenuItem>
         </Menu>
+      </ToolbarItem>
+      <ToolbarItem id="toggle">
+        <Button icon="eye" label="Night" active={night} onClick={() => setNight(!night)} />
+        <Icon name="check" size={16} label="Saved" />
       </ToolbarItem>
       <Panel id="notes">
         <textarea data-check="notes" placeholder="Your notes" />

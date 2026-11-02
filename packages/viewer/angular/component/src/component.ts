@@ -167,6 +167,10 @@ export abstract class EpdfPdfViewerBase implements EpdfPdfViewerRef, OnInit {
   /** Every feature that changes the document off, or all but `except`. Follows its input. */
   readonly readOnly: ConfigInput<'readOnly'> = input<ElementConfig['readOnly']>();
   readonly layout: ConfigInput<'layout'> = input<ElementConfig['layout']>();
+  /** The size the layout is for at every width, or `'auto'` to measure. Read once. */
+  readonly size: ConfigInput<'size'> = input<ElementConfig['size']>();
+  /** Whether the viewer is laid out for a finger, or `'auto'` to ask the browser. Read once. */
+  readonly touch: ConfigInput<'touch'> = input<ElementConfig['touch']>();
   readonly commands: ConfigInput<'commands'> = input<ElementConfig['commands']>();
   /** Your app's state, which your commands read. Follows its input. */
   readonly appState: ConfigInput<'appState'> = input<ElementConfig['appState']>();
@@ -176,6 +180,9 @@ export abstract class EpdfPdfViewerBase implements EpdfPdfViewerRef, OnInit {
   readonly plugins: ConfigInput<'plugins'> = input<ElementConfig['plugins']>();
   /** Your fonts, beyond the standard 14, registered on a local engine and offered for text. Read once. */
   readonly fonts: ConfigInput<'fonts'> = input<ElementConfig['fonts']>();
+  /** `false` leaves the page without asking, unsaved changes or not. Read once. */
+  readonly warnBeforeLeaving: ConfigInput<'warnBeforeLeaving'> =
+    input<ElementConfig['warnBeforeLeaving']>();
 
   // ── what the viewer tells ──────────────────────────────────────────────────
 
@@ -222,6 +229,8 @@ export abstract class EpdfPdfViewerBase implements EpdfPdfViewerRef, OnInit {
       disable: this.disable(),
       readOnly: this.readOnly(),
       layout: this.layout(),
+      size: this.size(),
+      touch: this.touch(),
       commands: this.commands(),
       appState: this.appState(),
       icons: this.icons(),
@@ -229,6 +238,7 @@ export abstract class EpdfPdfViewerBase implements EpdfPdfViewerRef, OnInit {
       notAllowed: this.notAllowed(),
       plugins: this.plugins(),
       fonts: this.fonts(),
+      warnBeforeLeaving: this.warnBeforeLeaving(),
     }),
   );
 

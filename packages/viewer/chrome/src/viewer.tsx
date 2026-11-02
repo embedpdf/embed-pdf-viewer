@@ -54,7 +54,7 @@ import { CommandsToken, commandsPlugin } from '@embedpdf/react/commands';
 import type { NotAllowedMode } from '@embedpdf/react/commands';
 import { historyPlugin } from '@embedpdf/react/history';
 import { shellPlugin } from '@embedpdf/react/shell';
-import type { LayoutOption } from '@embedpdf/core-ui';
+import type { LayoutOption, ViewerSize } from '@embedpdf/core-ui';
 import { ThumbsStageToken } from './config/stage';
 import { defaultCommands, toolCommandsFor } from './config/commands';
 import { resolveViewerCommands, type CommandDef } from './config/viewer-commands';
@@ -152,6 +152,18 @@ export interface ViewerCustomization<AppState = any> {
    */
   layout?: LayoutOption;
   /**
+   * The size the layout is for at every width, as `env.size` then says: `'compact'` (a phone's
+   * layout), `'medium'` or `'expanded'`. `'auto'` (default) sizes the viewer by its own width.
+   * Read once.
+   */
+  size?: 'auto' | ViewerSize;
+  /**
+   * Whether the viewer is laid out for a finger, as `env.touch` then says: 44 px buttons and menu
+   * rows for every pointer (`true`), or for none (`false`). `'auto'` (default) asks whether the
+   * main pointer is a finger. Read once.
+   */
+  touch?: 'auto' | boolean;
+  /**
    * Each plugin's settings, by the plugin's name, as its page in the headless docs lists them
    * (`stage: { spread: 'odd' }`), over the viewer's own; and a plugin of your own as its
    * definition (`analytics: analyticsPlugin()`), which `viewer.get('analytics')` then finds.
@@ -172,6 +184,12 @@ export interface ViewerCustomization<AppState = any> {
    * a warning. Read once.
    */
   fonts?: readonly ViewerFont[];
+  /**
+   * Whether leaving the page asks first while a document has unsaved changes (changed since it
+   * opened or was last downloaded, by the user or the app's code). Default `true`; `false` leaves
+   * without asking. Closing a document's tab asks either way. Read once.
+   */
+  warnBeforeLeaving?: boolean;
   /** Light/dark preference (string shorthand), or the full theme config: the
    *  accent and the other tokens. Tokens are applied by the delivery (the
    *  custom element adopts them into its shadow root); direct
@@ -179,8 +197,9 @@ export interface ViewerCustomization<AppState = any> {
    *  instead. Follows its prop. */
   theme?: ThemePreference | ThemeConfig;
   /**
-   * Called with the `viewer` once it's live, before any document has opened: capabilities
-   * resolve from then on, and document-scoped calls wait for their document. Read once.
+   * Called with the `viewer` once it's live, before any document has opened: the viewer's own
+   * plugins (`documents`, `commands`) are there from then on, a document's plugins once it has
+   * opened (`documents.onOpened`; `watch()` waits for them). Read once.
    */
   onReady?: (viewer: Viewer) => void;
   /**
@@ -364,8 +383,11 @@ export function FullViewer({
   identity,
   notAllowed,
   layout,
+  size,
+  touch,
   plugins: pluginsConfig,
   fonts,
+  warnBeforeLeaving,
   theme,
   themeTarget,
   components,
@@ -409,10 +431,13 @@ export function FullViewer({
       viewerCommands,
       // Structure: resolved at the viewer's env by the shell's layout root.
       layout,
+      size,
+      touch,
       icons: icons ?? {},
       stamp: pluginsRead.viewer.stamp,
       signature: pluginsRead.viewer.signature,
       fonts: fonts ?? [],
+      warnBeforeLeaving: warnBeforeLeaving !== false,
       onPanelResize,
       i18n: { locales, loaders, codes, initial: localeCodeOf(locale, codes) },
       plugins: pluginsRead,

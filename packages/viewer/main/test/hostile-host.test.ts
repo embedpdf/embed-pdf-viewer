@@ -129,7 +129,7 @@ const toolbarOf = (page: Page) =>
   page.evaluate(() => {
     const toolbar = document
       .querySelector('embedpdf-viewer')!
-      .shadowRoot!.querySelector<HTMLElement>('[part="toolbar"]')!;
+      .shadowRoot!.querySelector<HTMLElement>('[part~="toolbar"]')!;
     const style = getComputedStyle(toolbar);
     const pressed = toolbar.querySelector('[part~="toolbar-button-active"]')!;
     const shadows = getComputedStyle(pressed).boxShadow;
@@ -194,7 +194,7 @@ describe('the viewer on a hostile page', () => {
   it('keeps an open menu and its scrim inside its own box, and closes it on a press on the page', async () => {
     for (const { page } of [neutral, hostile]) {
       await page.bringToFront();
-      await page.locator('[part="toolbar"] button[aria-haspopup="menu"]').first().click();
+      await page.locator('[part~="toolbar"] button[aria-haspopup="menu"]').first().click();
       await frames(page);
       expect(await menuOpen(page)).toBe(true);
 

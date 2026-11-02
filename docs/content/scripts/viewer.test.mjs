@@ -80,6 +80,30 @@ export const config = { notAKeyEither: 1 } satisfies ViewerConfig;
 </Fw>
 `;
 
+/**
+ * A page that sets the element's config at its script's top level, after naming the element: the
+ * config's keys keep their types (`'light'` is a theme), as in a function. Its own items show
+ * where its layout makes room for them, the viewer's own where the viewer's does.
+ */
+const CONFIG_PAGE = `<embedpdf-viewer id="viewer" src="/report.pdf">
+  <span slot="item:status">Draft</span>
+  <span slot="item:nowhere">Not in the layout</span>
+  <span slot="item:page-number">The viewer's own</span>
+</embedpdf-viewer>
+
+<script type="module">
+  import 'https://cdn.jsdelivr.net/npm/@embedpdf/viewer@3/dist/embedpdf.js';
+
+  const viewer = document.getElementById('viewer');
+  viewer.config = { theme: 'light', layout: (layout) => layout.add({ custom: 'status' }, { to: 'main' }) };
+  viewer.config = { theme: 'not-a-theme' };
+</script>
+
+<script type="module">
+  export const notOnAPage = true;
+</script>
+`;
+
 /** cloudpdf.com's copy of a plain-HTML page: the cloud door's script, and a cloud document. */
 const CLOUD_PAGE = `<embedpdf-viewer id="viewer" src="/report.pdf" style="height: 100vh"></embedpdf-viewer>
 
@@ -103,14 +127,22 @@ const snippet = {
   shownAs: 'viewer/test/page.html',
 };
 
+const configSnippet = {
+  file: 'viewer/test/config.vanilla.html',
+  name: 'viewer/test/config',
+  framework: 'vanilla',
+  shownAs: 'viewer/test/config.html',
+};
+
 before(async () => {
   run = runDirectory('embedpdf-viewer-test');
   const snippets = path.join(run, 'snippets');
   fs.mkdirSync(path.join(snippets, 'viewer/test'), { recursive: true });
   fs.writeFileSync(path.join(snippets, 'viewer/test/page.vanilla.html'), PAGE);
+  fs.writeFileSync(path.join(snippets, 'viewer/test/config.vanilla.html'), CONFIG_PAGE);
   page = readPage(MDX, VIEWER_INTEGRATIONS, 'viewer/test.mdx');
   const result = await checkVanilla(
-    [snippet],
+    [snippet, configSnippet],
     new Map([['viewer/test', page]]),
     path.join(run, 'vanilla'),
     snippets,
@@ -159,6 +191,29 @@ describe('a plain-HTML snippet', () => {
     assert.deepEqual(
       (errors.get(file) ?? []).map((error) => error.line).sort((a, b) => a - b),
       [3, 4, 13, 16],
+    );
+  });
+});
+
+describe("a plain-HTML snippet's script, run as the demo runs it", () => {
+  const file = 'viewer/test/config.vanilla.html';
+
+  it('types a config set at the top level as the config, at the page’s line', () => {
+    assert.deepEqual(on(file, 11), []);
+    assert.match(on(file, 12)[0]?.message ?? '', /not-a-theme/);
+  });
+
+  it('wants room in the layout for an item of its own', () => {
+    assert.deepEqual(on(file, 2), []);
+    assert.match(on(file, 3)[0]?.message ?? '', /item:nowhere" shows nothing.*custom: 'nowhere'/);
+    assert.deepEqual(on(file, 4), []);
+  });
+
+  it('reports what a page’s script may not do, and nothing else', () => {
+    assert.match(on(file, 16)[0]?.message ?? '', /exports nothing/);
+    assert.deepEqual(
+      (errors.get(file) ?? []).map((error) => error.line).sort((a, b) => a - b),
+      [3, 12, 16],
     );
   });
 });

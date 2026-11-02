@@ -3,20 +3,23 @@
   Inside a shadow root (a custom element that renders the toolbar) the browser projects the
   host's same-named children into it; anywhere else it shows its own content, the item's
   command. It is measured where it renders, never in the measurement layer: only the first
-  <slot> of a name gets the projected children.
+  <slot> of a name gets the projected children. One that grows fills its item's box, and reports
+  its own length without the growth.
 -->
 <script lang="ts">
   import { untrack, type Snippet } from 'svelte';
-  import { observeLength, type Orientation } from '@embedpdf/web';
+  import { observeLength, observeOwnLength, type Orientation } from '@embedpdf/web';
 
   let {
     name,
     orientation,
+    grow,
     onLength,
     children,
   }: {
     name: string;
     orientation: Orientation;
+    grow: boolean;
     onLength: (length: number) => void;
     children?: Snippet;
   } = $props();
@@ -27,8 +30,9 @@
   $effect(() => {
     const element = socket;
     const along = orientation;
+    const observe = grow ? observeOwnLength : observeLength;
     if (!element) return;
-    return untrack(() => observeLength(element, along, (length) => onLength(length)));
+    return untrack(() => observe(element, along, (length) => onLength(length)));
   });
 </script>
 
@@ -37,7 +41,7 @@
   this={'slot'}
   bind:this={socket}
   {name}
-  style="display: inline-flex; align-items: center; flex-shrink: 0"
+  style="display: inline-flex; align-items: center; flex-shrink: 0; flex-grow: {grow ? 1 : 0}"
 >
   {@render children?.()}
 </svelte:element>

@@ -62,6 +62,8 @@ Everything the viewer can do is one config object. In a framework, every key is 
 | `documents` | Several documents, shown as tabs | [Documents](documents#several-documents) |
 | `fetch` | Your own `fetch` for documents at a URL, to add headers or cookies | [Documents](documents#files-that-need-a-sign-in) |
 | `layout` | Where every toolbar, button, menu and panel goes | [Layout](customize/layout) |
+| `size` | `'auto'` (default), or the layout of one size at every width: `'compact'`, `'medium'` or `'expanded'` | [Small screens](customize/small-screens#one-size-at-every-width) |
+| `touch` | `'auto'` (default), or `true` or `false`: a finger's 44 px buttons on any pointer, or on none | [Small screens](customize/small-screens#touch) |
 | `commands` | Your own actions | [Buttons & commands](customize/commands) |
 | `appState` | Your app's state, which your commands read | [Buttons & commands](customize/commands#your-apps-state) |
 | `icons` | Your own icons | [Buttons & commands](customize/commands#icons) |
@@ -75,6 +77,7 @@ Everything the viewer can do is one config object. In a framework, every key is 
 | `notAllowed` | `'hide'` (default) or `'disable'` what the scope doesn't allow | [Turn features off](features/turning-off#what-a-user-may-do) |
 | `plugins` | The settings of each feature's plugin | [Plugins](code/plugins#settings) |
 | `fonts` | Your fonts, beyond the standard PDF fonts, for the text people write | [Fonts](features/fonts) |
+| `warnBeforeLeaving` | `true` (default), or `false` to leave the page without asking, unsaved changes or not | [Documents](documents#warn-before-changes-are-lost) |
 | `engine` | Where the engine's files come from, or another engine | [Self-hosting](self-hosting) |
 | `onReady` | Called with the `viewer` once it's live | [The viewer in code](code/viewer) |
 | `onDocumentChange` | Called with the document that's showing: the first one, each one the user switches to, and `null` after the last one closes | [Documents](documents#several-documents) |
@@ -89,6 +92,8 @@ Everything the viewer can do is one config object. In a framework, every key is 
 | `src` | One document: `{ token }`, `{ id }` or `{ grant }` | [Documents](documents) |
 | `documents` | Several documents, shown as tabs | [Documents](documents#several-documents) |
 | `layout` | Where every toolbar, button, menu and panel goes | [Layout](customize/layout) |
+| `size` | `'auto'` (default), or the layout of one size at every width: `'compact'`, `'medium'` or `'expanded'` | [Small screens](customize/small-screens#one-size-at-every-width) |
+| `touch` | `'auto'` (default), or `true` or `false`: a finger's 44 px buttons on any pointer, or on none | [Small screens](customize/small-screens#touch) |
 | `commands` | Your own actions | [Buttons & commands](customize/commands) |
 | `appState` | Your app's state, which your commands read | [Buttons & commands](customize/commands#your-apps-state) |
 | `icons` | Your own icons | [Buttons & commands](customize/commands#icons) |
@@ -173,7 +178,24 @@ app's state as it is now.
 
 </Engine>
 
-Any plugin's settings change through the `viewer` (see [The viewer in code](code/viewer)).
+<Fw only="vanilla">
+
+On a plain HTML page, each of these keys is a property of the element too. Set one, and that key
+changes in place:
+
+```js
+const element = document.querySelector('embedpdf-viewer');
+element.theme = 'dark';
+element.locale = 'de';
+element.readOnly = true;
+```
+
+`element.config = { … }` replaces the whole config, and with it what the properties set: set them
+again after it, or put them in it. What the element's attributes say stays.
+
+</Fw>
+
+Any plugin's settings change through the `viewer` (see [Plugins](code/plugins#settings)).
 Everything else is read once, when the viewer starts. To change it, mount a new viewer:
 
 <Snippet name="viewer/setup/remount" />

@@ -696,8 +696,8 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('menus', () => {
     const print = menu!.rows.find((row) => row.label === 'Print')!;
     for (const row of [download, print]) {
       expect(row.disabled).toBe(true);
-      expect(row.title).toBeTruthy();
-      expect(row.title).not.toBe(row.label);
+      // Why, in the viewer's own tooltip beside the row (buttons.test.ts), not the browser's.
+      expect(row.title).toBeNull();
     }
     // Opening another file needs nothing of this document's scope.
     expect(await focused(tab)).toBe('Open');

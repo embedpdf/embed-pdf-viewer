@@ -124,8 +124,8 @@ export type PDFViewerComponent<Props> = new (
 
 /**
  * Every config key, as a prop (TypeScript keeps the list complete). `null` takes any value, which
- * the viewer checks itself; `readOnly` written without a value is `true`, as for any boolean prop
- * (`<PDFViewer read-only />`).
+ * the viewer checks itself; `readOnly` and `warnBeforeLeaving` written without a value are `true`,
+ * as for any boolean prop (`<PDFViewer read-only />`).
  */
 const CONFIG_PROPS = {
   src: null,
@@ -142,8 +142,11 @@ const CONFIG_PROPS = {
   identity: null,
   notAllowed: null,
   layout: null,
+  size: null,
+  touch: null,
   plugins: null,
   fonts: null,
+  warnBeforeLeaving: { type: Boolean, default: undefined },
   theme: null,
   fetch: null,
 } satisfies Record<keyof PDFViewerImplProps, unknown>;

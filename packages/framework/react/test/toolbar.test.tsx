@@ -185,6 +185,80 @@ describe('<Toolbar>', () => {
     expect(sockets[0]!.textContent).toBe('Go to');
   });
 
+  /** The live row's sections, in order: the toolbar's children before the measurement layer. */
+  const sections = () =>
+    [...document.querySelector('[role="toolbar"]')!.children].filter(
+      (child) => child.getAttribute('aria-hidden') !== 'true',
+    ) as HTMLElement[];
+
+  /** A title of your own that takes the rest of the bar, before the commands at its end. */
+  const growing: BarSchema = {
+    id: 'main',
+    sections: {
+      start: [group('title', [custom('title', undefined, { grow: true })])],
+      end: [group('b', ['one', 'two', 'three'])],
+    },
+  };
+
+  it('keeps each section at its items’ length, and the center balanced, while nothing grows', async () => {
+    await mountToolbar(<Toolbar bar={bar} renderCommand={renderCommand} />);
+    const [start, center, end] = sections();
+    expect([start, center, end].map((section) => section!.style.flex)).toEqual([
+      '0 0 auto',
+      '0 0 auto',
+      '0 0 auto',
+    ]);
+    expect(center!.style.marginLeft).toBe('auto');
+    expect(center!.style.marginRight).toBe('auto');
+    expect(
+      live('[data-epdf-toolbar-item]').every((item) => item.style.display === 'contents'),
+    ).toBe(true);
+  });
+
+  it('grows an item with grow and its section into the room left, a gap before the next section', async () => {
+    await mountToolbar(
+      <Toolbar
+        bar={growing}
+        renderCommand={renderCommand}
+        renderCustom={{ title: () => <input className="title" style={{ flex: 1 }} /> }}
+      />,
+    );
+    const [start, center, end] = sections();
+    expect(start!.style.flex).toBe('1 0 auto');
+    expect(center!.style.marginLeft).toBe('');
+    expect(end!.getAttribute('style')).toContain('margin-inline-start: 8px');
+    const box = live('.title')[0]!.parentElement!;
+    expect(box.hasAttribute('data-epdf-toolbar-item')).toBe(true);
+    expect(box.style.display).toBe('flex');
+    expect(box.style.flex).toBe('1 0 auto');
+  });
+
+  it('counts a socket that grows at its own length, not the room it grew into', async () => {
+    // Grown, the socket would take the whole toolbar; its own length is its text's.
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: Element,
+    ) {
+      const grown = this instanceof HTMLSlotElement && this.style.flexGrow === '1';
+      const width = grown ? 990 : (this.textContent ?? '').trim().length * 10;
+      return {
+        width,
+        height: 20,
+        x: 0,
+        y: 0,
+        top: 0,
+        left: 0,
+        right: width,
+        bottom: 20,
+      } as DOMRect;
+    });
+    room = 200;
+    await mountToolbar(<Toolbar bar={growing} renderCommand={renderCommand} />);
+    const socket = document.querySelector<HTMLSlotElement>('slot[name="title"]')!;
+    expect(socket.style.flexGrow).toBe('1');
+    expect(live('button.cmd').map((button) => button.textContent)).toEqual(['One', 'Two', 'Three']);
+    expect(live('button[title="More"]')).toHaveLength(0);
+  });
+
   it('draws the default parts without render props', async () => {
     await mountToolbar(<Toolbar bar={bar} />);
     expect(live('button').map((button) => button.textContent)).toEqual(['One', 'Two', 'Three']);

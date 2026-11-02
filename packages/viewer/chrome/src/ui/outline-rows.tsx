@@ -30,6 +30,7 @@ import {
   type OutlineDrop,
 } from './outline-tree';
 import { CommandButton } from './toolbar';
+import { useTooltip } from './tooltip';
 
 /** Rows drawn past each edge of the view, so a scroll shows no gap before the next frame. */
 const OVERSCAN = 8;
@@ -443,6 +444,11 @@ function Row(props: RowProps) {
   const { row, outline } = props;
   const { item, depth, hasChildren, expanded } = row;
   const menuButton = useRef<HTMLSpanElement>(null);
+  // A title cut short shows whole in its tooltip.
+  const titleTip = useTooltip(
+    { label: item.title || props.untitled, labelShown: true },
+    { clipped: (title) => title },
+  );
   // An item that goes nowhere and runs nothing is drawn faint: a heading of the outline.
   const inert = !item.target && !item.action;
   const color = readableColor(item.color, props.mode);
@@ -511,18 +517,21 @@ function Row(props: RowProps) {
           }}
         />
       ) : (
-        <span
-          className={`min-w-0 flex-1 truncate ${inert ? 'opacity-60' : ''}`}
-          style={{
-            fontSize: TEXT_PX,
-            color: color ?? undefined,
-            fontWeight: item.bold ? 600 : undefined,
-            fontStyle: item.italic ? 'italic' : undefined,
-          }}
-          title={item.title || props.untitled}
-        >
-          {item.title || props.untitled}
-        </span>
+        <>
+          <span
+            {...titleTip.trigger}
+            className={`min-w-0 flex-1 truncate ${inert ? 'opacity-60' : ''}`}
+            style={{
+              fontSize: TEXT_PX,
+              color: color ?? undefined,
+              fontWeight: item.bold ? 600 : undefined,
+              fontStyle: item.italic ? 'italic' : undefined,
+            }}
+          >
+            {item.title || props.untitled}
+          </span>
+          {titleTip.element}
+        </>
       )}
       {props.editable && !props.renaming && (
         <span

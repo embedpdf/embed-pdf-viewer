@@ -42,6 +42,7 @@ import { PageLoading } from './page-loading';
 import { useCloseOnPick } from './panel-frame';
 import { slotMove, thumbDropAt, columnsOf, type ThumbBox, type ThumbDrop } from './thumbnail-drop';
 import { CommandButton } from './toolbar';
+import { TooltipButton } from './tooltip';
 import { isPdfFile, mayCarryPdf } from '../config/open-files';
 import type { PageInsertArgs } from '../config/page-commands';
 import { ThumbsStageToken } from '../config/stage';
@@ -485,15 +486,13 @@ export function ThumbnailList() {
               <div className="group" style={{ position: 'absolute', inset: 0 }}>
                 {/* BOX-SPACE chrome: the click target and its border hug the page box; the
                     number sits in the reserved bottom band. Neither rotates. */}
-                <button
-                  type="button"
+                <TooltipButton
+                  label={label}
                   id={`${idPrefix}-${number}`}
                   role="option"
                   aria-selected={editable ? isSelected : isCurrent}
                   aria-current={isCurrent ? 'page' : undefined}
-                  aria-label={label}
                   tabIndex={-1}
-                  title={label}
                   onClick={(event) => onPageClick(page.ref, page.pageIndex, event)}
                   onPointerDown={(event) => onPagePointerDown(page.ref, event)}
                   onContextMenu={(event) => {

@@ -9,7 +9,7 @@ export type { ViewerInside } from './component';
 export { EpdfPdfViewerRef } from './viewer-ref';
 export { EpdfPanel, EpdfRegion, EpdfToolbarItem, EpdfToolbarItemContext } from './slots';
 export type { RegionName } from './slots';
-export { EpdfButton, EpdfMenu, EpdfMenuItem } from './viewer-components';
+export { EpdfButton, EpdfIcon, EpdfMenu, EpdfMenuItem } from './viewer-components';
 /**
  * A command as a button needs it, for the active document: the headless `epdfCommand`
  * directive on a button of yours, and `inject(EpdfCommands).commandOf(id)` for anything else.

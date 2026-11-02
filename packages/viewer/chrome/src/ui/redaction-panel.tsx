@@ -5,6 +5,7 @@ import { usePendingRedactions, useRedaction, useRedactionState } from '@embedpdf
 import { useSurface } from '@embedpdf/react/shell';
 import { useT } from '@embedpdf/react/i18n';
 import { Icon } from './icons';
+import { TooltipButton } from './tooltip';
 
 /**
  * The pending-redactions review panel (right sidebar). The list is a live view
@@ -52,17 +53,16 @@ export function RedactionPanel() {
                       params: { page: item.pageIndex >= 0 ? String(item.pageIndex + 1) : '?' },
                     })}
                   </span>
-                  <button
-                    type="button"
+                  <TooltipButton
+                    label={t('demo.redactionRemove')}
                     onClick={(event) => {
                       event.stopPropagation();
                       void anno.delete(item.ref);
                     }}
                     className="text-fg-muted hover:text-fg grid h-6 w-6 shrink-0 place-items-center rounded opacity-0 group-hover:opacity-100"
-                    title={t('demo.redactionRemove')}
                   >
                     <Icon name="trash" size={14} />
-                  </button>
+                  </TooltipButton>
                 </div>
               </li>
             ))}

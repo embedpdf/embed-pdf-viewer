@@ -99,6 +99,12 @@ children for that slot show there.
 The first element in your item that takes focus is where the toolbar's arrow keys stop. The rest of
 its controls are your item's own, and a text field keeps Left and Right for its caret.
 
+An item that should take the room the toolbar has left, as a search field or a title does, gets
+`grow: true`: `custom('title', undefined, { grow: true })`. The toolbar fits it in at its own
+length, like any item, then grows it and its section into the rest, keeping its gap before the
+items after it. Draw your item to fill its place (`flex: 1`, or `width: 100%`). An item you measure
+yourself, where it renders, reports its own length, not the room it grew into.
+
 ## Draw every part
 
 | Prop                    | Draws                                                                  |

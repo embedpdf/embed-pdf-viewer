@@ -32,6 +32,10 @@
   --embedpdf-host-border: var(--epdf-border);
   --embedpdf-host-hover: var(--epdf-hover);
   --embedpdf-host-canvas: var(--epdf-canvas);
+  --embedpdf-host-page-background: var(--epdf-page-background);
+  --embedpdf-host-page-shadow: var(--epdf-page-shadow);
+  --embedpdf-host-tooltip: var(--epdf-tooltip);
+  --embedpdf-host-tooltip-text: var(--epdf-tooltip-text);
   --embedpdf-host-radius: var(--epdf-radius);
   --embedpdf-host-font: var(--epdf-font);
   --embedpdf-host-scrollbar-thumb: var(--epdf-scrollbar-thumb);
@@ -56,6 +60,13 @@
   --epdf-border: var(--embedpdf-host-border, #d1d5db);
   --epdf-hover: var(--embedpdf-host-hover, #f3f4f6);
   --epdf-canvas: var(--embedpdf-host-canvas, #f3f4f6);
+  /* A page before its picture arrives, and the shadow under it, the same in both modes: the
+     pages are paper. The Stage and a page view read them over their `page` settings. */
+  --epdf-page-background: var(--embedpdf-host-page-background, #ffffff);
+  --epdf-page-shadow: var(--embedpdf-host-page-shadow, 0 6px 18px rgb(0 0 0 / 0.18));
+  /* A tooltip in the other mode's colors, so it stands off what it's over, in either mode. */
+  --epdf-tooltip: var(--embedpdf-host-tooltip, var(--epdf-text));
+  --epdf-tooltip-text: var(--embedpdf-host-tooltip-text, var(--epdf-surface));
   --epdf-radius: var(--embedpdf-host-radius, 6px);
   --epdf-font: var(
     --embedpdf-host-font,
@@ -96,6 +107,8 @@
   --epdf-border: var(--embedpdf-host-border, #4b5563);
   --epdf-hover: var(--embedpdf-host-hover, #374151);
   --epdf-canvas: var(--embedpdf-host-canvas, #0d1117);
+  --epdf-tooltip: var(--embedpdf-host-tooltip, var(--epdf-text));
+  --epdf-tooltip-text: var(--embedpdf-host-tooltip-text, var(--epdf-surface));
   --epdf-scrollbar-thumb: var(
     --embedpdf-host-scrollbar-thumb,
     color-mix(in srgb, var(--epdf-text) 28%, transparent)
@@ -127,6 +140,8 @@
   --color-active: color-mix(in srgb, var(--epdf-hover) 90%, var(--epdf-text));
   --color-selected: var(--embedpdf-accent-tint);
   --color-canvas: var(--epdf-canvas);
+  --color-tooltip: var(--epdf-tooltip);
+  --color-tooltip-fg: var(--epdf-tooltip-text);
 
   --radius: calc(var(--epdf-radius) * 2 / 3);
   --radius-xs: calc(var(--epdf-radius) / 2);
@@ -208,8 +223,8 @@ body {
   font-size: 16px;
 }
 
-/* On a phone, the floating bar with the page number gets out of the way while the pages scroll
-   (places.tsx): it fades out, then takes no presses or focus until it fades back in. */
+/* A floating bar that gets out of the way while the pages scroll (places.tsx, its place's
+   `hideWhileScrolling`): it fades out, then takes no presses or focus until it fades back in. */
 [data-scroll-hidden] {
   opacity: 0;
   visibility: hidden;

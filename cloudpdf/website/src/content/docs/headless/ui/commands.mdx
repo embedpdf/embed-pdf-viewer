@@ -125,7 +125,8 @@ A disabled command is still in the results, so show it greyed out.
 
 `enabled`, `active` and `visible` get the viewer's state through `get(Token)` and your app's through
 `appState`. They're asked again whenever either changes, and after the command runs, so a button is
-always right without events or effects of your own.
+always right without events or effects of your own. One that throws, because what it reads isn't
+there yet, counts as `false`: the button is disabled, not pressed, or hidden until it answers.
 
 `appState` is a setting: values, and functions that change them. Give it a new value whenever your
 state changes, and every button asks its command again:

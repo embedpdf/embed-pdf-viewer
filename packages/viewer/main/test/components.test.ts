@@ -1,10 +1,12 @@
 /**
  * Your own components in a running viewer: an element slotted as `item:<id>` shows in its bar
  * and says where it sits (`data-orientation`, `data-edge`, `data-variant`, `data-size`, kept
- * live as the bar moves to a rail), it's a stop of the toolbar's arrow keys, a `panel:<id>` body
+ * live as the bar moves to a rail), it's a stop of the toolbar's arrow keys, one with `grow`
+ * takes the room its bar has left and costs the bar nothing more than its own width, a `panel:<id>` body
  * shows in its panel, each region shows where it goes (`empty` only while no document is open),
- * `<epdf-button>` and `<epdf-menu>` look and work like the viewer's own, and the zoom field is
- * one Tab stop with its buttons on the arrow keys.
+ * `<epdf-button>` and `<epdf-menu>` look and work like the viewer's own (`active` too),
+ * `<epdf-icon>` draws the viewer's icons and the app's, and the zoom field is one Tab stop with
+ * its buttons on the arrow keys.
  *
  * Runs against the built snippet (`pnpm build` first).
  */
@@ -90,20 +92,28 @@ const primitives = (place: string) =>
     `<div slot="item:pill" id="pill">
        <epdf-button command="zoom:in" id="zoom-in"></epdf-button>
        <epdf-button command="tool:pan" id="pan"></epdf-button>
+       <epdf-button icon="eye" label="Night" id="night" active></epdf-button>
        <epdf-button icon="link" label="Mine" id="mine"></epdf-button>
      </div>
      <epdf-menu slot="item:share" icon="link" label="Share" id="share">
        <epdf-menu-item icon="copy" id="copy">Copy link</epdf-menu-item>
        <epdf-menu-item command="zoom:out" id="out"></epdf-menu-item>
+       <epdf-menu-item id="notes" active>Show notes</epdf-menu-item>
      </epdf-menu>
-     <epdf-button slot="item:solo" command="zoom:in" id="solo"></epdf-button>`,
+     <epdf-button slot="item:solo" command="zoom:in" id="solo"></epdf-button>
+     <span slot="item:status" id="status">
+       <epdf-icon name="check" id="check"></epdf-icon>
+       <epdf-icon name="seal" size="16" label="Approved" id="seal"></epdf-icon>
+     </span>`,
     `{
+      icons: { seal: { paths: ['M4 4h16v16H4z'], fill: true } },
       layout: (layout) =>
         layout
           .place('main', '${place}')
           .add({ custom: 'pill' }, { to: 'main', section: 'start' })
           .add({ custom: 'share' }, { to: 'main', section: 'start' })
-          .add({ custom: 'solo' }, { to: 'main', section: 'start' }),
+          .add({ custom: 'solo' }, { to: 'main', section: 'start' })
+          .add({ custom: 'status' }, { to: 'main', section: 'end' }),
     }`,
   );
 
@@ -123,8 +133,29 @@ const VARIANTS = page(
    #sized[data-variant='short'] { width: 48px; }`,
 );
 
+/** A title field of yours in a bar, with `grow` or without, and in the main bar the same way. */
+const growing = (grow: boolean) =>
+  page(
+    `<input slot="item:title" id="title" value="Q3 report">
+     <input slot="item:note" id="note" value="Draft">`,
+    `{
+      layout: (layout) =>
+        layout
+          .addBar('heading', {
+            place: { edge: 'top', after: 'main' },
+            start: [[{ custom: 'title', grow: ${grow} }]],
+            end: [['zoom:out', 'zoom:in']],
+          })
+          .add({ custom: 'note', grow: ${grow} }, { to: 'main', section: 'start' }),
+    }`,
+    '/sample.pdf',
+    `#title, #note { width: 100%; box-sizing: border-box; font: inherit; }`,
+  );
+
 const PAGES = {
   '/items.html': ITEMS,
+  '/grow.html': growing(true),
+  '/no-grow.html': growing(false),
   '/variants.html': VARIANTS,
   '/regions.html': REGIONS,
   '/panel.html': PANEL,
@@ -222,13 +253,13 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('your own components', (
       id,
     );
 
-  /** The element that has focus, inside the shadow roots too: its id, or its title. */
+  /** The element that has focus, inside the shadow roots too: its id, or its label. */
   const focused = (tab: Page) =>
     tab.evaluate(() => {
       let active: Element | null = document.activeElement;
       while (active?.shadowRoot?.activeElement) active = active.shadowRoot.activeElement;
       const bar = active?.closest('[data-bar]')?.getAttribute('data-bar') ?? null;
-      return { id: active?.id || null, title: active?.getAttribute('title') ?? null, bar };
+      return { id: active?.id || null, label: active?.getAttribute('aria-label') ?? null, bar };
     });
 
   it('shows an item:<id> element in its bar, saying where it sits, and keeps it live as the bar moves', async () => {
@@ -278,6 +309,46 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('your own components', (
       () => document.getElementById('sized')!.getAttribute('data-variant') === 'full',
     );
     expect(within(await boxOf(tab, 'sized'), await barBox(tab, 'main'))).toBe(true);
+    await tab.close();
+  });
+
+  /** The live buttons a bar shows, by their labels: what didn't go to its "More" menu. */
+  const buttonsOf = (tab: Page, bar: string) =>
+    tab.evaluate(
+      (id) =>
+        [
+          ...document
+            .querySelector('embedpdf-viewer')!
+            .shadowRoot!.querySelectorAll(`[data-bar="${id}"] button`),
+        ]
+          .filter((button) => !button.closest('[aria-hidden]'))
+          .map((button) => button.getAttribute('aria-label') ?? button.textContent ?? ''),
+      bar,
+    );
+
+  it('gives an item with grow the room its bar has left, at no cost to the rest of the bar', async () => {
+    const fixed = await open('/no-grow.html');
+    const own = (await boxOf(fixed, 'title'))!;
+    const fixedMain = await buttonsOf(fixed, 'main');
+    await fixed.close();
+
+    const tab = await open('/grow.html');
+    const title = (await boxOf(tab, 'title'))!;
+    const bar = (await barBox(tab, 'heading'))!;
+    const zoomOut = await tab.evaluate(() => {
+      const button = document
+        .querySelector('embedpdf-viewer')!
+        .shadowRoot!.querySelector('[data-bar="heading"] button[aria-label="Zoom Out"]')!;
+      return button.getBoundingClientRect().left;
+    });
+    // From the bar's start to the buttons after it, with the bar's gap between.
+    expect(title.right - title.left).toBeGreaterThan(own.right - own.left + 400);
+    expect(title.left - bar.left).toBeLessThanOrEqual(24);
+    expect(zoomOut - title.right).toBeGreaterThanOrEqual(8 - 0.5);
+    expect(zoomOut - title.right).toBeLessThanOrEqual(8 + 0.5);
+    // The fit counts it at its own width: the main bar keeps every button it kept without grow.
+    expect(await buttonsOf(tab, 'main')).toEqual(fixedMain);
+    expect(within(await boxOf(tab, 'note'), await barBox(tab, 'main'))).toBe(true);
     await tab.close();
   });
 
@@ -343,10 +414,18 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('your own components', (
       tab.evaluate((id) => {
         const button = document.getElementById(id)!.shadowRoot!.querySelector('button');
         return button
-          ? { title: button.getAttribute('title'), pressed: button.getAttribute('aria-pressed') }
+          ? {
+              label: button.getAttribute('aria-label'),
+              title: button.getAttribute('title'),
+              pressed: button.getAttribute('aria-pressed'),
+            }
           : null;
       }, id);
-    expect((await inner('zoom-in'))!.title).toBe(await labelOf(tab, 'zoom:in'));
+    // Its tooltip is the viewer's own, not the browser's.
+    expect(await inner('zoom-in')).toMatchObject({
+      label: await labelOf(tab, 'zoom:in'),
+      title: null,
+    });
     expect(within(await boxOf(tab, 'pill'), await barBox(tab, 'main'))).toBe(true);
 
     const zoom = () =>
@@ -369,7 +448,7 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('your own components', (
     );
 
     // A button of your own: its click is yours.
-    expect((await inner('mine'))!.title).toBe('Mine');
+    expect((await inner('mine'))!.label).toBe('Mine');
     await tab.evaluate(() => {
       document.getElementById('mine')!.addEventListener('click', () => {
         (window as unknown as TestWindow).clicks += 1;
@@ -405,7 +484,7 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('your own components', (
     );
     const opened = (await menu())!;
     expect(opened.inTopLayer).toBe(true);
-    expect(opened.rows).toEqual(['Copy link', await labelOf(tab, 'zoom:out')]);
+    expect(opened.rows).toEqual(['Copy link', await labelOf(tab, 'zoom:out'), 'Show notes']);
     // Below its button in a top bar.
     expect(opened.top).toBeGreaterThanOrEqual((await boxOf(tab, 'share'))!.bottom);
 
@@ -437,12 +516,136 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('your own components', (
     await bottom.close();
   });
 
+  it('shows <epdf-button active> pressed and <epdf-menu-item active> checked, as they change', async () => {
+    const tab = await open('/primitives.html');
+    const night = () =>
+      tab.evaluate(() => {
+        const button = document.getElementById('night')!.shadowRoot!.querySelector('button')!;
+        return { pressed: button.getAttribute('aria-pressed'), part: button.getAttribute('part') };
+      });
+    expect(await night()).toEqual({
+      pressed: 'true',
+      part: 'toolbar-button toolbar-button-active',
+    });
+    // The property sets the attribute, and the viewer follows it.
+    await tab.evaluate(() => {
+      (document.getElementById('night') as HTMLElement & { active: boolean }).active = false;
+    });
+    await tab.waitForFunction(() => !document.getElementById('night')!.hasAttribute('active'));
+    await frames(tab);
+    expect(await night()).toEqual({ pressed: null, part: 'toolbar-button' });
+    await tab.evaluate(() => document.getElementById('night')!.toggleAttribute('active', true));
+    await frames(tab);
+    expect((await night()).pressed).toBe('true');
+
+    const row = () =>
+      tab.evaluate(() => {
+        const rows = [
+          ...document
+            .getElementById('share')!
+            .shadowRoot!.querySelectorAll<HTMLElement>('[role^="menuitem"]'),
+        ];
+        const notes = rows.find((each) => each.textContent?.includes('Show notes'))!;
+        return {
+          role: notes.getAttribute('role'),
+          checked: notes.getAttribute('aria-checked'),
+          part: notes.getAttribute('part'),
+        };
+      });
+    await tab.click('#share');
+    await tab.waitForFunction(
+      () => document.getElementById('share')!.shadowRoot!.querySelector('[role="menu"]') !== null,
+    );
+    expect(await row()).toEqual({
+      role: 'menuitemcheckbox',
+      checked: 'true',
+      part: 'menu-item menu-item-active',
+    });
+    await tab.evaluate(() => document.getElementById('notes')!.removeAttribute('active'));
+    await frames(tab);
+    expect(await row()).toEqual({ role: 'menuitem', checked: null, part: 'menu-item' });
+    await tab.close();
+  });
+
+  it("draws <epdf-icon>: the viewer's icon or the app's, at its size, read only with a label", async () => {
+    const tab = await open('/primitives.html');
+    const icon = (id: string) =>
+      tab.evaluate((id) => {
+        const host = document.getElementById(id)!;
+        const svg = host.shadowRoot!.querySelector('svg');
+        if (!svg) return null;
+        const { width, height } = svg.getBoundingClientRect();
+        return {
+          width,
+          height,
+          hidden: svg.getAttribute('aria-hidden'),
+          name: svg.getAttribute('aria-label'),
+          filled: svg.querySelector('path')?.getAttribute('fill') ?? null,
+          color: getComputedStyle(svg).color === getComputedStyle(host).color,
+          tabIndex: host.tabIndex,
+        };
+      }, id);
+    await tab.waitForFunction(
+      () => document.getElementById('seal')!.shadowRoot?.querySelector('svg') != null,
+    );
+    expect(await icon('check')).toEqual({
+      width: 20,
+      height: 20,
+      hidden: 'true',
+      name: null,
+      // Drawn as a line: the path has no fill of its own.
+      filled: null,
+      color: true,
+      tabIndex: -1,
+    });
+    // The app's own icon, by its name in `icons`, filled; with a label, screen readers read it.
+    expect(await icon('seal')).toEqual({
+      width: 16,
+      height: 16,
+      hidden: null,
+      name: 'Approved',
+      filled: 'currentColor',
+      color: true,
+      tabIndex: -1,
+    });
+    await tab.evaluate(() => document.getElementById('check')!.setAttribute('name', 'x'));
+    await frames(tab);
+    expect(
+      await tab.evaluate(() =>
+        document.getElementById('check')!.shadowRoot!.querySelector('path')!.getAttribute('d'),
+      ),
+    ).toBe('M18 6l-12 12');
+    await tab.close();
+  });
+
+  it("gives <epdf-button> the viewer's tooltip, in the element's own shadow root", async () => {
+    const tab = await open('/primitives.html');
+    const box = (await boxOf(tab, 'mine'))!;
+    await tab.mouse.move((box.left + box.right) / 2, (box.top + box.bottom) / 2);
+    await tab.waitForFunction(() =>
+      document
+        .getElementById('mine')!
+        .shadowRoot!.querySelector('[role="tooltip"]')
+        ?.matches(':popover-open'),
+    );
+    const tooltip = await tab.evaluate(() => {
+      const root = document.getElementById('mine')!.shadowRoot!;
+      const tip = root.querySelector<HTMLElement>('[role="tooltip"]')!;
+      const { top } = tip.getBoundingClientRect();
+      return { text: tip.textContent?.trim(), top, part: tip.getAttribute('part') };
+    });
+    expect(tooltip).toMatchObject({ text: 'Mine', part: 'tooltip' });
+    // Below its button in a top bar.
+    expect(tooltip.top).toBeGreaterThanOrEqual(box.bottom);
+    await tab.close();
+  });
+
   it("keeps the viewer's own components on the toolbar's arrow keys, out of the Tab order", async () => {
     const tab = await open('/primitives.html');
     // The solo button is its item's stop: an arrow reaches it, and Tab passes it while it isn't
     // the bar's tab stop.
     await tab.evaluate(() => document.getElementById('solo')!.focus());
-    expect((await focused(tab)).title).toBe(await labelOf(tab, 'zoom:in'));
+    expect((await focused(tab)).label).toBe(await labelOf(tab, 'zoom:in'));
     await tab.keyboard.press('ArrowLeft');
     await tab.keyboard.press('ArrowRight');
     expect(await tab.evaluate(() => document.activeElement?.id)).toBe('solo');
@@ -455,15 +658,15 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('your own components', (
 
   it('makes the zoom field one Tab stop, its buttons on the arrow keys', async () => {
     const tab = await open('/default.html');
-    const zoomButton = (title: string) =>
-      tab.evaluate((title) => {
+    const zoomButton = (label: string) =>
+      tab.evaluate((label) => {
         const root = document.querySelector('embedpdf-viewer')!.shadowRoot!;
         const bar = root.querySelector('[data-bar="main"]')!;
         const button = [...bar.querySelectorAll<HTMLElement>('[data-epdf-toolbar-item] button')]
           .filter((candidate) => !candidate.closest('[aria-hidden="true"]'))
-          .find((candidate) => candidate.getAttribute('title') === title)!;
+          .find((candidate) => candidate.getAttribute('aria-label') === label)!;
         return button.tabIndex;
-      }, title);
+      }, label);
     expect(await zoomButton('Zoom Out')).toBe(-1);
     expect(await zoomButton('Zoom In')).toBe(-1);
     expect(await zoomButton('Zoom')).toBe(-1);
@@ -477,12 +680,12 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('your own components', (
 
     await tab.evaluate(() => {
       const root = document.querySelector('embedpdf-viewer')!.shadowRoot!;
-      [...root.querySelectorAll<HTMLElement>('[data-bar="main"] button[title="Zoom In"]')]
+      [...root.querySelectorAll<HTMLElement>('[data-bar="main"] button[aria-label="Zoom In"]')]
         .find((button) => !button.closest('[aria-hidden="true"]'))!
         .focus();
     });
     await tab.keyboard.press('ArrowLeft');
-    expect((await focused(tab)).title).toBe('Zoom Out');
+    expect((await focused(tab)).label).toBe('Zoom Out');
     await tab.close();
   });
 });

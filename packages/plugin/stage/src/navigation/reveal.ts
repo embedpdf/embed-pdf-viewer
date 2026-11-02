@@ -57,23 +57,27 @@ export function createReveal(
     viewportExtent: number,
     zoom: number,
     zoomChanged: boolean,
+    before: number,
+    after: number,
   ): number => {
     if (anchor === 'keep') return cameraPosition;
-    const inset = padding();
     if (anchor === undefined) {
       if (!zoomChanged) {
-        const low = cameraPosition + inset / zoom;
-        const high = cameraPosition + (viewportExtent - inset) / zoom;
+        const low = cameraPosition + before / zoom;
+        const high = cameraPosition + (viewportExtent - after) / zoom;
         if (rectPosition >= low && rectPosition + rectExtent <= high) return cameraPosition; // already visible
-        if (rectExtent > high - low || rectPosition < low) return rectPosition - inset / zoom;
-        return rectPosition + rectExtent - (viewportExtent - inset) / zoom;
+        if (rectExtent > high - low || rectPosition < low) return rectPosition - before / zoom;
+        return rectPosition + rectExtent - (viewportExtent - after) / zoom;
       }
       anchor = 'center';
     }
-    if (anchor === 'start') return rectPosition - inset / zoom;
-    if (anchor === 'end') return rectPosition + rectExtent - (viewportExtent - inset) / zoom;
+    if (anchor === 'start') return rectPosition - before / zoom;
+    if (anchor === 'end') return rectPosition + rectExtent - (viewportExtent - after) / zoom;
     const fraction = anchor === 'center' ? 0.5 : Math.min(1, Math.max(0, anchor));
-    return rectPosition + rectExtent / 2 - (viewportExtent * fraction) / zoom;
+    // Over the viewport moved by half the sides' difference, as `placeCamera` does.
+    return (
+      rectPosition + rectExtent / 2 - (viewportExtent * fraction + (before - after) / 2) / zoom
+    );
   };
 
   const revealAt = (pageIndex: number, options?: RevealOptions): void => {
@@ -135,8 +139,9 @@ export function createReveal(
         ? worldRectForContent(item, target, options.rect)
         : pageRectOf(item, target);
       const zoomDirective = options.zoom ?? 'keep';
-      const availableWidth = Math.max(1, viewport().width - 2 * padding());
-      const availableHeight = Math.max(1, viewport().height - 2 * padding());
+      const inset = padding();
+      const availableWidth = Math.max(1, viewport().width - inset.left - inset.right);
+      const availableHeight = Math.max(1, viewport().height - inset.top - inset.bottom);
       let zoom =
         typeof zoomDirective === 'object'
           ? zoomDirective.level
@@ -163,6 +168,8 @@ export function createReveal(
             viewport().width,
             zoom,
             zoomChanged,
+            inset.left,
+            inset.right,
           ),
           y: revealAxis(
             anchor.y,
@@ -172,6 +179,8 @@ export function createReveal(
             viewport().height,
             zoom,
             zoomChanged,
+            inset.top,
+            inset.bottom,
           ),
           zoom,
         },

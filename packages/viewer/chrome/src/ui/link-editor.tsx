@@ -17,6 +17,7 @@ import type { PdfLinkTarget } from '@embedpdf/react/link';
 import { useKernel } from '@embedpdf/react/runtime';
 import { useT } from '@embedpdf/react/i18n';
 import { Icon } from './icons';
+import { TooltipButton, useTooltip } from './tooltip';
 
 function ModeToggle({
   active,
@@ -29,19 +30,24 @@ function ModeToggle({
   onClick: () => void;
   children: ReactNode;
 }) {
+  // Its words are its name; the tooltip says more.
+  const tooltip = useTooltip({ label: title });
   return (
-    <button
-      type="button"
-      title={title}
-      onClick={onClick}
-      className={`rounded border px-2.5 py-1 text-xs font-medium transition-colors ${
-        active
-          ? 'border-accent bg-accent text-on-accent'
-          : 'border-border bg-surface text-fg hover:bg-hover'
-      }`}
-    >
-      {children}
-    </button>
+    <>
+      <button
+        {...tooltip.trigger}
+        type="button"
+        onClick={onClick}
+        className={`rounded border px-2.5 py-1 text-xs font-medium transition-colors ${
+          active
+            ? 'border-accent bg-accent text-on-accent'
+            : 'border-border bg-surface text-fg hover:bg-hover'
+        }`}
+      >
+        {children}
+      </button>
+      {tooltip.element}
+    </>
   );
 }
 
@@ -76,15 +82,13 @@ export function LinkEditorCard({ onClose }: { onClose: () => void }) {
     <div className="border-border bg-surface w-64 rounded-lg border p-3 shadow-lg">
       <div className="mb-2 flex items-center justify-between">
         <span className="text-fg text-sm font-semibold">{t('commands.annotate.link')}</span>
-        <button
-          type="button"
+        <TooltipButton
+          label={t('panel.close')}
           onClick={onClose}
-          aria-label={t('panel.close')}
-          title={t('panel.close')}
           className="text-fg-muted hover:bg-hover grid h-6 w-6 place-items-center rounded"
         >
           <Icon name="x" size={14} />
-        </button>
+        </TooltipButton>
       </div>
       <div className="mb-2 flex gap-1.5">
         <ModeToggle

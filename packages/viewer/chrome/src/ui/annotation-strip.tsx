@@ -26,7 +26,8 @@ const LinkEditorCard = lazyComponent(() => import('./link-editor').then((ui) => 
 
 export function AnnotationStrip() {
   const t = useT();
-  const view = useStripView(useStripSchema('annotation'));
+  const bar = useStripSchema('annotation');
+  const view = useStripView(bar);
   // The link editor popover rides the same anchor and replaces the strip
   // while open — one anchored card at a time, on the projector.
   const editor = useSurface('link-editor');
@@ -36,13 +37,13 @@ export function AnnotationStrip() {
     if (!selection.length && editor.isOpen) editor.close();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selection.length, editor.isOpen]);
-  if (!view) return null;
+  if (!bar || !view) return null;
   return (
     <AnnotationMenu placement="bottom" gap={15}>
       {editor.isOpen ? (
         <LinkEditorCard onClose={editor.close} />
       ) : (
-        <StripBar view={view} label={t('commands.annotate.strip')} />
+        <StripBar bar={bar} view={view} label={t('commands.annotate.strip')} />
       )}
     </AnnotationMenu>
   );

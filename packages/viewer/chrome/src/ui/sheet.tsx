@@ -2,6 +2,8 @@
  * A sheet: what a panel or a menu is on a phone. It slides up from the bottom
  * of the viewer, over the pages, in a layer over the whole viewer
  * (`viewer-layer.ts`); the viewer behind it dims, and a tap there closes it.
+ * It is as wide as the viewer, or as wide as it's asked to be, in the middle
+ * (a panel's sheet on a wider viewer).
  * Its handle drags it taller or shorter, or down to close it, the dimming
  * fading as it goes, and a flick moves it a whole step (`sheet-rest.ts`).
  * It keeps clear of the home bar and the screen's rounded corners when the
@@ -71,6 +73,8 @@ export interface SheetProps {
   readonly trapFocus?: boolean;
   /** Drawn under the handle, above the part that scrolls; dragging it moves the sheet too. */
   readonly header?: ReactNode;
+  /** Its width in px, in the middle of the viewer, never wider than it. Default: the viewer's. */
+  readonly width?: number;
   /** The sheet's part name, for page CSS through `::part()`, when it is one: a panel's `panel`. */
   readonly part?: string;
   /** `data-*` attributes for the sheet, by their names without `data-`. */
@@ -102,6 +106,7 @@ export function Sheet({
   list = false,
   trapFocus = true,
   header,
+  width,
   part,
   data,
   children,
@@ -238,7 +243,10 @@ export function Sheet({
         part={part}
         {...dataAttributesOf(data)}
         data-epdf-sheet=""
-        className="border-border-subtle bg-elevated starting:translate-y-full in-data-dragging:transition-none relative flex w-full shrink-0 flex-col rounded-t-2xl border-t shadow-2xl transition-[translate,height] duration-200 ease-out motion-reduce:transition-none"
+        className={`border-border-subtle bg-elevated starting:translate-y-full in-data-dragging:transition-none relative flex shrink-0 flex-col rounded-t-2xl border-t shadow-2xl transition-[translate,height] duration-200 ease-out motion-reduce:transition-none ${
+          width === undefined ? 'w-full' : 'max-w-full self-center border-x'
+        }`}
+        style={width === undefined ? undefined : { width }}
       >
         <div
           className="shrink-0 touch-pan-x select-none"

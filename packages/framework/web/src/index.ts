@@ -356,7 +356,9 @@ export {
   observeContentWidth,
   observeHeight,
   observeLength,
+  observeOwnLength,
   observeWidth,
+  ownLengthOf,
   toolbarMeasureKey,
 } from './toolbar-measure';
 export type { ToolbarFitMetrics, ToolbarLengths } from './toolbar-measure';

@@ -58,6 +58,10 @@ export interface PanelResizeEvent {
 export interface ResolvedViewerConfig {
   /** The `layout` option as given: the default without one. */
   readonly layout?: LayoutOption;
+  /** The `size` option as given: what the env's size is, or `'auto'` (or nothing) to measure. */
+  readonly size?: unknown;
+  /** The `touch` option as given: what the env's touch is, or `'auto'` (or nothing) to ask. */
+  readonly touch?: unknown;
   /** User-registered icons — additive over the built-in set. */
   readonly icons: Readonly<Record<string, IconDef>>;
   /** Your commands over the built-in ones, for the commands the layout brings too. */
@@ -68,6 +72,8 @@ export interface ResolvedViewerConfig {
   readonly signature: ViewerSignatureSettings;
   /** The engine's fonts the style panel offers (see {@link ViewerFont}). */
   readonly fonts: readonly ViewerFont[];
+  /** Whether leaving the page asks first while a document has unsaved changes. */
+  readonly warnBeforeLeaving: boolean;
   /** Hears each width the user gives a panel, by dragging its edge or with its keys. */
   readonly onPanelResize?: (event: PanelResizeEvent) => void;
 }
@@ -78,6 +84,7 @@ const DEFAULT_CONFIG: ResolvedViewerConfig = {
   stamp: {},
   signature: {},
   fonts: [],
+  warnBeforeLeaving: true,
 };
 
 const ViewerConfigContext = createContext<ResolvedViewerConfig>(DEFAULT_CONFIG);
@@ -87,6 +94,17 @@ export const ViewerConfigProvider = ViewerConfigContext.Provider;
 /** The `layout` option, for <LayoutRoot> to resolve at the viewer's size. */
 export function useLayoutOption(): LayoutOption | undefined {
   return useContext(ViewerConfigContext).layout;
+}
+
+/** The `size` and `touch` options as given, for <LayoutRoot> to read into the env. */
+export function useEnvOptions(): { readonly size: unknown; readonly touch: unknown } {
+  const { size, touch } = useContext(ViewerConfigContext);
+  return { size, touch };
+}
+
+/** Whether leaving the page asks first while a document has unsaved changes. */
+export function useWarnBeforeLeaving(): boolean {
+  return useContext(ViewerConfigContext).warnBeforeLeaving;
 }
 
 /** Tells the app a panel's new width: what the panel frame calls once the user has resized it. */

@@ -31,11 +31,12 @@ const TOUCH_GAP_PX = GAP_PX + 12 + 14;
 export function SelectionStrip() {
   const t = useT();
   const { touch } = useLayoutEnv();
-  const view = useStripView(useStripSchema('selection'));
-  if (!view) return null;
+  const bar = useStripSchema('selection');
+  const view = useStripView(bar);
+  if (!bar || !view) return null;
   return (
     <SelectionMenu placement="top" gap={touch ? TOUCH_GAP_PX : GAP_PX}>
-      <StripBar view={view} label={t('commands.selection.strip')} />
+      <StripBar bar={bar} view={view} label={t('commands.selection.strip')} />
     </SelectionMenu>
   );
 }

@@ -4,7 +4,9 @@
  * One ResizeObserver on the root measures the viewer (its width, and from it
  * the size), a media query says whether the main pointer is a finger, and the
  * language gives the direction: together the env, and the `layout` function
- * runs again whenever it changes. The direction is the root's `dir`, so the
+ * runs again whenever it changes. The config's `size` and `touch`, when they
+ * name one, take the place of the measured size and the media query. The
+ * direction is the root's `dir`, so the
  * viewer reads its own language's way whatever the page around it does. A
  * finger as the main pointer marks the root `data-touch` (every button and
  * menu row is then 44 px tall, styles.css), and the root keeps clear of the
@@ -42,6 +44,7 @@ import {
   type LayoutData,
   type LayoutEnv,
   type MenuSection,
+  type ViewerSize,
 } from '@embedpdf/core-ui';
 import { useCommands } from '@embedpdf/react/commands';
 import { useI18nState } from '@embedpdf/react/i18n';
@@ -67,6 +70,7 @@ import {
   DEFAULT_ENV,
   ResolvedLayoutProvider,
   stripOf,
+  useEnvOptions,
   useLayoutOption,
   useViewerCommands,
   type ResolvedLayout,
@@ -91,30 +95,63 @@ function useEqualValue<T>(value: T, isEqual: (left: T, right: T) => boolean): T 
   return last.current;
 }
 
+const SIZES: readonly unknown[] = ['compact', 'medium', 'expanded'] satisfies ViewerSize[];
+
+/** What the env takes from the config: a size and a touch it says, or `null` for what's measured. */
+interface EnvChoice {
+  readonly size: ViewerSize | null;
+  readonly touch: boolean | null;
+  /** What in the options isn't one of their values, which then measure. */
+  readonly problems: readonly string[];
+}
+
+/** The config's `size` and `touch` read: `'auto'` (or nothing) measures, as anything else does. */
+export function envChoiceOf(size: unknown, touch: unknown): EnvChoice {
+  const problems: string[] = [];
+  const auto = (value: unknown) => value === undefined || value === 'auto';
+  if (!auto(size) && !SIZES.includes(size))
+    problems.push(
+      `size: ${JSON.stringify(size)} is not auto, compact, medium or expanded; the viewer measures its width`,
+    );
+  if (!auto(touch) && typeof touch !== 'boolean')
+    problems.push(
+      `touch: ${JSON.stringify(touch)} is not auto, true or false; the viewer asks the browser`,
+    );
+  return {
+    size: SIZES.includes(size) ? (size as ViewerSize) : null,
+    touch: typeof touch === 'boolean' ? touch : null,
+    problems,
+  };
+}
+
 /**
  * The env of the element `root` points at: measured before the first paint, then on every
- * change. `null` for the first render, before there is anything to measure.
+ * change, with what `choice` says in place of what's measured. `null` for the first render,
+ * before there is anything to measure.
  */
-function useMeasuredEnv(root: RefObject<HTMLElement | null>): LayoutEnv | null {
+function useMeasuredEnv(root: RefObject<HTMLElement | null>, choice: EnvChoice): LayoutEnv | null {
   const dir = useI18nState((state) => state.direction);
   const [width, setWidth] = useState<number | null>(null);
-  const [touch, setTouch] = useState(isCoarsePointer);
+  const [coarse, setCoarse] = useState(isCoarsePointer);
   useLayoutEffect(() => {
     const element = root.current;
     return element
       ? observeWidth(element, (measured) => setWidth(Math.round(measured)))
       : undefined;
   }, [root]);
+  const asks = choice.touch === null;
   useEffect(() => {
-    if (typeof matchMedia !== 'function') return undefined;
+    if (!asks || typeof matchMedia !== 'function') return undefined;
     const query = matchMedia(COARSE_POINTER);
-    const update = () => setTouch(query.matches);
+    const update = () => setCoarse(query.matches);
     query.addEventListener('change', update);
     return () => query.removeEventListener('change', update);
-  }, []);
+  }, [asks]);
+  const size = choice.size;
+  const touch = choice.touch ?? coarse;
   return useMemo(
-    () => (width === null ? null : { size: sizeOf(width), width, touch, dir }),
-    [width, touch, dir],
+    () => (width === null ? null : { size: size ?? sizeOf(width), width, touch, dir }),
+    [width, size, touch, dir],
   );
 }
 
@@ -134,7 +171,13 @@ export function LayoutRoot({
 }) {
   const ownRoot = useRef<HTMLDivElement>(null);
   const root = rootRef ?? ownRoot;
-  const measured = useMeasuredEnv(root);
+  // Read once, as the config is.
+  const options = useEnvOptions();
+  const [choice] = useState(() => envChoiceOf(options.size, options.touch));
+  useEffect(() => {
+    for (const problem of choice.problems) console.warn(`[embedpdf] ${problem}`);
+  }, [choice]);
+  const measured = useMeasuredEnv(root, choice);
   // The first render, before the root is measured, lays out as a wide viewer; the measured
   // env replaces it before the browser paints.
   const env = measured ?? DEFAULT_ENV;

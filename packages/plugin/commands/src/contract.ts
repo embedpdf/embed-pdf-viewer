@@ -132,11 +132,11 @@ export interface CommandDef<AppState = any> {
   readonly modal?: string;
 
   // ── read from live state and your app's, again whenever either changes ──
-  /** When it can run. Default: always. */
+  /** When it can run. Default: always. One that throws counts as false. */
   enabled?(context: CommandContext<AppState>): boolean;
-  /** When it shows as pressed, such as the current tool. */
+  /** When it shows as pressed, such as the current tool. One that throws counts as false. */
   active?(context: CommandContext<AppState>): boolean;
-  /** When it shows at all. Default: always. */
+  /** When it shows at all. Default: always. One that throws counts as false. */
   visible?(context: CommandContext<AppState>): boolean;
 
   /** What it does; `execute()` resolves once it has. Not needed for a `menu`, `panel` or `modal`. */
