@@ -3,7 +3,7 @@ import { toPageRef } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import { withScratchN } from '../../runtime/memory/scratch';
-import { F32_BYTES, I32_BYTES, readF32, readI32 } from '../../runtime/memory/structs';
+import { F32_BYTES, readF32, readI32 } from '../../runtime/memory/structs';
 import { U64_BYTES } from '../../runtime/memory/u64';
 import { DEST_VIEW } from './destinationViewCodes';
 
@@ -51,7 +51,9 @@ export function readDestination(
 
   switch (view.code) {
     case DEST_VIEW.xyz:
-      return { kind: 'xyz', page, ...readXyzLocation(fn, mem, destPtr) };
+      // `/XYZ left top zoom`, null-aware like every other view: a literal 0
+      // zoom reads as 0, only a null one as null.
+      return { kind: 'xyz', page, left: at(0), top: at(1), zoom: at(2) };
     case DEST_VIEW.fit:
       return { kind: 'fit', page };
     case DEST_VIEW.fitH:
@@ -80,27 +82,4 @@ export function readDestination(
     default:
       return null;
   }
-}
-
-/** `/XYZ` null-aware axes via `FPDFDest_GetLocationInPage` (FPDF_BOOL is 4 bytes). */
-function readXyzLocation(
-  fn: PdfFunctions,
-  mem: PdfRuntimeMemory,
-  destPtr: Ptr,
-): { left: number | null; top: number | null; zoom: number | null } {
-  return withScratchN(
-    mem,
-    [I32_BYTES, I32_BYTES, I32_BYTES, F32_BYTES, F32_BYTES, F32_BYTES],
-    ([hasLeft, hasTop, hasZoom, left, top, zoom]) => {
-      if (!fn.FPDFDest_GetLocationInPage(destPtr, hasLeft, hasTop, hasZoom, left, top, zoom)) {
-        // Unreadable location: every axis "retains current" — still a valid /XYZ.
-        return { left: null, top: null, zoom: null };
-      }
-      return {
-        left: readI32(mem, hasLeft) ? readF32(mem, left) : null,
-        top: readI32(mem, hasTop) ? readF32(mem, top) : null,
-        zoom: readI32(mem, hasZoom) ? readF32(mem, zoom) : null,
-      };
-    },
-  );
 }
