@@ -156,12 +156,15 @@ number fixes the count.
 
 - **`padding`** is the space between the pages and the edge of the Stage, in screen pixels. Fit
   modes respect it, so "fit page" never touches the edges. It's `24`, or `4` on narrow screens.
+  A number is every side; `{ top, right, bottom, left }` gives each side its own, the ones you
+  leave out `0`, such as room at the bottom for a toolbar floating over the pages.
 - **`gap`** is the space between pages. A number (`16`, the default) grows with the zoom, like the
   space between sheets of paper. `{ px: 16 }` stays 16 screen pixels at every zoom, which suits a
   thumbnail strip.
 
 ```ts
 stagePlugin({ padding: 32, gap: { px: 12 } });
+stagePlugin({ padding: { top: 24, right: 24, bottom: 72, left: 24 } });
 ```
 
 <Example name="stage/spacing" />
@@ -554,7 +557,7 @@ Set them when you register the plugin, and change them while the app runs with
 | `zoom`           | A mode, a level, `{ pageWidth }` or `{ pageHeight }`                                      | `{ mode: 'automatic' }`        |
 | `minZoom`        | The lowest zoom: nothing zooms out past it, a fit mode included                           | `0.05` (5%)                    |
 | `maxZoom`        | The highest zoom: nothing zooms in past it, a fit mode included                           | `64` (6400%)                   |
-| `padding`        | Space around the pages, in screen pixels                                                  | `24` (`4` when compact)        |
+| `padding`        | Space around the pages, in screen pixels: a number, or `{ top, right, bottom, left }`     | `24` (`4` when compact)        |
 | `gap`            | Space between pages: a number (grows with zoom) or `{ px }`                               | `16`                           |
 | `pageFrame`      | Space reserved around each page for your labels, in screen pixels                         | `0` on every side              |
 | `bounded`        | Keep panning within the pages; `false` for an endless canvas                              | `true`                         |

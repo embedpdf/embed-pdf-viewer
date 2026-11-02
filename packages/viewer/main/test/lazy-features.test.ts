@@ -32,7 +32,7 @@ const FEATURES = [
   {
     name: 'comments panel',
     open: { command: 'panel:comments' },
-    marker: 'demo.commentsReplyPlaceholder',
+    marker: 'comments.replyPlaceholder',
   },
   { name: 'stamps panel', open: { command: 'panel:stamps' }, marker: 'demo.stampsImportHint' },
   {

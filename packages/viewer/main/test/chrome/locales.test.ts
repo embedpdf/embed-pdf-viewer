@@ -3,8 +3,12 @@
  * slots in each string; the English pack names the style panel's properties and options as the
  * annotation kinds do; Arabic and Hebrew read right to left; readers of Traditional Chinese get
  * the Traditional pack, never Simplified; and the app's `strings` change a language, or add one
- * that reads the way its code says.
+ * that reads the way its code says. The keys the Translations page names are the English pack's.
  */
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { describe, expect, it } from 'vitest';
 
 import { KINDS, propertiesOf } from '@embedpdf/core-annotation';
@@ -98,6 +102,24 @@ describe('the language packs', () => {
         direction: RIGHT_TO_LEFT.includes(pack.code) ? 'rtl' : 'ltr',
       });
     }
+  });
+});
+
+describe('the keys the Translations page names', () => {
+  it('are in the English pack', () => {
+    const page = readFileSync(
+      resolve(
+        dirname(fileURLToPath(import.meta.url)),
+        '../../../../../docs/content/viewer/customize/translations.mdx',
+      ),
+      'utf8',
+    );
+    const english = stringsOf(en.translations);
+    const named = [...page.matchAll(/`((?:pageNumber|comments|annotation|form)\.[\w.]+)`/g)].map(
+      (match) => match[1]!,
+    );
+    expect(named).toEqual(expect.arrayContaining(['pageNumber.page', 'comments.empty']));
+    expect(named.filter((key) => !english.has(key))).toEqual([]);
   });
 });
 

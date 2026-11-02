@@ -2,12 +2,14 @@
  * How a panel opens, in a running viewer: docked beside the pages in a wide
  * viewer, its edge dragged wider and the width kept when it opens again; over
  * the pages' edge at medium widths, taking focus while the bars around the
- * pages keep working, until a click on the pages closes it; and as a sheet
- * from the bottom on a phone, which closes when its handle is dragged down or
- * a page is picked in it. And what the layout changes: how a panel opens per
- * size, its width limits, an edge that doesn't drag, the width the app hears
- * (`onPanelResize`, `epdf:panelresize`), and thumbnails that wrap into more
- * columns as the panel widens, sized by `plugins.thumbnails`.
+ * pages keep working, until a click on the pages closes it, its edge dragging
+ * as a docked panel's; and as a sheet from the bottom on a phone, which closes
+ * when its handle is dragged down or a page is picked in it, and as wide as
+ * its panel, in the middle, on a wider viewer. And what the layout changes:
+ * how a panel opens per size, its width limits, an edge that doesn't drag,
+ * the width the app hears (`onPanelResize`, `epdf:panelresize`), and
+ * thumbnails that wrap into more columns as the panel widens, sized by
+ * `plugins.thumbnails`.
  *
  * Runs against the built snippet (`pnpm build` first).
  */
@@ -22,6 +24,7 @@ import {
   frames,
   launchChromium,
   serveViewer,
+  settle,
   waitForDocument,
   type ViewerHost,
 } from './helpers/viewer-host';
@@ -68,6 +71,41 @@ const PAGES = {
   window.element.addEventListener('epdf:panelresize', (event) =>
     window.heard.push(['event', event.detail.id, event.detail.width]),
   );
+</script>
+</body></html>`,
+  '/heard.html': `<!doctype html><html><head><meta charset="utf-8">
+<title>panel frames, heard</title>
+<style>
+  body { margin: 0; }
+  #viewer { position: absolute; inset: 0; display: block; }
+</style></head>
+<body>
+<div id="viewer"></div>
+<script type="module">
+  import EmbedPDF from '/embedpdf.js';
+  window.heard = [];
+  window.element = EmbedPDF.init({
+    target: '#viewer',
+    src: '/sample.pdf',
+    onPanelResize: (event) => window.heard.push([event.id, event.width]),
+  });
+</script>
+</body></html>`,
+  '/sheets.html': `<!doctype html><html><head><meta charset="utf-8">
+<title>panel frames, sheets</title>
+<style>
+  body { margin: 0; }
+  #viewer { position: absolute; inset: 0; display: block; }
+</style></head>
+<body>
+<div id="viewer"></div>
+<script type="module">
+  import EmbedPDF from '/embedpdf.js';
+  window.element = EmbedPDF.init({
+    target: '#viewer',
+    src: '/sample.pdf',
+    layout: (layout) => layout.panel('comments', { present: 'sheet', width: 560 }),
+  });
 </script>
 </body></html>`,
 };
@@ -159,23 +197,6 @@ const execute = (tab: Page, command: string) =>
     command,
   );
 
-/**
- * Wait out a slide or a fade: the time one takes, then until none is still running in the viewer
- * (a busy machine starts one late). Endless animations, a spinner's, don't count.
- */
-const settle = async (tab: Page) => {
-  await tab.waitForTimeout(350);
-  await tab.waitForFunction(() =>
-    document
-      .querySelector('embedpdf-viewer')!
-      .shadowRoot!.getAnimations()
-      .every(
-        (animation) =>
-          animation.playState !== 'running' ||
-          animation.effect?.getComputedTiming().endTime === Infinity,
-      ),
-  );
-};
 
 const widthOf = (box: Box) => Math.round(box.right - box.left);
 
@@ -369,6 +390,65 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('panel frames', () => {
     await tab.close();
   });
 
+  it("drags an overlay's edge as a docked panel's, by pointer and keys, and tells the app", async () => {
+    const tab = await open(800, '/heard.html');
+    await execute(tab, 'panel:thumbnails');
+    await settle(tab);
+    expect(await frameOf(tab, 'thumbnails')).toMatchObject({ present: 'overlay' });
+    // The same limits as docked: never past half the viewer.
+    expect(await edgeOf(tab, 'thumbnails')).toMatchObject({ now: '288', min: '200', max: '400' });
+
+    await dragEdge(tab, 'thumbnails', 60);
+    // A drag out over the pages isn't a click on them: it stays open.
+    expect(widthOf((await frameOf(tab, 'thumbnails'))!.box)).toBe(348);
+    await tab.evaluate(() => {
+      const root = document.querySelector('embedpdf-viewer')!.shadowRoot!;
+      root.querySelector<HTMLElement>('[data-epdf-panel="thumbnails"] [role="separator"]')!.focus();
+    });
+    await tab.keyboard.press('End');
+    await frames(tab);
+    expect(widthOf((await frameOf(tab, 'thumbnails'))!.box)).toBe(400);
+    await tab.keyboard.press('Home');
+    await frames(tab);
+    expect(widthOf((await frameOf(tab, 'thumbnails'))!.box)).toBe(200);
+    expect(await heard(tab)).toEqual([
+      ['thumbnails', 348],
+      ['thumbnails', 400],
+      ['thumbnails', 200],
+    ]);
+
+    // The width it was given stays: open again, it is 200 px.
+    await tab.keyboard.press('Escape');
+    await frames(tab);
+    expect(await frameOf(tab, 'thumbnails')).toBeNull();
+    await execute(tab, 'panel:thumbnails');
+    await settle(tab);
+    expect(widthOf((await frameOf(tab, 'thumbnails'))!.box)).toBe(200);
+    await tab.close();
+  });
+
+  it('makes a sheet as wide as its panel, in the middle, on a wider viewer, and the full width on a phone', async () => {
+    const wide = await open(1280, '/sheets.html');
+    await execute(wide, 'panel:comments');
+    await settle(wide);
+    const frame = await frameOf(wide, 'comments');
+    expect(frame).toMatchObject({ present: 'sheet', inTopLayer: true });
+    expect(widthOf(frame!.box)).toBe(560);
+    expect(Math.round(frame!.box.left)).toBe(360);
+    expect(Math.round(frame!.box.bottom)).toBe(800);
+    // A sheet has no edge to drag.
+    expect(await edgeOf(wide, 'comments')).toBeNull();
+    await wide.close();
+
+    const phone = await open(375, '/sheets.html');
+    await execute(phone, 'panel:comments');
+    await settle(phone);
+    const sheet = await frameOf(phone, 'comments');
+    expect(sheet).toMatchObject({ present: 'sheet' });
+    expect([Math.round(sheet!.box.left), Math.round(sheet!.box.right)]).toEqual([0, 375]);
+    await phone.close();
+  });
+
   it('closes an overlay with Escape, giving focus back to its button', async () => {
     const tab = await open(800);
     await clickBox(tab, await buttonOf(tab, 'Thumbnails'), 'the Thumbnails button');
@@ -420,7 +500,9 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('panel frames', () => {
     const thumb = await tab.waitForFunction(
       () => {
         const root = document.querySelector('embedpdf-viewer')!.shadowRoot!;
-        const button = root.querySelector('[data-epdf-panel="thumbnails"] button[title="Page 2"]');
+        const button = root.querySelector(
+          '[data-epdf-panel="thumbnails"] button[aria-label="Page 2"]',
+        );
         if (!button) return null;
         const rect = button.getBoundingClientRect();
         return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom };
@@ -446,7 +528,7 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('panel frames', () => {
       () =>
         document
           .querySelector('embedpdf-viewer')!
-          .shadowRoot!.querySelector('[data-epdf-panel="thumbnails"] button[title="Page 2"]'),
+          .shadowRoot!.querySelector('[data-epdf-panel="thumbnails"] button[aria-label="Page 2"]'),
       null,
       { timeout: 10_000 },
     );
@@ -604,7 +686,7 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('panel frames', () => {
       () =>
         document
           .querySelector('embedpdf-viewer')!
-          .shadowRoot!.querySelector('[data-epdf-panel="thumbnails"] button[title="Page 2"]'),
+          .shadowRoot!.querySelector('[data-epdf-panel="thumbnails"] button[aria-label="Page 2"]'),
       null,
       { timeout: 10_000 },
     );

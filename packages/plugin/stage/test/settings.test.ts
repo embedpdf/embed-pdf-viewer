@@ -50,6 +50,26 @@ describe('stage settings', () => {
     expect(stage.getSettings().pageFrame).toEqual({ top: 8, right: 0, bottom: 0, left: 0 });
   });
 
+  it('take the padding as a number or by side, a side left out being 0', () => {
+    const { stage } = placedStage(5, { padding: { bottom: 72 } });
+    expect(stage.getSettings().padding).toEqual({ top: 0, right: 0, bottom: 72, left: 0 });
+    stage.updateSettings({ padding: 8 });
+    expect(stage.getSettings().padding).toBe(8);
+  });
+
+  it('fit the page inside the padding of each side', () => {
+    const { stage } = placedStage(5, {
+      padding: { top: 24, right: 24, bottom: 72, left: 24 },
+      responsive: [],
+      zoom: { mode: 'fit-page' },
+    });
+    // 600 × 800 pages in a 1000 × 700 viewport: the height decides, less 24 above and 72 below.
+    expect(stage.getZoomLevel()).toBeCloseTo((700 - 24 - 72) / 800, 6);
+    const [first] = stage.listVisiblePages();
+    expect(first!.screenY).toBeCloseTo(24, 4);
+    expect(700 - (first!.screenY + first!.transform.viewHeight)).toBeCloseTo(72, 4);
+  });
+
   it('have a default for every setting', () => {
     expect(Object.keys(DEFAULT_SETTINGS)).toEqual(
       expect.arrayContaining(['interaction', 'panFallback', 'zoomGestures']),

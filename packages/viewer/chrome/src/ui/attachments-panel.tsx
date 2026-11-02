@@ -22,6 +22,7 @@ import { useLayoutEnv } from '../config-context';
 import { Icon, type IconName } from './icons';
 import { useCloseOnPick } from './panel-frame';
 import { CommandButton } from './toolbar';
+import { useTooltip } from './tooltip';
 import type { AttachmentAddArgs } from '../config/attachments';
 
 /** A file's size in the viewer's language: bytes, then kB and MB with one decimal. */
@@ -195,6 +196,12 @@ function FileRow({ file, page, selected, pending, locale, onPick, onMenu }: File
   const { touch } = useLayoutEnv();
   const menuButton = useRef<HTMLSpanElement>(null);
   const name = displayNameOf(file);
+  // A name cut short shows whole in the row's tooltip.
+  const nameText = useRef<HTMLSpanElement>(null);
+  const tooltip = useTooltip(
+    { label: name, labelShown: true },
+    { clipped: () => nameText.current },
+  );
   const details = [
     pending ? t('attachments.adding') : file.size === null ? null : sizeText(file.size, locale),
     page === null ? null : t('attachments.onPage', { params: { page } }),
@@ -213,14 +220,14 @@ function FileRow({ file, page, selected, pending, locale, onPick, onMenu }: File
       } ${pending ? 'opacity-60' : ''}`}
     >
       <button
+        {...tooltip.trigger}
         type="button"
         onClick={onPick}
-        title={name}
         className="flex min-w-0 flex-1 items-center gap-2 rounded px-2 py-1.5 text-start"
       >
         <Icon name={iconOf(file)} size={16} className="text-fg-muted shrink-0" />
         <span className="min-w-0 flex-1">
-          <span className="text-fg block truncate text-sm">
+          <span ref={nameText} className="text-fg block truncate text-sm">
             <bdi>{name}</bdi>
           </span>
           {details.length > 0 && (
@@ -228,6 +235,7 @@ function FileRow({ file, page, selected, pending, locale, onPick, onMenu }: File
           )}
         </span>
       </button>
+      {tooltip.element}
       <span
         ref={menuButton}
         onClick={(event) => event.stopPropagation()}

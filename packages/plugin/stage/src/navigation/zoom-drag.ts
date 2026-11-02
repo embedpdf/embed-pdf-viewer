@@ -111,8 +111,8 @@ export function createZoomDrag(
     const view = scene.viewport();
     const inset = scene.padding();
     const fit = Math.min(
-      Math.max(1, view.width - 2 * inset) / sized.width,
-      Math.max(1, view.height - 2 * inset) / sized.height,
+      Math.max(1, view.width - inset.left - inset.right) / sized.width,
+      Math.max(1, view.height - inset.top - inset.bottom) / sized.height,
     );
     if (!Number.isFinite(fit)) return;
     const zoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, fit));
@@ -125,8 +125,9 @@ export function createZoomDrag(
     const target: Camera = clampCamera(
       {
         zoom,
-        x: box.x + box.width / 2 - view.width / (2 * zoom),
-        y: box.y + box.height / 2 - view.height / (2 * zoom),
+        // Centered in the padded viewport.
+        x: box.x + box.width / 2 - (view.width + inset.left - inset.right) / (2 * zoom),
+        y: box.y + box.height / 2 - (view.height + inset.top - inset.bottom) / (2 * zoom),
       },
       scene.stayBounds(),
       view,

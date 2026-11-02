@@ -44,8 +44,8 @@ const layout = (layout: Layout) => layout.add({ custom: 'doc-picker' }, { to: 'm
 </template>
 ```
 
-`useToolbarItem()` tells it where it sits, and `Button`, `Menu` and `MenuItem`
-are the viewer's own, for yours.
+`useToolbarItem()` tells it where it sits, and `Button`, `Menu`, `MenuItem` and
+`Icon` are the viewer's own, for yours.
 
 ## Driving the viewer
 

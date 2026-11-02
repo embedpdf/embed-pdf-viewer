@@ -9,6 +9,7 @@ import {
   menuPlacementOf,
   submenuKeysOf,
   submenuPlacementOf,
+  tooltipPlacementOf,
 } from '../../../chrome/src/ui/menu-placement';
 
 describe('menuPlacementOf', () => {
@@ -56,6 +57,27 @@ describe('submenuPlacementOf', () => {
   it('opens beside its row on the side the text runs toward', () => {
     expect(submenuPlacementOf('ltr')).toBe('right-start');
     expect(submenuPlacementOf('rtl')).toBe('left-start');
+  });
+});
+
+describe('tooltipPlacementOf', () => {
+  it("opens on the side the button's menu would, centered on the button", () => {
+    expect(tooltipPlacementOf('top', 'ltr')).toBe('bottom');
+    expect(tooltipPlacementOf('bottom', 'ltr')).toBe('top');
+    expect(tooltipPlacementOf('float-bottom', 'rtl')).toBe('top');
+    expect(tooltipPlacementOf('start', 'ltr')).toBe('right');
+    expect(tooltipPlacementOf('start', 'rtl')).toBe('left');
+    expect(tooltipPlacementOf('end', 'ltr')).toBe('left');
+  });
+
+  it('opens away from what is selected, from a bar over a selection', () => {
+    expect(tooltipPlacementOf('selection', 'ltr')).toBe('top');
+    expect(tooltipPlacementOf('selection', 'ltr', false, 'below')).toBe('bottom');
+  });
+
+  it("opens beside a menu's row, on the side a submenu would", () => {
+    expect(tooltipPlacementOf('top', 'ltr', true)).toBe('right');
+    expect(tooltipPlacementOf('bottom', 'rtl', true)).toBe('left');
   });
 });
 

@@ -1,14 +1,15 @@
 /**
  * Your own components in `<epdf-pdf-viewer>`: `epdfToolbarItem`, `epdfPanel` and `epdfRegion`
  * put them in the viewer, `EpdfToolbarItemContext` says where an item sits (and follows the bar
- * to a rail when the viewer narrows), and `<epdf-button>`, `<epdf-menu>` and `<epdf-menu-item>`
- * are the viewer's own. `components.test.ts` drives it.
+ * to a rail when the viewer narrows), and `<epdf-button>`, `<epdf-menu>`, `<epdf-menu-item>` and
+ * `<epdf-icon>` are the viewer's own, `active` too. `components.test.ts` drives it.
  */
 import { boot } from './boot';
 
 import { Component, inject, signal } from '@angular/core';
 import {
   EpdfButton,
+  EpdfIcon,
   EpdfMenu,
   EpdfMenuItem,
   EpdfPanel,
@@ -75,6 +76,7 @@ const layout: LayoutFunction = (base, env) => {
     )
     .add({ custom: 'zoom-in' }, { to: 'main', section: 'start' })
     .add({ custom: 'share' }, { to: 'main', section: 'start' })
+    .add({ custom: 'toggle' }, { to: 'main', section: 'end' })
     .addPanel('notes', { side: 'end', title: 'Notes', icon: 'book' })
     .add('panel:notes', { to: 'main', section: 'end' });
   return env.width < 900 ? placed.place('main', 'start') : placed;
@@ -88,6 +90,7 @@ const layout: LayoutFunction = (base, env) => {
     EpdfPanel,
     EpdfRegion,
     EpdfButton,
+    EpdfIcon,
     EpdfMenu,
     EpdfMenuItem,
     Where,
@@ -111,7 +114,12 @@ const layout: LayoutFunction = (base, env) => {
         <epdf-menu icon="link" label="Share">
           <epdf-menu-item icon="copy" (select)="pick('copy')">Copy link</epdf-menu-item>
           <epdf-menu-item icon="message" (select)="pick('email')">Email a link</epdf-menu-item>
+          <epdf-menu-item active>Show notes</epdf-menu-item>
         </epdf-menu>
+      </ng-template>
+      <ng-template epdfToolbarItem="toggle">
+        <epdf-button icon="eye" label="Night" [active]="night()" (click)="night.set(!night())" />
+        <epdf-icon name="check" [size]="16" label="Saved" />
       </ng-template>
       <ng-template epdfPanel="notes">
         <textarea data-check="notes" placeholder="Your notes"></textarea>
@@ -125,6 +133,7 @@ const layout: LayoutFunction = (base, env) => {
 export class App {
   protected readonly layout = layout;
   protected readonly width = signal('100%');
+  protected readonly night = signal(false);
 
   constructor() {
     record.setWidth = (width) => this.width.set(width);

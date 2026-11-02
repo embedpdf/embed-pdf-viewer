@@ -48,6 +48,7 @@ import { Icon } from './icons';
 import { useConfiguredFonts } from '../config-context';
 import { AnnotationFlagsSection } from './annotation-flags';
 import { useLabel } from './labels';
+import { TooltipButton, WithTooltip } from './tooltip';
 
 // ── app-level vocabulary (a viewer's decision) ────────────────────────────────
 // The schema says which controls to show, with each one's label and its
@@ -174,9 +175,8 @@ function Swatch({
       }
     : { backgroundColor: color };
   return (
-    <button
-      type="button"
-      title={isTransparent(color) ? t('stylePanel.transparent') : color}
+    <TooltipButton
+      label={isTransparent(color) ? t('stylePanel.transparent') : color}
       onClick={() => onSelect(color)}
       className={`border-border-strong h-5 w-5 rounded-full border ${active ? 'outline-accent outline outline-2 outline-offset-2' : ''}`}
       style={style}
@@ -290,18 +290,23 @@ function OptionRow({
   onClick: () => void;
   children: ReactNode;
 }) {
+  // An option drawn as a picture is named, in its tooltip too, beside it as in a menu.
   return (
-    <button
-      type="button"
-      title={title}
-      aria-label={title}
-      disabled={disabled}
-      onClick={onClick}
-      className={`flex w-full flex-col items-start rounded px-2 py-1.5 text-start text-sm ${disabled ? 'text-fg-muted cursor-not-allowed' : 'hover:bg-hover'} ${selected ? 'bg-selected' : ''} ${selected && !disabled ? 'text-accent' : ''} ${!selected && !disabled ? 'text-fg' : ''}`}
-    >
-      {children}
-      {hint && <span className="text-fg-muted text-xs">{hint}</span>}
-    </button>
+    <WithTooltip content={title ? { label: title } : null} options={{ inMenu: true }}>
+      {(tooltip) => (
+        <button
+          {...tooltip}
+          type="button"
+          aria-label={title}
+          disabled={disabled}
+          onClick={onClick}
+          className={`flex w-full flex-col items-start rounded px-2 py-1.5 text-start text-sm ${disabled ? 'text-fg-muted cursor-not-allowed' : 'hover:bg-hover'} ${selected ? 'bg-selected' : ''} ${selected && !disabled ? 'text-accent' : ''} ${!selected && !disabled ? 'text-fg' : ''}`}
+        >
+          {children}
+          {hint && <span className="text-fg-muted text-xs">{hint}</span>}
+        </button>
+      )}
+    </WithTooltip>
   );
 }
 
@@ -669,9 +674,8 @@ function Toggle({
   children: ReactNode;
 }) {
   return (
-    <button
-      type="button"
-      title={title}
+    <TooltipButton
+      label={title}
       onClick={onClick}
       onMouseDown={keepFocus ? (event) => event.preventDefault() : undefined}
       className={`flex h-9 w-9 items-center justify-center rounded border transition-colors ${
@@ -681,7 +685,7 @@ function Toggle({
       }`}
     >
       {children}
-    </button>
+    </TooltipButton>
   );
 }
 

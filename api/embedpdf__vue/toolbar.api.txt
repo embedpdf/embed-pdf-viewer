@@ -2,11 +2,11 @@
 
 BarChild [TypeAliasDeclaration] (from packages/core/ui/src/schema.ts): export type BarChild = BarItem | CustomItem | string;
 BarGroup [InterfaceDeclaration] (from packages/core/ui/src/schema.ts): export interface BarGroup{ readonly id: string; readonly labelKey?: string; readonly role?: 'buttons' | 'tabs'; readonly shed?: boolean; readonly collapse?: 'menu' | 'select'; readonly importance?: Importance; readonly dependent?: boolean; readonly items: readonly BarChild[]; }
-BarItem [InterfaceDeclaration] (from packages/core/ui/src/schema.ts): export interface BarItem{ readonly command: string; readonly variants?: readonly Variant[]; readonly importance?: Importance; }
+BarItem [InterfaceDeclaration] (from packages/core/ui/src/schema.ts): export interface BarItem{ readonly command: string; readonly variants?: readonly Variant[]; readonly importance?: Importance; readonly emphasis?: Emphasis; }
 BarSchema [InterfaceDeclaration] (from packages/core/ui/src/schema.ts): export interface BarSchema{ readonly id: string; readonly sections: BarSections; }
 BarSections [InterfaceDeclaration] (from packages/core/ui/src/schema.ts): export interface BarSections{ readonly start?: readonly BarGroup[]; readonly center?: readonly BarGroup[]; readonly end?: readonly BarGroup[]; }
 CollapsedGroupView [TypeAliasDeclaration] (from packages/framework/vue/src/toolbar/views.ts): export type CollapsedGroupView = CollapsedGroupViewOf<ResolvedCommand>;
-CustomItem [InterfaceDeclaration] (from packages/core/ui/src/schema.ts): export interface CustomItem{ readonly slot: string; readonly variants?: readonly string[]; readonly terminal?: string; readonly importance?: Importance; }
+CustomItem [InterfaceDeclaration] (from packages/core/ui/src/schema.ts): export interface CustomItem{ readonly slot: string; readonly variants?: readonly string[]; readonly terminal?: string; readonly importance?: Importance; readonly grow?: boolean; }
 CustomSlotCtx [InterfaceDeclaration] (from packages/core/ui/src/toolbar-layout.ts): export interface CustomSlotCtx{ layer: 'live' | 'measure'; measure: (length: number) => void; }
 DEFAULT_IMPORTANCE [VariableDeclaration] (from packages/core/ui/src/schema.ts): DEFAULT_IMPORTANCE: Importance = 3
 GroupDisclosureView [TypeAliasDeclaration] (from packages/framework/vue/src/toolbar/views.ts): export type GroupDisclosureView = GroupDisclosureViewOf<ResolvedCommand>;

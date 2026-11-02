@@ -48,8 +48,8 @@ export class Review {
 ```
 
 `EpdfToolbarItemContext` tells it where it sits, and `<epdf-button>`,
-`<epdf-menu>` and `<epdf-menu-item>` (`EpdfButton`, `EpdfMenu`, `EpdfMenuItem`)
-are the viewer's own, for yours.
+`<epdf-menu>`, `<epdf-menu-item>` and `<epdf-icon>` (`EpdfButton`, `EpdfMenu`,
+`EpdfMenuItem`, `EpdfIcon`) are the viewer's own, for yours.
 
 ## Driving the viewer
 

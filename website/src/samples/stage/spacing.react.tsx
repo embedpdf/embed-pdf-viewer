@@ -25,6 +25,8 @@ function SpacingControls() {
   const stage = useStage();
   const { padding, gap } = useStageSettings();
   const zoomLevel = useStageState((state) => state.zoomLevel);
+  // A number is every side, as this slider sets it; { top, right, bottom, left } is each side's.
+  const paddingSize = typeof padding === 'number' ? padding : padding.top;
   // A number grows with the zoom; { px } stays the same on screen.
   const onScreen = typeof gap !== 'number';
   const gapSize = typeof gap === 'number' ? gap : gap.px;
@@ -38,10 +40,10 @@ function SpacingControls() {
           type="range"
           min={0}
           max={64}
-          value={padding}
+          value={paddingSize}
           onChange={(event) => stage.updateSettings({ padding: Number(event.target.value) })}
         />
-        <output className="value">{padding}</output>
+        <output className="value">{paddingSize}</output>
       </label>
       <label className="label">
         Gap

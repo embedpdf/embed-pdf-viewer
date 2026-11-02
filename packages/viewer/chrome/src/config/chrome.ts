@@ -307,7 +307,7 @@ export const DEFAULT_LAYOUT: LayoutData = {
     // A card of the comments panel: its menu button and a right-click on it open this.
     'comment-item': [
       {
-        titleKey: 'demo.commentsStatus',
+        titleKey: 'comments.status',
         items: [
           'comment:status-accepted',
           'comment:status-rejected',
@@ -327,21 +327,21 @@ export const DEFAULT_LAYOUT: LayoutData = {
     ],
   },
 
-  // Each panel's button is its `panel:<id>` command, titled and drawn as the panel is
-  // (config/panels.ts); the panels on one side take turns.
+  // Each panel's button is its `panel:<id>` command; a built-in panel brings its title and icon
+  // wherever its id is (config/panels.ts). The panels on one side take turns.
   panels: {
-    thumbnails: { side: 'start', titleKey: 'panels.thumbnails', icon: 'sidebar' },
-    outline: { side: 'start', titleKey: 'panels.outline', icon: 'listTree' },
-    attachments: { side: 'start', titleKey: 'panels.attachments', icon: 'paperclip' },
-    search: { side: 'end', titleKey: 'panels.search', icon: 'search' },
-    comments: { side: 'end', titleKey: 'panels.comments', icon: 'comment' },
-    style: { side: 'end', titleKey: 'panels.style', icon: 'palette' },
-    stamps: { side: 'end', titleKey: 'panels.stamps', icon: 'rubberStamp' },
-    signatures: { side: 'end', titleKey: 'panels.signatures', icon: 'signature' },
-    redaction: { side: 'end', titleKey: 'panels.redaction', icon: 'redactionSidebar' },
-    measurement: { side: 'end', titleKey: 'panels.measurement', icon: 'updateScale' },
+    thumbnails: { side: 'start' },
+    outline: { side: 'start' },
+    attachments: { side: 'start' },
+    search: { side: 'end' },
+    comments: { side: 'end' },
+    style: { side: 'end' },
+    stamps: { side: 'end' },
+    signatures: { side: 'end' },
+    redaction: { side: 'end' },
+    measurement: { side: 'end' },
     // The form designer's sidebar: the document's fields, and what the selected one is.
-    'form-design': { side: 'end', titleKey: 'panels.formDesign', icon: 'formDesign' },
+    'form-design': { side: 'end' },
   },
 };
 

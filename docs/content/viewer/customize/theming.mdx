@@ -20,21 +20,26 @@ its prop, so a theme switch in your app switches the viewer too.
 
 ## Every color
 
-Change any of them with `tokens`, for both light and dark, and with `dark` for dark only:
+Change any of them with `tokens` for both light and dark, with `light` for light only, and with
+`dark` for dark only:
 
 ```js
 {
   theme: {
     accent: '#0f6e56',
-    tokens: { surface: '#fbfaf7', radius: '2px' },
-    dark: { surface: '#16201c' },
+    tokens: { radius: '2px' },
+    light: { surface: '#fbfaf7' },
+    dark: { surface: '#16201c', 'page-shadow': 'none' },
   },
 }
 ```
 
+When more than one sets a token, `light` or `dark` wins in its mode, then `tokens`, then `accent`.
+A CSS variable wins over all of them: see [From CSS](#from-css).
+
 | Token | What it colors | Light | Dark |
 | :-- | :-- | :-- | :-- |
-| `accent` | Pressed buttons, the active tab, links, focus rings, and every part on the pages that has no color of its own | `#3b82f6` | `#60a5fa` |
+| `accent` | Pressed buttons, [primary](layout#a-primary-button) buttons, the active tab, links, focus rings, and every part on the pages that has no color of its own | `#3b82f6` | `#60a5fa` |
 | `background` | Behind the bars and panels | `#f3f4f6` | `#111827` |
 | `surface` | Bars and panels | `#ffffff` | `#1f2937` |
 | `surface-raised` | Menus, sheets, dialogs and floating bars | `#ffffff` | `#1f2937` |
@@ -43,11 +48,15 @@ Change any of them with `tokens`, for both light and dark, and with `dark` for d
 | `border` | Lines between bars, panels and groups | `#d1d5db` | `#4b5563` |
 | `hover` | A button under the pointer | `#f3f4f6` | `#374151` |
 | `canvas` | Behind the pages | `#f3f4f6` | `#0d1117` |
-| `radius` | The corners of buttons, menus and panels | `6px` | `6px` |
-| `font` | Every word the viewer writes | your system's font | your system's font |
+| `page-background` | A page before its picture arrives | `#ffffff` | `#ffffff` |
+| `page-shadow` | The shadow under each page; `none` for none | `0 6px 18px rgb(0 0 0 / 0.18)` | `0 6px 18px rgb(0 0 0 / 0.18)` |
+| `tooltip` | Behind a tooltip's words | `text`'s color | `text`'s color |
+| `tooltip-text` | A tooltip's words | `surface`'s color | `surface`'s color |
+| `radius` | The corners of buttons, menus, panels and tooltips | `6px` | `6px` |
+| `font` | Every word the viewer writes, its tooltips' too | your system's font | your system's font |
 
-The pages themselves have their own colors: the text selection, search matches, the handles of a
-selected annotation, form fields. Every one follows `accent` until you set it, and every one is
+What's drawn on the pages has its own colors: the text selection, search matches, the handles of
+a selected annotation, form fields. Every one follows `accent` until you set it, and every one is
 listed on [Colors & theming](/docs/headless/ui/theming#every-color) in the headless docs, as a
 plugin setting and a CSS variable. Both work in the viewer.
 
@@ -82,12 +91,18 @@ embedpdf-viewer::part(toolbar-button) {
 embedpdf-viewer::part(mode-tab-active) {
   font-weight: 600;
 }
+
+embedpdf-viewer::part(toolbar-review) {
+  background: #fef3c7;
+}
 ```
 
 | Part | What it is |
 | :-- | :-- |
-| `toolbar` | A bar |
+| `toolbar`, `toolbar-<id>` | A bar, and the bar with that id: `toolbar-main`, `toolbar-pager`, or `toolbar-review` for a bar you added as `review` |
 | `toolbar-button`, `toolbar-button-active` | A button in a bar, and a pressed one |
+| `toolbar-button-primary` | A [primary](layout#a-primary-button) button |
+| `tooltip` | A tooltip |
 | `mode-tab`, `mode-tab-active` | A mode tab, and the selected one |
 | `tab`, `tab-active` | A document tab, and the open one |
 | `menu`, `menu-item`, `menu-item-active` | A menu, a row, and the row of the current choice |

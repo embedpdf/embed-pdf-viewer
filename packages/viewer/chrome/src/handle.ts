@@ -29,7 +29,7 @@ import { OutlineToken, type OutlineCapability } from '@embedpdf/react/outline';
 import { PageEditToken, type PageEditCapability } from '@embedpdf/react/page-edit';
 import { RedactionToken, type RedactionCapability } from '@embedpdf/react/redaction';
 import { RenderToken, type RenderCapability } from '@embedpdf/react/render';
-import { DocumentsToken, PluginError, isReadMember } from '@embedpdf/react/runtime';
+import { DocumentsToken, PluginError, isPluginError, isReadMember } from '@embedpdf/react/runtime';
 import type {
   CapabilityToken,
   DocumentsCapability,
@@ -116,8 +116,9 @@ export const VIEWER_PLUGINS: {
 export interface ScopedViewer {
   /**
    * A plugin's API, by its name (`'search'`) or its token (`SearchToken`). Throws when the
-   * viewer has no such plugin, when the plugin belongs to a document and none is open, and
-   * `instance-closed` once the viewer is done.
+   * viewer has no such plugin, `not-ready` when the plugin belongs to a document and that
+   * document hasn't opened (none is open, or it's still opening), and `instance-closed` once
+   * the viewer is done.
    */
   get<Name extends PluginName>(name: Name): ViewerPlugins[Name];
   get<Capability>(token: CapabilityToken<Capability>): Capability;
@@ -140,15 +141,30 @@ export interface Viewer extends ScopedViewer {
   forDocument(documentId: string): ScopedViewer;
 
   /**
-   * Run `read` on every change in the viewer, and call `onChange` when what it returns changed
-   * (`isEqual`, default `Object.is`: capability getters return the same object until their value
-   * changes, so identity works). Returns a function that stops it.
+   * Run `read` on every change in the viewer, and call `onChange` when what it returns changed;
+   * with `immediate`, with the first value it reads too (`previous` is then `undefined`). While
+   * `read` throws `not-ready` (a document's plugin before its document has opened, or after it
+   * closed), it waits, and reads again on the next change. Returns a function that stops it.
    */
-  watch<T>(
+  watch<T, Immediate extends boolean = false>(
     read: () => T,
-    onChange: (value: T, previous: T) => void,
-    isEqual?: (left: T, right: T) => boolean,
+    onChange: (value: T, previous: Immediate extends true ? T | undefined : T) => void,
+    options?: WatchOptions<T, Immediate>,
   ): Unsubscribe;
+}
+
+/** How {@link Viewer.watch} follows its read. */
+export interface WatchOptions<T, Immediate extends boolean = boolean> {
+  /**
+   * Call `onChange` with the first value `read` gives too, not only when it changes. Default
+   * `false`.
+   */
+  readonly immediate?: Immediate;
+  /**
+   * Whether two values are the same, so `onChange` isn't called. Default `Object.is`:
+   * capability getters return the same object until their value changes, so identity works.
+   */
+  readonly isEqual?: (left: T, right: T) => boolean;
 }
 
 /** The key of the kernel on a {@link Viewer}, for the framework wrappers only. */
@@ -272,13 +288,27 @@ export function createViewer(kernel: Kernel, plugins: PluginTokens): ViewerLifet
     return token;
   };
 
+  /** The plugin's API now; a document's plugin refuses with `not-ready` before its document opens. */
+  const capabilityOf = (
+    token: CapabilityToken<unknown>,
+    documentId: string | undefined,
+  ): object => {
+    try {
+      return kernel.capability(token, documentId) as object;
+    } catch (error) {
+      if (isPluginError(error) || kernel.scopeOf(token) !== 'document') throw error;
+      const message = error instanceof Error ? error.message : String(error);
+      throw new PluginError('not-ready', token.name, message, { cause: error });
+    }
+  };
+
   const scopedTo = (documentId: string | undefined): ScopedViewer => {
     function get<Name extends PluginName>(name: Name): ViewerPlugins[Name];
     function get<Capability>(token: CapabilityToken<Capability>): Capability;
     function get(plugin: string | CapabilityToken<unknown>): unknown {
       const token = tokenOf(plugin);
       if (disposed) throw goneError(token.name);
-      return lensOf(kernel.capability(token, documentId) as object, token.name);
+      return lensOf(capabilityOf(token, documentId), token.name);
     }
     function tryGet<Name extends PluginName>(name: Name): ViewerPlugins[Name] | null;
     function tryGet<Capability>(token: CapabilityToken<Capability>): Capability | null;
@@ -290,22 +320,36 @@ export function createViewer(kernel: Kernel, plugins: PluginTokens): ViewerLifet
     return { get, tryGet };
   };
 
-  const watch = <T>(
+  const watch = <T, Immediate extends boolean = false>(
     read: () => T,
-    onChange: (value: T, previous: T) => void,
-    isEqual: (left: T, right: T) => boolean = Object.is,
+    onChange: (value: T, previous: Immediate extends true ? T | undefined : T) => void,
+    options: WatchOptions<T, Immediate> = {},
   ): Unsubscribe => {
     if (disposed) return () => {};
-    let previous = read();
-    return keep(
-      kernel.subscribe(() => {
-        const next = read();
-        if (isEqual(previous, next)) return;
-        const before = previous;
-        previous = next;
-        onChange(next, before);
-      }),
-    );
+    const { immediate = false, isEqual = Object.is } = options;
+    const deliver = onChange as (value: T, previous: T | undefined) => void;
+    // Boxed, so a first value of `undefined` still counts as read.
+    let last: { readonly value: T } | null = null;
+    const follow = () => {
+      let value: T;
+      try {
+        value = read();
+      } catch (error) {
+        if (isPluginError(error, 'not-ready')) return;
+        throw error;
+      }
+      if (last === null) {
+        last = { value };
+        if (immediate) deliver(value, undefined);
+        return;
+      }
+      if (isEqual(last.value, value)) return;
+      const previous = last.value;
+      last = { value };
+      deliver(value, previous);
+    };
+    follow();
+    return keep(kernel.subscribe(follow));
   };
 
   const viewer: Viewer = {

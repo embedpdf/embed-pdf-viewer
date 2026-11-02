@@ -18,6 +18,7 @@ export type {
   PlacedButton,
   PlacedComponent,
   PlacedComponents,
+  PlacedIcon,
   PlacedMenu,
   PlacedMenuItem,
 } from './ui/placed-components';
@@ -47,6 +48,7 @@ export type {
   Viewer,
   ViewerLifetime,
   ViewerPlugins,
+  WatchOptions,
 } from './handle';
 export type { Feature, ReadOnlyExceptions } from './features';
 export type {

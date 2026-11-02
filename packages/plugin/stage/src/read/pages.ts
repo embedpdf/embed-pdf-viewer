@@ -320,15 +320,15 @@ export function createPageReads(
       },
       getViewpoint: (): Viewpoint => ({ anchor: currentAnchor(), zoom: state().zoom }),
       getCurrentDestination: (): PageDestination | null => {
-        // Where `goToDestination` puts a destination's point: a padding in from the viewport's
+        // Where `goToDestination` puts a destination's point: the padding in from the viewport's
         // top-left. The page read is the first one reaching past that point; the one above it
         // may still show in the padding.
-        const inset = padding();
+        const { left: insetX, top: insetY } = padding();
         const current = camera();
         const first = visiblePages()
           .filter((page) => {
             const corner = toScreen(current, { x: page.x + page.width, y: page.y + page.height });
-            return corner.x > inset && corner.y > inset;
+            return corner.x > insetX && corner.y > insetY;
           })
           .sort((left, right) => left.pageIndex - right.pageIndex)[0];
         const size = first && ctx.getPage(first.ref)?.size;
@@ -336,8 +336,8 @@ export function createPageReads(
         // That point on the page's plane, then the nearest point of the page: a quarter-turn
         // keeps the page's edges on the axes, so clamping each axis is exact.
         const corner = first.transform.viewToPage({
-          x: inset - first.screenX,
-          y: inset - first.screenY,
+          x: insetX - first.screenX,
+          y: insetY - first.screenY,
         });
         const clamp = (value: number, max: number) =>
           Math.round(Math.min(Math.max(value, 0), max) * 100) / 100;

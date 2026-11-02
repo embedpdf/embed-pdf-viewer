@@ -9,7 +9,7 @@
  * Placing bars, drawing menus and opening panels is the viewer's job: a bar
  * reaches a toolbar through `compileBar` (layout-compile.ts).
  */
-import type { Importance, Variant } from './schema';
+import type { Emphasis, Importance, Variant } from './schema';
 import { didYouMean } from './suggestions';
 
 // ── the data ─────────────────────────────────────────────────────────────────
@@ -31,6 +31,16 @@ export type FloatPosition =
 /** What a bar over a selection follows: selected text, or selected annotations. */
 export type SelectionTarget = 'selection' | 'annotation';
 
+/** A bar floating over the pages: where, and whether it gets out of the way while they scroll. */
+export interface FloatPlace {
+  readonly float: FloatPosition;
+  /**
+   * Fade out while the pages scroll, and come back once they have been still for a moment;
+   * `false` stays. Default: on a phone (a compact viewer) for a bar with the page number.
+   */
+  readonly hideWhileScrolling?: boolean;
+}
+
 /**
  * Where a bar goes: along an edge, floating over the pages, along another bar on the side of the
  * pages, over what's selected, or at the top of a panel, under its title. Bars on one edge stack
@@ -40,7 +50,7 @@ export type SelectionTarget = 'selection' | 'annotation';
 export type BarPlace =
   | BarEdge
   | { readonly edge: BarEdge; readonly before?: string; readonly after?: string }
-  | { readonly float: FloatPosition }
+  | FloatPlace
   | { readonly with: string }
   | { readonly at: SelectionTarget }
   | { readonly panel: string };
@@ -52,6 +62,8 @@ export interface LayoutCommandItem {
   readonly variants?: readonly Variant[];
   /** Who makes room first: `1` to `5` (never leaves the bar). Default: its group's. */
   readonly importance?: Importance;
+  /** `'primary'` draws its button filled in the accent; in the "More" menu it's a row like any. */
+  readonly emphasis?: Emphasis;
 }
 
 /** Your own component, by its id. `command` is what it becomes in the "More" menu; without one, it never leaves the bar. */
@@ -62,6 +74,11 @@ export interface LayoutCustomItem {
   readonly variants?: readonly string[];
   /** Who makes room first, with a `command`. Default: its group's. */
   readonly importance?: Importance;
+  /**
+   * Take the room the bar has left: the toolbar fits it in at its own length, like any item,
+   * then gives it the rest. Default `false`.
+   */
+  readonly grow?: boolean;
 }
 
 /** A command id, a command with options, or your own component. */
@@ -144,10 +161,14 @@ export interface PanelWidth {
 export interface LayoutPanel {
   /** Default `'end'`. */
   readonly side?: 'start' | 'end';
+  /**
+   * Its title, in its header and on its button. A built-in panel brings its own; this replaces
+   * it.
+   */
   readonly title?: string;
   /** The title as a translation key. */
   readonly titleKey?: string;
-  /** Its button's icon. */
+  /** Its button's icon. A built-in panel brings its own. */
   readonly icon?: string;
   /**
    * How it opens: the same way at every size, or per size. Default
@@ -158,11 +179,23 @@ export interface LayoutPanel {
   readonly width?: number | PanelWidth;
   /** Whether people can drag its edge to change its width. Default `true`. */
   readonly resizable?: boolean;
+  /**
+   * Open it when a document opens, where it docks; where it would cover the pages (an overlay,
+   * a sheet) it waits for its button. Default `false`.
+   */
+  readonly open?: boolean;
+  /**
+   * Whether people can close it where it docks. `false` keeps it open there: no close button,
+   * and its button opens it without closing it; another panel on its side can take its place,
+   * and it's back when that one closes. Default `true`.
+   */
+  readonly closable?: boolean;
 }
 
 /**
  * Changes to a panel: the fields to set. `present` and `width` change only what they name: a
- * map of sizes keeps the other sizes, and a number or `{ initial }` keeps `min` and `max`.
+ * map of sizes keeps the other sizes, and a number or `{ initial }` keeps `min` and `max`. A
+ * `title` replaces a `titleKey`, and a `titleKey` a `title`.
  */
 export type LayoutPanelPatch = Partial<LayoutPanel>;
 
@@ -208,8 +241,8 @@ export interface Layout {
   place(bar: string, place: BarPlace): Layout;
   /** Add a bar, or replace the bar with that id. */
   addBar(id: string, bar: LayoutBar): Layout;
-  /** Remove a bar. Removing a mode's bar removes its tab. */
-  removeBar(id: string): Layout;
+  /** Remove bars, and the bars that ride along them. Removing a mode's bar removes its tab. */
+  removeBar(ids: string | readonly string[]): Layout;
   /** Put an item in a bar or a menu: at the end of a section, in a group, or next to an item. */
   add(item: LayoutItem, options: AddItemOptions): Layout;
   /** Take items out of one bar or menu; a group or section with nothing left goes with them. */
@@ -227,7 +260,7 @@ export interface Layout {
    * so far, so a panel added after it keeps its own.
    */
   panels(changes: LayoutPanelPatch): Layout;
-  /** Remove a panel, and its `panel:<id>` button from every bar and menu. */
+  /** Remove a panel, its `panel:<id>` button from every bar and menu, and the bars at its top. */
   removePanel(id: string): Layout;
   /** When the document tabs show. */
   tabs(visibility: TabsVisibility): Layout;
@@ -271,7 +304,8 @@ function layoutOf(data: LayoutData, warnings: readonly string[]): Layout {
   const layout: Layout = Object.freeze({
     place: (bar: string, place: BarPlace) => next(placeBar(data, bar, place)),
     addBar: (id: string, bar: LayoutBar) => next([withRecord(data, 'bars', id, bar), []]),
-    removeBar: (id: string) => next(removeBar(data, id)),
+    removeBar: (ids: string | readonly string[]) =>
+      next(removeBars(data, typeof ids === 'string' ? [ids] : ids)),
     add: (item: LayoutItem, options: AddItemOptions) => next(addItem(data, item, options)),
     remove: (ids: string | readonly string[], options: RemoveItemOptions) =>
       next(removeItems(data, typeof ids === 'string' ? [ids] : ids, options)),
@@ -336,6 +370,16 @@ export function isLayoutItem(value: unknown): value is LayoutItem {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
   const item = value as { command?: unknown; custom?: unknown };
   return typeof item.custom === 'string' || typeof item.command === 'string';
+}
+
+/** The bar a place rides along, or `null`. */
+export function hostOf(place: BarPlace | undefined): string | null {
+  return typeof place === 'object' && place !== null && 'with' in place ? place.with : null;
+}
+
+/** The panel a place puts a bar at the top of, or `null`. */
+export function panelOf(place: BarPlace | undefined): string | null {
+  return typeof place === 'object' && place !== null && 'panel' in place ? place.panel : null;
 }
 
 /** Every item id in a bar, in order, once each. */
@@ -430,10 +474,35 @@ function placeBar(data: LayoutData, id: string, place: BarPlace): Edited {
   return [withRecord(data, 'bars', id, { ...bar, place }), []];
 }
 
-function removeBar(data: LayoutData, id: string): Edited {
-  if (!barsOf(data)[id])
-    return [data, [`removeBar: no bar "${id}"${didYouMean(id, Object.keys(barsOf(data)))}`]];
-  return [withoutRecord(data, 'bars', id), []];
+/**
+ * `data` without `ids`' bars and every bar that rides along one of them, and theirs: a bar riding
+ * along nothing has nowhere to go.
+ */
+function withoutBars(data: LayoutData, ids: readonly string[]): LayoutData {
+  const bars = barsOf(data);
+  const gone = new Set(ids.filter((id) => bars[id] !== undefined));
+  if (gone.size === 0) return data;
+  for (let added = true; added; ) {
+    added = false;
+    for (const [id, bar] of Object.entries(bars)) {
+      const host = hostOf(bar?.place);
+      if (host !== null && gone.has(host) && !gone.has(id)) {
+        gone.add(id);
+        added = true;
+      }
+    }
+  }
+  const kept = Object.fromEntries(Object.entries(bars).filter(([id]) => !gone.has(id)));
+  return { ...data, bars: kept };
+}
+
+function removeBars(data: LayoutData, ids: readonly string[]): Edited {
+  const bars = barsOf(data);
+  const missing = ids.filter((id) => bars[id] === undefined);
+  return [
+    withoutBars(data, ids),
+    missing.map((id) => `removeBar: no bar "${id}"${didYouMean(id, Object.keys(bars))}`),
+  ];
 }
 
 function addItem(data: LayoutData, item: LayoutItem, options: AddItemOptions | undefined): Edited {
@@ -657,12 +726,15 @@ export const panelWidthFieldsOf = (width: number | PanelWidth): PanelWidth =>
 /**
  * `panel` with `changes`: each field replaced, except `present` and `width`, which change only
  * what the change names (a map of sizes keeps the other sizes, `{ initial }` keeps the limits).
+ * The title is one of `title` and `titleKey`: setting one takes out the other.
  */
 function changedPanel(panel: LayoutPanel, changes: LayoutPanelPatch): LayoutPanel {
   const next: Record<string, unknown> = { ...panel };
   for (const [field, value] of Object.entries(changes)) {
     if (value !== undefined) next[field] = value;
   }
+  if (changes.title !== undefined && changes.titleKey === undefined) delete next.titleKey;
+  if (changes.titleKey !== undefined && changes.title === undefined) delete next.title;
   const { present, width } = changes;
   if (typeof present === 'object' && panel.present !== undefined)
     next.present = { ...panelPresentationsOf(panel.present), ...present };
@@ -722,7 +794,9 @@ function removePanel(data: LayoutData, id: string): Edited {
         : menu,
     ]),
   );
-  return [{ ...withoutRecord(data, 'panels', id), bars, menus }, []];
+  // So do the bars at its top, which have nowhere else to go.
+  const inPanel = Object.keys(bars).filter((barId) => panelOf(bars[barId]?.place) === id);
+  return [withoutBars({ ...withoutRecord(data, 'panels', id), bars, menus }, inPanel), []];
 }
 
 // ── the viewer's size ────────────────────────────────────────────────────────

@@ -2,10 +2,12 @@
  * How a panel opens and how wide it is. By default a panel docks beside the
  * pages in a wide viewer, opens over their edge at medium widths and is a
  * sheet on a phone; its layout `present` changes that, for every size or for
- * some. A docked panel's inner edge, the one beside the pages, drags between
- * the narrowest and the widest its layout `width` allows; it is on the panel's
- * right at the start in a left-to-right language and on its left at the end,
- * the other way round in a right-to-left one.
+ * some. The inner edge of a docked panel or an overlay, the one beside the
+ * pages, drags between the narrowest and the widest its layout `width`
+ * allows; it is on the panel's right at the start in a left-to-right language
+ * and on its left at the end, the other way round in a right-to-left one. A
+ * sheet has no edge: it is as wide as the viewer on a phone, and as wide as
+ * its panel on a wider viewer.
  */
 import {
   panelPresentationsOf,
@@ -80,7 +82,22 @@ export function overlayWidthOf(width: number, viewerWidth: number): number {
   return Math.round(Math.max(0, Math.min(width, viewerWidth - OVERLAY_CLEARANCE_PX)));
 }
 
-/** A docked panel's inner edge: the side it's on, and how far it can go in this viewer. */
+/**
+ * A sheet's width in a viewer wider than a phone: its panel's `width`, within the panel's limits
+ * and never wider than the viewer. A sheet covers the pages, so half the viewer isn't its limit.
+ */
+export function sheetWidthOf(width: number, viewerWidth: number, widths: PanelWidths): number {
+  const own = Math.min(widths.max, Math.max(widths.min, width));
+  return Math.round(Math.max(0, Math.min(own, viewerWidth)));
+}
+
+/** Whether a panel docks at `size`, as its layout `present` says or by default. */
+export const docksAt = (
+  size: ViewerSize,
+  present?: PanelPresentation | PanelPresentationBySize,
+): boolean => presentationOf(size, present) === 'dock';
+
+/** A panel's inner edge, docked or as an overlay: its side, and how far it goes in this viewer. */
 export interface PanelEdge {
   readonly side: PanelSide;
   readonly dir: PanelDirection;

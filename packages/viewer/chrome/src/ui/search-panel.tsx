@@ -29,6 +29,7 @@ import { useSurfaceFocus } from '@embedpdf/react/shell';
 import { Icon } from './icons';
 import { useCloseOnPick } from './panel-frame';
 import { buttonClass } from './toolbar';
+import { TooltipButton } from './tooltip';
 
 const DEBOUNCE_MS = 300;
 
@@ -209,26 +210,22 @@ function HitSteps({ box, disabled = false }: { box: SearchDraft; disabled?: bool
   const t = useT();
   return (
     <div className="flex shrink-0 items-center">
-      <button
-        type="button"
-        title={t('demo.searchPrevious')}
-        aria-label={t('demo.searchPrevious')}
+      <TooltipButton
+        label={t('demo.searchPrevious')}
         disabled={disabled}
         className={buttonClass(false, !disabled)}
         onClick={() => box.search.previousHit()}
       >
         <Icon name="chevronLeft" size={20} className="rtl:-scale-x-100" />
-      </button>
-      <button
-        type="button"
-        title={t('demo.searchNext')}
-        aria-label={t('demo.searchNext')}
+      </TooltipButton>
+      <TooltipButton
+        label={t('demo.searchNext')}
         disabled={disabled}
         className={buttonClass(false, !disabled)}
         onClick={() => box.search.nextHit()}
       >
         <Icon name="chevronRight" size={20} className="rtl:-scale-x-100" />
-      </button>
+      </TooltipButton>
     </div>
   );
 }
@@ -390,16 +387,14 @@ export function FindBar() {
           </span>
         )}
         <HitSteps box={box} disabled={hitCount === 0} />
-        <button
-          type="button"
-          title={t('demo.searchOptions')}
-          aria-label={t('demo.searchOptions')}
+        <TooltipButton
+          label={t('demo.searchOptions')}
           aria-expanded={optionsOpen}
           className={buttonClass(optionsOpen)}
           onClick={() => setOptionsOpen((open) => !open)}
         >
           <Icon name="chevronDown" size={20} />
-        </button>
+        </TooltipButton>
       </div>
       <InvalidPattern box={box} />
       {optionsOpen && (

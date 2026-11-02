@@ -33,6 +33,7 @@ import {
 import { useSignatureSettings } from '../config-context';
 import { Icon } from './icons';
 import { restoreStampLibrariesOnce } from './stamp-store';
+import { TooltipButton } from './tooltip';
 
 const fieldLabel = (
   field: { kind: 'fqn'; name: string } | { kind: 'objectNumber'; objectNumber: number },
@@ -209,30 +210,27 @@ function SignerRowView({
         ) : (
           <span className="text-fg min-w-0 flex-1 truncate text-sm font-medium">{row.name}</span>
         )}
-        <button
-          type="button"
+        <TooltipButton
+          label={t('demo.signaturesRename')}
           onClick={() => setRenaming(row.name)}
-          title={t('demo.signaturesRename')}
           className={iconButton}
         >
           <Icon name="pencilMarker" size={13} />
-        </button>
-        <button
-          type="button"
+        </TooltipButton>
+        <TooltipButton
+          label={t('demo.signaturesExport')}
           onClick={exportPdf}
-          title={t('demo.signaturesExport')}
           className={iconButton}
         >
           <Icon name="download" size={13} />
-        </button>
-        <button
-          type="button"
+        </TooltipButton>
+        <TooltipButton
+          label={t('demo.signaturesRemove')}
           onClick={() => void stamp.deleteLibrary(row.libraryId)}
-          title={t('demo.signaturesRemove')}
           className={iconButton}
         >
           <Icon name="trash" size={13} />
-        </button>
+        </TooltipButton>
       </div>
       <div className="mt-2 grid grid-cols-[2fr_1fr] gap-2">
         {row.signatures.map((asset) => (
@@ -253,14 +251,13 @@ function SignerRowView({
               onPick={() => onPick(row.initials!)}
             />
           ) : (
-            <button
-              type="button"
+            <TooltipButton
+              label={t('demo.signaturesAddInitials')}
               onClick={onAddInitials}
-              title={t('demo.signaturesAddInitials')}
               className="border-border-subtle text-fg-muted hover:bg-hover flex h-16 items-center justify-center rounded-md border border-dashed text-xs"
             >
               <Icon name="plus" size={14} />
-            </button>
+            </TooltipButton>
           )
         ) : null}
       </div>
@@ -281,10 +278,9 @@ function MarkThumb({
 }) {
   const url = useStampAssetPreviewUrl(asset.id);
   return (
-    <button
-      type="button"
+    <TooltipButton
+      label={label}
       onClick={onPick}
-      title={label}
       aria-pressed={armed}
       className={`flex h-16 items-center justify-center rounded-md border p-1 ${
         armed
@@ -297,7 +293,7 @@ function MarkThumb({
       ) : (
         <span className="text-fg-muted text-xs">{label}</span>
       )}
-    </button>
+    </TooltipButton>
   );
 }
 

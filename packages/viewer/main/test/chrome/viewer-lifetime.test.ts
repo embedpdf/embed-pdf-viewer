@@ -1,7 +1,8 @@
 /**
  * The `viewer` and the end of its life: while it lives, every API it hands out is the plugin's
  * own; once it's disposed, what was subscribed through it stops, reads throw `instance-closed`,
- * every other call rejects with it, and a new subscription does nothing.
+ * every other call rejects with it, and a new subscription does nothing. And a document's plugin
+ * before its document: `get()` refuses with `not-ready`, and `watch()` waits for it.
  */
 import { describe, expect, it } from 'vitest';
 
@@ -50,6 +51,7 @@ function fakeKernel() {
     documents,
     capability: (token: CapabilityToken<unknown>) => capabilities.get(token)!,
     tryCapability: (token: CapabilityToken<unknown>) => capabilities.get(token) ?? null,
+    scopeOf: () => 'workspace',
     subscribe: (listener: () => void) => {
       listeners.add(listener);
       return () => void listeners.delete(listener);
@@ -172,5 +174,142 @@ describe('createViewer', () => {
     const { viewer } = createViewer(kernel, { ...tokens, analytics: SearchToken });
     expect(viewer.get('analytics' as never)).toBe(viewer.get('search' as never));
     expect(() => viewer.get('nothing' as never)).toThrow(/no plugin named "nothing"/);
+  });
+});
+
+const StageToken: CapabilityToken<unknown> = { name: 'stage' };
+
+/** A kernel whose `stage` belongs to a document: there only while one is open. */
+function documentKernel() {
+  const listeners = new Set<() => void>();
+  let page: number | null = null;
+  const stage = { getCurrentPageIndex: () => page };
+  const notify = () => {
+    for (const listener of listeners) listener();
+  };
+  const commands = {};
+  const kernel = {
+    documents: {},
+    capability: (token: CapabilityToken<unknown>) => {
+      if (token === CommandsToken) return commands;
+      if (token !== StageToken) throw new Error(`No capability "${token.name}".`);
+      if (page === null) throw new Error('Capability "stage" requires an active document.');
+      return stage;
+    },
+    tryCapability: (token: CapabilityToken<unknown>) =>
+      token === StageToken && page !== null ? stage : null,
+    scopeOf: (token: CapabilityToken<unknown>) => (token === StageToken ? 'document' : 'workspace'),
+    subscribe: (listener: () => void) => {
+      listeners.add(listener);
+      return () => void listeners.delete(listener);
+    },
+  } as unknown as Kernel;
+  /** A document opens at `index`, or the open one shows `index`; `null` closes it. */
+  const show = (index: number | null) => {
+    page = index;
+    notify();
+  };
+  return { kernel, show, listeners };
+}
+
+const stageTokens = { stage: StageToken, nothing: SearchToken };
+
+/** The current page, read the way an app reads it: `viewer.get('stage')` in the read. */
+const pageOf = (viewer: ReturnType<typeof createViewer>['viewer']) => () =>
+  (viewer.get('stage' as never) as { getCurrentPageIndex(): number }).getCurrentPageIndex();
+
+describe("a document's plugin before its document", () => {
+  it('refuses get() with not-ready, and tryGet() gives null', async () => {
+    const { kernel, show } = documentKernel();
+    const { viewer } = createViewer(kernel, stageTokens);
+    const refusal = await refusalOf(() => viewer.get('stage' as never));
+    expect(refusal).toBeInstanceOf(PluginError);
+    expect(refusal?.code).toBe('not-ready');
+    expect(refusal?.capability).toBe('stage');
+    expect(viewer.tryGet('stage' as never)).toBeNull();
+    show(0);
+    expect(viewer.tryGet('stage' as never)).toBe(viewer.get('stage' as never));
+  });
+
+  it("keeps the kernel's own error for a plugin that isn't a document's", async () => {
+    const { kernel } = documentKernel();
+    const { viewer } = createViewer(kernel, stageTokens);
+    const refusal = await refusalOf(() => viewer.get('nothing' as never));
+    expect(refusal).not.toBeInstanceOf(PluginError);
+    expect(refusal?.message).toMatch(/No capability "search"/);
+  });
+});
+
+describe('watch', () => {
+  it('waits while its read is not ready, and calls back on changes from the first value on', () => {
+    const { kernel, show } = documentKernel();
+    const { viewer } = createViewer(kernel, stageTokens);
+    const heard: Array<[number, number]> = [];
+    viewer.watch(pageOf(viewer), (index, previous) => heard.push([index, previous]));
+    show(0);
+    expect(heard).toEqual([]);
+    show(3);
+    expect(heard).toEqual([[3, 0]]);
+  });
+
+  it('with immediate, calls back with the first value it reads, now or once ready', () => {
+    const { kernel, show } = documentKernel();
+    const { viewer } = createViewer(kernel, stageTokens);
+    const heard: Array<[number, number | undefined]> = [];
+    viewer.watch(pageOf(viewer), (index, previous) => heard.push([index, previous]), {
+      immediate: true,
+    });
+    expect(heard).toEqual([]);
+    show(0);
+    show(0);
+    show(2);
+    expect(heard).toEqual([
+      [0, undefined],
+      [2, 0],
+    ]);
+
+    const now: Array<[number, number | undefined]> = [];
+    viewer.watch(pageOf(viewer), (index, previous) => now.push([index, previous]), {
+      immediate: true,
+    });
+    expect(now).toEqual([[2, undefined]]);
+  });
+
+  it('waits again while the document is closed, and compares with the last value it read', () => {
+    const { kernel, show } = documentKernel();
+    const { viewer } = createViewer(kernel, stageTokens);
+    show(4);
+    const heard: Array<[number, number]> = [];
+    viewer.watch(pageOf(viewer), (index, previous) => heard.push([index, previous]));
+    show(null);
+    show(4);
+    show(null);
+    show(0);
+    expect(heard).toEqual([[0, 4]]);
+  });
+
+  it('compares with isEqual', () => {
+    const { kernel, show } = documentKernel();
+    const { viewer } = createViewer(kernel, stageTokens);
+    show(0);
+    const heard: number[] = [];
+    viewer.watch(pageOf(viewer), (index) => heard.push(index), {
+      isEqual: (left, right) => left % 2 === right % 2,
+    });
+    show(2);
+    show(3);
+    expect(heard).toEqual([3]);
+  });
+
+  it('throws what its read throws, other than not-ready, and follows nothing', () => {
+    const { kernel, listeners } = documentKernel();
+    const { viewer } = createViewer(kernel, stageTokens);
+    expect(() =>
+      viewer.watch(
+        () => viewer.get('nothing' as never),
+        () => {},
+      ),
+    ).toThrow(/No capability "search"/);
+    expect(listeners.size).toBe(0);
   });
 });

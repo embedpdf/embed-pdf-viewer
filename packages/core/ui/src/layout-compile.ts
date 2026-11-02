@@ -11,6 +11,7 @@
 import type {
   BarEdge,
   BarPlace,
+  FloatPlace,
   FloatPosition,
   LayoutBar,
   LayoutData,
@@ -23,11 +24,13 @@ import type {
 import {
   SECTION_NAMES,
   entriesOf,
+  hostOf,
   isGroupObject,
   isLayoutItem,
   itemIdOf,
   itemsOfEntry,
   itemsOfMenuSection,
+  panelOf,
   sectionsOfMenu,
 } from './layout';
 import type {
@@ -81,19 +84,9 @@ export function edgeOf(place: BarPlace | undefined): BarEdge | null {
   return null;
 }
 
-/** The bar a place rides along, or `null`. */
-export function hostOf(place: BarPlace | undefined): string | null {
-  return typeof place === 'object' && place !== null && 'with' in place ? place.with : null;
-}
-
 /** What a place follows when it is over a selection, or `null`. */
 export function selectionOf(place: BarPlace | undefined): SelectionTarget | null {
   return typeof place === 'object' && place !== null && 'at' in place ? place.at : null;
-}
-
-/** The panel a place puts a bar at the top of, or `null`. */
-export function panelOf(place: BarPlace | undefined): string | null {
-  return typeof place === 'object' && place !== null && 'panel' in place ? place.panel : null;
 }
 
 /** Where a place floats over the pages, or `null` for a place that doesn't float. */
@@ -180,6 +173,25 @@ export function floatStackOf(data: LayoutData, position: FloatPosition): string[
   return withRiders(data, barsFloating(data, position));
 }
 
+/**
+ * Whether a floating bar's place says it hides while the pages scroll: its own place's
+ * `hideWhileScrolling`, or that of the floating bar it rides along; `undefined` when it says
+ * neither, or the bar doesn't float.
+ */
+export function hideWhileScrollingOf(data: LayoutData, id: string): boolean | undefined {
+  const seen = new Set<string>();
+  for (let current: string | null = id; current !== null && !seen.has(current); ) {
+    seen.add(current);
+    const place = data.bars?.[current]?.place;
+    if (floatOf(place) !== null) {
+      const hide: unknown = (place as FloatPlace).hideWhileScrolling;
+      return typeof hide === 'boolean' ? hide : undefined;
+    }
+    current = hostOf(place);
+  }
+  return undefined;
+}
+
 /** The bars over a selection of this kind, in the order they were added. */
 export function barsAt(data: LayoutData, target: SelectionTarget): string[] {
   return barsOf(data)
@@ -227,11 +239,13 @@ const toBarChild = (item: LayoutItem): BarChild => {
     if (item.command !== undefined) custom.terminal = item.command;
     if (item.variants !== undefined) custom.variants = item.variants;
     if (item.importance !== undefined) custom.importance = item.importance;
+    if (item.grow === true) custom.grow = true;
     return custom;
   }
   const command: { -readonly [Key in keyof BarItem]: BarItem[Key] } = { command: item.command };
   if (item.variants !== undefined) command.variants = item.variants;
   if (item.importance !== undefined) command.importance = item.importance;
+  if (item.emphasis === 'primary') command.emphasis = 'primary';
   return command;
 };
 

@@ -1,11 +1,13 @@
 /**
  * Theming from the page: a `--epdf-*` variable set on `<embedpdf-viewer>` or
  * on any element around it wins, in light and in dark, over the viewer's own
- * default and over the `theme` config (`accent`, `tokens`, `dark`); with no
- * page CSS the config, or else the viewer's default, applies. The chrome (a
+ * default and over the `theme` config (`accent`, `tokens`, `light`, `dark`);
+ * with no page CSS the config, or else the viewer's default, applies, `light`
+ * or `dark` over `tokens` in its mode and `tokens` over `accent`. The chrome (a
  * pressed toolbar button) and the parts drawn on the pages (the text
  * selection) always agree. Every token the Theming page lists paints the
- * chrome, and every part it lists takes the page's `::part()` rules.
+ * chrome or the pages, and every part it lists takes the page's `::part()`
+ * rules.
  *
  * Runs against the built snippet (`pnpm build` first).
  */
@@ -33,6 +35,14 @@ const CONFIGS = {
     preference: 'dark',
     tokens: { accent: '#0f6e56', radius: '2px' },
     dark: { accent: '#7dd3fc', surface: '#16201c' },
+  },
+  // Every way to set a token at once, the page tokens among them; it switches mode while open.
+  modes: {
+    preference: 'light',
+    accent: '#7c3aed',
+    tokens: { surface: '#fbfaf7', radius: '2px', 'page-shadow': 'none' },
+    light: { accent: '#0f6e56', surface: '#fffdf5', 'page-background': '#fafaf9' },
+    dark: { surface: '#16201c', 'page-shadow': '0 0 0 1px rgb(255 255 255 / 0.1)' },
   },
 } as const;
 
@@ -136,16 +146,25 @@ const PAGE_TOKENS = {
   border: 'rgb(20, 20, 160)',
   hover: 'rgb(200, 180, 120)',
   canvas: 'rgb(120, 140, 160)',
+  'page-background': 'rgb(250, 250, 240)',
+  'page-shadow': 'rgb(10, 20, 30) 0px 0px 0px 3px',
   radius: '3px',
   font: 'serif',
 } as const;
 
 type Look = Record<keyof typeof PAGE_TOKENS, string | undefined>;
 
+/** The pages' look before any theme or page CSS sets it, in both modes. */
+const DEFAULT_PAGES = {
+  'page-background': 'rgb(255, 255, 255)',
+  'page-shadow': 'rgba(0, 0, 0, 0.18) 0px 6px 18px 0px',
+} as const;
+
 /**
  * Where the chrome shows each token: the viewer's background, the main bar (its surface, text and
- * line), the bar over the selected text (a raised surface), the pages' canvas, a button's corners
- * and font, and, under the pointer, a button (the hover) and a mode tab's line (muted text).
+ * line), the bar over the selected text (a raised surface), the pages' canvas, a page's backing
+ * and shadow, a button's corners and font, and, under the pointer, a button (the hover) and a mode
+ * tab's line (muted text).
  */
 async function lookOf(tab: Page): Promise<Look> {
   const look = await tab.evaluate(() => {
@@ -154,7 +173,7 @@ async function lookOf(tab: Page): Promise<Look> {
       element ? getComputedStyle(element) : null;
     const bar = root.querySelector('[data-bar="main"]');
     const button = root.querySelector('[data-bar="main"] [part="toolbar-button"]');
-    const selectionBar = [...root.querySelectorAll('[role="toolbar"][part="toolbar"]')].find(
+    const selectionBar = [...root.querySelectorAll('[role="toolbar"][part~="toolbar"]')].find(
       (element) => element.parentElement?.hasAttribute('data-placement'),
     );
     return {
@@ -164,6 +183,9 @@ async function lookOf(tab: Page): Promise<Look> {
       text: style(bar)?.color,
       border: style(bar)?.borderBottomColor,
       canvas: style(root.querySelector('[style*="--epdf-canvas"]'))?.backgroundColor,
+      'page-background': style(root.querySelector('[style*="--epdf-page-background"]'))
+        ?.backgroundColor,
+      'page-shadow': style(root.querySelector('[style*="--epdf-page-shadow"]'))?.boxShadow,
       radius: style(button)?.borderTopLeftRadius,
       font: style(button)?.fontFamily,
     };
@@ -269,9 +291,12 @@ describe('theming from the page', () => {
       await pageCss(tabs.get(name)!, '');
     }
     const light = await lookOf(tabs.get('light')!);
-    expect(light).toMatchObject({ surface: 'rgb(255, 255, 255)', radius: '6px' });
+    expect(light).toMatchObject({ surface: 'rgb(255, 255, 255)', radius: '6px', ...DEFAULT_PAGES });
     expect(light.font).toMatch(/^ui-sans-serif/);
-    expect(await lookOf(tabs.get('dark')!)).toMatchObject({ surface: 'rgb(31, 41, 55)' });
+    expect(await lookOf(tabs.get('dark')!)).toMatchObject({
+      surface: 'rgb(31, 41, 55)',
+      ...DEFAULT_PAGES,
+    });
     expect(await lookOf(tabs.get('tokens')!)).toMatchObject({
       surface: 'rgb(251, 250, 247)',
       radius: '2px',
@@ -279,6 +304,50 @@ describe('theming from the page', () => {
     expect(await lookOf(tabs.get('dark-tokens')!)).toMatchObject({
       surface: 'rgb(22, 32, 28)',
       radius: '2px',
+    });
+  });
+
+  it('takes light or dark in its mode over tokens, and tokens over accent, as the mode switches', async () => {
+    const tab = tabs.get('modes')!;
+    await tab.bringToFront();
+    await pageCss(tab, '');
+    const switchTo = async (preference: 'light' | 'dark') => {
+      await tab.evaluate(
+        (theme) => {
+          (document.querySelector('embedpdf-viewer') as HTMLElement & { theme: unknown }).theme =
+            theme;
+        },
+        { ...CONFIGS.modes, preference },
+      );
+      await frames(tab);
+    };
+
+    // Light: light's accent, surface and page backing; tokens' corners and no shadow.
+    await expectAccent('modes', '#0f6e56');
+    expect(await lookOf(tab)).toMatchObject({
+      surface: 'rgb(255, 253, 245)',
+      radius: '2px',
+      'page-background': 'rgb(250, 250, 249)',
+      'page-shadow': 'none',
+    });
+
+    // Dark: the accent (light's isn't dark's), dark's surface and shadow, tokens' corners, and
+    // the default page backing (light's isn't dark's either).
+    await switchTo('dark');
+    await expectAccent('modes', '#7c3aed');
+    expect(await lookOf(tab)).toMatchObject({
+      surface: 'rgb(22, 32, 28)',
+      radius: '2px',
+      'page-background': DEFAULT_PAGES['page-background'],
+      'page-shadow': 'rgba(255, 255, 255, 0.1) 0px 0px 0px 1px',
+    });
+
+    // And back.
+    await switchTo('light');
+    await expectAccent('modes', '#0f6e56');
+    expect(await lookOf(tab)).toMatchObject({
+      surface: 'rgb(255, 253, 245)',
+      'page-shadow': 'none',
     });
   });
 
@@ -401,17 +470,19 @@ describe('restyling a part from the page', () => {
         [...bar.querySelectorAll('button')].filter(live).map((button) => ({
           label: button.getAttribute('aria-label') ?? button.getAttribute('title'),
           part: button.getAttribute('part'),
+          pageNumber: bar.closest('[data-bar="pager"]') !== null,
         })),
       );
       return {
         main: toolbars.some((bar) => bar.getAttribute('data-bar') === 'main'),
         floating: toolbars.some((bar) => bar.closest('[data-float]') !== null),
         selection: toolbars.some((bar) => bar.parentElement?.hasAttribute('data-placement')),
-        // The page number is a field, not a button.
-        unnamed: buttons.filter(
-          (button) =>
-            button.label !== 'Go to page' && !/toolbar-button|mode-tab/.test(button.part ?? ''),
-        ),
+        // The page number, the pager's, is a field, not a button.
+        unnamed: buttons
+          .filter(
+            (button) => !button.pageNumber && !/toolbar-button|mode-tab/.test(button.part ?? ''),
+          )
+          .map(({ label, part }) => ({ label, part })),
       };
     });
     expect(bars).toEqual({ main: true, floating: true, selection: true, unnamed: [] });

@@ -1,7 +1,7 @@
 /**
  * Where a menu opens, as a placement for `@embedpdf/web`'s `fitAnchoredRect`:
  * away from the edge its bar sits on, toward the pages, and a submenu beside
- * its row. Placements are physical sides, so the bar's edge and the menu's
+ * its row; a tooltip opens on the same side. Placements are physical sides, so the bar's edge and the menu's
  * alignment are read through the writing direction: a start bar is on the
  * right in a right-to-left language. When the side asked for has no room,
  * the fit opens the menu on the other.
@@ -57,6 +57,23 @@ export function menuPlacementOf(
 /** The placement of a submenu: beside its row, on the side the text runs toward, tops lined up. */
 export function submenuPlacementOf(direction: MenuDirection): AnchoredPlacement {
   return direction === 'ltr' ? 'right-start' : 'left-start';
+}
+
+/**
+ * The placement of a button's tooltip: on the side its menu would open (`menuPlacementOf`),
+ * centered on the button; for a row in a menu (`inMenu`), beside the row, on the side a submenu
+ * would open.
+ */
+export function tooltipPlacementOf(
+  edge: BarEdge,
+  direction: MenuDirection,
+  inMenu = false,
+  selectionBar: SelectionBarSide = 'above',
+): AnchoredPlacement {
+  const placement = inMenu
+    ? submenuPlacementOf(direction)
+    : menuPlacementOf(edge, direction, 'start', selectionBar);
+  return placement.split('-')[0] as AnchoredPlacement;
 }
 
 /** The key that opens a submenu from its row, and the one that closes it again. */

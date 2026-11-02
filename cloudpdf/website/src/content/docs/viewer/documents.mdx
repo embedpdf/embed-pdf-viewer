@@ -284,14 +284,29 @@ lose when the tab closes.
 ## Warn before changes are lost
 
 When someone closes a tab or leaves the page with unsaved changes, the viewer asks first. Unsaved
-means changed since it opened or since the last download. `viewer.documents.get().hasUnsavedChanges`
-tells you the same, and `onUnsavedChangesChanged` fires when it changes:
+means changed since it opened or since the last download: anything a download would carry, whether
+the user changed it or your code did, such as form values from `importValues()` or a form `reset()`.
+`viewer.documents.get().hasUnsavedChanges` tells you the same, and `onUnsavedChangesChanged` fires
+when it changes:
 
 ```js
 viewer.documents.onUnsavedChangesChanged(({ documentId, hasUnsavedChanges }) => {
   saveButton.disabled = !hasUnsavedChanges;
 });
 ```
+
+<Engine local>
+
+When your app keeps the changes itself, or nothing is meant to be kept, as at a kiosk that starts
+over for the next visitor, leave the browser's question out. Closing a tab still asks:
+
+```js
+{ warnBeforeLeaving: false }
+```
+
+`warnBeforeLeaving` is read once, when the viewer starts.
+
+</Engine>
 
 ## Good to know
 

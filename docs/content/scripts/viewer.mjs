@@ -3,10 +3,11 @@
  *
  * - a plain-HTML snippet (`.vanilla.html`): its module scripts, taken out of the page and checked
  *   as JavaScript against the site's viewer (`@embedpdf/viewer`, or `@cloudpdf/viewer` for
- *   cloudpdf.com's copy); every `<embedpdf-viewer>` and `<epdf-*>` element the viewer's types
- *   declare; every `<embedpdf-viewer>` attribute a config key (and on cloudpdf.com no `src`: a
- *   cloud document isn't a string); every `slot` one the viewer has, on a child of the viewer;
- *   every `<script src>` the site's CDN script or a path;
+ *   cloudpdf.com's copy), each run as the demo runs it; every `<embedpdf-viewer>` and `<epdf-*>`
+ *   element the viewer's types declare; every `<embedpdf-viewer>` attribute a config key (and on
+ *   cloudpdf.com no `src`: a cloud document isn't a string); every `slot` one the viewer has, on
+ *   a child of the viewer, and an item's with room in the page's layout; every `<script src>` the
+ *   site's CDN script or a path;
  * - the code a viewer page shows itself (`js` and `ts` blocks: the config, the layout, the
  *   viewer in code), checked the same way, for every framework, as the config is the same in each;
  * - an install command (`.sh`) names packages this repository publishes.
@@ -170,6 +171,21 @@ const isGlobalAttribute = (name) => GLOBAL_ATTRIBUTES.has(name) || /^(aria-|data
 const SLOT = /^(header|footer|tabs|empty)$|^(item|panel):[\w.:-]+$/;
 const SLOTS_SAID = '`header`, `footer`, `tabs`, `empty`, `item:<id>` or `panel:<id>`';
 
+/** The viewer's own components, which its default layout has room for (Layout lists them). */
+const VIEWER_ITEMS = new Set([
+  'zoom',
+  'page-number',
+  'quick-stamps',
+  'measurement-scale',
+  'view-only',
+  'outline-filter',
+  'attachments-count',
+]);
+
+/** Whether a page's code makes room for the item `id` in the layout: `{ custom: '<id>' }`. */
+const hasRoomFor = (source, id) =>
+  new RegExp(`custom:\\s*(['"\`])${id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\1`).test(source);
+
 const camel = (name) => name.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
 
 /**
@@ -259,11 +275,47 @@ function domModule(elements) {
 }
 
 /**
- * Stage one plain-HTML snippet in `directory`, as `engine`'s site shows it: each module script as
- * its own file, the elements and attributes as a file of type checks on their own lines, and the
- * errors that need no compiler. Returns the staged files with their `locate`, and those errors.
+ * Where a script's code runs in the demo (`website/src/lib/vanilla-demo-samples.ts`): its imports
+ * at the module's top, the rest in a function of its own. `start` and `end` are offsets in `body`
+ * of the rest, null when there's none; `exports` the offsets of the statements that export, which
+ * a page's script can't. Run in a function, `element.config = { … }` takes the config's types;
+ * at a JavaScript module's top level, TypeScript reads it as a new property of `element`.
  */
-function stageHtml(snippet, source, directory, viewerNames, engine) {
+function scriptRun(ts, body) {
+  const file = ts.createSourceFile(
+    'script.js',
+    body,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.JS,
+  );
+  const rest = file.statements.filter((statement) => !ts.isImportDeclaration(statement));
+  const exports = file.statements
+    .filter(
+      (statement) =>
+        ts.isExportDeclaration(statement) ||
+        ts.isExportAssignment(statement) ||
+        (ts.canHaveModifiers(statement) &&
+          (ts.getModifiers(statement) ?? []).some((m) => m.kind === ts.SyntaxKind.ExportKeyword)),
+    )
+    .map((statement) => statement.getStart(file));
+  if (rest.length === 0) return { start: null, end: null, exports };
+  return { start: rest[0].getStart(file), end: rest.at(-1).getEnd(), exports };
+}
+
+/** The line and column (from 1) of an offset in `source`. */
+function positionIn(source, offset) {
+  const before = source.slice(0, offset).split('\n');
+  return { line: before.length, column: before.at(-1).length + 1 };
+}
+
+/**
+ * Stage one plain-HTML snippet in `directory`, as `engine`'s site shows it: each module script as
+ * its own file, run as the demo runs it (`scriptRun`), the elements and attributes as a file of
+ * type checks on their own lines, and the errors that need no compiler. Returns the staged files
+ * with their `locate`, and those errors.
+ */
+function stageHtml(ts, snippet, source, directory, viewerNames, engine) {
   const cdnScript = VIEWER_CDN_URLS[engine];
   const { elements, lines } = readHtml(source);
   const base = path.join(directory, path.basename(snippet.name));
@@ -302,6 +354,16 @@ function stageHtml(snippet, source, directory, viewerNames, engine) {
             attribute,
             `slot="${attribute.value}" works on a child of <embedpdf-viewer> only, not of <${element.parent ?? 'the page'}>`,
           );
+        } else if (
+          attribute.value.startsWith('item:') &&
+          !VIEWER_ITEMS.has(attribute.value.slice(5)) &&
+          !hasRoomFor(source, attribute.value.slice(5))
+        ) {
+          const id = attribute.value.slice(5);
+          error(
+            attribute,
+            `slot="${attribute.value}" shows nothing: the layout has no room for it, { custom: '${id}' }`,
+          );
         }
       }
     }
@@ -332,9 +394,22 @@ function stageHtml(snippet, source, directory, viewerNames, engine) {
     const dom = specifier(directory, `${base}.dom`);
     const preamble = `const document = /** @type {import(${JSON.stringify(dom)}).SnippetDocument} */ (globalThis.document); `;
     scripts.forEach((script, index) => {
-      const staged = stagedText(scriptLines(lines, source, script.body), [
-        { line: 1, column: 1, text: preamble },
-      ]);
+      const run = scriptRun(ts, source.slice(script.body.start, script.body.end));
+      const insertions = [{ line: 1, column: 1, text: preamble }];
+      for (const offset of run.exports) {
+        error(
+          positionIn(source, script.body.start + offset),
+          "a page's script exports nothing: it runs, and nothing imports it",
+        );
+      }
+      // A script that exports stays as written: its error is the one above.
+      if (run.start !== null && run.exports.length === 0) {
+        const open = positionIn(source, script.body.start + run.start);
+        const close = positionIn(source, script.body.start + run.end);
+        insertions.push({ ...open, text: 'async function script() { ', at: null });
+        insertions.push({ ...close, text: ' }', at: null });
+      }
+      const staged = stagedText(scriptLines(lines, source, script.body), insertions);
       files.push({ file: `${base}.script-${index + 1}.js`, ...staged });
     });
   }
@@ -551,7 +626,7 @@ export function stageVanilla(
     const source = read(snippet.file);
     const directory = path.join(root, path.dirname(snippet.name));
     fs.mkdirSync(directory, { recursive: true });
-    const { files, errors } = stageHtml(snippet, source, directory, viewerNamesFile, engine);
+    const { files, errors } = stageHtml(ts, snippet, source, directory, viewerNamesFile, engine);
     for (const file of files) write(snippet.file, file);
     if (errors.length) markup.set(snippet.file, errors);
   }

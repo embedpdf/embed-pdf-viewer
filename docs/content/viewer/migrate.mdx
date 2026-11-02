@@ -176,21 +176,21 @@ makes most:
 
 ## Theme
 
-2.x set colors per mode, in groups: `theme.light.accent.primary`. 3.0 has one set of tokens for both
-modes, and `dark` for what's different in dark mode:
+2.x set colors per mode, in groups: `theme.light.accent.primary`. 3.0 names each color once, as a
+token, with `tokens` for both modes, `light` for light only and `dark` for dark only:
 
 ```js
 {
   theme: {
     preference: 'system',
-    accent: '#9333ea',
-    tokens: { canvas: '#f5f3ff' },
+    tokens: { radius: '4px' },
+    light: { accent: '#9333ea', canvas: '#f5f3ff' },
     dark: { accent: '#a855f7', canvas: '#1e1b2e' },
   },
 }
 ```
 
-2.x's `light` colors go in `tokens`, and its `dark` ones in `dark`:
+2.x's `light` colors go in `light`, and its `dark` ones in `dark`:
 
 | 2.x color | 3.0 token |
 | :-- | :-- |

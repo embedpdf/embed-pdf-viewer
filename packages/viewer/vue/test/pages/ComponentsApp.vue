@@ -2,6 +2,7 @@
 import { shallowRef } from 'vue';
 import {
   Button,
+  Icon,
   Menu,
   MenuItem,
   PDFViewer,
@@ -18,6 +19,7 @@ import ItemWhere from './ItemWhere.vue';
 const { record } = defineProps<{ record: ComponentsRecord }>();
 
 const width = shallowRef('100%');
+const night = shallowRef(false);
 record.setWidth = (next) => (width.value = next);
 
 const layout: LayoutFunction = (base, env) => {
@@ -29,6 +31,7 @@ const layout: LayoutFunction = (base, env) => {
     )
     .add({ custom: 'zoom-in' }, { to: 'main', section: 'start' })
     .add({ custom: 'share' }, { to: 'main', section: 'start' })
+    .add({ custom: 'toggle' }, { to: 'main', section: 'end' })
     .addPanel('notes', { side: 'end', title: 'Notes', icon: 'book' })
     .add('panel:notes', { to: 'main', section: 'end' });
   return env.width < 900 ? placed.place('main', 'start') : placed;
@@ -62,7 +65,12 @@ function onReady(viewer: Viewer) {
       <Menu icon="link" label="Share">
         <MenuItem icon="copy" @select="record.picked.push('copy')">Copy link</MenuItem>
         <MenuItem icon="message" @select="record.picked.push('email')">Email a link</MenuItem>
+        <MenuItem active>Show notes</MenuItem>
       </Menu>
+    </ToolbarItem>
+    <ToolbarItem id="toggle">
+      <Button icon="eye" label="Night" :active="night" @click="night = !night" />
+      <Icon name="check" :size="16" label="Saved" />
     </ToolbarItem>
     <Panel id="notes">
       <textarea data-check="notes" placeholder="Your notes" />

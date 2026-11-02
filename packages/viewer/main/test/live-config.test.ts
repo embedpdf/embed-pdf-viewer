@@ -5,7 +5,8 @@
  * `.config` and (for `src`, `theme` and `locale`) from the attributes: the viewer, and the kernel
  * inside it, stay the same objects. Any other change builds a new viewer. `scope` and `identity`
  * from the config reach the documents, and a read-only viewer still lets the app's code call
- * its plugins.
+ * its plugins. `.config` replaces what the properties set, and keeps the attributes. A plugin's
+ * settings changed from code reach every document; the stage's, one.
  *
  * Runs against the built snippet (`pnpm build` first).
  */
@@ -304,6 +305,29 @@ describe('a declarative viewer follows its attributes', () => {
     expect(await shadowText(tab)).toMatch(/Página 1 de \d+/);
   });
 
+  it('replaces what the properties set with .config, and keeps the attributes', async () => {
+    const tab = await open(browser, `${host.origin}/declarative.html`);
+    await tab.evaluate(() => {
+      window.element.theme = 'dark';
+      window.element.readOnly = true;
+    });
+    await frames(tab);
+    expect(await isDark(tab)).toBe(true);
+    await tab.evaluate(() => (window.element.config = { locale: 'es' }));
+    await tab.waitForFunction(() =>
+      /Página 1 de \d+/.test(window.element.shadowRoot!.textContent ?? ''),
+    );
+    expect(await isDark(tab)).toBe(false);
+    expect(
+      await tab.evaluate(() => ({
+        readOnly: window.element.readOnly ?? null,
+        src: window.element.config.src,
+        theme: window.element.theme,
+      })),
+    ).toEqual({ readOnly: null, src: '/sample.pdf', theme: 'light' });
+    expect(await sameViewer(tab)).toBe(true);
+  });
+
   it('takes a property over its attribute, and the attribute back for undefined', async () => {
     const tab = await open(browser, `${host.origin}/declarative.html`);
     await tab.evaluate(() => (window.element.theme = 'dark'));
@@ -396,6 +420,30 @@ describe('the viewer in code', () => {
       return { status, executed };
     });
     expect(result).toEqual({ status: 'executed', executed: ['zoom:in'] });
+  });
+
+  it("changes a plugin's settings for every document, and the stage's for one", async () => {
+    const result = await tab.evaluate(async () => {
+      const viewer = window.element.viewer;
+      const first = viewer.documents.getActiveId();
+      const { document } = await viewer.documents.open(
+        { kind: 'url', url: '/sample.pdf' },
+        { name: 'Second' },
+      );
+      viewer.get('selection').updateSettings({ color: 'rgb(1 2 3 / 0.3)' });
+      viewer.get('stage').updateSettings({ spread: 'odd' });
+      const of = (id: string) => viewer.forDocument(id);
+      return {
+        active: viewer.documents.getActiveId() === document.id,
+        selection: [first, document.id].map((id) => of(id).get('selection').getSettings().color),
+        spread: [first, document.id].map((id) => of(id).get('stage').getSettings().spread),
+      };
+    });
+    expect(result).toEqual({
+      active: true,
+      selection: ['rgb(1 2 3 / 0.3)', 'rgb(1 2 3 / 0.3)'],
+      spread: ['none', 'odd'],
+    });
   });
 });
 

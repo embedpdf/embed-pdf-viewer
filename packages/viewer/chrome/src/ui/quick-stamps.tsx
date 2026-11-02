@@ -26,6 +26,7 @@ import {
 } from '../config/default-stamps';
 import { restoreStampLibrariesOnce } from './stamp-store';
 import { buttonClass, buttonPart } from './toolbar';
+import { useTooltip } from './tooltip';
 
 export function QuickStamps() {
   const t = useT();
@@ -87,21 +88,25 @@ function QuickStampButton({
   onArm: () => void;
 }) {
   const url = useStampAssetPreviewUrl(asset.id);
+  const tooltip = useTooltip({ label: asset.label, labelShown: !url });
   return (
-    <button
-      type="button"
-      onClick={onArm}
-      title={asset.label}
-      aria-label={asset.label}
-      aria-pressed={active || undefined}
-      part={buttonPart(active)}
-      className={buttonClass(active, true)}
-    >
-      {url ? (
-        <img src={url} alt="" className="h-5 w-5 object-contain" draggable={false} />
-      ) : (
-        <span className="text-xs">{asset.label}</span>
-      )}
-    </button>
+    <>
+      <button
+        {...tooltip.trigger}
+        type="button"
+        onClick={onArm}
+        aria-label={asset.label}
+        aria-pressed={active || undefined}
+        part={buttonPart(active)}
+        className={buttonClass(active, true)}
+      >
+        {url ? (
+          <img src={url} alt="" className="h-5 w-5 object-contain" draggable={false} />
+        ) : (
+          <span className="text-xs">{asset.label}</span>
+        )}
+      </button>
+      {tooltip.element}
+    </>
   );
 }

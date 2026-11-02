@@ -105,6 +105,21 @@ export interface Scene {
   nearestItem(pt: Point): SceneItem;
   itemOfPage(pageIndex: number): number;
 }
+/** Space on each side of the viewport, in screen px: physical sides, the same in RTL. */
+export interface PaddingSides {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
+/** Space around the content, in screen px: one number for every side, or each side its own. */
+export type Padding = number | PaddingSides;
+/** Each side of a {@link Padding}. */
+export const paddingSidesOf = (padding: Padding): PaddingSides =>
+  typeof padding === 'number'
+    ? { top: padding, right: padding, bottom: padding, left: padding }
+    : padding;
+
 export interface CameraConstraint {
   bounded: boolean;
   /**
@@ -112,7 +127,7 @@ export interface CameraConstraint {
    * Fit-modes inset by it, placement leaves it as gutter, and the clamp lets the
    * camera reveal exactly this much beyond each content edge.
    */
-  padding: number;
+  padding: Padding;
   /** Where content rests on an axis it fits (locked — there is nowhere else to
    *  be). Default center/center. x is logical against `direction`. */
   fitAlign?: Alignment;
@@ -250,11 +265,12 @@ export const travelRange = (
   content: number,
   view: number,
   zoom: number,
-  padding: number,
+  before: number,
+  after: number = before,
 ): AxisTravel => ({
-  near: origin - padding / zoom,
-  far: origin + content - (view - padding) / zoom,
-  fits: content * zoom <= view - 2 * padding,
+  near: origin - before / zoom,
+  far: origin + content - (view - after) / zoom,
+  fits: content * zoom <= view - before - after,
 });
 
 /**
@@ -274,7 +290,7 @@ export const clampCamera = (
   constraint: CameraConstraint,
 ): Camera => {
   if (!constraint.bounded) return camera;
-  const padding = constraint.padding;
+  const padding = paddingSidesOf(constraint.padding);
   const fit = constraint.fitAlign ?? { x: 'center', y: 'center' };
   const axis = (
     pos: number,
@@ -282,8 +298,10 @@ export const clampCamera = (
     content: number,
     view: number,
     align: Align,
+    before: number,
+    after: number,
   ): number => {
-    const travel = travelRange(origin, content, view, camera.zoom, padding);
+    const travel = travelRange(origin, content, view, camera.zoom, before, after);
     if (travel.fits)
       return align === 'start'
         ? travel.near
@@ -301,8 +319,8 @@ export const clampCamera = (
       : fit.x;
   return {
     zoom: camera.zoom,
-    x: axis(camera.x, bounds.x, bounds.width, vp.width, ax),
-    y: axis(camera.y, bounds.y, bounds.height, vp.height, fit.y),
+    x: axis(camera.x, bounds.x, bounds.width, vp.width, ax, padding.left, padding.right),
+    y: axis(camera.y, bounds.y, bounds.height, vp.height, fit.y, padding.top, padding.bottom),
   };
 };
 
@@ -336,17 +354,25 @@ export const scrollMetrics = (
   camera: Camera,
   bounds: Rect,
   vp: Size,
-  padding: number,
+  padding: Padding,
 ): ScrollMetrics => {
-  const axis = (pos: number, origin: number, content: number, view: number) => {
-    const lo = Math.min(origin - padding / camera.zoom, pos);
-    const hi = Math.max(origin + content + padding / camera.zoom, pos + view / camera.zoom);
+  const sides = paddingSidesOf(padding);
+  const axis = (
+    pos: number,
+    origin: number,
+    content: number,
+    view: number,
+    before: number,
+    after: number,
+  ) => {
+    const lo = Math.min(origin - before / camera.zoom, pos);
+    const hi = Math.max(origin + content + after / camera.zoom, pos + view / camera.zoom);
     const total = (hi - lo) * camera.zoom;
     // half-px slack, like the fits-predicate: sub-pixel overflow must not flash a bar
     return { offset: (pos - lo) * camera.zoom, total, scrollable: total > view + 0.5 };
   };
-  const horizontal = axis(camera.x, bounds.x, bounds.width, vp.width);
-  const vertical = axis(camera.y, bounds.y, bounds.height, vp.height);
+  const horizontal = axis(camera.x, bounds.x, bounds.width, vp.width, sides.left, sides.right);
+  const vertical = axis(camera.y, bounds.y, bounds.height, vp.height, sides.top, sides.bottom);
   return {
     scrollLeft: horizontal.offset,
     scrollTop: vertical.offset,
@@ -369,26 +395,29 @@ export const cameraFromScroll = (
   camera: Camera,
   bounds: Rect,
   vp: Size,
-  padding: number,
+  padding: Padding,
   target: { left?: number; top?: number },
 ): Camera => {
+  const sides = paddingSidesOf(padding);
   const axis = (
     want: number | undefined,
     pos: number,
     origin: number,
     content: number,
     view: number,
+    before: number,
+    after: number,
   ): number => {
     if (want === undefined) return pos;
-    const lo = Math.min(origin - padding / camera.zoom, pos);
-    const hi = Math.max(origin + content + padding / camera.zoom, pos + view / camera.zoom);
+    const lo = Math.min(origin - before / camera.zoom, pos);
+    const hi = Math.max(origin + content + after / camera.zoom, pos + view / camera.zoom);
     const max = Math.max(0, (hi - lo) * camera.zoom - view);
     return lo + clamp(want, 0, max) / camera.zoom;
   };
   return {
     zoom: camera.zoom,
-    x: axis(target.left, camera.x, bounds.x, bounds.width, vp.width),
-    y: axis(target.top, camera.y, bounds.y, bounds.height, vp.height),
+    x: axis(target.left, camera.x, bounds.x, bounds.width, vp.width, sides.left, sides.right),
+    y: axis(target.top, camera.y, bounds.y, bounds.height, vp.height, sides.top, sides.bottom),
   };
 };
 
@@ -437,15 +466,24 @@ export function placeCamera(
   subject: Rect,
   vp: Size,
   zoom: number,
-  padding = 0,
+  padding: Padding = 0,
   align: AlignmentValue = { x: 'start', y: 'start' },
   direction: Direction = 'ltr',
 ): Camera {
-  const axis = (alignValue: AlignValue, pos: number, extent: number, view: number): number => {
-    if (alignValue === 'start') return pos - padding / zoom;
-    if (alignValue === 'end') return pos + extent - (view - padding) / zoom;
+  const sides = paddingSidesOf(padding);
+  const axis = (
+    alignValue: AlignValue,
+    pos: number,
+    extent: number,
+    view: number,
+    before: number,
+    after: number,
+  ): number => {
+    if (alignValue === 'start') return pos - before / zoom;
+    if (alignValue === 'end') return pos + extent - (view - after) / zoom;
     const fraction = alignValue === 'center' ? 0.5 : clamp(alignValue, 0, 1);
-    return pos + extent / 2 - (view * fraction) / zoom;
+    // Over the viewport moved by half the sides' difference, so 'center' is the padded middle.
+    return pos + extent / 2 - (view * fraction + (before - after) / 2) / zoom;
   };
   const ax =
     direction === 'rtl' && align.x === 'start'
@@ -455,8 +493,8 @@ export function placeCamera(
         : align.x;
   return {
     zoom,
-    x: axis(ax, subject.x, subject.width, vp.width),
-    y: axis(align.y, subject.y, subject.height, vp.height),
+    x: axis(ax, subject.x, subject.width, vp.width, sides.left, sides.right),
+    y: axis(align.y, subject.y, subject.height, vp.height, sides.top, sides.bottom),
   };
 }
 
@@ -470,17 +508,25 @@ export function placeCamera(
  * This is deliberately not placement: `placeCamera` answers "I am navigating here"
  * (canonical); `revealCamera` answers "make sure this is seeable" (minimal).
  */
-export function revealCamera(cam: Camera, rect: Rect, vp: Size, padding = 0): Camera {
-  const axis = (pos: number, start: number, size: number, view: number): number => {
-    const lo = start + size - (view - padding) / cam.zoom; // far edge just inside
-    const hi = start - padding / cam.zoom; // near edge just inside
+export function revealCamera(cam: Camera, rect: Rect, vp: Size, padding: Padding = 0): Camera {
+  const sides = paddingSidesOf(padding);
+  const axis = (
+    pos: number,
+    start: number,
+    size: number,
+    view: number,
+    before: number,
+    after: number,
+  ): number => {
+    const lo = start + size - (view - after) / cam.zoom; // far edge just inside
+    const hi = start - before / cam.zoom; // near edge just inside
     if (lo > hi) return hi; // rect larger than the viewport: align its start
     return clamp(pos, lo, hi);
   };
   return {
     zoom: cam.zoom,
-    x: axis(cam.x, rect.x, rect.width, vp.width),
-    y: axis(cam.y, rect.y, rect.height, vp.height),
+    x: axis(cam.x, rect.x, rect.width, vp.width, sides.left, sides.right),
+    y: axis(cam.y, rect.y, rect.height, vp.height, sides.top, sides.bottom),
   };
 }
 
@@ -491,15 +537,16 @@ export function resolveZoom(
   spec: ZoomSpec,
   box: Size,
   vp: Size,
-  padding = 0,
+  padding: Padding = 0,
   limits?: ZoomLimits,
 ): number {
   if ('level' in spec) return clampZoom(spec.level, limits);
   // absolute pixel targets: box dimension = N screen px (document-independent)
   if ('pageWidth' in spec) return clampZoom(spec.pageWidth / box.width, limits);
   if ('pageHeight' in spec) return clampZoom(spec.pageHeight / box.height, limits);
-  const fitW = Math.max(1, vp.width - 2 * padding) / box.width;
-  const fitH = Math.max(1, vp.height - 2 * padding) / box.height;
+  const sides = paddingSidesOf(padding);
+  const fitW = Math.max(1, vp.width - sides.left - sides.right) / box.width;
+  const fitH = Math.max(1, vp.height - sides.top - sides.bottom) / box.height;
   switch (spec.mode) {
     case ZoomMode.FitWidth:
       return clampZoom(fitW, limits);

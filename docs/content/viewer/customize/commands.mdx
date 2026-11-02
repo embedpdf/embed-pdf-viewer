@@ -24,8 +24,9 @@ agree. Add one of yours, then put it in the [layout](layout):
 }
 ```
 
-The button has a tooltip with its shortcut, moves into the "More" menu when the toolbar is full,
-and `Ctrl`+`Enter` (`Cmd`+`Enter` on a Mac) runs it while the viewer has focus.
+The button's tooltip says its label and its shortcut the way the platform writes it: `Ctrl+Enter`,
+or `⌘↩` on a Mac. The button moves into the "More" menu when the toolbar is full, and `Ctrl`+`Enter`
+(`Cmd`+`Enter` on a Mac) runs it while the viewer has focus.
 
 ## Define a command
 
@@ -66,6 +67,9 @@ button is always right:
 ```
 
 `run` gets the same: `get`, the `viewer`, and the `documentId` of the document it runs for.
+
+One that throws, because what it reads isn't there yet, such as a plugin of a document while none
+is open, counts as `false`: the button is greyed out, not pressed, or hidden until it answers.
 
 ## Change what a built-in button does
 
@@ -191,14 +195,39 @@ Every tool you add to the [annotation plugin](/docs/headless/annotations/tools) 
 
 ## Good to know
 
+### Tooltips
+
+Every button in a bar, every mode tab and the buttons in a panel's header have a tooltip: the
+button's label, its shortcut, and why it's greyed out when it is. A button that shows its label
+already has a tooltip only when there's more to say. A greyed-out menu row says why in a tooltip
+too. The tooltip shows when the pointer rests on the button for a moment, at once when the button
+gets focus from the keyboard, and never from a touch. Escape hides it. Screen readers read the
+shortcut and the reason with the button. Its colors are theme tokens: see
+[Theming](theming#every-color).
+
+Every other tooltip in the viewer is the same one, with the same timing: those of the buttons in
+panels and dialogs, and a name too long for its row, such as an attachment's or an outline item's,
+which shows whole while it's cut short.
+
 ### The viewer's icons
 
-`area`, `bold`, `book`, `calibrate`, `callout`, `check`, `chevronsDown`, `chevronsUp`, `circle`,
-`circleCheck`, `comment`, `copy`, `distance`, `dots`, `download`, `eye`, `file`, `fileExport`, `filePlus`, `fullscreen`, `fullscreenExit`, `group`, `hand`, `highlight`, `italic`, `line`,
-`link`, `lock`, `menu`, `message`, `pageRotateClockwise`, `pageRotateCounterClockwise`, `palette`, `paperclip`, `perimeter`, `photo`, `plus`,
-`pointer`, `polygon`, `print`, `redact`, `ruler`, `save`, `search`, `send`, `settings`, `sidebar`,
-`signature`, `square`, `squiggly`, `strikethrough`, `text`, `trash`, `underline`, `ungroup`,
-`unlock`, `x`, `zigzag`.
+Every icon the viewer has, by name:
+
+`alertTriangle`, `alignBottom`, `alignCenter`, `alignLeft`, `alignMiddle`, `alignRight`, `alignTop`,
+`area`, `arrowBackUp`, `arrowForwardUp`, `bold`, `book`, `book2`, `calibrate`, `callout`, `check`,
+`chevronDown`, `chevronLeft`, `chevronRight`, `chevronsDown`, `chevronsUp`, `circle`, `circleCheck`,
+`comment`, `copy`, `deviceFloppy`, `distance`, `dots`, `doublePage`, `download`, `externalLink`,
+`eye`, `file`, `fileExport`, `fileImport`, `filePlus`, `fitToPage`, `fitToWidth`, `formButton`,
+`formCheckbox`, `formDesign`, `formListbox`, `formRadio`, `formSelect`, `formTextfield`, `freeText`,
+`fullscreen`, `fullscreenExit`, `group`, `hand`, `highlight`, `horizontal`, `inkHighlighter`,
+`insertText`, `italic`, `line`, `lineArrow`, `link`, `linkOff`, `listTree`, `lock`, `marqueeSelect`,
+`menu`, `message`, `pageRotateClockwise`, `pageRotateCounterClockwise`, `palette`, `paperclip`,
+`pencilMarker`, `perimeter`, `photo`, `plus`, `pointer`, `polygon`, `print`, `redact`, `redactArea`,
+`redactCombined`, `redactionSidebar`, `replaceText`, `rotateClockwise`, `rotateCounterClockwise`,
+`rubberStamp`, `rubberStampPlus`, `ruler`, `save`, `screenshot`, `search`, `send`, `settings`,
+`sidebar`, `signature`, `singlePage`, `square`, `squares`, `squiggly`, `strikethrough`, `text`,
+`trash`, `underline`, `ungroup`, `unlock`, `updateScale`, `vertical`, `viewSettings`, `widgetEdit`,
+`x`, `zigzag`, `zoomIn`, `zoomInArea`, `zoomOut`.
 
 ### Enabled is for now, permissions are for good
 

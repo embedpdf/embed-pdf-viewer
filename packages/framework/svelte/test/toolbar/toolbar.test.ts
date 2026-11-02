@@ -214,6 +214,75 @@ describe('Toolbar', () => {
     expect(sockets[0]!.closest('[aria-hidden="true"]')).toBeNull();
     expect(sockets[0]!.textContent?.trim()).toBe('Go to page');
   });
+
+  /** The live row's sections, in order: the toolbar's children before the measurement layer. */
+  const sections = (root: HTMLElement) =>
+    [...root.querySelector('[role="toolbar"]')!.children].filter(
+      (child) => child.getAttribute('aria-hidden') !== 'true',
+    ) as HTMLElement[];
+
+  /** A title of your own that takes the rest of the bar, before the commands at its end. */
+  const growing: BarSchema = {
+    id: 'main',
+    sections: {
+      start: [group('title', [custom('title', undefined, { grow: true })])],
+      end: [group('pages', ['zoom:out', 'zoom:in', 'page:next'])],
+    },
+  };
+
+  it('keeps each section at its items’ length, and the center balanced, while nothing grows', async () => {
+    withWidth(1000);
+    const { view } = await viewerWith(commands(), ToolbarHarness, { bar, drawCommands: true });
+    flushSync();
+    const [start, center, end] = sections(view.container);
+    expect([start, center, end].map((section) => section!.style.flex)).toEqual([
+      '0 0 auto',
+      '0 0 auto',
+      '0 0 auto',
+    ]);
+    expect(center!.style.marginLeft).toBe('auto');
+    expect(center!.style.marginRight).toBe('auto');
+    const items = split(view.container, '[data-epdf-toolbar-item]').live;
+    expect(items.every((element) => element.style.display === 'contents')).toBe(true);
+  });
+
+  it('grows an item with grow and its section into the room left, a gap before the next section', async () => {
+    withWidth(1000);
+    const { view } = await viewerWith(commands(), ToolbarHarness, {
+      bar: growing,
+      drawCommands: true,
+      drawCustom: true,
+    });
+    flushSync();
+    const [start, center, end] = sections(view.container);
+    expect(start!.style.flex).toBe('1 0 auto');
+    expect(center!.style.marginLeft).toBe('');
+    expect(end!.getAttribute('style')).toContain('margin-inline-start: 8px');
+    const box = split(view.container, '[data-custom="title"]').live[0]!.parentElement!;
+    expect(box.hasAttribute('data-epdf-toolbar-item')).toBe(true);
+    expect(box.style.display).toBe('flex');
+    expect(box.style.flex).toBe('1 0 auto');
+  });
+
+  it('counts a socket that grows at its own length, not the room it grew into', async () => {
+    // Grown, the socket would take the whole toolbar; its own length is 0, as every length here.
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: Element,
+    ) {
+      const width = this instanceof HTMLSlotElement && this.style.flexGrow === '1' ? 990 : 0;
+      return { width, height: 0, x: 0, y: 0, top: 0, left: 0, right: width, bottom: 0 } as DOMRect;
+    });
+    withWidth(200);
+    const { view } = await viewerWith(commands(), ToolbarHarness, {
+      bar: growing,
+      drawCommands: true,
+    });
+    flushSync();
+    const socket = view.container.querySelector<HTMLElement>('slot[name="title"]')!;
+    expect(socket.style.flexGrow).toBe('1');
+    expect(split(view.container, '[data-command]').live).toHaveLength(3);
+    expect(split(view.container, 'button[title="More"]').live).toHaveLength(0);
+  });
 });
 
 /** Press a key on what has focus, and let Svelte draw what it changed. */

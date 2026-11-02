@@ -1,7 +1,7 @@
 /**
  * Your own components in <PDFViewer>: `ToolbarItem`, `Panel` and `Region` put them in the
  * viewer, `useToolbarItem()` says where an item sits (and follows the bar to a rail when the
- * viewer narrows), and `Button`, `Menu` and `MenuItem` are the viewer's own
+ * viewer narrows), and `Button`, `Menu`, `MenuItem` and `Icon` are the viewer's own, `active` too
  * (`ComponentsApp.vue`). `components.test.ts` drives it.
  */
 import type { Viewer } from '@embedpdf/viewer-vue';

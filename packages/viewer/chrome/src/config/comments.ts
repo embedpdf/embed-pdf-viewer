@@ -18,11 +18,11 @@ export const REVIEW_STATES = ['accepted', 'rejected', 'cancelled', 'completed', 
 
 /** A review state's label key; a custom state shows as it is written. */
 export const REVIEW_STATE_LABEL_KEYS: Readonly<Record<string, string>> = {
-  none: 'demo.commentsStatusNone',
-  accepted: 'demo.commentsStatusAccepted',
-  rejected: 'demo.commentsStatusRejected',
-  cancelled: 'demo.commentsStatusCancelled',
-  completed: 'demo.commentsStatusCompleted',
+  none: 'comments.statusNone',
+  accepted: 'comments.statusAccepted',
+  rejected: 'comments.statusRejected',
+  cancelled: 'comments.statusCancelled',
+  completed: 'comments.statusCompleted',
 };
 
 /** Whether anything is said in a thread: its annotation's own text or a reply. */
@@ -72,7 +72,7 @@ export const commentCommands: CommandDef[] = [
   ...REVIEW_STATES.map(statusCommand),
   {
     id: 'comment:delete-thread',
-    labelKey: 'demo.commentsDeleteThread',
+    labelKey: 'comments.deleteThread',
     icon: 'trash',
     categories: ['comments.writing'],
     enabled: (commandContext) => {

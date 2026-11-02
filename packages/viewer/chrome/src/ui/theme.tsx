@@ -29,6 +29,10 @@ export const THEME_TOKENS = [
   'border',
   'hover',
   'canvas',
+  'page-background',
+  'page-shadow',
+  'tooltip',
+  'tooltip-text',
   'radius',
   'font',
 ] as const;
@@ -46,6 +50,8 @@ export interface ThemeConfig {
   accent?: string;
   /** Token values for both modes, over the viewer's defaults. */
   tokens?: ThemeTokens;
+  /** Token values for light mode only, over `tokens`. */
+  light?: ThemeTokens;
   /** Token values for dark mode only, over `tokens`. */
   dark?: ThemeTokens;
 }
@@ -76,18 +82,27 @@ function tokenDeclarations(tokens: ThemeTokens): string {
     .join('');
 }
 
+/** A rule declaring `tokens` on `selector`, or nothing when none of them is a token. */
+function tokenRule(selector: string, tokens: ThemeTokens | undefined): string {
+  const declarations = tokens ? tokenDeclarations(tokens) : '';
+  return declarations ? `${selector}{${declarations}}` : '';
+}
+
 /**
  * The CSS that applies a theme's tokens on the viewer's root (`root`, a selector), for a sheet
  * after the chrome's: its tokens win over the defaults in both modes by coming later, and its
- * dark ones win in dark by naming the class too. A value is a default only: the page's own
- * `--epdf-*` variable still wins, read on the host as the chrome's stylesheet does. Empty when
- * the theme sets no token.
+ * light and dark ones win in their mode by naming the class too (`:not(.dark)`, `.dark`). So
+ * `light` or `dark` wins in its mode, then `tokens`, then `accent`. A value is a default only:
+ * the page's own `--epdf-*` variable still wins, read on the host as the chrome's stylesheet
+ * does. Empty when the theme sets no token.
  */
 export function themeTokenCss(theme: ThemePreference | ThemeConfig | undefined, root: string) {
-  const { accent, tokens, dark } = themeConfigOf(theme);
-  const both = tokenDeclarations({ ...(accent === undefined ? null : { accent }), ...tokens });
-  const darkOnly = dark ? tokenDeclarations(dark) : '';
-  return (both ? `${root}{${both}}` : '') + (darkOnly ? `${root}.dark{${darkOnly}}` : '');
+  const { accent, tokens, light, dark } = themeConfigOf(theme);
+  return (
+    tokenRule(root, { ...(accent === undefined ? null : { accent }), ...tokens }) +
+    tokenRule(`${root}:not(.dark)`, light) +
+    tokenRule(`${root}.dark`, dark)
+  );
 }
 
 const ThemeCtx = createContext<{ mode: ThemeMode } | null>(null);

@@ -21,7 +21,6 @@ import {
   anchoredViewOf,
   attachMenuKeys,
   directionOf,
-  fitAnchoredRect,
   isUnavailable,
   observeClientGeometry,
   observeOutsidePress,
@@ -47,9 +46,10 @@ import {
   submenuPlacementOf,
   type MenuAlign,
   type MenuDirection,
-  type SelectionBarSide,
 } from './menu-placement';
 import { Sheet } from './sheet';
+import { boxOf, placeInWindow, selectionBarSideOf } from './top-layer';
+import { useTooltip } from './tooltip';
 import { useLayoutEnv, useMenu } from '../config-context';
 
 // ── the popover ──────────────────────────────────────────────────────────────
@@ -75,25 +75,15 @@ const itemsOf = (menu: HTMLElement): HTMLElement[] =>
     (item) => item.closest('[role="menu"]') === menu,
   );
 
+/** A button's name, which its menu takes: its `aria-label`, else its words. */
+const nameOf = (trigger: HTMLElement | null): string | undefined =>
+  trigger?.getAttribute('aria-label') || trigger?.textContent?.trim() || undefined;
+
 /** The button that opens the menu: the one beside it that says it has a popup. */
 const triggerOf = (holder: HTMLElement, menu: HTMLElement): HTMLElement | null =>
   [...holder.querySelectorAll<HTMLElement>('[aria-haspopup]')].find(
     (candidate) => !menu.contains(candidate),
   ) ?? null;
-
-/**
- * Where the bar over a selection that `element` is in sits now: its anchored wrapper says so
- * in `data-placement` (`Anchored` in `@embedpdf/react`), `bottom…` once it went below.
- */
-const selectionBarSideOf = (element: Element): SelectionBarSide =>
-  element.closest('[data-placement]')?.getAttribute('data-placement')?.startsWith('bottom')
-    ? 'below'
-    : 'above';
-
-const boxOf = (element: Element): AnchoredRect => {
-  const rect = element.getBoundingClientRect();
-  return { x: rect.left, y: rect.top, width: rect.width, height: rect.height };
-};
 
 /**
  * What a submenu opens beside: its row, across the whole width of the menu
@@ -122,17 +112,7 @@ function placeMenu(
   const view = anchoredViewOf(menu, 'client');
   if (!view) return;
   menu.style.maxHeight = `${Math.max(0, view.height - 2 * MENU_GAP_PX)}px`;
-  const size = { width: menu.offsetWidth, height: menu.offsetHeight };
-  const { left, top } = fitAnchoredRect(box, placement, gap, { size, view });
-  menu.style.left = `${left}px`;
-  menu.style.top = `${top}px`;
-  // Without the top layer, `position: fixed` starts at the viewer's box (its `contain`):
-  // move by however far from the window's origin the menu landed.
-  const landed = menu.getBoundingClientRect();
-  if (Math.abs(landed.left - left) > 0.5 || Math.abs(landed.top - top) > 0.5) {
-    menu.style.left = `${2 * left - landed.left}px`;
-    menu.style.top = `${2 * top - landed.top}px`;
-  }
+  placeInWindow(menu, box, placement, gap);
 }
 
 /**
@@ -155,10 +135,7 @@ function openMenu(
   const direction = directionOf(holder);
   const placement = options.placement(direction);
   // The menu is named after its button.
-  const name =
-    trigger?.getAttribute('aria-label') ||
-    trigger?.getAttribute('title') ||
-    trigger?.textContent?.trim();
+  const name = nameOf(trigger);
   if (name) menu.setAttribute('aria-label', name);
 
   if (typeof menu.showPopover === 'function') menu.showPopover();
@@ -384,7 +361,7 @@ function SheetMenu({
     const element = menu.current;
     if (!element) return;
     const trigger = opener ?? sheetTriggerOf(element);
-    const name = label ?? (trigger?.getAttribute('aria-label') || trigger?.getAttribute('title'));
+    const name = label ?? nameOf(trigger);
     if (name) element.setAttribute('aria-label', name);
     const detachKeys = attachMenuKeys(element, {
       trigger,
@@ -569,6 +546,18 @@ const ROW_CLASS = `${ROW_BASE} text-fg-secondary hover:bg-hover focus-visible:bg
 const CHOSEN_ROW_CLASS = `${ROW_BASE} bg-selected text-accent focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-accent forced-colors:outline-2 forced-colors:outline-solid forced-colors:-outline-offset-2`;
 
 /**
+ * The tooltip of a row that can't run: why, beside the row. A row shows its label and its
+ * shortcut itself, so one that can run has none.
+ */
+const useRowTooltip = (command: ResolvedCommand) =>
+  useTooltip(
+    command.enabled
+      ? null
+      : { label: command.label, reason: command.disabledReason, labelShown: true },
+    { inMenu: true },
+  );
+
+/**
  * One row: the command's icon, label and shortcut, in the accent look when it
  * is the current choice. A row that can't run says why in its tooltip, and
  * stays where it is, greyed out.
@@ -584,31 +573,40 @@ export function MenuItem({
 }) {
   const checked = choice !== 'none' && command.active;
   const [shortcut] = command.shortcuts;
+  const tooltip = useRowTooltip(command);
   return (
-    <button
-      type="button"
-      tabIndex={-1}
-      role={ROLE_OF[choice]}
-      aria-checked={choice === 'none' ? undefined : command.active}
-      aria-disabled={command.enabled ? undefined : true}
-      title={command.enabled ? undefined : command.disabledReason}
-      part={checked ? 'menu-item menu-item-active' : 'menu-item'}
-      onClick={() => {
-        if (command.enabled) onSelect();
-      }}
-      className={checked ? CHOSEN_ROW_CLASS : ROW_CLASS}
-    >
-      {command.icon && (
-        <Icon
-          name={command.icon}
-          size={16}
-          accent={command.iconAccent}
-          className={checked ? 'text-accent' : 'text-fg-muted'}
-        />
-      )}
-      <span className="flex-1 truncate">{command.label}</span>
-      {shortcut && <span className="text-fg-muted ms-4 text-xs">{formatShortcut(shortcut)}</span>}
-    </button>
+    <>
+      <button
+        {...tooltip.trigger}
+        type="button"
+        tabIndex={-1}
+        role={ROLE_OF[choice]}
+        aria-checked={choice === 'none' ? undefined : command.active}
+        aria-disabled={command.enabled ? undefined : true}
+        part={checked ? 'menu-item menu-item-active' : 'menu-item'}
+        onClick={() => {
+          if (command.enabled) onSelect();
+        }}
+        className={checked ? CHOSEN_ROW_CLASS : ROW_CLASS}
+      >
+        {command.icon && (
+          <Icon
+            name={command.icon}
+            size={16}
+            accent={command.iconAccent}
+            className={checked ? 'text-accent' : 'text-fg-muted'}
+          />
+        )}
+        <span className="flex-1 truncate">{command.label}</span>
+        {shortcut && (
+          // `↩` as a symbol, not a color emoji.
+          <span className="text-fg-muted ms-4 text-xs [font-variant-emoji:text]">
+            {formatShortcut(shortcut)}
+          </span>
+        )}
+      </button>
+      {tooltip.element}
+    </>
   );
 }
 
@@ -628,16 +626,17 @@ function SubmenuItem({
 }) {
   const [open, setOpen] = useState(false);
   const openInSheet = useContext(MenuSheetContext);
+  const tooltip = useRowTooltip(command);
   return (
     <div role="none" className="relative">
       <button
+        {...tooltip.trigger}
         type="button"
         tabIndex={-1}
         role="menuitem"
         aria-haspopup="menu"
         aria-expanded={open}
         aria-disabled={command.enabled ? undefined : true}
-        title={command.enabled ? undefined : command.disabledReason}
         part="menu-item"
         onClick={(event) => {
           if (!command.enabled) return;
@@ -659,6 +658,7 @@ function SubmenuItem({
         <span className="flex-1 truncate">{command.label}</span>
         <Icon name="chevronRight" size={16} className="text-fg-muted rtl:-scale-x-100" />
       </button>
+      {tooltip.element}
       {open && (
         <MenuPopover onClose={() => setOpen(false)}>
           <MenuBody menuId={menuId} onRun={onRun} />

@@ -129,7 +129,7 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('languages', () => {
 
     // The pager reads in Arabic.
     const text = await tab.evaluate(() => window.element.shadowRoot!.textContent ?? '');
-    const pageOne = stringOf(ar.translations, 'demo.page')
+    const pageOne = stringOf(ar.translations, 'pageNumber.page')
       .replace('{current}', '1')
       .split('{total}')[0]!;
     expect(text).toContain(pageOne);
