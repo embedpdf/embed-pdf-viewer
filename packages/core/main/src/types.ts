@@ -10,6 +10,7 @@
 import type { ChangeQueue } from './changes';
 import type { PluginClock } from './clock';
 import type { EventHook } from './event-hook';
+import type { HostTextMeasurer } from './measurer';
 import type { Mirror, MirrorSpec } from './mirror';
 import type { PageMirror, PageMirrorSpec } from './page-mirror';
 import type { SerialQueue } from './serial-queue';
@@ -49,6 +50,15 @@ import type {
   PdfDestination,
   Identity,
   PrintDpi,
+  Font,
+  FontList,
+  FontName,
+  FontProgram,
+  FontProgramInfo,
+  FontResolution,
+  FontResolveRequest,
+  FontRestriction,
+  FontSource,
   GrantOpenRequest,
   VisitorAnswers,
   VisitorIdentityRequest,
@@ -85,6 +95,16 @@ export type {
   CustomMetadata,
   CustomMetadataPatch,
   CustomMetadataUpdateResult,
+  /** The fonts that can be named in a document, what each allows, and their programs (`doc.fonts`). */
+  FontList,
+  Font,
+  FontName,
+  FontProgram,
+  FontProgramInfo,
+  FontResolution,
+  FontResolveRequest,
+  FontRestriction,
+  FontSource,
   DocumentEvent,
   /** Who the user is: the author of what they make, and whom `:self` and `:group` permissions are checked against. */
   Identity,
@@ -472,6 +492,12 @@ export interface PluginContext<S = unknown, T extends object = NoSettings> {
    * it closes. Plugins never read timers or frames from the environment.
    */
   readonly clock: PluginClock;
+  /**
+   * Text measuring, from the host: how wide text is in a font program, as the
+   * browser that draws it shapes it. `null` on a host that gives none (a
+   * kernel in Node, a test): measure nothing then.
+   */
+  readonly measurer: HostTextMeasurer | null;
   /**
    * Register what this plugin holds back from the engine, such as text typed a moment ago or
    * the writes in its write queue (`() => queue.idle()`). Before anything reads the whole

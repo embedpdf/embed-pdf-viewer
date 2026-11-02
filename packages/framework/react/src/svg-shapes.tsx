@@ -14,14 +14,22 @@ export function SvgShapes({ shapes }: { shapes: readonly SvgShape[] }) {
   return <>{svgElements(shapes)}</>;
 }
 
-/** SVG attribute names as React's props: `stroke-width` is `strokeWidth`. */
+/** A hyphenated name as React's: `stroke-width` is `strokeWidth`, `mix-blend-mode` is `mixBlendMode`. */
+const camelCase = (name: string) =>
+  name.replace(/-([a-z])/g, (_dash, letter: string) => letter.toUpperCase());
+
+/** SVG attribute names as React's props. */
 function reactProps(attributes: Readonly<Record<string, string | number>>) {
   return Object.fromEntries(
-    Object.entries(attributes).map(([name, value]) => [
-      name.replace(/-([a-z])/g, (_dash, letter: string) => letter.toUpperCase()),
-      value,
-    ]),
+    Object.entries(attributes).map(([name, value]) => [camelCase(name), value]),
   );
+}
+
+/** CSS names as React's style keys. */
+function reactStyle(style: Readonly<Record<string, string>>): React.CSSProperties {
+  return Object.fromEntries(
+    Object.entries(style).map(([name, value]) => [camelCase(name), value]),
+  ) as React.CSSProperties;
 }
 
 function svgElements(shapes: readonly SvgShape[]): React.ReactNode[] {
@@ -31,9 +39,7 @@ function svgElements(shapes: readonly SvgShape[]): React.ReactNode[] {
       {
         key: index,
         ...reactProps(shape.attributes),
-        ...(shape.blend
-          ? { style: { mixBlendMode: shape.blend as React.CSSProperties['mixBlendMode'] } }
-          : {}),
+        ...(shape.style ? { style: reactStyle(shape.style) } : {}),
       },
       shape.children ? svgElements(shape.children) : shape.text,
     ),

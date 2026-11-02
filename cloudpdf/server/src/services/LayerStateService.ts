@@ -131,6 +131,7 @@ export class LayerStateService {
         annotationsVersion: row.annotationsVersion,
         formsVersion: row.formsVersion,
         outlineVersion: row.outlineVersion,
+        fontsVersion: row.fontsVersion,
       };
     }
     return { sha256, byteLength: fallbackByteLength ?? 0, ...INITIAL_BASE_POINTERS };
@@ -285,6 +286,8 @@ export class LayerStateService {
     version: BaseVersionFacts,
     /** What the head version's signatures forbid. */
     protection: DocumentProtection | null,
+    /** The server's fonts' fingerprint (`ServerFonts.fingerprint`). */
+    serverFonts: string,
   ): DocumentManifest {
     return {
       docVersion: head.docVersion,
@@ -297,6 +300,8 @@ export class LayerStateService {
       annotationsVersion: version.annotationsVersion,
       formsVersion: version.formsVersion,
       outlineVersion: version.outlineVersion,
+      fontsVersion: version.fontsVersion,
+      serverFonts,
       // No layer writes have happened on the base view; a fresh subscriber's
       // gapless cursor starts at 0 ("everything in the log is new to me").
       auditHead: 0,
@@ -325,6 +330,7 @@ export class LayerStateService {
       | 'annotationsVersion'
       | 'formsVersion'
       | 'outlineVersion'
+      | 'fontsVersion'
       | 'lastAuditId'
       | 'currentVersion'
       | 'currentArtifactKey'
@@ -336,6 +342,8 @@ export class LayerStateService {
      * flips the whole plane.
      */
     scopes: LayerScopes,
+    /** The server's fonts' fingerprint (`ServerFonts.fingerprint`). */
+    serverFonts: string,
   ): DocumentManifest {
     return {
       docVersion: layer.docVersion,
@@ -346,6 +354,8 @@ export class LayerStateService {
       annotationsVersion: layer.annotationsVersion,
       formsVersion: layer.formsVersion,
       outlineVersion: layer.outlineVersion,
+      fontsVersion: layer.fontsVersion,
+      serverFonts,
       // Written in the same transaction as the audit append, so a client
       // subscribing from this manifest can never miss a row (gapless cursor).
       auditHead: layer.lastAuditId,
@@ -375,6 +385,8 @@ export class LayerStateService {
      */
     annotationsVersion?: number;
     formsVersion?: number;
+    /** The font list's pin, when the write changed the fonts the list shows. */
+    fontsVersion?: number;
     pages: DurablePageRow[];
   }): CacheDelta {
     return {
@@ -384,6 +396,7 @@ export class LayerStateService {
         ? { annotationsVersion: input.annotationsVersion }
         : {}),
       ...(input.formsVersion !== undefined ? { formsVersion: input.formsVersion } : {}),
+      ...(input.fontsVersion !== undefined ? { fontsVersion: input.fontsVersion } : {}),
       // Every ordinary commit writes an artifact: the layer holds edits not
       // yet sealed into a version (a signature's publish clears it again,
       // and refreshes the manifest instead of sending a delta).

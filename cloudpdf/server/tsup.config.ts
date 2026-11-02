@@ -20,7 +20,12 @@ export default defineConfig({
   // Inline workspace packages that can resolve to TS source in development
   // so the built server runs directly in Node. The runtime stays external
   // because it ships built artifacts.
-  noExternal: ['@embedpdf/core-signature', '@embedpdf/engine-core', '@embedpdf/engine-services'],
+  noExternal: [
+    '@embedpdf/core-fonts',
+    '@embedpdf/core-signature',
+    '@embedpdf/engine-core',
+    '@embedpdf/engine-services',
+  ],
   external: [
     /^@embedpdf\//,
     'fastify',

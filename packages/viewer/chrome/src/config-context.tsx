@@ -28,20 +28,23 @@ import { NO_VIEWER_COMMANDS, type ViewerCommands } from './config/viewer-command
 import type { ViewerSignatureSettings, ViewerStampSettings } from './plugin-settings';
 
 /**
- * A font beyond the standard 14, for the engine: what `engine.fonts` lists. The style panel
- * offers it for text boxes, once it's registered on the engine and mounted for the live editor.
+ * A font of the app's, beyond the standard 14 (the viewer's `fonts` setting): registered on a
+ * local engine under its key, which the style panel then offers for text boxes, form fields and
+ * redaction labels.
  */
 export interface ViewerFont {
-  /** The id a free-text `fontFamily` carries, and the engine's key for it. Not one of the 14 standard names. */
+  /** What a `fontFamily` names it by, and the engine's key for it. Not one of the 14 standard names. */
   readonly key: string;
   /** Where the TTF or OTF file comes from (same-origin or CORS-enabled). */
   readonly url?: string;
   /** The file's bytes, in place of `url`. */
   readonly data?: Uint8Array | ArrayBuffer;
-  /** The family's name, which the style panel shows (else the key); inferred from the file when left out. */
+  /** The family's name, written into the PDF and matched by rich text; inferred from the file when left out. */
   readonly familyName?: string;
   readonly weight?: number;
   readonly italic?: boolean;
+  /** What the style panel calls it; else its family's name. */
+  readonly label?: string;
 }
 
 /** What `onPanelResize` hears: the panel, and the width the user gave it. */

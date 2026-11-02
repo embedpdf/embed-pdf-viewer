@@ -18,6 +18,10 @@ import {
 } from '../src/index';
 import { buildAppForTesting } from '../src/app/buildApp';
 import { createValidTestLicenseGate } from '../src/licensing/testing';
+import { serverFontsFingerprint } from '../src/services/ServerFonts';
+
+/** The stub worker's server fonts: it registers none. */
+const SERVER_FONTS = serverFontsFingerprint([], []);
 
 const STUB_ENTRY = new URL('./_helpers/stub-worker-entry.cjs', import.meta.url);
 const SECRET = 'doc-versioned-secret';
@@ -317,7 +321,7 @@ describe('Phase 4 versioned reads — GET /pages/:pageKey/text@cN', () => {
     const tenantId = 'tenant-annotatedperm';
     const docId = 'doctxx009';
     await seedDocument(fx, tenantId, docId);
-    const options = 'background=white,format=webp,viewport.kind=width,viewport.width=320';
+    const options = `background=white,format=webp,serverFonts=${SERVER_FONTS},viewport.kind=width,viewport.width=320`;
     const fetchAs = (scope: string[], path: string) =>
       fetch(`${fx.baseUrl}/v1/docs/${docId}${path}`, {
         headers: { Authorization: `Bearer ${docToken(tenantId, docId, { scope })}` },
@@ -388,7 +392,9 @@ describe('Phase 4 versioned reads — GET /pages/:pageKey/text@cN', () => {
     for (const { tier, rights } of tiers) {
       for (const family of families) {
         // A print picture's token is its pins and its format, nothing else.
-        const token = [...family.pins.split(','), 'format=png'].sort().join(',');
+        const token = [...family.pins.split(','), `format=png,serverFonts=${SERVER_FONTS}`]
+          .sort()
+          .join(',');
         for (const path of [
           `/render/${tier}/${family.path}/obj:1/data@${token}`,
           `/layers/default/render/${tier}/${family.path}/obj:1/data@${token}`,
@@ -407,7 +413,7 @@ describe('Phase 4 versioned reads — GET /pages/:pageKey/text@cN', () => {
 
     // What sizes a screen picture has no place in a print picture's token.
     const everything = ['doc.open', 'doc.render', 'doc.print'];
-    const sized = 'contentVersion=1,format=png,viewport.kind=width,viewport.width=320';
+    const sized = `contentVersion=1,format=png,serverFonts=${SERVER_FONTS},viewport.kind=width,viewport.width=320`;
     expect((await fetchAs(everything, `/render/print/pages/obj:1/data@${sized}`)).status).toBe(400);
   });
 

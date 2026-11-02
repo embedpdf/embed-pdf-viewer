@@ -6,8 +6,8 @@
  * stream). Over-invalidation is acceptable (a z-order move that changes
  * nothing repaints one thumbnail); under-invalidation is the bug.
  *
- * The map ignores origin: a baked raster is stale whether this session moved
- * the highlight or a collaborator did. Events fire only for confirmed
+ * The map ignores whose change it is: a baked raster is stale whether this
+ * session moved the highlight or a collaborator did. Events fire only for confirmed
  * mutations, so a drag invalidates once at commit; optimistic previews live
  * in the overlay, never here.
  */
@@ -94,6 +94,13 @@ export function pixelChangeOf(
     // The stream lost events that will never arrive: any page may be stale.
     case 'stream.desynced':
       return changeOf(allPageObjectNumbers(), 'content');
+    // The engine's own fonts changed, with no write behind it (a font
+    // registered after the first pages were drawn): a page's text draws a
+    // glyph its font lacks from a fallback, so any page may be stale. A
+    // write's `fonts.changed` carries its `tx`; that write's own events
+    // repaint what it changed.
+    case 'fonts.changed':
+      return event.origin.tx ? null : changeOf(allPageObjectNumbers(), 'content');
     // pages.* replace the page registry: the kernel's `revision` bump already
     // re-keys every layout, and metadata never touches pixels. A new saved
     // version changes no pixels beyond the signature it seals. The

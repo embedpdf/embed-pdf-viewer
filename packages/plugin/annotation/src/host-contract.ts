@@ -253,7 +253,17 @@ export interface AnnotationHostCapability extends AnnotationCapability {
   draftContents(ref: AnnotationRef, text: string): void;
   draftRichText(ref: AnnotationRef, doc: { paragraphs: RichTextParagraph[] }): void;
   setTextSelection(ref: AnnotationRef, range: { start: number; end: number } | null): void;
-  getCssFontFamily(family: string): string;
+  /**
+   * The CSS family list a face is drawn with in a text box (`id`; `null` for
+   * none yet): the font programs the engine draws it in, with the fonts
+   * plugin installed.
+   */
+  getCssFontFamily(
+    face: { family: string; weight: number; italic: boolean },
+    id: string | null,
+  ): string;
+  /** The family a CSS family a text box was drawn with stands for, for text the browser drew itself. */
+  getFamilyOfCss(cssFamily: string): string | undefined;
 
   // ── pointer routing ──
   getHitKind(

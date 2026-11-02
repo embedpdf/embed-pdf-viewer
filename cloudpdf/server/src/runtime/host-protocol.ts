@@ -4,7 +4,7 @@ import type {
   WorkerResultPayload,
 } from '@embedpdf/engine-core/runtime';
 
-import type { FallbackFontDescriptor } from './WorkerThreadPool';
+import type { ServerFontDescriptor } from './WorkerThreadPool';
 
 /**
  * The parent↔engine-host IPC protocol. Version-checked at `ready`: a
@@ -65,7 +65,7 @@ export interface HostBootConfig {
   workerEntry: string;
   poolSize?: number;
   maxDocsPerSlot?: number;
-  fonts: ReadonlyArray<FallbackFontDescriptor>;
+  fonts: ReadonlyArray<ServerFontDescriptor>;
   /** Signing candidate root (the API process derives the same paths). */
   signingRoot?: string;
   /** Memory-heartbeat interval (ms). Default 5000; tests shrink it. */

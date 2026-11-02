@@ -23,7 +23,7 @@ import {
   ColorSchema,
 } from '../base.schema';
 import { field } from '../declaration';
-import type { FreeTextFont } from '../primitives';
+import type { FontName } from '../primitives';
 
 /** `/IRT` and `/RT`: the annotation this one replies to, and how it relates to it. */
 export const AnnotationReplySchema = z.object({
@@ -38,7 +38,7 @@ export const AnnotationReplyWriteSchema = z.object({
 });
 
 /** A standard font name or a registered font key; the writer resolves which. */
-export const FontNameSchema = z.string().min(1) as unknown as z.ZodType<FreeTextFont>;
+export const FontNameSchema = z.string().min(1) as unknown as z.ZodType<FontName>;
 
 /** One `/F` bit (ISO 32000-2 §12.5.3); every bit defaults to off. */
 const flag = () => field.data(z.boolean()).optional();

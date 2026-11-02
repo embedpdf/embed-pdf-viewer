@@ -497,6 +497,25 @@ export const zhTW: Locale = {
       selected: '已選取 {count} 項',
       toolDefaults: '{tool} 預設值',
       defaults: '預設值',
+      fontGroups: {
+        document: '此文件中',
+        yours: '您的字型',
+        server: '伺服器字型',
+        standard: '標準',
+      },
+      fontStyles: {
+        bold: '粗體',
+        italic: '斜體',
+        boldItalic: '粗斜體',
+      },
+      fontRestrictions: {
+        notEmbedded: '文件僅引用其名稱',
+        subset: '文件僅包含所用的字元',
+        previewAndPrint: '其授權僅允許檢視和列印',
+        unsupportedFormat: '無法用此類字型書寫新文字',
+        noUnicodeMap: '未說明其繪製哪些字元',
+        other: '無法用它書寫新文字',
+      },
     },
     // The flags section of the style panel: its title, and what each flag does.
     annotationFlags: {

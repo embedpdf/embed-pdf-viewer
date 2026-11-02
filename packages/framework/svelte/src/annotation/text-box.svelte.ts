@@ -17,6 +17,7 @@ import {
   ownTextBoxOf,
   textBoxEditorScaleOf,
 } from '@embedpdf/web';
+import { useFontMounts } from '../runtime/font-mounts.svelte';
 import { usePage } from '../runtime/page';
 import { useOptionalCapability, useOptionalSelector } from '../runtime/readers.svelte';
 import { valueOf, type MaybeGetter } from '../runtime/values.svelte';
@@ -98,6 +99,7 @@ export function useRichTextEditor(annotation: MaybeGetter<Annotation>): RichText
     () => item.current,
     () => own?.scale ?? scale,
   );
+  useFontMounts(() => item.current?.programs ?? []);
   return {
     attach,
     get style() {

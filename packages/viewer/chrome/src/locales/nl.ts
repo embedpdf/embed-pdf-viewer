@@ -497,6 +497,25 @@ export const nl: Locale = {
       selected: '{count} geselecteerd',
       toolDefaults: 'Standaardwaarden voor {tool}',
       defaults: 'Standaardwaarden',
+      fontGroups: {
+        document: 'In dit document',
+        yours: 'Uw lettertypen',
+        server: 'Serverlettertypen',
+        standard: 'Standaard',
+      },
+      fontStyles: {
+        bold: 'Vet',
+        italic: 'Cursief',
+        boldItalic: 'Vet cursief',
+      },
+      fontRestrictions: {
+        notEmbedded: 'Het document noemt het alleen',
+        subset: 'Het document bevat alleen de tekens die het gebruikt',
+        previewAndPrint: 'De licentie staat alleen weergeven en afdrukken toe',
+        unsupportedFormat: 'In dit soort lettertype kan geen nieuwe tekst worden geschreven',
+        noUnicodeMap: 'Het geeft niet aan welke tekens het tekent',
+        other: 'Er kan geen nieuwe tekst in worden geschreven',
+      },
     },
     // The flags section of the style panel: its title, and what each flag does.
     annotationFlags: {

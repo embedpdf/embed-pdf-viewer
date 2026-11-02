@@ -79,6 +79,7 @@ export function createWidgetReads(
       renderAppearances: pictures.render,
       getWidgetPainting: looks.getWidgetPainting,
       getTextEditorLayout: looks.getTextEditorLayout,
+      getWidgetFontCss: looks.getWidgetFontCss,
       ensureLoaded: loadWidgets,
       getWidgetAt,
       getPageBox,

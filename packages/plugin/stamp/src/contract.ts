@@ -41,7 +41,8 @@ export type StampLibraryKind = string;
 
 /**
  * How a mark is authored: drawn strokes (kept as a vector path), typed text
- * in a registered font (embedded by the flatten), a raster image, or a page
+ * in a standard font or one of the `fonts` setting's (embedded by the
+ * flatten), a raster image, or a page
  * of a PDF. Ink strokes are in points, from the top-left and y down like
  * every page position, any origin — the asset page is the mark's bounds.
  */
@@ -114,6 +115,18 @@ export interface StampLibrary {
 export type StampAssetEngine = LocalEngine | (() => LocalEngine | Promise<LocalEngine>);
 
 /**
+ * A font typed marks can be written in (`mark: { kind: 'text', fontFamily: key }`), beyond the
+ * standard 14 and the asset engine's own: registered on the asset engine the first time a mark
+ * names it.
+ */
+export interface StampFont {
+  /** What a typed mark's `fontFamily` names it by. */
+  readonly key: string;
+  /** Its TrueType or OpenType file, read the first time a mark names it. */
+  readonly load: () => Promise<Uint8Array>;
+}
+
+/**
  * The stamp plugin's settings. `stampPlugin(config)` registers them over
  * {@link STAMP_DEFAULTS}, and `updateSettings()` changes them while the app
  * runs.
@@ -131,6 +144,12 @@ export interface StampSettings {
    * ```
    */
   readonly assetEngine: StampAssetEngine | null;
+  /**
+   * The fonts typed marks can be written in, each registered on the asset engine the first time
+   * a mark names it: a mark is written on the asset engine, so the font goes there, whichever
+   * engine the viewer draws with.
+   */
+  readonly fonts: readonly StampFont[];
   /** The width of a stamp's thumbnail, in device pixels. */
   readonly previewWidth: number;
   /**
@@ -146,6 +165,7 @@ export interface StampSettings {
 /** What the stamp settings are when the app registers none. */
 export const STAMP_DEFAULTS: StampSettings = {
   assetEngine: null,
+  fonts: [],
   previewWidth: 256,
   dynamic: true,
 };

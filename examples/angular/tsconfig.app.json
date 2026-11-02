@@ -16,6 +16,7 @@
     "../../packages/plugin/actions/src/**/*.ts",
     "../../packages/framework/web/src/**/*.ts",
     "../../packages/core/acrojs/src/**/*.ts",
+    "../../packages/core/fonts/src/**/*.ts",
     "../../packages/engine/main/src/**/*.ts",
     "../../packages/engine/core/src/**/*.ts",
     "../../packages/engine/services/src/**/*.ts",

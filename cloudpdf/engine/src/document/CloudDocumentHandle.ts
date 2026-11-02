@@ -17,6 +17,7 @@ import {
   type DocumentSignaturesService,
   type DocumentEvent,
   type DocumentEventStream,
+  type DocumentFontsService,
   type DocumentFormsService,
   type DocumentPagesService,
   type DocumentHandle,
@@ -53,6 +54,7 @@ import { CloudDocumentActionsService } from './CloudDocumentActionsService';
 import { CloudDocumentAnnotationsService } from './CloudDocumentAnnotationsService';
 import { CloudDocumentAttachmentsService } from './CloudDocumentAttachmentsService';
 import { changeSender, CloudDocumentChanges } from './CloudDocumentChanges';
+import { CloudDocumentFontsService } from './CloudDocumentFontsService';
 import { CloudDocumentFormsService } from './CloudDocumentFormsService';
 import { readCloudOutline } from './CloudDocumentOutlineService';
 import { CloudDocumentPagesService } from './CloudDocumentPagesService';
@@ -123,6 +125,7 @@ export class CloudDocumentHandle implements DocumentHandle {
   readonly attachments: DocumentAttachmentsService;
   readonly signatures: DocumentSignaturesService;
   readonly forms: DocumentFormsService;
+  readonly fonts: DocumentFontsService;
   readonly search: CloudDocumentSearchService;
   readonly pages: DocumentPagesService;
   /** The page reads behind `pages`, the layout per page among them. */
@@ -272,12 +275,26 @@ export class CloudDocumentHandle implements DocumentHandle {
     hub.subscribe((event) => {
       if (event.type === 'document.versioned') pool.versioned(event.version.sha256);
     });
+    // An own write whose delta moved the font list's pin changed the fonts
+    // the list shows: its events end with `fonts.changed`, as locally.
+    const noticeFonts = (meta: MutationMeta) => {
+      if (meta.cacheDelta?.fontsVersion !== undefined) this.publisher.noteFontsChanged(meta.opId);
+    };
     this.manifestAccessor = {
       get: (signal) => this.getManifest(signal),
       refresh: (signal) => this.refreshManifest(signal),
-      apply: (meta, owns) => this.absorbMutation(meta, owns),
-      applyPageDelete: (meta, deletedPages) => this.absorbPageDelete(meta, deletedPages),
-      applyPageInsert: (meta) => this.absorbPageInsert(meta),
+      apply: (meta, owns) => {
+        noticeFonts(meta);
+        this.absorbMutation(meta, owns);
+      },
+      applyPageDelete: (meta, deletedPages) => {
+        noticeFonts(meta);
+        this.absorbPageDelete(meta, deletedPages);
+      },
+      applyPageInsert: (meta) => {
+        noticeFonts(meta);
+        this.absorbPageInsert(meta);
+      },
     };
     this.changes = new CloudDocumentChanges(
       () => this.closed,
@@ -318,6 +335,13 @@ export class CloudDocumentHandle implements DocumentHandle {
     this.outline = outlineVerbs(
       () => readCloudOutline(http, id, layerName, () => this.closed, this.manifestAccessor),
       (change, options) => this.apply(change, options),
+    );
+    this.fonts = new CloudDocumentFontsService(
+      http,
+      id,
+      layerName,
+      () => this.closed,
+      this.manifestAccessor,
     );
     this.attachments = attachmentVerbs(
       new CloudDocumentAttachmentsService(
@@ -545,7 +569,7 @@ export class CloudDocumentHandle implements DocumentHandle {
         ? { annotationsVersion: delta.annotationsVersion }
         : {}),
       ...(delta?.formsVersion !== undefined ? { formsVersion: delta.formsVersion } : {}),
-      // The plane pins a page-structure, metadata, attachment or outline write bumps:
+      // The plane pins a page-structure, metadata, attachment, outline or font write bumps:
       // absorbed so the next read addresses the fresh leaf.
       ...(delta?.layoutVersion !== undefined ? { layoutVersion: delta.layoutVersion } : {}),
       ...(delta?.metadataVersion !== undefined ? { metadataVersion: delta.metadataVersion } : {}),
@@ -553,6 +577,7 @@ export class CloudDocumentHandle implements DocumentHandle {
         ? { attachmentsVersion: delta.attachmentsVersion }
         : {}),
       ...(delta?.outlineVersion !== undefined ? { outlineVersion: delta.outlineVersion } : {}),
+      ...(delta?.fontsVersion !== undefined ? { fontsVersion: delta.fontsVersion } : {}),
       // The signing fences: every ordinary commit writes an artifact
       // (`working`), and the layer's write serial when the delta names it.
       ...(delta?.layerVersion !== undefined ? { layerVersion: delta.layerVersion } : {}),

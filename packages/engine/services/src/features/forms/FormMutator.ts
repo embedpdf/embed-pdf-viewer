@@ -40,6 +40,7 @@ import type { DocumentSession } from '../../document-session/DocumentSession';
 import { throwIfAborted } from '../../shared/abort';
 import { withI32Array, withScratch, withScratchN } from '../../runtime/memory/scratch';
 import { U64_BYTES, pokeU64 } from '../../runtime/memory/u64';
+import { fontWriteContext, type FontRegistrar } from '../fonts';
 import { createUnattachedWidget } from './internal/authorWidget';
 import { flagMasks } from './internal/fieldFlagBits';
 import { acquireFormModel } from './internal/formModelCache';
@@ -119,6 +120,8 @@ export class FormMutator {
   constructor(
     private readonly runtime: PdfRuntimeModule,
     private readonly session: DocumentSession,
+    /** The thread's registered fonts: what a widget's `fontFamily` may name, besides the standard and document fonts. */
+    private readonly fonts?: FontRegistrar,
   ) {}
 
   /**
@@ -405,6 +408,7 @@ export class FormMutator {
         pageIndexes[at]!,
         placement,
         widgetObjectNumbers?.[at],
+        fontWriteContext(this.runtime, this.session, this.fonts),
       );
       // A new field is never merged, so no split number is needed.
       if (
@@ -809,6 +813,7 @@ export class FormMutator {
       pageIndex,
       fitted,
       numbers.objectNumber,
+      fontWriteContext(this.runtime, this.session, this.fonts),
     );
     if (
       !fn.EPDFForm_AttachWidget(

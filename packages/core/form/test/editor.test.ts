@@ -3,10 +3,16 @@
  * `lineHeight`, inside `padding`, centred for one line and from the top for several, gives the
  * painter's baselines, and a comb's even spacing gives a fixed-width face's cells.
  */
-import type { FormFieldDTO, WidgetAnnotation } from '@embedpdf/engine-core/runtime';
+import {
+  lastResortPaintFont,
+  standardPaintFont,
+  type PaintFont,
+  type PaintFonts,
+} from '@embedpdf/core-text';
+import type { FormFieldDTO, StandardFont, WidgetAnnotation } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
-import { layoutFontOf, textEditorLayout, widgetDrawing, type DrawOp, type TextRun } from '../src';
+import { textEditorLayout, widgetDrawing, widgetText, type DrawOp, type TextRun } from '../src';
 
 const widget = (patch: Partial<WidgetAnnotation> = {}): WidgetAnnotation =>
   ({
@@ -51,7 +57,8 @@ function paintedText(row: WidgetAnnotation, field: FormFieldDTO) {
 /** Where the CSS line box puts the first baseline, from the box's top. */
 function cssBaseline(row: WidgetAnnotation, field: FormFieldDTO, text: string): number {
   const layout = textEditorLayout(row, field, text)!;
-  const ascent = (layoutFontOf(row.fontFamily)!.ascent * layout.fontSize) / 1000;
+  const ascent =
+    (standardPaintFont(row.fontFamily as StandardFont).ascent * layout.fontSize) / 1000;
   const content = row.box!.height - layout.padding.top - layout.padding.bottom;
   const multiline = field.family === 'text' && field.multiline;
   const lineTop = layout.padding.top + (multiline ? 0 : (content - layout.lineHeight) / 2);
@@ -108,7 +115,78 @@ describe('textEditorLayout', () => {
     ).toBeCloseTo(runs[0]!.x, 2);
   });
 
+  it('reads the line in the direction the engine draws it: its first strong character', () => {
+    const rtl = (text: string) => textEditorLayout(widget(), textField(), text)!.rtl;
+    expect(rtl('שלום test 123')).toBe(true);
+    expect(rtl('test 123 שלום')).toBe(false);
+    expect(rtl('123 שלום')).toBe(true);
+    expect(rtl('')).toBe(false);
+  });
+
   it('is only for text fields', () => {
     expect(textEditorLayout(widget(), { family: 'checkbox' } as FormFieldDTO, '')).toBeNull();
+  });
+
+  it('names the programs its text is drawn in: the face, the fallbacks it needs, the last resort', () => {
+    const fallback = (name: string, first: number, last: number): PaintFont => ({
+      key: name,
+      ascent: 900,
+      descent: -200,
+      standard: false,
+      covers: (codePoint) => codePoint >= first && codePoint <= last,
+      width: (text) => [...text].length * 600,
+      fontFamily: `"epdf-${name}"`,
+      fontWeight: 400,
+      fontStyle: 'normal',
+      program: {
+        hash: name,
+        family: `epdf-${name}`,
+        weight: 400,
+        style: 'normal',
+        load: async () => new Uint8Array(),
+      },
+    });
+    const fonts: PaintFonts = {
+      face: standardPaintFont('helvetica'),
+      fallbacks: [fallback('arabic', 0x0600, 0x06ff), fallback('hebrew', 0x0590, 0x05ff)],
+      lastResort: lastResortPaintFont(),
+    };
+    const families = (text: string) =>
+      textEditorLayout(widget(), textField(), text, fonts)!.programs.map(
+        (program) => program.family,
+      );
+    const face = standardPaintFont('helvetica').program.family;
+    const lastResort = lastResortPaintFont().program.family;
+    expect(families('Hello')).toEqual([face, lastResort]);
+    expect(families('Hello שלום')).toEqual([face, 'epdf-hebrew', lastResort]);
+    const layout = textEditorLayout(widget(), textField(), 'Hello שלום', fonts)!;
+    expect(layout.fontFamily).toBe(
+      `"${face}", "epdf-hebrew", "${lastResort}", Helvetica, Arial, sans-serif`,
+    );
+  });
+});
+
+describe('widgetText', () => {
+  it('is every character the painter draws for the widget', () => {
+    expect(widgetText(widget(), textField({ value: 'שלום' }))).toBe('שלום');
+    expect(widgetText(widget(), textField({ value: '1234.5' }), { text: '$1,234.50' })).toBe(
+      '$1,234.50',
+    );
+    expect(widgetText(widget(), textField({ value: 'secret', password: true }))).toBe('*');
+    expect(widgetText(widget(), textField({ password: true }))).toBe('');
+    expect(
+      widgetText(widget(), {
+        family: 'listbox',
+        options: [
+          { label: 'One', selected: false },
+          { label: 'שתיים', selected: true },
+        ],
+        topIndex: 0,
+      } as unknown as FormFieldDTO),
+    ).toBe('One\nשתיים');
+    expect(widgetText(widget({ caption: 'שלח' }), { family: 'pushbutton' } as FormFieldDTO)).toBe(
+      'שלח',
+    );
+    expect(widgetText(widget(), { family: 'checkbox' } as FormFieldDTO)).toBe('');
   });
 });

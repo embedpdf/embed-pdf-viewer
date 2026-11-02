@@ -82,35 +82,7 @@ annotations, comments and replies as they're made, and every change is stored on
 
 ## Fonts
 
-<Engine local>
-
-Text boxes and callouts use the 14 standard PDF fonts. Give the engine more, such as your brand's
-typeface or a script the standard fonts don't cover, and the style panel offers them:
-
-```js
-{
-  engine: {
-    fonts: [
-      { key: 'brand-sans', familyName: 'Brand Sans', url: '/fonts/BrandSans-Regular.ttf' },
-      { key: 'noto-sc', familyName: 'Noto Sans SC', url: '/fonts/NotoSansSC-Regular.otf' },
-    ],
-  },
-}
-```
-
-Each font is fetched once, and the text box shows the very face the PDF will carry: only the
-characters people use are embedded when they save. A `key` can't be one of the standard names,
-such as `helvetica`.
-
-</Engine>
-
-<Engine cloud>
-
-Text boxes and callouts use the 14 standard PDF fonts. The server draws them, so fonts are your
-server's to configure, not the browser's: a script the standard fonts don't cover needs a fallback
-font on the server. See [Fallback fonts](/docs/server/configuration/fonts).
-
-</Engine>
+The font picker, your own fonts and text in any language are on [Fonts](fonts).
 
 ## Stamps
 

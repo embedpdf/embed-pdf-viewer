@@ -71,6 +71,7 @@ Everything the viewer can do is one config object. In a framework, every key is 
 | `identity` | Who the user is: the author of their annotations | [All features](features#who-the-user-is) |
 | `notAllowed` | `'hide'` (default) or `'disable'` what the scope doesn't allow | [Turn features off](features/turning-off#what-a-user-may-do) |
 | `plugins` | The settings of each feature's plugin | [Plugins](code/plugins#settings) |
+| `fonts` | Your fonts, beyond the standard PDF fonts, for the text people write | [Fonts](features/fonts) |
 | `engine` | Where the engine's files come from, or another engine | [Self-hosting](self-hosting) |
 | `onReady` | Called with the `viewer` once it's live | [The viewer in code](code/viewer) |
 | `onDocumentChange` | Called with the document that's showing: the first one, each one the user switches to, and `null` after the last one closes | [Documents](documents#several-documents) |
@@ -94,6 +95,7 @@ Everything the viewer can do is one config object. In a framework, every key is 
 | `readOnly` | Every feature that changes the document off | [Turn features off](features/turning-off#read-only) |
 | `notAllowed` | `'hide'` (default) or `'disable'` what the user's token doesn't allow | [Turn features off](features/turning-off#what-a-user-may-do) |
 | `plugins` | The settings of each feature's plugin | [Plugins](code/plugins#settings) |
+| `fonts` | Ignored on the cloud: your server's fonts are the ones offered | [Fonts](features/fonts) |
 | `engine` | Your own CloudPDF server (`baseUrl`), the engine's own `token`, or another engine | [Self-hosting](self-hosting) |
 | `onReady` | Called with the `viewer` once it's live | [The viewer in code](code/viewer) |
 | `onDocumentChange` | Called with the document that's showing: the first one, each one the user switches to, and `null` after the last one closes | [Documents](documents#several-documents) |

@@ -170,6 +170,7 @@ describe('the form read family', () => {
       'GET',
       `/form/pages/obj:${PAGE}/appearances@${widgetAppearancesImageOptionsToToken(options, {
         widgetVersion: cache.widgetVersion,
+        serverFonts: manifest.serverFonts,
       })}`,
       { layer: 'reader' },
     );
@@ -179,7 +180,7 @@ describe('the form read family', () => {
       'GET',
       `/annotations/pages/obj:${PAGE}/appearances@${annotationAppearancesImageOptionsToToken(
         options,
-        { annotationVersion: cache.annotationVersion },
+        { annotationVersion: cache.annotationVersion, serverFonts: manifest.serverFonts },
       )}`,
       { layer: 'reader' },
     );

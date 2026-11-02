@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "canonicalVersion": "3.0.0-next.19",
-  "openapiSha256": "240fcfaa94c274f22f5bd0cfa311f460785feb415fa2657fc54651115ab6e245",
+  "openapiSha256": "18050d5aef43abd3b91d1b135df2608eec4b5848777c7d2a67f383931f6f9191",
   "languages": {
     "typescript": {
       "label": "TypeScript",
@@ -687,6 +687,154 @@
       "ruby": {
         "status": "available",
         "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\"\n)\n\nclient.doc.download_link(\n  doc_id: \"docId\",\n  layer_name: \"layerName\"\n)",
+        "frameLines": 6
+      }
+    },
+    "doc.fonts.programs.download": {
+      "typescript": {
+        "status": "available",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  token: \"<token>\",\n});\n\nawait client.doc.fonts.programs.download({\n  docId: \"docId\",\n  layerName: \"layerName\",\n  displayHash: \"displayHash\"\n});",
+        "frameLines": 6
+      },
+      "python": {
+        "status": "available",
+        "source": "from cloudpdf import CloudPDFClient\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n)\n\nclient.doc.fonts.programs.download(\n    doc_id=\"docId\",\n    layer_name=\"layerName\",\n    display_hash=\"displayHash\",\n)",
+        "frameLines": 6
+      },
+      "php": {
+        "status": "available",
+        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n);\n\n$client->doc->fonts->programs->download(\n    'docId',\n    'layerName',\n    'displayHash',\n    new DownloadProgramsRequest([]),\n);",
+        "frameLines": 6
+      },
+      "csharp": {
+        "status": "available",
+        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\"\n);\n\nawait client.Doc.Fonts.Programs.DownloadAsync(\n    new DownloadProgramsRequest\n    {\n        DocId = \"docId\",\n        LayerName = \"layerName\",\n        DisplayHash = \"displayHash\",\n    }\n);",
+        "frameLines": 6
+      },
+      "go": {
+        "status": "available",
+        "source": "import (\n    \"context\"\n\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n)\n\nrequest := &fonts.DownloadProgramsRequest{\n    DocID: \"docId\",\n    LayerName: \"layerName\",\n    DisplayHash: \"displayHash\",\n}\nclient.Doc.Fonts.Programs.Download(\n    context.TODO(),\n    request,\n)",
+        "frameLines": 11
+      },
+      "java": {
+        "status": "available",
+        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .build();\n\nclient.doc().fonts().programs().download(\n    \"docId\",\n    \"layerName\",\n    \"displayHash\",\n    DownloadProgramsRequest\n        .builder()\n        .build()\n);",
+        "frameLines": 7
+      },
+      "ruby": {
+        "status": "available",
+        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\"\n)\n\nclient.doc.fonts.programs.download(\n  doc_id: \"docId\",\n  layer_name: \"layerName\",\n  display_hash: \"displayHash\"\n)",
+        "frameLines": 6
+      }
+    },
+    "doc.fonts.programs.get": {
+      "typescript": {
+        "status": "available",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  token: \"<token>\",\n});\n\nawait client.doc.fonts.programs.get({\n  docId: \"docId\",\n  layerName: \"layerName\",\n  displayHash: \"displayHash\"\n});",
+        "frameLines": 6
+      },
+      "python": {
+        "status": "available",
+        "source": "from cloudpdf import CloudPDFClient\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n)\n\nclient.doc.fonts.programs.get(\n    doc_id=\"docId\",\n    layer_name=\"layerName\",\n    display_hash=\"displayHash\",\n)",
+        "frameLines": 6
+      },
+      "php": {
+        "status": "available",
+        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n);\n\n$client->doc->fonts->programs->get(\n    'docId',\n    'layerName',\n    'displayHash',\n    new GetProgramsRequest([]),\n);",
+        "frameLines": 6
+      },
+      "csharp": {
+        "status": "available",
+        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\"\n);\n\nawait client.Doc.Fonts.Programs.GetAsync(\n    new GetProgramsRequest\n    {\n        DocId = \"docId\",\n        LayerName = \"layerName\",\n        DisplayHash = \"displayHash\",\n    }\n);",
+        "frameLines": 6
+      },
+      "go": {
+        "status": "available",
+        "source": "import (\n    \"context\"\n\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n)\n\nrequest := &fonts.GetProgramsRequest{\n    DocID: \"docId\",\n    LayerName: \"layerName\",\n    DisplayHash: \"displayHash\",\n}\nclient.Doc.Fonts.Programs.Get(\n    context.TODO(),\n    request,\n)",
+        "frameLines": 11
+      },
+      "java": {
+        "status": "available",
+        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .build();\n\nclient.doc().fonts().programs().get(\n    \"docId\",\n    \"layerName\",\n    \"displayHash\",\n    GetProgramsRequest\n        .builder()\n        .build()\n);",
+        "frameLines": 7
+      },
+      "ruby": {
+        "status": "available",
+        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\"\n)\n\nclient.doc.fonts.programs.get(\n  doc_id: \"docId\",\n  layer_name: \"layerName\",\n  display_hash: \"displayHash\"\n)",
+        "frameLines": 6
+      }
+    },
+    "doc.fonts.list": {
+      "typescript": {
+        "status": "available",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  token: \"<token>\",\n});\n\nawait client.doc.fonts.list({\n  docId: \"docId\",\n  layerName: \"layerName\"\n});",
+        "frameLines": 6
+      },
+      "python": {
+        "status": "available",
+        "source": "from cloudpdf import CloudPDFClient\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n)\n\nclient.doc.fonts.list(\n    doc_id=\"docId\",\n    layer_name=\"layerName\",\n)",
+        "frameLines": 6
+      },
+      "php": {
+        "status": "available",
+        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n);\n\n$client->doc->fonts->list(\n    'docId',\n    'layerName',\n    new ListFontsRequest([]),\n);",
+        "frameLines": 6
+      },
+      "csharp": {
+        "status": "available",
+        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\"\n);\n\nawait client.Doc.Fonts.ListAsync(new ListFontsRequest { DocId = \"docId\", LayerName = \"layerName\" });",
+        "frameLines": 6
+      },
+      "go": {
+        "status": "available",
+        "source": "import (\n    \"context\"\n\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n)\n\nrequest := &doc.ListFontsRequest{\n    DocID: \"docId\",\n    LayerName: \"layerName\",\n}\nclient.Doc.Fonts.List(\n    context.TODO(),\n    request,\n)",
+        "frameLines": 11
+      },
+      "java": {
+        "status": "available",
+        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .build();\n\nclient.doc().fonts().list(\n    \"docId\",\n    \"layerName\",\n    ListFontsRequest\n        .builder()\n        .build()\n);",
+        "frameLines": 7
+      },
+      "ruby": {
+        "status": "available",
+        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\"\n)\n\nclient.doc.fonts.list(\n  doc_id: \"docId\",\n  layer_name: \"layerName\"\n)",
+        "frameLines": 6
+      }
+    },
+    "doc.fonts.resolve": {
+      "typescript": {
+        "status": "available",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  token: \"<token>\",\n});\n\nawait client.doc.fonts.resolve({\n  docId: \"docId\",\n  layerName: \"layerName\",\n  body: {\n    runs: [{\n        text: \"text\"\n      }]\n  }\n});",
+        "frameLines": 6
+      },
+      "python": {
+        "status": "available",
+        "source": "from cloudpdf import CloudPDFClient\nfrom cloudpdf import CloudPDFClient, FontResolveRun\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n)\n\nclient.doc.fonts.resolve(\n    doc_id=\"docId\",\n    layer_name=\"layerName\",\n    runs=[\n        FontResolveRun(\n            text=\"text\",\n        )\n    ],\n)",
+        "frameLines": 7
+      },
+      "php": {
+        "status": "available",
+        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n);\n\n$client->doc->fonts->resolve(\n    'docId',\n    'layerName',\n    new ResolveFontsRequest([\n        'body' => new FontResolveRequest([\n            'runs' => [\n                new FontResolveRun([\n                    'text' => 'text',\n                ]),\n            ],\n        ]),\n    ]),\n);",
+        "frameLines": 6
+      },
+      "csharp": {
+        "status": "available",
+        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\"\n);\n\nawait client.Doc.Fonts.ResolveAsync(\n    new ResolveFontsRequest\n    {\n        DocId = \"docId\",\n        LayerName = \"layerName\",\n        Body = new FontResolveRequest\n        {\n            Runs = new List<FontResolveRun>() { new FontResolveRun { Text = \"text\" } },\n        },\n    }\n);",
+        "frameLines": 6
+      },
+      "go": {
+        "status": "available",
+        "source": "import (\n    \"context\"\n\n    cloudpdf \"github.com/embedpdf/cloudpdf-sdk-go/v3\"\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n)\n\nrequest := &doc.ResolveFontsRequest{\n    DocID: \"docId\",\n    LayerName: \"layerName\",\n    Body: &cloudpdf.FontResolveRequest{\n        Runs: []*cloudpdf.FontResolveRun{\n            &cloudpdf.FontResolveRun{\n                Text: \"text\",\n            },\n        },\n    },\n}\nclient.Doc.Fonts.Resolve(\n    context.TODO(),\n    request,\n)",
+        "frameLines": 12
+      },
+      "java": {
+        "status": "available",
+        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .build();\n\nclient.doc().fonts().resolve(\n    \"docId\",\n    \"layerName\",\n    ResolveFontsRequest\n        .builder()\n        .body(\n            FontResolveRequest\n                .builder()\n                .runs(\n                    Arrays.asList(\n                        FontResolveRun\n                            .builder()\n                            .text(\"text\")\n                            .build()\n                    )\n                )\n                .build()\n        )\n        .build()\n);",
+        "frameLines": 7
+      },
+      "ruby": {
+        "status": "available",
+        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\"\n)\n\nclient.doc.fonts.resolve(\n  doc_id: \"docId\",\n  layer_name: \"layerName\",\n  runs: [{\n    text: \"text\"\n  }]\n)",
         "frameLines": 6
       }
     },

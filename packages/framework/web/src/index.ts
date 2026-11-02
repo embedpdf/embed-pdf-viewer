@@ -22,6 +22,8 @@ export { browserClock } from './clock';
 export type { WebClock } from './clock';
 export { browserPrinter } from './printer';
 export type { WebPrinter, WebPrintSheet, WebStagedPrint } from './printer';
+export { browserTextMeasurer } from './text-measurer';
+export type { WebTextMeasurer } from './text-measurer';
 export { cssText } from './css-text';
 export type { StyleRecord } from './css-text';
 export { copySelection, wireSelectionClipboard } from './clipboard';
@@ -107,6 +109,7 @@ export {
   offsetOfPosition,
   positionOfOffset,
   renderRichText,
+  restyleFaces,
   serializeRichText,
   styleDeltaOf,
 } from './rich-text-editor';
@@ -122,6 +125,7 @@ export type {
   RichTextEditorCommand,
   RichTextEditorDecoration,
   RichTextEditorDocument,
+  RichTextEditorFace,
   RichTextEditorHost,
   RichTextEditorParagraph,
   RichTextEditorProps,
@@ -130,15 +134,10 @@ export type {
   RichTextEditorScript,
   RichTextEditorStyle,
 } from './rich-text-editor';
-export {
-  createFontMounts,
-  mountFontProgram,
-  mountWebFont,
-  type MountableFontProgram,
-} from './web-font';
+export { createFontMounts, mountFontProgram, type MountableFontProgram } from './web-font';
 export { pictureOrPainting, type LookState, type PictureOrPainting } from './picture-or-painting';
 export { firstLineShiftFor, lineModelFor, webFontMetrics } from './web-font-metrics';
-export type { LineModel, WebFontMetrics } from './web-font-metrics';
+export type { FamilyOfCss, LineModel, WebFontMetrics } from './web-font-metrics';
 export { EPDF_VARIABLES, epdfThemeVariables, mixAccent, paint, paintDefault } from './theme';
 export type {
   EpdfCssOnlyVariable,
@@ -173,7 +172,13 @@ export type {
   SelectionEndpointShape,
   SelectionEndpointsShape,
 } from './anchor-equality';
-export { fontProgramsOf, ghostOpacity, sceneViewBox, svgShapesOf } from './annotation-scene';
+export {
+  fontProgramsOf,
+  ghostOpacity,
+  sceneViewBox,
+  styleText,
+  svgShapesOf,
+} from './annotation-scene';
 export type {
   ScenePaint,
   SceneShapeNode,
@@ -248,7 +253,6 @@ export {
   bindWidgetEvents,
   createOptimisticSelection,
   createTextFieldEditor,
-  cssFontOf,
   formColorsOf,
   listBoxStyleOf,
   pressToggle,

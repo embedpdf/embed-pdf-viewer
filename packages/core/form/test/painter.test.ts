@@ -3,10 +3,43 @@
  * drawing lands on the page. That it draws what the engine writes is the
  * engine's parity gate (`widget-painter-parity.test.ts`).
  */
+import {
+  defaultPaintFonts,
+  layoutField,
+  lastResortPaintFont,
+  standardPaintFont,
+  type PaintFont,
+  type PaintFonts,
+} from '@embedpdf/core-text';
 import type { FormFieldDTO, WidgetAnnotation } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
-import { layoutVariableText, layoutFontOf, widgetDrawing, widgetScene } from '../src';
+import { widgetDrawing, widgetScene } from '../src';
+
+/** A Hebrew font: every letter 600 thousandths wide. */
+const HEBREW: PaintFont = {
+  key: 'hebrew-hash',
+  ascent: 950,
+  descent: -250,
+  standard: false,
+  covers: (codePoint) => codePoint >= 0x0590 && codePoint <= 0x05ff,
+  width: (text) => [...text].length * 600,
+  fontFamily: '"epdf-hebrew"',
+  fontWeight: 400,
+  fontStyle: 'normal',
+  program: {
+    hash: 'hebrew-hash',
+    family: 'epdf-hebrew',
+    weight: 400,
+    style: 'normal',
+    load: async () => new Uint8Array(),
+  },
+};
+const FONTS: PaintFonts = {
+  face: standardPaintFont('helvetica'),
+  fallbacks: [HEBREW],
+  lastResort: lastResortPaintFont(),
+};
 
 const widget = (patch: Partial<WidgetAnnotation> = {}): WidgetAnnotation =>
   ({
@@ -42,8 +75,10 @@ const textField = (value: string): FormFieldDTO =>
 describe('the painter', () => {
   it('says when its drawing may differ from the engine picture', () => {
     expect(widgetDrawing(widget(), textField('Plain'))!.approximate).toBeNull();
-    // WinAnsi can't write Cyrillic: the engine takes another font for it.
+    // WinAnsi can't write Cyrillic: the engine takes another font for it, which the painter
+    // wasn't given; given the fonts, a box is what the engine draws too.
     expect(widgetDrawing(widget(), textField('Привет'))!.approximate).toBe('glyph');
+    expect(widgetDrawing(widget(), textField('Привет'), {}, FONTS)!.approximate).toBeNull();
     // A font that isn't one of the 14 lays out with Helvetica's numbers.
     expect(widgetDrawing(widget({ fontFamily: 'Roboto' }), textField('Plain'))!.approximate).toBe(
       'font',
@@ -67,44 +102,92 @@ describe('the painter', () => {
   });
 
   it('fits a size of 0 to the box, with the engine sizes', () => {
-    const font = layoutFontOf('helvetica')!;
     const fitted = (height: number) =>
-      layoutVariableText('Hello', font, {
+      layoutField('Hello', defaultPaintFonts('helvetica'), {
         plate: { left: 0, bottom: 0, right: 200, top: height },
         fontSize: 0,
         alignment: 0,
         multiline: false,
+        password: false,
         limit: 0,
         cells: 0,
+        centered: true,
       }).fontSize;
     // The line is (945 + 224) / 1000 em tall: the biggest step whose line fits.
     expect([fitted(10), fitted(20), fitted(40)]).toEqual([8, 14, 30]);
   });
 
-  it('lands on the page: glyphs at their advances, clipped to the text box, turned with the widget', () => {
+  it('lands on the page: a run at its left edge, clipped to the text box, turned with the widget', () => {
     const upright = widgetScene(widgetDrawing(widget(), textField('Hi'))!, {
       box: { x: 10, y: 20, width: 100, height: 20 },
     });
-    const glyphs = upright.find((node) => node.kind === 'glyphs')!;
-    expect(glyphs.kind === 'glyphs' && glyphs.offsets).toEqual([0, 7.22]);
-    expect(glyphs.kind === 'glyphs' && glyphs.fontFamily).toMatch(
-      /^"epdf-[0-9a-f]{16}", Helvetica/,
-    );
+    const run = upright.find((node) => node.kind === 'textRun')!;
+    expect(run).toMatchObject({ text: 'Hi', rtl: false, plain: true, at: { x: 12 } });
+    expect(run.kind === 'textRun' && run.fontFamily).toMatch(/^"epdf-[0-9a-f]{16}", Helvetica/);
     // The face it draws in comes with it, for whatever draws it to mount.
-    expect(glyphs.kind === 'glyphs' && glyphs.program).toMatchObject({
-      family: (glyphs.kind === 'glyphs' && glyphs.fontFamily.slice(1, 22)) || '',
+    expect(run.kind === 'textRun' && run.program).toMatchObject({
+      family: (run.kind === 'textRun' && run.fontFamily.slice(1, 22)) || '',
       weight: 400,
       style: 'normal',
     });
-    expect(glyphs.clip).toEqual({ x: 11, y: 21, width: 98, height: 18 });
+    expect(run.clip).toEqual({ x: 11, y: 21, width: 98, height: 18 });
 
     const turned = widgetScene(widgetDrawing(widget({ rotation: 90 }), textField('Hi'))!, {
       box: { x: 10, y: 20, width: 100, height: 20 },
       rotation: 90,
     });
-    const run = turned.find((node) => node.kind === 'glyphs')!;
-    expect(run.kind === 'glyphs' && run.rotation).toBe(90);
+    const turnedRun = turned.find((node) => node.kind === 'textRun')!;
+    expect(turnedRun.kind === 'textRun' && turnedRun.rotation).toBe(90);
     // Turned a quarter clockwise about the box's middle (60, 30): the clip stands up.
-    expect(run.clip).toEqual({ x: 51, y: -19, width: 18, height: 98 });
+    expect(turnedRun.clip).toEqual({ x: 51, y: -19, width: 18, height: 98 });
+  });
+
+  it('draws mixed scripts as runs in their fonts, in the order the engine draws them', () => {
+    const scene = widgetScene(widgetDrawing(widget(), textField('Hello שלום 123'), {}, FONTS)!, {
+      box: { x: 10, y: 20, width: 100, height: 20 },
+    });
+    const runs = scene.flatMap((node) =>
+      node.kind === 'textRun' ? [[node.text, node.rtl, node.fontFamily.split(',')[0]]] : [],
+    );
+    const helvetica = standardPaintFont('helvetica').fontFamily.split(',')[0];
+    expect(runs).toEqual([
+      ['Hello ', false, helvetica],
+      ['123', false, helvetica],
+      [' ', true, helvetica],
+      ['שלום', true, '"epdf-hebrew"'],
+    ]);
+    // Each starts where the one before it ends.
+    const xs = scene.flatMap((node) => (node.kind === 'textRun' ? [node.at.x] : []));
+    expect(xs).toEqual([...xs].sort((a, b) => a - b));
+    const hebrew = scene.find(
+      (node) => node.kind === 'textRun' && node.rtl && node.text === 'שלום',
+    );
+    expect(hebrew).toMatchObject({ plain: false, program: HEBREW.program });
+  });
+
+  it("draws a comb's Arabic letters in the forms the whole word gives them", () => {
+    const arabic: PaintFont = {
+      ...HEBREW,
+      key: 'arabic-hash',
+      covers: (codePoint) => codePoint >= 0x0600 && codePoint <= 0x06ff,
+      fontFamily: '"epdf-arabic"',
+      program: { ...HEBREW.program, hash: 'arabic-hash', family: 'epdf-arabic' },
+    };
+    const comb = { ...textField('مرحبا'), comb: true, maxLength: 5 } as FormFieldDTO;
+    const scene = widgetScene(
+      widgetDrawing(widget(), comb, {}, { ...FONTS, fallbacks: [arabic] })!,
+      { box: { x: 10, y: 20, width: 100, height: 20 } },
+    );
+    expect(
+      scene.flatMap((node) =>
+        node.kind === 'textRun' ? [[node.text, !!node.joinsPrevious, !!node.joinsNext]] : [],
+      ),
+    ).toEqual([
+      ['م', false, true],
+      ['ر', true, false],
+      ['ح', false, true],
+      ['ب', true, true],
+      ['ا', true, false],
+    ]);
   });
 });

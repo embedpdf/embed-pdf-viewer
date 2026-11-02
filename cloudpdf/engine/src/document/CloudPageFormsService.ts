@@ -55,7 +55,7 @@ export class CloudPageFormsService implements PageFormsService {
         }
         const token = widgetAppearancesImageOptionsToWire(
           { ...options, format },
-          { widgetVersion: page.cache.widgetVersion },
+          { widgetVersion: page.cache.widgetVersion, serverFonts: manifest.serverFonts },
         );
         return planesInherited(manifest, ['forms'])
           ? wirePaths.docPageFormAppearances(this.docId, this.pageRef, token)

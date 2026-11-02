@@ -7,6 +7,7 @@
  */
 import type { Mirror, SerialQueue } from '@embedpdf/core';
 import type { FormFieldRef } from '@embedpdf/engine-core/runtime';
+import { FontsToken } from '@embedpdf/plugin-fonts/contract';
 
 import { canonicalKey, type FieldIndex, type FieldKey } from '../model';
 import { createFieldsMirror } from '../sync/fields';
@@ -65,7 +66,7 @@ export function createServices(ctx: FormContext): FormServices {
     design,
     formatted,
     pictures: createWidgetPictures(fields, siblings),
-    looks: createWidgetLooks({ fields, formatted, design }),
+    looks: createWidgetLooks({ fields, formatted, design, fonts: () => ctx.tryGet(FontsToken) }),
     enqueue: ctx.serialQueue('writes'),
     keyOf: (ref) => canonicalKey(fields.view(), ref),
   };

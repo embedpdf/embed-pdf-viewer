@@ -46,6 +46,7 @@ import { instanceClock, timerClock, type Cancel, type HostClock } from './clock'
 import { PluginError } from './errors';
 import { createEventHook } from './event-hook';
 import { createLatestLane, type LatestLane } from './lanes';
+import { instanceMeasurer, type HostTextMeasurer } from './measurer';
 import { createMirror, type MirrorController, type MirrorEnvironment } from './mirror';
 import { createPageMirror } from './page-mirror';
 import { createPageView, layoutFromEvent, NO_PENDING_PAGES } from './page-view';
@@ -104,6 +105,8 @@ export interface TestContextOptions<S, T extends object = NoSettings> {
   readonly engine?: Partial<Engine>;
   /** The host's time (`ctx.clock`). Default: `timerClock`, the environment's timers and no frames. */
   readonly clock?: HostClock;
+  /** The host's text measuring (`ctx.measurer`). Default: none. */
+  readonly measurer?: HostTextMeasurer;
 }
 
 export interface TestContext<S, T extends object = NoSettings> extends PluginContext<S, T> {
@@ -410,6 +413,7 @@ export function createTestContext<S = void, T extends object = NoSettings>(
       cleanups.push(fn);
     },
     clock: instanceClock(options.clock ?? timerClock, lifetime.signal),
+    measurer: options.measurer ? instanceMeasurer(options.measurer, lifetime.signal) : null,
     onSettle: (flush) => {
       settleFlushes.add(flush);
       cleanups.push(() => {

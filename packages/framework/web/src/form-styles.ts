@@ -6,10 +6,10 @@
  * as CSS text with `cssText`. Each is a type alias, so it fits Vue's
  * `CSSProperties` (see the note in `form-field`). The field's own look inside them comes from
  * `form-field` ({@link textFieldStyleOf}, {@link listBoxStyleOf}); its colors
- * from the form settings ({@link formColorsOf}).
+ * from the form settings ({@link formColorsOf}); its font from the form plugin.
  */
 import { listBoxStyleOf, scaleOf, textFieldFontPxOf, textFieldStyleOf } from './form-field';
-import type { FieldLook, FormColors, ListBoxStyle, TextFieldStyle } from './form-field';
+import type { CssFont, FieldLook, FormColors, ListBoxStyle, TextFieldStyle } from './form-field';
 import { legibleScaleOf, legibleShrinkOf } from './legible-text';
 import type { PixelRect } from './page-pixels';
 
@@ -82,6 +82,8 @@ export interface TextEditorLayout {
   /** A comb's room between characters; it starts at the left padding, whatever the alignment. */
   readonly letterSpacing: number;
   readonly comb: boolean;
+  /** The text reads right to left, as the engine draws it (its first strong character is). */
+  readonly rtl: boolean;
 }
 
 /** A text field's editor: see-through at rest, the field's own look while focused. */
@@ -103,6 +105,14 @@ export type TextFieldEditorStyle = TextFieldStyle & {
   padding: string;
   /** In pixels, with its unit: one line of the engine's layout. */
   lineHeight?: string;
+  /** `none` with the engine's layout: the browser never fakes a bold or an italic the face doesn't have. */
+  fontSynthesis?: 'none';
+  /**
+   * With the engine's layout, the direction the line reads in, the engine's:
+   * mixed scripts are ordered as the engine orders them, and the end of a
+   * right-to-left line is where typing goes on. Alignment stays the field's.
+   */
+  direction?: 'ltr' | 'rtl';
   resize: 'none';
   cursor: 'text';
   /** 1 while focused, 0 at rest, where the field's picture shows through. */
@@ -159,6 +169,8 @@ export function textFieldEditorStyleOf(
           fontFamily: layout.fontFamily,
           fontWeight: layout.fontWeight,
           fontStyle: layout.fontStyle,
+          fontSynthesis: 'none' as const,
+          direction: layout.rtl ? ('rtl' as const) : ('ltr' as const),
           fontSize: pixels(layout.fontSize),
           lineHeight: pixels(layout.lineHeight),
           padding: [
@@ -201,13 +213,14 @@ export function listBoxControlStyleOf(
   field: Parameters<typeof listBoxStyleOf>[0] & { disabled: boolean },
   frame: PixelRect,
   colors: FormColors,
+  font: CssFont | null = null,
 ): ListBoxControlStyle {
   return {
     ...FORM_CONTROL_FILL,
     padding: '0',
     borderRadius: '0',
     outline: 'none',
-    ...listBoxStyleOf(field, frame, colors),
+    ...listBoxStyleOf(field, frame, colors, font),
     cursor: field.disabled ? 'default' : 'pointer',
     ...(field.disabled ? { pointerEvents: 'none' as const } : {}),
   };

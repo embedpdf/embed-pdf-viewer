@@ -1,0 +1,373 @@
+import type { PluginContext } from '@embedpdf/core';
+import {
+  fontProgramFamily,
+  LAST_RESORT_HASH,
+  lastResortFontProgram,
+  standardFontForFace,
+  standardFontOf,
+  standardFontOfProgramFamily,
+  standardFontProgram,
+  standardFontStack,
+  type MountableFontProgram,
+} from '@embedpdf/core-fonts';
+import {
+  isStandardFontName,
+  standardFamilyOf,
+  STANDARD_FACES,
+  type Font,
+  type FontList,
+  type FontName,
+  type FontProgramInfo,
+  type StandardFont,
+} from '@embedpdf/engine-core/runtime';
+
+import type { FontCss, FontListChangedEvent, FontsCapability } from './contract';
+import {
+  cssFamilyList,
+  fallbackHashes,
+  fontForFace,
+  fontNamed,
+  foldFontList,
+  styleOfProgram,
+} from './model';
+import { createPaintFonts } from './paint';
+
+/** The hash prefix a program's CSS family names (`fontProgramFamily`), or undefined for another family. */
+function programPrefixOf(cssFamily: string): string | undefined {
+  const prefix = /^epdf-([0-9a-f]{16})$/.exec(cssFamily)?.[1];
+  return prefix && !LAST_RESORT_HASH.startsWith(prefix) ? prefix : undefined;
+}
+
+/**
+ * The fonts controller. The list is a mirror: read the first time something
+ * asks for it, and read again when the engine says the document's fonts
+ * changed. What a browser draws with comes from it: each program is built
+ * once, so it loads once, and each font's CSS is built once while the list
+ * stays the same, so it can be compared by identity.
+ */
+export function createFontsController(ctx: PluginContext<void>) {
+  const listChanged = ctx.events.source<FontListChangedEvent>();
+  const programs = new Map<string, MountableFontProgram>();
+  const programInfos = new Map<string, Promise<FontProgramInfo>>();
+  let css = new Map<string, FontCss>();
+  // Per style (`weight|italic`): the engine's fallback order, or `null` while it's read.
+  let styleFallbacks = new Map<string, readonly string[] | null>();
+  let paintFontsEpoch = 0;
+  const paintFontsChanged = () => {
+    paintFontsEpoch++;
+    ctx.notify();
+  };
+
+  const list = ctx.mirror<FontList | null>({
+    name: 'fonts',
+    onDemand: true,
+    initial: () => null,
+    load: async (doc) => ({ value: await doc.fonts.list() }),
+    fold: foldFontList,
+    changed: ({ previous, next }) => {
+      css = new Map();
+      styleFallbacks = new Map();
+      // A change can move the fallbacks; what the first read was asked for meanwhile still holds.
+      if (previous) paintFonts.reset();
+      paintFontsChanged();
+      if (next) listChanged.emit({ fonts: next });
+    },
+  });
+
+  /**
+   * A program as a browser mounts it. The standard fonts' and the last
+   * resort's ship with `@embedpdf/core-fonts`; every other program comes from
+   * the engine, the first time it's mounted.
+   */
+  const programOf = (
+    displayHash: string,
+    style: { weight: number; italic: boolean },
+  ): MountableFontProgram => {
+    const standard = standardFontOfProgramFamily(fontProgramFamily(displayHash));
+    if (standard) return standardFontProgram(standard);
+    if (displayHash === LAST_RESORT_HASH) return lastResortFontProgram();
+    let program = programs.get(displayHash);
+    if (!program) {
+      let bytes: Promise<Uint8Array> | null = null;
+      program = {
+        hash: displayHash,
+        family: fontProgramFamily(displayHash),
+        weight: style.weight,
+        style: style.italic ? 'italic' : 'normal',
+        load: () => {
+          if (!bytes) {
+            const loading = Promise.resolve().then(() =>
+              ctx.doc.fonts.downloadProgram(displayHash),
+            );
+            // A load that failed is tried again next time.
+            loading.catch(() => {
+              if (bytes === loading) bytes = null;
+            });
+            bytes = loading;
+          }
+          return bytes;
+        },
+      };
+      programs.set(displayHash, program);
+    }
+    return program;
+  };
+
+  /**
+   * The standard font the engine falls back to for `font`'s face, in
+   * `style` when given (a run's own weight and italic); Helvetica for a font
+   * the list doesn't name.
+   */
+  const standardOfName = (
+    font: FontName,
+    style?: { weight: number; italic: boolean },
+  ): StandardFont => {
+    if (isStandardFontName(font)) return font;
+    const current = list.get();
+    const listed = current ? fontNamed(current, font) : undefined;
+    if (!listed) return 'helvetica';
+    return standardFontForFace({
+      family: listed.familyName,
+      weight: style?.weight ?? listed.weight,
+      italic: style?.italic ?? listed.italic,
+    });
+  };
+
+  /**
+   * Whether the host tried `program` and can't use it (a browser refuses a
+   * malformed font whole): it is drawn as a program a browser can't get is.
+   */
+  const refused = (program: MountableFontProgram): boolean =>
+    ctx.measurer?.refused(program) ?? false;
+
+  /**
+   * The CSS for text drawn by `primary`: then the fallbacks the host didn't
+   * refuse, then the last resort, then `tail`, the system's families. Until
+   * the host has every program (`ctx.measurer`; asking loads them), the list
+   * is `tail` alone: a program still loading would leave its text to the last
+   * resort, which draws every character as a box.
+   */
+  const cssOf = (
+    primary: MountableFontProgram | null,
+    style: { weight: number; italic: boolean },
+    fallbacks: readonly string[],
+    tail: string,
+  ): FontCss => {
+    const current = list.get();
+    const named: MountableFontProgram[] = [];
+    const add = (program: MountableFontProgram) => {
+      if (!named.some((known) => known.hash === program.hash)) named.push(program);
+    };
+    if (primary) add(primary);
+    for (const hash of fallbacks) {
+      const program = programOf(hash, styleOfProgram(current, hash));
+      if (!refused(program)) add(program);
+    }
+    add(lastResortFontProgram());
+    // Each asked, so they all load at once.
+    const mounted = named
+      .map((program) => ctx.measurer?.ready(program) ?? true)
+      .every((ready) => ready);
+    return {
+      fontFamily: mounted
+        ? cssFamilyList(
+            named.map((program) => program.family),
+            tail,
+          )
+        : tail,
+      fontWeight: style.weight,
+      fontStyle: style.italic ? 'italic' : 'normal',
+      programs: named,
+    };
+  };
+
+  /** A program's coverage and metrics, read once per hash (a failed read is tried again). */
+  const programInfoOf = (displayHash: string): Promise<FontProgramInfo> => {
+    let info = programInfos.get(displayHash);
+    if (!info) {
+      info = ctx.doc.fonts.getProgram(displayHash);
+      programInfos.set(displayHash, info);
+      info.catch(() => programInfos.delete(displayHash));
+    }
+    return info;
+  };
+
+  const paintFonts = createPaintFonts({
+    measurer: ctx.measurer,
+    // After the asker's turn: a read (a render) that asks for fonts writes no state while it runs.
+    loadList: () => Promise.resolve().then(() => list.ensureLoaded()),
+    resolve: (request) => ctx.doc.fonts.resolve(request),
+    getProgram: programInfoOf,
+    programOf: (hash, style) => programOf(hash, style ?? styleOfProgram(list.get(), hash)),
+    standardOf: (font) => standardOfName(font),
+    refused,
+    changed: paintFontsChanged,
+  });
+  // A program loaded, so text in it is drawn; or refused, so the CSS leaves it out.
+  ctx.measurer?.onChange(() => {
+    css = new Map();
+    paintFontsChanged();
+  });
+
+  /**
+   * Read the document's fonts the first time a font needs them, after the asker's turn: a read
+   * (a render) that asks writes no state while it runs.
+   */
+  const loadListSoon = () => {
+    if (list.getStatus() !== 'idle') return;
+    Promise.resolve()
+      .then(() => list.ensureLoaded())
+      .catch(() => {});
+  };
+
+  /**
+   * The fallbacks text in `style` draws with, in the order the engine tries them for it (a bold
+   * run tries the bold ones first). The engine says, once per style, after the asker's turn; the
+   * list's order until it has.
+   */
+  const fallbacksFor = (style: { weight: number; italic: boolean }): readonly string[] => {
+    const current = list.get();
+    const key = `${style.weight}|${style.italic}`;
+    const known = styleFallbacks.get(key);
+    if (known) return known;
+    if (current && known === undefined) {
+      const reading = styleFallbacks;
+      reading.set(key, null);
+      Promise.resolve()
+        .then(() =>
+          ctx.doc.fonts.resolve({
+            runs: [{ text: ' ', family: 'Helvetica', weight: style.weight, italic: style.italic }],
+          }),
+        )
+        .then(({ runs }) => {
+          // The list changed meanwhile: its fallbacks may have too.
+          if (reading !== styleFallbacks) return;
+          reading.set(key, runs[0]?.fallbacks ?? []);
+          css = new Map();
+          paintFontsChanged();
+        })
+        .catch(() => {
+          if (reading === styleFallbacks) reading.delete(key);
+        });
+    }
+    return fallbackHashes(current);
+  };
+
+  const cached = (key: string, build: () => FontCss): FontCss => {
+    let known = css.get(key);
+    if (!known) {
+      known = build();
+      css.set(key, known);
+    }
+    return known;
+  };
+
+  /**
+   * The system's families for a font, for before its programs are mounted:
+   * the look-alikes of the standard font the engine falls back to for it.
+   */
+  const tailOf = (font: Font | undefined, standard: StandardFont | null): string =>
+    standardFontStack(
+      standard ??
+        (font
+          ? standardFontForFace({
+              family: font.familyName,
+              weight: font.weight,
+              italic: font.italic,
+            })
+          : 'helvetica'),
+    );
+
+  const standardCss = (font: StandardFont): FontCss =>
+    cssOf(
+      standardFontProgram(font),
+      STANDARD_FACES[font],
+      fallbacksFor(STANDARD_FACES[font]),
+      tailOf(undefined, font),
+    );
+
+  /**
+   * A listed font's CSS. A font whose program can't reach the browser (one
+   * the document only names, a subset without a display file, one the
+   * browser refused) is drawn in the standard font the engine falls back to
+   * for its face.
+   */
+  const listedCss = (font: Font): FontCss => {
+    const program = font.programs[0];
+    const mountable =
+      program?.displayHash && program.canDownload ? programOf(program.displayHash, font) : null;
+    if (!mountable || refused(mountable)) {
+      return standardCss(
+        standardFontForFace({ family: font.familyName, weight: font.weight, italic: font.italic }),
+      );
+    }
+    return cssOf(mountable, font, fallbacksFor(font), tailOf(font, null));
+  };
+
+  const api: FontsCapability = {
+    getFontList: list.get,
+    getStatus: list.getStatus,
+    ensureLoaded: () => list.ensureLoaded(),
+    refresh: () => list.refresh(),
+    resolve: async (request, options) =>
+      ctx.cancellable(options?.signal, ctx.doc.fonts.resolve(request)),
+    getProgram: async (displayHash, options) =>
+      // Another caller may share the read: cancelling this one leaves it running.
+      ctx.cancellable(
+        options?.signal,
+        programInfoOf(displayHash).then((value) => value),
+      ),
+    getPaintFonts: (font, text) => paintFonts.get(font, text),
+    getPaintFontsEpoch: () => paintFontsEpoch,
+    getFontCss: (font) => {
+      if (!isStandardFontName(font)) loadListSoon();
+      return cached(`font:${font}`, () => {
+        if (isStandardFontName(font)) return standardCss(font);
+        const current = list.get();
+        const listed = current ? fontNamed(current, font) : undefined;
+        // Not listed (yet): the standard font the engine falls back to.
+        return listed ? listedCss(listed) : standardCss(standardFontOf(font));
+      });
+    },
+    getFaceCss: (face) => {
+      if (!standardFamilyOf(face.family)) loadListSoon();
+      return cached(`face:${face.family}|${face.weight ?? 400}|${face.italic ?? false}`, () => {
+        const current = list.get();
+        const listed = current ? fontForFace(current, face) : undefined;
+        return listed ? listedCss(listed) : standardCss(standardFontForFace(face));
+      });
+    },
+    getRunCss: (run) =>
+      cached(
+        `run:${run.font}|${run.weight}|${run.italic}|${run.program}|${run.fallbacks.join(',')}`,
+        () => {
+          const standard = isStandardFontName(run.font) ? run.font : null;
+          const current = list.get();
+          const program = run.program ? programOf(run.program, run) : null;
+          return cssOf(
+            program && refused(program)
+              ? standardFontProgram(standardOfName(run.font, run))
+              : program,
+            run,
+            run.fallbacks,
+            tailOf(current ? fontNamed(current, run.font) : undefined, standard),
+          );
+        },
+      ),
+    getFaceOfCssFamily: (cssFamily) => {
+      const standard = standardFontOfProgramFamily(cssFamily);
+      if (standard) return { ...STANDARD_FACES[standard] };
+      const prefix = programPrefixOf(cssFamily);
+      if (!prefix) return null;
+      const font = list
+        .get()
+        ?.fonts.find((candidate) =>
+          candidate.programs.some((program) => program.displayHash?.startsWith(prefix)),
+        );
+      return font ? { family: font.familyName, weight: font.weight, italic: font.italic } : null;
+    },
+    onFontListChanged: listChanged.on,
+  };
+
+  return { api };
+}

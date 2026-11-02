@@ -381,6 +381,30 @@ export function setDefaultAppearanceRegisteredFont(
 }
 
 /**
+ * Write the `/DA` default appearance naming a font program the document
+ * already holds, by its stream's object number (via
+ * `EPDFAnnot_SetDefaultAppearanceDocumentFont`). The appearance generated
+ * next installs its `/DR` entry.
+ */
+export function setDefaultAppearanceDocumentFont(
+  fn: PdfFunctions,
+  annotPtr: Ptr,
+  programObjectNumber: number,
+  fontSize: number,
+  color: Color,
+): void {
+  const { r, g, b } = rgbOf(color);
+  if (
+    !fn.EPDFAnnot_SetDefaultAppearanceDocumentFont(annotPtr, programObjectNumber, fontSize, r, g, b)
+  ) {
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      'EPDFAnnot_SetDefaultAppearanceDocumentFont refused the program',
+    );
+  }
+}
+
+/**
  * Write the `/Q` text alignment of a free-text annotation via
  * `EPDFAnnot_SetTextAlignment`. `code` is the raw quadding value — the
  * string<->code mapping lives in `textAlignment.ts`.

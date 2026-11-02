@@ -11,10 +11,9 @@
  * carries as a hard break and the `\r` that separates two paragraphs.
  */
 import {
-  faceForFreeTextFont,
+  faceForFontName,
   type Annotation,
   type FaceRequest,
-  type FontHandle,
   type RichTextBody,
   type RichTextDocument,
   type RichTextDocumentInput,
@@ -288,14 +287,22 @@ export function isPlainRichText(doc: RichTextDocumentInput): boolean {
 
 /* ── a free text's document ──────────────────────────────────────────────── */
 
-/** The registered fonts an engine knows (the local engine's `fonts.list()`;
- *  none on the cloud engine). */
-export type FontLookup = () => readonly FontHandle[];
+/** A font a box can name other than a standard one: its name (`fontFamily`) and its face. */
+export interface NamedFont {
+  readonly key: string;
+  readonly familyName: string;
+  readonly weight: number;
+  readonly italic: boolean;
+}
+
+/** The fonts a box can name besides the standard ones: the document's
+ *  fonts list, or the local engine's registered fonts. */
+export type FontLookup = () => readonly NamedFont[];
 
 /** The face a DTO font names: a standard font's family, weight and italic, a
- *  registered key's identity, else the string itself as a family. */
+ *  listed font's face, else the string itself as a family. */
 export const faceForFont = (font: string, fonts?: FontLookup): FaceRequest =>
-  faceForFreeTextFont(font, fonts && ((key) => fonts().find((handle) => handle.key === key)));
+  faceForFontName(font, fonts && ((key) => fonts().find((handle) => handle.key === key)));
 
 const hex = (css: string): string => css.trim().toUpperCase();
 

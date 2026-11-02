@@ -32,7 +32,8 @@ function textEditing(editingId: () => string | null = () => null) {
     draftRichText: (ref, document) => annotation.drafts.push({ ref, document }),
     setTextSelection: vi.fn(),
     text: { toggleFormat: vi.fn() },
-    getCssFontFamily: (family) => family,
+    getCssFontFamily: (face) => face.family,
+    getFamilyOfCss: () => undefined,
     getEditingId: editingId,
   };
   return annotation;
@@ -50,6 +51,7 @@ const item = (editing: boolean, text = 'hello'): TextBoxEditorItem<Ref> => ({
   id: 'obj:7',
   ref: { objectNumber: 7 },
   richText: { paragraphs: [{ runs: [{ text }] }] },
+  face: { family: 'Helvetica', weight: 400, italic: false },
   editing,
 });
 
@@ -216,6 +218,7 @@ describe('text box geometry and style', () => {
   it('sizes the body font in pixels, with no line height of its own', () => {
     expect(textBoxStyleOf(css, 1.5)).toEqual({
       fontFamily: 'Helvetica',
+      fontSynthesis: 'none',
       fontSize: '15px',
       color: '#000',
       fontWeight: 700,
