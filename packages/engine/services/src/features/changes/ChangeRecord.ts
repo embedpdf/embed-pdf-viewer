@@ -12,6 +12,7 @@ import type {
   MetadataPatch,
   OutlineItemPatch,
   OutlineItemRef,
+  PageLabelSection,
   PageRef,
   PdfCoordinates,
   PdfDestination,
@@ -341,6 +342,18 @@ export interface PageReorderStep {
   readonly placements: readonly { readonly page: number; readonly after: number }[];
   /** The page each was left after (0: first). */
   readonly left: readonly { readonly page: number; readonly after: number }[];
+  readonly labels?: PageLabelsStep;
+}
+
+/**
+ * The page label sections a page step puts back once its pages moved: those
+ * the change found, while the document's read as the change left them
+ * (`left`). Otherwise the sections follow the pages as an edit's do. A step
+ * whose change left the sections as they were has none.
+ */
+export interface PageLabelsStep {
+  readonly sections: readonly PageLabelSection[];
+  readonly left: readonly PageLabelSection[];
 }
 
 /**
@@ -353,6 +366,7 @@ export interface PageRestoreStep {
   readonly kind: 'pages.restore';
   /** Each page and its capture, in the display order they had. */
   readonly pages: readonly { readonly page: number; readonly capture: Uint8Array }[];
+  readonly labels?: PageLabelsStep;
 }
 
 /**
@@ -366,6 +380,13 @@ export interface PageRemoveStep {
   readonly kind: 'pages.remove';
   /** Each page, and the digest of how the change left it. */
   readonly pages: readonly { readonly page: number; readonly left: string }[];
+  readonly labels?: PageLabelsStep;
+  /**
+   * The form fields the pages brought, when an insert or a copy copied them
+   * in: they go first, those whose widgets are all on these pages still, and
+   * come back after the pages.
+   */
+  readonly fields?: readonly number[];
 }
 
 /**

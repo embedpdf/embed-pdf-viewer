@@ -19,10 +19,15 @@ import type { CapabilityToken } from '@embedpdf/react/runtime';
 import type { PluginTokens, ScopedViewer, Viewer } from '../handle';
 import type { IconName } from '../ui/icons';
 
-/** What a command's functions get: its document, any plugin by its name or token, and the viewer. */
-export interface CommandContext extends ScopedViewer {
+/**
+ * What a command's functions get: its document, any plugin by its name or token, the viewer, and
+ * your app's state.
+ */
+export interface CommandContext<AppState = any> extends ScopedViewer {
   /** The document it's for: the one named, else the active one; `null` with none open. */
   readonly documentId: string | null;
+  /** Your app's state, as you last gave it (`appState`). */
+  readonly appState: AppState;
   /** What the caller passed: `execute(id, { args })`. */
   readonly args?: unknown;
   /** Fires when the caller cancels `execute()`: pass it on to the calls `run` makes. */
@@ -33,26 +38,28 @@ export interface CommandContext extends ScopedViewer {
 
 /**
  * A command, as the `commands` config takes it: the headless command, its functions getting
- * {@link CommandContext}. With a built-in command's id it changes that one, field by field.
+ * {@link CommandContext}. With a built-in command's id it changes that one, field by field. Its
+ * functions are methods, so a command typed for your app's state (`CommandDef<Review>`) goes
+ * wherever a command does.
  */
-export interface CommandDef extends Omit<
-  PluginCommandDef,
+export interface CommandDef<AppState = any> extends Omit<
+  PluginCommandDef<AppState>,
   'icon' | 'iconAccent' | 'allowed' | 'enabled' | 'active' | 'visible' | 'run'
 > {
   /** An icon's name: one of the viewer's, or one of yours (`icons`). */
   readonly icon?: IconName | (string & {});
   /** Colors for the icon, read from live state like `active`. */
-  readonly iconAccent?: (context: CommandContext) => IconAccent | null;
+  iconAccent?(context: CommandContext<AppState>): IconAccent | null;
   /** Whether the session may run it, from the plugins' `can*` checks. Prefer `requires`. */
-  readonly allowed?: (context: CommandContext) => boolean;
+  allowed?(context: CommandContext<AppState>): boolean;
   /** When it can run. When it can't, its button is greyed out. Default: always. */
-  readonly enabled?: (context: CommandContext) => boolean;
+  enabled?(context: CommandContext<AppState>): boolean;
   /** When it shows as pressed, or checked in a menu. */
-  readonly active?: (context: CommandContext) => boolean;
+  active?(context: CommandContext<AppState>): boolean;
   /** When it shows at all. Default: always. */
-  readonly visible?: (context: CommandContext) => boolean;
+  visible?(context: CommandContext<AppState>): boolean;
   /** What it does; `execute()` resolves once it has. Not needed for a `menu` or `panel`. */
-  readonly run?: (context: CommandContext) => void | Promise<unknown>;
+  run?(context: CommandContext<AppState>): void | Promise<unknown>;
 }
 
 /** What a command of yours reaches: the viewer's plugins by name, and the viewer once it's live. */
@@ -94,6 +101,7 @@ function viewerContextOf(context: PluginCommandContext, scope: CommandScope): Co
   }) as ScopedViewer['tryGet'];
   return {
     documentId: context.documentId,
+    appState: context.appState,
     ...(context.args === undefined ? {} : { args: context.args }),
     ...(context.signal ? { signal: context.signal } : {}),
     get,

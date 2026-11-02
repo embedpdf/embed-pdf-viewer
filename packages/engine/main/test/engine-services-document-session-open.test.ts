@@ -81,6 +81,9 @@ function createFakeRuntime(): PdfRuntimeModule & {
     fn: {
       FPDF_InitLibrary: () => undefined,
       FPDF_DestroyLibrary: () => undefined,
+      // Every thread registers the last-resort font.
+      EPDFFont_RegisterMemFont64: () => 1,
+      EPDFFont_SetLastResortFont: () => true,
       EPDF_InitThread: () => undefined,
       EPDF_ShutdownThread: () => undefined,
       FPDF_LoadMemDocument64: (dataPtr: Ptr, size: number, password: string) => {
@@ -125,7 +128,8 @@ function createFakeRuntime(): PdfRuntimeModule & {
       EPDF_GetPageRotateByIndex: () => 0,
       EPDF_GetPageUserUnitByIndex: () => 0,
       EPDF_GetPageTabOrderByIndex: () => 0,
-      FPDF_GetPageLabel: () => 0,
+      // No page label sections.
+      EPDFDoc_GetPageLabelSectionCount: () => 0,
       // No page-level actions in this ownership/routing fixture.
       EPDFDoc_GetPageActionModel: () => ptr(0),
       // No named pages either: `pages.list` reads both catalog name trees.

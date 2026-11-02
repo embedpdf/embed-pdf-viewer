@@ -54,7 +54,7 @@ const engine = {
     Promise.resolve({
       id: 'doc',
       events: { subscribe: () => () => {}, lastServerId: () => null },
-      pages: { list: () => Promise.resolve({ pageCount: 1, pages: [page] }) },
+      pages: { list: () => Promise.resolve({ pageCount: 1, labels: [], pages: [page] }) },
       security: { allows: () => true, allowsAnnotation: () => true },
       outline: { get: () => Promise.resolve({ items: ITEMS, incomplete: false }) },
       close: () => Promise.resolve(),

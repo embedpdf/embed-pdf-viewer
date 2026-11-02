@@ -119,6 +119,32 @@ export function observeLength(
   return observeBorderBox(element, orientation === 'vertical' ? 'height' : 'width', onLength);
 }
 
+/**
+ * An element's length along a toolbar without the room it grew into: a toolbar item that grows
+ * (`grow` on its custom item) is drawn with `flex-grow`, which is off for this one read, so the
+ * fit counts the item at its own length.
+ */
+export function ownLengthOf(element: HTMLElement, orientation: Orientation): number {
+  const growth = element.style.flexGrow;
+  element.style.flexGrow = '0';
+  const length = element.getBoundingClientRect()[orientation === 'vertical' ? 'height' : 'width'];
+  element.style.flexGrow = growth;
+  return length;
+}
+
+/** {@link observeLength} for an item that grows: its {@link ownLengthOf}, now and on resize. */
+export function observeOwnLength(
+  element: HTMLElement,
+  orientation: Orientation,
+  onLength: (length: number) => void,
+): () => void {
+  const report = () => onLength(ownLengthOf(element, orientation));
+  report();
+  const observer = new ResizeObserver(report);
+  observer.observe(element);
+  return () => observer.disconnect();
+}
+
 // ── the room a toolbar fills ─────────────────────────────────────────────────
 
 /** Report one side of an element's content box now, then on changes over half a pixel. */

@@ -291,6 +291,7 @@ describe("AnnotationsClient", () => {
                     metadataVersion: 1,
                     attachmentsVersion: 1,
                     outlineVersion: 1,
+                    fontsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [
@@ -302,6 +303,7 @@ describe("AnnotationsClient", () => {
                 },
                 opId: "opId",
                 undoable: true,
+                missingCharacters: ["missingCharacters"],
                 changed: [{ kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 }],
             },
         };
@@ -400,6 +402,7 @@ describe("AnnotationsClient", () => {
                     metadataVersion: 1,
                     attachmentsVersion: 1,
                     outlineVersion: 1,
+                    fontsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [
@@ -411,6 +414,7 @@ describe("AnnotationsClient", () => {
                 },
                 opId: "opId",
                 undoable: true,
+                missingCharacters: ["missingCharacters"],
                 changed: [{ kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 }],
             },
         };
@@ -531,6 +535,7 @@ describe("AnnotationsClient", () => {
                     metadataVersion: 1,
                     attachmentsVersion: 1,
                     outlineVersion: 1,
+                    fontsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [
@@ -542,6 +547,7 @@ describe("AnnotationsClient", () => {
                 },
                 opId: "opId",
                 undoable: true,
+                missingCharacters: ["missingCharacters"],
                 changed: [{ kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 }],
             },
         };
@@ -651,6 +657,7 @@ describe("AnnotationsClient", () => {
                     metadataVersion: 1,
                     attachmentsVersion: 1,
                     outlineVersion: 1,
+                    fontsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [
@@ -662,6 +669,7 @@ describe("AnnotationsClient", () => {
                 },
                 opId: "opId",
                 undoable: true,
+                missingCharacters: ["missingCharacters"],
             },
         };
 
@@ -763,6 +771,7 @@ describe("AnnotationsClient", () => {
                     metadataVersion: 1,
                     attachmentsVersion: 1,
                     outlineVersion: 1,
+                    fontsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [
@@ -774,6 +783,7 @@ describe("AnnotationsClient", () => {
                 },
                 opId: "opId",
                 undoable: true,
+                missingCharacters: ["missingCharacters"],
                 changed: [{ kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 }],
             },
         };

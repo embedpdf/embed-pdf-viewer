@@ -393,6 +393,12 @@ const ROUND_TRIPS: { readonly [T in ChangeOp['type']]: RoundTrip } = {
     // The redo brings back the same pages, under the same refs.
     ops: () => [{ type: 'pages.insert', source: SIGNATURE_ARTWORK_PDF, position: 'start' }],
   },
+  'pages.copy': {
+    // The copy brings the page's annotations and its widget as a field of its own.
+    ops: ([page]) => [
+      { type: 'pages.copy', pages: [PAGE], position: 'end', objectNumbers: [page!] },
+    ],
+  },
   'attachments.create': {
     // The redo brings back the same file, with its dates.
     ops: () => [embedNotes()],

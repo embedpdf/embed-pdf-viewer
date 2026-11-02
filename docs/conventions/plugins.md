@@ -9,7 +9,8 @@ it answers "may this session do that?": [`permissions.md`](./permissions.md).
 
 ## Anatomy
 
-Every plugin has the same layout, so any file can be found without searching:
+Every plugin has the same layout, so any file can be found without searching. A CloudPDF
+plugin is laid out the same in `cloudpdf/plugin/<name>/` ([`packages.md`](./packages.md)):
 
 ```
 packages/plugin/<name>/

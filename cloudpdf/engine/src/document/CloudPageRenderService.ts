@@ -108,8 +108,11 @@ export class CloudPageRenderService implements PageRenderService {
         // Normalized above so the URL always carries an explicit,
         // network-supported format (PNG or WebP; default WebP). What the
         // picture draws is its family's path; the token carries the family's
-        // pins.
-        const pins: RenderVersions = { contentVersion: page.cache.contentVersion };
+        // pins, and the server's fonts it is drawn with.
+        const pins: RenderVersions = {
+          contentVersion: page.cache.contentVersion,
+          serverFonts: manifest.serverFonts,
+        };
         for (const pin of picture.pins) pins[pin] = page.cache[pin];
         const wireToken = renderImageOptionsToWire({ ...options, format }, pins);
         // Plane-scope rule: a picture resolves at the doc-level (shared base)

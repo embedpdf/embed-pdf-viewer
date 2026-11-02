@@ -8,4 +8,4 @@ The documents follow the four-hook pattern. `useDocuments()` is the documents AP
 
 `<Viewer>` takes `identity` and `scope`, the defaults for every document it opens (a document's own replace them; documents opened after a change use the new values), and `accent` and `page { background, shadow }`, which the Stage and `<PageView>` paint pages with through the `--epdf-page-*` variables. `useViewerSettings(select?)` reads them. `children` is optional.
 
-The view manager's entry is `/view-manager` (was `/views`): `useViewManager()`, `useViewManagerState(select?)` (`{ panes, focusedPaneId }`) and `useViewManagerEvent()`; `usePanes()` is gone. `saveFile` and `mountWebFont` are exported from `/runtime`.
+The view manager's entry is `/view-manager` (was `/views`): `useViewManager()`, `useViewManagerState(select?)` (`{ panes, focusedPaneId }`) and `useViewManagerEvent()`; `usePanes()` is gone. `saveFile` is exported from `/runtime`.

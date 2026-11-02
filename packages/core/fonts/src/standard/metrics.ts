@@ -15,6 +15,8 @@ export interface StandardFontMetrics {
   readonly ascent: number;
   /** In 1/1000 em, below the baseline (negative). */
   readonly descent: number;
+  /** The characters the face's encoding writes, in code order. */
+  readonly codePoints: readonly number[];
   /**
    * A character's advance in 1/1000 em; `null` when the face's encoding
    * can't write it (the engine draws it with another font).
@@ -34,6 +36,7 @@ export function standardFontMetrics(font: StandardFont): StandardFontMetrics {
     font,
     ascent: face.ascent,
     descent: face.descent,
+    codePoints: face.codePoints,
     advance: (codePoint) => advances.get(codePoint) ?? null,
   };
   cache.set(font, metrics);

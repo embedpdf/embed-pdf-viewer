@@ -66,12 +66,7 @@ async function insertFromOtherPdf(after: PageRef) {
     <button type="button" class="button" :disabled="!canEdit" @click="insertBlankAfter(page.ref)">
       + Blank page after
     </button>
-    <button
-      type="button"
-      class="button"
-      :disabled="!canEdit || !pageEdit.canExtract()"
-      @click="duplicate(page.ref)"
-    >
+    <button type="button" class="button" :disabled="!canEdit" @click="duplicate(page.ref)">
       Duplicate page
     </button>
     <button type="button" class="button" :disabled="!canEdit" @click="insertFromOtherPdf(page.ref)">

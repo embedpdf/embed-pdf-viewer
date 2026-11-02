@@ -12,11 +12,15 @@ import {
 } from '../dto/AnnotationRender';
 import type { PageImageOptions, PageRenderOptions } from '../dto/PageRender';
 
-/** A picture's pins: `contentVersion`, and the pins of what its family draws. */
+/**
+ * A picture's pins: `contentVersion`, the pins of what its family draws, and
+ * the server's fonts it is drawn with (fallback fonts draw page text).
+ */
 export interface RenderVersions {
   contentVersion: number;
   annotationVersion?: number;
   widgetVersion?: number;
+  serverFonts: string;
 }
 
 /**
@@ -91,6 +95,7 @@ export function pageRenderOptionsFromImageOptions(options: PageImageOptions): Pa
  */
 export interface AnnotationRenderVersion {
   annotationVersion: number;
+  serverFonts: string;
 }
 
 /**
@@ -102,7 +107,10 @@ export function annotationAppearancesImageOptionsToWire(
   options: AnnotationAppearanceImageOptions,
   versions: AnnotationRenderVersion,
 ): WireFlat {
-  return appearancesToWire(options, { annotationVersion: versions.annotationVersion });
+  return appearancesToWire(options, {
+    annotationVersion: versions.annotationVersion,
+    serverFonts: versions.serverFonts,
+  });
 }
 
 /** Convenience: build the full encoded appearance render token in one call. */
@@ -121,6 +129,7 @@ export function annotationAppearancesImageOptionsToToken(
  */
 export interface WidgetRenderVersion {
   widgetVersion: number;
+  serverFonts: string;
 }
 
 /** The widget twin of {@link annotationAppearancesImageOptionsToWire}. */
@@ -128,7 +137,10 @@ export function widgetAppearancesImageOptionsToWire(
   options: AnnotationAppearanceImageOptions,
   versions: WidgetRenderVersion,
 ): WireFlat {
-  return appearancesToWire(options, { widgetVersion: versions.widgetVersion });
+  return appearancesToWire(options, {
+    widgetVersion: versions.widgetVersion,
+    serverFonts: versions.serverFonts,
+  });
 }
 
 /** The widget twin of {@link annotationAppearancesImageOptionsToToken}. */
@@ -145,7 +157,7 @@ export function widgetAppearancesImageOptionsToToken(
  */
 function appearancesToWire(
   options: AnnotationAppearanceImageOptions,
-  pin: Record<string, number>,
+  pin: Record<string, number | string>,
 ): WireFlat {
   const { modes, ...rest } = options;
   const asked = appearanceModesOf(modes);

@@ -199,6 +199,8 @@ interface CommittedDocumentMutation {
   layerDocVersion: number;
   /** The form's new pin, for a form write. */
   formsVersion?: number;
+  /** The font list's new pin, for a write that changed the fonts it shows. */
+  fontsVersion?: number;
 }
 
 /** Flatten has form-like multi-page persistence, but with explicit content
@@ -317,6 +319,12 @@ export class LayerService {
    * per layer runs at a time in a process (the layer write queue).
    */
   private readonly layerWrites = new Map<string, LayerWriteObjectNumbers>();
+  /**
+   * Layers whose last write the worker said changed the fonts the document's
+   * list shows (`fontsChanged`), by {@link fontsWriteKey}: its commit moves
+   * `fonts_version`.
+   */
+  private readonly fontsChangedBy = new Set<string>();
   /** The guard against scripts: how often one token may be handed numbers. */
   private readonly issueTurns = new RequestRateLimiter(OBJECT_NUMBER_ISSUE_TURNS);
   private readonly objectNumbers?: ObjectNumberService;
@@ -398,6 +406,7 @@ export class LayerService {
             annotationsVersion: base.annotationsVersion,
             formsVersion: base.formsVersion,
             outlineVersion: base.outlineVersion,
+            fontsVersion: base.fontsVersion,
           }
         : {}),
     });
@@ -1384,6 +1393,7 @@ export class LayerService {
       previousDocVersion: durable.previousLayerDocVersion,
       docVersion: durable.layerDocVersion,
       ...(durable.formsVersion !== undefined ? { formsVersion: durable.formsVersion } : {}),
+      ...(durable.fontsVersion !== undefined ? { fontsVersion: durable.fontsVersion } : {}),
       pages: durable.pages,
     });
     return {
@@ -1451,11 +1461,13 @@ export class LayerService {
         const previousLayerDocVersion = Number(currentLayer.doc_version);
         const layerDocVersion = previousLayerDocVersion + 1;
 
+        const fontsVersion = this.fontsVersionAfter(input.docId, input.layerName, currentLayer);
         const durable: CommittedDocumentMutation = {
           pages: nextPages,
           previousLayerDocVersion,
           layerDocVersion,
           ...(formWrite ? { formsVersion: Number(currentLayer.forms_version ?? 1) + 1 } : {}),
+          ...(fontsVersion !== undefined ? { fontsVersion } : {}),
         };
         // Finalize before the audit append so the row stores exactly what
         // the caller will receive.
@@ -1486,6 +1498,7 @@ export class LayerService {
           {
             doc_version: layerDocVersion,
             ...(durable.formsVersion !== undefined ? { forms_version: durable.formsVersion } : {}),
+            ...(durable.fontsVersion !== undefined ? { fonts_version: durable.fontsVersion } : {}),
           },
           auditId,
           now,
@@ -1625,12 +1638,13 @@ export class LayerService {
     signal?: AbortSignal,
   ): Promise<WorkerResultPayload> {
     let write: LayerWriteObjectNumbers | undefined;
+    let layerName: string | undefined;
     const payload = await this.requirePool().run(
       docId,
       (jobId) => {
         const pack = build(jobId);
         const request = pack.payload;
-        const layerName = 'layerName' in request ? request.layerName : undefined;
+        layerName = 'layerName' in request ? request.layerName : undefined;
         write = [...this.layerWrites.values()].find(
           (candidate) => candidate.docId === docId && candidate.layerName === layerName,
         );
@@ -1646,7 +1660,26 @@ export class LayerService {
       signal,
     );
     write?.recordResult(payload);
+    if (layerName !== undefined) {
+      const key = fontsWriteKey(docId, layerName);
+      if ('fontsChanged' in payload && payload.fontsChanged) this.fontsChangedBy.add(key);
+      else this.fontsChangedBy.delete(key);
+    }
     return payload;
+  }
+
+  /**
+   * The font list's pin after the layer's last write: the next one when the
+   * worker said it changed the fonts the document's list shows, else none.
+   */
+  private fontsVersionAfter(
+    docId: string,
+    layerName: string,
+    current: { fonts_version: number | bigint },
+  ): number | undefined {
+    return this.fontsChangedBy.has(fontsWriteKey(docId, layerName))
+      ? Number(current.fonts_version ?? 1) + 1
+      : undefined;
   }
 
   // ── changes ───────────────────────────────────────────────────────────────
@@ -1844,7 +1877,9 @@ export class LayerService {
               outcome.status === 'applied' && wrote(outcome.result) ? [outcome.result] : [],
             ),
           );
-          const bumped = await this.bumpChangeVersions(trx, layer, facts, now);
+          const bumped = await this.bumpChangeVersions(trx, layer, facts, now, {
+            fonts: this.fontsChangedBy.has(fontsWriteKey(docId, layerName)),
+          });
           cacheDelta = this.layerState.buildCacheDelta({
             docId,
             layerName,
@@ -1855,6 +1890,9 @@ export class LayerService {
               : {}),
             ...(bumped.versions.forms_version !== undefined
               ? { formsVersion: bumped.versions.forms_version }
+              : {}),
+            ...(bumped.versions.fonts_version !== undefined
+              ? { fontsVersion: bumped.versions.fonts_version }
               : {}),
             pages: bumped.pages,
           });
@@ -2001,6 +2039,8 @@ export class LayerService {
     layer: LayerRow,
     facts: ChangeFacts,
     now: number,
+    /** Whether the worker said the write changed the fonts the document's list shows. */
+    written: { fonts: boolean },
   ): Promise<{
     previousDocVersion: number;
     versions: {
@@ -2011,6 +2051,7 @@ export class LayerService {
       outline_version?: number;
       attachments_version?: number;
       layout_version?: number;
+      fonts_version?: number;
     };
     pages: DurablePageRow[];
   }> {
@@ -2024,6 +2065,7 @@ export class LayerService {
         'outline_version',
         'attachments_version',
         'layout_version',
+        'fonts_version',
       ])
       .where('id', '=', layer.id)
       .executeTakeFirst();
@@ -2071,6 +2113,7 @@ export class LayerService {
           ? { attachments_version: Number(current.attachments_version) + 1 }
           : {}),
         ...(facts.layout ? { layout_version: Number(current.layout_version) + 1 } : {}),
+        ...(written.fonts ? { fonts_version: Number(current.fonts_version ?? 1) + 1 } : {}),
       },
       pages,
     };
@@ -2707,6 +2750,7 @@ export class LayerService {
         // lists change.
         const annotationsVersion = Number(currentLayer.annotations_version ?? 1) + 1;
         const formsVersion = Number(currentLayer.forms_version ?? 1) + 1;
+        const fontsVersion = this.fontsVersionAfter(input.docId, input.layerName, currentLayer);
         const durable: CommittedPageFlatten = {
           pages: nextPages,
           previousLayerDocVersion,
@@ -2723,6 +2767,7 @@ export class LayerService {
               docVersion: durable.layerDocVersion,
               annotationsVersion,
               formsVersion,
+              ...(fontsVersion !== undefined ? { fontsVersion } : {}),
               pages: nextPages,
             }),
           },
@@ -2754,6 +2799,7 @@ export class LayerService {
             doc_version: durable.layerDocVersion,
             annotations_version: annotationsVersion,
             forms_version: formsVersion,
+            ...(fontsVersion !== undefined ? { fonts_version: fontsVersion } : {}),
           },
           auditId,
           now,
@@ -2831,6 +2877,7 @@ export class LayerService {
         // fields included — both lists change.
         const annotationsVersion = Number(currentLayer.annotations_version ?? 1) + 1;
         const formsVersion = Number(currentLayer.forms_version ?? 1) + 1;
+        const fontsVersion = this.fontsVersionAfter(input.docId, input.layerName, currentLayer);
         const result: RedactionApplyResult = {
           ...input.raw,
           meta: {
@@ -2842,6 +2889,7 @@ export class LayerService {
               docVersion: layerDocVersion,
               annotationsVersion,
               formsVersion,
+              ...(fontsVersion !== undefined ? { fontsVersion } : {}),
               pages: nextPages,
             }),
           },
@@ -2873,6 +2921,7 @@ export class LayerService {
             doc_version: layerDocVersion,
             annotations_version: annotationsVersion,
             forms_version: formsVersion,
+            ...(fontsVersion !== undefined ? { fonts_version: fontsVersion } : {}),
           },
           auditId,
           now,
@@ -2906,6 +2955,7 @@ export class LayerService {
     layout_version: number | bigint;
     annotations_version: number | bigint;
     forms_version: number | bigint;
+    fonts_version: number | bigint;
   }> {
     // Plain read — values feed the next-version computation. The fence is
     // the guarded UPDATE (see guardedVersionBump), never a SELECT check.
@@ -2917,6 +2967,7 @@ export class LayerService {
         'layout_version',
         'annotations_version',
         'forms_version',
+        'fonts_version',
       ])
       .where('id', '=', layer.id)
       .executeTakeFirst();
@@ -3741,6 +3792,8 @@ export class LayerService {
           annotationsVersion: layer.annotationsVersion,
           formsVersion: layer.formsVersion + 1,
           outlineVersion: layer.outlineVersion,
+          // A signature's appearance may draw with a font of its own.
+          fontsVersion: layer.fontsVersion + 1,
           createdAt: now,
         });
 
@@ -3864,6 +3917,7 @@ export class LayerService {
       annotations_version?: number;
       forms_version?: number;
       outline_version?: number;
+      fonts_version?: number;
     },
     lastAuditId: number,
     now: number,
@@ -4216,6 +4270,11 @@ function requireLayerArtifact(payload: unknown): LayerArtifactInput {
   return artifact;
 }
 
+/** A layer's key in {@link LayerService}'s record of writes that changed the fonts. */
+function fontsWriteKey(docId: string, layerName: string): string {
+  return `${docId}::${layerName}`;
+}
+
 /** One key grammar for everything scoped to a layer's write pipeline. */
 function layerWriteKey(ctx: LayerWriteContext, docId: string, layerName: string): string {
   return `${ctx.tenantId}::${docId}::${layerName}`;
@@ -4255,6 +4314,7 @@ interface LayoutVersions {
   previousDocVersion: number;
   docVersion: number;
   layoutVersion: number;
+  fontsVersion?: number;
 }
 
 /**

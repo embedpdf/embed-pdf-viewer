@@ -69,7 +69,8 @@ export interface CustomSlotCtx {
   layer: 'live' | 'measure';
   /**
    * Report the item's length yourself (its width, or its height in a vertical
-   * bar), for content the measurement layer can't hold.
+   * bar), for content the measurement layer can't hold. An item that grows
+   * reports its own length, without the room it grew into.
    */
   measure: (length: number) => void;
 }
@@ -103,6 +104,11 @@ export type ToolbarPart<Command extends ToolbarCommand = ToolbarCommand> =
       /** The command it becomes in the "More" menu; drawn when no renderer draws the item. */
       readonly terminal: Command | null;
       readonly runTerminal: () => void;
+      /**
+       * Takes the room the toolbar has left (`custom(name, terminal, { grow: true })`): in the
+       * live row, an adapter draws it in a box that grows, and its section grows too.
+       */
+      readonly grow: boolean;
     }
   | {
       readonly kind: 'collapsed';
@@ -123,10 +129,21 @@ export interface LiveGroup<Command extends ToolbarCommand = ToolbarCommand> {
   readonly parts: readonly ToolbarPart<Command>[];
 }
 
+/**
+ * How a section of the live row keeps its distance from the others along the toolbar:
+ * `'balance'`, auto margins on both sides, which center it in the room the others leave (the
+ * center, while nothing in the toolbar grows); `'gap'`, the toolbar's gap before it (a drawn
+ * section after another, while something grows and takes that room); `'none'`.
+ */
+export type SectionSpacing = 'balance' | 'gap' | 'none';
+
 /** A section of the live row (`start`, `center` or `end`), with only its visible groups. */
 export interface LiveSection<Command extends ToolbarCommand = ToolbarCommand> {
   readonly name: 'start' | 'center' | 'end';
   readonly groups: readonly LiveGroup<Command>[];
+  /** It holds an item that grows: the section grows into the room the toolbar has left. */
+  readonly grows: boolean;
+  readonly spacing: SectionSpacing;
 }
 
 export interface ToolbarLayout<Command extends ToolbarCommand = ToolbarCommand> {
@@ -230,6 +247,7 @@ export function layoutToolbar<Command extends ToolbarCommand>(
           runTerminal: () => {
             if (unit.terminal !== null) execute(unit.terminal);
           },
+          grow: unit.grow,
         };
       }
       const command = resolve(unit.command);
@@ -273,7 +291,10 @@ export function layoutToolbar<Command extends ToolbarCommand>(
   };
 
   return {
-    sections: SECTIONS.map((name) => liveSection(name, bar, fit, parts)),
+    sections: spacedSections(
+      SECTIONS.map((name) => liveSection(name, bar, fit, parts)),
+      fit.hasOverflow,
+    ),
     measured: measuredParts(bar, parts),
     hasOverflow: fit.hasOverflow,
     overflow: projectOverflow(bar, fit, input.menuTarget),
@@ -287,12 +308,46 @@ interface PartBuilders<Command extends ToolbarCommand> {
   disclosure(group: NormalizedGroup, allChildren: boolean): ToolbarPart<Command>;
 }
 
+/** A section as {@link liveSection} reads it, before the toolbar's spacing is known. */
+type UnspacedSection<Command extends ToolbarCommand> = Omit<
+  LiveSection<Command>,
+  'grows' | 'spacing'
+>;
+
+/**
+ * The sections with their growth and spacing. While nothing grows, the center balances in the
+ * room the others leave, as it always has. While something grows, it takes that room, so each
+ * drawn section after another keeps the toolbar's gap instead: the gap the fit counted between
+ * them. The end section is drawn while it holds the "More" button too.
+ */
+function spacedSections<Command extends ToolbarCommand>(
+  sections: readonly UnspacedSection<Command>[],
+  hasOverflow: boolean,
+): LiveSection<Command>[] {
+  const growsIn = (section: UnspacedSection<Command>) =>
+    section.groups.some((group) => group.parts.some((part) => part.kind === 'custom' && part.grow));
+  const anyGrows = sections.some(growsIn);
+  let drawnBefore = false;
+  return sections.map((section) => {
+    const drawn = section.groups.length > 0 || (section.name === 'end' && hasOverflow);
+    const spacing: SectionSpacing = !anyGrows
+      ? section.name === 'center'
+        ? 'balance'
+        : 'none'
+      : drawn && drawnBefore
+        ? 'gap'
+        : 'none';
+    drawnBefore ||= drawn;
+    return { ...section, grows: growsIn(section), spacing };
+  });
+}
+
 function liveSection<Command extends ToolbarCommand>(
   name: LiveSection['name'],
   bar: NormalizedBar,
   fit: FitResult,
   parts: PartBuilders<Command>,
-): LiveSection<Command> {
+): UnspacedSection<Command> {
   const section = bar.sections.find((each) => each.name === name);
   const groups: LiveGroup<Command>[] = [];
   for (const group of section?.groups ?? []) {

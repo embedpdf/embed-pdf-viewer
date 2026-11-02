@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   COMMANDS_DEFAULTS,
+  type CommandContext,
   type CommandDef,
   type CommandFamily,
   type CommandsConfig,
@@ -13,10 +14,14 @@ import {
 import { createCommandsController } from '../src/controller';
 
 /** The controller over a real test context: workspace-scoped, no document, no siblings. */
-function harness(config: CommandsConfig = {}) {
+function harness<AppState>(config: CommandsConfig<AppState> = {}) {
   const ctx = createTestContext({
     id: 'commands',
-    settings: { defaults: COMMANDS_DEFAULTS, registered: config },
+    settings: {
+      defaults: COMMANDS_DEFAULTS,
+      registered: config as CommandsConfig,
+      whole: ['appState'],
+    },
     doc: null,
   });
   const commands = ctx.connect(createCommandsController(ctx));
@@ -56,6 +61,33 @@ describe('resolution carries iconAccent', () => {
     const resolved = commands.resolveCommand('tool:ink');
     expect(resolved).not.toBeNull(); // the button still renders…
     expect(resolved?.iconAccent).toBeUndefined(); // …just untinted
+  });
+});
+
+describe('enabled, active and visible', () => {
+  it('count as false when they throw, and as their default when they are not given', async () => {
+    const MissingToken = createCapabilityToken<{ ready(): boolean }>('missing');
+    const reads = (context: CommandContext) => context.get(MissingToken).ready();
+    const { commands } = harness({
+      commands: [
+        { id: 'acme:thrown', label: 'thrown', enabled: reads, active: reads, run: () => {} },
+        { id: 'acme:hidden', label: 'hidden', visible: reads },
+        { id: 'acme:plain', label: 'plain' },
+      ],
+    });
+    expect(commands.resolveCommand('acme:thrown')).toMatchObject({
+      enabled: false,
+      active: false,
+      visible: true,
+    });
+    expect(commands.resolveCommand('acme:hidden')).toMatchObject({ visible: false });
+    expect(commands.resolveCommand('acme:plain')).toMatchObject({
+      enabled: true,
+      active: false,
+      visible: true,
+    });
+    expect(commands.canExecute('acme:thrown')).toBe(false);
+    expect(await commands.execute('acme:thrown')).toMatchObject({ status: 'rejected' });
   });
 });
 
@@ -169,6 +201,70 @@ describe('execution', () => {
     commands.onExecutionFailed((event) => failures.push(event.error.message));
     await expect(commands.execute('broken')).rejects.toMatchObject({ capability: 'commands' });
     expect(failures).toEqual(['boom']);
+  });
+});
+
+describe("your app's state", () => {
+  interface Review {
+    done: string[];
+    status: 'review' | 'approved';
+    approve(): void;
+  }
+
+  /** A command over an app's checklist: enabled once all four are done, active once approved. */
+  const approve: CommandDef<Review> = {
+    id: 'acme:approve',
+    label: 'Approve',
+    enabled: ({ appState }) => appState.done.length === 4,
+    active: ({ appState }) => appState.status === 'approved',
+    run: ({ appState }) => appState.approve(),
+  };
+
+  it('gives every command the appState setting, and asks again when a new value replaces it', () => {
+    const review: Review = { done: [], status: 'review', approve: () => {} };
+    const { ctx, commands } = harness({ appState: review, commands: [approve] });
+    expect(commands.resolveCommand('acme:approve')).toMatchObject({
+      enabled: false,
+      active: false,
+    });
+
+    const listener = vi.fn();
+    ctx.subscribe(listener);
+    commands.updateSettings({ appState: { ...review, done: ['a', 'b', 'c', 'd'] } });
+    expect(listener).toHaveBeenCalled();
+    expect(commands.resolveCommand('acme:approve')).toMatchObject({ enabled: true, active: false });
+    // Replaced whole, never merged: what the new value leaves out is gone.
+    commands.updateSettings({ appState: { done: [] } });
+    expect(commands.getSettings().appState).toEqual({ done: [] });
+  });
+
+  it('wakes every reader once a command ran, so state its run changed outside the viewer shows', async () => {
+    let status: Review['status'] = 'review';
+    // The app changes its own state in place, without giving the viewer a new value.
+    const review: Review = {
+      done: ['a', 'b', 'c', 'd'],
+      get status() {
+        return status;
+      },
+      approve: () => (status = 'approved'),
+    };
+    const { ctx, commands } = harness({ appState: review, commands: [approve] });
+    expect(commands.resolveCommand('acme:approve')?.active).toBe(false);
+    const listener = vi.fn();
+    ctx.subscribe(listener);
+    await commands.execute('acme:approve');
+    expect(listener).toHaveBeenCalled();
+    expect(commands.resolveCommand('acme:approve')?.active).toBe(true);
+  });
+
+  it('wakes the readers after a run that fails too', async () => {
+    const { ctx, commands } = harness({
+      commands: [{ id: 'acme:fail', run: () => Promise.reject(new Error('no')) }],
+    });
+    const listener = vi.fn();
+    ctx.subscribe(listener);
+    await expect(commands.execute('acme:fail')).rejects.toThrow();
+    expect(listener).toHaveBeenCalled();
   });
 });
 

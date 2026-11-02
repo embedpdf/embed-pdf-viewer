@@ -52,7 +52,7 @@ const textBounds = (
 });
 
 export function createMarks({ assetEngine }: Pick<StampServices, 'assetEngine'>) {
-  const { openAssetDocument } = assetEngine;
+  const { openAssetDocument, registerFont } = assetEngine;
 
   /**
    * A drawn or typed mark rendered to a one-page PDF: the annotation is
@@ -63,6 +63,7 @@ export function createMarks({ assetEngine }: Pick<StampServices, 'assetEngine'>)
   const renderMark = async (
     mark: Extract<MarkSource, { kind: 'ink' | 'text' }>,
   ): Promise<Uint8Array> => {
+    if (mark.kind === 'text') await registerFont(mark.fontFamily);
     const doc = await openAssetDocument(blankLibraryPdf());
     try {
       const layout = await doc.pages.list();

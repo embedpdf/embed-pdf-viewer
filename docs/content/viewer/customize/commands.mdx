@@ -24,8 +24,9 @@ agree. Add one of yours, then put it in the [layout](layout):
 }
 ```
 
-The button has a tooltip with its shortcut, moves into the "More" menu when the toolbar is full,
-and `Ctrl`+`Enter` (`Cmd`+`Enter` on a Mac) runs it while the viewer has focus.
+The button's tooltip says its label and its shortcut the way the platform writes it: `Ctrl+Enter`,
+or `⌘↩` on a Mac. The button moves into the "More" menu when the toolbar is full, and `Ctrl`+`Enter`
+(`Cmd`+`Enter` on a Mac) runs it while the viewer has focus.
 
 Here **Approve** writes to a status line of your app, above the viewer:
 
@@ -58,9 +59,9 @@ shortcuts](/docs/headless/ui/commands#define-a-command).
 
 ## Enabled, active and visible
 
-`enabled`, `active` and `visible` are functions of the viewer's state. They get `get`, which gives
-you any plugin by its name, and the viewer asks them again whenever something changes, so a
-button is always right:
+`enabled`, `active` and `visible` say how a command's button looks now. They get `get`, which gives
+you any plugin by its name, and `appState`, your app's own state. The viewer asks them again
+whenever either changes, and after the command runs, so a button is always right:
 
 ```js
 {
@@ -68,12 +69,32 @@ button is always right:
   label: 'Flag for review',
   icon: 'eye',
   enabled: ({ get }) => get('selection').hasSelection(),
-  active: ({ documentId }) => flagged.has(documentId),
-  run: ({ documentId }) => toggleFlag(documentId),
+  active: ({ appState, documentId }) => appState.flagged.includes(documentId),
+  run: ({ appState, documentId }) => appState.toggleFlag(documentId),
 }
 ```
 
-`run` gets the same: `get`, the `viewer`, and the `documentId` of the document it runs for.
+`run` gets the same: `get`, `appState`, the `viewer`, and the `documentId` of the document it runs
+for.
+
+An `enabled`, `active` or `visible` that throws, because what it reads isn't there yet, such as a
+plugin of a document while none is open, counts as `false`: the button is greyed out, not pressed,
+or hidden until it answers.
+
+### Your app's state
+
+Give the viewer what your commands read as `appState`: values, and functions that change them. It
+follows its prop like `theme` does: give it a new value, and every button asks its command again.
+Here **Approve** stays greyed out until every item of the app's checklist is ticked, and shows as
+pressed once the document is approved:
+
+<Snippet name="viewer/commands/app-state" />
+
+Because the commands read your state from `appState`, never from a variable they closed over, they
+can be a constant outside your component and never see an old value. Give it a new value when
+something changes, as you do with any prop: the viewer sees a new object, not a change inside the
+one it has (`[...done, item]`, not `done.push(item)`). In TypeScript, `ViewerConfig<AppState>` gives
+`appState` its type in every command.
 
 ## Change what a built-in button does
 
@@ -199,14 +220,39 @@ Every tool you add to the [annotation plugin](/docs/headless/annotations/tools) 
 
 ## Good to know
 
+### Tooltips
+
+Every button in a bar, every mode tab and the buttons in a panel's header have a tooltip: the
+button's label, its shortcut, and why it's greyed out when it is. A button that shows its label
+already has a tooltip only when there's more to say. A greyed-out menu row says why in a tooltip
+too. The tooltip shows when the pointer rests on the button for a moment, at once when the button
+gets focus from the keyboard, and never from a touch. Escape hides it. Screen readers read the
+shortcut and the reason with the button. Its colors are theme tokens: see
+[Theming](theming#every-color).
+
+Every other tooltip in the viewer is the same one, with the same timing: those of the buttons in
+panels and dialogs, and a name too long for its row, such as an attachment's or an outline item's,
+which shows whole while it's cut short.
+
 ### The viewer's icons
 
-`area`, `bold`, `book`, `calibrate`, `callout`, `check`, `chevronsDown`, `chevronsUp`, `circle`,
-`circleCheck`, `comment`, `copy`, `distance`, `dots`, `download`, `eye`, `file`, `fileExport`, `filePlus`, `fullscreen`, `fullscreenExit`, `group`, `hand`, `highlight`, `italic`, `line`,
-`link`, `lock`, `menu`, `message`, `pageRotateClockwise`, `pageRotateCounterClockwise`, `palette`, `paperclip`, `perimeter`, `photo`, `plus`,
-`pointer`, `polygon`, `print`, `redact`, `ruler`, `save`, `search`, `send`, `settings`, `sidebar`,
-`signature`, `square`, `squiggly`, `strikethrough`, `text`, `trash`, `underline`, `ungroup`,
-`unlock`, `x`, `zigzag`.
+Every icon the viewer has, by name:
+
+`alertTriangle`, `alignBottom`, `alignCenter`, `alignLeft`, `alignMiddle`, `alignRight`, `alignTop`,
+`area`, `arrowBackUp`, `arrowForwardUp`, `bold`, `book`, `book2`, `calibrate`, `callout`, `check`,
+`chevronDown`, `chevronLeft`, `chevronRight`, `chevronsDown`, `chevronsUp`, `circle`, `circleCheck`,
+`comment`, `copy`, `deviceFloppy`, `distance`, `dots`, `doublePage`, `download`, `externalLink`,
+`eye`, `file`, `fileExport`, `fileImport`, `filePlus`, `fitToPage`, `fitToWidth`, `formButton`,
+`formCheckbox`, `formDesign`, `formListbox`, `formRadio`, `formSelect`, `formTextfield`, `freeText`,
+`fullscreen`, `fullscreenExit`, `group`, `hand`, `highlight`, `horizontal`, `inkHighlighter`,
+`insertText`, `italic`, `line`, `lineArrow`, `link`, `linkOff`, `listTree`, `lock`, `marqueeSelect`,
+`menu`, `message`, `pageRotateClockwise`, `pageRotateCounterClockwise`, `palette`, `paperclip`,
+`pencilMarker`, `perimeter`, `photo`, `plus`, `pointer`, `polygon`, `print`, `redact`, `redactArea`,
+`redactCombined`, `redactionSidebar`, `replaceText`, `rotateClockwise`, `rotateCounterClockwise`,
+`rubberStamp`, `rubberStampPlus`, `ruler`, `save`, `screenshot`, `search`, `send`, `settings`,
+`sidebar`, `signature`, `singlePage`, `square`, `squares`, `squiggly`, `strikethrough`, `text`,
+`trash`, `underline`, `ungroup`, `unlock`, `updateScale`, `vertical`, `viewSettings`, `widgetEdit`,
+`x`, `zigzag`, `zoomIn`, `zoomInArea`, `zoomOut`.
 
 ### Enabled is for now, permissions are for good
 

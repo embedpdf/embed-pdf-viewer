@@ -13,6 +13,7 @@ import {
   readAnnotRect,
   readAnnotString,
   readAppearanceState,
+  readStructurePosition,
 } from './annotationReadPrimitives';
 import { readAnnotationRelationship, readLinkedAnnotationRef } from './readAnnotationRelationship';
 import { readEmbedMetadata } from './readEmbedMetadata';
@@ -60,6 +61,7 @@ export function readAnnotationBase(
     page,
     hasAppearance: fn.EPDFAnnot_HasAppearanceStream(annotPtr, APPEARANCE_MODE_NORMAL),
     appearanceState: readAppearanceState(fn, mem, annotPtr),
+    structurePosition: readStructurePosition(fn, mem, annotPtr),
     nm: readAnnotString(fn, mem, annotPtr, 'NM'),
     ...flags,
     rect,

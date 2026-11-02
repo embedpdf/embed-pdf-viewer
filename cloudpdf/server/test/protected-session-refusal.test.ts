@@ -54,6 +54,7 @@ const RULES: ReadonlyArray<readonly [method: string, pattern: RegExp, Category]>
   ['GET', /^\/layers\/:layerName\/versions\/(download|revisions)\//, 'page'],
   ['POST', /^\/layers\/:layerName\/pages\/extract$/, 'page'],
   ['GET', /^(\/layers\/:layerName)?\/attachment-files\//, 'page'],
+  ['GET', /^\/layers\/:layerName\/font-program-files\//, 'page'],
   ['GET', /^(\/layers\/:layerName)?\/(annotations|form)\/export@:token$/, 'page'],
   ['POST', /^\/layers\/:layerName\/(annotations|form)\/export$/, 'page'],
   ['POST', /^\/layers\/:layerName\/annotations\/pages\/:pageKey\/items\/appearance$/, 'page'],
@@ -72,6 +73,8 @@ const RULES: ReadonlyArray<readonly [method: string, pattern: RegExp, Category]>
     /^(\/layers\/:layerName)?\/(head|manifest|layout|metadata|outline|actions|attachments)(@:token|\/custom(@:token)?)?$/,
     'session',
   ],
+  ['GET', /^(\/layers\/:layerName)?\/fonts(@:token)?$/, 'session'],
+  ['GET', /^\/layers\/:layerName\/font-programs\//, 'session'],
   ['GET', /^(\/layers\/:layerName)?\/geometry\/pages\//, 'session'],
   ['GET', /^\/layers\/:layerName\/search\/rects\//, 'session'],
   ['GET', /^\/layers\/:layerName\/(events|signatures(@:token|\/analysis(@:token)?)?)$/, 'session'],
@@ -236,6 +239,7 @@ function urlOf(route: DocRoute): string {
     .replace(':sha', 'a'.repeat(64))
     .replace(':index', '0')
     .replace(':signingId', 'sig1')
+    .replace(':displayHash', 'a'.repeat(64))
     .replace(':algorithm', 'sha256')
     .replace(':token', request?.token ?? 'contentVersion=1');
   return `${baseUrl}/v1/docs/${DOC}${path}${request?.query ?? ''}`;

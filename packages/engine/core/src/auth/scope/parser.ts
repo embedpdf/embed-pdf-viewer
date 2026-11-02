@@ -201,6 +201,18 @@ function parseFilter(s: string, raw: string): CollabFilter {
 // Validates shape first, then membership in the closed set.
 const CAPABILITY_SHAPE = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/;
 
+/** A plugin id: lowercase words joined by dashes. */
+const PLUGIN_ID_SHAPE = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
+
+/**
+ * Whether `id` can be a plugin's id: lowercase words joined by dashes, and
+ * not one of the core's names ({@link CORE_NAMESPACES}). The id names the
+ * plugin's permissions, its server module and that module's routes.
+ */
+export function isPluginId(id: string): boolean {
+  return PLUGIN_ID_SHAPE.test(id) && !CORE_NAMESPACES.has(id);
+}
+
 /** A plugin id (lowercase words joined by dashes), then one or more dotted actions of the same form. */
 const PLUGIN_PERMISSION_SHAPE = /^[a-z][a-z0-9]*(-[a-z0-9]+)*(\.[a-z][a-z0-9]*(-[a-z0-9]+)*)+$/;
 

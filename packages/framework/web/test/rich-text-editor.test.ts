@@ -9,12 +9,14 @@ import {
   styleDeltaOf,
   type EditorNode,
   type RichTextEditorDocument,
+  type RichTextEditorFace,
   type RichTextEditorHost,
+  restyleFaces,
 } from '../src/rich-text-editor';
 import { element, elementTree, emptyStyle, fakeEditor, root, text } from './helpers/fake-editor';
 
-const cssFontFamily = (family: string) =>
-  family === 'Helvetica' ? 'Helvetica, Arial, sans-serif' : `"${family}"`;
+const cssFontFamily = (face: RichTextEditorFace) =>
+  face.family === 'Helvetica' ? 'Helvetica, Arial, sans-serif' : `"${face.family}"`;
 
 function projection(node: EditorNode): string {
   const doc = serializeRichText(node, 1);
@@ -110,6 +112,64 @@ describe('serializeRichText', () => {
     expect(serializeRichText(element, 1.5)).toEqual(doc);
   });
 
+  it("draws a run in its face's family and reads back only the family it names", () => {
+    const faces: RichTextEditorFace[] = [];
+    const programFamily = (face: RichTextEditorFace) => {
+      faces.push(face);
+      return `"epdf-${face.family.toLowerCase()}-${face.weight}${face.italic ? 'i' : ''}"`;
+    };
+    const doc: RichTextEditorDocument = {
+      paragraphs: [
+        {
+          runs: [
+            { text: 'body ' },
+            { text: 'bold', style: { weight: 700 } },
+            { text: ' brand', style: { family: 'Brand Sans' } },
+          ],
+        },
+      ],
+    };
+    const element = root();
+    const body = { family: 'Roboto', weight: 400, italic: false };
+    renderRichText(element, doc, { scale: 1, cssFontFamily: programFamily, body });
+    const [, bold, brand] = element.childNodes[0]!.childNodes;
+    // A bold run draws in the body family's bold program, not a faked bold.
+    expect(bold!.style!.fontFamily).toBe('"epdf-roboto-700"');
+    expect(brand!.style!.fontFamily).toBe('"epdf-brand sans-400"');
+    expect(faces).toEqual([
+      { family: 'Roboto', weight: 700, italic: false },
+      { family: 'Brand Sans', weight: 400, italic: false },
+    ]);
+    // The program families never read back as families: the spans keep theirs.
+    expect(serializeRichText(element, 1, () => 'Wrong')).toEqual(doc);
+  });
+
+  it("reads a family from CSS only for a span the browser made, through the host's mapping", () => {
+    const element = root(
+      elementTree('div', {}, elementTree('span', { fontFamily: '"epdf-0123", "epdf-ffff"' }, 'a')),
+    );
+    expect(
+      serializeRichText(element, 1, (css) => (css === 'epdf-0123' ? 'Roboto' : undefined)),
+    ).toEqual({ paragraphs: [{ runs: [{ text: 'a', style: { family: 'Roboto' } }] }] });
+  });
+
+  it('draws the spans again in the families the host answers now, the text untouched', () => {
+    const doc: RichTextEditorDocument = {
+      paragraphs: [
+        { runs: [{ text: 'a' }, { text: 'b', style: { family: 'Brand', italic: true } }] },
+      ],
+    };
+    const element = root();
+    const body = { family: 'Helvetica', weight: 400, italic: false };
+    renderRichText(element, doc, { scale: 1, cssFontFamily, body });
+    const span = element.childNodes[0]!.childNodes[1]!;
+    const textNode = span.childNodes[0];
+    expect(span.style!.fontFamily).toBe('"Brand"');
+    restyleFaces(element, body, (face) => `"loaded-${face.family}-${face.italic}"`);
+    expect(span.style!.fontFamily).toBe('"loaded-Brand-true"');
+    expect(span.childNodes[0]).toBe(textNode);
+  });
+
   it('reads inline styles only (never invents an inherited value)', () => {
     const element = root(
       elementTree('div', {}, elementTree('span', { fontWeight: 'bold' }, 'a'), 'b'),
@@ -196,9 +256,9 @@ describe('styleDeltaOf', () => {
     expect(styleDeltaOf({ ...emptyStyle(), fontFamily: '"My Font", serif' }, 1)).toEqual({
       family: 'My Font',
     });
-    // A registered font's mounted family reads back as its key.
+    // Without a host to read it back, a family reads back as it is.
     expect(styleDeltaOf({ ...emptyStyle(), fontFamily: '"epdf-brand-sans"' }, 1)).toEqual({
-      family: 'brand-sans',
+      family: 'epdf-brand-sans',
     });
   });
 });
@@ -329,6 +389,7 @@ describe('attachRichTextEditor', () => {
     const binding = attachRichTextEditor(element as unknown as HTMLElement, h1, {
       document: rich,
       scale: 1,
+      body: { family: 'Custom', weight: 400, italic: true },
     });
     const block = element.childNodes[0]!;
     const span = block.childNodes[1]!;

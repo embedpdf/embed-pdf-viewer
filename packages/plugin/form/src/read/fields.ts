@@ -89,7 +89,7 @@ export function writeOfPlainValue(
 }
 
 /** Whether a field holds nothing a required check would accept. */
-function isEmpty(field: FormFieldDTO): boolean {
+export function isEmpty(field: FormFieldDTO): boolean {
   switch (field.family) {
     case 'text':
     case 'combobox':

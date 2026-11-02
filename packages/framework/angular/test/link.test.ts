@@ -38,7 +38,9 @@ const engine = {
     Promise.resolve({
       id: 'doc',
       events: { subscribe: () => () => {}, lastServerId: () => null },
-      pages: { list: () => Promise.resolve({ pageCount: 1, pages: [pageLayout(1, 0)] }) },
+      pages: {
+        list: () => Promise.resolve({ pageCount: 1, labels: [], pages: [pageLayout(1, 0)] }),
+      },
       security: { allows: () => true },
       page: () => ({
         annotations: {

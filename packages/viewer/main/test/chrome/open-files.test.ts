@@ -24,7 +24,7 @@ function engineThat(canOpenFiles: boolean) {
       return {
         id: `doc-${count}`,
         events: { subscribe: () => () => {}, lastServerId: () => null },
-        pages: { list: () => Promise.resolve({ pageCount: 0, pages: [] }) },
+        pages: { list: () => Promise.resolve({ pageCount: 0, labels: [], pages: [] }) },
         security: { allows: () => true },
         close: () => Promise.resolve(),
       } as unknown as DocumentHandle;

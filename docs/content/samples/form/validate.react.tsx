@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
-import { Stage, stagePlugin, useStage } from '@embedpdf/react/stage';
+import { Stage, stagePlugin } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
 import { interactionPlugin } from '@embedpdf/react/interaction';
 import { FormLayer, formPlugin, toFieldRef, useForm, useFormState } from '@embedpdf/react/form';
@@ -35,19 +35,21 @@ function useFilledInName(onReady: () => void) {
 
 function SubmitToolbar() {
   const form = useForm();
-  const stage = useStage();
   const [check, setCheck] = useState<FormValidation | null>(null);
 
-  // Check the required fields, and take the reader to the first empty one.
-  const submit = useCallback(() => {
+  // Check the required fields.
+  const validate = useCallback(() => {
     const result = form.validate();
     setCheck(result);
-    // Where a field shows is its widget's row in the form.
-    const first = result.missing[0]?.widgets[0];
-    const widget = first ? form.getWidget(first) : null;
-    if (widget) stage.reveal(widget.page, { rect: widget.rect });
-  }, [form, stage]);
-  useFilledInName(submit);
+    return result;
+  }, [form]);
+  useFilledInName(validate);
+
+  // Submit: check, and put the cursor in the first empty field.
+  const submit = () => {
+    const first = validate().missing[0];
+    if (first) form.focus(first.ref);
+  };
 
   return (
     <div className="toolbar">

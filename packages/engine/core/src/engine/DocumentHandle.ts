@@ -1,6 +1,7 @@
 import type { DocumentActionsService } from './DocumentActionsService';
 import type { DocumentAnnotationsService } from './DocumentAnnotationsService';
 import type { DocumentAttachmentsService } from './DocumentAttachmentsService';
+import type { DocumentFontsService } from './DocumentFontsService';
 import type { DocumentFormsService } from './DocumentFormsService';
 import type { DocumentOutlineService } from './DocumentOutlineService';
 import type { DocumentPagesService } from './DocumentPagesService';
@@ -101,6 +102,8 @@ export interface DocumentHandle {
   readonly attachments: DocumentAttachmentsService;
   /** The document's interactive form (AcroForm): fields, values, interchange. */
   readonly forms: DocumentFormsService;
+  /** The fonts that can be named in the document, what each allows, and their programs. */
+  readonly fonts: DocumentFontsService;
   /** The document's outline (`/Root /Outlines`, the bookmarks): its items, read and written. */
   readonly outline: DocumentOutlineService;
   /** Document text search: budgeted, cursor-resumable slices. */
@@ -140,9 +143,9 @@ export interface DocumentHandle {
   /**
    * This session's reserved object numbers: take one to name an object
    * before creating it (`page.annotations.create(data, { objectNumber })`,
-   * `pages.insertBlank(spec, position, { objectNumbers })`, `forms.create`,
-   * `forms.addWidget`). Its ref is then known at once and stays its name
-   * for life. Creates without a number still work; the engine picks one.
+   * `pages.insertBlank(spec, position, { objectNumbers })`, `pages.copy`,
+   * `pages.insert`, `forms.create`, `forms.addWidget`). Its ref is then known
+   * at once and stays its name for life. Creates without a number still work; the engine picks one.
    */
   readonly objectNumbers: ObjectNumberPool;
   /**

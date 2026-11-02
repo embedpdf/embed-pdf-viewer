@@ -12,6 +12,7 @@ import type { FormWidgetItem } from '@embedpdf/plugin-form';
 // The widget's PDF events go to the plugin's host lens.
 import { FormToken as FormHostToken } from '@embedpdf/plugin-form/contract/host';
 import {
+  bindFieldFocus,
   bindWidgetEvents,
   isolatePointerDown,
   rectInPixels,
@@ -33,7 +34,10 @@ export interface WidgetBox {
 
 /**
  * The box of one widget. `edge: false` leaves out the edge for controls that
- * draw their own (a list box) or never have one (a button).
+ * draw their own (a list box) or never have one (a button). The box is also
+ * where the form's cursor reaches the control: `focus()` and Tab go through
+ * the form, in the document's order (`bindFieldFocus`), unless the box has
+ * nothing to focus (`focusable`).
  *
  * The box keeps every press that starts in it from the page below: the Stage
  * listens natively on an ancestor, and a press reaching it would start the
@@ -53,7 +57,7 @@ export interface WidgetBox {
 export function useWidgetBox(
   item: () => FormWidgetItem,
   colors: () => FormColors,
-  options: { edge?: boolean } = {},
+  options: { edge?: boolean; focusable?: () => boolean } = {},
 ): WidgetBox {
   const page = usePage();
   const form = useCapability(FormHostToken);
@@ -74,6 +78,22 @@ export function useWidgetBox(
         release();
         unbind();
       });
+    },
+    { immediate: true, flush: 'post' },
+  );
+
+  watch(
+    [
+      element,
+      () => item().annotationRef,
+      () => !item().disabled && (options.focusable?.() ?? true),
+      () => {
+        const control = item();
+        return control.control === 'toggle' && control.kind === 'radio';
+      },
+    ],
+    ([box, widget, takesCursor, radio], _previous, onCleanup) => {
+      if (box && widget && takesCursor) onCleanup(bindFieldFocus(box, form, widget, { radio }));
     },
     { immediate: true, flush: 'post' },
   );

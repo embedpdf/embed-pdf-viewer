@@ -19,7 +19,8 @@ const { padding, spread } = useStageSettings();
       compact <strong>{{ compact ? 'on' : 'off' }}</strong>
     </output>
     <output class="badge">
-      padding <strong>{{ padding }}</strong> · spread <strong>{{ spread }}</strong>
+      padding <strong>{{ typeof padding === 'number' ? padding : 'by side' }}</strong> · spread
+      <strong>{{ spread }}</strong>
     </output>
     <div class="pager">
       <button type="button" class="button" @click="stage.previousPage()">

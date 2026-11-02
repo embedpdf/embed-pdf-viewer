@@ -112,7 +112,7 @@ export class FormImporter {
 
     const orderBefore = this.calculationOrder();
     const boxOf = visibleBoxReader(this.runtime, this.session);
-    const forms = new FormMutator(this.runtime, this.session);
+    const forms = new FormMutator(this.runtime, this.session, this.fonts);
     const docPtr = this.session.requireDocPtr();
     const importedBy = request.actor.userId ?? null;
     const created = plan.creates.map((planned) => {
@@ -217,7 +217,7 @@ export class FormImporter {
     actor: AnnotationActor,
     signal: AbortSignal,
   ): FormFieldDTO<PdfCoordinates> {
-    new FormMutator(this.runtime, this.session).setValue(
+    new FormMutator(this.runtime, this.session, this.fonts).setValue(
       write.target.ref,
       write.value,
       signal,

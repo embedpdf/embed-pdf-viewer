@@ -88,6 +88,9 @@ const RESOURCE_PLANES: Partial<Record<DocResourceId, readonly LayerScopePlane[]>
   'attachment-files': ['attachments'],
   // Read in page space: a page delete or a box change moves it too.
   outline: ['outline', 'layout'],
+  // A document's fonts are wherever its drawings are: its pages, its
+  // annotations' appearances, its form.
+  fonts: ['content', 'annotations', 'forms'],
 };
 
 export function cdnCoverageForScope(

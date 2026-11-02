@@ -35,6 +35,7 @@
   "dependencies": {
     "@embedpdf/core-annotation": "workspace:*",
     "@embedpdf/core-fonts": "workspace:*",
+    "@embedpdf/core-text": "workspace:*",
     "@embedpdf/engine-core": "workspace:*"
   },
   "devDependencies": {

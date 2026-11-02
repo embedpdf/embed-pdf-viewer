@@ -35,7 +35,7 @@ export function makeHandle(id: string, pages: PageLayout[] = [page(1, 0)]): Docu
       emit: (event: unknown) => listeners.forEach((listener) => listener(event)),
       lastServerId: () => null,
     },
-    pages: { list: () => Promise.resolve({ pageCount: pages.length, pages }) },
+    pages: { list: () => Promise.resolve({ pageCount: pages.length, labels: [], pages }) },
     security: { allows: () => true },
     close: () => Promise.resolve(),
     // Calls' facts change no result: the same document, also for a copy that adds members.

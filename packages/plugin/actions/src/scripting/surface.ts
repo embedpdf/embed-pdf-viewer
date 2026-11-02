@@ -101,6 +101,16 @@ export function createScriptSurface(
         );
         continue;
       }
+      // The cursor into a field is the form plugin's, not the app's UI.
+      if (effect.kind === 'focusField') {
+        if (!ports.formFocus?.(effect.field)) {
+          scriptDiagnosticReported.emit({
+            code: 'ui-effect-suppressed',
+            message: `script setFocus on "${effect.field}" withheld: no such field to fill in on screen`,
+          });
+        }
+        continue;
+      }
       if (!ports.uiAdapter) {
         reportDiagnostic(
           { code: 'no-adapter', message: `script ${effect.kind}: no UI adapter installed` },

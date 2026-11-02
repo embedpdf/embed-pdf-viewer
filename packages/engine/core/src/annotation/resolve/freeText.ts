@@ -7,7 +7,7 @@ import {
 } from '../../dto/RichText';
 import type { PdfCoordinates } from '../../pageSpace/coordinates';
 import { pdfCalloutEnd } from '../calloutEnd';
-import { faceForFreeTextFont, type DescribeFont } from '../fontFaces';
+import { faceForFontName, type DescribeFont } from '../fontFaces';
 import type { AnnotationDraft, Annotation, AnnotationPatch } from '../kinds';
 import type { FreeTextIntent } from '../primitives';
 
@@ -30,7 +30,7 @@ export function bodyWithStyle(
 ): Partial<RichTextBody> {
   const body = { ...base };
   if (style.fontFamily !== undefined) {
-    const face = faceForFreeTextFont(style.fontFamily, describe);
+    const face = faceForFontName(style.fontFamily, describe);
     body.family = face.family;
     if (face.weight !== undefined) body.weight = face.weight;
     if (face.italic !== undefined) body.italic = face.italic;

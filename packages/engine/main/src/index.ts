@@ -12,8 +12,10 @@
  */
 import {
   deserializeError,
+  FALLBACK_TIERS,
   wirePack,
   type EngineRenderPolicy,
+  type FallbackTier,
   type FontSpec,
   type WirePack,
   type WorkerRequest,
@@ -343,6 +345,14 @@ export interface LocalEngineRecipeOptions extends WasmSourceOptions {
    * automatic substitution.
    */
   fonts?: RecipeFontSpec[];
+  /**
+   * The fonts the engine fills in Hebrew and Arabic with
+   * (`@embedpdf/default-fallback-fonts`: Noto Sans Hebrew and Noto Naskh
+   * Arabic, regular and bold), tried after your `fallbackFonts`. They load at
+   * boot, alongside the worker, as lazy chunks of your build (about 320 KB).
+   * `false` leaves them out. Default: `true`.
+   */
+  defaultFallbackFonts?: boolean;
   /** WorkerQueue concurrency (default 1). */
   concurrency?: number;
   /** Custom raster encoder (thumbnails / image export). */
@@ -463,11 +473,12 @@ function runsInThisThread(options: LocalEngineRecipeOptions): boolean {
 interface ResolvedRecipeFont {
   spec: FontSpec;
   fallback: boolean;
+  tier: FallbackTier;
 }
 
 /** Resolve every configured font's bytes (fetching `url` entries) in declared
- *  order: plain fonts first, then fallback fonts — fallback precedence is
- *  registration order (first font covering a missing glyph wins). */
+ *  order: plain fonts first, then fallback fonts, then the default fallback
+ *  fonts, which are tried after the app's whatever their style. */
 async function resolveRecipeFonts(
   options: LocalEngineRecipeOptions,
 ): Promise<ResolvedRecipeFont[]> {
@@ -475,8 +486,37 @@ async function resolveRecipeFonts(
     ...(options.fonts ?? []).map((raw) => ({ raw, fallback: false })),
     ...(options.fallbackFonts ?? []).map((raw) => ({ raw, fallback: true })),
   ];
+  const [own, defaults] = await Promise.all([
+    Promise.all(
+      entries.map(async ({ raw, fallback }) => ({
+        spec: await toFontSpec(raw),
+        fallback,
+        tier: FALLBACK_TIERS.own,
+      })),
+    ),
+    options.defaultFallbackFonts === false ? [] : loadDefaultFallbackFonts(),
+  ]);
+  // A key of the app's own keeps its font.
+  const taken = new Set(own.map((font) => font.spec.key));
+  return [...own, ...defaults.filter((font) => !taken.has(font.spec.key))];
+}
+
+/** The default fallback fonts, from `@embedpdf/default-fallback-fonts`: lazy chunks of the app's build. */
+async function loadDefaultFallbackFonts(): Promise<ResolvedRecipeFont[]> {
+  const { DEFAULT_FALLBACK_FONTS, loadFallbackFont } =
+    await import('@embedpdf/default-fallback-fonts/library');
   return Promise.all(
-    entries.map(async ({ raw, fallback }) => ({ spec: await toFontSpec(raw), fallback })),
+    DEFAULT_FALLBACK_FONTS.map(async (font) => ({
+      spec: {
+        key: font.key,
+        familyName: font.familyName,
+        weight: font.weight,
+        italic: font.italic,
+        data: await loadFallbackFont(font.key),
+      },
+      fallback: true,
+      tier: FALLBACK_TIERS.builtIn,
+    })),
   );
 }
 
@@ -496,10 +536,10 @@ async function registerBootFonts(
   fontService: LocalFontService,
   fonts: ResolvedRecipeFont[],
 ): Promise<void> {
-  for (const { spec, fallback } of fonts) {
+  for (const { spec, fallback, tier } of fonts) {
     // Seed before the raw send: seeding copies the bytes, and the wire buffer
     // is transferred (neutered) by the worker transport.
-    fontService.seedRegistered(spec, { fallback });
+    fontService.seedRegistered(spec, { fallback, tier });
     const bytes = toStandaloneArrayBuffer(spec.data);
     const registered = await requestOverTransport(transport, (jobId) =>
       wirePack(
@@ -521,7 +561,13 @@ async function registerBootFonts(
     }
     if (fallback) {
       await requestOverTransport(transport, (jobId) =>
-        wirePack({ kind: 'fonts.addFallback', effect: 'runtimeWrite', jobId, fontKey: spec.key }),
+        wirePack({
+          kind: 'fonts.addFallback',
+          effect: 'runtimeWrite',
+          jobId,
+          fontKey: spec.key,
+          tier,
+        }),
       );
     }
   }

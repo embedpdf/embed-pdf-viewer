@@ -355,6 +355,77 @@ describe('an annotation an undo brings back', () => {
   });
 });
 
+describe('a hovered redaction’s label', () => {
+  const mark = {
+    ref: { kind: 'objectNumber', page: PAGE, objectNumber: 30 },
+    page: PAGE,
+    hasAppearance: true,
+    appearanceState: null,
+    nm: null,
+    invisible: false,
+    hidden: false,
+    print: true,
+    noZoom: false,
+    noRotate: false,
+    noView: false,
+    readOnly: false,
+    locked: false,
+    toggleNoView: false,
+    lockedContents: false,
+    contents: null,
+    subject: null,
+    author: null,
+    createdAt: null,
+    modifiedAt: null,
+    blendMode: 'normal',
+    subtype: 'redact',
+    rect: { left: 40, bottom: 270, right: 160, top: 300 },
+    quadPoints: [],
+    color: '#ff0000',
+    strokeWidth: 1,
+    opacity: 1,
+    interiorColor: '#000000',
+    overlayText: 'SECRET',
+    repeat: false,
+    fontFamily: 'Roboto',
+    fontSize: 12,
+    fontColor: '#ffffff',
+    textAlign: 'left',
+  } as unknown as FileAnnotation;
+
+  it('draws in the fonts plugin’s fonts for its font, once they are found', async () => {
+    const found = { face: {}, fallbacks: [], lastResort: {} };
+    let answer: typeof found | null = null;
+    let epoch = 0;
+    const asked: [string, string][] = [];
+    const harness = annotationHarness({
+      fonts: {
+        getPaintFonts: (font: string, text: string) => {
+          asked.push([font, text]);
+          return answer;
+        },
+        getPaintFontsEpoch: () => epoch,
+      },
+    });
+    await harness.load([mark]);
+    const labelOf = () =>
+      harness.capability.listPageItems(PAGE).find((item) => item.subtype === 'redact')?.label;
+
+    // At rest the mark draws no label: nothing asks for its fonts.
+    expect(labelOf()).toEqual({ text: 'SECRET', repeat: false });
+    expect(asked).toEqual([]);
+
+    // Hovered while the plugin finds them: the label's standard font draws it.
+    harness.capability.hoverAt({ page: PAGE, point: { x: 100, y: 515 } });
+    expect(labelOf()?.fonts).toBeUndefined();
+    expect(asked).toEqual([['Roboto', 'SECRET']]);
+
+    answer = found;
+    epoch++;
+    expect(labelOf()?.fonts).toBe(found);
+  });
+});
+
 describe('a text box saved in the file', () => {
   const ref = { kind: 'objectNumber', page: PAGE, objectNumber: 80 } as const;
   const body = {

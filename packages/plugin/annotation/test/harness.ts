@@ -21,6 +21,7 @@ import type {
   PdfRect,
 } from '@embedpdf/engine-core/runtime';
 import { pageAnnotationOf, toPageRef } from '@embedpdf/engine-core/runtime';
+import { FontsToken } from '@embedpdf/plugin-fonts/contract';
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
 import { renderPlugin } from '@embedpdf/plugin-render';
 import { RenderToken as RenderHostToken } from '@embedpdf/plugin-render/contract/host';
@@ -68,6 +69,8 @@ export interface AnnotationHarnessOptions {
   readonly selection?: object;
   /** The settings the app registers (`annotationPlugin(config)`). */
   readonly config?: AnnotationConfig;
+  /** A fonts plugin to draw text boxes with (`FontsToken`). */
+  readonly fonts?: object;
 }
 
 const DEFAULT_CROP: PdfRect = { left: 0, bottom: 0, right: 600, top: 800 };
@@ -319,6 +322,7 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
       [InteractionToken, interaction],
       [RenderHostToken, render.api],
       ...(options.selection ? [[SelectionToken, options.selection] as const] : []),
+      ...(options.fonts ? [[FontsToken, options.fonts] as const] : []),
     ],
     pages,
     doc,

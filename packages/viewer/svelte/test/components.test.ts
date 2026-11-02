@@ -1,8 +1,8 @@
 /**
  * Your own components in <PDFViewer> (`pages/components.ts`): `ToolbarItem` in the bar with
  * `useToolbarItem()` saying where, and following the bar to a rail; a variant drawn by Svelte and
- * measured as drawn; `Button` and `Menu` / `MenuItem`; `Panel`; the `header` and `footer`
- * regions.
+ * measured as drawn; `Button` and `Menu` / `MenuItem`, `active` on both, and `Icon`; `Panel`;
+ * the `header` and `footer` regions.
  */
 import type { Browser, Page } from 'playwright-core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -138,7 +138,7 @@ describe('your own components in <PDFViewer>', () => {
         ...document.querySelector('epdf-menu')!.shadowRoot!.querySelectorAll('[role^="menuitem"]'),
       ].map((row) => row.textContent!.trim()),
     );
-    expect(rows).toEqual(['Copy link', 'Email a link']);
+    expect(rows).toEqual(['Copy link', 'Email a link', 'Show notes']);
     await page.evaluate(() =>
       document
         .querySelector('epdf-menu')!
@@ -148,6 +148,84 @@ describe('your own components in <PDFViewer>', () => {
     expect(
       await page.evaluate(() => [...(window.__viewerCheck as ComponentsRecord).picked]),
     ).toEqual(['email']);
+  });
+
+  it('shows a Button pressed while it’s active, a MenuItem checked, and draws an Icon', async () => {
+    const night = () =>
+      page.evaluate(
+        () =>
+          document
+            .querySelector('epdf-button[label="Night"]')
+            ?.shadowRoot?.querySelector('button')
+            ?.getAttribute('aria-pressed') ?? 'none',
+      );
+    expect(
+      await until(
+        page,
+        () =>
+          document
+            .querySelector('epdf-button[label="Night"]')
+            ?.shadowRoot?.querySelector('button') != null,
+        { timeout: 10_000 },
+      ),
+    ).toBe(true);
+    expect(await night()).toBe('none');
+    await page.click('epdf-button[label="Night"]');
+    expect(
+      await until(
+        page,
+        () =>
+          document
+            .querySelector('epdf-button[label="Night"]')!
+            .shadowRoot!.querySelector('button')
+            ?.getAttribute('aria-pressed') === 'true',
+        { timeout: 10_000 },
+      ),
+    ).toBe(true);
+    await page.click('epdf-button[label="Night"]');
+    expect(
+      await until(
+        page,
+        () =>
+          !document
+            .querySelector('epdf-button[label="Night"]')!
+            .shadowRoot!.querySelector('button')
+            ?.hasAttribute('aria-pressed'),
+        { timeout: 10_000 },
+      ),
+    ).toBe(true);
+
+    expect(
+      await until(
+        page,
+        () => document.querySelector('epdf-icon')?.shadowRoot?.querySelector('svg'),
+        {
+          timeout: 10_000,
+        },
+      ),
+    ).toBe(true);
+    const icon = await page.evaluate(() => {
+      const svg = document.querySelector('epdf-icon')!.shadowRoot!.querySelector('svg')!;
+      return { size: svg.getBoundingClientRect().width, name: svg.getAttribute('aria-label') };
+    });
+    expect(icon).toEqual({ size: 16, name: 'Saved' });
+
+    await page.click('epdf-menu');
+    expect(
+      await until(
+        page,
+        () => document.querySelector('epdf-menu')?.shadowRoot?.querySelector('[role="menu"]'),
+        { timeout: 10_000 },
+      ),
+    ).toBe(true);
+    const notes = await page.evaluate(() => {
+      const row = document
+        .querySelector('epdf-menu')!
+        .shadowRoot!.querySelectorAll('[role^="menuitem"]')[2]!;
+      return { role: row.getAttribute('role'), checked: row.getAttribute('aria-checked') };
+    });
+    expect(notes).toEqual({ role: 'menuitemcheckbox', checked: 'true' });
+    await page.keyboard.press('Escape');
   });
 
   it('shows a Panel once its panel opens', async () => {

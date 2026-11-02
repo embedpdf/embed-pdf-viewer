@@ -203,6 +203,8 @@ export type ScriptUiEffect =
   | { kind: 'alert'; message: string; icon: number; title?: string }
   | { kind: 'print' }
   | { kind: 'gotoPage'; page: number }
+  /** `field.setFocus()`: the cursor into that field, by its full name. */
+  | { kind: 'focusField'; field: string }
   /** `doc.submitForm(...)` — a submit intent, resolved and sink-routed
    *  outside the VM (never a network call from here). `fieldNames` are
    *  include-mode (Acrobat's aFields); `null` = the whole eligible form. */

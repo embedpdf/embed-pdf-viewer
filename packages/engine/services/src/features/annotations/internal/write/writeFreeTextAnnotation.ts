@@ -51,8 +51,14 @@ function writeRichText(
   annotPtr: Ptr,
   input: RichTextDocumentInput,
   ctx: AnnotationWriteContext | undefined,
+  fontFamily?: string,
 ): void {
-  const json = engineRichTextJson(input, ctx?.describeRegisteredFont);
+  const json = engineRichTextJson(input, {
+    describe: ctx?.describeFont,
+    programOf: ctx?.documentProgramOf,
+    // The box's font, exactly: the program its `fontFamily` names.
+    bodyProgram: fontFamily === undefined ? undefined : ctx?.documentProgramOf?.(fontFamily),
+  });
   if (!fn.EPDFAnnot_SetRichTextJSON(annotPtr, json)) {
     throw new EngineError(
       EngineErrorCode.InvalidArg,
@@ -134,7 +140,7 @@ export function applyFreeTextDraft(
   // Rich text last, always: a box is born with all four forms (/RC, /DS,
   // /DA, /Contents) and its appearance, Acrobat's shape. Must come after the
   // geometry, which the layout needs.
-  writeRichText(fn, annotPtr, richText, ctx);
+  writeRichText(fn, annotPtr, richText, ctx, draft.fontFamily ?? DEFAULTS.fontFamily);
 }
 
 /**
@@ -197,7 +203,7 @@ export function applyFreeTextPatch(
   }
   if (patch.richText !== undefined) {
     // Everything regenerated: /RC, /DS, /DA, /Contents and the appearance.
-    writeRichText(fn, annotPtr, patch.richText, ctx);
+    writeRichText(fn, annotPtr, patch.richText, ctx, patch.fontFamily);
   }
 
   if (patch.textAlign !== undefined) {

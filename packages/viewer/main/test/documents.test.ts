@@ -1,7 +1,8 @@
 /**
  * Documents, as the page says: `documents` entries with `src`, `name`, `password` and `active`
  * each open in a tab; a document that can't be opened says why in its tab, with **Try again**;
- * closing a tab or leaving the page with unsaved changes asks first; a `src` that is an
+ * closing a tab or leaving the page with unsaved changes asks first, leaving it not with
+ * `warnBeforeLeaving: false`; a `src` that is an
  * engine's open input (what the cloud viewer makes of `{ token }`) opens as it is and follows
  * its prop; and a document at a URL downloads with the config's `fetch`, which follows its prop.
  *
@@ -84,6 +85,13 @@ const PAGES = {
       { src: '/sample.pdf', name: 'Contract' },
       { src: '/sample.pdf', name: 'Appendix' },
     ],
+  }`),
+  '/no-warning.html': page(`{
+    documents: [
+      { src: '/sample.pdf', name: 'Contract' },
+      { src: '/sample.pdf', name: 'Appendix' },
+    ],
+    warnBeforeLeaving: false,
   }`),
   '/token.html': page(`{ engine: tokenEngine, src: { kind: 'token', token: 'a' } }`),
   // The page's own fetch, with the token the page has when it's called.
@@ -353,6 +361,41 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('documents', () => {
     stay = false;
     await tab.goto('about:blank');
     expect(asked).toEqual(['beforeunload']);
+    await tab.close();
+  });
+
+  it('leaves the page without asking with warnBeforeLeaving: false, and still asks before a tab closes', async () => {
+    const tab = await open('/no-warning.html');
+    await waitForSettled(tab, 2);
+    await frames(tab);
+    const closeButton = '[role="tab"] button';
+    // Every document has changes, so whichever tab's button is pressed asks.
+    await tab.evaluate(async () => {
+      const { viewer } = window.element;
+      for (const { id } of viewer.documents.list() as Array<{ id: string }>) {
+        await viewer.forDocument(id).get('pageEdit').rotateBy([0], 90);
+      }
+    });
+    await tab.waitForFunction(() =>
+      (window.element.viewer.documents.list() as Array<{ hasUnsavedChanges: boolean }>).every(
+        (document) => document.hasUnsavedChanges,
+      ),
+    );
+
+    // Closing its tab still asks.
+    await click(tab, closeButton);
+    expect(await dialogTitle(tab)).toBe('Close without saving?');
+    await click(tab, '[role="dialog"] button', 'Cancel');
+    expect(await dialogTitle(tab)).toBeNull();
+
+    const asked: string[] = [];
+    tab.on('dialog', (dialog) => {
+      asked.push(dialog.type());
+      void dialog.dismiss();
+    });
+    await tab.goto('about:blank');
+    expect(asked).toEqual([]);
+    expect(tab.url()).toBe('about:blank');
     await tab.close();
   });
 

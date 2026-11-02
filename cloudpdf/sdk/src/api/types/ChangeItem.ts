@@ -37,6 +37,7 @@ export type ChangeItem =
     | CloudPDF.ChangeItem.PagesDelete
     | CloudPDF.ChangeItem.PagesInsertBlank
     | CloudPDF.ChangeItem.PagesInsert
+    | CloudPDF.ChangeItem.PagesCopy
     | CloudPDF.ChangeItem.PagesRestore
     | CloudPDF.ChangeItem.AttachmentsCreate
     | CloudPDF.ChangeItem.AttachmentsDelete
@@ -80,6 +81,7 @@ export namespace ChangeItem {
             PagesDelete: "pages.delete",
             PagesInsertBlank: "pages.insertBlank",
             PagesInsert: "pages.insert",
+            PagesCopy: "pages.copy",
             AttachmentsCreate: "attachments.create",
             AttachmentsDelete: "attachments.delete",
             AnnotationsRestore: "annotations.restore",
@@ -339,6 +341,7 @@ export namespace ChangeItem {
         export interface Layout {
             pageCount: number;
             pages: Layout.Pages.Item[];
+            labels: Layout.Labels.Item[];
             namedPages: Layout.NamedPages.Item[];
         }
 
@@ -425,6 +428,28 @@ export namespace ChangeItem {
                         right: number;
                         top: number;
                     }
+                }
+            }
+
+            export type Labels = Labels.Item[];
+
+            export namespace Labels {
+                export interface Item {
+                    firstPage: number;
+                    style: Item.Style | null;
+                    firstNumber: number;
+                    prefix: string;
+                }
+
+                export namespace Item {
+                    export const Style = {
+                        Decimal: "decimal",
+                        UpperRoman: "upperRoman",
+                        LowerRoman: "lowerRoman",
+                        UpperLetters: "upperLetters",
+                        LowerLetters: "lowerLetters",
+                    } as const;
+                    export type Style = (typeof Style)[keyof typeof Style];
                 }
             }
 
@@ -450,6 +475,7 @@ export namespace ChangeItem {
         export interface Layout {
             pageCount: number;
             pages: Layout.Pages.Item[];
+            labels: Layout.Labels.Item[];
             namedPages: Layout.NamedPages.Item[];
         }
 
@@ -536,6 +562,28 @@ export namespace ChangeItem {
                         right: number;
                         top: number;
                     }
+                }
+            }
+
+            export type Labels = Labels.Item[];
+
+            export namespace Labels {
+                export interface Item {
+                    firstPage: number;
+                    style: Item.Style | null;
+                    firstNumber: number;
+                    prefix: string;
+                }
+
+                export namespace Item {
+                    export const Style = {
+                        Decimal: "decimal",
+                        UpperRoman: "upperRoman",
+                        LowerRoman: "lowerRoman",
+                        UpperLetters: "upperLetters",
+                        LowerLetters: "lowerLetters",
+                    } as const;
+                    export type Style = (typeof Style)[keyof typeof Style];
                 }
             }
 
@@ -561,6 +609,7 @@ export namespace ChangeItem {
         export interface Layout {
             pageCount: number;
             pages: Layout.Pages.Item[];
+            labels: Layout.Labels.Item[];
             namedPages: Layout.NamedPages.Item[];
         }
 
@@ -647,6 +696,28 @@ export namespace ChangeItem {
                         right: number;
                         top: number;
                     }
+                }
+            }
+
+            export type Labels = Labels.Item[];
+
+            export namespace Labels {
+                export interface Item {
+                    firstPage: number;
+                    style: Item.Style | null;
+                    firstNumber: number;
+                    prefix: string;
+                }
+
+                export namespace Item {
+                    export const Style = {
+                        Decimal: "decimal",
+                        UpperRoman: "upperRoman",
+                        LowerRoman: "lowerRoman",
+                        UpperLetters: "upperLetters",
+                        LowerLetters: "lowerLetters",
+                    } as const;
+                    export type Style = (typeof Style)[keyof typeof Style];
                 }
             }
 
@@ -672,6 +743,7 @@ export namespace ChangeItem {
         export interface Layout {
             pageCount: number;
             pages: Layout.Pages.Item[];
+            labels: Layout.Labels.Item[];
             namedPages: Layout.NamedPages.Item[];
         }
 
@@ -758,6 +830,28 @@ export namespace ChangeItem {
                         right: number;
                         top: number;
                     }
+                }
+            }
+
+            export type Labels = Labels.Item[];
+
+            export namespace Labels {
+                export interface Item {
+                    firstPage: number;
+                    style: Item.Style | null;
+                    firstNumber: number;
+                    prefix: string;
+                }
+
+                export namespace Item {
+                    export const Style = {
+                        Decimal: "decimal",
+                        UpperRoman: "upperRoman",
+                        LowerRoman: "lowerRoman",
+                        UpperLetters: "upperLetters",
+                        LowerLetters: "lowerLetters",
+                    } as const;
+                    export type Style = (typeof Style)[keyof typeof Style];
                 }
             }
 
@@ -783,6 +877,7 @@ export namespace ChangeItem {
         export interface Layout {
             pageCount: number;
             pages: Layout.Pages.Item[];
+            labels: Layout.Labels.Item[];
             namedPages: Layout.NamedPages.Item[];
         }
 
@@ -872,12 +967,168 @@ export namespace ChangeItem {
                 }
             }
 
+            export type Labels = Labels.Item[];
+
+            export namespace Labels {
+                export interface Item {
+                    firstPage: number;
+                    style: Item.Style | null;
+                    firstNumber: number;
+                    prefix: string;
+                }
+
+                export namespace Item {
+                    export const Style = {
+                        Decimal: "decimal",
+                        UpperRoman: "upperRoman",
+                        LowerRoman: "lowerRoman",
+                        UpperLetters: "upperLetters",
+                        LowerLetters: "lowerLetters",
+                    } as const;
+                    export type Style = (typeof Style)[keyof typeof Style];
+                }
+            }
+
             export type NamedPages = NamedPages.Item[];
 
             export namespace NamedPages {
                 export interface Item {
                     name: string;
                     target: CloudPDF.ChangeItemPagesInsertLayoutNamedPagesItemTarget;
+                }
+            }
+        }
+    }
+
+    export interface PagesCopy {
+        type: "pages.copy";
+        insertedPages: CloudPDF.PageRef[];
+        layout: ChangeItemPagesCopy.Layout;
+        meta: CloudPDF.MutationMeta;
+    }
+
+    export namespace ChangeItemPagesCopy {
+        export interface Layout {
+            pageCount: number;
+            pages: Layout.Pages.Item[];
+            labels: Layout.Labels.Item[];
+            namedPages: Layout.NamedPages.Item[];
+        }
+
+        export namespace Layout {
+            export type Pages = Pages.Item[];
+
+            export namespace Pages {
+                export interface Item {
+                    index: number;
+                    ref: CloudPDF.PageRef;
+                    label: string | null;
+                    size: Item.Size;
+                    rotation: number;
+                    userUnit: number;
+                    tabOrder: Item.TabOrder | null;
+                    boxes: Item.Boxes;
+                    pdfCropBox: Item.PdfCropBox;
+                    actions?: CloudPDF.PdfPageActions | undefined;
+                }
+
+                export namespace Item {
+                    export interface Size {
+                        width: number;
+                        height: number;
+                    }
+
+                    export const TabOrder = {
+                        Rows: "rows",
+                        Columns: "columns",
+                        Structure: "structure",
+                        Annotations: "annotations",
+                        Widgets: "widgets",
+                    } as const;
+                    export type TabOrder = (typeof TabOrder)[keyof typeof TabOrder];
+
+                    export interface Boxes {
+                        media: Boxes.Media;
+                        crop: Boxes.Crop;
+                        bleed: Boxes.Bleed;
+                        trim: Boxes.Trim;
+                        art: Boxes.Art;
+                    }
+
+                    export namespace Boxes {
+                        export interface Media {
+                            x: number;
+                            y: number;
+                            width: number;
+                            height: number;
+                        }
+
+                        export interface Crop {
+                            x: number;
+                            y: number;
+                            width: number;
+                            height: number;
+                        }
+
+                        export interface Bleed {
+                            x: number;
+                            y: number;
+                            width: number;
+                            height: number;
+                        }
+
+                        export interface Trim {
+                            x: number;
+                            y: number;
+                            width: number;
+                            height: number;
+                        }
+
+                        export interface Art {
+                            x: number;
+                            y: number;
+                            width: number;
+                            height: number;
+                        }
+                    }
+
+                    export interface PdfCropBox {
+                        left: number;
+                        bottom: number;
+                        right: number;
+                        top: number;
+                    }
+                }
+            }
+
+            export type Labels = Labels.Item[];
+
+            export namespace Labels {
+                export interface Item {
+                    firstPage: number;
+                    style: Item.Style | null;
+                    firstNumber: number;
+                    prefix: string;
+                }
+
+                export namespace Item {
+                    export const Style = {
+                        Decimal: "decimal",
+                        UpperRoman: "upperRoman",
+                        LowerRoman: "lowerRoman",
+                        UpperLetters: "upperLetters",
+                        LowerLetters: "lowerLetters",
+                    } as const;
+                    export type Style = (typeof Style)[keyof typeof Style];
+                }
+            }
+
+            export type NamedPages = NamedPages.Item[];
+
+            export namespace NamedPages {
+                export interface Item {
+                    name: string;
+                    target: CloudPDF.ChangeItemPagesCopyLayoutNamedPagesItemTarget;
                 }
             }
         }
@@ -894,6 +1145,7 @@ export namespace ChangeItem {
         export interface Layout {
             pageCount: number;
             pages: Layout.Pages.Item[];
+            labels: Layout.Labels.Item[];
             namedPages: Layout.NamedPages.Item[];
         }
 
@@ -980,6 +1232,28 @@ export namespace ChangeItem {
                         right: number;
                         top: number;
                     }
+                }
+            }
+
+            export type Labels = Labels.Item[];
+
+            export namespace Labels {
+                export interface Item {
+                    firstPage: number;
+                    style: Item.Style | null;
+                    firstNumber: number;
+                    prefix: string;
+                }
+
+                export namespace Item {
+                    export const Style = {
+                        Decimal: "decimal",
+                        UpperRoman: "upperRoman",
+                        LowerRoman: "lowerRoman",
+                        UpperLetters: "upperLetters",
+                        LowerLetters: "lowerLetters",
+                    } as const;
+                    export type Style = (typeof Style)[keyof typeof Style];
                 }
             }
 

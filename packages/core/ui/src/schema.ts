@@ -30,7 +30,15 @@ export interface BarItem {
   readonly variants?: readonly Variant[];
   /** Default: its group's. */
   readonly importance?: Importance;
+  /**
+   * How its button stands out among the bar's: `'primary'`, for the one thing the bar is for. A
+   * renderer reads it from the bar; the fit and the "More" menu treat it like any item.
+   */
+  readonly emphasis?: Emphasis;
 }
+
+/** How a command's button stands out: `'primary'` is the viewer's filled one. */
+export type Emphasis = 'primary';
 
 /**
  * An app-rendered slot (e.g. the inline zoom strip). Each named variant is
@@ -47,6 +55,11 @@ export interface CustomItem {
   readonly terminal?: string;
   /** Default: its group's. Without a `terminal`, always {@link PINNED}. */
   readonly importance?: Importance;
+  /**
+   * Takes the room the toolbar has left: the fit counts it at its own length, like any item, and
+   * the toolbar then grows it, and its section, into the rest. Default false.
+   */
+  readonly grow?: boolean;
 }
 
 export type BarChild = BarItem | CustomItem | string; // string = { command }
@@ -158,6 +171,8 @@ export type NormalizedUnit =
        */
       readonly terminal: string | null;
       readonly importance: Importance;
+      /** Takes the room the toolbar has left: see {@link CustomItem.grow}. */
+      readonly grow: boolean;
     };
 
 export interface NormalizedGroup {
@@ -207,6 +222,7 @@ function normalizeChild(group: BarGroup, child: BarChild, seen: Set<string>): No
           variants: asItem.variants ?? DEFAULT_CUSTOM_VARIANTS,
           terminal: asItem.terminal ?? null,
           importance: asItem.terminal === undefined ? PINNED : importance,
+          grow: asItem.grow === true,
         }
       : {
           kind: 'command',

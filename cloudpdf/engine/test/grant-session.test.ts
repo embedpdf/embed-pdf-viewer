@@ -117,10 +117,11 @@ async function seedDocument(docId: string): Promise<void> {
 }
 
 async function createGrant(body: Record<string, unknown>): Promise<string> {
+  // A grant gives only what its maker holds: this one reads documents.
   const token = signDevToken(SECRET, {
     sub: 'dash-1',
     tenant_id: TENANT,
-    scope: ['grants.manage'],
+    scope: ['grants.manage', 'doc.open', 'doc.render'],
   });
   const res = await fetch(`${fx.baseUrl}/v1/tenants/${TENANT}/grants`, {
     method: 'POST',

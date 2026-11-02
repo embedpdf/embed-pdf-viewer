@@ -3,6 +3,7 @@ import {
   type AnnotationOwner,
   checkCapability,
   checkCollab,
+  checkPluginPermission,
   checkFieldAction,
   checkSetGroup,
   collabTargetOf,
@@ -25,6 +26,8 @@ import {
   type PagePictureRights,
   type PasswordPrompt,
   passwordPromptFromState,
+  pluginOfPermission,
+  type PluginPermission,
   protectedCapabilities,
   securityStateFromHead,
 } from '@embedpdf/engine-core/runtime';
@@ -128,10 +131,23 @@ export class CloudDocumentSecurityService implements DocumentSecurityService {
    * document's signatures forbid first, then the scope (the server's copy
    * once `/access` answered, else the JWT's), wildcard included, against the
    * PDF bits. `scope` alone can't gate UI: it enumerates concrete grants and
-   * drops the `*` admin wildcard.
+   * drops the `*` admin wildcard. A plugin's permission is the server's
+   * answer once `/access` gave it (`effectiveScope` lists the installed
+   * plugins' permissions the session holds, `*` expanded); before, the token's
+   * scope names it, or `*`.
    */
-  allows(cap: DocCapability): boolean {
-    return checkCapability(cap, this.rawScope(), this.pdfBits(), this.protection);
+  allows(permission: DocCapability | PluginPermission): boolean {
+    if (pluginOfPermission(permission) !== null) {
+      return this.access
+        ? this.access.effectiveScope.includes(permission)
+        : checkPluginPermission(permission, this.tokenScope, new Set([permission]));
+    }
+    return checkCapability(
+      permission as DocCapability,
+      this.rawScope(),
+      this.pdfBits(),
+      this.protection,
+    );
   }
 
   /**

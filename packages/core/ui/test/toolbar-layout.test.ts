@@ -104,6 +104,60 @@ describe('layoutToolbar', () => {
     expect(result.overflow).toEqual([]);
   });
 
+  it('balances the center while nothing grows, its sections at their items’ length', () => {
+    const result = layout(
+      {
+        id: 'main',
+        sections: { start: [group('zoom', ['zoom:in'])], end: [group('p', ['page:next'])] },
+      },
+      1000,
+    );
+    expect(result.sections.map(({ grows, spacing }) => ({ grows, spacing }))).toEqual([
+      { grows: false, spacing: 'none' },
+      { grows: false, spacing: 'balance' },
+      { grows: false, spacing: 'none' },
+    ]);
+  });
+
+  it('grows the item with grow and its section, and keeps a gap before each drawn section after it', () => {
+    const result = layout(
+      {
+        id: 'main',
+        sections: {
+          start: [group('title', [custom('title', undefined, { grow: true })])],
+          end: [group('zoom', ['zoom:out', 'zoom:in'])],
+        },
+      },
+      1000,
+    );
+    const [title] = result.sections[0]!.groups[0]!.parts;
+    expect(title).toMatchObject({ kind: 'custom', name: 'title', grow: true });
+    expect(result.sections.map(({ grows, spacing }) => ({ grows, spacing }))).toEqual([
+      { grows: true, spacing: 'none' },
+      { grows: false, spacing: 'none' },
+      { grows: false, spacing: 'gap' },
+    ]);
+    // Its own length is what the fit counts: the item's, like any other.
+    expect(result.measured.some((part) => part.kind === 'custom' && part.grow)).toBe(true);
+  });
+
+  it('keeps the gap before the "More" button when only it is left in the end section', () => {
+    const result = layout(
+      {
+        id: 'main',
+        sections: {
+          center: [
+            group('title', [custom('title', undefined, { grow: true })]),
+            group('tools', [item('tool:pen', { importance: 1 }), 'tool:ink']),
+          ],
+        },
+      },
+      150,
+    );
+    expect(result.hasOverflow).toBe(true);
+    expect(result.sections.map((section) => section.spacing)).toEqual(['none', 'none', 'gap']);
+  });
+
   it('runs a part’s command through execute', () => {
     const execute = vi.fn();
     const result = layout(

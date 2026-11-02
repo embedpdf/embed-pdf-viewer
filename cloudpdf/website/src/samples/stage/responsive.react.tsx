@@ -50,7 +50,8 @@ function Toolbar({ narrow, onNarrow }: { narrow: boolean; onNarrow: (narrow: boo
         compact <strong>{compact ? 'on' : 'off'}</strong>
       </output>
       <output className="badge">
-        padding <strong>{padding}</strong> · spread <strong>{spread}</strong>
+        padding <strong>{typeof padding === 'number' ? padding : 'by side'}</strong> · spread{' '}
+        <strong>{spread}</strong>
       </output>
       <div className="pager">
         <button type="button" className="button" onClick={() => stage.previousPage()}>

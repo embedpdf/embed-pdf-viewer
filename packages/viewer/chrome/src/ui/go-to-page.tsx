@@ -34,7 +34,7 @@ function GoToPageForm({ onClose }: { onClose: () => void }) {
     }
     onClose();
   };
-  const [before, after = ''] = t('demo.page', {
+  const [before, after = ''] = t('pageNumber.page', {
     params: { current: NUMBER_SLOT, total },
   }).split(NUMBER_SLOT);
 
@@ -58,7 +58,7 @@ function GoToPageForm({ onClose }: { onClose: () => void }) {
           <input
             type="text"
             inputMode="numeric"
-            aria-label={t('demo.goToPage')}
+            aria-label={t('pageNumber.goToPage')}
             value={draft}
             onChange={(event) => setDraft(event.target.value.replace(/[^0-9]/g, ''))}
             onFocus={(event) => event.currentTarget.select()}

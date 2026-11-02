@@ -18,6 +18,7 @@ import { REVIEW_STATE_LABEL_KEYS, hasComment, reviewStateOf } from '../config/co
 import { Icon } from './icons';
 import { commentIconAccent, commentTypeConfig } from './comment-config';
 import { CommandButton, buttonClass, buttonPart } from './toolbar';
+import { TooltipButton, WithTooltip } from './tooltip';
 
 /**
  * The comments sidebar (right panel): a live view over the conversation
@@ -133,28 +134,23 @@ export function CommentsPanel() {
     return [...groups.entries()].sort((left, right) => left[0] - right[0]);
   }, [threads]);
 
-  if (status === 'loading') return <Empty icon="comment" text={t('demo.commentsLoading')} />;
-  if (status === 'forbidden') return <Empty icon="lock" text={t('demo.commentsForbidden')} />;
+  if (status === 'loading') return <Empty icon="comment" text={t('comments.loading')} />;
+  if (status === 'forbidden') return <Empty icon="lock" text={t('comments.forbidden')} />;
   if (status === 'error') {
     return (
-      <Empty icon="alertTriangle" text={t('demo.commentsError')}>
+      <Empty icon="alertTriangle" text={t('comments.error')}>
         <button
           type="button"
           onClick={() => void anno.refresh()}
           className="bg-accent text-on-accent rounded-md px-3 py-1.5 text-sm font-medium"
         >
-          {t('demo.commentsRetry')}
+          {t('comments.retry')}
         </button>
       </Empty>
     );
   }
   if (threads.length === 0) {
-    return (
-      <Empty
-        icon="comment"
-        text={t(writing ? 'demo.commentsEmpty' : 'demo.commentsEmptyReadOnly')}
-      />
-    );
+    return <Empty icon="comment" text={t(writing ? 'comments.empty' : 'comments.emptyReadOnly')} />;
   }
 
   return (
@@ -167,11 +163,11 @@ export function CommentsPanel() {
               <div className="bg-surface sticky top-0 z-10">
                 <div className="border-border-subtle border-b pb-1.5">
                   <h3 className="text-fg text-sm font-semibold">
-                    {t('demo.commentsPage', { params: { page: group[0]!.pageLabel } })}
+                    {t('comments.page', { params: { page: group[0]!.pageLabel } })}
                   </h3>
                   {count > 0 && (
                     <p className="text-fg-muted text-xs">
-                      {t(count === 1 ? 'demo.commentCount' : 'demo.commentCountPlural', {
+                      {t(count === 1 ? 'comments.count' : 'comments.countPlural', {
                         params: { count: String(count) },
                       })}
                     </p>
@@ -283,29 +279,42 @@ function ThreadCard({
       <div className="flex flex-col gap-2 p-3">
         {/* identity row: the annotation's own glyph + color is the anchor */}
         <div className="flex items-start gap-2.5">
-          <div
-            className="bg-hover grid h-8 w-8 shrink-0 place-items-center rounded-full"
-            title={t(config.labelKey, { fallback: config.label })}
-          >
-            <Icon name={config.icon} size={18} accent={commentIconAccent(view.root)} />
-          </div>
+          <WithTooltip content={{ label: t(config.labelKey, { fallback: config.label }) }}>
+            {(tooltip) => (
+              <div
+                {...tooltip}
+                role="img"
+                aria-label={t(config.labelKey, { fallback: config.label })}
+                className="bg-hover grid h-8 w-8 shrink-0 place-items-center rounded-full"
+              >
+                <Icon name={config.icon} size={18} accent={commentIconAccent(view.root)} />
+              </div>
+            )}
+          </WithTooltip>
           <div className="min-w-0 flex-1">
             <div className="text-fg truncate text-sm font-medium">
-              {view.root.author ?? t('demo.commentsAnonymous')}
+              {view.root.author ?? t('comments.anonymous')}
             </div>
             <div className="text-fg-muted flex items-center gap-1.5 text-xs">
               <span>{dateLabel(view.root.modifiedAt ?? view.root.createdAt)}</span>
               {state !== 'none' && (
-                <span
-                  title={
+                // Who set the status, in its tooltip.
+                <WithTooltip
+                  content={
                     view.review.lastChange?.by
-                      ? `${statusLabel(t, state)} · ${view.review.lastChange.by}`
-                      : undefined
+                      ? { label: `${statusLabel(t, state)} · ${view.review.lastChange.by}` }
+                      : null
                   }
-                  className="bg-accent-light text-accent rounded px-1.5 text-[11px] font-medium"
                 >
-                  {statusLabel(t, state)}
-                </span>
+                  {(tooltip) => (
+                    <span
+                      {...tooltip}
+                      className="bg-accent-light text-accent rounded px-1.5 text-[11px] font-medium"
+                    >
+                      {statusLabel(t, state)}
+                    </span>
+                  )}
+                </WithTooltip>
               )}
             </div>
           </div>
@@ -319,17 +328,15 @@ function ThreadCard({
               }`}
             >
               {perms.canSetStatus && (
-                <button
-                  type="button"
+                <TooltipButton
+                  label={t('comments.markCompleted')}
                   aria-pressed={completed}
-                  aria-label={t('demo.commentsMarkCompleted')}
-                  title={t('demo.commentsMarkCompleted')}
                   part={buttonPart(completed)}
                   onClick={() => void comments.setStatus(root, completed ? 'none' : 'completed')}
                   className={buttonClass(completed)}
                 >
                   <Icon name="circleCheck" size={20} />
-                </button>
+                </TooltipButton>
               )}
               {hasMenu && (
                 <span ref={menuButton} onPointerDownCapture={onPick}>
@@ -364,23 +371,19 @@ function ThreadCard({
             <input
               type="text"
               value={draft}
-              placeholder={t(
-                said ? 'demo.commentsReplyPlaceholder' : 'demo.commentsAddPlaceholder',
-              )}
+              placeholder={t(said ? 'comments.replyPlaceholder' : 'comments.addPlaceholder')}
               onChange={(event) => setDraft(event.target.value)}
               onKeyDown={(event) => event.key === 'Enter' && send()}
               className="border-border bg-surface text-fg focus:border-accent h-8 w-full min-w-0 flex-1 rounded-md border px-2.5 text-sm outline-none"
             />
-            <button
-              type="button"
+            <TooltipButton
+              label={t(said ? 'comments.reply' : 'commands.comment')}
               onClick={send}
               disabled={!draft.trim()}
               className="bg-accent text-on-accent grid h-8 w-8 shrink-0 place-items-center rounded-md disabled:opacity-40"
-              aria-label={t(said ? 'demo.commentsReply' : 'commands.comment')}
-              title={t(said ? 'demo.commentsReply' : 'commands.comment')}
             >
               <Icon name="send" size={16} />
-            </button>
+            </TooltipButton>
           </div>
         )}
       </div>
@@ -401,7 +404,7 @@ function Reply({ dto, writing }: { dto: Annotation; writing: boolean }) {
     <div className="border-border-subtle ms-1 border-s-2 ps-2">
       <div className="flex items-baseline gap-2">
         <span className="text-fg-secondary text-xs font-medium">
-          {dto.author ?? t('demo.commentsAnonymous')}
+          {dto.author ?? t('comments.anonymous')}
         </span>
         <span className="text-fg-muted text-[11px]">
           {dateLabel(dto.modifiedAt ?? dto.createdAt)}
@@ -463,30 +466,28 @@ function CommentBody({
     <div className="group/body flex items-start gap-1">
       <p className="text-fg min-w-0 flex-1 whitespace-pre-wrap text-sm">{text}</p>
       {perms.canEditText && (
-        <button
-          type="button"
+        <TooltipButton
+          label={t('comments.edit')}
           onClick={(event) => {
             event.stopPropagation();
             setDraft(text);
           }}
           className="text-fg-muted hover:text-fg grid h-5 w-5 shrink-0 place-items-center rounded opacity-0 group-hover/body:opacity-100"
-          title={t('demo.commentsEdit')}
         >
           <Icon name="pencilMarker" size={12} />
-        </button>
+        </TooltipButton>
       )}
       {deletable && perms.canDelete && (
-        <button
-          type="button"
+        <TooltipButton
+          label={t('comments.delete')}
           onClick={(event) => {
             event.stopPropagation();
             void comments.delete(annotationRef);
           }}
           className="text-fg-muted hover:text-fg grid h-5 w-5 shrink-0 place-items-center rounded opacity-0 group-hover/body:opacity-100"
-          title={t('demo.commentsDelete')}
         >
           <Icon name="trash" size={12} />
-        </button>
+        </TooltipButton>
       )}
     </div>
   );

@@ -11,6 +11,7 @@ export interface CacheDelta {
     metadataVersion?: number | undefined;
     attachmentsVersion?: number | undefined;
     outlineVersion?: number | undefined;
+    fontsVersion?: number | undefined;
     layerVersion?: number | undefined;
     working?: boolean | undefined;
     pages: CacheDelta.Pages.Item[];

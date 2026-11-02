@@ -1,5 +1,4 @@
 import {
-  freeTextFontForFace,
   type AnnotationBase,
   type Color,
   type RedactAnnotation,
@@ -21,6 +20,7 @@ import {
   readQuadPoints,
   readTextAlignment,
 } from './annotationReadPrimitives';
+import { boxFontName } from './boxFontName';
 
 /** Default `/C` marking outline (red) — the redaction marking convention and
  *  the AP generator's default. */
@@ -56,10 +56,7 @@ export function readRedact(
   const face = da ? readEngineRichText(fn, mem, annotPtr)?.body : undefined;
   const fonts = ctx?.fonts;
   const fontFamily = face?.family
-    ? freeTextFontForFace(
-        face,
-        fonts ? (family, weight, italic) => fonts.keyForFace(family, weight, italic) : undefined,
-      )
+    ? boxFontName(fn, mem, annotPtr, face, fonts)
     : da
       ? standardFontFromCode(da.fontCode)
       : DEFAULT_STANDARD_FONT;

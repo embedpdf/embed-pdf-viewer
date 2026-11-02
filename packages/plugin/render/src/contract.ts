@@ -17,8 +17,10 @@ import {
   type PageImageHandle,
   type PageImageOptions,
   type PageRef,
+  type ResourceStatus,
   type SettingsApi,
 } from '@embedpdf/core';
+import type { PageTransform } from '@embedpdf/core-geometry';
 import type { FullPageOptions, PageViewDemand, TilesOptions } from './paint-plan';
 
 export type { FullPageOptions, PageViewDemand, TilesOptions } from './paint-plan';
@@ -52,6 +54,11 @@ export interface RenderSettings {
   readonly format: RenderFormat | undefined;
   /** WebP quality from 0 (smallest) to 1 (best); PNG and BMP ignore it. */
   readonly quality: number | undefined;
+  /**
+   * How long a page waits for its first picture before its state turns `slow`, in milliseconds:
+   * the moment to show a loading indicator ({@link PictureState}). `0` turns it on at once.
+   */
+  readonly slowAfterMs: number;
   /** Diagnostic logging of tile scheduling and fetch outcomes (console `debug`). */
   readonly debug: boolean;
 }
@@ -69,6 +76,7 @@ export const RENDER_DEFAULTS: RenderSettings = {
   },
   format: undefined,
   quality: undefined,
+  slowAfterMs: 400,
   debug: false,
 };
 
@@ -160,6 +168,86 @@ export interface RenderInvalidatedEvent {
   readonly origin: EventOrigin | null;
 }
 
+// ── whether a page's picture is on screen ───────────────────────────────────
+
+/**
+ * Whether a picture of a page is on screen in a view ({@link RenderCapability.getPictureState}).
+ * Only the first picture counts: tiles arriving as the view zooms in, and a redraw after a
+ * change, keep the old picture on screen, so the page stays `ready`.
+ */
+export interface PictureState {
+  /**
+   * `idle`: the view doesn't show the page. `loading`: it does, and no picture of the page is on
+   * screen yet. `ready`: one is. `forbidden`: the user may not see it (no `doc.render`).
+   * `error`: it couldn't be drawn.
+   */
+  readonly status: ResourceStatus;
+  /** Loading for longer than `slowAfterMs`: the moment to show an indicator. */
+  readonly slow: boolean;
+}
+
+/** A page's picture came on screen, failed, went slow, or the page left the view. */
+export interface PictureStateChangedEvent extends PictureState {
+  readonly page: PageRef;
+  readonly view: string;
+}
+
+/**
+ * What paints a page's picture tells the render plugin, so the page's {@link PictureState}
+ * knows: the page layers say it for the plugin's own pictures, a {@link PicturePainter} for its.
+ */
+export interface PictureReport {
+  /** A picture of the page is on screen now: it has been presented. */
+  shown(): void;
+  /**
+   * The picture can't be painted, and why: a `permission-denied` error makes the page
+   * `forbidden`, any other `error`. Ignored once a picture showed, which stays on screen.
+   */
+  failed(error: unknown): void;
+}
+
+// ── another plugin painting the pictures ────────────────────────────────────
+
+/**
+ * The page a painter paints, as every framework's page layer knows it: a
+ * subset of `@embedpdf/web`'s page context, the same in each framework.
+ */
+export interface PicturePage {
+  /** The page's address, the same for as long as the page is shown. */
+  readonly ref: PageRef;
+  /** Its place in the document, from 0. */
+  readonly pageIndex: number;
+  /** The view that shows it: a Stage's lens id. */
+  readonly view: string;
+  /** Its size, zoom and turn on screen, and its device pixels. */
+  readonly transform: PageTransform;
+  /** The part of it on screen, read when asked; absent for a view without a camera. */
+  readonly getViewDemand?: () => PageViewDemand;
+}
+
+/** A picture a painter is painting: follow the page as it changes, and stop. */
+export interface PaintedPicture {
+  /** The page's geometry changed (a zoom, a turn, a resize): `page` is how it is now. */
+  update(page: PicturePage): void;
+  /** The page left its view, or the painter was given back: take the picture away. */
+  destroy(): void;
+}
+
+/**
+ * Something that paints the pages' pictures instead of the render plugin
+ * ({@link RenderCapability.handOverPictures}). `Host` is the box a page layer
+ * lends it: an `HTMLElement` on the web.
+ */
+export interface PicturePainter<Host = unknown> {
+  /** Whether it paints the pictures of this view; a view it doesn't paint keeps the render plugin's. */
+  paints(view: string): boolean;
+  /**
+   * Paint `page`'s picture into `host`, an empty box over the page's content, until `destroy()`.
+   * The page is `loading` until `report.shown()`: call it once the first picture is on screen.
+   */
+  paint(host: Host, page: PicturePage, report: PictureReport): PaintedPicture;
+}
+
 // ── the public capability ───────────────────────────────────────────────────
 
 export interface RenderCapability extends SettingsApi<RenderSettings> {
@@ -220,6 +308,25 @@ export interface RenderCapability extends SettingsApi<RenderSettings> {
   invalidate(options?: InvalidateOptions): void;
   /** Pages' pixels changed and they will redraw. */
   readonly onInvalidated: EventHook<RenderInvalidatedEvent>;
+  /**
+   * Whether a picture of the page is on screen in `view` (a page context's `view`): `loading`
+   * until one is, and `slow` once it waited `slowAfterMs`. The same object while it's the same;
+   * `idle` for a page that isn't in the document.
+   */
+  getPictureState(page: PageRef | number, view: string): PictureState;
+  /** A page's {@link PictureState} changed in a view. */
+  readonly onPictureStateChanged: EventHook<PictureStateChangedEvent>;
+  /**
+   * Let another plugin paint the pages' pictures until the returned function
+   * is called, or the document closes. While it holds them, every page layer
+   * in a view it paints lends it its box instead of drawing: no picture, no
+   * tiles, no renders. One painter at a time: a second is refused
+   * (`conflict`) until the first is given back. Take them over in a plugin's
+   * `connect()`, and no page shows this plugin's picture first.
+   */
+  handOverPictures<Host>(painter: PicturePainter<Host>): () => void;
+  /** The plugin painting the pictures now, or `null` while this one does. */
+  getPicturePainter(): PicturePainter | null;
 }
 
 export { RenderToken } from './token';

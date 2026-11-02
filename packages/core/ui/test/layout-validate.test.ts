@@ -123,6 +123,58 @@ describe('validateLayout', () => {
     ]);
   });
 
+  it('says nothing about the bars that rode along a removed bar: they went with it', () => {
+    const { review: _review, ...bars } = valid.bars!;
+    const layout = createLayout({ ...valid, bars }).removeBar('main');
+    expect(Object.keys(layout.toJSON().bars!)).toEqual(['pager', 'selection']);
+    expect(validateLayout(layout, { commands })).toEqual([]);
+  });
+
+  it('checks hideWhileScrolling and grow: true or false, and grow on your own components only', () => {
+    const flags: LayoutData = {
+      bars: {
+        pager: { place: { float: 'bottom', hideWhileScrolling: 'yes' as never } },
+        zoom: { place: { float: 'bottom-end', hideWhileScrolling: false } },
+        main: {
+          place: 'top',
+          start: [
+            [
+              { custom: 'title', grow: true },
+              { custom: 'status', grow: 1 as never },
+              { command: 'tool:pan', grow: true } as never,
+            ],
+          ],
+        },
+      },
+    };
+    expect(validateLayout(flags, { commands })).toEqual([
+      'bar "pager": hideWhileScrolling "yes" is not true or false',
+      'bar "main": "status" has grow 1, which is not true or false',
+      'bar "main": "tool:pan" has grow, which only your own components take',
+    ]);
+  });
+
+  it('checks emphasis: primary, on a command only', () => {
+    const emphasis: LayoutData = {
+      bars: {
+        main: {
+          place: 'top',
+          start: [
+            [
+              { command: 'tool:pan', emphasis: 'primary' },
+              { command: 'tool:pointer', emphasis: 'loud' as never },
+              { custom: 'title', emphasis: 'primary' } as never,
+            ],
+          ],
+        },
+      },
+    };
+    expect(validateLayout(emphasis, { commands })).toEqual([
+      'bar "main": "tool:pointer" has emphasis "loud", which is not primary',
+      'bar "main": "title" has emphasis, which only a command\'s button takes',
+    ]);
+  });
+
   it('warns about a mode bar with no title and no command of its own', () => {
     const untitled: LayoutData = {
       bars: {
@@ -185,15 +237,22 @@ describe('validateLayout', () => {
     ]);
   });
 
-  it('checks a panel’s present per size, its width limits and resizable', () => {
+  it('checks a panel’s present per size, its width limits and its flags', () => {
     const wrong: LayoutData = {
       panels: {
         notes: {
           present: { compact: 'overlay', medum: 'dock', expanded: 'float' } as never,
           width: { initial: 300, min: 400, max: 320, widest: 9 } as never,
           resizable: 'no' as never,
+          open: 1 as never,
+          closable: 'never' as never,
         },
-        fine: { present: { compact: 'overlay' }, width: { initial: 320, min: 240, max: 480 } },
+        fine: {
+          present: { compact: 'overlay' },
+          width: { initial: 320, min: 240, max: 480 },
+          open: true,
+          closable: false,
+        },
       },
     };
     expect(validateLayout(wrong, { commands })).toEqual([
@@ -202,6 +261,8 @@ describe('validateLayout', () => {
       'panel "notes": width has "widest", not initial, min or max',
       'panel "notes": width.min 400 is wider than width.max 320',
       'panel "notes": resizable "no" is not true or false',
+      'panel "notes": open 1 is not true or false',
+      'panel "notes": closable "never" is not true or false',
     ]);
   });
 

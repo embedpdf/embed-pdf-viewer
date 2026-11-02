@@ -12,6 +12,7 @@ import {
   FormExportTokenSchema,
   AttachmentsTokenSchema,
   OutlineTokenSchema,
+  FontsTokenSchema,
   ContentTokenSchema,
   DocTokenSchema,
   DownloadTokenSchema,
@@ -108,8 +109,17 @@ export const encodeContentToken = (contentVersion: number): string =>
 export const decodeContentToken = (raw: string): number =>
   decodePositiveInteger(decodeToken(ContentTokenSchema, raw).contentVersion, 'contentVersion');
 
+/**
+ * The shape of the page list a layout read answers with, in its token: an
+ * answer is cached for good under its URL, so a client asks for the shape it
+ * reads, and an answer cached before the shape changed is never read as this
+ * one. 2: with the page label sections (`labels`). The server answers every
+ * format with the current shape.
+ */
+export const LAYOUT_FORMAT = 2;
+
 export const encodeLayoutToken = (layoutVersion: number): string =>
-  encodeToken(LayoutTokenSchema, { layoutVersion });
+  encodeToken(LayoutTokenSchema, { layoutVersion, format: LAYOUT_FORMAT });
 export const decodeLayoutToken = (raw: string): number =>
   decodePositiveInteger(decodeToken(LayoutTokenSchema, raw).layoutVersion, 'layoutVersion');
 
@@ -296,6 +306,29 @@ export const decodeOutlineToken = (raw: string): OutlineToken => {
   return {
     outlineVersion: decodePositiveInteger(query.outlineVersion, 'outlineVersion'),
     layoutVersion: decodePositiveInteger(query.layoutVersion, 'layoutVersion'),
+  };
+};
+
+/** What a font list is: the document's fonts' pin and the server's fonts' fingerprint. */
+export interface FontsToken {
+  fontsVersion: number;
+  serverFonts: string;
+}
+
+export const encodeFontsToken = (token: FontsToken): string =>
+  encodeToken(FontsTokenSchema, {
+    fontsVersion: token.fontsVersion,
+    serverFonts: token.serverFonts,
+  });
+export const decodeFontsToken = (raw: string): FontsToken => {
+  const query = decodeToken(FontsTokenSchema, raw);
+  const serverFonts = query.serverFonts;
+  if (serverFonts === undefined || !/^[0-9a-f]{1,64}$/.test(serverFonts)) {
+    throw new Error('token field "serverFonts" must be a hex fingerprint');
+  }
+  return {
+    fontsVersion: decodePositiveInteger(query.fontsVersion, 'fontsVersion'),
+    serverFonts,
   };
 };
 

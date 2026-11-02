@@ -76,7 +76,8 @@ error. The document is as it was before the call.
 | `pages.reorder`                | `pages`, `position`                                       | `doc.pages.reorder(pages, position)`                                            |
 | `pages.delete`                 | `pages`                                                   | `doc.pages.delete(pages)`                                                       |
 | `pages.insertBlank`            | `spec`, `position`, `objectNumbers`                       | `doc.pages.insertBlank(spec, position, { objectNumbers })`                      |
-| `pages.insert`                 | `source`, `position`                                      | `doc.pages.insert(source, position)`                                            |
+| `pages.insert`                 | `source`, `position`, `objectNumbers`                     | `doc.pages.insert(source, position, { objectNumbers })`                         |
+| `pages.copy`                   | `pages`, `position`, `objectNumbers`                      | `doc.pages.copy(pages, position, { objectNumbers })`                            |
 | `attachments.create`           | `file`, `resources`                                       | `doc.attachments.create({ data, ...file })`                                     |
 | `attachments.delete`           | `ref`                                                     | `doc.attachments.delete(ref)`                                                   |
 

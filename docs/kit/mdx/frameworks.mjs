@@ -67,6 +67,7 @@ const PLUGINS = [
   'Commands',
   'Comments',
   'Documents',
+  'Fonts',
   'Form',
   'I18n',
   'Interaction',

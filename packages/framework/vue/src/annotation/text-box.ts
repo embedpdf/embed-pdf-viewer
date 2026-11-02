@@ -20,6 +20,7 @@ import type { Annotation, AnnotationRef, TextItem } from '@embedpdf/plugin-annot
 import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotation/contract/host';
 import { createTextBoxEditorFollower, ownTextBoxOf, textBoxEditorScaleOf } from '@embedpdf/web';
 import { useOptionalCapability, useOptionalSelector } from '../runtime/capabilities';
+import { useFontMounts } from '../runtime/font-mounts';
 import { usePage } from '../runtime/page';
 import type { RichTextEditor } from './types';
 
@@ -97,6 +98,7 @@ export function useRichTextEditor(annotation: MaybeRefOrGetter<Annotation>): Ric
   );
   const own = computed(() => (item.value ? ownTextBoxOf(item.value, scale.value) : null));
   const element = useTextBoxEditor(item, () => own.value?.scale ?? scale.value);
+  useFontMounts(() => item.value?.programs ?? []);
   const style = computed((): CSSProperties => own.value?.style ?? NO_STYLE);
   return {
     ref: (target: Element | ComponentPublicInstance | null) => {

@@ -40,7 +40,7 @@ export interface DraftContext<Box = unknown> {
    * works out (a shape, a line, text markup). Left out: its `box`.
    */
   readonly rect?: Box;
-  /** Looks up a registered font, for a free text in one. */
+  /** Looks up a font a box can name (a registered key, a document font's name), for a free text in one. */
   readonly describeFont?: DescribeFont;
 }
 

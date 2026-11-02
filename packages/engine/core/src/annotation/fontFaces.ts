@@ -4,8 +4,8 @@
  * font's `key`, or a family the document has); rich text and the engine name
  * it the way a PDF does (family, weight, italic). Both directions map here.
  */
+import { STANDARD_FONTS, type FontName, type StandardFont } from './primitives';
 import type { FontIdentityInfo } from '../dto/FontSpec';
-import { STANDARD_FONTS, type FreeTextFont, type StandardFont } from './primitives';
 
 /** The face a font name asks for; weight and italic when the name implies them. */
 export interface FaceRequest {
@@ -20,8 +20,10 @@ interface StandardFace {
   italic: boolean;
 }
 
-/** Looks up a registered font by its key: what `engine.fonts` knows about it. */
-export type DescribeFont = (fontKey: string) => FontIdentityInfo | undefined;
+/** Looks up a font by the name a box gives it: its face. */
+export type DescribeFont = (
+  fontKey: string,
+) => Pick<FontIdentityInfo, 'familyName' | 'weight' | 'italic'> | undefined;
 
 export const STANDARD_FACES: Readonly<Record<StandardFont, StandardFace>> = {
   courier: { family: 'Courier', weight: 400, italic: false },
@@ -46,11 +48,12 @@ export const isStandardFontName = (font: string): font is StandardFont =>
 
 /**
  * The face a free text's `fontFamily` (or a rich run's `family`) asks for: a
- * standard font's family, weight and italic; a registered key's identity; or,
- * for anything else, the string itself as a family name (a face the document
+ * standard font's family, weight and italic; the face `describe` knows the
+ * name by (a registered key's identity, a document font's face); or, for
+ * anything else, the string itself as a family name (a face the document
  * embeds, or one the engine will substitute).
  */
-export function faceForFreeTextFont(font: FreeTextFont, describe?: DescribeFont): FaceRequest {
+export function faceForFontName(font: FontName, describe?: DescribeFont): FaceRequest {
   if (isStandardFontName(font)) {
     const face = STANDARD_FACES[font];
     return { family: face.family, weight: face.weight, italic: face.italic };
@@ -88,18 +91,23 @@ const STANDARD_FAMILY_KEYS: Record<string, StandardFace['family']> = {
   dingbats: 'ZapfDingbats',
 };
 
+/** The standard family a family name stands for ("Arial" is Helvetica), or undefined. */
+export function standardFamilyOf(family: string): StandardFace['family'] | undefined {
+  return STANDARD_FAMILY_KEYS[familyKey(family)];
+}
+
 /** Looks up the registered font a face is: its `key`, or undefined. */
 export type KeyForFace = (family: string, weight: number, italic: boolean) => string | undefined;
 
 /**
  * The `fontFamily` that names a face (the other direction of
- * {@link faceForFreeTextFont}): the registered `key` whose identity matches,
+ * {@link faceForFontName}): the registered `key` whose identity matches,
  * else the standard font's kebab name, else the family itself.
  */
-export function freeTextFontForFace(
+export function fontNameForFace(
   face: { family: string; weight: number; italic: boolean },
   keyForFace?: KeyForFace,
-): FreeTextFont {
+): FontName {
   const key = keyForFace?.(face.family, face.weight, face.italic);
   if (key !== undefined) return key;
   const standard = STANDARD_FAMILY_KEYS[familyKey(face.family)];

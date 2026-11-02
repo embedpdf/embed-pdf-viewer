@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
-import { useStage } from '@embedpdf/vue/stage';
 import { toFieldRef, useForm, useFormState } from '@embedpdf/vue/form';
 import type { FormValidation } from '@embedpdf/vue/form';
 
@@ -22,19 +21,21 @@ function useFilledInName(onReady: () => void) {
 }
 
 const form = useForm();
-const stage = useStage();
 const check = ref<FormValidation | null>(null);
 
-// Check the required fields, and take the reader to the first empty one.
-function submit() {
+// Check the required fields.
+function validate() {
   const result = form.validate();
   check.value = result;
-  // Where a field shows is its widget's row in the form.
-  const first = result.missing[0]?.widgets[0];
-  const widget = first ? form.getWidget(first) : null;
-  if (widget) stage.reveal(widget.page, { rect: widget.rect });
+  return result;
 }
-useFilledInName(submit);
+useFilledInName(validate);
+
+// Submit: check, and put the cursor in the first empty field.
+function submit() {
+  const first = validate().missing[0];
+  if (first) form.focus(first.ref);
+}
 </script>
 
 <template>

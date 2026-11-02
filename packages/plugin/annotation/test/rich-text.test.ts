@@ -1,20 +1,9 @@
-import {
-  cssFontFamilyForFont,
-  DRAWN_FLAGS,
-  type ModelAnnotation,
-  type TextStyle,
-} from '@embedpdf/core-annotation';
+import { DRAWN_FLAGS, type ModelAnnotation, type TextStyle } from '@embedpdf/core-annotation';
 import type { AnnotationDraft, FontHandle, RichTextDocument } from '@embedpdf/engine-core/runtime';
 import { annotationOfDraft, toPageRef } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
-import {
-  cssFontFamilyForFace,
-  fontForFace,
-  rangeProps,
-  runDeltaForFields,
-  textCommitPatch,
-} from '../src/rich-text';
+import { fontForFace, rangeProps, runDeltaForFields, textCommitPatch } from '../src/rich-text';
 
 const roboto: FontHandle = {
   key: 'roboto-bold',
@@ -77,15 +66,6 @@ describe('faces', () => {
     expect(fontForFace({ family: 'roboto', weight: 600 }, fonts)).toBe('roboto-bold');
     expect(fontForFace({ family: 'roboto', weight: 400 }, fonts)).toBe('roboto');
     expect(fontForFace({ family: 'Mystery' })).toBe('Mystery');
-  });
-
-  it('gives the DOM a CSS family for a font key and for a face family', () => {
-    expect(cssFontFamilyForFont('times-bold')).toBe('"Times New Roman", Times, serif');
-    // A key names the family its face is mounted under, namespaced away from the page's own.
-    expect(cssFontFamilyForFont('roboto')).toBe('"epdf-roboto", sans-serif');
-    expect(cssFontFamilyForFace('Arial')).toBe('Helvetica, Arial, sans-serif');
-    expect(cssFontFamilyForFace('Roboto', fonts)).toBe('"epdf-roboto-bold"');
-    expect(cssFontFamilyForFace('Mystery')).toBe('"Mystery", sans-serif');
   });
 });
 

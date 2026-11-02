@@ -42,6 +42,7 @@ import {
   type WriteStamp,
 } from '../../document-session/DocumentSession';
 import { throwIfAborted } from '../../shared/abort';
+import { fontWriteContext } from '../fonts/DocumentFontReader';
 import type { FontRegistrar } from '../fonts/FontRegistrar';
 
 /**
@@ -325,14 +326,8 @@ export class AnnotationBatchApplier {
   }
 
   private writeContext(resources?: WireAnnotationResources): AnnotationWriteContext {
-    const fonts = this.fonts;
     return {
-      ...(fonts
-        ? {
-            resolveRegisteredFontId: (key: string) => fonts.idFor(key),
-            describeRegisteredFont: (key: string) => fonts.describeOrUndefined(key),
-          }
-        : {}),
+      ...fontWriteContext(this.runtime, this.session, this.fonts),
       docPtr: this.session.requireDocPtr(),
       drawings: this.session.drawingIndex(),
       pdfPageCount: (bytes) => pdfPageCountOf(this.runtime.fn, this.runtime.mem, bytes),

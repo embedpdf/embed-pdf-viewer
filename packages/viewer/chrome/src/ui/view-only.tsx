@@ -15,6 +15,7 @@ import { useT } from '@embedpdf/react/i18n';
 
 import { leavesNothingToChange } from '../features';
 import { Icon } from './icons';
+import { WithTooltip } from './tooltip';
 
 /** Whether the scope lets this user change an annotation: make one, or change or delete one there. */
 function mayChangeAnnotations(annotation: AnnotationCapability): boolean {
@@ -65,12 +66,16 @@ export function ViewOnlyLabel({ compact = false }: { compact?: boolean }) {
   const nothingAllowed = useNothingAllowed();
   if (!turnedOff && !nothingAllowed) return null;
   return (
-    <span
-      title={t(turnedOff ? 'viewOnly.turnedOff' : 'viewOnly.notAllowed')}
-      className="bg-hover text-fg-secondary flex h-7 shrink-0 select-none items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 text-xs font-medium"
-    >
-      <Icon name="eye" size={16} className="shrink-0" />
-      <span className={compact ? 'sr-only' : undefined}>{t('viewOnly.label')}</span>
-    </span>
+    <WithTooltip content={{ label: t(turnedOff ? 'viewOnly.turnedOff' : 'viewOnly.notAllowed') }}>
+      {(tooltip) => (
+        <span
+          {...tooltip}
+          className="bg-hover text-fg-secondary flex h-7 shrink-0 select-none items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 text-xs font-medium"
+        >
+          <Icon name="eye" size={16} className="shrink-0" />
+          <span className={compact ? 'sr-only' : undefined}>{t('viewOnly.label')}</span>
+        </span>
+      )}
+    </WithTooltip>
   );
 }

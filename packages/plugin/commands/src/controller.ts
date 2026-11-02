@@ -133,6 +133,7 @@ export function createCommandsController(ctx: PluginContext<void, CommandsSettin
       target ? ctx.forDocument(token, target) : ctx.get(token);
     return {
       documentId: target,
+      appState: settings.get().appState,
       ...(call.args === undefined ? {} : { args: call.args }),
       ...(call.signal ? { signal: call.signal } : {}),
       get,
@@ -183,19 +184,20 @@ export function createCommandsController(ctx: PluginContext<void, CommandsSettin
     },
   );
 
-  // Derivations run against live state; one that throws (it needs a document
-  // and none is open, say) falls back to a safe default, so the button renders
-  // disabled instead of breaking.
+  // Derivations run against live state: without one, the command is what
+  // `absent` says; one that throws (it needs a document and none is open, say)
+  // says no, so the button renders disabled, not pressed or hidden instead of
+  // breaking.
   const derive = (
     derivation: ((context: CommandContext) => boolean) | undefined,
     context: CommandContext,
-    fallback: boolean,
+    absent: boolean,
   ): boolean => {
-    if (!derivation) return fallback;
+    if (!derivation) return absent;
     try {
       return derivation(context);
     } catch {
-      return fallback;
+      return false;
     }
   };
   const deriveAccent = (
@@ -388,6 +390,10 @@ export function createCommandsController(ctx: PluginContext<void, CommandsSettin
         error: toPluginErrorInfo(failure),
       });
       throw failure;
+    } finally {
+      // A run may change what the commands read outside the viewer (your app's state): every
+      // button asks its command again, so the one just pressed shows what it did.
+      ctx.notify();
     }
     executed.emit({ commandId: id, documentId: context.documentId, args });
     return { status: 'executed' };

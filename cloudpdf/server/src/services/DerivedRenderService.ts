@@ -27,6 +27,7 @@ import { EngineBusyError } from '../runtime/SchedulingEnginePool';
 import type { BaseFileCache } from '../storage/BaseFileCache';
 import { StorageKeys } from '../storage/keys';
 import type { ObjectStore } from '../storage/ObjectStore';
+import type { ServerFonts } from './ServerFonts';
 
 export interface DerivedRenderServiceOptions {
   storage: ObjectStore;
@@ -67,6 +68,8 @@ export interface DerivedRenderServiceOptions {
   pool?: EnginePool;
   encoder?: SharpImageEncoder;
   documents?: DocumentsRepo;
+  /** The server's fonts: a warmed picture is keyed by them, as a requested one is. */
+  serverFonts?: ServerFonts;
   /**
    * Called when a thumbnail warm fails, right before the document's
    * thumbnail state is recorded as `failed`. Warming is deliberately
@@ -131,6 +134,7 @@ export class DerivedRenderService {
   private readonly encoder?: SharpImageEncoder;
   private readonly encodeInEngine: boolean;
   private readonly documents?: DocumentsRepo;
+  private readonly serverFonts?: ServerFonts;
   private readonly onWarmError?: (err: unknown, ctx: { docId: string; tenantId: string }) => void;
   private readonly inFlight = new Map<string, Flight>();
 
@@ -145,6 +149,7 @@ export class DerivedRenderService {
     this.encoder = opts.encoder;
     this.encodeInEngine = opts.encodeInEngine ?? true;
     this.documents = opts.documents;
+    this.serverFonts = opts.serverFonts;
     this.onWarmError = opts.onWarmError;
   }
 
@@ -209,6 +214,9 @@ export class DerivedRenderService {
 
     const pins: Partial<RenderVersions> = {};
     for (const pin of PAGE_RENDER_FAMILIES[input.family].pins) pins[pin] = input.pins[pin];
+    // The server's fonts it was drawn with key it too: fallback fonts draw
+    // page text, so a change of them stores the picture again.
+    if (input.pins.serverFonts !== undefined) pins.serverFonts = input.pins.serverFonts;
     const canonicalToken = encodeRenderToken(
       flatten({
         ...pins,
@@ -391,8 +399,8 @@ export class DerivedRenderService {
     /** Object key of the base PDF (the lifecycle's upload key). */
     baseKey: string;
   }): Promise<void> {
-    const { cache, pool, encoder, documents } = this;
-    if (!cache || !pool || !encoder || !documents) return;
+    const { cache, pool, encoder, documents, serverFonts } = this;
+    if (!cache || !pool || !encoder || !documents || !serverFonts) return;
 
     try {
       const imageOptions: PageImageOptions = {
@@ -406,7 +414,7 @@ export class DerivedRenderService {
         imageOptions,
         format: 'webp',
         family: 'pages',
-        pins: { contentVersion: 1 },
+        pins: { contentVersion: 1, serverFonts: await serverFonts.fingerprint() },
       });
       if (!classification.canonicalToken) return;
       const token = classification.canonicalToken;

@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, ViewEncapsulation } from '@angular/
 import { EpdfDocumentGate, provideEmbedPdf } from '@embedpdf/angular/runtime';
 import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
-import type { Gap } from '@embedpdf/angular/stage';
+import type { Gap, Padding } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { cloudEngine } from '@cloudpdf/engine';
 
@@ -34,10 +34,10 @@ const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY
             type="range"
             min="0"
             max="64"
-            [value]="stage.settings().padding"
+            [value]="paddingSize(stage.settings().padding)"
             (input)="stage.updateSettings({ padding: +padding.value })"
           />
-          <output class="value">{{ stage.settings().padding }}</output>
+          <output class="value">{{ paddingSize(stage.settings().padding) }}</output>
         </label>
         <label class="label">
           Gap
@@ -92,6 +92,11 @@ const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY
   `,
 })
 export class App {
+  // A number is every side, as this slider sets it; { top, right, bottom, left } is each side's.
+  protected paddingSize(padding: Padding): number {
+    return typeof padding === 'number' ? padding : padding.top;
+  }
+
   // A number grows with the zoom; { px } stays the same on screen.
   protected onScreen(gap: Gap): boolean {
     return typeof gap !== 'number';

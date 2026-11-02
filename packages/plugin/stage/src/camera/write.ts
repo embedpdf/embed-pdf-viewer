@@ -24,7 +24,7 @@ export function createCameraWrite(
   ctx: PluginContext<StageModel>,
   { clock, placement, scene }: Pick<StageServices, 'clock' | 'placement' | 'scene'>,
 ) {
-  const { camera, viewport, paged, buildScene, stayBounds, constraint } = scene;
+  const { camera, viewport, padding, paged, buildScene, stayBounds, constraint } = scene;
 
   // ── the gesture bracket (touch pan and pinch) ──
   // While open, zoomAround defers its zoom-intent patch and the rest
@@ -80,8 +80,17 @@ export function createCameraWrite(
   // fits the viewport has no travel, the clamp holds it at its fitAlign rest,
   // and it stays rigid however hard the finger tugs (the UIScrollView
   // default: bouncing exists only where content exceeds the bounds).
-  const axisTravels = (origin: number, content: number, view: number, zoom: number): boolean =>
-    !travelRange(origin, content, view, zoom, constraint().padding).fits;
+  const axisTravels = (
+    axis: 'x' | 'y',
+    origin: number,
+    content: number,
+    view: number,
+    zoom: number,
+  ): boolean => {
+    const inset = padding();
+    const [before, after] = axis === 'x' ? [inset.left, inset.right] : [inset.top, inset.bottom];
+    return !travelRange(origin, content, view, zoom, before, after).fits;
+  };
   /** The unclamped finger-integrated camera → the displayed camera: clamp,
    *  then re-apply the overshoot through the resistance curve, per travelling
    *  axis. Inside the bounds this is exactly the clamp, and on a fitting axis
@@ -108,13 +117,13 @@ export function createCameraWrite(
         raw.x,
         clamped.x,
         size.width,
-        axisTravels(bounds.x, bounds.width, size.width, raw.zoom),
+        axisTravels('x', bounds.x, bounds.width, size.width, raw.zoom),
       ),
       y: axis(
         raw.y,
         clamped.y,
         size.height,
-        axisTravels(bounds.y, bounds.height, size.height, raw.zoom),
+        axisTravels('y', bounds.y, bounds.height, size.height, raw.zoom),
       ),
     };
   };
@@ -146,13 +155,13 @@ export function createCameraWrite(
         displayed.x,
         clamped.x,
         size.width,
-        axisTravels(bounds.x, bounds.width, size.width, displayed.zoom),
+        axisTravels('x', bounds.x, bounds.width, size.width, displayed.zoom),
       ),
       y: axis(
         displayed.y,
         clamped.y,
         size.height,
-        axisTravels(bounds.y, bounds.height, size.height, displayed.zoom),
+        axisTravels('y', bounds.y, bounds.height, size.height, displayed.zoom),
       ),
     };
   };

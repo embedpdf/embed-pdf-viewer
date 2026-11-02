@@ -1,7 +1,13 @@
 import {
   authorizeCapability,
+  sameSections,
+  sectionsAfterDelete,
+  sectionsAfterInsert,
+  sectionsAfterMove,
   toPageRef,
   type ChangeOp,
+  type PageInsertResult,
+  type PageLabelSection,
   type PageListSnapshot,
   type PdfCoordinates,
   type PdfRotation,
@@ -10,9 +16,12 @@ import {
 
 import { canonicalDict, exportPage, importPage } from './captures';
 import { leftAlone, type ChangeContext, type Done } from './changeContext';
+import { deleteFieldsOn, fieldNumbersOf } from './formChanges';
 import { sha256HexOf } from '../../../runtime/digest';
 import { PagesInserter, PagesMutator, PagesReader, rotationAt } from '../../pages';
+import { readLabelSections, writeLabelSections } from '../../pages/internal/pageLabels';
 import type {
+  PageLabelsStep,
   PageRemoveStep,
   PageReorderStep,
   PageRestoreStep,
@@ -79,15 +88,30 @@ export function rotatePagesBack(ctx: ChangeContext, step: PageRotateStep): Done 
   };
 }
 
-/** `pages.reorder`; its reverse puts each page back after the page it followed. */
+/**
+ * `pages.reorder`; its reverse puts each page back after the page it
+ * followed. A move that changes the order moves the label sections too: a
+ * delete, then an insert.
+ */
 export function reorderPages(ctx: ChangeContext, op: Op<'pages.reorder'>): Done {
   authorize(ctx);
   const pages = op.pages.map((page) => page.objectNumber);
-  const back = placementsOf(orderOf(ctx), pages);
+  const before = orderOf(ctx);
+  const found = labelsOf(ctx);
+  const back = placementsOf(before, pages);
   const result = mutatorOf(ctx).reorder([...op.pages], op.position, ctx.signal);
+  const after = orderOf(ctx);
+  const labels = relabel(ctx, found, labelsMoved(found, before, after, pages));
   return {
-    item: { type: 'pages.reorder', ...result },
-    reverse: [{ kind: 'pages.reorder', placements: back, left: placementsOf(orderOf(ctx), pages) }],
+    item: { type: 'pages.reorder', ...result, ...layoutIfRelabelled(ctx, labels) },
+    reverse: [
+      {
+        kind: 'pages.reorder',
+        placements: back,
+        left: placementsOf(after, pages),
+        ...(labels ? { labels } : {}),
+      },
+    ],
   };
 }
 
@@ -110,20 +134,34 @@ export function reorderPagesBack(ctx: ChangeContext, step: PageReorderStep): Don
   authorize(ctx);
   const pages = placements.map(({ page }) => page);
   const back = placementsOf(order, pages);
+  const found = labelsOf(ctx);
   const mutator = mutatorOf(ctx);
   let layout: PageListSnapshot<PdfCoordinates> | null = null;
+  let ruled: readonly PageLabelSection[] = found;
+  let moving = order;
   for (const { page, after } of placements) {
     const position = after === 0 ? 'start' : { after: toPageRef(after) };
     ({ layout } = mutator.reorder([toPageRef(page)], position, ctx.signal));
+    const moved = orderOf(ctx);
+    ruled = labelsMoved(ruled, moving, moved, [page]);
+    moving = moved;
   }
+  const labels = relabel(ctx, found, labelsAfter(found, ruled, step.labels));
   return {
     item: {
       type: 'pages.reorder',
       pages: pages.map(toPageRef),
-      layout: layout!,
+      layout: labels ? layoutOf(ctx) : layout!,
       meta: metaOf(ctx),
     },
-    reverse: [{ kind: 'pages.reorder', placements: back, left: placementsOf(orderOf(ctx), pages) }],
+    reverse: [
+      {
+        kind: 'pages.reorder',
+        placements: back,
+        left: placementsOf(orderOf(ctx), pages),
+        ...(labels ? { labels } : {}),
+      },
+    ],
   };
 }
 
@@ -137,21 +175,33 @@ export function deletePages(ctx: ChangeContext, op: Op<'pages.delete'>): Done {
   return writeDelete(ctx, pages);
 }
 
-/** Brings back pages a delete removed, those that aren't back already. */
+/**
+ * Brings back pages a delete removed, those that aren't back already, and the
+ * label sections the delete found; each page lands in the numbering of the
+ * section it lands in when the sections moved since.
+ */
 export function restorePages(ctx: ChangeContext, step: PageRestoreStep): Done {
   const order = orderOf(ctx);
   const gone = step.pages.filter(({ page }) => !order.includes(page));
   if (gone.length === 0) return leftAlone(ctx, 'pages.restore');
   authorize(ctx);
+  const found = labelsOf(ctx);
   const docPtr = ctx.session.requireDocPtr();
   // In the display order they had: each page it followed is back before it.
   for (const { capture } of gone) importPage(ctx.runtime, docPtr, capture);
   ctx.session.refreshPageRegistry();
   ctx.session.invalidateDerived();
+  const restored = orderOf(ctx);
   const pages = inDisplayOrder(
-    orderOf(ctx),
+    restored,
     gone.map(({ page }) => page),
   );
+  // Each came back where the pages before it already were.
+  const ruled = pages.reduce<readonly PageLabelSection[]>(
+    (sections, page) => sectionsAfterInsert(sections, restored.indexOf(page), 1),
+    found,
+  );
+  const labels = relabel(ctx, found, labelsAfter(found, ruled, step.labels));
   return {
     item: {
       type: 'pages.restore',
@@ -159,7 +209,7 @@ export function restorePages(ctx: ChangeContext, step: PageRestoreStep): Done {
       layout: layoutOf(ctx),
       meta: metaOf(ctx),
     },
-    reverse: [removeStepOf(ctx, pages)],
+    reverse: [removeStepOf(ctx, pages, labels)],
   };
 }
 
@@ -176,52 +226,162 @@ export function removePages(ctx: ChangeContext, step: PageRemoveStep): Done {
     return leftAlone(ctx, 'pages.delete');
   }
   authorize(ctx);
-  return writeDelete(ctx, inDisplayOrder(order, pages));
+  const fields = deleteFieldsOn(ctx, step.fields ?? [], new Set(pages));
+  const done = writeDelete(ctx, inDisplayOrder(order, pages), step.labels);
+  return { item: done.item, reverse: [...done.reverse, ...fields] };
 }
 
 /** `pages.insertBlank`; its reverse deletes the new pages while nobody changed them. */
 export function insertBlankPages(ctx: ChangeContext, op: Op<'pages.insertBlank'>): Done {
   authorize(ctx);
-  const result = inserterOf(ctx).insertBlank(
-    op.spec,
-    op.position ?? 'end',
-    ctx.signal,
-    op.objectNumbers,
+  return inserting(ctx, 'pages.insertBlank', () =>
+    inserterOf(ctx).insertBlank(op.spec, op.position ?? 'end', ctx.signal, op.objectNumbers),
   );
-  const pages = result.insertedPages.map((page) => page.objectNumber);
-  return { item: { type: 'pages.insertBlank', ...result }, reverse: [removeStepOf(ctx, pages)] };
 }
 
 /** `pages.insert`; its reverse deletes the pages it copied in while nobody changed them. */
 export function insertPages(ctx: ChangeContext, op: Op<'pages.insert'>): Done {
   authorize(ctx);
-  const result = inserterOf(ctx).insert(bufferOf(op.source), op.position ?? 'end', ctx.signal);
-  // The pages copied in may bring form fields.
-  ctx.session.invalidateDerived();
-  const pages = result.insertedPages.map((page) => page.objectNumber);
-  return { item: { type: 'pages.insert', ...result }, reverse: [removeStepOf(ctx, pages)] };
+  return inserting(ctx, 'pages.insert', () =>
+    inserterOf(ctx).insert(bufferOf(op.source), op.position ?? 'end', ctx.signal, op.objectNumbers),
+  );
 }
 
-/** Deletes `pages`, in display order, each captured first so its restore brings it back. */
-function writeDelete(ctx: ChangeContext, pages: readonly number[]): Done {
+/** `pages.copy`; its reverse deletes the copies while nobody changed them. */
+export function copyPages(ctx: ChangeContext, op: Op<'pages.copy'>): Done {
+  authorize(ctx);
+  return inserting(ctx, 'pages.copy', () =>
+    inserterOf(ctx).copy(op.pages, op.position ?? 'end', ctx.signal, op.objectNumbers),
+  );
+}
+
+/**
+ * Runs an insert: the new pages take the numbering of the section they land
+ * in. Pages copied in may bring form fields, which its reverse deletes with
+ * them.
+ */
+function inserting(
+  ctx: ChangeContext,
+  type: 'pages.insertBlank' | 'pages.insert' | 'pages.copy',
+  insert: () => PageInsertResult<PdfCoordinates>,
+): Done {
+  const copying = type !== 'pages.insertBlank';
+  const found = labelsOf(ctx);
+  const fieldsBefore = copying ? fieldNumbersOf(ctx) : new Set<number>();
+  const result = insert();
+  if (copying) ctx.session.invalidateDerived();
+  const fields = copying
+    ? [...fieldNumbersOf(ctx)].filter((field) => !fieldsBefore.has(field))
+    : [];
+  const pages = result.insertedPages.map((page) => page.objectNumber);
+  const at = orderOf(ctx).indexOf(pages[0]!);
+  const labels = relabel(ctx, found, sectionsAfterInsert(found, at, pages.length));
+  return {
+    item: { type, ...result, ...layoutIfRelabelled(ctx, labels) },
+    reverse: [removeStepOf(ctx, pages, labels, fields)],
+  };
+}
+
+/**
+ * Deletes `pages`, in display order, each captured first so its restore
+ * brings it back. The label sections follow (`sectionsAfterDelete`), or
+ * become a step's (`labels`) while they read as its change left them.
+ */
+function writeDelete(ctx: ChangeContext, pages: readonly number[], step?: PageLabelsStep): Done {
   const docPtr = ctx.session.requireDocPtr();
+  const order = orderOf(ctx);
+  const found = labelsOf(ctx);
   // Every capture before any page goes, so each holds the page it followed.
   const captures = pages.map((page) => ({ page, capture: exportPage(ctx.runtime, docPtr, page) }));
   const refs = pages.map(toPageRef);
   const result = mutatorOf(ctx).delete(refs, ctx.signal);
   ctx.session.invalidateDerived();
+  const ruled = sectionsAfterDelete(
+    found,
+    order.length,
+    pages.map((page) => order.indexOf(page)),
+  );
+  const labels = relabel(ctx, found, labelsAfter(found, ruled, step));
   return {
-    item: { type: 'pages.delete', pages: refs, ...result },
-    reverse: [{ kind: 'pages.restore', pages: captures }],
+    item: { type: 'pages.delete', pages: refs, ...result, ...layoutIfRelabelled(ctx, labels) },
+    reverse: [{ kind: 'pages.restore', pages: captures, ...(labels ? { labels } : {}) }],
   };
 }
 
 /** The step that deletes `pages` again while each reads as it does now. */
-function removeStepOf(ctx: ChangeContext, pages: readonly number[]): PageRemoveStep {
+function removeStepOf(
+  ctx: ChangeContext,
+  pages: readonly number[],
+  labels?: PageLabelsStep,
+  fields: readonly number[] = [],
+): PageRemoveStep {
   return {
     kind: 'pages.remove',
     pages: pages.map((page) => ({ page, left: digestOf(ctx, page) })),
+    ...(labels ? { labels } : {}),
+    ...(fields.length > 0 ? { fields } : {}),
   };
+}
+
+/* ── label sections ─────────────────────────────────────────────────────── */
+
+function labelsOf(ctx: ChangeContext): PageLabelSection[] {
+  return readLabelSections(ctx.runtime, ctx.session.requireDocPtr());
+}
+
+/**
+ * The sections a step leaves: those it puts back while the document's read
+ * as its change left them (`found` is how they read before the step), else
+ * those the rules give.
+ */
+function labelsAfter(
+  found: readonly PageLabelSection[],
+  ruled: readonly PageLabelSection[],
+  step: PageLabelsStep | undefined,
+): readonly PageLabelSection[] {
+  return step && sameSections(found, step.left) ? step.sections : ruled;
+}
+
+/**
+ * Writes `sections` when they say other than `found`, and the step that puts
+ * `found` back; `undefined` when the sections stay.
+ */
+function relabel(
+  ctx: ChangeContext,
+  found: readonly PageLabelSection[],
+  sections: readonly PageLabelSection[],
+): PageLabelsStep | undefined {
+  if (sameSections(found, sections)) return undefined;
+  writeLabelSections(ctx.runtime, ctx.session.requireDocPtr(), sections);
+  return { sections: found, left: sections };
+}
+
+/**
+ * The sections once `pages` moved together from `before` to `after`: a move
+ * that changes the order is a delete followed by an insert, where the first
+ * of them lands.
+ */
+function labelsMoved(
+  sections: readonly PageLabelSection[],
+  before: readonly number[],
+  after: readonly number[],
+  pages: readonly number[],
+): readonly PageLabelSection[] {
+  if (before.every((page, index) => after[index] === page)) return sections;
+  return sectionsAfterMove(
+    sections,
+    before.length,
+    pages.map((page) => before.indexOf(page)),
+    after.indexOf(pages[0]!),
+  );
+}
+
+/** A write's layout read again when it wrote label sections: the labels moved after its read. */
+function layoutIfRelabelled(
+  ctx: ChangeContext,
+  labels: PageLabelsStep | undefined,
+): { layout?: PageListSnapshot<PdfCoordinates> } {
+  return labels ? { layout: layoutOf(ctx) } : {};
 }
 
 /**

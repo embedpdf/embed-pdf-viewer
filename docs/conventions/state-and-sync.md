@@ -278,7 +278,9 @@ Built in:
   overwrites a newer value;
 - `pages.deleted` drops the deleted pages (`cause: 'drop'`);
 - `stream.desynced` and `document.versioned` re-read every loaded page;
-- a failed read keeps the page's previous value and sets its status.
+- a failed read keeps the page's previous value and sets its status;
+- a page the engine doesn't have yet ([the page list](#the-page-list)) is read
+  once the engine has it, and not at all when it goes first.
 
 From `packages/plugin/link/src/controller.ts`:
 
@@ -401,6 +403,30 @@ The annotation plugin is the reference: one change per message
 (`services/store.ts`), its records mirror predicts (`sync/records.ts`), new
 records are named by the object numbers they take, and typing is a hold
 (`write/text-editing.ts`).
+
+### The page list
+
+The document's pages (`ctx.document().pages`, `ctx.getPage`, `ctx.pageOf`,
+`documents.listPages`) are a view as well: the engine's pages, from its layout
+events, with the pending changes' page ops replayed on top through
+engine-core's `pagesAfter` (a rotate, a move, a delete, a blank insert or a
+copy that names its pages, an undo that restores pages). The Stage, the
+thumbnails and every index a verb takes read it, so a page edit shows at once
+and an index names the page the user sees. `revision` moves when the list
+does; an answer the prediction got right leaves the same list and the same
+page objects.
+
+The page label sections move with the pages (`ctx.document().pageLabels`), by
+the same rules the engine writes `/PageLabels` with (engine-core
+`pages/labels`), so each page's `label` is the one the engine will give it. An
+undo of a page edit ends with `pages.relabel`: the sections the edit found.
+
+A page a pending change makes is in the list before the engine has it.
+`ctx.document().pendingPages` names those pages, with where each one's look
+comes from (`blank`, `own`, or `copy` of another page). Code that asks the
+engine about a page waits for them: page mirrors do it for you, and the render
+plugin asks for no picture until the page lands, except that a copy draws as
+the page it copies.
 
 ### Undo and redo
 

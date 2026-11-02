@@ -229,7 +229,7 @@ describe('what a turned-off feature made stays, frozen', () => {
         reply: root.textContent!.includes('Agreed'),
         inputs: root.querySelectorAll('li input, li select, li textarea').length,
         deletes: [...root.querySelectorAll('li button')].filter((button) =>
-          /Delete/.test(button.getAttribute('title') ?? ''),
+          /Delete/.test(button.getAttribute('aria-label') ?? ''),
         ).length,
       };
     });

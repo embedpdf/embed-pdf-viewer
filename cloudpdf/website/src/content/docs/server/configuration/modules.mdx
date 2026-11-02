@@ -92,6 +92,29 @@ Before the module's code runs, the server checks what it checks for its own rout
 the document and layer it's for, `doc.open`, and the permission the route needs. A response is
 `Cache-Control: no-store` unless the module sets its own.
 
+## From the viewer
+
+The browser side of a plugin calls its module through the document it has open on the cloud
+engine:
+
+```ts
+import { cloudDocument } from '@cloudpdf/engine';
+
+const snapshot = cloudDocument(doc)?.module('snapshot');
+const response = await snapshot?.fetch('pages/obj:12?width=800');
+if (response?.ok) show(await response.blob());
+```
+
+- **`module(id).fetch(path, init)` is `fetch`** for the module's routes on this document's layer:
+  `path` is below `/v1/docs/{docId}/layers/{layerName}/{module id}/`. It sends the document's
+  token, renewed as the document renews it, and answers a plain `Response`, whatever its status,
+  so read `response.ok` and the module's own error body.
+- **Never through a CDN.** A module's routes are the server's own, so they always go to the
+  server, even when it has a CDN in front.
+- **`null` on the local engine**, which has no server: `cloudDocument(doc)` returns a value only for a
+  document open on the cloud engine. A viewer plugin passes its own `ctx.doc`, and its calls stop
+  when the document closes.
+
 ## Writing a module
 
 A module's default export is `defineServerModule(…)` from `@cloudpdf/server-modules`. Each

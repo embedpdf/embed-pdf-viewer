@@ -7,8 +7,10 @@ import { PluginError } from './errors';
 import { createEventHook, type EventHookSource } from './event-hook';
 import { guardHandle } from './guarded-handle';
 import { createLatestLane, type LatestLane } from './lanes';
+import { instanceMeasurer, type HostTextMeasurer } from './measurer';
 import { createMirror, type MirrorEnvironment } from './mirror';
 import { createPageMirror } from './page-mirror';
+import type { PageViewController } from './page-view';
 import type { Scope } from './scope';
 import { createSerialQueue, type SerialQueue } from './serial-queue';
 import { cancellable } from './cancellable';
@@ -57,6 +59,8 @@ export interface SessionRef {
   readonly printWraps: PrintWrap[];
   /** The document's change queue, shared by its plugins (`ctx.changes`). */
   readonly changes: DocumentChanges;
+  /** The document's pages as the user sees them: the engine's, with the pending page changes on top. */
+  readonly pageView: PageViewController;
 }
 
 /** Something of the document's own that runs around a download: it gets the read and returns its bytes. */
@@ -85,6 +89,8 @@ export interface ContextServices {
   readonly report: (error: unknown) => void;
   /** The host's time, which each instance's `ctx.clock` schedules on. */
   readonly clock: HostClock;
+  /** The host's text measuring (`ctx.measurer`); `null` when it gives none. */
+  readonly measurer: HostTextMeasurer | null;
   resolveCapability<T>(token: CapabilityToken<T>, documentId?: string): T;
   /** Total resolution (the kernel's internal rule: bring-up or ready) — what
    *  `ctx.tryGet` delegates to. Never exception-driven: a throwing capability
@@ -203,6 +209,7 @@ export function createPluginContext(
   const mirrorEnvironment = (): MirrorEnvironment => ({
     doc: doc(),
     changes: session!.changes,
+    pages: session!.pageView,
     notify: () => {
       if (lease.live) store.notify();
     },
@@ -381,6 +388,7 @@ export function createPluginContext(
     },
     cleanup: (teardown) => scope.defer(teardown),
     clock: instanceClock(services.clock, lifetime),
+    measurer: services.measurer && instanceMeasurer(services.measurer, lifetime),
     onSettle(flush) {
       if (!session) {
         throw new Error(

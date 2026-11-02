@@ -136,9 +136,10 @@ export function pdfPredictAnnotationPatch(
 
 export interface ResolveOptions {
   /**
-   * Looks up a registered font by its key, so a free text's new `fontFamily`
-   * moves its rich body to that face. Without it a registered key names the
-   * family as it is; the standard 14 need no lookup.
+   * Looks up a font a box can name (a registered key, a document font's
+   * name), so a free text's new `fontFamily` moves its rich body to that
+   * font's face. Without it such a name stands as a family; the standard 14
+   * need no lookup.
    */
   describeFont?: DescribeFont;
 }

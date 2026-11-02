@@ -3,7 +3,8 @@
  * without a `locale`, or with `'auto'`, it follows the browser's languages, Traditional Chinese
  * included; its fifteen languages each load the first time they show, Hebrew right to left; your
  * command's `labelKey` and a panel's and a mode bar's `titleKey` read per language, English where
- * a language has no words; the style panel's words change through `strings`; a language of your
+ * a language has no words; one string, or one layout title, renames a panel's button and its
+ * header; the style panel's words change through `strings`; a language of your
  * own falls back to English, and reads right to left when its code says so; `setLocale` resolves once the language shows; `addTranslations`
  * changes words in place; and the toolbar moves more or fewer buttons into "More" as the words
  * get longer or shorter. Arabic, `fa` and a built-in button's label by its command id are
@@ -95,6 +96,18 @@ const PAGES = {
   '/english.html': page(`{ locale: 'en' }`),
   // Wide enough for every mode tab beside your button and your panel's.
   '/own.html': page(OWN, 1500),
+  // The comments panel renamed by its button's string, search by a title, thumbnails by a titleKey.
+  '/panel-words.html': page(`{
+    locale: 'en',
+    strings: {
+      en: { 'panel:comments': 'Review notes', 'acme.pages': 'Pages' },
+      nl: { 'panel:comments': 'Reviewnotities', 'acme.pages': "Pagina's" },
+    },
+    layout: (layout) =>
+      layout
+        .panel('search', { title: 'Find' })
+        .panel('thumbnails', { titleKey: 'acme.pages' }),
+  }`),
   '/style.html': page(`{
     locale: 'en',
     strings: {
@@ -385,6 +398,50 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('translations', () => {
     await switchTo(tab, 'de');
     expect(await panelName(tab, 'notes')).toBe('Notes');
     expect(await modeTabs(tab)).toContain('Review');
+    await close(tab);
+  });
+
+  it("renames a panel's button and its header with one string, or one layout title", async () => {
+    const tab = await open('/panel-words.html', 'en');
+    /** The title in the open panel's header: its own, or the switcher's. */
+    const headerOf = (id: string) =>
+      tab.evaluate(
+        (panel) =>
+          window.element
+            .shadowRoot!.querySelector(
+              `[data-epdf-panel="${panel}"] [part="panel-header"] :is(h2, [data-epdf-panel-switcher] .truncate)`,
+            )
+            ?.textContent?.trim() ?? null,
+        id,
+      );
+    const main = '[data-bar="main"]';
+
+    // `panel:comments` in strings: the button and the header.
+    expect(await buttonOf(tab, 'Review notes', main)).not.toBeNull();
+    expect(await buttonOf(tab, 'Comments', main)).toBeNull();
+    await run(tab, 'panel:comments');
+    expect(await panelName(tab, 'comments')).toBe('Review notes');
+    expect(await headerOf('comments')).toBe('Review notes');
+
+    // A layout title: the same in both, in place of the built-in words.
+    expect(await buttonOf(tab, 'Find', main)).not.toBeNull();
+    await run(tab, 'panel:search');
+    expect(await panelName(tab, 'search')).toBe('Find');
+    expect(await headerOf('search')).toBe('Find');
+
+    // A titleKey of yours, in each language.
+    expect(await buttonOf(tab, 'Pages', main)).not.toBeNull();
+    await run(tab, 'panel:thumbnails');
+    expect(await panelName(tab, 'thumbnails')).toBe('Pages');
+
+    await switchTo(tab, 'nl');
+    expect(await panelName(tab, 'thumbnails')).toBe("Pagina's");
+    expect(await buttonOf(tab, "Pagina's", main)).not.toBeNull();
+    expect(await panelName(tab, 'search')).toBe('Find');
+    await run(tab, 'panel:comments');
+    expect(await panelName(tab, 'comments')).toBe('Reviewnotities');
+    expect(await headerOf('comments')).toBe('Reviewnotities');
+    expect(await buttonOf(tab, 'Reviewnotities', main)).not.toBeNull();
     await close(tab);
   });
 

@@ -1,13 +1,17 @@
 /**
  * The panels a layout brings, as commands. Every panel gets `panel:<id>`, which
  * opens and closes it, labeled and drawn as the layout's panel says (its
- * `title` or `titleKey`, its `icon`). Which side a panel is on is the layout's
- * too; the panels on one side take turns where they're drawn (ui/panels.tsx).
- * The built-in panels add what their commands need: the feature that turns
- * them off, whether the session may use them (the owning plugin's `can*`
- * check), when there is something to show, and whether opening one puts the
- * cursor in it. Search also brings Find (`search:find`, Ctrl/Cmd+F), which
- * opens it with the cursor in its field and never closes it.
+ * `title` or `titleKey`, its `icon`); a panel that can't close (`closable:
+ * false`) gets one that only opens it. The command's label is the panel's
+ * title in its header too, so one string (`panel:<id>`) or one `title` renames
+ * both. Which side a panel is on is the layout's too; the panels on one side
+ * take turns where they're drawn (ui/panels.tsx).
+ * The built-in panels bring their own title and icon, whatever layout names
+ * them, and what their commands need: the feature that turns them off,
+ * whether the session may use them (the owning plugin's `can*` check), when
+ * there is something to show, and whether opening one puts the cursor in it.
+ * Search also brings Find (`search:find`, Ctrl/Cmd+F), which opens it with the
+ * cursor in its field and never closes it.
  */
 import { panelCommandOf, type LayoutData, type LayoutPanel } from '@embedpdf/core-ui';
 import { AnnotationToken } from '@embedpdf/react/annotation';
@@ -42,8 +46,54 @@ export function panelsOnSide(data: LayoutData, side: PanelSide): string[] {
     .map(([id]) => id);
 }
 
-/** What a built-in panel's command adds to the layout's panel. */
-type PanelCommandFacts = Pick<CommandDef, 'allowed' | 'notAllowedKey' | 'visible'> & {
+/** One side of the pages as it stands: the layout's panels there, which show, and the one drawn. */
+export interface SidePanels {
+  /** The layout's panels on the side, in layout order. */
+  readonly ids: readonly string[];
+  /** Those whose buttons show. */
+  readonly shown: readonly string[];
+  /** The panel drawn on the side, or `null` with none open. */
+  readonly current: string | null;
+  /** Whether a panel docks now, at the viewer's size. */
+  readonly docks: (id: string) => boolean;
+}
+
+/** What a side opens by itself ({@link panelOpeningOnSide}). */
+export interface SideOpening {
+  /** The panel to open, or `null`. */
+  readonly open: string | null;
+  /** The panels opening from the start that had their turn now, opened or not. */
+  readonly started: readonly string[];
+}
+
+/**
+ * What a side opens by itself, on a side with nothing open: the first panel, in layout order,
+ * that docks now and either can't close (`closable: false`: it's always open where it docks) or
+ * opens from the start (`open: true`) and hasn't had its turn in this document (`started`). A
+ * panel opening from the start has its turn the first time it shows, so one whose button waits
+ * for its list still opens once it has one; on a side already open, or where it doesn't dock,
+ * its turn passes and it stays closed.
+ */
+export function panelOpeningOnSide(
+  panels: Panels,
+  side: SidePanels,
+  started: ReadonlySet<string>,
+): SideOpening {
+  const shown = side.ids.filter((id) => side.shown.includes(id) && isPanel(panels[id]));
+  const turns = shown.filter((id) => panels[id]!.open === true && !started.has(id));
+  if (side.current !== null) return { open: null, started: turns };
+  const open =
+    shown.find((id) => side.docks(id) && (panels[id]!.closable === false || turns.includes(id))) ??
+    null;
+  return { open, started: turns };
+}
+
+/** What a built-in panel brings to the layout's panel: its words, icon and command's needs. */
+type BuiltInPanel = Pick<CommandDef, 'allowed' | 'notAllowedKey' | 'visible'> & {
+  /** Its title's key, in its header and on its button, unless the layout gives its own title. */
+  readonly titleKey: string;
+  /** Its button's icon, unless the layout gives one. */
+  readonly icon: string;
   readonly categories: readonly Feature[];
   /** Opening it asks for the cursor (`open(id, { focus: true })`), for a panel you type in. */
   readonly focus?: boolean;
@@ -90,12 +140,14 @@ const FIND_COMMAND: CommandDef = {
   run: (commandContext) => commandContext.tryGet(ShellToken)?.open(SEARCH_PANEL, { focus: true }),
 };
 
-const BUILT_IN_PANELS: ReadonlyMap<string, PanelCommandFacts> = new Map<string, PanelCommandFacts>([
+const BUILT_IN_PANELS: ReadonlyMap<string, BuiltInPanel> = new Map<string, BuiltInPanel>([
   // A thumbnail is a picture of the page with a right of its own (`doc.render.thumbnail`, which
   // `doc.render` includes): without it there is nothing the panel could show.
   [
     'thumbnails',
     {
+      titleKey: 'panels.thumbnails',
+      icon: 'sidebar',
       categories: ['thumbnails'],
       allowed: (commandContext) => commandContext.tryGet(RenderToken)?.canRenderThumbnail() ?? true,
       notAllowedKey: 'commands.notAllowed.doc-render-thumbnail',
@@ -106,6 +158,8 @@ const BUILT_IN_PANELS: ReadonlyMap<string, PanelCommandFacts> = new Map<string, 
   [
     'outline',
     {
+      titleKey: 'panels.outline',
+      icon: 'listTree',
       categories: ['outline'],
       visible: (commandContext) => {
         const outline = commandContext.tryGet(OutlineToken);
@@ -119,6 +173,8 @@ const BUILT_IN_PANELS: ReadonlyMap<string, PanelCommandFacts> = new Map<string, 
   [
     'attachments',
     {
+      titleKey: 'panels.attachments',
+      icon: 'paperclip',
       categories: ['attachments'],
       visible: (commandContext) => {
         const attachment = commandContext.tryGet(AttachmentToken);
@@ -135,21 +191,25 @@ const BUILT_IN_PANELS: ReadonlyMap<string, PanelCommandFacts> = new Map<string, 
     },
   ],
   // Without searching the panel has no job; its button puts the cursor in the field, as Find does.
-  [SEARCH_PANEL, { ...SEARCHES, focus: true }],
+  [SEARCH_PANEL, { titleKey: 'panels.search', icon: 'search', ...SEARCHES, focus: true }],
   // Without it there is nothing this panel could show.
   [
     'comments',
     {
+      titleKey: 'panels.comments',
+      icon: 'comment',
       categories: ['comments'],
       allowed: (commandContext) => commandContext.tryGet(AnnotationToken)?.canRead() ?? true,
       notAllowedKey: 'commands.notAllowed.doc-annotate-read',
     },
   ],
-  ['style', { categories: ['annotations'] }],
+  ['style', { titleKey: 'panels.style', icon: 'palette', categories: ['annotations'] }],
   // The stamp libraries are the stamp plugin's: without it there is nothing to pick.
   [
     'stamps',
     {
+      titleKey: 'panels.stamps',
+      icon: 'rubberStamp',
       categories: ['stamps'],
       allowed: (commandContext) =>
         commandContext.tryGet(StampToken)?.canPlace(commandContext.documentId ?? undefined) ?? true,
@@ -161,6 +221,8 @@ const BUILT_IN_PANELS: ReadonlyMap<string, PanelCommandFacts> = new Map<string, 
   [
     'signatures',
     {
+      titleKey: 'panels.signatures',
+      icon: 'signature',
       categories: ['signatures'],
       visible: (commandContext) =>
         commandContext.tryGet(StampToken) != null && commandContext.tryGet(SignatureToken) != null,
@@ -171,6 +233,8 @@ const BUILT_IN_PANELS: ReadonlyMap<string, PanelCommandFacts> = new Map<string, 
   [
     'redaction',
     {
+      titleKey: 'panels.redaction',
+      icon: 'redactionSidebar',
       categories: ['redaction'],
       allowed: (commandContext) => {
         const redaction = commandContext.tryGet(RedactionToken);
@@ -183,6 +247,8 @@ const BUILT_IN_PANELS: ReadonlyMap<string, PanelCommandFacts> = new Map<string, 
   [
     'measurement',
     {
+      titleKey: 'panels.measurement',
+      icon: 'updateScale',
       categories: ['measurement'],
       allowed: (commandContext) => {
         const measurement = commandContext.tryGet(MeasurementToken);
@@ -196,6 +262,8 @@ const BUILT_IN_PANELS: ReadonlyMap<string, PanelCommandFacts> = new Map<string, 
   [
     'form-design',
     {
+      titleKey: 'panels.formDesign',
+      icon: 'formDesign',
       categories: ['forms.building'],
       allowed: (commandContext) => commandContext.tryGet(FormToken)?.canDesign() ?? true,
       visible: (commandContext) => commandContext.tryGet(ShellToken)?.isOpen('mode:form') ?? false,
@@ -204,9 +272,27 @@ const BUILT_IN_PANELS: ReadonlyMap<string, PanelCommandFacts> = new Map<string, 
 ]);
 
 /**
+ * How a panel's button opens it: it opens the panel and closes it again; for a panel that can't
+ * close, it opens it and leaves it open, pressed while it's open.
+ */
+const openingOf = (
+  id: string,
+  focus: boolean | undefined,
+  closable: boolean,
+): Pick<CommandDef, 'panel' | 'run' | 'active'> =>
+  closable
+    ? { panel: focus ? { id, focus } : id }
+    : {
+        run: (commandContext) =>
+          commandContext.tryGet(ShellToken)?.open(id, focus ? { focus } : undefined),
+        active: (commandContext) => commandContext.tryGet(ShellToken)?.isOpen(id) ?? false,
+      };
+
+/**
  * A `panel:<id>` command for each of the layout's panels that has none yet (`isTaken` says which
- * ids do): it opens the panel, or closes it when it's open. Without a title, its button reads
- * the panel's id. A search panel brings Find too.
+ * ids do): it opens the panel, or closes it when it's open, unless the panel can't close. Its
+ * label is the layout's title, else a built-in panel's own; without either, the panel's id. Its
+ * icon is the layout's, else a built-in panel's. A search panel brings Find too.
  */
 export function panelCommandsFor(
   panels: LayoutData['panels'],
@@ -217,14 +303,16 @@ export function panelCommandsFor(
     if (!isPanel(panel)) return [];
     const find = id === SEARCH_PANEL && !isTaken(FIND_COMMAND.id) ? [FIND_COMMAND] : [];
     if (isTaken(commandId)) return find;
-    const { focus, ...facts } = BUILT_IN_PANELS.get(id) ?? {};
+    const builtIn = BUILT_IN_PANELS.get(id);
+    const { focus, titleKey: _titleKey, icon: _icon, ...facts } = builtIn ?? {};
+    const titleKey = panel.titleKey ?? (panel.title === undefined ? builtIn?.titleKey : undefined);
     return [
       {
         id: commandId,
-        label: panel.title ?? (panel.titleKey === undefined ? id : undefined),
-        labelKey: panel.titleKey,
-        icon: panel.icon,
-        panel: focus ? { id, focus } : id,
+        label: panel.title ?? (titleKey === undefined ? id : undefined),
+        labelKey: titleKey,
+        icon: panel.icon ?? builtIn?.icon,
+        ...openingOf(id, focus, panel.closable !== false),
         ...facts,
       },
       ...find,

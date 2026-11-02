@@ -61,7 +61,7 @@ function InsertToolbar() {
       <button
         type="button"
         className="button"
-        disabled={!canEdit || !pageEdit.canExtract()}
+        disabled={!canEdit}
         onClick={() => pageEdit.duplicate([page.ref]).then(show)}
       >
         Duplicate page

@@ -95,8 +95,10 @@ saveFile(bytes, 'chapter-2.pdf');
 
 <Example name="page-edit/extract" />
 
-`duplicate()` and `extract()` copy the pages as they show: they wait for the edits made before
-them.
+`duplicate()` and `extract()` copy the pages as they show, with the edits made before them. A
+duplicate's copies bring the pages' annotations, and their form fields as fields of their own: a name
+the document already uses gets the first free `name_2`, so filling in a copy leaves the original
+alone.
 
 ## Select pages
 
@@ -164,10 +166,10 @@ The page edit plugin has no events of its own. <Fw only={['react', 'vue', 'svelt
 
 ## Permissions
 
-| Permission           | What it allows                                                              | Check                   |
-| :------------------- | :-------------------------------------------------------------------------- | :---------------------- |
-| `doc.pages.assemble` | Rotate, reorder, delete and insert pages                                    | `pageEdit.canEdit()`    |
-| `doc.download`       | `extract()`, `duplicate()` and `insertFromDocument()`, which copy pages out | `pageEdit.canExtract()` |
+| Permission           | What it allows                                               | Check                   |
+| :------------------- | :----------------------------------------------------------- | :---------------------- |
+| `doc.pages.assemble` | Rotate, reorder, delete, duplicate and insert pages          | `pageEdit.canEdit()`    |
+| `doc.download`       | `extract()` and `insertFromDocument()`, which copy pages out | `pageEdit.canExtract()` |
 
 ## Good to know
 
@@ -185,8 +187,19 @@ edits alike. Undo puts the pages back as they were: a moved page goes back to it
 page comes back under the same ref with its annotations, and inserted pages go. A page someone
 changed since is left alone.
 
-An edit shows once the engine has it: right away on this device, after a round trip on a server.
-Quick edits still add up: two quarter turns in a row are a half turn.
+A turn, a move, a delete, a blank page or a duplicate shows at once, before the engine has it, and
+so does undoing one: on a server there's no round trip to wait for. If the engine refuses an edit,
+the pages go back as they were. Pages of another PDF or document show once the engine has them.
+Quick edits add up: two quarter turns in a row are a half turn.
+
+### Page labels
+
+A page's `label` (`'iii'`, `'A-1'`) follows the page through edits, the way the engine numbers it:
+a page takes the numbering of the section it lands in, so a page inserted after the front matter
+is numbered as front matter, and deleting a section's first page makes the next page its first.
+The labels show at once with the edit, and undo puts them back. The sections themselves are
+`pageLabels` on the document; see [Page labels](/docs/engine/documents/pages#page-labels) in the
+engine docs for the rules.
 
 ### What moves with a page
 

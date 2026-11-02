@@ -57,10 +57,10 @@ export { DbJwksCacheStore } from './auth/JwksCacheStore';
 export { WorkerThreadPool } from './runtime/WorkerThreadPool';
 export type {
   WorkerThreadPoolOptions,
-  FallbackFontDescriptor,
+  ServerFontDescriptor,
   WorkerBootstrapData,
 } from './runtime/WorkerThreadPool';
-export { loadFallbackFontsFromEnv } from './runtime/loadFallbackFontsFromEnv';
+export { loadServerFontsFromEnv } from './runtime/loadServerFontsFromEnv';
 export * from './security/index';
 
 // Database drivers, migrations, repositories and object storage.

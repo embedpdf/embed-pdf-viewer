@@ -1,0 +1,21 @@
+<embedpdf-viewer id="viewer" src="/report.pdf" style="height: 100vh">
+  <span slot="item:review" class="review">
+    <epdf-button icon="message" label="Notes" id="notes"></epdf-button>
+    <span class="saved" id="saved" hidden>
+      <epdf-icon name="check" size="16"></epdf-icon>
+      Saved
+    </span>
+  </span>
+</embedpdf-viewer>
+
+<script type="module">
+  import 'https://cdn.jsdelivr.net/npm/@embedpdf/viewer@3/dist/embedpdf.js';
+  import { toggleNotes, onSaved } from './review.js'; // your app
+
+  document.getElementById('viewer').config = {
+    layout: (layout) => layout.add({ custom: 'review' }, { to: 'main', section: 'end' }),
+  };
+  const notes = document.getElementById('notes');
+  notes.addEventListener('click', () => notes.toggleAttribute('active', toggleNotes()));
+  onSaved(() => (document.getElementById('saved').hidden = false));
+</script>

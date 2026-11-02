@@ -6,9 +6,9 @@
  * button draws (`BuildCheckboxBoxStream`).
  */
 import type { WidgetBorderStyle } from '@embedpdf/engine-core/runtime';
+import type { PdfRect } from '@embedpdf/engine-core/runtime';
 
 import type { DrawOp, PathSegment, Rgb } from './types';
-import type { PdfRect } from '../layout/variable-text';
 
 const f32 = Math.fround;
 

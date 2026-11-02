@@ -68,15 +68,16 @@ everything the user typed.
 
 ## Show your own fonts
 
-The engine puts a font into the PDF, but the browser draws the text while people type, so it needs
-the same font. Register the font with the engine, and give the browser the same file under the same
-key<Fw only="angular">, in your `engine` function, which runs only in the browser</Fw>:
+The engine puts a font into the PDF, and the browser draws the text while people type, in the same
+font: the fonts plugin (`fontsPlugin()`, from the `fonts` entry) hands the browser the file the
+engine writes with. Register the font with the engine<Fw only="angular">, in your `engine` function,
+which runs only in the browser</Fw>:
 
 <Snippet name="concepts/web-font" />
 
-The key is the font's name in both places: `fontFamily: 'brand-sans'` on a text box. The standard
-PDF fonts need nothing: Helvetica shows as `Helvetica, Arial, sans-serif`, and so on. More in
-[Fonts](/docs/engine/documents/fonts).
+The key is the font's name: `fontFamily: 'brand-sans'` on a text box. The standard PDF fonts need
+nothing: they show in the engine's own faces. Without the fonts plugin, a box shows in its standard
+font, or in Helvetica. More in [Fonts](/docs/engine/documents/fonts).
 
 </Engine>
 

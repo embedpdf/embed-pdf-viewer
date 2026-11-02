@@ -47,6 +47,8 @@
   "license": "Apache-2.0",
   "dependencies": {
     "@cloudpdf/engine": "workspace:*",
+    "@cloudpdf/plugin-protected-display": "workspace:*",
+    "@cloudpdf/web": "workspace:*",
     "@embedpdf/engine": "workspace:*",
     "@embedpdf/viewer": "workspace:*"
   },

@@ -203,6 +203,50 @@ class FoldingToolbar {
   };
 }
 
+/** A title of your own that takes the rest of the bar, before two commands at its end. */
+const GROWING: BarSchema = {
+  id: 'growing',
+  sections: {
+    start: [group('title', [custom('title', undefined, { grow: true })])],
+    end: [group('zoom', ['test:out', 'test:in'])],
+  },
+};
+
+@Component({
+  selector: 'test-growing-toolbar',
+  imports: [EpdfToolbar, EpdfToolbarCommandTemplate, EpdfToolbarCustomTemplate],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `
+    <epdf-toolbar [bar]="bar">
+      <ng-template epdfToolbarCommand let-command let-run="run">
+        <button class="cmd" (click)="run()">{{ command.label }}</button>
+      </ng-template>
+      <ng-template epdfToolbarCustom="title">
+        <input class="title" style="flex: 1" />
+      </ng-template>
+    </epdf-toolbar>
+  `,
+})
+class GrowingToolbar {
+  readonly bar = GROWING;
+}
+
+@Component({
+  selector: 'test-growing-socket-toolbar',
+  imports: [EpdfToolbar, EpdfToolbarCommandTemplate],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `
+    <epdf-toolbar [bar]="bar">
+      <ng-template epdfToolbarCommand let-command let-run="run">
+        <button class="cmd" (click)="run()">{{ command.label }}</button>
+      </ng-template>
+    </epdf-toolbar>
+  `,
+})
+class GrowingSocketToolbar {
+  readonly bar = GROWING;
+}
+
 /** A viewer around one of the toolbars above, given as its class and its element. */
 async function toolbarWith(component: Type<unknown>, element: string) {
   ran.length = 0;
@@ -319,6 +363,52 @@ describe('<epdf-toolbar>', () => {
     expect(slot?.textContent?.trim()).toBe('PREVIOUS');
     // Only one slot of a name: the measurement layer leaves it out.
     expect(measured().querySelector('slot')).toBeNull();
+  });
+
+  /** The live row's sections, in order. */
+  const sectionsOf = (toolbar: HTMLElement) =>
+    [...toolbar.querySelectorAll(':scope > div:not([aria-hidden])')] as HTMLElement[];
+
+  it('keeps each section at its items’ length, and the center balanced, while nothing grows', async () => {
+    const { toolbar } = await toolbarWith(TestToolbar, 'test-toolbar');
+    const [start, center, end] = sectionsOf(toolbar);
+    expect([start, center, end].map((section) => section!.style.flex)).toEqual([
+      '0 0 auto',
+      '0 0 auto',
+      '0 0 auto',
+    ]);
+    expect(center!.style.marginLeft).toBe('auto');
+    expect(center!.style.marginRight).toBe('auto');
+    const items = [
+      ...toolbar.querySelectorAll(':scope > div:not([aria-hidden]) [data-epdf-toolbar-item]'),
+    ] as HTMLElement[];
+    expect(items.every((element) => element.style.display === 'contents')).toBe(true);
+  });
+
+  it('grows an item with grow and its section into the room left, a gap before the next section', async () => {
+    const { toolbar } = await toolbarWith(GrowingToolbar, 'test-growing-toolbar');
+    const [start, center, end] = sectionsOf(toolbar);
+    expect(start!.style.flex).toBe('1 0 auto');
+    expect(center!.style.marginLeft).toBe('');
+    expect(end!.getAttribute('style')).toContain('margin-inline-start: 8px');
+    const box = toolbar.querySelector(':scope > div:not([aria-hidden]) .title')!
+      .parentElement as HTMLElement;
+    expect(box.hasAttribute('data-epdf-toolbar-item')).toBe(true);
+    expect(box.style.display).toBe('flex');
+    expect(box.style.flex).toBe('1 0 auto');
+  });
+
+  it('counts a socket that grows at its own length, not the room it grew into', async () => {
+    // Each command is 60px; grown, the socket would be too. Its own length is 0 here, as
+    // happy-dom lays nothing out: room enough for both commands, and no "More" button.
+    layout.room = { horizontal: 150, vertical: 150 };
+    const { toolbar } = await toolbarWith(GrowingSocketToolbar, 'test-growing-socket-toolbar');
+    const socket = toolbar.querySelector('slot[name="title"]') as HTMLElement;
+    expect(socket.style.flexGrow).toBe('1');
+    const live = [
+      ...toolbar.querySelectorAll(':scope > div:not([aria-hidden]) button'),
+    ] as HTMLElement[];
+    expect(live.map((button) => button.textContent?.trim())).toEqual(['OUT', 'IN']);
   });
 
   it('measures an item of your own that draws nothing in the measurement layer where it renders, by measure', async () => {

@@ -93,12 +93,15 @@ array names two kinds of grant, and they never overlap:
 | `["docs.read", "doc.render"]` | A file browser: names plus thumbnails. |
 | `["docs.read", "doc.open", "doc.text.copy"]` | An indexer: lists documents and reads their text. |
 | `["doc.open", "doc.forms.fill"]` | A server that fills in forms and does nothing else. |
-| `["docs.read", "tokens.issue-doc"]` | The backend that opens documents for your users. |
+| `["tokens.issue-doc", "doc.open", "doc.render"]` | The backend that opens documents for your users to read. |
 | `["*"]` | A full tenant administrator. |
 
-`tokens.issue-doc` mints document tokens with any capability, so a token holding
-it can reach anything inside the tenant's documents: treat it as the strongest
-scope after `*`.
+A token hands out only the capabilities it holds itself. With `tokens.issue-doc`
+it mints document tokens, and with `grants.manage` it makes grants, carrying
+any of its own capabilities and nothing more: the reading backend above can't
+mint a token that downloads, prints or annotates, and asking is refused with
+**403**. Give the key every capability your users may get, or `*` for all of
+them.
 
 On managed CloudPDF this is what your dashboard API key is, with `*`. On a
 self-hosted deployment, mint one with the API token via
@@ -183,8 +186,9 @@ kills sessions. Different blast radii deserve different grants.
 - **401** — the credential is missing, malformed, expired, or its signature does
   not verify.
 - **403** — the credential is valid but insufficient: wrong tenant, missing
-  tenant scope, or missing document capability. Each operation page lists what
-  it requires.
+  tenant scope, missing document capability, or a token or grant asked to carry
+  capabilities the credential doesn't hold. Each operation page lists what it
+  requires.
 - **422 `DocPasswordRequired`** — the document is encrypted and needs
   `X-Document-Password`. That header is accepted only with the API token; viewer
   document tokens use the SDK's password-session flow instead.

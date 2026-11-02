@@ -1,6 +1,6 @@
 /**
- * Which bar hides while the pages scroll on a phone, and what counts as a
- * scroll.
+ * Which bar hides while the pages scroll, as its place says or on a phone, and
+ * what counts as a scroll.
  */
 import type { BarSchema } from '@embedpdf/core-ui';
 import { describe, expect, it } from 'vitest';
@@ -33,14 +33,20 @@ describe('isScrollOf', () => {
 });
 
 describe('hidesWhileScrolling', () => {
-  it('hides the bar with the page number on a phone only', () => {
+  it('hides a bar whose place says so at every size, and keeps one whose place says not', () => {
+    expect(hidesWhileScrolling(true, ZOOM, 'expanded')).toBe(true);
+    expect(hidesWhileScrolling(true, PAGER, 'medium')).toBe(true);
+    expect(hidesWhileScrolling(false, PAGER, 'compact')).toBe(false);
+  });
+
+  it('hides the bar with the page number on a phone when its place says nothing', () => {
     expect(holdsSlot(PAGER, PAGE_NUMBER_SLOT)).toBe(true);
-    expect(hidesWhileScrolling(PAGER, 'compact')).toBe(true);
-    expect(hidesWhileScrolling(PAGER, 'medium')).toBe(false);
+    expect(hidesWhileScrolling(undefined, PAGER, 'compact')).toBe(true);
+    expect(hidesWhileScrolling(undefined, PAGER, 'medium')).toBe(false);
   });
 
   it('keeps every other bar', () => {
-    expect(hidesWhileScrolling(ZOOM, 'compact')).toBe(false);
-    expect(hidesWhileScrolling(null, 'compact')).toBe(false);
+    expect(hidesWhileScrolling(undefined, ZOOM, 'compact')).toBe(false);
+    expect(hidesWhileScrolling(true, null, 'compact')).toBe(false);
   });
 });

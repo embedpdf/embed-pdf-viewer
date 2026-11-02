@@ -13,6 +13,7 @@ import type {
   ActionsHostCapability,
   AnnotCommitSink,
   FormCommitSink,
+  FormFocus,
   FormReader,
   SubmitResolver,
 } from '../host-contract';
@@ -24,6 +25,8 @@ export interface ActionPorts {
   formCommitSink: FormCommitSink | null;
   /** The form plugin's form, as the user sees it. */
   formReader: FormReader | null;
+  /** The form plugin's cursor, for `field.setFocus()`. */
+  formFocus: FormFocus | null;
   uiAdapter: ActionUiAdapter | null;
   /** Sink 1 of the submit chain (consent = installation). */
   submitHandler: ActionSubmitHandler | null;
@@ -37,6 +40,7 @@ export function createPorts({ reportDiagnostic }: Pick<ActionsEvents, 'reportDia
     annotCommitSink: null,
     formCommitSink: null,
     formReader: null,
+    formFocus: null,
     uiAdapter: null,
     submitHandler: null,
     submitResolver: null,
@@ -70,6 +74,12 @@ export function createPorts({ reportDiagnostic }: Pick<ActionsEvents, 'reportDia
       ports.formReader = reader;
       return () => {
         if (ports.formReader === reader) ports.formReader = null;
+      };
+    },
+    registerFormFocus: (focus): Unsubscribe => {
+      ports.formFocus = focus;
+      return () => {
+        if (ports.formFocus === focus) ports.formFocus = null;
       };
     },
     setSubmitHandler: (handler): Unsubscribe => {

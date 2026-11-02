@@ -35,7 +35,8 @@ function substitutedUrl(template: string): string {
     .replace(':layerName', 'default')
     .replace(':pageKey', 'obj:1')
     .replace(':annotKey', 'reg-annot')
-    .replace(':fieldKey', 'reg-field');
+    .replace(':fieldKey', 'reg-field')
+    .replace(':displayHash', '0'.repeat(64));
 }
 
 function isRouterNotFound(res: { statusCode: number; body: string }): boolean {

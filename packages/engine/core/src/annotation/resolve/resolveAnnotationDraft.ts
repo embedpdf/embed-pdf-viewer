@@ -15,8 +15,9 @@ export interface DraftResolveOptions {
    */
   linked?: readonly string[];
   /**
-   * Looks up a registered font by its key, so a free text in one takes that
-   * face in its rich body. The standard 14 need no lookup.
+   * Looks up a font a box can name (a registered key, a document font's
+   * name), so a free text in one takes that font's face in its rich body. The
+   * standard 14 need no lookup.
    */
   describeFont?: DescribeFont;
 }

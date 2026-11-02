@@ -17,9 +17,19 @@ import {
   textEditorLayout,
   widgetDrawing,
   widgetScene,
+  widgetText,
+  type ShownValue,
   type TextEditorLayout,
 } from '@embedpdf/core-form';
-import type { AnnotationRef, FormFieldDTO, WidgetAnnotation } from '@embedpdf/engine-core/runtime';
+import { standardFontCss, standardFontOf } from '@embedpdf/core-fonts';
+import {
+  isStandardFontName,
+  type AnnotationRef,
+  type FontName,
+  type FormFieldDTO,
+  type WidgetAnnotation,
+} from '@embedpdf/engine-core/runtime';
+import type { FontCss, FontsCapability, PaintFonts } from '@embedpdf/plugin-fonts/contract';
 
 import {
   fieldForWidget,
@@ -49,11 +59,27 @@ export function createWidgetLooks({
   fields,
   formatted,
   design,
+  fonts,
 }: {
   readonly fields: Mirror<FieldIndex>;
   readonly formatted: FormattedTexts;
   readonly design: FormDesign;
+  /**
+   * The fonts plugin, when installed: the fonts the painter and the editor draw a widget's
+   * text in, as the engine picks them.
+   */
+  readonly fonts: () => FontsCapability | null;
 }) {
+  /** Moves when the fonts plugin may draw a widget's text differently. */
+  const fontsEpoch = (): number => fonts()?.getPaintFontsEpoch() ?? 0;
+
+  /**
+   * The fonts `row` draws `text` in: the fonts plugin's (`null` while it finds them), else
+   * `undefined`, the widget's standard font.
+   */
+  const paintFontsOf = (row: WidgetAnnotation, text: string): PaintFonts | null | undefined =>
+    fonts()?.getPaintFonts(row.fontFamily ?? 'helvetica', text);
+
   /** What the widget's picture depends on, as one string. */
   const lookKeyOf = (row: WidgetAnnotation, field: FormFieldDTO | null): string => {
     const box = row.box ?? row.rect;
@@ -100,9 +126,10 @@ export function createWidgetLooks({
   };
 
   // In design mode the annotation layer draws the widgets it borrowed.
+  // A widget the painter waits on the fonts for shows again once they're found.
   const shownOn = memoByKey(
     (_pageObjectNumber: number) =>
-      [fields.view(), fields.get(), formatted.version(), design.lending()] as const,
+      [fields.view(), fields.get(), formatted.version(), design.lending(), fontsEpoch()] as const,
     (pageObjectNumber, view, truth, _formatted, lent): readonly ShownWidget[] =>
       lent
         ? NOTHING_SHOWN
@@ -115,17 +142,25 @@ export function createWidgetLooks({
           }),
   );
 
-  /** The painter's drawing of `row` (in the view's field, as this session formatted it) at `box`, turned. */
+  /**
+   * The painter's drawing of `row` (in the view's field, as this session formatted it) at `box`,
+   * turned. While the fonts its text needs are found, `null`, so the engine's picture stays;
+   * unless `now`, then in the widget's standard font.
+   */
   const paint = (
     row: WidgetAnnotation,
     box: Box,
     rotation: number | null | undefined,
+    now = false,
   ): readonly SceneNode[] | null => {
     const view = fields.view();
     const field = fieldForWidget(view, numberOf(row.ref));
     if (!field) return null;
     const text = formatted.textOf(field);
-    const drawing = widgetDrawing({ ...row, box }, field, text === null ? {} : { text });
+    const shown: ShownValue = text === null ? {} : { text };
+    const painted = paintFontsOf(row, widgetText(row, field, shown));
+    if (painted === null && !now) return null;
+    const drawing = widgetDrawing({ ...row, box }, field, shown, painted ?? undefined);
     return drawing && widgetScene(drawing, { box, rotation });
   };
 
@@ -135,13 +170,39 @@ export function createWidgetLooks({
       const view = fields.view();
       const row = widgetRowOf(view, number);
       const field = row ? fieldForWidget(view, number) : null;
-      return [row, field, field ? formatted.textOf(field) : null] as const;
+      return [row, field, field ? formatted.textOf(field) : null, fontsEpoch()] as const;
     },
     (_number, row): WidgetPainting | null => {
       const scene = row && paint(row, row.box ?? row.rect, row.rotation);
       return scene ? { scene } : null;
     },
   );
+
+  /**
+   * How a browser draws text in a widget's font: the fonts plugin's CSS for
+   * it (the first widget in a font that isn't standard reads the document's
+   * fonts); without the plugin, the standard font the engine falls back to.
+   */
+  const fontCssOf = (font: FontName): FontCss =>
+    fonts()?.getFontCss(font) ?? standardFontCss(standardFontOf(font));
+
+  /**
+   * Until the fonts plugin has found a field's fonts, the layout in its own
+   * font, when it isn't a standard one: its program, the fallbacks and the
+   * last resort, as the fonts plugin draws it. The layout's numbers stay the
+   * standard face's until then.
+   */
+  const inItsFont = (layout: TextEditorLayout, font: string | null): TextEditorLayout => {
+    if (!fonts() || !font || isStandardFontName(font)) return layout;
+    const css = fontCssOf(font);
+    return {
+      ...layout,
+      programs: css.programs,
+      fontFamily: css.fontFamily,
+      fontWeight: css.fontWeight,
+      fontStyle: css.fontStyle,
+    };
+  };
 
   return {
     listShownWidgets: (pageObjectNumber: number) => shownOn(pageObjectNumber),
@@ -157,14 +218,21 @@ export function createWidgetLooks({
      */
     painterOf: (row: WidgetAnnotation): ((box: Box) => readonly SceneNode[]) | null => {
       const field = fieldForWidget(fields.view(), numberOf(row.ref));
-      return field && paints(field) ? (box) => paint(row, box, 0) ?? [] : null;
+      return field && paints(field) ? (box) => paint(row, box, 0, true) ?? [] : null;
     },
     getTextEditorLayout: (ref: AnnotationRef, text: string): TextEditorLayout | null => {
       const view = fields.view();
       const number = numberOf(ref);
       const row = widgetRowOf(view, number);
       const field = row ? fieldForWidget(view, number) : null;
-      return row && field ? textEditorLayout(row, field, text) : null;
+      if (!row || !field) return null;
+      const painted = paintFontsOf(row, widgetText(row, field, { text }));
+      const layout = textEditorLayout(row, field, text, painted ?? undefined);
+      return layout && (painted ? layout : inItsFont(layout, row.fontFamily ?? null));
+    },
+    getWidgetFontCss: (ref: AnnotationRef): FontCss | null => {
+      const row = widgetRowOf(fields.view(), numberOf(ref));
+      return row ? fontCssOf(row.fontFamily ?? 'helvetica') : null;
     },
   };
 }

@@ -1,0 +1,68 @@
+/* Colors */
+:root {
+  --ink: #1a2748;
+  --muted: #5a6b92;
+  --line: #e6eaf2;
+  --surface: #ffffff;
+  --canvas: #f7f9fc;
+  --shadow: rgb(7 32 76 / 0.04);
+}
+
+/* The font picker and the text drawn in it, in a card */
+.panel {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow:
+    0 1px 2px var(--shadow),
+    0 18px 40px -28px rgb(7 32 76 / 0.28);
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.field select {
+  min-width: 0;
+  flex: 1;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 8px;
+  font: inherit;
+  font-weight: 400;
+  color: var(--ink);
+  background: var(--surface);
+}
+
+/* The text, in the chosen font */
+.preview {
+  min-height: 96px;
+  resize: vertical;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px;
+  font-size: 24px;
+  line-height: 1.4;
+  color: var(--ink);
+  background: var(--canvas);
+}
+
+.hint,
+.loading {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.loading {
+  padding: 24px 0;
+  text-align: center;
+}

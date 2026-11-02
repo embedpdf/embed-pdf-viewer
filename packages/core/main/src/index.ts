@@ -5,6 +5,7 @@ export * from './serial-queue';
 export * from './errors';
 export { timerClock } from './clock';
 export type { Cancel, HostClock, PluginClock } from './clock';
+export type { HostFontProgram, HostTextMeasurer } from './measurer';
 export { composeApi } from './compose';
 export type { LatestCancellation, LatestLane, LatestRun } from './lanes';
 export { createLatestLane } from './lanes';
@@ -66,6 +67,10 @@ export {
   annotationKey,
   // Local-only members (warmup, fonts) are reached through this check.
   isLocalEngine,
+  // What undoing a page edit shows: a change's `undo` (the page list predicts with these).
+  reorderBackOf,
+  restoredPagesOf,
+  rotateBackOf,
 } from '@embedpdf/engine-core/runtime';
 export type {
   AnnotationAppearanceImage,
@@ -84,6 +89,7 @@ export type {
   PageImageOptions,
   PageImageObjectUrl,
   PdfRect,
+  RestoredPage,
   CallFacts,
   CallPriority,
   WorkingSetPage,

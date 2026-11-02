@@ -12,6 +12,7 @@ import { StageToken } from '@embedpdf/react/stage';
 
 import { Icon } from './icons';
 import { buttonClass, buttonPart } from './toolbar';
+import { useTooltip } from './tooltip';
 
 export function MeasurementScaleButton() {
   const t = useT();
@@ -20,24 +21,28 @@ export function MeasurementScaleButton() {
   const scale = usePageScale(page);
 
   const surface = useSurface('measurement');
+  const tooltip = useTooltip({ label: t('measurement.title') });
   return (
-    <button
-      type="button"
-      part={buttonPart(surface.isOpen)}
-      className={buttonClass(surface.isOpen)}
-      aria-pressed={surface.isOpen || undefined}
-      onClick={() => surface.toggle()}
-      title={t('measurement.title')}
-    >
-      <span className="flex items-center whitespace-nowrap text-sm">
-        <Icon name="updateScale" size={20} className="me-1.5 shrink-0" />
-        <span>
-          {t('measurement.scale')}:{' '}
-          {scale?.measure?.subtype === 'rectilinear'
-            ? (scale.measure.ratio ?? t('measurement.custom'))
-            : t('measurement.unavailable')}
+    <>
+      <button
+        {...tooltip.trigger}
+        type="button"
+        part={buttonPart(surface.isOpen)}
+        className={buttonClass(surface.isOpen)}
+        aria-pressed={surface.isOpen || undefined}
+        onClick={() => surface.toggle()}
+      >
+        <span className="flex items-center whitespace-nowrap text-sm">
+          <Icon name="updateScale" size={20} className="me-1.5 shrink-0" />
+          <span>
+            {t('measurement.scale')}:{' '}
+            {scale?.measure?.subtype === 'rectilinear'
+              ? (scale.measure.ratio ?? t('measurement.custom'))
+              : t('measurement.unavailable')}
+          </span>
         </span>
-      </span>
-    </button>
+      </button>
+      {tooltip.element}
+    </>
   );
 }

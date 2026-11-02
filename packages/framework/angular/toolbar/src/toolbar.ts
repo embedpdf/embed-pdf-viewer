@@ -55,6 +55,7 @@ import {
   createToolbarLengths,
   observeContentLength,
   observeLength,
+  observeOwnLength,
   toolbarMeasureKey,
   type Orientation,
   type RovingFocus,
@@ -97,6 +98,8 @@ type Entry =
       readonly key: string;
       readonly template: TemplateRef<EpdfToolbarCustomContext>;
       readonly context: EpdfToolbarCustomContext;
+      /** It takes the room the toolbar has left. */
+      readonly grow: boolean;
     }
   | {
       // An item of your own with no template: a `<slot>`, measured where it renders.
@@ -104,6 +107,7 @@ type Entry =
       readonly key: string;
       readonly slot: string;
       readonly context: EpdfToolbarCommandContext | null;
+      readonly grow: boolean;
     }
   | {
       readonly kind: 'collapsed';
@@ -127,9 +131,9 @@ interface Row {
 /** What the toolbar draws while there is no commands plugin: nothing. */
 const EMPTY_LAYOUT: ToolbarLayout<ResolvedCommand> = {
   sections: [
-    { name: 'start', groups: [] },
-    { name: 'center', groups: [] },
-    { name: 'end', groups: [] },
+    { name: 'start', groups: [], grows: false, spacing: 'none' },
+    { name: 'center', groups: [], grows: false, spacing: 'balance' },
+    { name: 'end', groups: [], grows: false, spacing: 'none' },
   ],
   measured: [],
   hasOverflow: false,
@@ -160,23 +164,26 @@ const drawsSomething = (element: Element): boolean =>
  * Reports its element's border-box length along the toolbar (its width, or its height in a
  * vertical one) to the toolbar, under its key, now and on resize. With `ifDrawn`, only while the
  * element draws something: an item of your own whose template draws nothing in the measurement
- * layer reports its length itself, with `measure`, from where it renders.
+ * layer reports its length itself, with `measure`, from where it renders. With `grows`, the
+ * length without the room the element grew into.
  */
 @Directive({ selector: '[epdfToolbarLength]' })
 export class EpdfToolbarLength {
   readonly key = input.required<string>({ alias: 'epdfToolbarLength' });
   readonly ifDrawn = input(false);
+  readonly grows = input(false);
 
   constructor() {
-    const element = inject<ElementRef<Element>>(ElementRef).nativeElement;
+    const element = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
     const sink = inject(TOOLBAR_LENGTHS);
     if (!isPlatformBrowser(inject(PLATFORM_ID))) return;
     effect((onCleanup) => {
       const key = this.key();
       const orientation = sink.orientation();
+      const observe = this.grows() ? observeOwnLength : observeLength;
       onCleanup(
         untracked(() =>
-          observeLength(element, orientation, (length) => {
+          observe(element, orientation, (length) => {
             if (this.ifDrawn() && !drawsSomething(element)) return;
             sink.reportLength(key, length);
           }),
@@ -229,20 +236,21 @@ export class EpdfToolbarLength {
     <!--
       The sections run along the toolbar: the center one has auto margins, so it stays centered
       in the space the others leave and gives way before anything overlaps. The sections never
-      grow or shrink: what fits is the solver's decision, so the row's least length is exactly
-      what it counted.
+      shrink: what fits is the solver's decision, so the row's least length is exactly what it
+      counted. One grows only to hold an item that grows, taking the space left, and each drawn
+      section after another keeps the gap the solver counted instead.
     -->
-    <div [style]="sectionStyle()" [style.gap.px]="gap()">
+    <div [style]="sectionStyles()[0]" [style.gap.px]="gap()">
       @for (entry of row().start; track entry.key) {
         <ng-container *ngTemplateOutlet="liveEntry; context: { $implicit: entry }" />
       }
     </div>
-    <div [style]="centerStyle()" [style.gap.px]="gap()">
+    <div [style]="sectionStyles()[1]" [style.gap.px]="gap()">
       @for (entry of row().center; track entry.key) {
         <ng-container *ngTemplateOutlet="liveEntry; context: { $implicit: entry }" />
       }
     </div>
-    <div [style]="sectionStyle()" [style.gap.px]="gap()">
+    <div [style]="sectionStyles()[2]" [style.gap.px]="gap()">
       @for (entry of row().end; track entry.key) {
         <ng-container *ngTemplateOutlet="liveEntry; context: { $implicit: entry }" />
       }
@@ -292,13 +300,14 @@ export class EpdfToolbarLength {
     <!--
       An item of the live row, in the element that marks it (TOOLBAR_ITEM_ATTRIBUTE in
       @embedpdf/web): its first element that takes focus is the item's stop in the arrow-key
-      order. The element adds no box, so the item lays out as the section's own child.
+      order. The element adds no box, so the item lays out as the section's own child; around an
+      item that grows, it's a box that grows into the space the toolbar has left.
     -->
     <ng-template #liveEntry let-entry>
       @if (entry.kind === 'separator') {
         <ng-container *ngTemplateOutlet="drawn; context: { $implicit: entry }" />
       } @else {
-        <span data-epdf-toolbar-item style="display: contents">
+        <span data-epdf-toolbar-item [style]="itemStyle(entry)">
           <ng-container *ngTemplateOutlet="drawn; context: { $implicit: entry }" />
         </span>
       }
@@ -322,7 +331,9 @@ export class EpdfToolbarLength {
           <slot
             [attr.name]="entry.slot"
             [epdfToolbarLength]="entry.key"
+            [grows]="entry.grow"
             style="display: inline-flex; align-items: center; flex-shrink: 0"
+            [style.flex-grow]="entry.grow ? 1 : 0"
           >
             @if (entry.context) {
               <ng-container
@@ -510,18 +521,33 @@ export class EpdfToolbar implements ToolbarLengthSink {
 
   protected readonly overflowTriggerKey = toolbarMeasureKey.overflowTrigger;
   protected readonly paint = TOOLBAR_PAINT;
-  protected readonly sectionStyle = computed(
-    () =>
-      `display: flex; flex-direction: ${this.vertical() ? 'column' : 'row'}; ` +
-      'align-items: center; flex: 0 0 auto;',
+  /** Each section's style, in order: see the template's note on the sections. */
+  protected readonly sectionStyles = computed(() =>
+    this.layout().sections.map((section) => {
+      const vertical = this.vertical();
+      const spacing =
+        section.spacing === 'balance'
+          ? vertical
+            ? ' margin-top: auto; margin-bottom: auto;'
+            : ' margin-left: auto; margin-right: auto;'
+          : section.spacing === 'gap'
+            ? vertical
+              ? ` margin-top: ${this.gap()}px;`
+              : ` margin-inline-start: ${this.gap()}px;`
+            : '';
+      return (
+        `display: flex; flex-direction: ${vertical ? 'column' : 'row'}; align-items: center; ` +
+        `flex: ${section.grows ? '1 0 auto' : '0 0 auto'};${spacing}`
+      );
+    }),
   );
-  protected readonly centerStyle = computed(
-    () =>
-      this.sectionStyle() +
-      (this.vertical()
-        ? ' margin-top: auto; margin-bottom: auto;'
-        : ' margin-left: auto; margin-right: auto;'),
-  );
+  /** The element around an item of the live row: no box, or a growing one around one that grows. */
+  protected itemStyle(entry: Entry): string {
+    return (entry.kind === 'custom' || entry.kind === 'socket') && entry.grow
+      ? `display: flex; flex-direction: ${this.vertical() ? 'column' : 'row'}; ` +
+          'align-items: center; flex: 1 0 auto;'
+      : 'display: contents;';
+  }
   /** A 1px line across the toolbar: upright in a horizontal one, flat in a vertical one. */
   protected readonly separatorStyle = computed(
     () =>
@@ -636,6 +662,7 @@ export class EpdfToolbar implements ToolbarLengthSink {
               layer,
               measure: (length) => this.reportLength(key, length),
             },
+            grow: part.grow,
           };
         }
         // An item of your own with no template is measured where it renders: only the first
@@ -650,6 +677,7 @@ export class EpdfToolbar implements ToolbarLengthSink {
             variant: 'icon',
             run: part.runTerminal,
           },
+          grow: part.grow,
         };
       }
       case 'collapsed':

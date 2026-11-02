@@ -289,14 +289,29 @@ lose when the tab closes.
 ## Warn before changes are lost
 
 When someone closes a tab or leaves the page with unsaved changes, the viewer asks first. Unsaved
-means changed since it opened or since the last download. `viewer.documents.get().hasUnsavedChanges`
-tells you the same, and `onUnsavedChangesChanged` fires when it changes:
+means changed since it opened or since the last download: anything a download would carry, whether
+the user changed it or your code did, such as form values from `importValues()` or a form `reset()`.
+`viewer.documents.get().hasUnsavedChanges` tells you the same, and `onUnsavedChangesChanged` fires
+when it changes:
 
 ```js
 viewer.documents.onUnsavedChangesChanged(({ documentId, hasUnsavedChanges }) => {
   saveButton.disabled = !hasUnsavedChanges;
 });
 ```
+
+<Engine local>
+
+When your app keeps the changes itself, or nothing is meant to be kept, as at a kiosk that starts
+over for the next visitor, leave the browser's question out. Closing a tab still asks:
+
+```js
+{ warnBeforeLeaving: false }
+```
+
+`warnBeforeLeaving` is read once, when the viewer starts.
+
+</Engine>
 
 ## Good to know
 
@@ -315,6 +330,14 @@ CloudPDF renders each page on the server and sends it as an image, so the first 
 once, without the browser downloading the whole PDF.
 
 </Engine>
+
+### Pages that take a moment
+
+A page whose picture takes more than 400 milliseconds to arrive shows a spinner, in the main view
+and in the thumbnails, until it's there; a page that shows quickly shows none. Getting sharper as
+you zoom in isn't loading, so it never spins. A page that can't load says so. Change the wait with
+`plugins: { render: { slowAfterMs: 200 } }`, and restyle the spinner or hide it with its
+[part](customize/theming#restyle-a-part), `page-loading`.
 
 ### Where the bytes go
 

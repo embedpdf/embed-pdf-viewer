@@ -42,7 +42,7 @@ import { formatPdfDate } from '../../shared/pdf-date';
 import { generateUuid } from '../../shared/uuid';
 import { groupLockFields, groupOfField } from '../forms/internal/fieldGroups';
 import { disposeFormModel } from '../forms/internal/formModelCache';
-import { withWideStringArray } from '../forms/internal/wideStringArray';
+import { withWideStringArray } from '../../runtime/memory/wideStringArray';
 import { DocumentSaver } from '../save/DocumentSaver';
 
 // Mirrors public/epdf_signature.h.

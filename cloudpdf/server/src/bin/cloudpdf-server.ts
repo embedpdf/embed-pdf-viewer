@@ -29,7 +29,7 @@ import { loadModules } from '../modules/load';
 import { PostgresRealtimeBus } from '../realtime/PostgresRealtimeBus';
 import { readCgroupMemory } from '../runtime/cgroup-memory';
 import { resolveRecycleConfig } from '../runtime/EngineRecycler';
-import { loadFallbackFontsFromEnv } from '../runtime/loadFallbackFontsFromEnv';
+import { loadServerFontsFromEnv } from '../runtime/loadServerFontsFromEnv';
 import { loadKmsConfigFromEnv } from '../security/kms/config/loadKmsConfigFromEnv';
 import { createKmsKeyring } from '../security/kms/createKmsKeyring';
 import type { KmsKeyring } from '../security/kms/KmsKeyring';
@@ -114,7 +114,7 @@ import type { ObjectStore } from '../storage/ObjectStore';
  *   port                   (default: 3000)
  *   host                   (default: 0.0.0.0)
  *   CLOUDPDF_WORKER_POOL_SIZE  int|max  (default: min(2, cpus))
- *   CLOUDPDF_FALLBACK_FONTS  JSON [{key,path,familyName?,...}]  (default: none)
+ *   CLOUDPDF_FONTS           JSON [{key,path,familyName?,...,serve?}]  (default: none)
  *   CLOUDPDF_MODULES        comma-separated server modules (packages or paths);
  *                           each reads its settings from CLOUDPDF_<ID>_*
  *   CLOUDPDF_LICENSE_MODE     connected|air-gapped
@@ -371,7 +371,7 @@ function printHelp(): void {
       '    CLOUDPDF_CACHE_MAX_BYTES                 (default: 4 GiB)',
       '    CLOUDPDF_SIGNING_TMP                     (default: <tmpdir>/cloudpdf-signing)',
       '  Fonts',
-      '    CLOUDPDF_FALLBACK_FONTS  JSON [{key,path,familyName?,...}]  (default: none)',
+      '    CLOUDPDF_FONTS           JSON [{key,path,familyName?,...,serve?}]  (default: none)',
       '  Modules',
       '    CLOUDPDF_MODULES       comma-separated packages or paths; each module reads CLOUDPDF_<ID>_*',
       '  Optional adapters (see ADAPTERS.md)',
@@ -1026,7 +1026,7 @@ async function cmdServe(): Promise<void> {
       ...(corsOrigins !== undefined ? { corsOrigins } : {}),
       ...(enableRevocation ? { enableRevocation: true } : {}),
       workerEntry: WORKER_ENTRY_URL,
-      fallbackFonts: loadFallbackFontsFromEnv(),
+      fonts: loadServerFontsFromEnv(),
       db: dbCtx.db,
       objectStore,
       cdnSigner,

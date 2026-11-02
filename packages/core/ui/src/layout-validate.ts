@@ -16,6 +16,7 @@ import type {
 } from './layout';
 import {
   SECTION_NAMES,
+  hostOf,
   isGroupObject,
   isLayout,
   isLayoutItem,
@@ -28,7 +29,6 @@ import {
 import {
   VIEW_MODE_COMMAND,
   edgeOf,
-  hostOf,
   modeCommandOf,
   modesOf,
   panelCommandOf,
@@ -139,12 +139,17 @@ function placeProblems(
       return [`${where} goes ${side} "${anchor}", which is not on the ${place.edge} edge`];
     return [`${where} goes ${side} "${anchor}": no such bar${didYouMean(anchor, onEdge)}`];
   }
-  if ('float' in place)
-    return FLOAT_POSITIONS.includes(place.float)
+  if ('float' in place) {
+    const problems = FLOAT_POSITIONS.includes(place.float)
       ? []
       : [
           `${where}: "${place.float}" is not a floating position${didYouMean(place.float, FLOAT_POSITIONS)}`,
         ];
+    const hide: unknown = place.hideWhileScrolling;
+    if (hide !== undefined && typeof hide !== 'boolean')
+      problems.push(`${where}: hideWhileScrolling ${JSON.stringify(hide)} is not true or false`);
+    return problems;
+  }
   if ('with' in place) {
     if (place.with === id) return [`${where} rides along itself`];
     if (!bars[place.with])
@@ -212,6 +217,7 @@ function itemProblems(
         const id = itemIdOf(item as LayoutItem);
         if (seen.has(id)) problems.push(`${where}: "${id}" is twice in one group`);
         seen.add(id);
+        problems.push(...itemOptionProblems(where, id, item as LayoutItem));
         const command = itemCommandOf(item as LayoutItem);
         if (command !== null) checkCommand(where, command);
       }
@@ -219,6 +225,28 @@ function itemProblems(
   }
   if (groups > 0 && dependentGroups === groups)
     problems.push(`${where}: every group in it is dependent, so it never shows`);
+  return problems;
+}
+
+/**
+ * What's wrong with an item's options: `grow` is your own component's, true or false; `emphasis`
+ * is a command's, `'primary'`.
+ */
+function itemOptionProblems(where: string, id: string, item: LayoutItem): string[] {
+  if (typeof item !== 'object') return [];
+  const custom = 'custom' in item;
+  const { grow, emphasis } = item as { grow?: unknown; emphasis?: unknown };
+  const problems: string[] = [];
+  if (grow !== undefined && !custom)
+    problems.push(`${where}: "${id}" has grow, which only your own components take`);
+  else if (grow !== undefined && typeof grow !== 'boolean')
+    problems.push(`${where}: "${id}" has grow ${JSON.stringify(grow)}, which is not true or false`);
+  if (emphasis !== undefined && custom)
+    problems.push(`${where}: "${id}" has emphasis, which only a command's button takes`);
+  else if (emphasis !== undefined && emphasis !== 'primary')
+    problems.push(
+      `${where}: "${id}" has emphasis ${JSON.stringify(emphasis)}, which is not primary`,
+    );
   return problems;
 }
 
@@ -296,7 +324,10 @@ function panelProblems(where: string, panel: LayoutPanel): string[] {
     problems.push(`${where}: side "${panel.side}" is not start or end`);
   if (panel.present !== undefined) problems.push(...presentProblems(where, panel.present));
   if (panel.width !== undefined) problems.push(...widthProblems(where, panel.width));
-  if (panel.resizable !== undefined && typeof panel.resizable !== 'boolean')
-    problems.push(`${where}: resizable ${JSON.stringify(panel.resizable)} is not true or false`);
+  for (const flag of ['resizable', 'open', 'closable'] as const) {
+    const value: unknown = panel[flag];
+    if (value !== undefined && typeof value !== 'boolean')
+      problems.push(`${where}: ${flag} ${JSON.stringify(value)} is not true or false`);
+  }
   return problems;
 }

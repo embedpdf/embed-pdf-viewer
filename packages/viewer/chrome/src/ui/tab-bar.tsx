@@ -16,6 +16,7 @@ import { useState } from 'react';
 
 import { errorReasonKeyOf } from './document-boot';
 import { Icon } from './icons';
+import { WithTooltip } from './tooltip';
 import { CloseUnsavedDialog } from './unsaved-changes';
 
 export type TabBarVisibility = 'always' | 'multiple' | 'never';
@@ -82,14 +83,18 @@ export function TabBar({
                 <Icon name="lock" size={13} className="text-fg-muted flex-shrink-0" />
               )}
               {document.status === 'error' && !document.grantRequest && (
-                <span
-                  className="flex flex-shrink-0"
-                  role="img"
-                  aria-label={t(errorReasonKeyOf(document.error))}
-                  title={t(errorReasonKeyOf(document.error))}
-                >
-                  <Icon name="alertTriangle" size={13} className="text-red-500" />
-                </span>
+                <WithTooltip content={{ label: t(errorReasonKeyOf(document.error)) }}>
+                  {(tooltip) => (
+                    <span
+                      {...tooltip}
+                      className="flex flex-shrink-0"
+                      role="img"
+                      aria-label={t(errorReasonKeyOf(document.error))}
+                    >
+                      <Icon name="alertTriangle" size={13} className="text-red-500" />
+                    </span>
+                  )}
+                </WithTooltip>
               )}
               <span className="min-w-0 flex-1 truncate">{name}</span>
 

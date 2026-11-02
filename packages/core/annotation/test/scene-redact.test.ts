@@ -1,11 +1,11 @@
 import { quadFromRect } from '@embedpdf/core-geometry';
+import { defaultPaintFonts, standardPaintFont } from '@embedpdf/core-text';
 import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
 import { step } from './support';
 import { DRAWN_FLAGS } from '../src/flags';
-import { HELVETICA_ASCENT, helveticaAdvance } from '../src/helvetica';
-import { layoutRedactLabel, scene } from '../src/scene';
+import { layoutRedactLabel, redactLabelText, scene } from '../src/scene';
 import type { ModelAnnotation, Model, RenderItem, TextStyle } from '../src/types';
 import { initialModel } from '../src/update';
 import { placed } from '../src/frame';
@@ -93,11 +93,11 @@ describe('redact scene', () => {
   it('hovered: fills opaquely and draws the label', () => {
     const nodes = scene(redactItem({ hovered: true, label: { text: 'REDACTED', repeat: false } }));
     const fills = nodes.filter((node) => node.kind === 'poly');
-    const texts = nodes.filter((node) => node.kind === 'text');
+    const texts = nodes.filter((node) => node.kind === 'textRun');
     expect(fills).toHaveLength(1);
     expect(fills[0]!.paint).toMatchObject({ fill: '#000000', opacity: 1 });
     expect(texts).toHaveLength(1);
-    expect(texts[0]).toMatchObject({ kind: 'text', text: 'REDACTED', fontSize: 12 });
+    expect(texts[0]).toMatchObject({ kind: 'textRun', text: 'REDACTED', fontSize: 12 });
   });
 
   it('hovered without interiorColor or label paints nothing (ISO transparent)', () => {
@@ -124,82 +124,107 @@ describe('redact scene', () => {
 });
 
 describe('layoutRedactLabel', () => {
-  it('single label: left-aligned at the top baseline', () => {
+  const helvetica = defaultPaintFonts('helvetica');
+
+  it('single label: left-aligned, its first baseline an ascent below the top, clipped to the region', () => {
     const [node] = layoutRedactLabel(REGION, { text: 'TOP', repeat: false }, LABEL_STYLE);
-    expect(node).toMatchObject({ kind: 'text', text: 'TOP', fontSize: 12 });
-    if (node!.kind !== 'text') throw new Error('expected text node');
+    expect(node).toMatchObject({ kind: 'textRun', text: 'TOP', fontSize: 12, clip: REGION });
+    if (node!.kind !== 'textRun') throw new Error('expected a text run');
     expect(node.at.x).toBe(REGION.x);
-    expect(node.at.y).toBeCloseTo(REGION.y + 12 * HELVETICA_ASCENT);
+    expect(node.at.y).toBeCloseTo(REGION.y + (12 * helvetica.face.ascent) / 1000, 2);
   });
 
-  it("draws the label in the font's CSS family: a standard stack, or a registered key's face", () => {
-    const [standard] = layoutRedactLabel(REGION, { text: 'A', repeat: false }, LABEL_STYLE);
-    expect(standard).toMatchObject({ fontFamily: 'Helvetica, Arial, sans-serif' });
-    const [registered] = layoutRedactLabel(
+  it('draws in the fonts the label carries; without them, its standard font, or Helvetica', () => {
+    const courier = { ...helvetica, face: standardPaintFont('courier') };
+    const [carried] = layoutRedactLabel(
+      REGION,
+      { text: 'A', repeat: false, fonts: courier },
+      LABEL_STYLE,
+    );
+    expect(carried).toMatchObject({
+      fontFamily: courier.face.fontFamily,
+      program: courier.face.program,
+    });
+    const [times] = layoutRedactLabel(
+      REGION,
+      { text: 'A', repeat: false },
+      { ...LABEL_STYLE, fontFamily: 'times-roman' },
+    );
+    expect(times).toMatchObject({ fontFamily: standardPaintFont('times-roman').fontFamily });
+    const [other] = layoutRedactLabel(
       REGION,
       { text: 'A', repeat: false },
       { ...LABEL_STYLE, fontFamily: 'brand-sans' },
     );
-    expect(registered).toMatchObject({ fontFamily: '"epdf-brand-sans", sans-serif' });
+    expect(other).toMatchObject({ fontFamily: helvetica.face.fontFamily });
   });
 
-  it('alignment: right pushes the line to the region edge', () => {
-    const [node] = layoutRedactLabel(
+  it('alignment: right ends the line at the region edge', () => {
+    const laid = redactLabelText(
       REGION,
       { text: 'X', repeat: false },
       { ...LABEL_STYLE, textAlign: 'right' },
-    );
-    if (node!.kind !== 'text') throw new Error('expected text node');
-    expect(node.at.x).toBeCloseTo(REGION.x + REGION.width - helveticaAdvance('X') * 12);
+      helvetica,
+    )!;
+    const [run] = laid.lines[0]!.runs;
+    expect(run!.x + run!.width).toBeCloseTo(REGION.width, 3);
   });
 
-  it('fontSize 0 fits one label to the region, at the size the engine picks', () => {
+  it('a label at a set size wraps to the region', () => {
+    const laid = redactLabelText(
+      { width: 60, height: 60 },
+      { text: 'one two three four', repeat: false },
+      LABEL_STYLE,
+      helvetica,
+    )!;
+    expect(laid.lines.length).toBeGreaterThan(1);
+  });
+
+  it('fontSize 0 fits one label to the region on one line, at the size the engine picks', () => {
     // As the engine fits it: "Classified" in 352 × 114 draws at 80pt (90
     // would overflow the width).
-    const [node] = layoutRedactLabel(
-      { x: 0, y: 0, width: 352, height: 114 },
+    const laid = redactLabelText(
+      { width: 352, height: 114 },
       { text: 'Classified', repeat: false },
       { ...LABEL_STYLE, fontSize: 0 },
-    );
-    expect(node).toMatchObject({ kind: 'text', fontSize: 80 });
+      helvetica,
+    )!;
+    expect(laid.fontSize).toBe(80);
+    expect(laid.lines).toHaveLength(1);
   });
 
   it('fontSize 0 fits a one-line region by its height', () => {
-    const [node] = layoutRedactLabel(
-      { x: 0, y: 0, width: 400, height: 14 },
+    const laid = redactLabelText(
+      { width: 400, height: 14 },
       { text: 'A', repeat: false },
       { ...LABEL_STYLE, fontSize: 0 },
-    );
-    expect(node).toMatchObject({ kind: 'text', fontSize: 10 });
+      helvetica,
+    )!;
+    expect(laid.fontSize).toBe(10);
   });
 
-  it('fontSize 0 with repeat tiles at 12pt, like the engine', () => {
+  it('fontSize 0 with repeat wraps the label, space-joined, at 12pt down past the region bottom', () => {
     // Measured from the engine: 3 labels a line in 180 × 120, 14.028pt apart.
-    const nodes = layoutRedactLabel(
-      { x: 0, y: 0, width: 180, height: 120 },
+    const laid = redactLabelText(
+      { width: 180, height: 120 },
       { text: 'Classified', repeat: true },
       { ...LABEL_STYLE, fontSize: 0 },
-    );
-    expect(nodes[0]).toMatchObject({ kind: 'text', fontSize: 12 });
-    const rows = new Set(nodes.map((node) => (node.kind === 'text' ? node.at.y : 0)));
-    expect(nodes.length / rows.size).toBe(3);
-    expect(rows.size).toBe(8);
+      helvetica,
+    )!;
+    expect(laid.fontSize).toBe(12);
+    const lines = laid.lines.map((line) => line.runs.map((run) => run.text).join(''));
+    expect(lines[0]!.trim()).toBe('Classified Classified Classified');
+    expect(laid.lines[0]!.baseline - laid.lines[1]!.baseline).toBeCloseTo(14.028, 2);
+    expect(laid.contentHeight).toBeGreaterThanOrEqual(120);
+    // Doubled one time fewer, the lines would end above the region's bottom.
+    const labels = lines.join(' ').split(/\s+/).filter(Boolean).length;
+    expect(Math.ceil(labels / 2 / 3) * 14.028).toBeLessThan(120);
   });
 
-  it('repeat tiles a full grid that FITS the region (no bleed)', () => {
-    const nodes = layoutRedactLabel(REGION, { text: 'AB', repeat: true }, LABEL_STYLE);
-    expect(nodes.length).toBeGreaterThan(1);
-    const width = helveticaAdvance('AB') * 12;
-    for (const node of nodes) {
-      if (node.kind !== 'text') throw new Error('expected text node');
-      expect(node.at.x + width).toBeLessThanOrEqual(REGION.x + REGION.width + 1e-6);
-      expect(node.at.y).toBeLessThanOrEqual(REGION.y + REGION.height);
-    }
-  });
-
-  it('caps the tile count as a runaway guard', () => {
-    const huge = { x: 0, y: 0, width: 100000, height: 100000 };
-    const nodes = layoutRedactLabel(huge, { text: 'A', repeat: true }, LABEL_STYLE);
-    expect(nodes.length).toBeLessThanOrEqual(400);
+  it('a repeated label doubles at most ten times: 1,024 labels', () => {
+    const huge = { width: 100000, height: 100000 };
+    const laid = redactLabelText(huge, { text: 'A', repeat: true }, LABEL_STYLE, helvetica)!;
+    const shown = laid.lines.flatMap((line) => line.runs.map((run) => run.text)).join('');
+    expect(shown.split('A').length - 1).toBe(1024);
   });
 });

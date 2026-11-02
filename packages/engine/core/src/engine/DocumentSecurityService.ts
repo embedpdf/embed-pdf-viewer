@@ -1,5 +1,5 @@
 import type { Identity } from '../auth/scope/types';
-import type { DocCapability, FieldRights, PdfBits } from '../auth/scope';
+import type { DocCapability, FieldRights, PdfBits, PluginPermission } from '../auth/scope';
 import type { AbortablePromise } from '../promise/AbortablePromise';
 import type { DocumentProtection } from '../signature/types';
 import type { EditSessionAccess } from '../identity/ObjectNumbers';
@@ -230,7 +230,7 @@ export interface DocumentSecurityService {
    * gating (e.g. `allows('doc.pages.assemble')`); use `scope` only to
    * *display* the concrete grants.
    */
-  allows(capability: DocCapability): boolean;
+  allows(capability: DocCapability | PluginPermission): boolean;
 
   /**
    * Per-record annotation authorization mirrors — the same resolver the

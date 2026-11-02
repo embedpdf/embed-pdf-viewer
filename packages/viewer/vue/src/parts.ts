@@ -20,5 +20,5 @@ export type {
 export { useCommand, usePDFViewer } from './composables';
 export { Panel, Region, ToolbarItem, useToolbarItem } from './slots';
 export type { PanelProps, RegionName, RegionProps, ToolbarItemProps } from './slots';
-export { Button, Menu, MenuItem } from './viewer-components';
-export type { ButtonProps, MenuItemProps, MenuProps } from './viewer-components';
+export { Button, Icon, Menu, MenuItem } from './viewer-components';
+export type { ButtonProps, IconProps, MenuItemProps, MenuProps } from './viewer-components';

@@ -38,8 +38,8 @@ state, your CSS:
 </PDFViewer>
 ```
 
-`useToolbarItem()` tells it where it sits, and `Button`, `Menu` and `MenuItem`
-are the viewer's own, for yours.
+`useToolbarItem()` tells it where it sits, and `Button`, `Menu`, `MenuItem` and
+`Icon` are the viewer's own, for yours.
 
 ## Driving the viewer
 

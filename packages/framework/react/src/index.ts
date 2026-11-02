@@ -12,6 +12,7 @@ export * from './actions';
 export * from './view-manager';
 export * from './page-edit';
 export * from './metadata';
+export * from './fonts';
 export * from './outline';
 export * from './attachment';
 export * from './history';

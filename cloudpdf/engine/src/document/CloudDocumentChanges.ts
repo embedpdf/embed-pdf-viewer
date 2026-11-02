@@ -102,6 +102,7 @@ export class CloudDocumentChanges {
       else if (
         item.type === 'pages.insert' ||
         item.type === 'pages.insertBlank' ||
+        item.type === 'pages.copy' ||
         item.type === 'pages.restore'
       ) {
         this.manifest.applyPageInsert(result.meta);

@@ -6,7 +6,7 @@ import type { WriteOptions } from '../mutation/WriteOptions';
 import { AbortablePromise } from '../promise/AbortablePromise';
 
 /** The verbs of `doc.pages` that change the page structure: each one op of a change. */
-export type PageStructureVerb = 'reorder' | 'rotate' | 'delete' | 'insert' | 'insertBlank';
+export type PageStructureVerb = 'reorder' | 'rotate' | 'delete' | 'insert' | 'insertBlank' | 'copy';
 
 /** The ops the structure verbs make. */
 type PageOpType = Extract<ChangeOp['type'], `pages.${string}`>;
@@ -68,6 +68,7 @@ export function pageVerbs(
           type: 'pages.insert',
           source: bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes),
           ...(position === undefined ? {} : { position }),
+          ...(options?.objectNumbers === undefined ? {} : { objectNumbers: options.objectNumbers }),
         },
         options,
         (item) => ({ insertedPages: item.insertedPages, layout: item.layout, meta: item.meta }),
@@ -77,6 +78,17 @@ export function pageVerbs(
         {
           type: 'pages.insertBlank',
           spec,
+          ...(position === undefined ? {} : { position }),
+          ...(options?.objectNumbers === undefined ? {} : { objectNumbers: options.objectNumbers }),
+        },
+        options,
+        (item) => ({ insertedPages: item.insertedPages, layout: item.layout, meta: item.meta }),
+      ),
+    copy: (pages, position, options) =>
+      one(
+        {
+          type: 'pages.copy',
+          pages,
           ...(position === undefined ? {} : { position }),
           ...(options?.objectNumbers === undefined ? {} : { objectNumbers: options.objectNumbers }),
         },

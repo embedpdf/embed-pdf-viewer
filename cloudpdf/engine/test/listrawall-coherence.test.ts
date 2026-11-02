@@ -51,6 +51,7 @@ function annotation(pageObjectNumber: number, index: number) {
     page: toPageRef(pageObjectNumber),
     hasAppearance: true,
     appearanceState: null,
+    structurePosition: null,
     nm: `stub-${pageObjectNumber}-${index}`,
     invisible: false,
     hidden: false,
@@ -153,6 +154,7 @@ function buildStub(overrides: Partial<StubState> = {}): Stub {
         annotationsVersion: state.annotationsVersion,
         auditHead: state.auditHead,
         baseSha: 'stub-sha',
+        serverFonts: 'f0',
         protection: null,
         pages: PAGE_OBJECT_NUMBERS.map((pageObjectNumber) => ({
           page: toPageRef(pageObjectNumber),

@@ -11,7 +11,9 @@ import {
 
 describe('versioned resource tokens', () => {
   test('round-trips each resource version without a representation coordinate', () => {
-    expect(encodeLayoutToken(7)).toBe('layoutVersion=7');
+    expect(encodeLayoutToken(7)).toBe('format=2,layoutVersion=7');
+    // A token from before the format: an older client's, answered the same.
+    expect(decodeLayoutToken('layoutVersion=7')).toBe(7);
     expect(encodeAnnotationToken(8)).toBe('annotationVersion=8');
     expect(encodeActionsToken(1)).toBe('actionsVersion=1');
     expect(decodeLayoutToken(encodeLayoutToken(7))).toBe(7);

@@ -44,6 +44,21 @@ function fakeHandle() {
 }
 
 describe('guardHandle', () => {
+  it('passes a symbol-keyed member through, so an engine can add its own side', async () => {
+    const side = Symbol.for('test/side');
+    const handle = {
+      id: 'd',
+      [side]: { channel: () => ({ fetch: () => Promise.resolve('answered') }) },
+    } as unknown as DocumentHandle;
+    const controller = new AbortController();
+    const doc = guardHandle(handle, { signal: controller.signal, instanceId: 'd#1' }, 'test');
+    type Side = { channel(): { fetch(): Promise<string> } };
+    const reached = (doc as unknown as Record<symbol, Side>)[side]!;
+    await expect(reached.channel().fetch()).resolves.toBe('answered');
+    controller.abort();
+    await expect(reached.channel().fetch()).rejects.toMatchObject({ code: 'instance-closed' });
+  });
+
   it('passes values through while the instance is live, with the raw target as `this`', async () => {
     const { handle, read } = fakeHandle();
     const controller = new AbortController();

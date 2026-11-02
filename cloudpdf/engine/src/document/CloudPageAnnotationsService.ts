@@ -141,7 +141,7 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
         }
         const wireToken = annotationAppearancesImageOptionsToWire(
           { ...options, format },
-          { annotationVersion: page.cache.annotationVersion },
+          { annotationVersion: page.cache.annotationVersion, serverFonts: manifest.serverFonts },
         );
         // Same `annotations` plane switch as list(): the appearance
         // batch shares too.

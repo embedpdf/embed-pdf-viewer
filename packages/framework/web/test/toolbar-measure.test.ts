@@ -7,7 +7,9 @@ import {
   observeContentWidth,
   observeHeight,
   observeLength,
+  observeOwnLength,
   observeWidth,
+  ownLengthOf,
   toolbarMeasureKey,
 } from '../src/toolbar-measure';
 
@@ -90,6 +92,37 @@ describe('observing widths', () => {
     created[0]!.callback([{ contentRect: { width: 300.4, height: 0 } }]);
     created[0]!.callback([{ contentRect: { width: 280, height: 0 } }]);
     expect(onWidth.mock.calls).toEqual([[300], [280]]);
+  });
+});
+
+describe('the length of an item that grows', () => {
+  /** An element as wide as its own 40 px, or the 400 px it grows to while `flex-grow` is on. */
+  const growing = () => {
+    const style = { flexGrow: '1' };
+    const element = {
+      style,
+      getBoundingClientRect: () =>
+        style.flexGrow === '0' ? { width: 40, height: 20 } : { width: 400, height: 200 },
+    } as unknown as HTMLElement;
+    return { element, style };
+  };
+
+  it('is its length without the growth, which is back on after the read', () => {
+    const { element, style } = growing();
+    expect(ownLengthOf(element, 'horizontal')).toBe(40);
+    expect(ownLengthOf(element, 'vertical')).toBe(20);
+    expect(style.flexGrow).toBe('1');
+  });
+
+  it('is reported now and on every resize, until detached', () => {
+    const created = observers();
+    const { element } = growing();
+    const onLength = vi.fn();
+    const detach = observeOwnLength(element, 'horizontal', onLength);
+    created[0]!.callback([]);
+    expect(onLength.mock.calls).toEqual([[40], [40]]);
+    detach();
+    expect(created[0]!.disconnected).toBe(true);
   });
 });
 

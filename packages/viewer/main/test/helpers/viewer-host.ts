@@ -79,11 +79,14 @@ export async function launchChromium(): Promise<Browser> {
   }
 }
 
-/** Wait until the viewer shows the opened document: the chrome reports its page count. */
+/**
+ * Wait until the viewer shows the opened document: the chrome reports its page count, as
+ * "Page 1 of 8", or "Pages 1–2 of 8" for a spread.
+ */
 export function waitForDocument(page: Page): Promise<unknown> {
   return page.waitForFunction(
     () =>
-      /Page 1 of \d+/.test(
+      /Pages? 1(–\d+)? of \d+/.test(
         document.querySelector('embedpdf-viewer')?.shadowRoot?.textContent ?? '',
       ),
     null,
@@ -95,5 +98,23 @@ export function waitForDocument(page: Page): Promise<unknown> {
 export function frames(page: Page): Promise<unknown> {
   return page.evaluate(
     () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))),
+  );
+}
+
+/**
+ * Wait out a slide or a fade: the time one takes, then until none is still running in the viewer
+ * (a busy machine starts one late). Endless animations, a spinner's, don't count.
+ */
+export async function settle(page: Page): Promise<void> {
+  await page.waitForTimeout(350);
+  await page.waitForFunction(() =>
+    document
+      .querySelector('embedpdf-viewer')!
+      .shadowRoot!.getAnimations()
+      .every(
+        (animation) =>
+          animation.playState !== 'running' ||
+          animation.effect?.getComputedTiming().endTime === Infinity,
+      ),
   );
 }

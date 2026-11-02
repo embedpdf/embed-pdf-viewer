@@ -82,7 +82,6 @@ export interface AuditEventRow {
  */
 export function auditRowToEvents(row: AuditEventRow, mySessionId: string): DocumentEvent[] {
   if (row.originSessionId === mySessionId) return []; // own echo — local publish covered it
-  if (row.withheld) return []; // nothing this connection may read: no facts, only pins
 
   const origin: EventOrigin = {
     kind: 'remote',
@@ -95,11 +94,26 @@ export function auditRowToEvents(row: AuditEventRow, mySessionId: string): Docum
   // Every event of the write shares its id: the request's `Idempotency-Key`,
   // or the row's own id when it came without one.
   const id = row.idempotencyKey ?? `audit:${row.id}`;
-  const events = factsOf(row, origin);
+  // Nothing this connection may read of a withheld row, only its pins: it
+  // still says the fonts changed, which the list shows anyone.
+  const facts = row.withheld ? [] : factsOf(row, origin);
+  // A write that changed the fonts the list shows ends with `fonts.changed`,
+  // as locally: its delta moved the list's pin.
+  const events: DocumentEvent[] =
+    (facts.length > 0 || row.withheld) && movesFonts(row)
+      ? [...facts, { type: 'fonts.changed', origin }]
+      : facts;
   return events.map((event, index) => ({
     ...event,
     origin: { ...origin, tx: { id, index, count: events.length } },
   }));
+}
+
+/** Whether a row's write moved the font list's pin. */
+function movesFonts(row: AuditEventRow): boolean {
+  const meta = (row.payload as { meta?: { cacheDelta?: { fontsVersion?: unknown } | null } } | null)
+    ?.meta;
+  return meta?.cacheDelta?.fontsVersion !== undefined;
 }
 
 /** The events a row records, in order, or none for a kind this version doesn't know. */

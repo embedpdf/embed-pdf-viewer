@@ -1,17 +1,20 @@
 /**
  * How a panel opens, by default and by its layout's `present` per size; how
- * wide it is, within its layout's `width` limits; and where its inner edge
- * goes from a drag or a key, on either side and in either writing direction.
+ * wide it is, within its layout's `width` limits, a sheet on a wider viewer
+ * included; and where its inner edge goes from a drag or a key, on either
+ * side and in either writing direction.
  */
 import { describe, expect, it } from 'vitest';
 
 import {
   DEFAULT_PANEL_WIDTHS,
   clampPanelWidth,
+  docksAt,
   maxPanelWidthOf,
   overlayWidthOf,
   panelWidthsOf,
   presentationOf,
+  sheetWidthOf,
   widenDirectionOf,
   widthAfterDrag,
   widthAfterKey,
@@ -39,6 +42,13 @@ describe('presentationOf', () => {
     expect(presentationOf('compact', { medium: 'dock' })).toBe('sheet');
     expect(presentationOf('compact', { compact: 'overlay' })).toBe('overlay');
     expect(presentationOf('expanded', { compact: 'overlay' })).toBe('dock');
+  });
+
+  it('says where a panel docks', () => {
+    expect(docksAt('expanded')).toBe(true);
+    expect(docksAt('medium')).toBe(false);
+    expect(docksAt('medium', { medium: 'dock' })).toBe(true);
+    expect(docksAt('expanded', 'overlay')).toBe(false);
   });
 });
 
@@ -70,6 +80,16 @@ describe('panel widths', () => {
   it('leaves some of the pages uncovered beside an overlay', () => {
     expect(overlayWidthOf(288, 800)).toBe(288);
     expect(overlayWidthOf(288, 300)).toBe(252);
+  });
+
+  it("makes a sheet as wide as its panel, within the panel's limits, never wider than the viewer", () => {
+    expect(sheetWidthOf(288, 1280, widths)).toBe(288);
+    // More than half the viewer: a sheet covers the pages anyway.
+    expect(sheetWidthOf(560, 800, widths)).toBe(560);
+    expect(sheetWidthOf(900, 1280, widths)).toBe(640);
+    expect(sheetWidthOf(100, 1280, widths)).toBe(200);
+    expect(sheetWidthOf(560, 500, widths)).toBe(500);
+    expect(sheetWidthOf(720, 1280, panelWidthsOf({ initial: 720, max: 760 }))).toBe(720);
   });
 });
 

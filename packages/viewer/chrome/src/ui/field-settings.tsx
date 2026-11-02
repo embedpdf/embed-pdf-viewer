@@ -15,6 +15,7 @@ import { useOptionalCapability, useOptionalSelector } from '@embedpdf/react/runt
 import { useEffect, useState } from 'react';
 
 import { useLabel } from './labels';
+import { TooltipButton } from './tooltip';
 
 const inputClass = 'border-border bg-surface text-fg w-full rounded-md border px-2 py-1.5 text-sm';
 
@@ -233,14 +234,13 @@ function OptionsEditor({
             value={row.value}
             onCommit={(value) => replace(at, { ...row, value })}
           />
-          <button
-            type="button"
-            title={t('demo.fieldOptionRemove')}
+          <TooltipButton
+            label={t('demo.fieldOptionRemove')}
             className="text-fg-muted hover:text-fg px-1"
             onClick={() => replace(at, null)}
           >
             ×
-          </button>
+          </TooltipButton>
         </div>
       ))}
       <button

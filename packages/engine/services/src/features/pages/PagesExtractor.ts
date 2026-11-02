@@ -5,7 +5,7 @@ import {
   type PageObjectNumber,
   type PageRef,
 } from '@embedpdf/engine-core/runtime';
-import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
+import { NULL_PTR, type PdfRuntimeModule, type Ptr } from '@embedpdf/engine-runtime';
 
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { U64_BYTES, pokeU64 } from '../../runtime/memory/u64';
@@ -124,7 +124,7 @@ export class PagesExtractor {
     if (!destPtr) {
       throw new EngineError(EngineErrorCode.Unknown, 'FPDF_CreateNewDocument failed');
     }
-    if (!fn.EPDFDoc_ImportPages(destPtr, srcPtr, idxPtr, indices.length, 0)) {
+    if (!fn.EPDFDoc_ImportPages(destPtr, srcPtr, idxPtr, indices.length, 0, NULL_PTR)) {
       fn.FPDF_CloseDocument(destPtr);
       throw new EngineError(
         EngineErrorCode.Unknown,

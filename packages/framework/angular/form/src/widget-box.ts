@@ -9,7 +9,9 @@
  *   tool's gesture, or end an edit as a click outside), and still sends it to the field's PDF
  *   "mouse down" action;
  * - a field without a border of its own gets an edge in the form settings' color, so people
- *   see where to fill in (lists and buttons draw their own).
+ *   see where to fill in (lists and buttons draw their own);
+ * - the form's cursor reaches the control here: `focus()` and Tab go through the form, in the
+ *   document's order (`bindFieldFocus`), unless the box has nothing to focus (`focusable`).
  *
  * Each control (`controls.ts`) is a component whose host element is its box: it extends this
  * class and adds its own control inside. The listeners, the box's style and the colors are
@@ -20,15 +22,18 @@ import {
   computed,
   DestroyRef,
   Directive,
+  effect,
   ElementRef,
   inject,
   input,
   PLATFORM_ID,
+  type Signal,
 } from '@angular/core';
 import { CapabilityBinding, injectKernelHost, injectPage } from '@embedpdf/angular/runtime';
 import type { FormWidgetItem } from '@embedpdf/plugin-form';
 import { FormToken as FormHostToken } from '@embedpdf/plugin-form/contract/host';
 import {
+  bindFieldFocus,
   bindWidgetEvents,
   isolatePointerDown,
   rectInPixels,
@@ -64,6 +69,9 @@ export abstract class FormWidgetBox<Item extends FormWidgetItem> {
   /** Whether a field without a border of its own gets an edge. A list and a button draw their own. */
   protected readonly drawsEdge: boolean = true;
 
+  /** Whether the box has a control the cursor can go into. */
+  protected readonly focusable: Signal<boolean> = computed(() => true);
+
   /** The box in the page layer's pixels: moves with the camera. */
   protected readonly frame = computed(() => rectInPixels(this.item().box, this.page.transform()));
 
@@ -82,6 +90,15 @@ export abstract class FormWidgetBox<Item extends FormWidgetItem> {
     inject(DestroyRef).onDestroy(() => {
       detachEvents();
       detachPress();
+    });
+    // The form's cursor in this box, bound again when the widget or what it takes changes.
+    effect((onCleanup) => {
+      const item = this.item();
+      const form = this.form();
+      const widget = item.annotationRef;
+      if (!form || !widget || item.disabled || !this.focusable()) return;
+      const radio = item.control === 'toggle' && item.kind === 'radio';
+      onCleanup(bindFieldFocus(this.element, form, widget, { radio }));
     });
   }
 

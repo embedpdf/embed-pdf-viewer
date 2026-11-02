@@ -23,7 +23,7 @@ import {
   ColorSchema,
 } from '../base.schema';
 import { field } from '../declaration';
-import type { FreeTextFont } from '../primitives';
+import type { FontName } from '../primitives';
 
 /** `/IRT` and `/RT`: the annotation this one replies to, and how it relates to it. */
 export const AnnotationReplySchema = z.object({
@@ -38,7 +38,7 @@ export const AnnotationReplyWriteSchema = z.object({
 });
 
 /** A standard font name or a registered font key; the writer resolves which. */
-export const FontNameSchema = z.string().min(1) as unknown as z.ZodType<FreeTextFont>;
+export const FontNameSchema = z.string().min(1) as unknown as z.ZodType<FontName>;
 
 /** One `/F` bit (ISO 32000-2 §12.5.3); every bit defaults to off. */
 const flag = () => field.data(z.boolean()).optional();
@@ -60,6 +60,14 @@ export const annotationBaseFields = {
    * names, so this picks the one to show.
    */
   appearanceState: field.engine(z.string()).nullable(),
+  /**
+   * Where the annotation sits in the document's logical structure (its tags,
+   * ISO 32000-2 §14.7): from the structure tree's root down, the index of each
+   * step among its parent's kids. Compared index by index, positions give the
+   * reading order the tags say, the order a page's `/Tabs /S` gives its
+   * annotations focus in. `null` for an annotation that isn't tagged.
+   */
+  structurePosition: field.engine(z.array(z.number().int().nonnegative())).nullable(),
   nm: field.data(z.string()).nullable().optional().createOnly(),
   rect: field.data(PdfRectSchema).space('box'),
   contents: field.data(z.string()).nullable().optional(),

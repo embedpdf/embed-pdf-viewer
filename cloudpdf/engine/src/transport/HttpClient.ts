@@ -126,6 +126,8 @@ export interface RequestOptions {
   readonly write?: WriteRequest;
   /** Sent as the editing session though not a write: `/access`, the bulk reservation. */
   readonly session?: boolean;
+  /** Sent to the server itself, never to a CDN in front of it, whatever the path. */
+  readonly origin?: boolean;
 }
 
 /** A raw-bytes response plus its headers. */
@@ -250,6 +252,18 @@ export class HttpClient {
 
   absoluteUrl(path: string): string {
     return `${this.baseUrl}${path}`;
+  }
+
+  /**
+   * One of the server's routes as it is, for a caller that reads the response
+   * itself, such as a server module's routes: with the token (fresh for each
+   * request), the document's affinity header and the busy retries, always to
+   * the server and never to a CDN, and answering whatever the status.
+   */
+  async fetchRoute(path: string, init: RequestInit = {}): Promise<Response> {
+    const headers = new Headers(init.headers ?? {});
+    if (!headers.has('Accept')) headers.set('Accept', '*/*');
+    return this.request(path, { ...init, headers }, { origin: true });
   }
 
   async getBlob(path: string, signal: AbortSignal): Promise<Blob> {
@@ -531,7 +545,11 @@ export class HttpClient {
     init: RequestInit,
     options: RequestOptions = {},
   ): Promise<Response> {
-    const { url, extraHeader, routedToCdn } = this.resolveOutgoing(path, init.method ?? 'GET');
+    const { url, extraHeader, routedToCdn } = this.resolveOutgoing(
+      path,
+      init.method ?? 'GET',
+      options.origin === true,
+    );
     const headers = new Headers(init.headers ?? {});
     if (this.tokenFn) {
       const token = await this.tokenFn();
@@ -660,13 +678,14 @@ export class HttpClient {
   private resolveOutgoing(
     path: string,
     method: string,
+    origin = false,
   ): {
     url: string;
     extraHeader: { name: string; value: string } | null;
     routedToCdn: boolean;
   } {
     const read = method === 'GET' || method === 'HEAD';
-    if (!read || !this.usesCdn || !this.cdnBinding || !this.cdnBinding.cdn) {
+    if (origin || !read || !this.usesCdn || !this.cdnBinding || !this.cdnBinding.cdn) {
       return { url: `${this.baseUrl}${path}`, extraHeader: null, routedToCdn: false };
     }
     const applied = applyCdnAccess({

@@ -105,6 +105,8 @@ export interface AnnotationAppearanceImageOptions extends AnnotationAppearanceRe
 export interface AnnotationAppearancesQuery {
   options: AnnotationAppearanceImageOptions;
   annotationVersion?: number;
+  /** As {@link PageRenderQuery.serverFonts}: an appearance drawn here may use fallback fonts. */
+  serverFonts?: string;
 }
 
 /**
@@ -114,6 +116,8 @@ export interface AnnotationAppearancesQuery {
 export interface WidgetAppearancesQuery {
   options: AnnotationAppearanceImageOptions;
   widgetVersion?: number;
+  /** As {@link PageRenderQuery.serverFonts}. */
+  serverFonts?: string;
 }
 
 /**

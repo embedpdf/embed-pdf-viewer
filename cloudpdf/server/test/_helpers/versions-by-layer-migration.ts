@@ -15,9 +15,6 @@ import {
   DocumentPagesRepo,
   DocumentSigningsRepo,
   DocumentsRepo,
-  LayerPagesRepo,
-  LayerService,
-  LayerStateService,
   LayersRepo,
   migrate,
   type DbSchema,
@@ -65,22 +62,25 @@ export async function checkVersionsByLayerMigration(
     .values([version(SHA1, 1, null, null)] as never)
     .execute();
 
-  const layerState = new LayerStateService({
-    documentPages: new DocumentPagesRepo(db),
-    layers: new LayersRepo(db),
-    layerPages: new LayerPagesRepo(db),
-    documents,
-    baseVersions: new BaseVersionsRepo(db),
-  });
-  const layerService = new LayerService({ documents, layerState });
+  // Inserted directly too: the layer repo writes columns that later
+  // migrations add (fonts_version).
   const layerIds: Record<string, string> = {};
   for (const name of ['alice', 'bob', 'dave']) {
-    const { layer } = await layerService.materializeLayerForWrite(
-      { tenantId: TENANT, sub: 'user-1' },
-      DOC,
-      name,
-    );
-    layerIds[name] = layer.id;
+    const id = `layer-${name}`;
+    await db
+      .insertInto('layers')
+      .values({
+        id,
+        doc_id: DOC,
+        tenant_id: TENANT,
+        name,
+        base_sha: SHA1,
+        doc_version: 1,
+        created_at: 1,
+        updated_at: 1,
+      } as never)
+      .execute();
+    layerIds[name] = id;
   }
 
   await db.transaction().execute(async (trx) => {

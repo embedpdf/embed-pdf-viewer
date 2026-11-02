@@ -21,6 +21,7 @@ import {
   type PdfBits,
   type ProtectableCapability,
   PermissionDenied,
+  scopeNotCovered,
 } from '@embedpdf/engine-core/runtime';
 import { checkResourceAccess, DOC_RESOURCES, type DocResourceId } from '@embedpdf/engine-core/wire';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
@@ -411,6 +412,25 @@ export async function requireTenantContentAccess(
     throw forbidden(`document permission required: ${capability}`);
   }
   return { tenantId, sub: t.sub, via: 'tenant-jwt' };
+}
+
+/**
+ * A route that hands out document permissions (a doc token, a grant), after
+ * {@link requireTenantAccess}: the caller gives only what it holds. The API
+ * token holds everything; a tenant JWT, its document permissions
+ * ({@link documentScopeOf}), so `tokens.issue-doc` next to reading mints
+ * reading tokens and nothing more.
+ */
+export function requireHeldScope(req: FastifyRequest, scope: ReadonlyArray<string>): void {
+  if (req.apiAuth) return;
+  const claims = req.tenant?.claims;
+  const held = claims && isTenantClaims(claims) ? documentScopeOf(claims.scope) : [];
+  const beyond = scopeNotCovered(scope, held);
+  if (beyond.length > 0) {
+    throw forbiddenError(
+      `scope gives document permissions this token doesn't hold: ${beyond.join(', ')}`,
+    );
+  }
 }
 
 /** Deployment-surface guard: the root credential only, never a JWT. */

@@ -16,7 +16,7 @@ import {
 
 import { setTextSelection } from '../model';
 import type { ChromeReads } from '../read/chrome';
-import { cssFontFamilyForFace, textCommitPatch, type TextSelection } from '../rich-text';
+import { textCommitPatch, type TextSelection } from '../rich-text';
 import type { AnnotationContext, AnnotationServices } from '../services';
 import type { Commit, StoreHold, Written } from '../services/store';
 
@@ -24,7 +24,7 @@ const TEXT_WRITE_DELAY_MS = 250;
 
 export function createTextEditing(
   ctx: Pick<AnnotationContext, 'state' | 'clock' | 'cancellable'>,
-  { store, fonts }: Pick<AnnotationServices, 'store' | 'fonts'>,
+  { store, fonts, textFonts }: Pick<AnnotationServices, 'store' | 'fonts' | 'textFonts'>,
   chrome: Pick<ChromeReads, 'textBoxAt'>,
 ) {
   /** What is being typed: the record, the change it goes into, how it settles, and the pause before it is sent. */
@@ -60,6 +60,7 @@ export function createTextEditing(
     };
     const current = typing;
     const commit = store.commit(message, { into: current.hold });
+    textFonts.typed(id);
     current.written = commit.written;
     current.cancelPause();
     current.cancelPause = ctx.clock.after(TEXT_WRITE_DELAY_MS, () => {
@@ -134,7 +135,9 @@ export function createTextEditing(
       }
       ctx.state.update(setTextSelection, next);
     },
-    getCssFontFamily: (family: string) => cssFontFamilyForFace(family, fonts),
+    getCssFontFamily: (face: { family: string; weight: number; italic: boolean }, id: Id | null) =>
+      textFonts.faceCss(id, face).fontFamily,
+    getFamilyOfCss: (cssFamily: string) => textFonts.familyOfCss(cssFamily) ?? cssFamily,
   };
 
   return { type, sendTyping, text, api };

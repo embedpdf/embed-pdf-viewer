@@ -36,7 +36,7 @@ function answerOf(change: Change): ChangeResult {
   return {
     items: ops.map((op) => ({
       type: op.type,
-      ...(op.type === 'pages.insert' || op.type === 'pages.insertBlank'
+      ...(op.type === 'pages.insert' || op.type === 'pages.insertBlank' || op.type === 'pages.copy'
         ? { insertedPages: NEW_PAGES }
         : {}),
       meta,
@@ -64,6 +64,8 @@ function harness(
   );
   const extract = vi.fn(async (_pages: PageRef[]): Promise<Uint8Array> => new Uint8Array([9]));
   const allows = vi.fn(options.allows ?? (() => true));
+  // The session's names for new objects, as the engine reserves them.
+  const pool = NEW_PAGES.map((page) => page.objectNumber).concat([103, 104]);
   const ctx = createTestContext({
     id: 'page-edit',
     state: initialPageEditModel(),
@@ -72,6 +74,14 @@ function harness(
       security: { allows },
       apply,
       pages: { extract },
+      objectNumbers: {
+        take: () => pool.shift() ?? null,
+        get held() {
+          return pool.length;
+        },
+        reserve: vi.fn(async () => {}),
+        onLost: () => () => {},
+      },
     } as unknown as Partial<DocumentHandle>,
   });
   if (options.otherDocument) {
@@ -205,8 +215,50 @@ describe('PageEditCapability', () => {
       control.hold = true;
       void pageEdit.delete([toPageRef(30), 0]);
       expect(ctx.changes.pending()[0]!.label).toEqual({ key: 'pages.delete', count: 2 });
-      await expect(pageEdit.delete([0, 1, 2])).rejects.toMatchObject({ code: 'invalid-input' });
+      // The pages go at once: the one page left is all the user sees.
+      expect(ctx.document()!.pages.map((page) => page.ref)).toEqual([toPageRef(20)]);
+      await expect(pageEdit.delete([0])).rejects.toMatchObject({ code: 'invalid-input' });
       expect(sent()).toEqual([[{ type: 'pages.delete', pages: [toPageRef(30), toPageRef(10)] }]]);
+    });
+
+    it('a delete shows at once, and undoing it shows the pages back where they were', () => {
+      const { ctx, pageEdit, control } = harness({ pages: THREE_PAGES });
+      control.hold = true;
+      const before = ctx.document()!.pages;
+      void pageEdit.delete([toPageRef(30), toPageRef(10)]);
+      expect(ctx.changes.pending()[0]!.undo).toEqual([
+        {
+          type: 'pages.restore',
+          pages: [
+            { page: before[0], after: null },
+            { page: before[2], after: toPageRef(20) },
+          ],
+        },
+      ]);
+    });
+
+    it('a move shows at once, and undoing it puts each page back after the page it followed', () => {
+      const { ctx, pageEdit, control } = harness({ pages: THREE_PAGES });
+      control.hold = true;
+      void pageEdit.reorder([toPageRef(10), toPageRef(20)], 'end');
+      expect(ctx.document()!.pages.map((page) => page.ref)).toEqual([
+        toPageRef(30),
+        toPageRef(10),
+        toPageRef(20),
+      ]);
+      expect(ctx.changes.pending()[0]!.undo).toEqual([
+        { type: 'pages.reorder', pages: [toPageRef(10)], position: 'start' },
+        { type: 'pages.reorder', pages: [toPageRef(20)], position: { after: toPageRef(10) } },
+      ]);
+    });
+
+    it('a turn shows at once, and an index names the page as the user sees the pages', () => {
+      const { ctx, pageEdit, last, control } = harness({ pages: THREE_PAGES });
+      control.hold = true;
+      void pageEdit.reorder([toPageRef(30)], 'start');
+      void pageEdit.rotateBy([0], 90);
+      expect(last()).toEqual([{ type: 'pages.rotate', pages: [toPageRef(30)], rotation: 90 }]);
+      expect(ctx.getPage(toPageRef(30))!.rotation).toBe(90);
     });
 
     it('rejects with the engine’s reason when the engine refuses the change', async () => {
@@ -219,9 +271,12 @@ describe('PageEditCapability', () => {
   });
 
   describe('inserts resolve the new pages', () => {
-    const blank = (size: { width: number; height: number }, count: number, position: unknown) => [
-      { type: 'pages.insertBlank', spec: { size, count }, position },
-    ];
+    const blank = (
+      size: { width: number; height: number },
+      count: number,
+      position: unknown,
+      objectNumbers = [101],
+    ) => [{ type: 'pages.insertBlank', spec: { size, count }, position, objectNumbers }];
 
     it('insertBlank appends by default, sized like the last page', async () => {
       const { pageEdit, last } = harness({ pages: THREE_PAGES });
@@ -240,7 +295,9 @@ describe('PageEditCapability', () => {
       await pageEdit.insertBlank({ position: { after: toPageRef(20) } });
       expect(last()).toEqual(blank({ width: 300, height: 400 }, 1, { after: toPageRef(20) }));
       await pageEdit.insertBlank({ position: { before: toPageRef(10) } });
-      expect(last()).toEqual(blank({ width: 100, height: 200 }, 1, { before: toPageRef(10) }));
+      expect(last()).toEqual(
+        blank({ width: 100, height: 200 }, 1, { before: toPageRef(10) }, [102]),
+      );
     });
 
     it("insertBlank 'start' goes first, sized like the first page", async () => {
@@ -257,8 +314,22 @@ describe('PageEditCapability', () => {
         count: 3,
         position: { after: toPageRef(10) },
       });
-      expect(last()).toEqual(blank({ width: 612, height: 792 }, 3, { after: toPageRef(10) }));
+      expect(last()).toEqual(
+        blank({ width: 612, height: 792 }, 3, { after: toPageRef(10) }, [101, 102, 103]),
+      );
       expect(ctx.changes.pending()[0]!.label).toEqual({ key: 'pages.insertBlank', count: 3 });
+    });
+
+    it('a blank insert shows its pages at once, named from the pool, and undoing it deletes them', () => {
+      const { ctx, pageEdit, control } = harness({ pages: THREE_PAGES });
+      control.hold = true;
+      void pageEdit.insertBlank({ position: { after: toPageRef(10) } });
+      expect(ctx.document()!.pages.map((page) => page.ref.objectNumber)).toEqual([10, 101, 20, 30]);
+      expect(ctx.getPage(toPageRef(101))!.size).toEqual({ width: 100, height: 200 });
+      expect(ctx.document()!.pendingPages.get(101)).toEqual({ look: 'blank' });
+      expect(ctx.changes.pending()[0]!.undo).toEqual([
+        { type: 'pages.delete', pages: [toPageRef(101)] },
+      ]);
     });
 
     it('insertBlank rejects a position page the document does not have', async () => {
@@ -283,22 +354,30 @@ describe('PageEditCapability', () => {
       expect(ctx.changes.pending()[0]!.label).toEqual({ key: 'pages.insert' });
     });
 
-    it('duplicate inserts copies right after the last of the pages, once the changes before it landed', async () => {
-      const { ctx, pageEdit, extract, sent, held, control } = harness({ pages: THREE_PAGES });
+    it('duplicate copies the pages right after the last of them, shown at once as they show', async () => {
+      const { ctx, pageEdit, extract, sent, control } = harness({ pages: THREE_PAGES });
       control.hold = true;
       void pageEdit.rotateBy([toPageRef(10)], 90);
-      const duplicated = pageEdit.duplicate([toPageRef(10), 1]);
-      await new Promise((resolve) => setTimeout(resolve));
-      // The copy waits for the rotate, so it holds the page as it shows.
-      expect(extract).not.toHaveBeenCalled();
-      control.hold = false;
-      held.shift()!.resolve();
-      await expect(duplicated).resolves.toEqual({ pages: NEW_PAGES });
-      expect(extract).toHaveBeenCalledWith([toPageRef(10), toPageRef(20)]);
+      void pageEdit.duplicate([toPageRef(10), 1]);
+      // One change after the rotate, named from the pool: the copies show turned, pending.
       expect(sent()[1]).toEqual([
-        { type: 'pages.insert', source: new Uint8Array([9]), position: { after: toPageRef(20) } },
+        {
+          type: 'pages.copy',
+          pages: [toPageRef(10), toPageRef(20)],
+          position: { after: toPageRef(20) },
+          objectNumbers: [101, 102],
+        },
       ]);
-      expect(ctx.changes.hasPending()).toBe(false);
+      expect(ctx.document()!.pages.map((page) => page.ref.objectNumber)).toEqual([
+        10, 20, 101, 102, 30,
+      ]);
+      expect(ctx.getPage(toPageRef(101))!.rotation).toBe(90);
+      expect(ctx.document()!.pendingPages.get(102)).toEqual({ look: 'copy', of: toPageRef(20) });
+      expect(ctx.changes.pending()[1]!.undo).toEqual([
+        { type: 'pages.delete', pages: [toPageRef(101), toPageRef(102)] },
+      ]);
+      // Nothing leaves the document.
+      expect(extract).not.toHaveBeenCalled();
     });
 
     it('insertFromDocument copies pages of another open document, by ref or index', async () => {
@@ -318,8 +397,14 @@ describe('PageEditCapability', () => {
         pageEdit.insertFromDocument('other', [1, toPageRef(500)], { position: 'start' }),
       ).resolves.toEqual({ pages: NEW_PAGES });
       expect(otherExtract).toHaveBeenCalledWith([toPageRef(501), toPageRef(500)]);
+      // Two pages come in: named first, so undoing the insert shows at once.
       expect(last()).toEqual([
-        { type: 'pages.insert', source: new Uint8Array([7]), position: 'start' },
+        {
+          type: 'pages.insert',
+          source: new Uint8Array([7]),
+          position: 'start',
+          objectNumbers: [101, 102],
+        },
       ]);
       await expect(pageEdit.insertFromDocument('other', [5])).rejects.toMatchObject({
         code: 'not-found',
@@ -382,7 +467,7 @@ describe('PageEditCapability', () => {
       expect(ctx.changes.hasPending()).toBe(false);
     });
 
-    it('refuses extract and duplicate without doc.download', async () => {
+    it('refuses extract without doc.download; duplicate needs only doc.pages.assemble', async () => {
       const { pageEdit, extract } = harness({
         pages: THREE_PAGES,
         allows: (permission) => permission !== 'doc.download',
@@ -391,10 +476,7 @@ describe('PageEditCapability', () => {
         code: 'permission-denied',
         permission: 'doc.download',
       });
-      await expect(pageEdit.duplicate([0])).rejects.toMatchObject({
-        code: 'permission-denied',
-        permission: 'doc.download',
-      });
+      await expect(pageEdit.duplicate([0])).resolves.toEqual({ pages: NEW_PAGES });
       expect(extract).not.toHaveBeenCalled();
     });
   });

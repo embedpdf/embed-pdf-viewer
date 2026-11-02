@@ -2,10 +2,12 @@
  * The free-text presentation projection: the core's geometry-only `textBoxes`
  * joined with the DTO-derived font + CSS into render-ready {@link TextItem}s. This
  * is the text analogue of the core's `scene()` "paint" for shapes, shared across
- * every web framework; the font's CSS family is the core's `cssFontFamilyForFont`.
+ * every web framework. The fonts are the text fonts' (the programs the engine
+ * draws with), else the standard font the engine falls back to.
  */
+import { standardFontCss, standardFontOf } from '@embedpdf/core-fonts';
 import {
-  cssFontFamilyForFont,
+  type FontLookup,
   initialTextStyle,
   type Id,
   type Model,
@@ -20,25 +22,42 @@ import {
 import type { PageRef } from '@embedpdf/engine-core/runtime';
 
 import type { TextItem } from './contract';
+import type { TextFonts } from './read/text-fonts';
 import { stripBodyDefaults } from './rich-text';
 import { styleOf, textOf } from '@embedpdf/core-annotation';
+
+type Programs = TextItem['programs'];
 
 /** Project the model's free-text boxes into render-ready {@link TextItem}s — the
  *  core geometry (`textBoxes`) joined with the DTO-derived CSS. Pure; memoized by
  *  model identity at the call site so selectors get a stable reference. */
-export function buildTextItems(model: Model, page: PageRef, view?: ViewEnv): TextItem[] {
-  return textBoxes(model, page, view).map((tb) => textItemOf(model, tb));
+export function buildTextItems(
+  model: Model,
+  page: PageRef,
+  view?: ViewEnv,
+  fonts?: { lookup: FontLookup; text: TextFonts },
+): TextItem[] {
+  return textBoxes(model, page, view).map((tb) => textItemOf(model, tb, fonts));
 }
 
 /** One free text's {@link TextItem}, live or baked (`textBoxOf`): what a renderer
  *  that draws the text box itself edits. `null` for a record that isn't one. */
-export function buildTextItem(model: Model, id: Id, view?: ViewEnv): TextItem | null {
+export function buildTextItem(
+  model: Model,
+  id: Id,
+  view?: ViewEnv,
+  fonts?: { lookup: FontLookup; text: TextFonts },
+): TextItem | null {
   const tb = textBoxOf(model, id, view);
-  return tb && textItemOf(model, tb);
+  return tb && textItemOf(model, tb, fonts);
 }
 
-/** A text box joined with its record's text, style and plate inset. */
-function textItemOf(model: Model, tb: TextBox): TextItem {
+/** A text box joined with its record's text, style, faces and plate inset. */
+function textItemOf(
+  model: Model,
+  tb: TextBox,
+  fonts?: { lookup: FontLookup; text: TextFonts },
+): TextItem {
   const record = model.byId[tb.id];
   // The text shows the user's pending change (a props edit lands here
   // before the engine confirms it), so the editor restyles instantly.
@@ -46,7 +65,12 @@ function textItemOf(model: Model, tb: TextBox): TextItem {
   // Match the engine's text plate inset. Browser font metrics and line
   // heights belong to the shared editor binding.
   const sw = record ? styleOf(record.annotation).strokeWidth : 0;
-  const doc = record ? richDocOf(record.annotation) : null;
+  const doc = record ? richDocOf(record.annotation, fonts?.lookup) : null;
+  const face = doc
+    ? { family: doc.body.family, weight: doc.body.weight, italic: doc.body.italic }
+    : { family: 'Helvetica', weight: 400, italic: false };
+  const bodyCss =
+    fonts?.text.bodyCss(tb.id, style, face) ?? standardFontCss(standardFontOf(style.fontFamily));
   return {
     id: tb.id,
     ref: refOf(record),
@@ -59,10 +83,13 @@ function textItemOf(model: Model, tb: TextBox): TextItem {
     richText: {
       paragraphs: doc ? stripBodyDefaults(doc.paragraphs, doc.body) : [{ runs: [{ text: '' }] }],
     },
+    face,
+    programs:
+      fonts && doc ? programsOf(tb.id, doc, face, bodyCss.programs, fonts.text) : bodyCss.programs,
     editing: tb.editing,
     ...(tb.rot ? { rot: tb.rot } : {}),
     css: {
-      fontFamily: cssFontFamilyForFont(style.fontFamily),
+      fontFamily: bodyCss.fontFamily,
       fontSize: style.fontSize,
       color: style.fontColor,
       fontWeight: style.bold ? 700 : 400,
@@ -72,4 +99,32 @@ function textItemOf(model: Model, tb: TextBox): TextItem {
       padding: textPlateInset(sw),
     },
   };
+}
+
+/** The programs a box's text is drawn in: the body's, then those of each face a run names. */
+function programsOf(
+  id: string,
+  doc: ReturnType<typeof richDocOf>,
+  body: { family: string; weight: number; italic: boolean },
+  bodyPrograms: Programs,
+  text: TextFonts,
+): Programs {
+  const programs = [...bodyPrograms];
+  for (const paragraph of doc.paragraphs) {
+    for (const run of paragraph.runs) {
+      const own = run.style;
+      if (own?.family === undefined && own?.weight === undefined && own?.italic === undefined) {
+        continue;
+      }
+      const css = text.faceCss(id, {
+        family: own.family ?? body.family,
+        weight: own.weight ?? body.weight,
+        italic: own.italic ?? body.italic,
+      });
+      for (const program of css.programs) {
+        if (!programs.some((known) => known.hash === program.hash)) programs.push(program);
+      }
+    }
+  }
+  return programs;
 }

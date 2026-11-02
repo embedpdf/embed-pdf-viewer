@@ -14,9 +14,11 @@ import {
   StorageKeys,
   type AppBundle,
   type DbSchema,
+  type ServerFontDescriptor,
 } from '@cloudpdf/server';
 import { buildAppForTesting } from '../../../server/src/app/buildApp';
 import { createValidTestLicenseGate } from '../../../server/src/licensing/testing';
+import type { HostedModule } from '../../../server/src/modules/protocol';
 
 /**
  * Shared cloud-test scaffolding for the versioned read pipeline. The
@@ -38,7 +40,13 @@ export interface DbSeededFixture {
 }
 
 export async function buildDbSeededFixture(
-  opts: { secret: string; bundleLimits?: BundleLimits } = {
+  opts: {
+    secret: string;
+    bundleLimits?: BundleLimits;
+    modules?: readonly HostedModule[];
+    /** The server's own fonts (`CLOUDPDF_FONTS`). */
+    fonts?: ReadonlyArray<ServerFontDescriptor>;
+  } = {
     secret: 'cloud-test-secret',
   },
 ): Promise<DbSeededFixture> {
@@ -59,6 +67,8 @@ export async function buildDbSeededFixture(
     cacheRoot,
     cacheMaxBytes: 4 * 1024 * 1024,
     ...(opts.bundleLimits ? { bundleLimits: opts.bundleLimits } : {}),
+    ...(opts.fonts ? { fonts: opts.fonts } : {}),
+    ...(opts.modules ? { modules: opts.modules } : {}),
   });
   const addr = await bundle.app.listen({ host: '127.0.0.1', port: 0 });
   const baseUrl = typeof addr === 'string' ? addr : `http://127.0.0.1:${addr}`;

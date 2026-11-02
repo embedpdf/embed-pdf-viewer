@@ -124,14 +124,15 @@ export type PDFViewerComponent<Props> = new (
 
 /**
  * Every config key, as a prop (TypeScript keeps the list complete). `null` takes any value, which
- * the viewer checks itself; `readOnly` written without a value is `true`, as for any boolean prop
- * (`<PDFViewer read-only />`).
+ * the viewer checks itself; `readOnly` and `warnBeforeLeaving` written without a value are `true`,
+ * as for any boolean prop (`<PDFViewer read-only />`).
  */
 const CONFIG_PROPS = {
   src: null,
   documents: null,
   engine: null,
   commands: null,
+  appState: null,
   icons: null,
   strings: null,
   locale: null,
@@ -141,7 +142,11 @@ const CONFIG_PROPS = {
   identity: null,
   notAllowed: null,
   layout: null,
+  size: null,
+  touch: null,
   plugins: null,
+  fonts: null,
+  warnBeforeLeaving: { type: Boolean, default: undefined },
   theme: null,
   fetch: null,
 } satisfies Record<keyof PDFViewerImplProps, unknown>;
@@ -185,6 +190,7 @@ const LIVE_PROPS: Readonly<Record<LiveConfigKey, true>> = {
   disable: true,
   readOnly: true,
   fetch: true,
+  appState: true,
 };
 
 /** The config as the props give it, each value raw: a reactive copy is another object. */
@@ -257,7 +263,15 @@ export function setupPDFViewer(
   // The live props, on every change of one: the element compares them by value, so an unchanged
   // one (an inline `:disable="['forms']"` too) changes nothing.
   watch(
-    () => [props.src, props.theme, props.locale, props.disable, props.readOnly, props.fetch],
+    () => [
+      props.src,
+      props.theme,
+      props.locale,
+      props.disable,
+      props.readOnly,
+      props.fetch,
+      props.appState,
+    ],
     () => {
       const target = element.value;
       if (!target) return;
@@ -267,6 +281,7 @@ export function setupPDFViewer(
       target.disable = toRaw(props.disable);
       target.readOnly = toRaw(props.readOnly);
       target.fetch = props.fetch;
+      target.appState = toRaw(props.appState);
     },
   );
 

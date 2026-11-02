@@ -50,6 +50,34 @@ export function createAssetEngine(ctx: StampContext) {
     return resolved.engine;
   };
 
+  /** Each asset engine's fonts, by key: each read and registered once (a failed read is tried again). */
+  const registered = new WeakMap<Engine, Map<string, Promise<void>>>();
+
+  /**
+   * Register the font a typed mark names on the asset engine, when it's one of the `fonts`
+   * setting's: a standard font, or one the engine has, needs nothing.
+   */
+  const registerFont = async (key: string): Promise<void> => {
+    const font = settings.get().fonts.find((each) => each.key === key);
+    if (!font) return;
+    const engine = await assetEngine();
+    // An engine that isn't local opens no mark (`openAssetDocument` says why).
+    if (!isLocalEngine(engine)) return;
+    let byKey = registered.get(engine);
+    if (!byKey) registered.set(engine, (byKey = new Map()));
+    let registering = byKey.get(key);
+    if (!registering) {
+      const fonts = byKey;
+      registering = font
+        .load()
+        .then((data) => engine.fonts.register({ key, data }))
+        .then(() => undefined);
+      fonts.set(key, registering);
+      registering.catch(() => fonts.delete(key));
+    }
+    return registering;
+  };
+
   /** Library PDFs are sliced and tagged (`/PieceInfo`) on a local engine only. */
   const openAssetDocument = async (bytes: Uint8Array): Promise<LocalDocumentHandle> => {
     const engine = await assetEngine();
@@ -102,6 +130,7 @@ export function createAssetEngine(ctx: StampContext) {
 
   return {
     openAssetDocument,
+    registerFont,
     imageToPreview,
     renderThumbnail,
     /** Optimistic until an import finds the asset engine is not local (cloud). */

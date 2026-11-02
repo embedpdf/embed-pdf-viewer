@@ -22,6 +22,7 @@ describe("PagesClient", () => {
                     metadataVersion: 1,
                     attachmentsVersion: 1,
                     outlineVersion: 1,
+                    fontsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [
@@ -33,6 +34,7 @@ describe("PagesClient", () => {
                 },
                 opId: "opId",
                 undoable: true,
+                missingCharacters: ["missingCharacters"],
             },
         };
 
@@ -181,6 +183,7 @@ describe("PagesClient", () => {
                     metadataVersion: 1,
                     attachmentsVersion: 1,
                     outlineVersion: 1,
+                    fontsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [
@@ -192,6 +195,7 @@ describe("PagesClient", () => {
                 },
                 opId: "opId",
                 undoable: true,
+                missingCharacters: ["missingCharacters"],
             },
         };
 
@@ -296,6 +300,7 @@ describe("PagesClient", () => {
                         pdfCropBox: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
                     },
                 ],
+                labels: [{ firstPage: 1, style: null, firstNumber: 1, prefix: "prefix" }],
                 namedPages: [
                     { name: "name", target: { kind: "page", page: { kind: "objectNumber", objectNumber: 1 } } },
                 ],
@@ -311,6 +316,7 @@ describe("PagesClient", () => {
                     metadataVersion: 1,
                     attachmentsVersion: 1,
                     outlineVersion: 1,
+                    fontsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [
@@ -322,6 +328,7 @@ describe("PagesClient", () => {
                 },
                 opId: "opId",
                 undoable: true,
+                missingCharacters: ["missingCharacters"],
             },
         };
 
@@ -426,6 +433,7 @@ describe("PagesClient", () => {
                         pdfCropBox: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
                     },
                 ],
+                labels: [{ firstPage: 1, style: null, firstNumber: 1, prefix: "prefix" }],
                 namedPages: [
                     { name: "name", target: { kind: "page", page: { kind: "objectNumber", objectNumber: 1 } } },
                 ],
@@ -441,6 +449,7 @@ describe("PagesClient", () => {
                     metadataVersion: 1,
                     attachmentsVersion: 1,
                     outlineVersion: 1,
+                    fontsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [
@@ -452,6 +461,7 @@ describe("PagesClient", () => {
                 },
                 opId: "opId",
                 undoable: true,
+                missingCharacters: ["missingCharacters"],
             },
         };
 

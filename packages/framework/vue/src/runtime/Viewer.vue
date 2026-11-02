@@ -8,7 +8,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, shallowRef, toRaw, watch } from 'vue';
 import { createKernel, isLocalEngine, viewerSettingsOf } from '@embedpdf/core';
-import { browserClock, browserPrinter } from '@embedpdf/web';
+import { browserClock, browserPrinter, browserTextMeasurer } from '@embedpdf/web';
 import type {
   AnyPlugin,
   Engine,
@@ -157,6 +157,7 @@ onMounted(() => {
       settings: settingsOf(),
       clock: browserClock(),
       printer: browserPrinter(),
+      measurer: browserTextMeasurer(),
       fetch: (url, init) => {
         // A plain call: the browser's own `fetch` refuses any other `this`.
         const download = props.fetch ?? globalThis.fetch;

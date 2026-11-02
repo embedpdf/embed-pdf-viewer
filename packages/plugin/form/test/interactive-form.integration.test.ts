@@ -99,6 +99,8 @@ describe('interactive form JavaScript acceptance', () => {
       revision: 0,
       hasUnsavedChanges: false,
       renderPolicy: { kind: 'continuous' },
+      pageLabels: [],
+      pendingPages: new Map(),
     });
     const realm = standaloneRealm(doc, document, {
       now: () => Date.UTC(2026, 6, 15, 9, 30, 0),

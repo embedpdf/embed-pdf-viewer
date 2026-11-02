@@ -15,7 +15,7 @@ import type {
 import type { Rect } from '@embedpdf/core-geometry';
 import type {
   AnnotationRef,
-  FreeTextFont,
+  FontName,
   PageRef,
   RedactionApplyResult,
   SearchQuery,
@@ -43,7 +43,7 @@ export interface RedactionSettings {
       /** The color of a label. */
       readonly color: string;
       /** The label's font: a standard font or a registered one. */
-      readonly fontFamily: FreeTextFont;
+      readonly fontFamily: FontName;
       /** The label's size in points; `0` fits it to the area. */
       readonly fontSize: number;
     };

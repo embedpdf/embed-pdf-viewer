@@ -1,6 +1,7 @@
 import {
   AbortablePromise,
   type AnnotationOwner,
+  checkPluginPermission,
   collabTargetOf,
   type DocCapability,
   type DocumentSecurityProbeInfo,
@@ -14,6 +15,8 @@ import {
   type Identity,
   type PasswordPrompt,
   passwordPromptFromState,
+  pluginOfPermission,
+  type PluginPermission,
   securityStateFromProbe,
   wirePack,
 } from '@embedpdf/engine-core/runtime';
@@ -71,9 +74,14 @@ export class LocalDocumentSecurityService implements DocumentSecurityService {
    * annotation services enforce with (`ScopeGuard.can`/`assertCapability`).
    * Returns `false` on the legacy no-ScopeGuard open path (no scope was
    * supplied, so we can't affirm a grant — UI should hide edit affordances).
+   * A plugin's permission holds when the scope names it, or `*`: nothing
+   * here knows which plugins are installed, and the plugin checks its own.
    */
-  allows(cap: DocCapability): boolean {
-    return this.guard ? this.guard.can(cap) : false;
+  allows(permission: DocCapability | PluginPermission): boolean {
+    if (!this.guard) return false;
+    return pluginOfPermission(permission) === null
+      ? this.guard.can(permission as DocCapability)
+      : checkPluginPermission(permission, this.guard.rawScope(), new Set([permission]));
   }
 
   /**

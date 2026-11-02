@@ -40,6 +40,7 @@ export function element(tag: string, style: Partial<EditorStyle> = {}): EditorEl
     parentNode: null,
     childNodes: [],
     style: { ...emptyStyle(), ...style },
+    dataset: {},
     appendChild(child: EditorNode) {
       const fakeChild = child as FakeNode;
       fakeChild.parentNode = node;

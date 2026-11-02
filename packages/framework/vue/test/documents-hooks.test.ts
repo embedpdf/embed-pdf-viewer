@@ -73,7 +73,7 @@ const engine = {
     Promise.resolve({
       id: input.id ?? 'doc',
       events: { subscribe: () => () => {}, lastServerId: () => null },
-      pages: { list: () => Promise.resolve({ pageCount: 1, pages: [page] }) },
+      pages: { list: () => Promise.resolve({ pageCount: 1, labels: [], pages: [page] }) },
       security: { allows: () => true, allowsAnnotation: () => true },
       metadata: {
         get: () => Promise.resolve(METADATA),

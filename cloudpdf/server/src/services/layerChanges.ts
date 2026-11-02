@@ -69,6 +69,8 @@ export function objectNumberEstimateOf(changes: readonly RequestedChange[]): num
         pages += OBJECT_NUMBER_ESTIMATES.insertedPages(op.source.byteLength);
       } else if (op.type === 'pages.insertBlank') {
         pages += OBJECT_NUMBER_ESTIMATES.blankPages(op.spec.count ?? 1);
+      } else if (op.type === 'pages.copy') {
+        pages += OBJECT_NUMBER_ESTIMATES.copiedPages(op.pages.length);
       } else if (op.type === 'attachments.create') {
         files += 1;
       }
@@ -159,7 +161,11 @@ export function factsOf(results: readonly ChangeResult[]): ChangeFacts {
     } else if (item.type.startsWith('pages.')) {
       layout = true;
       if (item.type === 'pages.delete') pageSetChanged('remove', item.pages);
-      else if (item.type === 'pages.insert' || item.type === 'pages.insertBlank') {
+      else if (
+        item.type === 'pages.insert' ||
+        item.type === 'pages.insertBlank' ||
+        item.type === 'pages.copy'
+      ) {
         pageSetChanged('insert', item.insertedPages);
       } else if (item.type === 'pages.restore') pageSetChanged('restore', item.pages);
     }

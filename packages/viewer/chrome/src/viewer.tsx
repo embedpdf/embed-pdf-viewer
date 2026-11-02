@@ -14,9 +14,9 @@
  * The engine stays a prop — choosing local-wasm vs cloud is the host's
  * decision, and each delivery wires its own. The chrome — toolbars,
  * translations, theme — renders at t≈0; only the pages wait on the engine.
- * Customization is mount-time, except `theme`, `locale`, `disable` and
- * `readOnly`, which follow their props (see {@link FollowProps}); changing any
- * other prop on a mounted viewer does not rebuild the workspace.
+ * Customization is mount-time, except `theme`, `locale`, `disable`,
+ * `readOnly` and `appState`, which follow their props (see {@link FollowProps});
+ * changing any other prop on a mounted viewer does not rebuild the workspace.
  */
 // One import line per feature: each subpath carries the
 // plugin and its UI; delete a line and the feature leaves the bundle.
@@ -33,6 +33,7 @@ import type {
 import { stagePlugin } from '@embedpdf/react/stage';
 import { renderPlugin } from '@embedpdf/react/render';
 import { pageEditPlugin } from '@embedpdf/react/page-edit';
+import { fontsPlugin } from '@embedpdf/react/fonts';
 import { metadataPlugin } from '@embedpdf/react/metadata';
 import { outlinePlugin } from '@embedpdf/react/outline';
 import { attachmentPlugin } from '@embedpdf/react/attachment';
@@ -53,7 +54,7 @@ import { CommandsToken, commandsPlugin } from '@embedpdf/react/commands';
 import type { NotAllowedMode } from '@embedpdf/react/commands';
 import { historyPlugin } from '@embedpdf/react/history';
 import { shellPlugin } from '@embedpdf/react/shell';
-import type { LayoutOption } from '@embedpdf/core-ui';
+import type { LayoutOption, ViewerSize } from '@embedpdf/core-ui';
 import { ThumbsStageToken } from './config/stage';
 import { defaultCommands, toolCommandsFor } from './config/commands';
 import { resolveViewerCommands, type CommandDef } from './config/viewer-commands';
@@ -93,19 +94,26 @@ import { isMacPlatform } from '@embedpdf/web';
 import { ThemeProvider, themeConfigOf, type ThemeConfig, type ThemePreference } from './ui/theme';
 import { Shell } from './Shell';
 import type { PlacedComponents } from './ui/placed-components';
+import { stampFontsOf } from './ui/signature-fonts';
 import { SlottedEdgesProvider, createSlottedEdges } from './ui/slotted-edges';
 
 /**
  * The customization surface — identical in the vanilla snippet and every
  * framework wrapper. See README.md for the ladder this implements.
  */
-export interface ViewerCustomization {
+export interface ViewerCustomization<AppState = any> {
   /**
    * Your commands, beside the built-in ones. One with a built-in id changes that one, field by
    * field: what it leaves out stays. A shortcut of yours wins over a built-in one with the same
    * keys.
    */
-  commands?: readonly CommandDef[];
+  commands?: readonly CommandDef<AppState>[];
+  /**
+   * Your app's state, which your commands' functions get as `appState`: values, and functions
+   * that change them. Follows its prop: a new value, and every button asks its command again.
+   * Its type is `any` until you give yours (`ViewerConfig<Review>`), which every command then gets.
+   */
+  appState?: AppState;
   /** Your icons by name: 24×24 path data. One with a built-in icon's name replaces it. */
   icons?: Readonly<Record<string, IconDef>>;
   /**
@@ -144,6 +152,18 @@ export interface ViewerCustomization {
    */
   layout?: LayoutOption;
   /**
+   * The size the layout is for at every width, as `env.size` then says: `'compact'` (a phone's
+   * layout), `'medium'` or `'expanded'`. `'auto'` (default) sizes the viewer by its own width.
+   * Read once.
+   */
+  size?: 'auto' | ViewerSize;
+  /**
+   * Whether the viewer is laid out for a finger, as `env.touch` then says: 44 px buttons and menu
+   * rows for every pointer (`true`), or for none (`false`). `'auto'` (default) asks whether the
+   * main pointer is a finger. Read once.
+   */
+  touch?: 'auto' | boolean;
+  /**
    * Each plugin's settings, by the plugin's name, as its page in the headless docs lists them
    * (`stage: { spread: 'odd' }`), over the viewer's own; and a plugin of your own as its
    * definition (`analytics: analyticsPlugin()`), which `viewer.get('analytics')` then finds.
@@ -156,6 +176,20 @@ export interface ViewerCustomization {
    * which marks people keep and their fonts. Read once.
    */
   plugins?: ViewerPluginsConfig;
+  /**
+   * Your fonts, beyond the standard 14: each read once (from `url`, or its `data`) and
+   * registered on a local engine under its key, the name a `fontFamily` takes. The style panel
+   * offers them for text boxes, form fields and redaction labels, and the browser draws them as
+   * the engine writes them. A cloud engine's fonts are its server's: there they're ignored, with
+   * a warning. Read once.
+   */
+  fonts?: readonly ViewerFont[];
+  /**
+   * Whether leaving the page asks first while a document has unsaved changes (changed since it
+   * opened or was last downloaded, by the user or the app's code). Default `true`; `false` leaves
+   * without asking. Closing a document's tab asks either way. Read once.
+   */
+  warnBeforeLeaving?: boolean;
   /** Light/dark preference (string shorthand), or the full theme config: the
    *  accent and the other tokens. Tokens are applied by the delivery (the
    *  custom element adopts them into its shadow root); direct
@@ -163,8 +197,9 @@ export interface ViewerCustomization {
    *  instead. Follows its prop. */
   theme?: ThemePreference | ThemeConfig;
   /**
-   * Called with the `viewer` once it's live, before any document has opened: capabilities
-   * resolve from then on, and document-scoped calls wait for their document. Read once.
+   * Called with the `viewer` once it's live, before any document has opened: the viewer's own
+   * plugins (`documents`, `commands`) are there from then on, a document's plugins once it has
+   * opened (`documents.onOpened`; `watch()` waits for them). Read once.
    */
   onReady?: (viewer: Viewer) => void;
   /**
@@ -198,12 +233,6 @@ export interface FullViewerProps extends ViewerCustomization {
    * viewer draws — a delivery concern: the custom element passes the ones inside it.
    */
   components?: PlacedComponents;
-  /**
-   * Fonts beyond the standard 14 for the engine (a delivery's `engine.fonts`): each is read
-   * once, registered on a local engine and mounted for the live text editor, and the style
-   * panel offers it. A cloud engine's fonts are its server's, so none are offered there.
-   */
-  fonts?: readonly ViewerFont[];
 }
 
 /**
@@ -279,16 +308,19 @@ function FollowProps({
   locale,
   disable,
   readOnly,
+  appState,
 }: {
   registered: {
     readonly locale: string;
     readonly disabled: DisabledSettings;
     readonly byHand: ByHandSettings;
+    readonly appState: unknown;
   };
   settings: PluginsConfigRead['settings'];
   locale: string;
   disable: ViewerCustomization['disable'];
   readOnly: ViewerCustomization['readOnly'];
+  appState: unknown;
 }) {
   const kernel = useKernel();
   // The kernel starts after the first render, so a prop may have changed before this mounts.
@@ -297,7 +329,11 @@ function FollowProps({
   useLayoutEffect(() => {
     const { disabled, byHand } = turnedOffOf(disable, readOnly, settings);
     const previous = applied.current;
-    applied.current = { locale, disabled, byHand };
+    applied.current = { locale, disabled, byHand, appState };
+    // Your app's state, which the commands read: a new value, and every button asks again.
+    if (!Object.is(previous.appState, appState)) {
+      kernel.capability(CommandsToken).updateSettings({ appState });
+    }
     // What a turned-off feature made stays in the document, frozen: no one changes it by hand.
     if (!sameByHand(previous.byHand.editable, byHand.editable)) {
       kernel.settingsOf(AnnotationToken).updateSettings({ editable: byHand.editable });
@@ -337,6 +373,7 @@ export function FullViewer({
   fetch,
   fallback,
   commands,
+  appState,
   icons,
   strings,
   locale = 'auto',
@@ -346,8 +383,11 @@ export function FullViewer({
   identity,
   notAllowed,
   layout,
+  size,
+  touch,
   plugins: pluginsConfig,
   fonts,
+  warnBeforeLeaving,
   theme,
   themeTarget,
   components,
@@ -391,15 +431,19 @@ export function FullViewer({
       viewerCommands,
       // Structure: resolved at the viewer's env by the shell's layout root.
       layout,
+      size,
+      touch,
       icons: icons ?? {},
       stamp: pluginsRead.viewer.stamp,
       signature: pluginsRead.viewer.signature,
       fonts: fonts ?? [],
+      warnBeforeLeaving: warnBeforeLeaving !== false,
       onPanelResize,
       i18n: { locales, loaders, codes, initial: localeCodeOf(locale, codes) },
       plugins: pluginsRead,
       tokens: tokens as PluginTokens,
       ...turnedOffOf(disable, readOnly, pluginsRead.settings),
+      appState,
     };
   });
 
@@ -456,6 +500,9 @@ export function FullViewer({
     // The document's title, author and your own fields, read the first time something asks
     // (`viewer.get('metadata').ensureLoaded()`, `useMetadataState()`), never as a document opens.
     metadataPlugin(),
+    // The document's fonts, read the first time text is typed in a font of its own: what
+    // the free text and form editors draw that text in, so it shows as the engine writes it.
+    fontsPlugin(),
     // The document's outline, read the first time its panel or its state asks for it.
     outlinePlugin(),
     // The files the document carries, read once a document shows, so the attachments panel
@@ -507,7 +554,9 @@ export function FullViewer({
     // stamps sidebar is the picker; placement rides annotation's armed stamp.
     // Libraries open on a local engine: the viewer's own unless the host
     // names one (`assetEngine`; a cloud viewer has to).
-    stampPlugin(settings.stamp),
+    // A typed signature's fonts go with the stamp plugin, which registers each on the engine
+    // marks are written on.
+    stampPlugin({ fonts: stampFontsOf(resolved.signature.fonts), ...settings.stamp }),
     // The action engine: /A and /AA trees dispatch through one policy-gated
     // executor spine, and the JavaScript switch lives here (the per-document
     // ScriptHost realm; form's K/V/C/F pipeline rides its transaction port,
@@ -544,6 +593,7 @@ export function FullViewer({
     commandsPlugin({
       ...settings.commands,
       commands: [...resolved.viewerCommands.commands, ...(settings.commands?.commands ?? [])],
+      ...(resolved.appState === undefined ? {} : { appState: resolved.appState }),
       ...resolved.disabled,
       ...(notAllowed ? { notAllowed } : {}),
     }),
@@ -573,11 +623,13 @@ export function FullViewer({
               locale: resolved.i18n.initial,
               disabled: resolved.disabled,
               byHand: resolved.byHand,
+              appState: resolved.appState,
             }}
             settings={settings}
             locale={localeCodeOf(locale, resolved.i18n.codes)}
             disable={disable}
             readOnly={readOnly}
+            appState={appState}
           />
           <HandleBridge
             slot={resolved.slot}

@@ -67,7 +67,7 @@ function makeHandle(id: string, options: FakeHandleOptions = {}) {
       list: async () => {
         await options.listGate;
         if (options.listRejection) throw options.listRejection;
-        return { pageCount: 1, pages: [page(1, 0)] };
+        return { pageCount: 1, labels: [], pages: [page(1, 0)] };
       },
     },
     security: options.security,

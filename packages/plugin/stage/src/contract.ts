@@ -19,6 +19,8 @@ import type {
   Camera,
   PageBox,
   PageFrame,
+  Padding,
+  PaddingSides,
   Point,
   ScrollMetrics,
   Size,
@@ -40,6 +42,8 @@ export type {
   Point,
   Direction,
   PageFrame,
+  Padding,
+  PaddingSides,
   ScrollMetrics,
   SpreadMode,
   SizingMode,
@@ -157,9 +161,11 @@ export interface StageSettings {
   /**
    * Breathing room (screen px) around the content — the one spacing concept.
    * Fit-modes inset by it, arrivals leave it as a gutter, and the clamp lets the
-   * camera reveal exactly this much beyond each content edge.
+   * camera reveal exactly this much beyond each content edge. A number is every
+   * side; `{ top, right, bottom, left }` gives each side its own, as room for a
+   * toolbar floating over one edge.
    */
-  padding: number;
+  padding: Padding;
   /**
    * Space between items — and between the halves of a spread. A number is world
    * units (scales with zoom — the canvas feel); `{ px }` is screen px (UI-stable
@@ -296,11 +302,14 @@ export interface ZoomBoxLook {
 
 /**
  * A change to the settings: any of them, each replacing the current value
- * whole. A `pageFrame` names only the sides it reserves (`{ bottom: 20 }`);
- * the sides it leaves out are 0. A `zoomBox` names only the colors it sets;
- * the ones it leaves out follow the accent.
+ * whole. A `pageFrame`, or a `padding` given by side, names only the sides it
+ * sets (`{ bottom: 20 }`); the sides it leaves out are 0. A `zoomBox` names
+ * only the colors it sets; the ones it leaves out follow the accent.
  */
-export interface StageSettingsPatch extends Partial<Omit<StageSettings, 'pageFrame' | 'zoomBox'>> {
+export interface StageSettingsPatch extends Partial<
+  Omit<StageSettings, 'padding' | 'pageFrame' | 'zoomBox'>
+> {
+  padding?: number | Partial<PaddingSides>;
   pageFrame?: Partial<PageFrame>;
   zoomBox?: Partial<ZoomBoxLook>;
 }

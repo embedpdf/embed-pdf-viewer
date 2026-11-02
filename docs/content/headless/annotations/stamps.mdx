@@ -92,6 +92,8 @@ await stamp.createAsset({ libraryId, label: 'Seal', mark: { kind: 'pdf', source:
 ```
 
 Ink and text are drawn by the engine as vector artwork, exactly as a placed annotation would show.
+Typed text is in a standard font, or in one of the `fonts` setting's, which the plugin registers on
+the engine marks are written on the first time a mark names it, and embeds when it saves.
 The example makes a drawn signature and typed initials; type more, and place them:
 
 <Example name="stamp/marks" />
@@ -228,6 +230,7 @@ Set them when you register the plugin, and change them while the app runs with
 | Setting        | What it does                                                           | Default          |
 | :------------- | :--------------------------------------------------------------------- | :--------------- |
 | `assetEngine`  | The engine stamp libraries open in                                     | the viewer's engine (local) |
+| `fonts`        | Fonts typed marks can be written in, `{ key, load }`: each registered on the asset engine the first time a mark names it | `[]` |
 | `previewWidth` | The width of stamp previews, in pixels                                 | `256`            |
 | `dynamic`      | Fill in dynamic stamps when they're placed                             | `true`           |
 

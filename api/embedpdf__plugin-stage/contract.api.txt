@@ -15,6 +15,8 @@ GoToDestinationOptions [InterfaceDeclaration]: export interface GoToDestinationO
 GoToOptions [InterfaceDeclaration]: export interface GoToOptions{ behavior?: ScrollBehaviorKind; viewpoint?: Viewpoint; arrivalAlign?: Partial<ArrivalAlignment>; }
 GridColumns [TypeAliasDeclaration]: export type GridColumns = 'square' | 'auto' | number;
 LayoutKind [TypeAliasDeclaration]: export type LayoutKind = 'vertical' | 'horizontal' | 'grid';
+Padding [TypeAliasDeclaration] (from packages/core/stage/src/index.ts): export type Padding = number | PaddingSides;
+PaddingSides [InterfaceDeclaration] (from packages/core/stage/src/index.ts): export interface PaddingSides{ top: number; right: number; bottom: number; left: number; }
 PageFrame [InterfaceDeclaration] (from packages/core/geometry/src/index.ts): export interface PageFrame{ top: number; right: number; bottom: number; left: number; }
 Point [InterfaceDeclaration] (from packages/core/geometry/src/index.ts): export interface Point{ x: number; y: number; }
 ResponsiveRule [InterfaceDeclaration]: export interface ResponsiveRule{ name?: string; when: BoxQuery | ((box: StageBox) => boolean); settings?: StageSettingsPatch; }
@@ -35,10 +37,10 @@ StageMotionEndedEvent [InterfaceDeclaration]: export interface StageMotionEndedE
 StagePageChangedEvent [InterfaceDeclaration]: export interface StagePageChangedEvent{ readonly page: PageRef | null; readonly pageIndex: number; readonly previousPageIndex: number; }
 StagePluginOptions [InterfaceDeclaration]: export interface StagePluginOptions extends StageConfig{ id?: string; token?: CapabilityToken<StageCapability>; }
 StageScrollToOptions [InterfaceDeclaration]: export interface StageScrollToOptions{ left?: number; top?: number; behavior?: ScrollBehaviorKind; }
-StageSettings [InterfaceDeclaration]: export interface StageSettings{ flow: FlowMode; layout: LayoutKind; spread: SpreadMode; sizing: SizingMode; columns: GridColumns; bounded: boolean; padding: number; gap: Gap; pageFrame: PageFrame; direction: Direction; fitAlign: Alignment; arrivalAlign: ArrivalAlignment; zoomAlign: AlignmentValue; anchorAlign: AlignmentValue; viewRotation: PageRotation; zoom: ZoomSpec; minZoom: number; maxZoom: number; scrollBehavior: ScrollBehaviorKind; interaction: boolean; panFallback: boolean; zoomGestures: boolean; zoomBox: ZoomBoxLook; viewUnitsPerPoint: number; }
+StageSettings [InterfaceDeclaration]: export interface StageSettings{ flow: FlowMode; layout: LayoutKind; spread: SpreadMode; sizing: SizingMode; columns: GridColumns; bounded: boolean; padding: Padding; gap: Gap; pageFrame: PageFrame; direction: Direction; fitAlign: Alignment; arrivalAlign: ArrivalAlignment; zoomAlign: AlignmentValue; anchorAlign: AlignmentValue; viewRotation: PageRotation; zoom: ZoomSpec; minZoom: number; maxZoom: number; scrollBehavior: ScrollBehaviorKind; interaction: boolean; panFallback: boolean; zoomGestures: boolean; zoomBox: ZoomBoxLook; viewUnitsPerPoint: number; }
 StageSettingsChangedEvent [InterfaceDeclaration]: export interface StageSettingsChangedEvent{ readonly settings: StageSettings; readonly changed: readonly (keyof StageSettings)[]; }
 StageSettingsLock [InterfaceDeclaration]: export interface StageSettingsLock extends SettingLock{ readonly settings: Omit<StageSettingsPatch, 'zoom'>; }
-StageSettingsPatch [InterfaceDeclaration]: export interface StageSettingsPatch extends Partial<Omit<StageSettings, 'pageFrame' | 'zoomBox'>>{ pageFrame?: Partial<PageFrame>; zoomBox?: Partial<ZoomBoxLook>; }
+StageSettingsPatch [InterfaceDeclaration]: export interface StageSettingsPatch extends Partial< Omit<StageSettings, 'padding' | 'pageFrame' | 'zoomBox'> >{ padding?: number | Partial<PaddingSides>; pageFrame?: Partial<PageFrame>; zoomBox?: Partial<ZoomBoxLook>; }
 StageToken [VariableDeclaration] (from packages/plugin/stage/src/token.ts): StageToken = createCapabilityToken<StageCapability>('stage', { hint: `add stagePlugin() from '@embedpdf/plugin-stage' to your plugins list`, } )
 StageViewState [InterfaceDeclaration]: export interface StageViewState extends StageSettings{ cursor: number; anchor: Anchor; }
 StageViewportChangedEvent [InterfaceDeclaration]: export interface StageViewportChangedEvent{ readonly size: Size; }

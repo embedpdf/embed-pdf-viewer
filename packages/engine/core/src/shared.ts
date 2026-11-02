@@ -40,8 +40,33 @@ export type { MetadataPatch } from './dto/MetadataPatch';
 export type { CustomMetadata } from './dto/CustomMetadata';
 export type { CustomMetadataPatch } from './dto/CustomMetadataPatch';
 export type { PageListSnapshot } from './dto/PageListSnapshot';
+export type { PageLabelSection, PageLabelStyle } from './dto/PageLabelSection';
 export type { NamedPageEntry, NamedPageTarget } from './dto/NamedPage';
 export type { PageLayout, PageBoxes, PageTabOrder } from './dto/PageLayout';
+export {
+  compareStructurePositions,
+  tabOrderOf,
+  type TabOrderItem,
+  type TabOrderPage,
+} from './pages/tabOrder';
+export {
+  pagesAfter,
+  pagesAfterRestore,
+  pagesRelabelled,
+  reorderBackOf,
+  restoredPagesOf,
+  rotateBackOf,
+  type PageList,
+  type PredictablePageOp,
+  type RestoredPage,
+} from './pages/predict';
+export {
+  labelAt,
+  sameSections,
+  sectionsAfterDelete,
+  sectionsAfterInsert,
+  sectionsAfterMove,
+} from './pages/labels';
 export type {
   PdfActionType,
   PdfActionNode,
@@ -201,6 +226,20 @@ export type {
   FontSpec,
 } from './dto/FontSpec';
 export type {
+  CodePointRange,
+  Font,
+  FontFormat,
+  FontList,
+  FontProgram,
+  FontProgramInfo,
+  FontResolution,
+  FontResolveRequest,
+  FontResolveRun,
+  FontRestriction,
+  FontSource,
+  ResolvedFontRun,
+} from './dto/DocumentFonts';
+export type {
   RichTextAlign,
   RichTextBody,
   RichTextDecoration,
@@ -264,7 +303,7 @@ export type {
   WidgetBorderStyle,
   WidgetCheckStyle,
   StandardFont,
-  FreeTextFont,
+  FontName,
   TextAlignment,
   VerticalAlignment,
   FreeTextIntent,
@@ -570,10 +609,11 @@ export {
   type AnnotationDefaults,
 } from './annotation/defaults';
 export {
-  faceForFreeTextFont,
+  faceForFontName,
   familyKey,
-  freeTextFontForFace,
+  fontNameForFace,
   isStandardFontName,
+  standardFamilyOf,
   STANDARD_FACES,
   type DescribeFont,
   type FaceRequest,
@@ -869,7 +909,7 @@ export type {
   AnnotationCreateOptions,
   AnnotationUpdateOptions,
   FlattenWriteOptions,
-  PageInsertBlankOptions,
+  PageInsertOptions,
   FormFieldCreateOptions,
   FormWidgetAddOptions,
 } from './mutation/WriteOptions';
@@ -910,6 +950,8 @@ export type {
   FieldAction,
   FieldFilter,
   Identity,
+  PluginPermission,
+  PluginPermissions,
   ParsedCapability,
   ParsedCollab,
   ParsedPluginPermission,
@@ -919,7 +961,13 @@ export type {
   PdfBits,
 } from './auth/scope';
 export { PDF_BITS, decodePdfBits } from './auth/scope';
-export { CORE_NAMESPACES, parseScope, pluginOfPermission, validateScopeArray } from './auth/scope';
+export {
+  CORE_NAMESPACES,
+  isPluginId,
+  parseScope,
+  pluginOfPermission,
+  validateScopeArray,
+} from './auth/scope';
 export { InvalidScope, MissingIdentity, PermissionDenied } from './auth/scope';
 export type { AnnotationAuthority, ChangeAuthority, FieldWriteAction } from './auth/scope';
 export {
@@ -953,6 +1001,7 @@ export {
   expandRawScope,
   filterMatches,
   pluginPermissionsOf,
+  scopeNotCovered,
 } from './auth/scope';
 export { caps, collab, materializePdfPermissions, pdfPermissions } from './auth/scope';
 

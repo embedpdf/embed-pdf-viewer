@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import type { WirePack, WorkerResponse } from '@embedpdf/engine-core/runtime';
+import { FALLBACK_TIERS, type WirePack, type WorkerResponse } from '@embedpdf/engine-core/runtime';
 import { WorkerHost } from '@embedpdf/engine-services';
 import { createPdfRuntime } from '@embedpdf/engine-runtime';
 import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
@@ -145,6 +145,7 @@ describe('localEngine()', () => {
   test('registers `fonts` then `fallbackFonts`, preserving declared order', async () => {
     const engine = localEngine({
       worker: fakeWorker,
+      defaultFallbackFonts: false,
       fonts: [{ key: 'plain', familyName: 'Roboto', data: roboto }],
       fallbackFonts: [
         { key: 'fb-1', familyName: 'Roboto', data: roboto },
@@ -168,6 +169,7 @@ describe('localEngine()', () => {
         worker = new FakeWorker();
         return worker as unknown as Worker;
       },
+      defaultFallbackFonts: false,
       fallbackFonts: [{ key: 'boot-font', familyName: 'Roboto', data: roboto }],
     });
 
@@ -192,6 +194,7 @@ describe('localEngine()', () => {
 
     const engine = localEngine({
       worker: fakeWorker,
+      defaultFallbackFonts: false,
       fallbackFonts: [{ key: 'remote', familyName: 'Roboto', url: 'https://example.test/f.ttf' }],
     });
     engine.warmup();
@@ -200,6 +203,46 @@ describe('localEngine()', () => {
     expect(fetchSpy).toHaveBeenCalledWith('https://example.test/f.ttf');
     expect(engine.fonts.list().map((f) => f.key)).toEqual(['remote']);
     await engine.destroy();
+  });
+
+  test('the default fallback fonts come after yours, and `defaultFallbackFonts: false` leaves them out', async () => {
+    let worker!: FakeWorker;
+    const engine = localEngine({
+      worker: () => {
+        worker = new FakeWorker();
+        return worker as unknown as Worker;
+      },
+      fallbackFonts: [{ key: 'mine', familyName: 'Roboto', data: roboto }],
+    });
+    // A font registered after the boot: the boot's fonts are all in by then.
+    await engine.fonts.register({ key: 'after-boot', familyName: 'Roboto', data: roboto });
+
+    expect(engine.fonts.list().map((font) => font.key)).toEqual([
+      'mine',
+      'noto-sans-hebrew',
+      'noto-sans-hebrew-bold',
+      'noto-naskh-arabic',
+      'noto-naskh-arabic-bold',
+      'after-boot',
+    ]);
+    const fallbacks = worker.received.filter(
+      (r): r is Extract<WorkerRequest, { kind: 'fonts.addFallback' }> =>
+        r.kind === 'fonts.addFallback',
+    );
+    expect(fallbacks.map((r) => [r.fontKey, r.tier])).toEqual([
+      ['mine', FALLBACK_TIERS.own],
+      ['noto-sans-hebrew', FALLBACK_TIERS.builtIn],
+      ['noto-sans-hebrew-bold', FALLBACK_TIERS.builtIn],
+      ['noto-naskh-arabic', FALLBACK_TIERS.builtIn],
+      ['noto-naskh-arabic-bold', FALLBACK_TIERS.builtIn],
+    ]);
+    await engine.destroy();
+
+    const without = localEngine({ worker: fakeWorker, defaultFallbackFonts: false });
+    without.warmup();
+    await without.fonts.clearFallbacks();
+    expect(without.fonts.list()).toEqual([]);
+    await without.destroy();
   });
 
   test('a bad font spec fails the boot: queued jobs reject and the worker is torn down', async () => {

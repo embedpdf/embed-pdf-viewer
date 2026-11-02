@@ -40,7 +40,7 @@ function makeHandle(id: string): DocumentHandle {
   return {
     id,
     events: { subscribe: () => () => {}, lastServerId: () => null },
-    pages: { list: () => Promise.resolve({ pageCount: 1, pages: [page(1, 0)] }) },
+    pages: { list: () => Promise.resolve({ pageCount: 1, labels: [], pages: [page(1, 0)] }) },
     close: () => Promise.resolve(),
   } as unknown as DocumentHandle;
 }

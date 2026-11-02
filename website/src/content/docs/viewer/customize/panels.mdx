@@ -32,10 +32,32 @@ one has a button, `panel:<id>`, and a side. Move one with `panel(id, changes)`:
 | `measurement` | The scale, and every measurement on the page | `end` | `panel:measurement` |
 | `form-design` | The form's fields, and the selected one's settings and buttons; in the Form mode only | `end` | `form:design`, `panel:form-design` |
 
+Each one comes with its title, its icon and what goes inside, wherever its id is: a [whole
+layout](layout#your-whole-layout) with `panels: { search: { side: 'end' } }` has the search panel
+as it is.
+
 A panel whose feature you [turn off](../features/turning-off) is gone, with its button. The
 outline and attachments panels show while they have a job: the document has items or files to
 list, or the user may add some. A read-only viewer on a document without an outline shows no
 outline button; the same for attachments.
+
+## A panel's title
+
+A panel's title is its button's label too: one word for both. Rename them per language with the
+button's command id in [`strings`](translations#change-a-word):
+
+```js
+{ strings: { en: { 'panel:comments': 'Review notes' } } }
+```
+
+Or give the panel a `title`, the same in every language, or a `titleKey` for words of your own per
+language. Either one replaces the built-in words, on the button and in the header:
+
+```js
+layout.panel('comments', { title: 'Review notes' });
+```
+
+A string for `panel:comments` comes first, over the layout's title.
 
 ## How a panel opens
 
@@ -68,6 +90,9 @@ every size, or a way for the sizes you name; the other sizes keep the default:
 one. A map of sizes changes only the sizes it names, so the thumbnails above still dock at medium
 widths. The sizes go by the viewer's own width: see [Small screens](small-screens#the-three-sizes).
 
+A sheet is as wide as the viewer on a phone. On a wider viewer it is as wide as the panel's
+[`width`](#width), in the middle.
+
 ### Search without copying
 
 Where the document's permissions let people search but not copy text, search opens as a find bar
@@ -80,9 +105,11 @@ a button. It has the same button and the same `Ctrl`/`Cmd`+`F`, and keeps the sa
 
 ## Width
 
-A panel starts 288 px wide. People can drag its edge, or use the arrow keys on it, between 200 and
-640 px and never past half the viewer, and the viewer keeps that width while it runs. Set where it
-starts, how far it drags, or no dragging at all:
+A panel starts 288 px wide. People can drag its edge, docked or over the pages, between 200 and
+640 px and never past half the viewer, and the viewer keeps that width while it runs. On the edge,
+the arrow keys move it, four times as far with `Shift`; `Home` makes the panel its narrowest and
+`End` its widest. A sheet has no edge. Set where it starts, how far it drags, or no dragging at
+all:
 
 ```js
 layout.panel('comments', { width: 360 }); // where it starts
@@ -94,8 +121,8 @@ layout.panel('comments', { resizable: false }); // no edge to drag
 
 ### Keep the width people chose
 
-`onPanelResize` tells you each width someone gives a panel: once a drag ends, and on each arrow
-key. Keep it where you like, and start the panel at it next time:
+`onPanelResize` tells you each width someone gives a panel: once a drag ends, and on each key. Keep
+it where you like, and start the panel at it next time:
 
 ```js
 const saved = Number(localStorage.getItem('thumbnails-width'));
@@ -205,13 +232,33 @@ One panel shows per side at a time. Opening another on that side closes the firs
 header switches between the panels that share its side. Both sides can be open at once: the
 thumbnails on the left and the comments on the right.
 
+## Open from the start
+
+`open: true` opens a panel when a document opens, where it docks. Where it would cover the pages,
+as a sheet on a phone or over them at medium widths, it waits for its button:
+
+```js
+layout.panel('comments', { open: true });
+```
+
+A panel people shouldn't close gets `closable: false`. Where it docks, it's always open: it has no
+close button, and its button opens it but doesn't close it. Another panel on its side can take its
+place, and when that one closes, it's back. Over the pages it closes like any other panel, since
+it would cover them.
+
+```js
+layout.panel('comments', { closable: false });
+```
+
+Of two panels on one side that open from the start, the first in the layout opens.
+
 ## Remove a panel
 
 ```js
 layout.removePanel('attachments');
 ```
 
-Its button goes with it, from every bar and menu.
+Its button goes with it, from every bar and menu, and so do the bars at its top.
 
 ## Open a panel from code
 
@@ -238,11 +285,13 @@ layout.addPanel('notes', { side: 'end', title: 'Notes', icon: 'book' });
 | Field | What it is | Default |
 | :-- | :-- | :-- |
 | `side` | `'start'` or `'end'` | `'end'` |
-| `title` | Its title, in its header; or `titleKey` for a [translated](translations) one | none |
+| `title` | Its title, in its header and on its button; or `titleKey` for a [translated](translations) one | none |
 | `icon` | Its button's icon | none |
 | `present` | `'dock'`, `'overlay'` or `'sheet'`, or one per size: `{ compact, medium, expanded }` | `{ compact: 'sheet', medium: 'overlay', expanded: 'dock' }` |
 | `width` | Where it starts, in px, or `{ initial, min, max }` | `{ initial: 288, min: 200, max: 640 }` |
 | `resizable` | Whether people can drag its edge | `true` |
+| `open` | Whether it opens when a document opens, where it docks | `false` |
+| `closable` | Whether people can close it where it docks | `true` |
 
 The viewer draws the frame, the header and the way it opens; you draw what's inside. See [Your own
 components](components#a-panel-of-your-own) for the content in each framework.

@@ -15,7 +15,7 @@
  * inside the next one. On the server it renders the empty element, and the viewer starts in the
  * browser: nothing here, or in the viewer it imports, touches the DOM when imported.
  *
- * `src`, `theme`, `locale`, `disable`, `readOnly` and `fetch` follow their inputs: the element
+ * `src`, `theme`, `locale`, `disable`, `readOnly`, `fetch` and `appState` follow their inputs: the element
  * changes them in place. Every other key is read once, when the viewer starts; a later change is ignored
  * (development warns once), and a new `@if` branch mounts a new viewer with it.
  */
@@ -71,6 +71,7 @@ const LIVE_KEYS: readonly LiveConfigKey[] = [
   'disable',
   'readOnly',
   'fetch',
+  'appState',
 ];
 
 /** The callbacks: the outputs, and the config's own, called with the latest config. */
@@ -166,11 +167,22 @@ export abstract class EpdfPdfViewerBase implements EpdfPdfViewerRef, OnInit {
   /** Every feature that changes the document off, or all but `except`. Follows its input. */
   readonly readOnly: ConfigInput<'readOnly'> = input<ElementConfig['readOnly']>();
   readonly layout: ConfigInput<'layout'> = input<ElementConfig['layout']>();
+  /** The size the layout is for at every width, or `'auto'` to measure. Read once. */
+  readonly size: ConfigInput<'size'> = input<ElementConfig['size']>();
+  /** Whether the viewer is laid out for a finger, or `'auto'` to ask the browser. Read once. */
+  readonly touch: ConfigInput<'touch'> = input<ElementConfig['touch']>();
   readonly commands: ConfigInput<'commands'> = input<ElementConfig['commands']>();
+  /** Your app's state, which your commands read. Follows its input. */
+  readonly appState: ConfigInput<'appState'> = input<ElementConfig['appState']>();
   readonly icons: ConfigInput<'icons'> = input<ElementConfig['icons']>();
   readonly strings: ConfigInput<'strings'> = input<ElementConfig['strings']>();
   readonly notAllowed: ConfigInput<'notAllowed'> = input<ElementConfig['notAllowed']>();
   readonly plugins: ConfigInput<'plugins'> = input<ElementConfig['plugins']>();
+  /** Your fonts, beyond the standard 14, registered on a local engine and offered for text. Read once. */
+  readonly fonts: ConfigInput<'fonts'> = input<ElementConfig['fonts']>();
+  /** `false` leaves the page without asking, unsaved changes or not. Read once. */
+  readonly warnBeforeLeaving: ConfigInput<'warnBeforeLeaving'> =
+    input<ElementConfig['warnBeforeLeaving']>();
 
   // ── what the viewer tells ──────────────────────────────────────────────────
 
@@ -217,11 +229,16 @@ export abstract class EpdfPdfViewerBase implements EpdfPdfViewerRef, OnInit {
       disable: this.disable(),
       readOnly: this.readOnly(),
       layout: this.layout(),
+      size: this.size(),
+      touch: this.touch(),
       commands: this.commands(),
+      appState: this.appState(),
       icons: this.icons(),
       strings: this.strings(),
       notAllowed: this.notAllowed(),
       plugins: this.plugins(),
+      fonts: this.fonts(),
+      warnBeforeLeaving: this.warnBeforeLeaving(),
     }),
   );
 
@@ -285,6 +302,7 @@ export abstract class EpdfPdfViewerBase implements EpdfPdfViewerRef, OnInit {
     element.disable = config.disable;
     element.readOnly = config.readOnly;
     element.fetch = config.fetch;
+    element.appState = config.appState;
     if (this.warned || !isDevMode()) return;
     const key = changedReadOnceKey(this.started.config, config);
     if (key === null) return;

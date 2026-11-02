@@ -83,16 +83,16 @@ export const STANDARD_FONTS = [
 export type StandardFont = (typeof STANDARD_FONTS)[number];
 
 /**
- * Font selector for a free-text annotation: either one of the 14 PDF
- * {@link StandardFont} names, or the `key` of a font registered through
- * `engine.fonts` (local/WASM engine only).
+ * What a `fontFamily` names (free text, form widgets, redaction labels): the
+ * `name` of a font in `doc.fonts.list()`. One of the 14 {@link StandardFont}
+ * names, the key of one of the engine's fonts (registered locally, the
+ * server's on the cloud), or a document font's name (its PostScript name).
  *
  * The `(string & {})` arm keeps the standard-font literals auto-completing
- * while still accepting any registered key. Because the standard names are
- * matched first at write time, those 14 names are reserved: don't register a
- * custom font under a key like `'helvetica'`.
+ * while still accepting any other name. The standard names are matched
+ * first, so they're reserved: no engine font can be keyed `'helvetica'`.
  */
-export type FreeTextFont = StandardFont | (string & {});
+export type FontName = StandardFont | (string & {});
 
 /**
  * Horizontal text alignment (`/Q`) for free-text annotations. Maps onto the
@@ -193,7 +193,7 @@ export type KnownAnnotationStateModel = 'review' | 'marked';
  * PDF stores the entry as a free text string and Acrobat supports
  * registering custom state models, so the type stays open. The
  * `(string & {})` arm keeps the standard literals auto-completing while
- * accepting any custom model (the {@link FreeTextFont} pattern).
+ * accepting any custom model (the {@link FontName} pattern).
  *
  * Known values are wire-stable lowercase; the engine maps them onto the
  * capitalized PDF spellings (`Review`, `Marked`) at read/write time.

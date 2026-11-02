@@ -373,7 +373,10 @@ export interface FormWidgetLook {
   readonly background: string | null;
   /** The text color (`/DA`), or `null` when the field names none. */
   readonly color: string | null;
-  /** One of the 14 standard PDF fonts, such as `'helvetica'`, or `null` when the field names none. */
+  /**
+   * The font the field names (a standard font such as `'helvetica'`, or another the document or
+   * the engine has), or `null` when it names none. How a browser draws it: `getWidgetFontCss`.
+   */
   readonly fontFamily: string | null;
   /** The font size in points; `0` or `null` sizes the text to the box. */
   readonly fontSize: number | null;
@@ -498,7 +501,15 @@ export function widgetAt(
 
 // ── session state ────────────────────────────────────────────────────────────
 
-/** The plugin's session state: nothing yet; a write in flight shows in the mirror's view. */
-export type FormModel = Readonly<Record<string, never>>;
+/** The box the cursor is in: its field and its annotation object number. */
+export interface FocusedWidget {
+  readonly field: FieldKey;
+  readonly widget: number;
+}
 
-export const initialFormModel = (): FormModel => ({});
+/** The plugin's session state: the box the cursor is in; a write in flight shows in the mirror's view. */
+export interface FormModel {
+  readonly focused: FocusedWidget | null;
+}
+
+export const initialFormModel = (): FormModel => ({ focused: null });

@@ -1,0 +1,118 @@
+---
+title: Fonts
+description: The fonts people can write text in, adding your own, and text in any language.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+# Fonts
+
+Text people write in the viewer, in a text box, a callout, a form field or a redaction label, shows
+while they type in the very font the PDF will carry, letter for letter, so what they see is what
+they save. Characters a font doesn't have come from fallback fonts, so text in any language shows,
+right to left where it reads that way.
+
+## Choosing a font
+
+The style panel's font picker offers every font text can be written in, in three groups:
+
+<Engine local>
+
+| Group | The fonts |
+| :-- | :-- |
+| In this document | The fonts the PDF already has |
+| Your fonts | The ones you give the viewer, and the engine's own |
+| Standard | Helvetica, Times and Courier, which every PDF app has |
+
+</Engine>
+
+<Engine cloud>
+
+| Group | The fonts |
+| :-- | :-- |
+| In this document | The fonts the PDF already has |
+| Server fonts | Your server's fonts |
+| Standard | Helvetica, Times and Courier, which every PDF app has |
+
+</Engine>
+
+Most PDFs carry only the characters their text uses, so their fonts can't be used for new text.
+Such a font shows greyed, with why, and a box that has it keeps it.
+
+<Engine local>
+
+## Your fonts
+
+Give the viewer your brand's typeface, or a font for a script the standard fonts don't cover, and
+the picker offers it under Your fonts:
+
+```js
+{
+  fonts: [
+    { key: 'brand-sans', url: '/fonts/BrandSans-Regular.ttf', label: 'Brand Sans' },
+    { key: 'noto-sc', url: '/fonts/NotoSansSC-Regular.otf', label: 'Noto Sans SC' },
+  ],
+}
+```
+
+| Field | What it is | Default |
+| :-- | :-- | :-- |
+| `key` | Your name for the font: what a text box's `fontFamily` names it by. Not one of the standard names, such as `helvetica`. | required |
+| `url` | Where the TTF or OTF file is, on your site or a server that allows it (CORS) | `url` or `data` |
+| `data` | The file's bytes, in place of `url` | |
+| `familyName` | The family the PDF names it by | read from the file |
+| `weight`, `italic` | Its style | read from the file |
+| `label` | What the picker calls it | its family's name |
+
+Each file is fetched once, when the viewer starts. Saving puts only the characters people used
+into the PDF.
+
+</Engine>
+
+<Engine cloud>
+
+## Your server's fonts
+
+The server writes the text, so its fonts are the ones offered, under Server fonts: configure them
+on the server, as [Fonts](/docs/server/configuration/fonts) shows, and choose which of them it may
+send to browsers. A font it keeps to itself is still offered, and shows in the closest font while
+people type; the saved text is in it.
+
+A `fonts` setting in the viewer is ignored on the cloud, with a warning in the console.
+
+</Engine>
+
+## Text in any language
+
+Hebrew and Arabic work with no setup: the engine fills them in from Noto Sans Hebrew and Noto Naskh
+Arabic.
+
+<Engine local>
+
+For another script, such as Chinese, give the engine a fallback font, which fills in the
+characters other fonts lack:
+
+```js
+{
+  engine: {
+    fallbackFonts: [{ key: 'noto-sc', url: '/fonts/NotoSansSC-Regular.otf' }],
+  },
+}
+```
+
+</Engine>
+
+<Engine cloud>
+
+For another script, such as Chinese, give your server a fallback font; see
+[Fonts](/docs/server/configuration/fonts).
+
+</Engine>
+
+A character no font has shows as a box, both while typing and in the PDF, so no text is lost
+without a trace.
+
+## Typed signatures
+
+A signature typed in the signature maker is written in a handwriting font. Pick the fonts it offers
+with `plugins.signature.fonts`; see [Signatures](forms-and-signatures#signatures).

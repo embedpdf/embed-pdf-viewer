@@ -10,6 +10,7 @@
 import type { ChangeQueue } from './changes';
 import type { PluginClock } from './clock';
 import type { EventHook } from './event-hook';
+import type { HostTextMeasurer } from './measurer';
 import type { Mirror, MirrorSpec } from './mirror';
 import type { PageMirror, PageMirrorSpec } from './page-mirror';
 import type { SerialQueue } from './serial-queue';
@@ -21,6 +22,7 @@ import type {
   EngineFactory,
   OpenInput,
   OpenOptions,
+  PageLabelSection,
   PageLayout,
   PageRef,
   PageObjectNumber,
@@ -33,6 +35,7 @@ import type {
   PageInsertBlankSpec,
   PdfSize,
   DocCapability,
+  PluginPermission,
   PdfSaveMode,
   DocumentMetadata,
   MetadataPatch,
@@ -47,6 +50,15 @@ import type {
   PdfDestination,
   Identity,
   PrintDpi,
+  Font,
+  FontList,
+  FontName,
+  FontProgram,
+  FontProgramInfo,
+  FontResolution,
+  FontResolveRequest,
+  FontRestriction,
+  FontSource,
   GrantOpenRequest,
   VisitorAnswers,
   VisitorIdentityRequest,
@@ -75,6 +87,7 @@ export type {
   PageInsertBlankSpec,
   PdfSize,
   DocCapability,
+  PluginPermission,
   PdfSaveMode,
   DocumentMetadata,
   MetadataPatch,
@@ -82,6 +95,16 @@ export type {
   CustomMetadata,
   CustomMetadataPatch,
   CustomMetadataUpdateResult,
+  /** The fonts that can be named in a document, what each allows, and their programs (`doc.fonts`). */
+  FontList,
+  Font,
+  FontName,
+  FontProgram,
+  FontProgramInfo,
+  FontResolution,
+  FontResolveRequest,
+  FontRestriction,
+  FontSource,
   DocumentEvent,
   /** Who the user is: the author of what they make, and whom `:self` and `:group` permissions are checked against. */
   Identity,
@@ -94,6 +117,9 @@ export type {
    */
   EventOrigin,
 };
+// Re-exported straight from engine-core, where `allows()` reads it, so a plugin's
+// `declare module '@embedpdf/core' { interface PluginPermissions { … } }` merges into it.
+export type { PluginPermissions } from '@embedpdf/engine-core/runtime';
 
 export type Unsubscribe = () => void;
 
@@ -118,12 +144,13 @@ export interface BatchResult<T, R = unknown> {
 
 /**
  * A permission a verb can need, named as the engine names it: a document
- * capability (`'doc.forms.fill'`), or `'annotations:create'`. Creating is the
- * one annotation action that needs no target: whether the session may change
- * or delete an annotation depends on whose it is, so the annotation plugin
- * asks that per annotation (`doc.security.allowsAnnotation`).
+ * capability (`'doc.forms.fill'`), `'annotations:create'`, or a plugin's own
+ * permission, declared in `PluginPermissions` (`'protected-display.view'`).
+ * Creating is the one annotation action that needs no target: whether the
+ * session may change or delete an annotation depends on whose it is, so the
+ * annotation plugin asks that per annotation (`doc.security.allowsAnnotation`).
  */
-export type Permission = DocCapability | 'annotations:create';
+export type Permission = DocCapability | 'annotations:create' | PluginPermission;
 
 /** Anything `ctx.listen` can subscribe to: an EventHook, or an object with `subscribe`. */
 export type Subscribable<T> =
@@ -188,10 +215,21 @@ export type PromiseMemberOf<Capability> =
 export type PromiseMembers<Capability> = { readonly [Path in PromiseMemberOf<Capability>]: true };
 
 /**
- * What the kernel knows about an open document — the page registry captured at open.
- * `pages` is the engine's own snapshot (`PageLayout`: index, ref, size,
- * rotation, label, boxes). `ref` (the page's `PageRef`) is the durable
- * per-page identity; the array index is only display order.
+ * Where a page the engine doesn't have yet gets its look until the engine has
+ * it: a blank insert is a white page of its size (`blank`); a deleted page an
+ * undo brings back has the pictures it had (`own`); a copy draws as the page
+ * it copies (`copy`).
+ */
+export type PendingPage =
+  | { readonly look: 'blank' }
+  | { readonly look: 'own' }
+  | { readonly look: 'copy'; readonly of: PageRef };
+
+/**
+ * What the kernel knows about an open document: its pages as the user sees
+ * them (`PageLayout`: index, ref, size, rotation, label, boxes). `ref` (the
+ * page's `PageRef`) is the durable per-page identity; the array index is only
+ * display order.
  */
 export interface DocumentMeta {
   readonly id: string;
@@ -203,12 +241,30 @@ export interface DocumentMeta {
   readonly instanceId: string;
   readonly name?: string;
   readonly pageCount: number;
+  /**
+   * The pages as the user sees them: the engine's, with this session's page
+   * changes that are on their way on top (a rotate, a move, a delete, a blank
+   * insert, an undo of one), so an edit shows before the engine answers. An
+   * index a verb takes names a page of this list.
+   */
   readonly pages: readonly PageLayout[];
   /**
-   * Bumps every time the page registry is replaced by a document mutation
-   * event (rotate/move/delete). The registry's monotonic version: anything
-   * caching a derivation of `pages` (e.g. the Stage's laid-out scene) keys
-   * on it so a same-`pageCount` change — like a rotation — still invalidates.
+   * The page label sections of `pages` (`PageListSnapshot.labels`), as they
+   * move with the changes on their way: each page's `label` is read from
+   * them. Empty when the document has none.
+   */
+  readonly pageLabels: readonly PageLabelSection[];
+  /**
+   * The pages of `pages` the engine doesn't have yet, by object number: a
+   * change on its way makes them. Code that asks the engine about a page
+   * (render, page mirrors) waits for these; everything else reads `pages`.
+   */
+  readonly pendingPages: ReadonlyMap<PageObjectNumber, PendingPage>;
+  /**
+   * Moves every time `pages` does: an edit shown, or the engine's pages
+   * changing other than shown. Anything caching a derivation of `pages` (the
+   * Stage's laid-out scene) keys on it, so a change that keeps the page count
+   * (a rotation) still invalidates.
    */
   readonly revision: number;
   /**
@@ -436,6 +492,12 @@ export interface PluginContext<S = unknown, T extends object = NoSettings> {
    * it closes. Plugins never read timers or frames from the environment.
    */
   readonly clock: PluginClock;
+  /**
+   * Text measuring, from the host: how wide text is in a font program, as the
+   * browser that draws it shapes it. `null` on a host that gives none (a
+   * kernel in Node, a test): measure nothing then.
+   */
+  readonly measurer: HostTextMeasurer | null;
   /**
    * Register what this plugin holds back from the engine, such as text typed a moment ago or
    * the writes in its write queue (`() => queue.idle()`). Before anything reads the whole

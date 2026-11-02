@@ -1,11 +1,12 @@
 /**
  * The config a running `<embedpdf-viewer>` follows, and the `viewer` it hands out.
  *
- * `src`, `theme`, `locale`, `disable` and `readOnly` change in place, from their properties, from
- * `.config` and (for `src`, `theme` and `locale`) from the attributes: the viewer, and the kernel
- * inside it, stay the same objects. Any other change builds a new viewer. `scope` and `identity`
+ * `src`, `theme`, `locale`, `disable`, `readOnly` and `appState` change in place, from their
+ * properties, from `.config` and (for `src`, `theme` and `locale`) from the attributes: the viewer,
+ * and the kernel inside it, stay the same objects. Any other change builds a new viewer. `scope` and `identity`
  * from the config reach the documents, and a read-only viewer still lets the app's code call
- * its plugins.
+ * its plugins. `.config` replaces what the properties set, and keeps the attributes. A plugin's
+ * settings changed from code reach every document; the stage's, one.
  *
  * Runs against the built snippet (`pnpm build` first).
  */
@@ -60,6 +61,35 @@ const PAGES = {
       window.element.disable = ['search'];
     });`,
   ),
+  // Approve reads the app's state: enabled once all four checks are done, pressed once approved.
+  '/app-state.html': shell(
+    '<div id="viewer"></div>',
+    `window.approved = 0;
+    window.review = (done, status = 'review') => ({
+      done,
+      status,
+      approve: () => {
+        window.approved += 1;
+        window.element.appState = window.review(done, 'approved');
+      },
+    });
+    window.element = EmbedPDF.init({
+      target: '#viewer',
+      src: '/sample.pdf',
+      appState: window.review([]),
+      commands: [
+        {
+          id: 'acme:approve',
+          label: 'Approve',
+          icon: 'check',
+          enabled: ({ appState }) => appState.done.length === 4,
+          active: ({ appState }) => appState.status === 'approved',
+          run: ({ appState }) => appState.approve(),
+        },
+      ],
+      layout: (layout) => layout.add('acme:approve', { to: 'main', section: 'end' }),
+    });`,
+  ),
   '/scoped.html': shell(
     '<div id="viewer"></div>',
     `window.element = EmbedPDF.init({
@@ -77,6 +107,9 @@ declare global {
     readies: unknown[];
     kernelOf(viewer: unknown): unknown;
     SearchToken: unknown;
+    /** The app-state page's review, and how many times Approve ran. */
+    review(done: string[], status?: string): unknown;
+    approved: number;
   }
 }
 
@@ -272,6 +305,63 @@ describe('a running viewer follows its live config', () => {
   });
 });
 
+describe("a running viewer follows your app's state", () => {
+  let host: ViewerHost;
+  let browser: Browser;
+  let tab: Page;
+
+  beforeAll(async () => {
+    host = await serveViewer(PAGES);
+    browser = await launchChromium();
+    tab = await open(browser, `${host.origin}/app-state.html`);
+  });
+  afterAll(async () => {
+    await browser?.close();
+    await host?.close();
+  });
+
+  /** The Approve button in the toolbar: whether it's greyed out, and whether it shows pressed. */
+  const approveButton = () =>
+    tab.evaluate(() => {
+      const button = window.element.shadowRoot!.querySelector<HTMLButtonElement>(
+        'button[aria-label="Approve"]',
+      );
+      return button && { disabled: button.disabled, pressed: button.ariaPressed === 'true' };
+    });
+
+  it("greys a button out and back as the commands read the app's state, in place", async () => {
+    await tab.waitForFunction(() =>
+      window.element.shadowRoot!.querySelector('button[aria-label="Approve"]'),
+    );
+    expect(await approveButton()).toEqual({ disabled: true, pressed: false });
+    await tab.evaluate(() => (window.element.appState = window.review(['a', 'b', 'c', 'd'])));
+    await tab.waitForFunction(
+      () =>
+        !window.element.shadowRoot!.querySelector<HTMLButtonElement>(
+          'button[aria-label="Approve"]',
+        )!.disabled,
+    );
+    expect(await approveButton()).toEqual({ disabled: false, pressed: false });
+    expect(await sameViewer(tab)).toBe(true);
+  });
+
+  it("runs with the app's state, and shows what the run changed", async () => {
+    await tab.evaluate(() =>
+      window.element
+        .shadowRoot!.querySelector<HTMLButtonElement>('button[aria-label="Approve"]')!
+        .click(),
+    );
+    await tab.waitForFunction(() => window.approved === 1);
+    await tab.waitForFunction(
+      () =>
+        window.element.shadowRoot!.querySelector('button[aria-label="Approve"]')!.ariaPressed ===
+        'true',
+    );
+    expect(await approveButton()).toEqual({ disabled: false, pressed: true });
+    expect(await sameViewer(tab)).toBe(true);
+  });
+});
+
 describe('a declarative viewer follows its attributes', () => {
   let host: ViewerHost;
   let browser: Browser;
@@ -302,6 +392,29 @@ describe('a declarative viewer follows its attributes', () => {
     expect(id).toBe('/sample.pdf?second');
     expect(await sameViewer(tab)).toBe(true);
     expect(await shadowText(tab)).toMatch(/Página 1 de \d+/);
+  });
+
+  it('replaces what the properties set with .config, and keeps the attributes', async () => {
+    const tab = await open(browser, `${host.origin}/declarative.html`);
+    await tab.evaluate(() => {
+      window.element.theme = 'dark';
+      window.element.readOnly = true;
+    });
+    await frames(tab);
+    expect(await isDark(tab)).toBe(true);
+    await tab.evaluate(() => (window.element.config = { locale: 'es' }));
+    await tab.waitForFunction(() =>
+      /Página 1 de \d+/.test(window.element.shadowRoot!.textContent ?? ''),
+    );
+    expect(await isDark(tab)).toBe(false);
+    expect(
+      await tab.evaluate(() => ({
+        readOnly: window.element.readOnly ?? null,
+        src: window.element.config.src,
+        theme: window.element.theme,
+      })),
+    ).toEqual({ readOnly: null, src: '/sample.pdf', theme: 'light' });
+    expect(await sameViewer(tab)).toBe(true);
   });
 
   it('takes a property over its attribute, and the attribute back for undefined', async () => {
@@ -396,6 +509,30 @@ describe('the viewer in code', () => {
       return { status, executed };
     });
     expect(result).toEqual({ status: 'executed', executed: ['zoom:in'] });
+  });
+
+  it("changes a plugin's settings for every document, and the stage's for one", async () => {
+    const result = await tab.evaluate(async () => {
+      const viewer = window.element.viewer;
+      const first = viewer.documents.getActiveId();
+      const { document } = await viewer.documents.open(
+        { kind: 'url', url: '/sample.pdf' },
+        { name: 'Second' },
+      );
+      viewer.get('selection').updateSettings({ color: 'rgb(1 2 3 / 0.3)' });
+      viewer.get('stage').updateSettings({ spread: 'odd' });
+      const of = (id: string) => viewer.forDocument(id);
+      return {
+        active: viewer.documents.getActiveId() === document.id,
+        selection: [first, document.id].map((id) => of(id).get('selection').getSettings().color),
+        spread: [first, document.id].map((id) => of(id).get('stage').getSettings().spread),
+      };
+    });
+    expect(result).toEqual({
+      active: true,
+      selection: ['rgb(1 2 3 / 0.3)', 'rgb(1 2 3 / 0.3)'],
+      spread: ['none', 'odd'],
+    });
   });
 });
 

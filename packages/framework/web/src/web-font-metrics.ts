@@ -11,8 +11,10 @@
  *
  * Canvas provides browser metrics, which can be rounded or differ from the
  * font program's metrics. They approximate the registered font's line model;
- * standard families use the engine's known values below. CSS still chooses
- * wrapping and combines mixed runs differently from the engine.
+ * a face whose family is a standard one (its family list's first family, as
+ * the host reads it back: the standard face's program) uses the engine's
+ * known values below. CSS still chooses wrapping and combines mixed runs
+ * differently from the engine.
  *
  * One thing CSS cannot express: it centres a line's leading (half above the
  * glyphs), and the substitute face's ascent differs from the engine's, so
@@ -40,25 +42,19 @@ export interface LineModel {
 export const ACROBAT_LEADING = 0.2;
 
 /** The engine's metrics for the standard families (Acrobat's substitutes'
- *  `hhea`), keyed the engine's way: no case, spaces, hyphens, quotes. */
-const STANDARD_METRICS: Record<string, WebFontMetrics> = {
-  helvetica: { ascent: 0.83, descent: 0.17 },
-  arial: { ascent: 0.83, descent: 0.17 },
-  arialmt: { ascent: 0.83, descent: 0.17 },
-  times: { ascent: 0.784, descent: 0.216 },
-  timesroman: { ascent: 0.784, descent: 0.216 },
-  timesnewroman: { ascent: 0.784, descent: 0.216 },
-  courier: { ascent: 0.627, descent: 0.373 },
-  couriernew: { ascent: 0.627, descent: 0.373 },
-};
+ *  `hhea`), by the family the engine names them by. */
+const STANDARD_METRICS: ReadonlyMap<string, WebFontMetrics> = new Map([
+  ['Helvetica', { ascent: 0.83, descent: 0.17 }],
+  ['Times', { ascent: 0.784, descent: 0.216 }],
+  ['Courier', { ascent: 0.627, descent: 0.373 }],
+]);
+
+/** The family a CSS family stands for, as a host reads it back; by default the family itself. */
+export type FamilyOfCss = (cssFamily: string) => string | undefined;
 
 /** What the browser resolves when nothing can be measured: a one-em content
  *  area, the ascent of the engine's Helvetica. */
 const FALLBACK_METRICS: WebFontMetrics = { ascent: 0.83, descent: 0.17 };
-
-function familyKey(family: string): string {
-  return family.toLowerCase().replace(/[\s\-_'"]/g, '');
-}
 
 /** The first family of a CSS family list, unquoted. */
 export function firstFamily(cssFamily: string): string {
@@ -108,14 +104,18 @@ export function webFontMetrics(
 
 /**
  * The standard families' engine metrics, or a browser approximation for
- * other families. `measure` is injectable for tests and resolved face styles.
+ * other families. `measure` is injectable for tests and resolved face styles;
+ * `familyOf` reads the family list's first family back to the face's family.
  */
 export function lineModelFor(
   cssFamily: string,
   measure: (cssFamily: string) => WebFontMetrics | null = webFontMetrics,
+  familyOf: FamilyOfCss = (family) => family,
 ): LineModel {
   const metrics =
-    STANDARD_METRICS[familyKey(firstFamily(cssFamily))] ?? measure(cssFamily) ?? FALLBACK_METRICS;
+    STANDARD_METRICS.get(familyOf(firstFamily(cssFamily)) ?? '') ??
+    measure(cssFamily) ??
+    FALLBACK_METRICS;
   return {
     ascent: metrics.ascent,
     descent: metrics.descent,
@@ -133,8 +133,9 @@ export function firstLineShiftFor(
   cssFamily: string,
   fontSize: number,
   measure: (cssFamily: string) => WebFontMetrics | null = webFontMetrics,
+  familyOf: FamilyOfCss = (family) => family,
 ): number {
-  const model = lineModelFor(cssFamily, measure);
+  const model = lineModelFor(cssFamily, measure, familyOf);
   const web = measure(cssFamily) ?? { ascent: model.ascent, descent: model.descent };
   const cssBaseline = (model.lineHeight - (web.ascent + web.descent)) / 2 + web.ascent;
   return Math.round((cssBaseline - model.ascent) * fontSize * 100) / 100;

@@ -86,7 +86,8 @@ async function boot() {
       lastServerId: () => null,
     },
     pages: {
-      list: () => Promise.resolve({ pageCount: 2, pages: [pageLayout(1, 0), pageLayout(2, 1)] }),
+      list: () =>
+        Promise.resolve({ pageCount: 2, labels: [], pages: [pageLayout(1, 0), pageLayout(2, 1)] }),
     },
     security: { allows: () => true },
     page: (ref: { objectNumber: number }) => ({

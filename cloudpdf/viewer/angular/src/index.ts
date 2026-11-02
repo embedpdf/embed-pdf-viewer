@@ -42,6 +42,7 @@ export {
   EpdfButton,
   EpdfCommand,
   EpdfCommands,
+  EpdfIcon,
   EpdfMenu,
   EpdfMenuItem,
   EpdfPanel,

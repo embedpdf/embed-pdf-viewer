@@ -12,6 +12,7 @@ import { formatIssues } from './_issues';
 import { folderIdOfPlace, ROOT_PLACE } from './_place';
 import {
   requireApiToken,
+  requireHeldScope,
   requireTenantAccess,
   type TenantAccessContext,
 } from '../../app/jwt-plugin';
@@ -47,7 +48,8 @@ export interface AdminTokensRoutesDeps {
  *
  * Issue rules (authority mints only downward):
  *   - kind "doc":    API token, or a tenant JWT holding
- *                    `tokens.issue-doc` for this tenant.
+ *                    `tokens.issue-doc` for this tenant, giving only
+ *                    document permissions it holds itself.
  *   - kind "tenant": API token only — a tenant JWT must not be able to
  *                    manufacture fresh tenant authority, not even for
  *                    its own tenant.
@@ -104,6 +106,7 @@ export async function registerAdminTokensRoutes(
               error: { code: 'InvalidArg', message: (err as Error).message },
             });
           }
+          requireHeldScope(req, body.scope);
           if (body.layerName !== undefined && isVisitorLayerName(body.layerName)) {
             return reply.code(400).send({
               error: {

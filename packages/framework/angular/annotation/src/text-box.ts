@@ -22,7 +22,8 @@ import {
   untracked,
   type Signal,
 } from '@angular/core';
-import { injectPage } from '@embedpdf/angular/runtime';
+import { annotationKey } from '@embedpdf/core';
+import { injectFontMounts, injectPage } from '@embedpdf/angular/runtime';
 import type { Annotation, AnnotationRef, TextItem } from '@embedpdf/plugin-annotation';
 import type { AnnotationHostCapability } from '@embedpdf/plugin-annotation/contract/host';
 import {
@@ -92,6 +93,8 @@ export class EpdfFreeTextBox {
   );
 
   constructor() {
+    // The programs the engine draws the text in, so the box shows them.
+    injectFontMounts(() => this.item().programs);
     const annotation = annotationHostOf(this.page, '[epdfFreeTextBox]').capability;
     bindTextBoxEditor(
       inject<ElementRef<HTMLElement>>(ElementRef).nativeElement,
@@ -161,5 +164,6 @@ export class EpdfRichTextEditor {
       this.item,
       computed(() => this.own()?.scale ?? this.scale()),
     );
+    injectFontMounts(() => this.item()?.programs ?? []);
   }
 }

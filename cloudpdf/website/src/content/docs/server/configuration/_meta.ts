@@ -4,7 +4,7 @@ export default {
   database: 'Database',
   storage: 'Storage',
   imports: 'Imports',
-  fonts: 'Fallback fonts',
+  fonts: 'Fonts',
   modules: 'Modules',
   authentication: 'Authentication',
   adapters: 'CDN, KMS & secrets',

@@ -1,7 +1,7 @@
 /**
- * What a phone's layout does by itself, as hooks: a bar that gets out of the
- * way while the pages scroll (`scroll-hiding.ts`), unless something in it has
- * focus, like the page number being typed; and the edges of the screen the
+ * What the layout does by itself, as hooks: a floating bar that gets out of
+ * the way while the pages scroll (`scroll-hiding.ts`), unless something in it
+ * has focus, like the page number being typed; and the edges of the screen the
  * viewer reaches, so it keeps clear of the notch and the home bar there
  * (`screen-edges.ts`).
  */

@@ -6,10 +6,18 @@
 import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { EpdfRender, EpdfRenderLayer, RENDER_DEFAULTS, withRender } from '@embedpdf/angular/render';
+import {
+  EpdfRender,
+  EpdfRenderLayer,
+  RENDER_DEFAULTS,
+  RenderToken,
+  withRender,
+  type PicturePage,
+  type PicturePainter,
+} from '@embedpdf/angular/render';
 import { injectPage, paintsPagePart } from '@embedpdf/angular/runtime';
-import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
-import type { Engine } from '@embedpdf/core';
+import { EpdfPageTemplate, EpdfStage, StageToken, withStage } from '@embedpdf/angular/stage';
+import { definePlugin, type Engine } from '@embedpdf/core';
 import { bytesInput, fakeEngine, handleFor, kernelOf, mount, viewerHost } from './fixtures';
 
 const measured = ['clientWidth', 'clientHeight'] as const;
@@ -227,3 +235,98 @@ function renderingEngine(onUrl: (url: string) => void, onRevoke: (url: string) =
     destroy: () => Promise.resolve(),
   } as unknown as Engine;
 }
+
+/**
+ * A plugin that takes the pictures over as it connects, as a plugin that paints them does, and
+ * records what it's lent: the box and page it paints, its updates, its end.
+ */
+function paintingFeature(paints: (view: string) => boolean = () => true) {
+  const painted: { host: HTMLElement; page: number; scale: number }[] = [];
+  const updates: PicturePage[] = [];
+  const destroyed = vi.fn();
+  const painter: PicturePainter<HTMLElement> = {
+    paints,
+    paint: (host, page) => {
+      painted.push({ host, page: page.ref.objectNumber, scale: page.transform.viewScale });
+      return { update: (next) => updates.push(next), destroy: destroyed };
+    },
+  };
+  let giveBack = () => {};
+  const plugin = definePlugin({
+    id: 'painting',
+    scope: 'document',
+    requires: [RenderToken],
+    create: (ctx) => ({
+      api: {},
+      connect() {
+        giveBack = ctx.get(RenderToken).handOverPictures(painter);
+      },
+    }),
+  });
+  return {
+    feature: { plugins: [plugin], services: [] },
+    painted,
+    updates,
+    destroyed,
+    giveBack: () => giveBack(),
+  };
+}
+
+async function paintedStage(painting: ReturnType<typeof paintingFeature>) {
+  const asked: Record<string, unknown>[] = [];
+  const fixture = await mount(
+    viewerHost({
+      imports: [EpdfStage, EpdfPageTemplate, EpdfRenderLayer],
+      config: { engine: recordingEngine(asked) },
+      features: [withStage({ zoom: { pageWidth: 100 } }), withRender(), painting.feature],
+      template: `
+        <epdf-stage>
+          <ng-template epdfPage><epdf-render-layer /></ng-template>
+        </epdf-stage>
+      `,
+    }),
+  );
+  await kernelOf(fixture).documents.open(bytesInput('a'));
+  return { fixture, asked };
+}
+
+describe('a plugin that paints the pictures', () => {
+  it('is lent the page box, follows the zoom, and never lets the raster be fetched', async () => {
+    const painting = paintingFeature();
+    const { fixture, asked } = await paintedStage(painting);
+    await vi.waitFor(async () => {
+      await fixture.whenStable();
+      expect(painting.painted.length).toBeGreaterThan(0);
+    });
+    expect(painting.painted[0]!.page).toBe(1);
+    expect(painting.painted[0]!.host.isConnected).toBe(true);
+    expect(fixture.nativeElement.querySelectorAll('epdf-render-layer img')).toHaveLength(0);
+    expect(asked).toEqual([]);
+
+    const painted = painting.painted.length;
+    kernelOf(fixture).capability(StageToken).zoomTo(2);
+    await fixture.whenStable();
+    expect(painting.updates.at(-1)!.transform.viewScale).toBeGreaterThan(
+      painting.painted[0]!.scale,
+    );
+    expect(painting.painted).toHaveLength(painted); // the same pictures, updated
+
+    // Given back, the render plugin draws the pages again.
+    painting.giveBack();
+    await vi.waitFor(async () => {
+      await fixture.whenStable();
+      expect(asked.length).toBeGreaterThan(0);
+    });
+    expect(painting.destroyed).toHaveBeenCalledTimes(painted);
+  });
+
+  it('leaves the views it doesn’t paint to the render plugin', async () => {
+    const painting = paintingFeature(() => false);
+    const { fixture, asked } = await paintedStage(painting);
+    await vi.waitFor(async () => {
+      await fixture.whenStable();
+      expect(asked.length).toBeGreaterThan(0);
+    });
+    expect(painting.painted).toEqual([]);
+  });
+});

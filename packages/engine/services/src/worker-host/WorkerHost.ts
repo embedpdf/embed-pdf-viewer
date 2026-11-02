@@ -58,8 +58,12 @@ import {
   type FontsAddFallbackWorkerRequest,
   type FontsClearFallbacksWorkerRequest,
   type FontsClearWorkerRequest,
+  type FontsProgramWorkerRequest,
   type FontsAuthorizeEditingWorkerRequest,
   type DocumentSetFontSettingsWorkerRequest,
+  type DocumentFontsListWorkerRequest,
+  type DocumentFontsProgramWorkerRequest,
+  type DocumentFontsResolveWorkerRequest,
   type AnnotationsListWorkerRequest,
   type AnnotationsRenderAppearancesWorkerRequest,
   type AnnotationsReorderWorkerRequest,
@@ -165,7 +169,13 @@ import {
   type ChangeSpace,
   type KeptResult,
 } from '../features/changes';
-import { FontRegistrar, type StartupFontSpec } from '../features/fonts';
+import {
+  DocumentFontReader,
+  FontRegistrar,
+  fontsChangedSince,
+  trackFontChanges,
+  type StartupFontSpec,
+} from '../features/fonts';
 import { FormExporter, FormMutator, FormReader, disposeFormModel } from '../features/forms';
 import { PageGeometryReader } from '../features/geometry';
 import { MeasureReader, MeasureMutator } from '../features/measure';
@@ -245,6 +255,14 @@ export interface WorkerHostOptions {
    * so an abort stops it about this soon. Defaults to {@link DEFAULT_SLICE_MS}.
    */
   sliceMs?: number;
+  /**
+   * Every write says whether it changed the fonts the document's list shows
+   * (`fontsChanged`), from a session's first write on. Without it a session
+   * says so only once its fonts were listed: the local engine's, which tells
+   * whoever listed them. The server sets it: it versions the list by every
+   * change.
+   */
+  reportEveryFontChange?: boolean;
 }
 
 /** See {@link WorkerHostOptions.sliceMs}. */
@@ -503,7 +521,15 @@ export class WorkerHost {
       // completes or is cancelled. Reads keep seeing the live document, which the
       // candidate never changed.
       this.assertNoPendingSigning(msg);
+      // The fonts before the first write are what the next one compares to.
+      if (this.options.reportEveryFontChange) {
+        const written = this.sessionWrittenBy(msg);
+        if (written) trackFontChanges(this.runtime, written);
+      }
       if (transacted && writesDocument(msg)) transacted.beginTransaction(msg.opId);
+      // What the write draws with no font for a character is read back at
+      // finishMutation; start from nothing.
+      this.writingSession(msg)?.clearMissingCharacters();
       // The write's own objects go at or above the floor its caller set.
       if (transacted && 'objectNumberFloor' in msg && msg.objectNumberFloor !== undefined) {
         transacted.raiseLastObjectNumber(msg.objectNumberFloor - 1);
@@ -718,8 +744,27 @@ export class WorkerHost {
         case 'fonts.authorizeEditing':
           resultPack = this.handleFontsAuthorizeEditing(msg);
           break;
+        case 'fonts.list':
+          resultPack = wirePack({
+            tag: 'fonts.list',
+            engineFonts: this.fonts.engineFontFacts(),
+            fallbacks: this.fonts.fallbackKeys(),
+          });
+          break;
+        case 'fonts.program':
+          resultPack = this.handleFontsProgram(msg);
+          break;
         case 'document.setFontSettings':
           resultPack = this.handleDocumentSetFontSettings(msg);
+          break;
+        case 'document.fonts.list':
+          resultPack = this.handleDocumentFontsList(msg);
+          break;
+        case 'document.fonts.resolve':
+          resultPack = this.handleDocumentFontsResolve(msg);
+          break;
+        case 'document.fonts.program':
+          resultPack = this.handleDocumentFontsProgram(msg);
           break;
         case 'objectNumbers.reserve':
           resultPack = wirePack({
@@ -762,6 +807,27 @@ export class WorkerHost {
    * open, usable layer document. Anything else (no such session, a locked
    * one) gets its handler's own error.
    */
+  /** The open session a write job writes to; undefined for any other job. */
+  private writingSession(msg: FileSpaceJob): DocumentSession | undefined {
+    if (!writesDocument(msg) || !('docId' in msg)) return undefined;
+    const layerName = 'layerName' in msg ? msg.layerName : undefined;
+    const session = this.sessions.get(sessionKey(msg.docId, layerName));
+    return session?.isOpen() ? session : undefined;
+  }
+
+  /**
+   * The open session a job may change: every write, those that run their own
+   * transactions (a server request's changes, a completed signing) included.
+   */
+  private sessionWrittenBy(msg: FileSpaceJob): DocumentSession | undefined {
+    if (!('docId' in msg) || (msg.effect !== 'write' && msg.effect !== 'contentWrite')) {
+      return undefined;
+    }
+    const layerName = 'layerName' in msg ? msg.layerName : undefined;
+    const session = this.sessions.get(sessionKey(msg.docId, layerName));
+    return session?.isOpen() ? session : undefined;
+  }
+
   private transactedSession(msg: FileSpaceJob): DocumentSession | undefined {
     if (!writesDocument(msg)) return undefined;
     const layerName = 'layerName' in msg ? msg.layerName : undefined;
@@ -1622,6 +1688,49 @@ export class WorkerHost {
     ]);
   }
 
+  private handleDocumentFontsList(
+    req: DocumentFontsListWorkerRequest,
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
+    const session = this.requireSession(req);
+    // Whoever listed them hears of every change from now on.
+    trackFontChanges(this.runtime, session);
+    const reader = new DocumentFontReader(this.runtime, session, this.fonts);
+    return wirePack({ tag: 'document.fonts.list', facts: reader.facts() });
+  }
+
+  private handleDocumentFontsResolve(
+    req: DocumentFontsResolveWorkerRequest,
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
+    const reader = new DocumentFontReader(this.runtime, this.requireSession(req), this.fonts);
+    const facts = reader.facts();
+    const { runs, missingCharacters } = reader.resolve(req.annotation, req.runs, facts);
+    return wirePack({ tag: 'document.fonts.resolve', runs, missingCharacters, facts });
+  }
+
+  private handleDocumentFontsProgram(
+    req: DocumentFontsProgramWorkerRequest,
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
+    const reader = new DocumentFontReader(this.runtime, this.requireSession(req), this.fonts);
+    const program = reader.program(req.displayHash, req.part === 'data');
+    // The bytes are a copy out of the runtime's memory: they transfer.
+    const bytes = program.bytes
+      ? (program.bytes.buffer.slice(
+          program.bytes.byteOffset,
+          program.bytes.byteOffset + program.bytes.byteLength,
+        ) as ArrayBuffer)
+      : null;
+    return wirePack(
+      {
+        tag: 'document.fonts.program',
+        covers: program.covers,
+        ascent: program.ascent,
+        descent: program.descent,
+        bytes,
+      },
+      bytes ? [bytes] : [],
+    );
+  }
+
   private handleAttachmentsList(
     req: AttachmentsListWorkerRequest,
     signal: AbortSignal,
@@ -2213,7 +2322,7 @@ export class WorkerHost {
   private handleFontsAddFallback(
     req: FontsAddFallbackWorkerRequest,
   ): WirePack<WorkerResultPayload<PdfCoordinates>> {
-    this.fonts.addFallback(req.fontKey);
+    this.fonts.addFallback(req.fontKey, req.tier);
     return wirePack({ tag: 'fonts.addFallback' });
   }
 
@@ -2222,6 +2331,27 @@ export class WorkerHost {
   ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     this.fonts.clearFallbacks();
     return wirePack({ tag: 'fonts.clearFallbacks' });
+  }
+
+  private handleFontsProgram(
+    req: FontsProgramWorkerRequest,
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
+    const served = this.fonts
+      .engineFontFacts()
+      .some((font) => font.sha256 === req.sha256 && font.served);
+    const program = served ? this.fonts.programFor(req.sha256) : undefined;
+    if (!program) {
+      throw new EngineError(
+        EngineErrorCode.NotFound,
+        `no served font has the program ${req.sha256}`,
+      );
+    }
+    const bytes = program.bytes();
+    const buffer = bytes.buffer.slice(
+      bytes.byteOffset,
+      bytes.byteOffset + bytes.byteLength,
+    ) as ArrayBuffer;
+    return wirePack({ tag: 'fonts.program', bytes: buffer }, [buffer]);
   }
 
   private handleFontsClear(
@@ -2423,7 +2553,7 @@ export class WorkerHost {
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
-    const mutator = new FormMutator(this.runtime, session);
+    const mutator = new FormMutator(this.runtime, session, this.fonts);
     const result = mutator.repair(req.bakeAppearances ?? false, signal);
     return this.finishMutation(session, { tag: 'forms.repair', result }, req.artifactPath);
   }
@@ -2642,11 +2772,15 @@ export class WorkerHost {
       session.invalidateDerived();
     }
     if (payload.tag !== 'signatures.complete') session.noteEdit();
+    const written = withMissingCharacters(payload, session.missingCharacters());
+    const reported = fontsChangedSince(this.runtime, session)
+      ? { ...written, fontsChanged: true as const }
+      : written;
     if (session.kind !== 'layer' || !session.persistLayerArtifact) {
-      return wirePack(payload);
+      return wirePack(reported);
     }
     const saved = this.saveLayerArtifact(session, artifactPath);
-    return wirePack({ ...payload, ...saved.payload }, saved.transfer);
+    return wirePack({ ...reported, ...saved.payload }, saved.transfer);
   }
 
   private saveLayerArtifact(session: DocumentSession, artifactPath?: string): LayerArtifactSave {
@@ -2725,6 +2859,24 @@ function actorOf({ identity }: ChangeAuthority): AnnotationActor {
 }
 
 /**
+ * A write's payload with the characters it drew with no font in its result's
+ * meta (`meta.missingCharacters`), when there are any, it has a meta, and
+ * that meta doesn't already say: a change's result says per op, and for the
+ * whole change.
+ */
+function withMissingCharacters<P extends WorkerResultPayload<PdfCoordinates>>(
+  payload: P,
+  missingCharacters: string[],
+): P {
+  if (missingCharacters.length === 0 || !('result' in payload)) return payload;
+  const result = payload.result as unknown;
+  if (typeof result !== 'object' || result === null || !('meta' in result)) return payload;
+  const { meta } = result as { meta: unknown };
+  if (typeof meta !== 'object' || meta === null || 'missingCharacters' in meta) return payload;
+  return { ...payload, result: { ...result, meta: { ...meta, missingCharacters } } };
+}
+
+/**
  * A change's result once it ran: its items, which were read back before the
  * change knew whether it could be undone, carry that now, as its meta does.
  */
@@ -2737,9 +2889,18 @@ function resultOf<C extends Coordinates>(
   const items = applied.items.map(
     (item) => ({ ...item, meta: { ...item.meta, undoable } }) as ChangeItem<C>,
   );
+  // What any of its ops drew with no font, first seen first.
+  const missingCharacters = [
+    ...new Set(items.flatMap((item) => item.meta.missingCharacters ?? [])),
+  ];
   return {
     items,
-    meta: { affectedPages: pagesOf(items), cacheDelta: null, ...session.writeStamp() },
+    meta: {
+      affectedPages: pagesOf(items),
+      cacheDelta: null,
+      ...session.writeStamp(),
+      ...(missingCharacters.length > 0 ? { missingCharacters } : {}),
+    },
   };
 }
 

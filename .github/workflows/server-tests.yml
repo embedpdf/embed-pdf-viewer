@@ -84,11 +84,14 @@ jobs:
           rm -rf packages/engine/runtime/_artifacts
 
       # Every workspace dep the server consumes from dist, in dependency
-      # order (contract needs engine-core; the sdk is a test-time dep).
+      # order (contract and core-fonts need engine-core; the fallback fonts
+      # build their modules; the sdk is a test-time dep).
       - name: Build workspace packages
         run: |
           pnpm --filter @embedpdf/engine-runtime build
           pnpm --filter @embedpdf/engine-core build
+          pnpm --filter @embedpdf/core-fonts build
+          pnpm --filter @embedpdf/default-fallback-fonts build
           pnpm --filter @embedpdf/engine-services build
           pnpm --filter @cloudpdf/contract build
           pnpm --filter @cloudpdf/sdk build

@@ -14,7 +14,7 @@
   import { untrack } from 'svelte';
   import { createKernel, isLocalEngine, viewerSettingsOf } from '@embedpdf/core';
   import type { Engine, EngineFactory, Kernel, ViewerSettings } from '@embedpdf/core';
-  import { browserClock, browserPrinter } from '@embedpdf/web';
+  import { browserClock, browserPrinter, browserTextMeasurer } from '@embedpdf/web';
   import { KernelBinding, setKernelHolder } from './binding.svelte';
   import { isDev } from './dev';
   import type { ViewerProps } from './props';
@@ -64,6 +64,7 @@
           settings,
           clock: browserClock(),
           printer: browserPrinter(),
+          measurer: browserTextMeasurer(),
           // Each download calls the latest prop.
           fetch: (url, init) => {
             // A plain call: the browser's own `fetch` refuses any other `this`.

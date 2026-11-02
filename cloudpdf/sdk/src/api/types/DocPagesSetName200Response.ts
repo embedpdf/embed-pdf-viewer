@@ -11,6 +11,7 @@ export namespace DocPagesSetName200Response {
     export interface Layout {
         pageCount: number;
         pages: Layout.Pages.Item[];
+        labels: Layout.Labels.Item[];
         namedPages: Layout.NamedPages.Item[];
     }
 
@@ -97,6 +98,28 @@ export namespace DocPagesSetName200Response {
                     right: number;
                     top: number;
                 }
+            }
+        }
+
+        export type Labels = Labels.Item[];
+
+        export namespace Labels {
+            export interface Item {
+                firstPage: number;
+                style: Item.Style | null;
+                firstNumber: number;
+                prefix: string;
+            }
+
+            export namespace Item {
+                export const Style = {
+                    Decimal: "decimal",
+                    UpperRoman: "upperRoman",
+                    LowerRoman: "lowerRoman",
+                    UpperLetters: "upperLetters",
+                    LowerLetters: "lowerLetters",
+                } as const;
+                export type Style = (typeof Style)[keyof typeof Style];
             }
         }
 

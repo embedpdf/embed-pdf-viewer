@@ -9,6 +9,7 @@ export default {
   text: 'Text',
   annotations: 'Annotations',
   attachments: 'Attachments',
+  fonts: 'Fonts',
   forms: 'Forms',
   metadata: 'Metadata',
   outline: 'Outline',

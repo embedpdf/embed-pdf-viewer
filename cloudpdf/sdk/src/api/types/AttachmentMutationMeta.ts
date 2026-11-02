@@ -7,6 +7,7 @@ export interface AttachmentMutationMeta {
     cacheDelta: CloudPDF.CacheDelta | null;
     opId: string;
     undoable: boolean;
+    missingCharacters?: string[] | undefined;
     changed: AttachmentMutationMeta.Changed.Item[];
 }
 

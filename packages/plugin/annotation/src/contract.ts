@@ -33,6 +33,7 @@ import type {
   ViewEnv,
 } from '@embedpdf/core-annotation';
 import type { Point } from '@embedpdf/core-geometry';
+import type { MountableFontProgram } from '@embedpdf/plugin-fonts/contract';
 import type {
   Annotation,
   AnnotationBundle,
@@ -372,6 +373,14 @@ export interface TextItem {
   /** The rich paragraphs the editor renders and edits (run deltas over the
    *  body, which `css` carries). `contents` is their plain projection. */
   richText: { paragraphs: RichTextParagraph[] };
+  /** The face of its text without one of its own: the body's. */
+  face: { family: string; weight: number; italic: boolean };
+  /**
+   * The font programs its text is drawn in (`css.fontFamily` and the runs'
+   * families name them): mount them where the box is drawn
+   * (`createFontMounts` in `@embedpdf/web`). Empty without the fonts plugin.
+   */
+  programs: readonly MountableFontProgram[];
   editing: boolean;
   /** Applied rotation (deg, CW). `box` is the unrotated text box; the framework
    *  rotates the editable element about its centre by this. 0/undefined = none. */

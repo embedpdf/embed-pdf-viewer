@@ -131,12 +131,7 @@ export const pageCommands: CommandDef[] = [
     id: 'page:duplicate',
     labelKey: 'commands.pages.duplicate',
     icon: 'copy',
-    categories: PAGE_EDITS.categories,
-    // A copy is made from the pages copied out: it needs both rights.
-    allowed: (commandContext) => {
-      const pageEdit = pageEditOf(commandContext);
-      return pageEdit ? pageEdit.canEdit() && pageEdit.canExtract() : true;
-    },
+    ...PAGE_EDITS,
     enabled: hasSelection,
     run: async (commandContext) => {
       const pageEdit = pageEditOf(commandContext);

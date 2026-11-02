@@ -22,7 +22,11 @@ export { isLocalPage } from './engine/LocalPageHandle';
 export type { LocalPageHandle } from './engine/LocalPageHandle';
 export { LOCAL_ENGINE_BRAND } from './engine/localEngineBrand';
 export type { FontService } from './engine/FontService';
-export type { DocumentFontSettings, FontEmbeddingPolicy } from './engine/DocumentFontSettings';
+export type {
+  DocumentFontsService,
+  FontEmbeddingPolicy,
+  LocalDocumentFontsService,
+} from './engine/DocumentFontsService';
 export type { DocumentHandle, DocumentGrant } from './engine/DocumentHandle';
 export type {
   DocumentEvent,
@@ -206,7 +210,12 @@ export type {
   FontsClearFallbacksWorkerRequest,
   FontsClearWorkerRequest,
   FontsAuthorizeEditingWorkerRequest,
+  FontsListWorkerRequest,
+  FontsProgramWorkerRequest,
   DocumentSetFontSettingsWorkerRequest,
+  DocumentFontsListWorkerRequest,
+  DocumentFontsResolveWorkerRequest,
+  DocumentFontsProgramWorkerRequest,
   CloseWorkerRequest,
   LayerCloseWorkerRequest,
   AbortWorkerRequest,
@@ -221,4 +230,28 @@ export type {
   AttachmentFileWorkerPayload,
   LayerArtifactWorkerPayload,
   LayerArtifactFileWorkerPayload,
+  WritePayloadFacts,
 } from './wire/worker-protocol';
+export {
+  canChooseProgram,
+  documentFontNameOf,
+  documentFontsOf,
+  documentProgramForName,
+  downloadableProgram,
+  FALLBACK_TIERS,
+  fontListOf,
+  fontResolutionOf,
+  listedProgram,
+  restrictionsOfProgram,
+  standardFontOfBaseFont,
+  TEXT_WRITING_CAPABILITIES,
+  type BuiltInPrograms,
+  type DocumentFace,
+  type DocumentFaceFacts,
+  type DocumentFontFacts,
+  type EngineFontFacts,
+  type FallbackTier,
+  type FontListFacts,
+  type FontProgramFacts,
+  type ResolvedRunFacts,
+} from './fonts/fontList';

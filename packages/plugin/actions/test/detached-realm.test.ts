@@ -9,7 +9,9 @@ import { createActionsTestContext } from './helpers/context';
 function harness() {
   const ctx = createActionsTestContext({
     id: 'actions',
-    doc: { forms: { list: async () => ({ fields: [], widgets: [] }) } } as unknown as Partial<DocumentHandle>,
+    doc: {
+      forms: { list: async () => ({ fields: [], widgets: [] }) },
+    } as unknown as Partial<DocumentHandle>,
   });
   return ctx.connect(createActionsController(ctx));
 }
@@ -64,6 +66,26 @@ describe('detached-realm script surfaces', () => {
       realm: 'document',
     });
     expect(gotoPage).toHaveBeenCalledWith(4, { origin: 'user', phase: 'user' });
+  });
+
+  it("sends a script's setFocus to the form plugin's cursor, and says when it can't", () => {
+    const capability = harness();
+    const focus = vi.fn((field: string) => field === 'email');
+    capability.registerFormFocus(focus);
+    const diagnostics: ScriptDiagnostic[] = [];
+    capability.onScriptDiagnosticReported((diagnostic) => diagnostics.push(diagnostic));
+    capability.surfaceScriptResult({
+      uiEffects: [
+        { kind: 'focusField', field: 'email' },
+        { kind: 'focusField', field: 'missing' },
+      ],
+      diagnostics: [],
+      origin: 'user',
+      phase: 'user',
+      realm: 'document',
+    });
+    expect(focus.mock.calls).toEqual([['email'], ['missing']]);
+    expect(diagnostics).toEqual([expect.objectContaining({ code: 'ui-effect-suppressed' })]);
   });
 
   it('surfaceScriptCommit splits boot and user phases; diagnostics and the error ride the user phase', () => {

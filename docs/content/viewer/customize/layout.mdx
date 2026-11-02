@@ -50,7 +50,7 @@ The ids of every bar, group, menu and button are at the [end of this page](#ever
 | :-- | :-- |
 | `'top'`, `'bottom'` | Along the top or bottom edge, horizontal |
 | `'start'`, `'end'` | Along the left or right edge, vertical. In a right-to-left language they swap sides. |
-| `{ float: 'bottom' }` | Floating over the pages: `'top-start'`, `'top'`, `'top-end'`, `'start'`, `'end'`, `'bottom-start'`, `'bottom'` or `'bottom-end'` |
+| `{ float: 'bottom' }` | Floating over the pages: `'top-start'`, `'top'`, `'top-end'`, `'start'`, `'end'`, `'bottom-start'`, `'bottom'` or `'bottom-end'`. Add `hideWhileScrolling` to [hide it while the pages scroll](#out-of-the-way-while-reading). |
 | `{ with: 'main' }` | Along another bar, on the side of the pages. The mode bars ride along `main` this way, so they follow it wherever it goes. |
 | `{ at: 'selection' }`, `{ at: 'annotation' }` | Over selected text, or over selected annotations |
 | `{ panel: 'thumbnails' }` | At the top of a panel, under its title: any panel's id, your own too. See [A bar in a panel](panels#a-bar-in-a-panel). |
@@ -106,6 +106,25 @@ with its out and in buttons, in the bottom-right corner:
 A floating bar has a shadow, keeps clear of the scrollbars, and sits above the pages but below
 menus and panels.
 
+It sits over the pages, so in "fit page" a page's edge can be under it. Give the pages room on that
+side with the Stage's `padding`, which takes each side on its own:
+
+```js
+{
+  plugins: { stage: { padding: { top: 24, right: 24, bottom: 72, left: 24 } } },
+}
+```
+
+Below 600 px wide the Stage's own rule makes the padding `4` on every side: see
+[Adapt to the space you have](/docs/headless/viewing/stage#adapt-to-the-space-you-have) to set your
+own.
+
+Bars floating on one edge share it: the corner ones sit in the corners, and the one in the middle
+stays centered over the pages, moving aside only as far as a corner bar needs. When it doesn't fit
+beside them, the corner bars move one row in, toward the middle of the pages, so no bar covers
+another. On a phone, the zoom above and the page number sit side by side when they fit, and one
+over the other when they don't.
+
 Here the main toolbar is at the bottom, and the zoom field has left it for a floating bar of its
 own:
 
@@ -113,6 +132,18 @@ own:
 
 > **Try it:** zoom in on the timeline on page 3 from the floating buttons at the bottom right, then
 > open the menu at the start of the toolbar: it opens upward.
+
+### Out of the way while reading
+
+`hideWhileScrolling: true` fades a floating bar out while the pages scroll, and brings it back once
+they've been still for a moment, at every size:
+
+```js
+layout.place('pager', { float: 'bottom', hideWhileScrolling: true });
+```
+
+`false` keeps a bar on screen. Without either, the bar with the page number hides on a phone, and
+every other bar stays. A bar with focus in it, like the page number being typed, stays too.
 
 ## Add a button
 
@@ -133,7 +164,10 @@ layout.add('document:print', { to: 'document' }); // the document menu
 | `before`, `after` | An item to put it next to, in that item's group | none |
 
 An item is a command id, such as one of yours from [Buttons & commands](commands). It can also be
-your own component: see [Your own components](components).
+your own component: see [Your own components](components). A component goes by its id in every
+change, the viewer's own components too: `remove('zoom', { from: 'main' })` takes out the zoom
+field, `replace('zoom', { custom: 'zoom-pill' })` puts yours in its place, and
+`{ to: 'pager', after: 'page-number' }` goes next to the page number.
 
 ## Remove buttons
 
@@ -150,12 +184,15 @@ To leave something out everywhere at once, every button, menu row, tab and short
 [`disable`](../features/turning-off) instead: the layout says where things go, `disable` says
 whether the viewer has them.
 
-`removeBar(id)` removes a whole bar. Removing a mode's bar removes its tab, while its tools stay
-available for a bar of your own:
+`removeBar(id)` removes a whole bar, with the bars that ride along it. Removing a mode's bar removes
+its tab, while its tools stay available for a bar of your own. It takes a list too:
 
 ```js
-layout.removeBar('measure').removeBar('pager');
+layout.removeBar(['measure', 'pager']);
 ```
+
+The mode bars ride along `main`, so `removeBar('main')` takes them with it: no main toolbar, and no
+modes.
 
 ## Replace a button
 
@@ -210,6 +247,22 @@ An item that needs more than a command id is an object:
 its group's, so `importance` on a group is for each of its items too. The bar measures what it
 really draws, so a longer translation or a bigger font just works.
 
+## A primary button
+
+The one thing a bar is for, such as Approve or Sign, can stand out: `emphasis: 'primary'` draws
+its button filled in the accent color.
+
+```js
+layout.add(
+  { command: 'acme:approve', emphasis: 'primary', variants: ['icon+label', 'icon'] },
+  { to: 'main', section: 'end' },
+);
+```
+
+In the "More" menu it's a row like the others. Its part is `toolbar-button-primary`, and each bar
+is the part `toolbar-<id>` too, so CSS can give one bar a look of its own: see
+[Theming](theming#restyle-a-part).
+
 ## A new mode
 
 The mode tabs list every bar that has a `mode`. Add one, and a tab appears:
@@ -247,7 +300,8 @@ each by id.
 }
 ```
 
-That's a reading room: zoom, search and download, nothing else. Which one to choose:
+That's a reading room: zoom, search and download, nothing else. A built-in panel's id brings its
+own title, icon and words, so `search` needs no more than its side. Which one to choose:
 
 - **A function** builds on the default, so a new version of the viewer brings its new buttons with it.
 - **A whole layout** stays exactly as you wrote it. New features arrive as new ids you add when you
@@ -281,7 +335,8 @@ page's, in the thumbnails panel). Their buttons are `menu:document`, `menu:view`
 `menu:outline-item`, `menu:attachment-item`, `menu:comment-item` and `menu:page`. See [Menus](menus).
 
 **Your own components the viewer ships**: `{ custom: 'zoom' }` (the zoom field),
-`{ custom: 'page-number' }` (the page number and count), `{ custom: 'quick-stamps' }` (the stamps
+`{ custom: 'page-number' }` (the page number and count, and both numbers while two pages sit side
+by side: "Pages 2–3 of 10"), `{ custom: 'quick-stamps' }` (the stamps
 bar of the Insert mode), `{ custom: 'measurement-scale' }` (the scale of the Measure mode),
 `{ custom: 'view-only' }` (the [View only](../features/turning-off#read-only) label, in the main bar's
 `panels` group), `{ custom: 'outline-filter' }` (the outline's filter field, in its panel's bar) and

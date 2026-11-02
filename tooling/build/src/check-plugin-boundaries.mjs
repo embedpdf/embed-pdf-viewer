@@ -6,8 +6,15 @@ import { fileURLToPath } from 'node:url';
 
 import ts from 'typescript';
 
-const PLUGIN_ROOT = /^@embedpdf\/plugin-[^/]+$/;
-const PLUGIN_PACKAGE = /^(@embedpdf\/plugin-[^/]+)(?:\/(.+))?$/;
+const PLUGIN_ROOT = /^@(?:embedpdf|cloudpdf)\/plugin-[^/]+$/;
+const PLUGIN_PACKAGE = /^(@(?:embedpdf|cloudpdf)\/plugin-[^/]+)(?:\/(.+))?$/;
+/** The two trees, each with its `plugin/` and `framework/` groups (docs/conventions/packages.md). */
+const TREES = ['packages', 'cloudpdf'];
+
+/** A group's directory in each tree: `plugin` or `framework`. */
+function groupRoots(repoRoot, group) {
+  return TREES.map((tree) => path.join(repoRoot, tree, group));
+}
 const SOURCE_EXTENSIONS = ['.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', '.cjs'];
 const IMPLEMENTATION_MODULE = /(?:^|\/)(?:[^/]+\.plugin|controller|connect)$/;
 
@@ -194,7 +201,10 @@ function folderEntryOwnedRoots(frameworkRoot) {
 }
 
 function publicContractChecks(repoRoot, violations) {
-  const pluginRoot = path.join(repoRoot, 'packages', 'plugin');
+  for (const pluginRoot of groupRoots(repoRoot, 'plugin')) contractChecksUnder(pluginRoot, violations);
+}
+
+function contractChecksUnder(pluginRoot, violations) {
   if (!fs.existsSync(pluginRoot)) return;
   for (const entry of fs.readdirSync(pluginRoot, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
@@ -321,8 +331,8 @@ function checkContractClosure(entryFile, violations) {
 }
 
 function importBoundaryChecks(repoRoot, violations) {
-  const pluginRoot = path.join(repoRoot, 'packages', 'plugin');
-  for (const file of sourceFilesUnder(pluginRoot)) {
+  const pluginRoots = groupRoots(repoRoot, 'plugin');
+  for (const file of pluginRoots.flatMap((pluginRoot) => sourceFilesUnder(pluginRoot))) {
     const source = parse(file);
     for (const reference of moduleReferences(source)) {
       const match = PLUGIN_PACKAGE.exec(reference.specifier);
@@ -337,12 +347,14 @@ function importBoundaryChecks(repoRoot, violations) {
     }
   }
 
-  const frameworkRoot = path.join(repoRoot, 'packages', 'framework');
-  const entryRoots = new Map([
-    ...angularOwnedRoots(frameworkRoot),
-    ...folderEntryOwnedRoots(frameworkRoot),
-  ]);
-  for (const file of sourceFilesUnder(frameworkRoot)) {
+  const frameworkRoots = groupRoots(repoRoot, 'framework');
+  const entryRoots = new Map(
+    frameworkRoots.flatMap((frameworkRoot) => [
+      ...angularOwnedRoots(frameworkRoot),
+      ...folderEntryOwnedRoots(frameworkRoot),
+    ]),
+  );
+  for (const file of frameworkRoots.flatMap((frameworkRoot) => sourceFilesUnder(frameworkRoot))) {
     const source = parse(file);
     const owned = runtimeRootReexports(source);
     for (const [entryRoot, roots] of entryRoots) {
@@ -363,17 +375,11 @@ function importBoundaryChecks(repoRoot, violations) {
     }
   }
 
-  const otherSourceRoots = ['packages', 'cloudpdf', 'examples'].map((part) =>
-    path.join(repoRoot, part),
-  );
+  const groupedRoots = [...pluginRoots, ...frameworkRoots];
+  const otherSourceRoots = [...TREES, 'examples'].map((part) => path.join(repoRoot, part));
   for (const sourceRoot of otherSourceRoots) {
     for (const file of sourceFilesUnder(sourceRoot)) {
-      if (
-        file === pluginRoot ||
-        file.startsWith(`${pluginRoot}${path.sep}`) ||
-        file === frameworkRoot ||
-        file.startsWith(`${frameworkRoot}${path.sep}`)
-      ) {
+      if (groupedRoots.some((root) => file === root || file.startsWith(`${root}${path.sep}`))) {
         continue;
       }
       const source = parse(file);

@@ -1,9 +1,11 @@
 /**
- * The viewer's own components in your page (`<epdf-button>`, `<epdf-menu>`):
- * elements the delivery defines, drawn here by the viewer into each one's
- * own shadow root, with the toolbar's button and the viewer's menu. So they
- * look and behave like the viewer's own: a command's icon, tooltip and
- * state; a menu that opens away from its bar, flips, and takes the menu keys.
+ * The viewer's own components in your page (`<epdf-button>`, `<epdf-menu>`,
+ * `<epdf-icon>`): elements the delivery defines, drawn here by the viewer into
+ * each one's own shadow root, with the toolbar's button, the viewer's menu and
+ * its icons. So they look and behave like the viewer's own: a command's icon,
+ * tooltip and state, or a pressed look of your own (`active`); a menu that
+ * opens away from its bar, flips, and takes the menu keys; an icon of the
+ * viewer's or of the app's `icons`.
  *
  * The delivery keeps the list of them per viewer ({@link PlacedComponents}),
  * one entry per element, replaced when its attributes or rows change; the
@@ -21,6 +23,7 @@ import { Icon } from './icons';
 import { MenuItem, MenuPopover } from './menu';
 import { useSlottedEdges } from './slotted-edges';
 import { CommandButton, buttonClass, buttonPart } from './toolbar';
+import { useTooltip } from './tooltip';
 
 // ── the list ─────────────────────────────────────────────────────────────────
 
@@ -39,6 +42,8 @@ interface PlacedComponentBase {
 export interface PlacedButton extends PlacedComponentBase {
   readonly kind: 'button';
   readonly command: string | null;
+  /** Shown pressed (`active`), as a command's button is while its command is active. */
+  readonly active: boolean;
 }
 
 /** `<epdf-menu>`: a button that opens a menu of its rows. */
@@ -53,11 +58,20 @@ export interface PlacedMenuItem {
   readonly icon: string | null;
   /** Its text; a command's label when it has none. */
   readonly label: string;
+  /** Shown checked (`active`), as a command's row is while its command is active. */
+  readonly active: boolean;
   /** Says the row was picked (the element's `select` event). */
   readonly select: () => void;
 }
 
-export type PlacedComponent = PlacedButton | PlacedMenu;
+/** `<epdf-icon>`: one of the viewer's icons or the app's, by its name (`icon`). */
+export interface PlacedIcon extends PlacedComponentBase {
+  readonly kind: 'icon';
+  /** Its width and height in px; `null` for a toolbar button's. */
+  readonly size: number | null;
+}
+
+export type PlacedComponent = PlacedButton | PlacedMenu | PlacedIcon;
 
 /** The viewer's own components placed in one viewer. */
 export interface PlacedComponents {
@@ -137,33 +151,60 @@ function Face({ icon, label }: { icon: string | null; label: string | null }) {
   );
 }
 
-function CommandOf({ host, commandId }: { host: HTMLElement; commandId: string }) {
+function CommandOf({
+  host,
+  commandId,
+  active,
+}: {
+  host: HTMLElement;
+  commandId: string;
+  active: boolean;
+}) {
   const command = useCommand(commandId);
   useHostState(host, command);
   if (!command.visible) return null;
-  return <CommandButton cmd={command} variant="icon" run={() => void command.run()} />;
+  return (
+    <CommandButton
+      cmd={active ? { ...command, active } : command}
+      variant="icon"
+      run={() => void command.run()}
+    />
+  );
 }
 
 /** A button of your own: its click is the element's, for your handler. */
-function OwnButton({ icon, label }: { icon: string | null; label: string | null }) {
+function OwnButton({
+  icon,
+  label,
+  active,
+}: {
+  icon: string | null;
+  label: string | null;
+  active: boolean;
+}) {
+  const tooltip = useTooltip(label ? { label, labelShown: !icon } : null);
   return (
-    <button
-      type="button"
-      aria-label={label ?? undefined}
-      title={label ?? undefined}
-      part="toolbar-button"
-      className={buttonClass(false)}
-    >
-      <Face icon={icon} label={label} />
-    </button>
+    <>
+      <button
+        {...tooltip.trigger}
+        type="button"
+        aria-label={label ?? undefined}
+        aria-pressed={active || undefined}
+        part={buttonPart(active)}
+        className={buttonClass(active)}
+      >
+        <Face icon={icon} label={label} />
+      </button>
+      {tooltip.element}
+    </>
   );
 }
 
 function ButtonView({ button }: { button: PlacedButton }) {
   return button.command ? (
-    <CommandOf host={button.host} commandId={button.command} />
+    <CommandOf host={button.host} commandId={button.command} active={button.active} />
   ) : (
-    <OwnButton icon={button.icon} label={button.label} />
+    <OwnButton icon={button.icon} label={button.label} active={button.active} />
   );
 }
 
@@ -176,7 +217,7 @@ const ownRowOf = (item: PlacedMenuItem): ResolvedCommand => ({
   icon: item.icon ?? undefined,
   shortcuts: [],
   enabled: true,
-  active: false,
+  active: item.active,
   visible: true,
   categories: [],
 });
@@ -197,11 +238,12 @@ function CommandRow({
     ...command,
     label: item.label || command.label,
     icon: item.icon ?? command.icon,
+    active: item.active || command.active,
   };
   return (
     <MenuItem
       command={shown}
-      choice={command.active ? 'checkbox' : 'none'}
+      choice={shown.active ? 'checkbox' : 'none'}
       onSelect={() => {
         void command.run();
         item.select();
@@ -214,20 +256,22 @@ function CommandRow({
 function MenuView({ menu }: { menu: PlacedMenu }) {
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
+  const tooltip = useTooltip(menu.label ? { label: menu.label, labelShown: !menu.icon } : null);
   return (
     <span className="relative inline-flex">
       <button
+        {...tooltip.trigger}
         type="button"
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={menu.label ?? undefined}
-        title={menu.label ?? undefined}
         part={buttonPart(open)}
         className={buttonClass(open)}
         onClick={() => setOpen((previous) => !previous)}
       >
         <Face icon={menu.icon} label={menu.label} />
       </button>
+      {tooltip.element}
       {open && (
         <MenuPopover onClose={close}>
           <div className="min-w-52 p-1">
@@ -238,7 +282,7 @@ function MenuView({ menu }: { menu: PlacedMenu }) {
                 <MenuItem
                   key={index}
                   command={ownRowOf(item)}
-                  choice="none"
+                  choice={item.active ? 'checkbox' : 'none'}
                   onSelect={() => {
                     item.select();
                     close();
@@ -250,6 +294,21 @@ function MenuView({ menu }: { menu: PlacedMenu }) {
         </MenuPopover>
       )}
     </span>
+  );
+}
+
+// ── the icon ─────────────────────────────────────────────────────────────────
+
+/** One of the viewer's icons, or the app's, in the color of the text around it. */
+function IconView({ icon }: { icon: PlacedIcon }) {
+  if (!icon.icon) return null;
+  return (
+    <Icon
+      name={icon.icon}
+      size={icon.size ?? 20}
+      title={icon.label ?? undefined}
+      className="block"
+    />
   );
 }
 
@@ -280,8 +339,10 @@ export function PlacedComponentsHost({ components }: { components: PlacedCompone
             <BarEdgeProvider value={edges.edgeOf(component.host)}>
               {component.kind === 'button' ? (
                 <ButtonView button={component} />
-              ) : (
+              ) : component.kind === 'menu' ? (
                 <MenuView menu={component} />
+              ) : (
+                <IconView icon={component} />
               )}
             </BarEdgeProvider>,
             component.root,

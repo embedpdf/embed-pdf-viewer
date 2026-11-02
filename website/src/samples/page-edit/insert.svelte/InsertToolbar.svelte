@@ -62,7 +62,7 @@
     <button
       type="button"
       class="button"
-      disabled={!canEdit || !pageEdit.canExtract()}
+      disabled={!canEdit}
       onclick={() => pageEdit.duplicate([page.ref]).then(show)}
     >
       Duplicate page

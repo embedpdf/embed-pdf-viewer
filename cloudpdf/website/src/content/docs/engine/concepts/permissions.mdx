@@ -114,6 +114,26 @@ is installed: the server refuses to issue a token or a grant that names one it d
 `*` includes every installed plugin's permissions. The first part of a permission says whose it is,
 so `doc.`, `docs.`, `pdf.`, `tokens.`, `grants.` and the other core prefixes are never a plugin's.
 
+Check one like the core's:
+
+```ts
+if (doc.security.allows('protected-display.view')) {
+  // …
+}
+```
+
+Once the session's `/access` has answered, that's the server's answer, which knows the installed
+plugins; before, it's whether the token names the permission, or `*`. A plugin declares its
+permissions, so they're typed like the core's and a typo is an error:
+
+```ts
+declare module '@embedpdf/core' {
+  interface PluginPermissions {
+    'protected-display.view': true;
+  }
+}
+```
+
 </Engine>
 
 ## Annotations

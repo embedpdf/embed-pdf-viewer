@@ -21,6 +21,7 @@ export interface BasePlanePointers {
   annotationsVersion: number;
   formsVersion: number;
   outlineVersion: number;
+  fontsVersion: number;
 }
 
 /** The initial epochs: what version 1 (an upload) carries. */
@@ -31,6 +32,7 @@ export const INITIAL_BASE_POINTERS: Readonly<BasePlanePointers> = Object.freeze(
   annotationsVersion: 1,
   formsVersion: 1,
   outlineVersion: 1,
+  fontsVersion: 1,
 });
 
 export interface BaseVersionRow extends BasePlanePointers {
@@ -156,6 +158,7 @@ export class BaseVersionsRepo {
         annotations_version: INITIAL_BASE_POINTERS.annotationsVersion,
         forms_version: INITIAL_BASE_POINTERS.formsVersion,
         outline_version: INITIAL_BASE_POINTERS.outlineVersion,
+        fonts_version: INITIAL_BASE_POINTERS.fontsVersion,
         created_at: input.createdAt,
       })
       .onConflict((oc) => oc.columns(['doc_id', 'sha256']).doNothing())
@@ -189,6 +192,7 @@ export class BaseVersionsRepo {
       annotations_version: input.annotationsVersion,
       forms_version: input.formsVersion,
       outline_version: input.outlineVersion,
+      fonts_version: input.fontsVersion,
       created_at: input.createdAt,
     };
     await trx.insertInto('base_versions').values(values).execute();
@@ -239,6 +243,7 @@ function mapRow(row: BaseVersionsTable): BaseVersionRow {
     annotationsVersion: Number(row.annotations_version),
     formsVersion: Number(row.forms_version),
     outlineVersion: Number(row.outline_version ?? 1),
+    fontsVersion: Number(row.fonts_version ?? 1),
     createdAt: Number(row.created_at),
   };
 }
