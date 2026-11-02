@@ -1473,7 +1473,7 @@ function Toolbar() {
             min={0}
             max={200}
             step={4}
-            value={settings.padding}
+            value={typeof settings.padding === 'number' ? settings.padding : settings.padding.top}
             onChange={(e) => update({ padding: Math.max(0, Number(e.target.value) || 0) })}
             style={tbNum}
           />
