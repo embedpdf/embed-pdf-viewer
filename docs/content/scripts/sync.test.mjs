@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { DEMO_DOCUMENTS } from '../documents.mjs';
-import { siteFiles, sitePages, transformViewerFile } from './sync.mjs';
+import { pageExamples, siteFiles, sitePages, transformViewerFile } from './sync.mjs';
 
 const cloud = (source, file) => transformViewerFile(source, 'cloud', file);
 const document = DEMO_DOCUMENTS.welcome.viewerCloud;
@@ -168,5 +168,18 @@ describe('a site’s pages', () => {
     const [, code] = page('cloud', 'setup').mdx.split('```');
     assert.match(code, /from '@cloudpdf\/viewer'/);
     assert.match(page('cloud', 'setup').mdx, /install\n`@embedpdf\/viewer`/);
+  });
+});
+
+describe('the examples on a page of their own', () => {
+  it('are the Examples section’s, each shown by its own page there, on both sites', () => {
+    for (const engine of ['local', 'cloud']) {
+      const examples = pageExamples(engine);
+      assert.ok(examples.length > 0, engine);
+      for (const { name, slug, source } of examples) {
+        assert.equal(name, `viewer/examples/${slug}`);
+        assert.match(source, new RegExp(`^viewer/examples/${slug}(\\.\\w+)?\\.mdx$`));
+      }
+    }
   });
 });

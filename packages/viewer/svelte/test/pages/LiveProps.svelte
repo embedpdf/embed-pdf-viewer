@@ -11,6 +11,7 @@
     locale: 'en',
     disable: [],
     readOnly: false,
+    appState: { approved: false },
   });
   let tag = $state('first');
   let label = $state('Hello');
@@ -30,7 +31,14 @@
      warning. -->
 <PDFViewer
   {...live}
-  commands={[{ id: 'acme:hello', label, run: () => {} }]}
+  commands={[
+    { id: 'acme:hello', label, run: () => {} },
+    {
+      id: 'acme:approve',
+      label: 'Approve',
+      active: ({ appState }) => (appState as LiveConfig['appState']).approved,
+    },
+  ]}
   style="height: 100vh; display: block"
   onready={(viewer) => record.viewers.push(viewer)}
   onpanelresize={resizedAs(tag)}

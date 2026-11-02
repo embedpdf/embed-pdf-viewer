@@ -23,7 +23,8 @@ interface RemarkCodeExampleOptions {
  *   <CodeExample codePaths={["a.tsx", "b.css"]}><Demo /></CodeExample>
  */
 let demoManifestCache: Record<string, Record<string, string>> | null = null;
-function readDemoManifest(): Record<string, Record<string, string>> {
+/** The built demos (`public/demos/demos-manifest.json`): each sample's module, by integration. */
+export function readDemoManifest(): Record<string, Record<string, string>> {
   if (demoManifestCache) return demoManifestCache;
   try {
     demoManifestCache = JSON.parse(

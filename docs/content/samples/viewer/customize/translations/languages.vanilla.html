@@ -1,0 +1,39 @@
+<link rel="stylesheet" href="./languages.css" />
+
+<div class="app">
+  <header class="bar">
+    <select id="language" aria-label="Language">
+      <option value="en">English</option>
+      <option value="de">Deutsch</option>
+      <option value="fr">Français</option>
+      <option value="nl">Nederlands</option>
+      <option value="ar">العربية</option>
+    </select>
+  </header>
+  <embedpdf-viewer id="viewer" class="viewer"></embedpdf-viewer>
+</div>
+
+<script type="module">
+  import 'https://cdn.jsdelivr.net/npm/@embedpdf/viewer@3/dist/embedpdf.js';
+
+  // [!doc-source welcome]
+  const welcome = '/pdfs/welcome.pdf';
+  // [!/doc-source]
+
+  const viewer = document.getElementById('viewer');
+  const language = document.getElementById('language');
+
+  viewer.config = {
+    src: welcome,
+    locale: language.value,
+    // Your own words for two of the viewer's labels, in each language.
+    strings: {
+      en: { 'mode:annotate': 'Review', 'document:download': 'Save a copy' },
+      de: { 'mode:annotate': 'Prüfen', 'document:download': 'Kopie speichern' },
+      fr: { 'mode:annotate': 'Relire', 'document:download': 'Enregistrer une copie' },
+      nl: { 'mode:annotate': 'Nakijken', 'document:download': 'Kopie opslaan' },
+      ar: { 'mode:annotate': 'مراجعة', 'document:download': 'حفظ نسخة' },
+    },
+  };
+  language.addEventListener('change', () => (viewer.locale = language.value));
+</script>

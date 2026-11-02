@@ -14,7 +14,8 @@ import {
 } from '@/lib/docs-integrations';
 import { docsProductFromPath } from '@/lib/docs-products';
 
-const INTEGRATION_ICONS: Record<DocsIntegration, ReactNode> = {
+/** Each integration's mark, as the switchers show it. */
+export const INTEGRATION_ICONS: Record<DocsIntegration, ReactNode> = {
   vanilla: <JsMark small />,
   react: <ReactIcon size={15} />,
   vue: <VueIcon size={15} />,

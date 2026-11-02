@@ -306,9 +306,14 @@ function FileBar({
   );
 }
 
-function CodePane({ file }: { file: ExampleFile }) {
+/** The code, scrolling: at most 520px tall, or, with `fill`, the rest of its column. */
+function CodePane({ file, fill = false }: { file: ExampleFile; fill?: boolean }) {
   return (
-    <pre className="dk-dark-scroll m-0 max-h-[520px] overflow-auto whitespace-pre bg-[#0B1530] px-[18px] py-4 font-mono text-[13px] leading-[1.8] text-[#C8D3EA] [tab-size:2]">
+    <pre
+      className={`dk-dark-scroll m-0 overflow-auto whitespace-pre bg-[#0B1530] px-[18px] py-4 font-mono text-[13px] leading-[1.8] text-[#C8D3EA] [tab-size:2] ${
+        fill ? 'min-h-0 flex-1' : 'max-h-[520px]'
+      }`}
+    >
       <code dangerouslySetInnerHTML={{ __html: file.highlightedCode ?? escapeHtml(file.code) }} />
     </pre>
   );
@@ -432,6 +437,34 @@ export function CodeExampleCard({
         <FileBar files={files} activeFile={active} onSelect={setActiveFile} />
         <CodePane file={file} />
       </Collapsible>
+    </div>
+  );
+}
+
+/**
+ * An example's code alone, filling its box: the dark file bar, then the code, which scrolls in
+ * the rest. For code beside a running example, such as on an example's own page; give it a `key`
+ * per version, so a new one starts at its first file.
+ */
+export function CodeFiles({ files }: { files: ExampleFile[] }) {
+  const [activeFile, setActiveFile] = useState(0);
+  if (files.length === 0) return null;
+  const active = Math.min(activeFile, files.length - 1);
+  const file = files[active];
+  return (
+    <div className="flex h-full min-h-0 flex-col bg-[#0B1530]">
+      <FileBar
+        files={files}
+        activeFile={active}
+        onSelect={setActiveFile}
+        right={
+          <>
+            <CopyButton code={file.code} tone="dark" />
+            <GitHubAction files={files} tone="dark" />
+          </>
+        }
+      />
+      <CodePane file={file} fill />
     </div>
   );
 }

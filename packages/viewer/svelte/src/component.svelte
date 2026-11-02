@@ -7,9 +7,10 @@
   difference between the two doors, and it lives only in those two files.
 
   It renders the element and gives it the config before the element's deferred first mount, so the
-  viewer starts once, with it. `src`, `theme`, `locale`, `disable`, `readOnly` and `fetch` follow
-  their props: the element changes them in place, comparing by value. Every other prop is read once: a
-  later change is ignored (development warns), and a `{#key}` block mounts a new viewer with it.
+  viewer starts once, with it. `src`, `theme`, `locale`, `disable`, `readOnly`, `fetch` and
+  `appState` follow their props: the element changes them in place, comparing by value. Every
+  other prop is read once: a later change is ignored (development warns), and a `{#key}` block
+  mounts a new viewer with it.
   `onready`, `ondocumentchange` and `onpanelresize` call the latest prop.
 
   Your components are its children, light DOM the browser shows in the viewer's slots while they
@@ -75,6 +76,14 @@
     class: className,
     style,
     ...(typeof document === 'undefined' ? {} : { config: started, ...liveConfigOf(config) }),
+  });
+
+  // A spread's names reach the element in lower case, and `appstate` is no property of it: the
+  // app's state goes to its `appState` property here, once it's a new one. The first one starts
+  // the viewer, in `config`.
+  $effect(() => {
+    const appState = config.appState;
+    if (element && element.appState !== appState) element.appState = appState;
   });
 
   // Every other prop is read once: say so, once, when one changes after the viewer started.

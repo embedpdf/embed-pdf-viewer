@@ -125,6 +125,14 @@ beside them, the corner bars move one row in, toward the middle of the pages, so
 another. On a phone, the zoom above and the page number sit side by side when they fit, and one
 over the other when they don't.
 
+Here the main toolbar is at the bottom, and the zoom field has left it for a floating bar of its
+own:
+
+<Example name="viewer/customize/layout/bottom-bar" />
+
+> **Try it:** zoom in on the timeline on page 3 from the floating buttons at the bottom right, then
+> open the menu at the start of the toolbar: it opens upward.
+
 ### Out of the way while reading
 
 `hideWhileScrolling: true` fades a floating bar out while the pages scroll, and brings it back once
@@ -135,7 +143,8 @@ layout.place('pager', { float: 'bottom', hideWhileScrolling: true });
 ```
 
 `false` keeps a bar on screen. Without either, the bar with the page number hides on a phone, and
-every other bar stays. A bar with focus in it, like the page number being typed, stays too.
+every other bar stays. A bar you're using from the keyboard, or typing in, like the page number,
+stays too; a button you clicked doesn't keep it.
 
 ## Add a button
 

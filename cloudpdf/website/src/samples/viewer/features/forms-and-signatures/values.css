@@ -1,0 +1,53 @@
+/* Colors, for light and dark */
+:root {
+  --ink: #1a2748;
+  --muted: #5a6b92;
+  --line: #e6eaf2;
+  --surface: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink: #e6ecfa;
+    --muted: #93a3c7;
+    --line: #27365f;
+    --surface: #131d3b;
+  }
+}
+
+/* The viewer, then the form's values under it */
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.viewer {
+  flex: 1;
+  min-height: 0;
+}
+
+.values {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  max-height: 64px;
+  overflow: auto;
+  padding: 8px 12px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+}
+
+.label {
+  flex: none;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.code {
+  font-family: ui-monospace, monospace;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}

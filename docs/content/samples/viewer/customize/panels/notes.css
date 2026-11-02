@@ -1,0 +1,21 @@
+/* What goes inside the panel: a box for notes that fills it. The viewer's colors come in as
+   CSS variables. */
+.notes {
+  flex: 1;
+  box-sizing: border-box;
+  margin: 12px;
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  color: inherit;
+  background: var(--epdf-surface);
+  border: 1px solid var(--epdf-border);
+  border-radius: 8px;
+  resize: none;
+}
+
+.notes:focus-visible {
+  outline: 2px solid var(--epdf-accent);
+  outline-offset: -1px;
+}

@@ -1,0 +1,84 @@
+/* Your own parts of the viewer: they use its colors, through its CSS variables. */
+
+/* The document's title and who sent it, at the start of the review bar */
+.review-title {
+  display: flex;
+  flex-direction: column;
+  max-width: 300px;
+  line-height: 1.3;
+}
+
+.review-title strong {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.review-title span {
+  color: var(--epdf-text-muted);
+  font-size: 12px;
+}
+
+/* The review status, which Approve and Request changes set */
+.review-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-inline-start: 8px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  color: #8a5300;
+  background: #fff1d6;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.review-status::before {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  content: '';
+}
+
+.review-status[data-status='approved'] {
+  color: #12703a;
+  background: #dcf5e4;
+}
+
+.review-status[data-status='changes'] {
+  color: #b42318;
+  background: #fde4e1;
+}
+
+/* The checklist panel */
+.review-checklist {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 16px 16px;
+}
+
+.review-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--epdf-border);
+  font-size: 14px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.review-check input {
+  margin: 2px 0 0;
+  accent-color: var(--epdf-accent);
+}
+
+.review-count {
+  margin: 12px 0 0;
+  color: var(--epdf-text-muted);
+  font-size: 12px;
+}

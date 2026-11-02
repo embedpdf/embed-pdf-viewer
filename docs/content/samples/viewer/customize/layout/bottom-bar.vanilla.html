@@ -1,0 +1,21 @@
+<embedpdf-viewer id="viewer" style="height: 100%"></embedpdf-viewer>
+
+<script type="module">
+  import 'https://cdn.jsdelivr.net/npm/@embedpdf/viewer@3/dist/embedpdf.js';
+
+  // [!doc-source welcome]
+  const welcome = '/pdfs/welcome.pdf';
+  // [!/doc-source]
+
+  document.getElementById('viewer').config = {
+    src: welcome,
+    layout: (layout) =>
+      layout
+        .place('main', 'bottom')
+        .remove('zoom', { from: 'main' })
+        .addBar('zoom', {
+          place: { float: 'bottom-end' },
+          center: [[{ custom: 'zoom' }]],
+        }),
+  };
+</script>

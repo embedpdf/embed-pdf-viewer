@@ -1,0 +1,18 @@
+<link rel="stylesheet" href="./phone.css" />
+
+<div class="phone">
+  <embedpdf-viewer id="viewer" style="height: 100%"></embedpdf-viewer>
+</div>
+
+<script type="module">
+  import 'https://cdn.jsdelivr.net/npm/@embedpdf/viewer@3/dist/embedpdf.js';
+
+  // [!doc-source welcome]
+  const welcome = '/pdfs/welcome.pdf';
+  // [!/doc-source]
+
+  document.getElementById('viewer').config = {
+    src: welcome,
+    layout: (layout, env) => (env.size === 'compact' ? layout.place('main', 'bottom') : layout),
+  };
+</script>
