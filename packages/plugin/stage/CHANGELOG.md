@@ -1,5 +1,13 @@
 # @embedpdf/plugin-stage
 
+## 3.0.0-next.20
+
+### Minor Changes
+
+- [#933](https://github.com/embedpdf/embed-pdf-viewer/pull/933) by [@bobsingor](https://github.com/bobsingor) – Lock settings for one document: `stage.lockSettings({ settings, by, reasonKey? })` holds them at a value over `updateSettings()`, the responsive rules, a restored view state and `resetSettings()`, which still change the settings underneath, so the user's own choice is back when the lock goes. It returns the function that lets go; otherwise the lock lasts until the document closes. A second lock on a setting at another value is refused (`conflict`), naming the holder; at the same value both hold. `getLock(setting)` says who holds a setting and why. Every setting but `zoom` can be locked. Taken in a plugin's `connect()`, a lock holds from the Stage's first layout. `getViewState()` saves the locked settings as they are underneath the lock.
+
+- [#949](https://github.com/embedpdf/embed-pdf-viewer/pull/949) by [@bobsingor](https://github.com/bobsingor) – `padding` takes `{ top, right, bottom, left }` beside one number, room for a toolbar floating over one edge. A change names only the sides it sets (`{ bottom: 56 }`) and the others are 0, as with `pageFrame`; `getSettings().padding` is what was given, with every side. The fit modes, the clamp, the scrollbars, arrivals and the wrapped grid's line width use each side, and a `'center'` or fractional placement shifts by half the difference between two sides, so equal sides place the content where they did.
+
 ## 3.0.0-next.19
 
 ### Minor Changes

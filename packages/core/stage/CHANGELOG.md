@@ -1,5 +1,11 @@
 # @embedpdf/core-stage
 
+## 3.0.0-next.20
+
+### Minor Changes
+
+- [#949](https://github.com/embedpdf/embed-pdf-viewer/pull/949) by [@bobsingor](https://github.com/bobsingor) – The padding can differ per side: `Padding` is one number for every side or `PaddingSides` (`{ top, right, bottom, left }`, physical sides, the same right to left), and `paddingSidesOf()` gives each side of either. `CameraConstraint.padding`, `scrollMetrics()`, `cameraFromScroll()` and `placeCamera()` take it, and `travelRange()` takes the room before and after the content (`after` defaults to `before`).
+
 ## 3.0.0-next.19
 
 ### Minor Changes

@@ -1,5 +1,25 @@
 # @cloudpdf/engine
 
+## 3.0.0-next.20
+
+### Minor Changes
+
+- [#926](https://github.com/embedpdf/embed-pdf-viewer/pull/926) by [@bobsingor](https://github.com/bobsingor) – Add the `renderRaw` option: where raw page pixels come from when the engine runs inside the server it talks to, as a server module's own document does. With it, `page(ref).render.raw()` gives the pixels and their transform, as on the local engine. Without it, which is everywhere else, `raw()` is refused with `NotImplemented`: over the network the cloud API serves images, through `image()`.
+
+  Add the `cdn` option: `cdn: false` reads everything from the server itself, even when the server offers a CDN, and skips the `/access` call that only fetched CDN credentials. For code running next to the server (a server module, a backend in the same network), where the CDN only adds a hop.
+
+- [#941](https://github.com/embedpdf/embed-pdf-viewer/pull/941) by [@bobsingor](https://github.com/bobsingor) – `doc.fonts` on a cloud document: `list()` (at the manifest's `fontsVersion` and the server's fonts, refreshed on a stale pin), `resolve(request)`, `getProgram(displayHash)` and `downloadProgram(displayHash)`, which fetches a served server font from its one URL for every document. A write that changes the fonts the document's list shows ends its events with `fonts.changed`, own writes and other sessions' alike. Every picture's URL carries the server's fonts (`serverFonts`).
+
+- [#940](https://github.com/embedpdf/embed-pdf-viewer/pull/940) by [@bobsingor](https://github.com/bobsingor) – Support `doc.pages.copy` and numbered `doc.pages.insert` against a CloudPDF server, and read the page label sections (`labels`) the page list now carries.
+
+- [#931](https://github.com/embedpdf/embed-pdf-viewer/pull/931) by [@bobsingor](https://github.com/bobsingor) – Thumbnails: `page.render.image({ viewport: { kind: 'thumbnail' } })` asks the server for the page's thumbnail at its own address, so a session with only `doc.render.thumbnail` gets thumbnails, and a CDN serves them apart from full pictures. Print pictures no longer need `doc.render`, and each picture is checked against its own permission before the request when the session's rights are known.
+
+- [#936](https://github.com/embedpdf/embed-pdf-viewer/pull/936) by [@bobsingor](https://github.com/bobsingor) – Reach a server module from the browser: `cloudDocument(doc)?.module(id).fetch(path, init)` calls the module's routes on the document's layer with the document's token, always on the server itself and never through a CDN, and answers a plain `Response`, whatever its status. `cloudDocument()` is `null` for a document that isn't open on the cloud engine. `doc.security.allows()` answers for a plugin's own permission: once `/access` answered, from the server's `effectiveScope`, which knows the installed plugins; before, from whether the token names it, or `*`.
+
+### Patch Changes
+
+- [#930](https://github.com/embedpdf/embed-pdf-viewer/pull/930) by [@bobsingor](https://github.com/bobsingor) – A redaction applied in another session now reaches every other open document on its layer as `redaction.applied`, as flattening already does. Before, the event never arrived there: the document kept its pins from before the redaction, and the viewer kept showing the page, its marks, its text and its links as they were until its next refresh.
+
 ## 3.0.0-next.19
 
 ### Minor Changes

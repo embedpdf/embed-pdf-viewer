@@ -1,5 +1,15 @@
 # @embedpdf/plugin-commands
 
+## 3.0.0-next.20
+
+### Minor Changes
+
+- [#948](https://github.com/embedpdf/embed-pdf-viewer/pull/948) by [@bobsingor](https://github.com/bobsingor) – Commands read your app's state. The new `appState` setting is what every command's functions get as `appState` (values, and functions that change them); a new value replaces the old one whole and every command's `enabled`, `active` and `visible` are asked again. After a command runs, every command is asked again too, so a button whose `run` changed state outside the viewer shows it at once. `CommandDef<AppState>`, `CommandContext<AppState>` and `commandsPlugin<AppState>()` type it; a command's functions are methods, so a typed command goes wherever a command does.
+
+- [#933](https://github.com/embedpdf/embed-pdf-viewer/pull/933) by [@bobsingor](https://github.com/bobsingor) – A command that changes a setting can say so with `locked: (context) => owner.getLock(key)`. While a lock holds that setting, the command shows disabled, whatever the `notAllowed` setting says, stays `active` for its own value, and gives the lock's sentence (its `reasonKey`, else `commands.locked.default`) as `disabledReason`. `getRefusal()` reports it with a third reason, `'locked'`, and `execute()` refuses it.
+
+- [#949](https://github.com/embedpdf/embed-pdf-viewer/pull/949) by [@bobsingor](https://github.com/bobsingor) – A command's `enabled`, `active` or `visible` that throws now counts as `false`, so its button shows disabled, not pressed, or hidden; only a command without one takes the default (enabled, not active, visible). `allowed` keeps its own rule.
+
 ## 3.0.0-next.19
 
 ### Minor Changes

@@ -1,5 +1,27 @@
 # @embedpdf/viewer
 
+## 3.0.0-next.20
+
+### Minor Changes
+
+- [#948](https://github.com/embedpdf/embed-pdf-viewer/pull/948) by [@bobsingor](https://github.com/bobsingor) – `appState` is a live config key: your app's state, which your commands read as `appState`. Set it with `.appState`, in `.config`, or as `ViewerConfig<AppState>`'s `appState`; a new value and every button asks its command again, in the same viewer.
+
+- [#941](https://github.com/embedpdf/embed-pdf-viewer/pull/941) by [@bobsingor](https://github.com/bobsingor) – `fonts` is a top-level setting: `EmbedPDF.init({ fonts: [{ key, url, label }] })`. The local door's `engine` options no longer take `fonts`, and a door's engine provider returns no fonts (`DoorEngine`). Depends on `@embedpdf/core-fonts`, which the viewer's chrome now imports.
+
+- [#949](https://github.com/embedpdf/embed-pdf-viewer/pull/949) by [@bobsingor](https://github.com/bobsingor) – Tooltips are the viewer's own, not the browser's: in the theme's font and its new `tooltip` and `tooltip-text` colors, above everything in the top layer, with a command's shortcut written the way the platform writes it, and why it can't run when it can't. Every button has one, in the toolbars, menus, panels and dialogs, and a name too long for its row shows whole while it's cut short. A command's button in the layout takes `emphasis: 'primary'`, filled in the accent, for the one thing its bar is for, and each toolbar is a part, `toolbar toolbar-<id>`, for your CSS (`::part(toolbar-annotate)`). `<epdf-button>` and `<epdf-menu-item>` take `active`, shown pressed or checked, and `<epdf-icon name size label>` draws one of the viewer's icons, or one of yours, in your own components.
+
+  The theme has `page-background` and `page-shadow` tokens, and `light` beside `dark`: token values for light mode only.
+
+  Panels: a built-in panel's id brings its title and icon wherever it is in a layout, even a whole layout of yours; one string (`strings['panel:comments']`) or one `title` (`layout.panel('comments', { title })`) renames its header and its button together. `layout.panel(id, { open: true })` opens a panel when a document opens, where it docks, and `closable: false` keeps it open there. A panel over the pages resizes from its edge as a docked one does, and on a viewer wider than a phone a sheet is as wide as the panel's `width`, in the middle.
+
+  Layout: bars floating on one edge share it instead of covering each other. `removeBar()` takes a list and takes out the bars riding along a removed one. `{ custom: 'id', grow: true }` gives your own component the rest of its bar. A floating bar's place takes `hideWhileScrolling`. Two config keys, read once: `size` lays the viewer out for one size at every width (`'compact'`, a phone's layout, `'medium'` or `'expanded'`), and `touch: true` gives every pointer 44 px buttons and menu rows (`false` none, `'auto'` asks the browser).
+
+  The viewer in code: `get()` of a document's plugin before its document opens throws `PluginError('not-ready')`, and `watch()` waits through it, starting once the document has opened and waiting again after it closes. `watch(read, onChange, { immediate: true })` calls back with the first value too, and its third argument is now `{ immediate, isEqual }` (`WatchOptions`). `warnBeforeLeaving: false` leaves the page without asking, unsaved changes or not. While pages sit side by side, the page number reads "Pages 1–2 of 8", in every language (`pageNumber.page`, `pageNumber.pages`, `pageNumber.goToPage`), and the comments panel's words have their own keys (`comments.*`) in place of `demo.*`. A command's `enabled`, `active` or `visible` that throws counts as `false`.
+
+### Patch Changes
+
+- [#941](https://github.com/embedpdf/embed-pdf-viewer/pull/941) by [@bobsingor](https://github.com/bobsingor) – Depends on `@embedpdf/plugin-fonts`: the viewer installs the fonts plugin, so text typed in a free text box or a text field shows in the font program the engine writes with.
+
 ## 3.0.0-next.19
 
 ### Minor Changes

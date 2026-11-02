@@ -1,5 +1,17 @@
 # @embedpdf/core-annotation
 
+## 3.0.0-next.20
+
+### Minor Changes
+
+- [#941](https://github.com/embedpdf/embed-pdf-viewer/pull/941) by [@bobsingor](https://github.com/bobsingor) – A `FontLookup` lists `NamedFont`s (a name, its family, weight and italic) instead of registered font handles, so a document's own fonts map to their faces and back like registered ones.
+
+  A `textRun` scene node replaces `glyphs`: a run of text in one font and one direction, at its left edge, which the browser shapes as one string (`rtl`, `plain` for kerning and ligatures off).
+
+  A `textRun` drawn alone that is joined to the letter before or after it in the text (a comb's cell) says so (`joinsPrevious`, `joinsNext`): it takes that joined form.
+
+- [#941](https://github.com/embedpdf/embed-pdf-viewer/pull/941) by [@bobsingor](https://github.com/bobsingor) – A redaction's label previews as the engine writes it: laid out as a form field's text in each region (`redactLabelText`, with `@embedpdf/core-text`'s `layoutField`), top-aligned and placed across by its alignment, one line when shown once at size 0, wrapped otherwise, and a repeated label space-joined and doubled until it reaches the region's bottom, clipped to the region. Its runs are `textRun` nodes in the label's own fonts (`RenderItem.label.fonts`; without them, its standard font, or Helvetica), each with the program to mount. A measurement's caption draws in the engine's own Helvetica (a `text` node's `program`). `cssFontFamilyForFont`, `mountedFontFamily` and `STANDARD_FONT_STACKS` are gone: the fonts plugin, or `@embedpdf/core-fonts` without it, says how a font is drawn.
+
 ## 3.0.0-next.19
 
 ## 3.0.0-next.18

@@ -1,5 +1,19 @@
 # @embedpdf/viewer-svelte
 
+## 3.0.0-next.20
+
+### Minor Changes
+
+- [#948](https://github.com/embedpdf/embed-pdf-viewer/pull/948) by [@bobsingor](https://github.com/bobsingor) – `<PDFViewer>` takes `appState`, your app's state, which your commands read; it follows its prop, and the commands' buttons with it.
+
+- [#949](https://github.com/embedpdf/embed-pdf-viewer/pull/949) by [@bobsingor](https://github.com/bobsingor) – `Button` and `MenuItem` take `active`: shown pressed, or checked, as a command's button or row is while its command is active, for a toggle of your own (a theme switch). `Icon` draws one of the viewer's icons, or one of yours (`icons`), in the color of the text around it: `name`, `size` (default 20) and `label` for screen readers.
+
+### Patch Changes
+
+- [#938](https://github.com/embedpdf/embed-pdf-viewer/pull/938) by [@bobsingor](https://github.com/bobsingor) – `<PDFViewer appState>` follows its prop: a new value reaches the running viewer, and its commands
+  read it. Before, only the first one did: Svelte spread it onto the element as an `appstate`
+  attribute.
+
 ## 3.0.0-next.19
 
 ### Minor Changes

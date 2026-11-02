@@ -1,6 +1,6 @@
 {
   "name": "@cloudpdf/plugin-protected-display",
-  "version": "3.0.0-next.19",
+  "version": "3.0.0-next.20",
   "private": false,
   "description": "Screenshot protection for the CloudPDF viewer: for a user who may read a document but not render its pages, it shows them as DRM-protected video frames from the protected display server module, so screenshots, recordings and shared screens show them black. DOM-free: the host gives the player (browserProtectedPlayer() from @cloudpdf/web in a browser), loaded only for a protected user.",
   "type": "module",
