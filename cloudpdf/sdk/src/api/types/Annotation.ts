@@ -31,6 +31,7 @@ export namespace Annotation {
         page: CloudPDF.PageRef;
         hasAppearance: boolean;
         appearanceState: string | null;
+        structurePosition: number[] | null;
         nm: string | null;
         rect: AnnotationHighlight.Rect;
         contents: string | null;
@@ -143,6 +144,7 @@ export namespace Annotation {
         page: CloudPDF.PageRef;
         hasAppearance: boolean;
         appearanceState: string | null;
+        structurePosition: number[] | null;
         nm: string | null;
         rect: AnnotationUnderline.Rect;
         contents: string | null;
@@ -255,6 +257,7 @@ export namespace Annotation {
         page: CloudPDF.PageRef;
         hasAppearance: boolean;
         appearanceState: string | null;
+        structurePosition: number[] | null;
         nm: string | null;
         rect: AnnotationSquiggly.Rect;
         contents: string | null;
@@ -367,6 +370,7 @@ export namespace Annotation {
         page: CloudPDF.PageRef;
         hasAppearance: boolean;
         appearanceState: string | null;
+        structurePosition: number[] | null;
         nm: string | null;
         rect: AnnotationStrikeout.Rect;
         contents: string | null;
@@ -485,6 +489,7 @@ export namespace Annotation {
         page: CloudPDF.PageRef;
         hasAppearance: boolean;
         appearanceState: string | null;
+        structurePosition: number[] | null;
         nm: string | null;
         rect: AnnotationCircle.Rect;
         contents: string | null;
@@ -585,6 +590,7 @@ export namespace Annotation {
         page: CloudPDF.PageRef;
         hasAppearance: boolean;
         appearanceState: string | null;
+        structurePosition: number[] | null;
         nm: string | null;
         rect: AnnotationSquare.Rect;
         contents: string | null;
@@ -685,6 +691,7 @@ export namespace Annotation {
         page: CloudPDF.PageRef;
         hasAppearance: boolean;
         appearanceState: string | null;
+        structurePosition: number[] | null;
         nm: string | null;
         rect: AnnotationPolygon.Rect;
         contents: string | null;
@@ -801,6 +808,7 @@ export namespace Annotation {
         page: CloudPDF.PageRef;
         hasAppearance: boolean;
         appearanceState: string | null;
+        structurePosition: number[] | null;
         nm: string | null;
         rect: AnnotationPolyline.Rect;
         contents: string | null;
@@ -950,6 +958,7 @@ export namespace Annotation {
         page: CloudPDF.PageRef;
         hasAppearance: boolean;
         appearanceState: string | null;
+        structurePosition: number[] | null;
         nm: string | null;
         rect: AnnotationLine.Rect;
         contents: string | null;
@@ -1122,6 +1131,7 @@ export namespace Annotation {
         page: CloudPDF.PageRef;
         hasAppearance: boolean;
         appearanceState: string | null;
+        structurePosition: number[] | null;
         nm: string | null;
         rect: AnnotationLink.Rect;
         contents: string | null;
@@ -1199,6 +1209,7 @@ export namespace Annotation {
         page: CloudPDF.PageRef;
         hasAppearance: boolean;
         appearanceState: string | null;
+        structurePosition: number[] | null;
         nm: string | null;
         rect: AnnotationInk.Rect;
         contents: string | null;
@@ -1304,6 +1315,7 @@ export namespace Annotation {
         page: CloudPDF.PageRef;
         hasAppearance: boolean;
         appearanceState: string | null;
+        structurePosition: number[] | null;
         nm: string | null;
         rect: AnnotationFreeText.Rect;
         contents: string | null;
@@ -1590,6 +1602,7 @@ export namespace Annotation {
         page: CloudPDF.PageRef;
         hasAppearance: boolean;
         appearanceState: string | null;
+        structurePosition: number[] | null;
         nm: string | null;
         rect: AnnotationCaret.Rect;
         contents: string | null;
@@ -1683,6 +1696,7 @@ export namespace Annotation {
         page: CloudPDF.PageRef;
         hasAppearance: boolean;
         appearanceState: string | null;
+        structurePosition: number[] | null;
         nm: string | null;
         rect: AnnotationText.Rect;
         contents: string | null;
@@ -1776,6 +1790,7 @@ export namespace Annotation {
         page: CloudPDF.PageRef;
         hasAppearance: boolean;
         appearanceState: string | null;
+        structurePosition: number[] | null;
         nm: string | null;
         rect: AnnotationStamp.Rect;
         contents: string | null;
@@ -1871,6 +1886,7 @@ export namespace Annotation {
         page: CloudPDF.PageRef;
         hasAppearance: boolean;
         appearanceState: string | null;
+        structurePosition: number[] | null;
         nm: string | null;
         rect: AnnotationFileAttachment.Rect;
         contents: string | null;
@@ -1963,6 +1979,7 @@ export namespace Annotation {
         page: CloudPDF.PageRef;
         hasAppearance: boolean;
         appearanceState: string | null;
+        structurePosition: number[] | null;
         nm: string | null;
         rect: AnnotationRedact.Rect;
         contents: string | null;
@@ -2089,6 +2106,7 @@ export namespace Annotation {
         page: CloudPDF.PageRef;
         hasAppearance: boolean;
         appearanceState: string | null;
+        structurePosition: number[] | null;
         nm: string | null;
         rect: AnnotationPopup.Rect;
         contents: string | null;
@@ -2167,6 +2185,7 @@ export namespace Annotation {
         page: CloudPDF.PageRef;
         hasAppearance: boolean;
         appearanceState: string | null;
+        structurePosition: number[] | null;
         nm: string | null;
         rect: AnnotationUnsupported.Rect;
         contents: string | null;

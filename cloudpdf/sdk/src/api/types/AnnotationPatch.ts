@@ -30,6 +30,7 @@ export namespace AnnotationPatch {
         page?: unknown | undefined;
         hasAppearance?: unknown | undefined;
         appearanceState?: unknown | undefined;
+        structurePosition?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect?: AnnotationPatchHighlight.Rect | undefined;
         contents?: (string | null) | undefined;
@@ -142,6 +143,7 @@ export namespace AnnotationPatch {
         page?: unknown | undefined;
         hasAppearance?: unknown | undefined;
         appearanceState?: unknown | undefined;
+        structurePosition?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect?: AnnotationPatchUnderline.Rect | undefined;
         contents?: (string | null) | undefined;
@@ -254,6 +256,7 @@ export namespace AnnotationPatch {
         page?: unknown | undefined;
         hasAppearance?: unknown | undefined;
         appearanceState?: unknown | undefined;
+        structurePosition?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect?: AnnotationPatchSquiggly.Rect | undefined;
         contents?: (string | null) | undefined;
@@ -366,6 +369,7 @@ export namespace AnnotationPatch {
         page?: unknown | undefined;
         hasAppearance?: unknown | undefined;
         appearanceState?: unknown | undefined;
+        structurePosition?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect?: AnnotationPatchStrikeout.Rect | undefined;
         contents?: (string | null) | undefined;
@@ -484,6 +488,7 @@ export namespace AnnotationPatch {
         page?: unknown | undefined;
         hasAppearance?: unknown | undefined;
         appearanceState?: unknown | undefined;
+        structurePosition?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect?: AnnotationPatchCircle.Rect | undefined;
         contents?: (string | null) | undefined;
@@ -578,6 +583,7 @@ export namespace AnnotationPatch {
         page?: unknown | undefined;
         hasAppearance?: unknown | undefined;
         appearanceState?: unknown | undefined;
+        structurePosition?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect?: AnnotationPatchSquare.Rect | undefined;
         contents?: (string | null) | undefined;
@@ -672,6 +678,7 @@ export namespace AnnotationPatch {
         page?: unknown | undefined;
         hasAppearance?: unknown | undefined;
         appearanceState?: unknown | undefined;
+        structurePosition?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect?: AnnotationPatchPolygon.Rect | undefined;
         contents?: (string | null) | undefined;
@@ -783,6 +790,7 @@ export namespace AnnotationPatch {
         page?: unknown | undefined;
         hasAppearance?: unknown | undefined;
         appearanceState?: unknown | undefined;
+        structurePosition?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect?: AnnotationPatchPolyline.Rect | undefined;
         contents?: (string | null) | undefined;
@@ -927,6 +935,7 @@ export namespace AnnotationPatch {
         page?: unknown | undefined;
         hasAppearance?: unknown | undefined;
         appearanceState?: unknown | undefined;
+        structurePosition?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect?: AnnotationPatchLine.Rect | undefined;
         contents?: (string | null) | undefined;
@@ -1093,6 +1102,7 @@ export namespace AnnotationPatch {
         page?: unknown | undefined;
         hasAppearance?: unknown | undefined;
         appearanceState?: unknown | undefined;
+        structurePosition?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect?: AnnotationPatchLink.Rect | undefined;
         contents?: (string | null) | undefined;
@@ -1172,6 +1182,7 @@ export namespace AnnotationPatch {
         page?: unknown | undefined;
         hasAppearance?: unknown | undefined;
         appearanceState?: unknown | undefined;
+        structurePosition?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect?: AnnotationPatchInk.Rect | undefined;
         contents?: (string | null) | undefined;
@@ -1271,6 +1282,7 @@ export namespace AnnotationPatch {
         page?: unknown | undefined;
         hasAppearance?: unknown | undefined;
         appearanceState?: unknown | undefined;
+        structurePosition?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect?: AnnotationPatchFreeText.Rect | undefined;
         contents?: (string | null) | undefined;
@@ -1548,6 +1560,7 @@ export namespace AnnotationPatch {
         page?: unknown | undefined;
         hasAppearance?: unknown | undefined;
         appearanceState?: unknown | undefined;
+        structurePosition?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect?: AnnotationPatchCaret.Rect | undefined;
         contents?: (string | null) | undefined;
@@ -1641,6 +1654,7 @@ export namespace AnnotationPatch {
         page?: unknown | undefined;
         hasAppearance?: unknown | undefined;
         appearanceState?: unknown | undefined;
+        structurePosition?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect?: AnnotationPatchText.Rect | undefined;
         contents?: (string | null) | undefined;
@@ -1734,6 +1748,7 @@ export namespace AnnotationPatch {
         page?: unknown | undefined;
         hasAppearance?: unknown | undefined;
         appearanceState?: unknown | undefined;
+        structurePosition?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect?: AnnotationPatchStamp.Rect | undefined;
         contents?: (string | null) | undefined;
@@ -1829,6 +1844,7 @@ export namespace AnnotationPatch {
         page?: unknown | undefined;
         hasAppearance?: unknown | undefined;
         appearanceState?: unknown | undefined;
+        structurePosition?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect?: AnnotationPatchFileAttachment.Rect | undefined;
         contents?: (string | null) | undefined;
@@ -1927,6 +1943,7 @@ export namespace AnnotationPatch {
         page?: unknown | undefined;
         hasAppearance?: unknown | undefined;
         appearanceState?: unknown | undefined;
+        structurePosition?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect?: AnnotationPatchRedact.Rect | undefined;
         contents?: (string | null) | undefined;
@@ -2053,6 +2070,7 @@ export namespace AnnotationPatch {
         page?: unknown | undefined;
         hasAppearance?: unknown | undefined;
         appearanceState?: unknown | undefined;
+        structurePosition?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect?: AnnotationPatchPopup.Rect | undefined;
         contents?: (string | null) | undefined;
