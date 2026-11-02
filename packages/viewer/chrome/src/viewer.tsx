@@ -33,6 +33,7 @@ import type {
 import { stagePlugin } from '@embedpdf/react/stage';
 import { renderPlugin } from '@embedpdf/react/render';
 import { pageEditPlugin } from '@embedpdf/react/page-edit';
+import { fontsPlugin } from '@embedpdf/react/fonts';
 import { metadataPlugin } from '@embedpdf/react/metadata';
 import { outlinePlugin } from '@embedpdf/react/outline';
 import { attachmentPlugin } from '@embedpdf/react/attachment';
@@ -93,6 +94,7 @@ import { isMacPlatform } from '@embedpdf/web';
 import { ThemeProvider, themeConfigOf, type ThemeConfig, type ThemePreference } from './ui/theme';
 import { Shell } from './Shell';
 import type { PlacedComponents } from './ui/placed-components';
+import { stampFontsOf } from './ui/signature-fonts';
 import { SlottedEdgesProvider, createSlottedEdges } from './ui/slotted-edges';
 
 /**
@@ -156,6 +158,14 @@ export interface ViewerCustomization {
    * which marks people keep and their fonts. Read once.
    */
   plugins?: ViewerPluginsConfig;
+  /**
+   * Your fonts, beyond the standard 14: each read once (from `url`, or its `data`) and
+   * registered on a local engine under its key, the name a `fontFamily` takes. The style panel
+   * offers them for text boxes, form fields and redaction labels, and the browser draws them as
+   * the engine writes them. A cloud engine's fonts are its server's: there they're ignored, with
+   * a warning. Read once.
+   */
+  fonts?: readonly ViewerFont[];
   /** Light/dark preference (string shorthand), or the full theme config: the
    *  accent and the other tokens. Tokens are applied by the delivery (the
    *  custom element adopts them into its shadow root); direct
@@ -198,12 +208,6 @@ export interface FullViewerProps extends ViewerCustomization {
    * viewer draws — a delivery concern: the custom element passes the ones inside it.
    */
   components?: PlacedComponents;
-  /**
-   * Fonts beyond the standard 14 for the engine (a delivery's `engine.fonts`): each is read
-   * once, registered on a local engine and mounted for the live text editor, and the style
-   * panel offers it. A cloud engine's fonts are its server's, so none are offered there.
-   */
-  fonts?: readonly ViewerFont[];
 }
 
 /**
@@ -456,6 +460,9 @@ export function FullViewer({
     // The document's title, author and your own fields, read the first time something asks
     // (`viewer.get('metadata').ensureLoaded()`, `useMetadataState()`), never as a document opens.
     metadataPlugin(),
+    // The document's fonts, read the first time text is typed in a font of its own: what
+    // the free text and form editors draw that text in, so it shows as the engine writes it.
+    fontsPlugin(),
     // The document's outline, read the first time its panel or its state asks for it.
     outlinePlugin(),
     // The files the document carries, read once a document shows, so the attachments panel
@@ -507,7 +514,9 @@ export function FullViewer({
     // stamps sidebar is the picker; placement rides annotation's armed stamp.
     // Libraries open on a local engine: the viewer's own unless the host
     // names one (`assetEngine`; a cloud viewer has to).
-    stampPlugin(settings.stamp),
+    // A typed signature's fonts go with the stamp plugin, which registers each on the engine
+    // marks are written on.
+    stampPlugin({ fonts: stampFontsOf(resolved.signature.fonts), ...settings.stamp }),
     // The action engine: /A and /AA trees dispatch through one policy-gated
     // executor spine, and the JavaScript switch lives here (the per-document
     // ScriptHost realm; form's K/V/C/F pipeline rides its transaction port,

@@ -1,5 +1,4 @@
 import {
-  freeTextFontForFace,
   type AnnotationBase,
   type CalloutLine,
   type Color,
@@ -25,6 +24,7 @@ import {
   readLineEndings,
   readTextAlignment,
 } from './annotationReadPrimitives';
+import { boxFontName } from './boxFontName';
 import { readAnnotationBox } from './readAnnotationTurn';
 import { readEmbedMetadataNumber } from './readEmbedMetadata';
 import { readBorderFields } from './readStyle';
@@ -52,10 +52,7 @@ export function readFreeText(
   const rich = readEngineRichText(fn, mem, annotPtr);
   const fonts = ctx?.fonts;
   const fontFamily = rich
-    ? freeTextFontForFace(
-        rich.body,
-        fonts ? (family, weight, italic) => fonts.keyForFace(family, weight, italic) : undefined,
-      )
+    ? boxFontName(fn, mem, annotPtr, rich.body, fonts)
     : da
       ? standardFontFromCode(da.fontCode)
       : DEFAULT_STANDARD_FONT;

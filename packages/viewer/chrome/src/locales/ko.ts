@@ -495,6 +495,25 @@ export const ko: Locale = {
       selected: '{count}개 선택됨',
       toolDefaults: '{tool} 기본값',
       defaults: '기본값',
+      fontGroups: {
+        document: '이 문서',
+        yours: '내 글꼴',
+        server: '서버 글꼴',
+        standard: '표준',
+      },
+      fontStyles: {
+        bold: '굵게',
+        italic: '기울임꼴',
+        boldItalic: '굵은 기울임꼴',
+      },
+      fontRestrictions: {
+        notEmbedded: '문서에 이름만 있습니다',
+        subset: '문서에 사용된 문자만 들어 있습니다',
+        previewAndPrint: '라이선스상 보기와 인쇄만 허용됩니다',
+        unsupportedFormat: '이 종류의 글꼴로는 새 텍스트를 쓸 수 없습니다',
+        noUnicodeMap: '어떤 문자를 그리는지 알 수 없습니다',
+        other: '새 텍스트를 쓸 수 없습니다',
+      },
     },
     // The flags section of the style panel: its title, and what each flag does.
     annotationFlags: {

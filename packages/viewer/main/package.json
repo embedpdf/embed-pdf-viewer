@@ -41,6 +41,7 @@
   "dependencies": {
     "@embedpdf/core": "workspace:*",
     "@embedpdf/core-annotation": "workspace:*",
+    "@embedpdf/core-fonts": "workspace:*",
     "@embedpdf/core-ui": "workspace:*",
     "@embedpdf/default-signature-fonts": "workspace:*",
     "@embedpdf/default-stamps": "workspace:*",
@@ -50,6 +51,7 @@
     "@embedpdf/plugin-annotation": "workspace:*",
     "@embedpdf/plugin-attachment": "workspace:*",
     "@embedpdf/plugin-commands": "workspace:*",
+    "@embedpdf/plugin-fonts": "workspace:*",
     "@embedpdf/plugin-form": "workspace:*",
     "@embedpdf/plugin-history": "workspace:*",
     "@embedpdf/plugin-i18n": "workspace:*",

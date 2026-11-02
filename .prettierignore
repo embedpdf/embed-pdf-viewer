@@ -11,7 +11,9 @@ public
 /static/
 # Generated: one long base64 line per font face (docs/kit/scripts/build-og-fonts.mjs).
 docs/kit/src/og/fonts.data.ts
-# Generated: the standard faces' programs and layout numbers (packages/core/fonts/scripts/generate-standard-fonts.mjs).
-packages/core/fonts/src/standard/**/*.generated.ts
+# Generated: the standard and last-resort programs and layout numbers (packages/core/fonts/scripts/generate-standard-fonts.mjs).
+packages/core/fonts/src/**/*.generated.ts
 # Generated: what each annotation kind declares, without zod (packages/engine/core/scripts/generate-kind-facts.ts).
 packages/engine/core/src/annotation/kind-facts.generated.ts
+# Generated: each cursive character's joining type, from the fork's HarfBuzz (packages/core/text/scripts/generate-joining-types.mjs).
+packages/core/text/src/joining.generated.ts

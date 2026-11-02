@@ -55,7 +55,7 @@ export interface FieldLook {
   readonly borderStyle: string;
   readonly background: string | null;
   readonly color: string | null;
-  /** One of the 14 standard PDF fonts (`'helvetica-bold'`), or `null`. */
+  /** The font the field names (a standard font such as `'helvetica-bold'`, or another), or `null`. */
   readonly fontFamily: string | null;
   /** In page points; `0` or `null` fits the text to the box. */
   readonly fontSize: number | null;
@@ -66,30 +66,19 @@ export interface FieldLook {
 // alias fits a framework's style type with an index signature for custom
 // properties (Vue's `CSSProperties`), which an interface never does.
 
-/** A standard PDF font as CSS. */
+/** A font as CSS, as the form plugin gives a widget's (`getWidgetFontCss`). */
 export type CssFont = {
   fontFamily: string;
   fontWeight: number;
   fontStyle: 'normal' | 'italic';
 };
 
-/** One of the 14 standard PDF fonts as CSS: a family that looks like it, its weight and style. */
-export function cssFontOf(pdfFont: string | null): CssFont {
-  const name = pdfFont ?? 'helvetica';
-  const fontFamily = name.startsWith('courier')
-    ? '"Courier New", Courier, monospace'
-    : name.startsWith('times')
-      ? '"Times New Roman", Times, serif'
-      : 'Helvetica, Arial, sans-serif';
-  return {
-    fontFamily,
-    fontWeight: name.includes('bold') ? 700 : 400,
-    fontStyle: name.includes('italic') || name.includes('oblique') ? 'italic' : 'normal',
-  };
-}
-
-/** A field's text as CSS: its font, size, alignment and colors, the settings where it has none. */
-export type FieldTextStyle = CssFont & {
+/**
+ * A field's text as CSS: its size, alignment and colors, the settings where it has none. Its
+ * font is the engine's, which the form plugin gives (a text field's editor layout, a widget's
+ * font), never one read off the font's name.
+ */
+export type FieldTextStyle = {
   /** In pixels, with its unit. */
   fontSize: string;
   textAlign: 'left' | 'center' | 'right';
@@ -140,7 +129,6 @@ export function textFieldStyleOf(
   legible = 1,
 ): TextFieldStyle {
   return {
-    ...cssFontOf(field.look.fontFamily),
     fontSize: `${textFieldFontPxOf(field, frame) * legible}px`,
     textAlign: field.look.textAlign,
     color: field.look.color ?? colors.text,
@@ -151,23 +139,30 @@ export function textFieldStyleOf(
   };
 }
 
-/** A list box as the layer draws it: the field's text look, and its border. */
-export type ListBoxStyle = FieldTextStyle & {
-  /** In pixels, with its unit; never thinner than one pixel. */
-  borderWidth: string;
-  borderStyle: 'solid' | 'dashed';
-  borderColor: string;
-};
+/** A list box as the layer draws it: the field's text look in its font, and its border. */
+export type ListBoxStyle = FieldTextStyle &
+  Partial<CssFont> & {
+    /** In pixels, with its unit; never thinner than one pixel. */
+    borderWidth: string;
+    borderStyle: 'solid' | 'dashed';
+    borderColor: string;
+  };
 
-/** A list box's style: the field's own look, the settings where it has none (12 pt for a fitted size). */
+/**
+ * A list box's style: the field's own look, the settings where it has none (12 pt for a fitted
+ * size), in `font`, the widget's font as the form plugin gives it (`null` while it has none).
+ */
 export function listBoxStyleOf(
   field: { box: { width: number }; look: FieldLook },
   frame: PixelRect,
   colors: FormColors,
+  font: CssFont | null = null,
 ): ListBoxStyle {
   const scale = scaleOf(field, frame);
   return {
-    ...cssFontOf(field.look.fontFamily),
+    ...(font
+      ? { fontFamily: font.fontFamily, fontWeight: font.fontWeight, fontStyle: font.fontStyle }
+      : {}),
     fontSize: `${(field.look.fontSize || 12) * scale}px`,
     textAlign: field.look.textAlign,
     color: field.look.color ?? colors.text,

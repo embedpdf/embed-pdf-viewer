@@ -5,9 +5,8 @@
  * each thing the engine's appearance stream paints, so the parity gate can
  * compare them one by one, and the scene can draw them.
  */
-import type { StandardFont } from '@embedpdf/engine-core/runtime';
-
-import type { PdfRect } from '../layout/variable-text';
+import type { PaintFont } from '@embedpdf/core-text';
+import type { PdfRect } from '@embedpdf/engine-core/runtime';
 
 /** A colour as the stream paints it: red, green and blue from 0 to 1. */
 export type Rgb = readonly [number, number, number];
@@ -33,15 +32,27 @@ export type PathSegment =
     }
   | { readonly op: 'close' };
 
-/** A run of text on one baseline, each character after the one before. */
+/** Text one font draws in one direction, on one baseline. */
 export interface TextRun {
-  /** Where the baseline starts. */
+  /** Where its left edge meets the baseline. */
   readonly x: number;
   readonly y: number;
-  /** The characters as drawn (a password field's are `*`). */
+  /** Its characters in typing order (a password field's are `*`). */
   readonly text: string;
-  /** Each character's advance, in points. */
-  readonly advances: readonly number[];
+  readonly font: PaintFont;
+  /** Drawn right to left: its first character on the right. */
+  readonly rtl: boolean;
+  /** Kerning and ligatures off: a simple script or a standard font, as the engine draws it. */
+  readonly plain: boolean;
+  /** In points. */
+  readonly width: number;
+  /**
+   * A comb cell's letter joined to the one before it, or after it (in typing
+   * order), as the engine shapes the whole text: drawn alone, it takes that
+   * joined form with a joiner (U+200D) on that side.
+   */
+  readonly joinsPrevious: boolean;
+  readonly joinsNext: boolean;
 }
 
 export type DrawOp =
@@ -61,7 +72,6 @@ export type DrawOp =
   | { readonly kind: 'clip'; readonly rect: PdfRect; readonly ops: readonly DrawOp[] }
   | {
       readonly kind: 'text';
-      readonly font: StandardFont;
       readonly size: number;
       readonly color: Rgb;
       readonly runs: readonly TextRun[];
@@ -73,8 +83,10 @@ export interface WidgetDrawing {
   readonly height: number;
   readonly ops: readonly DrawOp[];
   /**
-   * Why the drawing may differ from the engine's picture (a font that isn't
-   * one of the 14, a character its font can't write); `null` when it doesn't.
+   * Why the drawing may differ from the engine's picture: `'font'`, a font the
+   * painter wasn't given; `'symbolic-font'`, Symbol or Zapf Dingbats;
+   * `'glyph'`, a character drawn as a box, which a font the painter wasn't
+   * given may have. `null` when it doesn't.
    */
   readonly approximate: string | null;
 }

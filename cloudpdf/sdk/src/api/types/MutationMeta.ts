@@ -7,4 +7,5 @@ export interface MutationMeta {
     cacheDelta: CloudPDF.CacheDelta | null;
     opId: string;
     undoable: boolean;
+    missingCharacters?: string[] | undefined;
 }

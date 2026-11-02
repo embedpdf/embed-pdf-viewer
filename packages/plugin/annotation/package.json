@@ -50,13 +50,15 @@
   "dependencies": {
     "@embedpdf/core": "workspace:*",
     "@embedpdf/core-annotation": "workspace:*",
+    "@embedpdf/core-fonts": "workspace:*",
     "@embedpdf/core-geometry": "workspace:*",
     "@embedpdf/plugin-interaction": "workspace:*",
     "@embedpdf/plugin-selection": "workspace:*",
     "@embedpdf/plugin-render": "workspace:*",
     "@embedpdf/engine-core": "workspace:*",
     "@embedpdf/plugin-actions": "workspace:*",
-    "@embedpdf/core-acrojs": "workspace:*"
+    "@embedpdf/core-acrojs": "workspace:*",
+    "@embedpdf/plugin-fonts": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.0.0",

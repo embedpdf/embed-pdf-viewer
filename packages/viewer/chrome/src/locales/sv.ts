@@ -497,6 +497,25 @@ export const sv: Locale = {
       selected: '{count} valda',
       toolDefaults: 'Standardvärden för {tool}',
       defaults: 'Standardvärden',
+      fontGroups: {
+        document: 'I det här dokumentet',
+        yours: 'Dina teckensnitt',
+        server: 'Serverns teckensnitt',
+        standard: 'Standard',
+      },
+      fontStyles: {
+        bold: 'Fet',
+        italic: 'Kursiv',
+        boldItalic: 'Fet kursiv',
+      },
+      fontRestrictions: {
+        notEmbedded: 'Dokumentet anger bara dess namn',
+        subset: 'Dokumentet innehåller bara de tecken det använder',
+        previewAndPrint: 'Licensen tillåter bara visning och utskrift',
+        unsupportedFormat: 'Ny text kan inte skrivas med den här sortens teckensnitt',
+        noUnicodeMap: 'Det anger inte vilka tecken det ritar',
+        other: 'Ny text kan inte skrivas med det',
+      },
     },
     // The flags section of the style panel: its title, and what each flag does.
     annotationFlags: {

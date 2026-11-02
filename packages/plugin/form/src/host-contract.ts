@@ -22,6 +22,7 @@ import type {
   SubmitIntent,
 } from '@embedpdf/plugin-actions/contract';
 import type { FormCommitSinkResult } from '@embedpdf/plugin-actions/contract/host';
+import type { FontCss } from '@embedpdf/plugin-fonts/contract';
 import type { AppearancePicture } from '@embedpdf/plugin-render/contract/host';
 
 import type { FormCapability, FormCommitResult, FormSetValueResult } from './contract';
@@ -93,6 +94,13 @@ export interface FormHostCapability extends FormCapability {
    * `null` for a widget that isn't a text field's.
    */
   getTextEditorLayout(widget: AnnotationRef, text: string): TextEditorLayout | null;
+  /**
+   * How a control the painter doesn't draw (a list box's rows) draws the widget's text: its font
+   * as CSS, as the engine picks it (the fonts plugin's; without it, the standard font the engine
+   * falls back to), with the programs the family list names, to mount. `null` for a widget that
+   * isn't there.
+   */
+  getWidgetFontCss(widget: AnnotationRef): FontCss | null;
   /** The page box in page space, for keeping a placement on the page; `null` for a page that isn't there. */
   getPageBox(page: PageRef): Box | null;
   /**

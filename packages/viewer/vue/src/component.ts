@@ -142,6 +142,7 @@ const CONFIG_PROPS = {
   notAllowed: null,
   layout: null,
   plugins: null,
+  fonts: null,
   theme: null,
   fetch: null,
 } satisfies Record<keyof PDFViewerImplProps, unknown>;

@@ -4,10 +4,10 @@
  * symbol `/MK /CA` names (`WriteCheckSymbol`), in the `/DA` colour.
  */
 import type { WidgetCheckStyle } from '@embedpdf/engine-core/runtime';
+import type { PdfRect } from '@embedpdf/engine-core/runtime';
 
 import { BLACK, boxOps, deflate, type BorderStyleInfo } from './border';
 import type { DrawOp, PathSegment, Rgb } from './types';
-import type { PdfRect } from '../layout/variable-text';
 
 const f32 = Math.fround;
 /** PDFium's `FXSYS_BEZIER`: a quarter circle's control point distance. */

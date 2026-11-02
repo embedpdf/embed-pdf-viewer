@@ -12,7 +12,7 @@
 export * from '@embedpdf/core';
 // What a page with a viewer needs from the browser: handing bytes to the user as a download,
 // and a font the engine draws with, for text you draw yourself.
-export { mountWebFont, saveFile } from '@embedpdf/web';
+export { saveFile } from '@embedpdf/web';
 // The page context every layer draws through; its conversions are shared with every framework.
 export { makePageContext } from '@embedpdf/web';
 // A theme written with setting names, as the style for the element around a viewer.
@@ -62,7 +62,7 @@ import type {
 // PageContext seam stays stage-agnostic (it must also serve standalone PageView).
 import type { PageTransform } from '@embedpdf/core-geometry';
 import type { PageViewDemand } from '@embedpdf/plugin-render/contract';
-import { browserClock, browserPrinter } from '@embedpdf/web';
+import { browserClock, browserPrinter, browserTextMeasurer } from '@embedpdf/web';
 import type { PageContext } from '@embedpdf/web';
 
 import { isDev } from './dev';
@@ -533,6 +533,7 @@ export const Viewer = forwardRef<Kernel | null, ViewerProps>(function Viewer(
         settings: latestSettings.current,
         clock: browserClock(),
         printer: browserPrinter(),
+        measurer: browserTextMeasurer(),
         fetch: (url, init) => {
           // A plain call: the browser's own `fetch` refuses any other `this`.
           const download = fetchRef.current ?? globalThis.fetch;

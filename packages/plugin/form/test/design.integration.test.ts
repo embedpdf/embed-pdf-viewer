@@ -405,7 +405,7 @@ describe('design through lending', () => {
       expect(dragging.source).toBe('vector');
       expect(dragging.box.width).toBeCloseTo(before.box.width + 40, 3);
       // The painter laid its text out in the dragged box: clipped to its right edge.
-      const text = scene(dragging).find((node) => node.kind === 'glyphs');
+      const text = scene(dragging).find((node) => node.kind === 'textRun');
       expect(text?.clip).toBeDefined();
       expect(text!.clip!.x + text!.clip!.width).toBeCloseTo(
         dragging.box.x +

@@ -7,6 +7,7 @@ export interface FormMutationMeta {
     cacheDelta: CloudPDF.CacheDelta | null;
     opId: string;
     undoable: boolean;
+    missingCharacters?: string[] | undefined;
     changedFields: CloudPDF.FormFieldRef[];
     changedWidgets: CloudPDF.FormWidget[];
     redrawnWidgets: CloudPDF.FormWidget[];

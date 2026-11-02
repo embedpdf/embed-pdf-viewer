@@ -51,6 +51,7 @@
     "@embedpdf/core": "workspace:*",
     "@embedpdf/core-acrojs": "workspace:*",
     "@embedpdf/core-annotation": "workspace:*",
+    "@embedpdf/core-fonts": "workspace:*",
     "@embedpdf/core-form": "workspace:*",
     "@embedpdf/core-geometry": "workspace:*",
     "@embedpdf/core-js-sandbox": "workspace:*",
@@ -59,6 +60,7 @@
     "@embedpdf/plugin-annotation": "workspace:*",
     "@embedpdf/plugin-interaction": "workspace:*",
     "@embedpdf/plugin-render": "workspace:*",
+    "@embedpdf/plugin-fonts": "workspace:*",
     "@embedpdf/plugin-stage": "workspace:*"
   },
   "devDependencies": {

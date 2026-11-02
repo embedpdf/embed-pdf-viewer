@@ -8,6 +8,7 @@
 <script lang="ts">
   import type { TextItem } from '@embedpdf/plugin-annotation';
   import { freeTextBoxOf } from '@embedpdf/web';
+  import { useFontMounts } from '../runtime/font-mounts.svelte';
   import type { PageContextValue } from '../runtime/page';
   import { useChromePaint } from './chrome-paint.svelte';
   import { textBoxEditor } from './text-box.svelte';
@@ -15,6 +16,8 @@
   let { item, page }: { item: TextItem; page: PageContextValue } = $props();
 
   const paint = useChromePaint();
+  // The programs the engine draws the text in, so the box shows them.
+  useFontMounts(() => item.programs);
   // On the engine's text plate (the box inset by its padding), laid out at a legible size.
   const box = $derived(freeTextBoxOf(item, page.transform, paint.css.textOutline));
   const editor = textBoxEditor(
@@ -35,6 +38,7 @@
   style:color={box.style.color}
   style:font-weight={box.style.fontWeight}
   style:font-style={box.style.fontStyle}
+  style:font-synthesis={box.style.fontSynthesis}
   style:text-decoration={box.style.textDecoration}
   style:text-align={box.style.textAlign}
   style:box-sizing={box.style.boxSizing}

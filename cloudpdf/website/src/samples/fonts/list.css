@@ -1,0 +1,133 @@
+/* Colors */
+:root {
+  --ink: #1a2748;
+  --muted: #5a6b92;
+  --line: #e6eaf2;
+  --surface: #ffffff;
+  --canvas: #f7f9fc;
+  --accent: #0b6bcb;
+  --ready: #1f8a4c;
+  --ready-tint: #e8f6ee;
+  --waiting: #a86a00;
+  --waiting-tint: #fdf3e1;
+  --shadow: rgb(7 32 76 / 0.04);
+}
+
+/* The fonts, in a card */
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow:
+    0 1px 2px var(--shadow),
+    0 18px 40px -28px rgb(7 32 76 / 0.28);
+  overflow: hidden;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--canvas);
+  border-bottom: 1px solid var(--line);
+}
+
+.panel-title {
+  margin: 0 auto 0 0;
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.button {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--accent);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+.button:hover {
+  border-color: var(--accent);
+}
+
+/* The load state: loading, ready, forbidden or error */
+.status {
+  font-size: 11.5px;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 3px 9px;
+  color: var(--waiting);
+  background: var(--waiting-tint);
+}
+
+.status[data-status='ready'] {
+  color: var(--ready);
+  background: var(--ready-tint);
+}
+
+/* A group per source, its fonts as chips */
+.group {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.group:last-child {
+  border-bottom: 0;
+}
+
+.group-title {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chip {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 5px 9px;
+  font-size: 12.5px;
+  color: var(--ink);
+}
+
+/* A font new text can't be written in: greyed, with why */
+.chip[data-choosable='false'] {
+  color: var(--muted);
+  background: var(--canvas);
+}
+
+.chip-why {
+  font-size: 11px;
+}
+
+.empty,
+.loading {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.loading {
+  padding: 24px 0;
+  text-align: center;
+}

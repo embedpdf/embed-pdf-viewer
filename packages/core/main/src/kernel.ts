@@ -2,6 +2,7 @@ import { createBurstGate } from './bursts';
 import { createDocumentChanges } from './changes';
 import { createPageView, layoutFromEvent, NO_PENDING_PAGES, type PageView } from './page-view';
 import { timerClock, type HostClock } from './clock';
+import type { HostTextMeasurer } from './measurer';
 import { createStore } from './store';
 import {
   createPluginContext,
@@ -401,6 +402,11 @@ export function createKernel(config: {
    * `browserPrinter()` from `@embedpdf/web`. Without one, nothing prints (`canPrint()` is false).
    */
   printer?: HostPrinter;
+  /**
+   * The host's text measuring: what plugins' `ctx.measurer` measures with. A browser passes
+   * `browserTextMeasurer()` from `@embedpdf/web`. Without one, `ctx.measurer` is `null`.
+   */
+  measurer?: HostTextMeasurer;
   /**
    * How a `{ kind: 'url' }` source downloads: `fetch`'s own shape, called with the URL and the
    * document's cancel `signal`, and again on `retry()`. Yours adds headers or cookies. Default:
@@ -1291,6 +1297,7 @@ export function createKernel(config: {
     workspaceLeases,
     report,
     clock: config.clock ?? timerClock,
+    measurer: config.measurer ?? null,
     resolveCapability,
     tryResolveCapability: tryResolveInternal,
     documentHandle,

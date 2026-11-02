@@ -9,4 +9,5 @@ export default {
   outline: 'Outline',
   attachments: 'Attachments',
   redaction: 'Redaction',
+  fonts: 'Fonts',
 };

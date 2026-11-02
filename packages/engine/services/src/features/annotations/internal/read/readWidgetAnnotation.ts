@@ -5,12 +5,7 @@ import type {
   PdfCoordinates,
   PdfRotation,
 } from '@embedpdf/engine-core/runtime';
-import {
-  colorOf,
-  freeTextFontForFace,
-  pdfQuarterTurnBox,
-  quarterTurnOf,
-} from '@embedpdf/engine-core/runtime';
+import { colorOf, pdfQuarterTurnBox, quarterTurnOf } from '@embedpdf/engine-core/runtime';
 import { type PdfFunctions, type PdfRuntimeMemory, type Ptr } from '@embedpdf/engine-runtime';
 
 import { withScratchN } from '../../../../runtime/memory/scratch';
@@ -25,6 +20,7 @@ import {
   readDefaultAppearanceFace,
   readTextAlignment,
 } from './annotationReadPrimitives';
+import { boxFontName } from './boxFontName';
 import { readBorderFields } from './readStyle';
 
 const MK_BORDER_COLOR = 0; // EPDF_MK_COLOR_BC
@@ -94,12 +90,7 @@ export function readWidget(
     // A widget draws `underline` too, which no other annotation does.
     borderStyle: widgetBorderStyleFromCode(readBorderStyle(fn, mem, annotPtr).styleCode),
     dashArray: border.dashArray,
-    fontFamily: face
-      ? freeTextFontForFace(
-          face,
-          fonts ? (family, weight, italic) => fonts.keyForFace(family, weight, italic) : undefined,
-        )
-      : null,
+    fontFamily: face ? boxFontName(fn, mem, annotPtr, face, fonts) : null,
     fontSize: da ? da.fontSize : null,
     fontColor: da ? da.color : null,
     textAlign: textAlignmentFromCode(readTextAlignment(fn, annotPtr)),

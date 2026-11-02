@@ -495,6 +495,25 @@ export const zhCN: Locale = {
       selected: '已选择 {count} 项',
       toolDefaults: '{tool} 默认值',
       defaults: '默认值',
+      fontGroups: {
+        document: '此文档中',
+        yours: '您的字体',
+        server: '服务器字体',
+        standard: '标准',
+      },
+      fontStyles: {
+        bold: '粗体',
+        italic: '斜体',
+        boldItalic: '粗斜体',
+      },
+      fontRestrictions: {
+        notEmbedded: '文档仅引用其名称',
+        subset: '文档仅包含所用的字符',
+        previewAndPrint: '其许可仅允许查看和打印',
+        unsupportedFormat: '无法用此类字体书写新文本',
+        noUnicodeMap: '未说明其绘制哪些字符',
+        other: '无法用它书写新文本',
+      },
     },
     // The flags section of the style panel: its title, and what each flag does.
     annotationFlags: {

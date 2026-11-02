@@ -73,9 +73,10 @@ By the time `await page.annotations.create(…)` returns, your listeners have ru
 | `forms.repaired`                                                          | Many values or fields changed at once.                                                    |
 | `attachments.created`, `.deleted`                                         | An attached file was added or removed.                                                    |
 | `attachments.restored`                                                    | An undo brought back a deleted attached file.                                             |
+| `fonts.changed`                                                           | The fonts you can name in the document changed. Read `doc.fonts.list()` again.            |
 | `metadata.updated`                                                        | The title, author or another standard metadata field.                                     |
 | `metadata.customUpdated`                                                  | Your own metadata keys.                                                                   |
-| `outline.created`, `.updated`, `.moved`, `.deleted`                      | An outline item was added, changed, moved or deleted.                                     |
+| `outline.created`, `.updated`, `.moved`, `.deleted`                       | An outline item was added, changed, moved or deleted.                                     |
 | `outline.restored`                                                        | An undo brought back deleted outline items.                                               |
 | `redaction.applied`                                                       | Redactions were applied.                                                                  |
 | `signatures.prepared`, `.completed`, `.cancelled`                         | A signature was started or finished.                                                      |
@@ -98,6 +99,9 @@ doc.events.on('annotations.updated', ({ origin }) => {
 });
 await page.annotations.update(ref, { contents: 'Seen' }, { opId });
 ```
+
+One event comes from no write: `fonts.changed` when you register fonts on the local engine. It has
+no `origin.tx`.
 
 An `opId` is 1 to 255 visible ASCII characters (what an HTTP header can carry), on every engine.
 On the cloud, a write retried with the same `opId` is applied once, and the retry gets the first

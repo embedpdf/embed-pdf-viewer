@@ -49,11 +49,12 @@ export interface ViewerStampSettings {
 }
 
 /**
- * A font for typed signatures: its TrueType or OpenType file, from `url` or as `data`, read and
- * registered on the engine the first time someone types a mark in the signature maker.
+ * A font for typed signatures: its TrueType or OpenType file, from `url` or as `data`, read the
+ * first time someone types a mark in it, and registered by the stamp plugin on the engine the
+ * mark is written on.
  */
 export interface SignatureFont {
-  /** The engine's key for it. */
+  /** What a typed mark's `fontFamily` names it by. */
   readonly key: string;
   /** What the font picker shows. */
   readonly label: string;
@@ -92,6 +93,7 @@ interface BuiltInSettings {
   readonly signature: ConfigOf<typeof signaturePlugin> & ViewerSignatureSettings;
   readonly pageEdit: never;
   readonly metadata: never;
+  readonly fonts: never;
   readonly outline: never;
   readonly attachment: never;
   readonly actions: ConfigOf<typeof actionsPlugin>;
@@ -121,6 +123,7 @@ const WITHOUT_SETTINGS: ReadonlySet<string> = new Set<PluginName>([
   'link',
   'pageEdit',
   'metadata',
+  'fonts',
   'outline',
   'attachment',
   'documents',

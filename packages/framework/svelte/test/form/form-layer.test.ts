@@ -102,9 +102,15 @@ describe('<FormLayer> over fields made from code', () => {
           expect(form.getValue(toFieldRef('name'))).toEqual({ value: 'Ada Lovelace' }),
         );
 
+        const host = kernel.capability(FormHostToken);
         const checkbox = await waitFor(() => view.getByRole('checkbox', { name: 'agree' }));
+        // A click toggles, and once the value is written runs the widget's action (Acrobat's
+        // order): wait for that too, or it outlives the document.
+        const activated = vi.spyOn(host, 'activateWidget');
         await fireEvent.click(checkbox);
         await waitFor(() => expect(form.getValue(toFieldRef('agree'))).toEqual({ checked: true }));
+        await waitFor(() => expect(activated).toHaveBeenCalled());
+        await activated.mock.results[0]!.value;
 
         // The checkbox has no border of its own: the layer draws its edge in the setting's color.
         expect(checkbox.style.boxShadow).toContain('#ea580c');
@@ -113,7 +119,6 @@ describe('<FormLayer> over fields made from code', () => {
 
         // A press on a field stops at its box, before the page below sees it, and still reaches
         // the field's PDF actions as "mouse down" (the box's native listener sends it).
-        const host = kernel.capability(FormHostToken);
         const events: string[] = [];
         vi.spyOn(host, 'notifyWidgetEvent').mockImplementation((_field, _widget, event) => {
           events.push(event);

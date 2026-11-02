@@ -230,6 +230,7 @@ function buildStub(initial: ServerState): StubbedFixture {
           metadataVersion: state.metadataVersion,
           auditHead: 0,
           baseSha: 'stub-sha',
+          serverFonts: 'f0',
           protection: null,
           pages: [
             {
@@ -898,6 +899,7 @@ describe('CloudEngine schema parity — DocumentHeadSchema / DocumentManifestSch
       metadataVersion: 1,
       auditHead: 0,
       baseSha: 'sha',
+      serverFonts: 'f0',
       protection: null,
       pages: [
         {
