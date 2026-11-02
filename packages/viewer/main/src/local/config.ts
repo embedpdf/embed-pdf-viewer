@@ -6,7 +6,7 @@
 import type { LocalEngineRecipeOptions } from '@embedpdf/engine';
 import type { Engine, EngineFactory } from '@embedpdf/engine-core/runtime';
 
-import type { MountTarget, ViewerConfigBase } from '../kernel';
+import type { DocumentSrc, MountTarget, ViewerConfigBase } from '../kernel';
 
 /**
  * Configuration for the built-in local engine (PDFium wasm in a worker) —
@@ -31,7 +31,7 @@ export type LocalEngineConfig = Omit<LocalEngineRecipeOptions, 'fonts'>;
  * bag. (On the engine-agnostic door the same name means something stricter —
  * see ../doors/core.ts.)
  */
-export interface ViewerConfig extends ViewerConfigBase {
+export interface ViewerConfig<AppState = any> extends ViewerConfigBase<DocumentSrc, AppState> {
   /**
    * The engine seam. Omit for the built-in local engine with its defaults;
    * pass a {@link LocalEngineConfig} to configure it (self-hosted wasm,

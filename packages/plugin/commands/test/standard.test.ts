@@ -14,6 +14,7 @@ function contextWith(capabilities: Map<CapabilityToken<unknown>, unknown>): Comm
     (capabilities.get(token as CapabilityToken<unknown>) as T | undefined) ?? null;
   return {
     documentId: 'doc',
+    appState: undefined,
     tryGet,
     get: <T>(token: CapabilityToken<T>): T => {
       const capability = tryGet(token);

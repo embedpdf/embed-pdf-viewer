@@ -8,11 +8,12 @@
  * `footer`, `tabs`, `empty`); the viewer's own components among them
  * (`<epdf-button>`, `<epdf-menu>`) are drawn by the viewer (./components).
  *
- * Six keys follow their value while the viewer runs, from `.config`, their
+ * Seven keys follow their value while the viewer runs, from `.config`, their
  * own properties (`.src`, `.theme`, `.locale`, `.disable`, `.readOnly`,
- * `.fetch`) or the attributes: `src` opens the new document in place of the
- * old one, `theme` swaps the token sheet and the mode, `locale`, `disable` and
- * `readOnly` reach their plugins, and the next download uses the new `fetch`.
+ * `.fetch`, `.appState`) or the attributes: `src` opens the new document in
+ * place of the old one, `theme` swaps the token sheet and the mode, `locale`,
+ * `disable` and `readOnly` reach their plugins, the next download uses the new
+ * `fetch`, and the commands read the new `appState`.
  * Changing any other key re-creates the viewer from scratch — documents and
  * all — which is the honest semantic for a workspace-owning embed.
  */
@@ -164,7 +165,16 @@ const ElementBase: typeof HTMLElement =
   typeof HTMLElement === 'undefined' ? (class {} as unknown as typeof HTMLElement) : HTMLElement;
 
 /** The properties a framework may set before the element is defined (see `connectedCallback`). */
-const PROPERTIES = ['config', 'src', 'theme', 'locale', 'disable', 'readOnly', 'fetch'] as const;
+const PROPERTIES = [
+  'config',
+  'src',
+  'theme',
+  'locale',
+  'disable',
+  'readOnly',
+  'fetch',
+  'appState',
+] as const;
 
 /**
  * What a framework wrapper puts on the element it renders: it sets `.config` itself, so the
@@ -282,6 +292,14 @@ export class EmbedPdfViewerElement extends ElementBase {
     return this.config.fetch;
   }
 
+  /** Your app's state, which your commands read: a new value, and every button asks again. */
+  set appState(appState: ElementConfig['appState']) {
+    this.#change({ appState });
+  }
+  get appState(): ElementConfig['appState'] {
+    return this.config.appState;
+  }
+
   /**
    * The viewer in code: `get(name)`, `documents`, `commands`, `watch`. Null
    * until `epdf:ready` fires (once per mount); a new one after a config change
@@ -343,8 +361,8 @@ export class EmbedPdfViewerElement extends ElementBase {
     if (changed.includes('theme')) this.#adoptSheets(next.theme);
     // `src` opens below, and `#fetch` reads the new `fetch` at the next download.
     if (changed.some((key) => key !== 'src' && key !== 'fetch')) {
-      const { theme, locale, disable, readOnly } = next;
-      this.#props = { ...this.#props!, theme, locale, disable, readOnly };
+      const { theme, locale, disable, readOnly, appState } = next;
+      this.#props = { ...this.#props!, theme, locale, disable, readOnly, appState };
       this.#root.render(createElement(FullViewer, this.#props));
     }
     if (changed.includes('src')) this.#showSrc();

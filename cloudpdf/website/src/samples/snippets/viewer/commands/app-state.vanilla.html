@@ -1,0 +1,47 @@
+<fieldset id="checklist"></fieldset>
+<embedpdf-viewer id="viewer" style="height: 100vh"></embedpdf-viewer>
+
+<script type="module">
+  const CHECKS = ['Parties', 'Dates', 'Payment', 'Signatures'];
+
+  let review = {
+    done: [],
+    status: 'review',
+    approve: () => update({ status: 'approved' }),
+  };
+
+  // Each change is a new value: the viewer's buttons ask their commands again.
+  function update(changes) {
+    review = { ...review, ...changes };
+    document.getElementById('viewer').appState = review;
+  }
+
+  // The checklist: ticking an item gives `done` a new value.
+  const checklist = document.getElementById('checklist');
+  for (const check of CHECKS) {
+    const box = Object.assign(document.createElement('input'), { type: 'checkbox', value: check });
+    box.addEventListener('change', () => {
+      const ticked = checklist.querySelectorAll('input:checked');
+      update({ done: Array.from(ticked, (input) => input.value) });
+    });
+    const label = document.createElement('label');
+    label.append(box, ` ${check}`);
+    checklist.append(label);
+  }
+
+  document.getElementById('viewer').config = {
+    src: { grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' },
+    appState: review,
+    commands: [
+      {
+        id: 'acme:approve',
+        label: 'Approve',
+        icon: 'check',
+        enabled: ({ appState }) => appState.done.length === CHECKS.length,
+        active: ({ appState }) => appState.status === 'approved',
+        run: ({ appState }) => appState.approve(),
+      },
+    ],
+    layout: (layout) => layout.add('acme:approve', { to: 'main', section: 'end' }),
+  };
+</script>

@@ -133,6 +133,7 @@ export function createCommandsController(ctx: PluginContext<void, CommandsSettin
       target ? ctx.forDocument(token, target) : ctx.get(token);
     return {
       documentId: target,
+      appState: settings.get().appState,
       ...(call.args === undefined ? {} : { args: call.args }),
       ...(call.signal ? { signal: call.signal } : {}),
       get,
@@ -388,6 +389,10 @@ export function createCommandsController(ctx: PluginContext<void, CommandsSettin
         error: toPluginErrorInfo(failure),
       });
       throw failure;
+    } finally {
+      // A run may change what the commands read outside the viewer (your app's state): every
+      // button asks its command again, so the one just pressed shows what it did.
+      ctx.notify();
     }
     executed.emit({ commandId: id, documentId: context.documentId, args });
     return { status: 'executed' };

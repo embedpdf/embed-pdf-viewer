@@ -112,7 +112,7 @@ A disabled command is still in the results, so show it greyed out.
 | `icon`        | Your icon's name; your buttons turn it into an icon                              |
 | `shortcut`    | A key such as `'Mod+K'`, or a list of them                                       |
 | `shortcutInTextFields` | `true`: its shortcut runs while the cursor is in a text field too        |
-| `enabled`     | When it can run, as a function of the viewer's state                             |
+| `enabled`     | When it can run, as a function of the viewer's state and your app's (`appState`) |
 | `active`      | When it shows as pressed, such as the current tool                               |
 | `visible`     | When it shows at all                                                             |
 | `run`         | What it does                                                                     |
@@ -121,8 +121,37 @@ A disabled command is still in the results, so show it greyed out.
 | `categories`  | The features it belongs to, so you can [turn them off](#turn-features-off) together, such as `['annotations.highlight']` |
 | `panel`, `menu`, `modal` | A command that opens a [panel, menu or dialog](panels) needs no `run`  |
 
-`enabled`, `active` and `visible` get the viewer's state through `get(Token)`, and are asked again
-whenever anything changes, so a button is always right without events or effects of your own.
+`enabled`, `active` and `visible` get the viewer's state through `get(Token)` and your app's through
+`appState`. They're asked again whenever either changes, and after the command runs, so a button is
+always right without events or effects of your own.
+
+`appState` is a setting: values, and functions that change them. Give it a new value whenever your
+state changes, and every button asks its command again:
+
+```ts
+// Your app's state, and what changes it.
+let flagged: string[] = [];
+function toggleFlag(id: string) {
+  flagged = flagged.includes(id) ? flagged.filter((f) => f !== id) : [...flagged, id];
+  // A new value: every button asks its command again.
+  commands.updateSettings({ appState: { flagged, toggleFlag } });
+}
+
+commandsPlugin({
+  appState: { flagged, toggleFlag },
+  commands: [
+    {
+      id: 'review:flag',
+      label: 'Flag for review',
+      active: ({ appState, documentId }) => appState.flagged.includes(documentId),
+      run: ({ appState, documentId }) => appState.toggleFlag(documentId),
+    },
+  ],
+});
+```
+
+A new value replaces the old one whole, never merged, and the commands see a new object, not a
+change inside the one they have (`[...flagged, id]`, not `flagged.push(id)`).
 
 ## Turn features off
 
@@ -181,6 +210,7 @@ Set them when you register the plugin, and change them while the app runs with
 | Setting              | What it does                                          | Default |
 | :------------------- | :---------------------------------------------------- | :------ |
 | `commands`           | The commands your viewer has                          | none    |
+| `appState`           | Your app's state, which commands read as `appState`; replaced whole | none    |
 | `disabledCategories` | Categories that start turned off, with every category under them | none    |
 | `disabledCommands`   | Commands that start turned off, by id                 | none    |
 | `notAllowed`         | What a command the scope doesn't allow does: `'hide'` leaves it out, `'disable'` shows it disabled with `disabledReason` | `'hide'` |
