@@ -40,14 +40,17 @@ export function PageLoading({ small = false }: { small?: boolean }) {
 
   if (waiting) {
     const size = small ? 'h-5 w-5' : 'h-8 w-8';
+    // The box places the circle and the circle only spins: both are a `transform`, and on one
+    // element the spin's keyframes would replace the placement and slide the circle instead.
     return (
-      <div
-        part="page-loading"
-        role="status"
-        aria-label={t('demo.pageLoading', { params: { page: page.pageIndex + 1 } })}
-        className={`border-border-subtle border-t-accent ${size} rounded-full border-2 motion-safe:animate-spin`}
-        style={placed}
-      />
+      <div style={placed}>
+        <div
+          part="page-loading"
+          role="status"
+          aria-label={t('demo.pageLoading', { params: { page: page.pageIndex + 1 } })}
+          className={`border-border-subtle border-t-accent ${size} rounded-full border-2 motion-safe:animate-spin`}
+        />
+      </div>
     );
   }
   if (small) return null; // a thumbnail is too small for words: the main view says it
