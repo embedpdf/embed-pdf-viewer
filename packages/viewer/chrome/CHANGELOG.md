@@ -1,5 +1,44 @@
 # @embedpdf/viewer-chrome
 
+## 3.0.0-next.20
+
+### Minor Changes
+
+- [#948](https://github.com/embedpdf/embed-pdf-viewer/pull/948) by [@bobsingor](https://github.com/bobsingor) – `appState` in the viewer's config: your app's state, which your commands get as `appState`. It follows its prop, and the commands' buttons follow it. `CommandDef<AppState>` and `CommandContext<AppState>` type it.
+
+- [#941](https://github.com/embedpdf/embed-pdf-viewer/pull/941) by [@bobsingor](https://github.com/bobsingor) – The viewer installs the fonts plugin: text typed in a free text box or a text field shows in the font program the engine writes with, a document's own fonts included. `viewer.get('fonts')` returns it.
+
+- [#941](https://github.com/embedpdf/embed-pdf-viewer/pull/941) by [@bobsingor](https://github.com/bobsingor) – `fonts` is a setting of the viewer's own (`ViewerCustomization`, with `ViewerFont.label`): each font is read once and registered on a local engine, and the fonts plugin draws it by program; a cloud engine's fonts are its server's, so the setting is ignored there, with a warning. The style panel's font picker lists every font text can be written in, for text boxes, form fields and redaction labels alike: In this document, Your fonts (Server fonts on the cloud), then the standard fonts; a font that can't be chosen shows greyed with why, and a box's own font shows either way. A typed signature's font goes to the stamp plugin, which registers it where the mark is written, and the maker shows the typed name in it.
+
+- [#939](https://github.com/embedpdf/embed-pdf-viewer/pull/939) by [@bobsingor](https://github.com/bobsingor) – A page whose picture takes more than 400 milliseconds to arrive shows a spinner, in the main view and in the thumbnails, in the middle of the part of the page on screen; a page that can't load says so ("This page couldn't load.", or "You don't have access to this page." without `doc.render`), in all 15 languages. Restyle or hide them with the `page-loading` and `page-error` parts, and change the wait with `plugins.render.slowAfterMs`.
+
+- [#931](https://github.com/embedpdf/embed-pdf-viewer/pull/931) by [@bobsingor](https://github.com/bobsingor) – The thumbnails panel follows its own permission: its rail draws each page's thumbnail, and the panel is there only when the session may have thumbnails (`doc.render.thumbnail`, which `doc.render` includes), like any command the session may not run. The reason it's missing is translated into every language the viewer ships.
+
+- [#933](https://github.com/embedpdf/embed-pdf-viewer/pull/933) by [@bobsingor](https://github.com/bobsingor) – The facing-pages, scroll direction and view rotation commands follow setting locks: while a plugin or your app locks the setting one changes, its menu rows and buttons show greyed out, the current choice still checked, with the lock's reason as the tooltip. The general sentence, for a lock without a reason of its own, is translated into every language the viewer ships.
+
+- [#949](https://github.com/embedpdf/embed-pdf-viewer/pull/949) by [@bobsingor](https://github.com/bobsingor) – The viewer's own tooltips replace the browser's `title` everywhere in the chrome (`useTooltip`, `WithTooltip`, `TooltipButton`). A tooltip shows once the pointer rests on its button (at once while another one shows or just went), at once on focus from the keyboard, and never for a touch; the pointer can move onto it, and it goes on a press, on Escape, or when the pointer and focus leave. One shows at a time. It opens in the top layer on the side its button's menu would open, or beside a menu's row, flipped when there's no room, in the theme's font and the `tooltip` and `tooltip-text` tokens. It says a command's label, its shortcut the way the platform writes it, and why it can't run, and names itself in the button's `aria-describedby` for what the button's name doesn't say already. Icon buttons in the panels and dialogs take their name (`aria-label`) from it. Text cut short (an attachment's file name, an outline item's title) shows whole in one, only while it's cut short. A menu is named after its button.
+
+  Toolbars: a command's item takes `emphasis: 'primary'`, drawn filled in the accent, with the part `toolbar-button-primary` beside `toolbar-button`; every toolbar is the part `toolbar toolbar-<id>`; `{ custom, grow: true }` takes the room the bar has left, through the headless toolbar. Bars floating on one edge share it: the corner bars sit in the corners and the middle one stays centered, moving aside only as far as a corner bar needs; where it doesn't fit beside them, the corner bars move one row in, and two corner bars that don't fit side by side stack the same way. The bars on the two sides stay level until they'd meet, then sit one over the other. A floating bar's place takes `hideWhileScrolling`, on a phone by default for the bar with the page number. The page number reads a spread's first and last page ("Pages 1–2 of 8"), and opens its field at the first. `<epdf-button>` and `<epdf-menu-item>` take `active` (shown pressed or checked), and `<epdf-icon name size label>` draws an icon of the viewer's or of yours.
+
+  Theme: `page-background` and `page-shadow` tokens beside `tooltip` and `tooltip-text`, and `light` beside `dark`: `light` or `dark` wins in its mode, then `tokens`, then `accent`.
+
+  Panels: a built-in panel's id brings its title and icon in any layout, a whole layout of yours too. The panel's title is its button's label: a string for `panel:<id>` comes first, then the layout's `title` or `titleKey`. `open` opens a panel when each document opens, where it docks (the first in the layout of two on one side), and waits for its button where it would cover the pages; `closable: false` takes away its close button where it docks, and its button opens it without closing it. An overlay panel has a resize edge like a docked one, with Home and End, and a sheet on a viewer wider than a phone is as wide as the panel's `width`, centered.
+
+  Config: `size` (`'auto'` or the size the layout is for at every width) and `touch` (`'auto'` or a boolean) set `env.size` and `env.touch`, and `warnBeforeLeaving: false` turns off the question on leaving the page; each is read once.
+
+  `viewer.get()` of a document's plugin throws `PluginError('not-ready')` before its document has opened, and `watch()` waits while its read throws that, starting once the read works and waiting again after the document closes. `watch(read, onChange, options)` takes `{ immediate, isEqual }` (`WatchOptions`) in place of a third-argument `isEqual`; with `immediate`, `onChange` gets the first value too, with `previous` `undefined`.
+
+  The words: `pageNumber.page`, `pageNumber.pages` and `pageNumber.goToPage`, and 23 `comments.*` keys, replace the `demo.*` ones in all 15 languages.
+
+### Patch Changes
+
+- [#938](https://github.com/embedpdf/embed-pdf-viewer/pull/938) by [@bobsingor](https://github.com/bobsingor) –
+  - A click in a sheet or dialog that closes it and puts the cursor somewhere else, such as
+    `form.focus()` from a panel of your own, leaves the cursor there instead of on the button that
+    opened it.
+  - A floating bar with `hideWhileScrolling` hides after a click on one of its buttons too: only a bar
+    you're using from the keyboard, or typing in, stays while the pages scroll.
+
 ## 3.0.0-next.19
 
 ### Minor Changes

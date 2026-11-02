@@ -1,5 +1,11 @@
 # @embedpdf/core-acrojs
 
+## 3.0.0-next.20
+
+### Minor Changes
+
+- [#942](https://github.com/embedpdf/embed-pdf-viewer/pull/942) by [@bobsingor](https://github.com/bobsingor) – `field.setFocus()` works: it asks for the cursor in that field (a `focusField` UI effect, by the field's full name), where it used to report an unsupported API.
+
 ## 3.0.0-next.19
 
 ## 3.0.0-next.18

@@ -1,6 +1,6 @@
 {
   "name": "@embedpdf/plugin-fonts",
-  "version": "3.0.0-next.15",
+  "version": "3.0.0-next.20",
   "private": false,
   "description": "Document-scoped fonts: every font a document can be written in, mirrored from the engine, and the CSS and font programs a browser draws its text with, so typed text shows in the program the engine writes.",
   "type": "module",

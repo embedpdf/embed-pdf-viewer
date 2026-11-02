@@ -1,5 +1,13 @@
 # @cloudpdf/viewer
 
+## 3.0.0-next.20
+
+### Minor Changes
+
+- [#948](https://github.com/embedpdf/embed-pdf-viewer/pull/948) by [@bobsingor](https://github.com/bobsingor) – `ViewerConfig<AppState>` types `appState`, your app's state, which your commands read; it follows its prop, as on EmbedPDF's viewer.
+
+- [#936](https://github.com/embedpdf/embed-pdf-viewer/pull/936) by [@bobsingor](https://github.com/bobsingor) – The CloudPDF viewer includes screenshot protection: for a user who may see a document's pages only as protected video (`protected-display.view`, without `doc.render`), they show that way, from the protected display server module. `viewer.get('protectedDisplay').getStatus()` says whether they do. Nothing changes for anyone else, and the video player is loaded only for a protected user.
+
 ## 3.0.0-next.19
 
 ### Minor Changes

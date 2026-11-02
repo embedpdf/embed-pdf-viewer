@@ -1,5 +1,11 @@
 # @cloudpdf/viewer-angular
 
+## 3.0.0-next.20
+
+### Minor Changes
+
+- [#949](https://github.com/embedpdf/embed-pdf-viewer/pull/949) by [@bobsingor](https://github.com/bobsingor) – Export `EpdfIcon`: one of the viewer's icons, or one of yours, in your own components.
+
 ## 3.0.0-next.19
 
 ### Minor Changes

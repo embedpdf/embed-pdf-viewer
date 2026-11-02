@@ -1,5 +1,17 @@
 # @embedpdf/viewer-angular
 
+## 3.0.0-next.20
+
+### Minor Changes
+
+- [#948](https://github.com/embedpdf/embed-pdf-viewer/pull/948) by [@bobsingor](https://github.com/bobsingor) – `<epdf-pdf-viewer>` has an `appState` input, your app's state, which your commands read; it follows its input, and the commands' buttons with it.
+
+- [#949](https://github.com/embedpdf/embed-pdf-viewer/pull/949) by [@bobsingor](https://github.com/bobsingor) – `EpdfButton` and `EpdfMenuItem` take `active`: shown pressed, or checked, as a command's button or row is while its command is active, for a toggle of your own (a theme switch). `EpdfIcon` draws one of the viewer's icons, or one of yours (`icons`), in the color of the text around it: `name`, `size` (default 20) and `label` for screen readers. `size`, `touch` and `warnBeforeLeaving` are inputs (read once). Inside the viewer, `inject()` finds every plugin's service, now with `EpdfMetadata`, `EpdfOutline`, `EpdfAttachment` and `EpdfFonts`: the list is keyed by the viewer's plugin names, so the compiler catches one left out.
+
+### Patch Changes
+
+- [#941](https://github.com/embedpdf/embed-pdf-viewer/pull/941) by [@bobsingor](https://github.com/bobsingor) – `fonts` as an input of `<epdf-pdf-viewer>`.
+
 ## 3.0.0-next.19
 
 ### Minor Changes
