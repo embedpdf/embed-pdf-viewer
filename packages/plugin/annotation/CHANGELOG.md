@@ -1,5 +1,13 @@
 # @embedpdf/plugin-annotation
 
+## 3.0.0-next.20
+
+### Minor Changes
+
+- [#941](https://github.com/embedpdf/embed-pdf-viewer/pull/941) by [@bobsingor](https://github.com/bobsingor) – With the fonts plugin installed, a free text box being typed in is drawn in the font programs the engine will write it with. The box is resolved when the edit starts, and again after a pause once its text has a character it wasn't resolved with, so a box whose font can't draw it moves to the font the engine moves it to. A `TextItem` carries its body `face` and the `programs` to mount, and `css.fontFamily` names them. `getCssFontFamily(face, id)` takes a run's whole face and the box, and `getFamilyOfCss(cssFamily)` reads a drawn family back. A document's own fonts map to and from their faces like registered ones.
+
+- [#941](https://github.com/embedpdf/embed-pdf-viewer/pull/941) by [@bobsingor](https://github.com/bobsingor) – A hovered redaction's label is drawn in its fonts as the engine picks them (`label.fonts`, from the fonts plugin), and again once they're found. Without the fonts plugin, a text box draws in the standard font the engine falls back to for its font or face, in that font's built-in program, and `getFamilyOfCss()` reads a standard program's family back as its face's family. A text box being typed in follows its programs as they reach the browser.
+
 ## 3.0.0-next.19
 
 ### Patch Changes

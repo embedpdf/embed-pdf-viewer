@@ -1,6 +1,6 @@
 {
   "name": "@cloudpdf/web",
-  "version": "3.0.0-next.19",
+  "version": "3.0.0-next.20",
   "private": false,
   "description": "Framework-free browser code for CloudPDF's plugins: the one home in the CloudPDF tree for code that touches the DOM, as @embedpdf/web is for EmbedPDF's. Today the protected display player: Encrypted Media Extensions and Media Source behind @cloudpdf/plugin-protected-display's player port. Never imported by a plugin, which stays DOM-free.",
   "type": "module",

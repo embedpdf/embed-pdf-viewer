@@ -1,5 +1,29 @@
 # @embedpdf/react
 
+## 3.0.0-next.20
+
+### Minor Changes
+
+- [#941](https://github.com/embedpdf/embed-pdf-viewer/pull/941) by [@bobsingor](https://github.com/bobsingor) – Add `@embedpdf/react/fonts`: `fontsPlugin`, `useFonts()`, `useFontsState()`, `useFontsEvent()` and `useFontMounts()`. Free text boxes and text fields mount the font programs their text is drawn in, so typed text shows in the program the engine writes with.
+
+  Scene shapes apply their whole `style`, not only a blend mode, so form text draws as runs.
+
+  The viewer's kernel measures text with the browser (`browserTextMeasurer()`), so a form field's text draws in the fonts the engine writes it in before the engine's picture arrives. A text field's editor draws again once its fonts are found.
+
+- [#941](https://github.com/embedpdf/embed-pdf-viewer/pull/941) by [@bobsingor](https://github.com/bobsingor) – `useFontCss(font)` from `/fonts`: the CSS to draw text in a font as the engine draws it, again once its programs reach the browser, with the programs mounted while the component lives.
+
+- [#941](https://github.com/embedpdf/embed-pdf-viewer/pull/941) by [@bobsingor](https://github.com/bobsingor) – A list box draws its rows in the widget's font, as the engine picks it, its programs mounted. `mountWebFont` is no longer exported from `/runtime`.
+
+- [#939](https://github.com/embedpdf/embed-pdf-viewer/pull/939) by [@bobsingor](https://github.com/bobsingor) – `usePictureState()` gives a layer of a page whether that page's picture is on screen in its view: `{ status, slow }`, from the render plugin's `getPictureState`. Show a loading indicator while `status` is `'loading'` and `slow` is true. `<RenderLayer>` reports its page `loading` until its whole-page picture is on screen, and a render that fails; the box it lends a plugin that paints the pictures hands that plugin the page's report.
+
+- [#936](https://github.com/embedpdf/embed-pdf-viewer/pull/936) by [@bobsingor](https://github.com/bobsingor) – `<RenderLayer>` lends its box to the plugin that paints its view's pictures (`handOverPictures` in the render plugin): it calls the painter's `paint` once per page, `update` as the page moves, and `destroy` when the page goes or the pictures are given back, and fetches no picture of its own meanwhile.
+
+- [#931](https://github.com/embedpdf/embed-pdf-viewer/pull/931) by [@bobsingor](https://github.com/bobsingor) – `<RenderLayer thumbnail />` draws the page's thumbnail instead of its full picture: one small picture of the whole page, without tiles, which needs only `doc.render.thumbnail`. Use it in a strip of thumbnails or a page picker, so they show for sessions that may have thumbnails but not render pages.
+
+### Patch Changes
+
+- [#942](https://github.com/embedpdf/embed-pdf-viewer/pull/942) by [@bobsingor](https://github.com/bobsingor) – `<FormLayer>` fields take the form's cursor: `focus()` and `focusNext()` put it in them, Tab and Shift+Tab move through the fields in the document's order across pages that aren't on screen, and the arrow keys move between a radio group's buttons.
+
 ## 3.0.0-next.19
 
 ### Minor Changes

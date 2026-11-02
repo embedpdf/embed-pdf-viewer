@@ -1,5 +1,21 @@
 # @cloudpdf/sdk
 
+## 3.0.0-next.20
+
+### Minor Changes
+
+- [#941](https://github.com/embedpdf/embed-pdf-viewer/pull/941) by [@bobsingor](https://github.com/bobsingor) – `doc.fonts.list()`, `doc.fonts.resolve()`, `doc.fonts.programs.get()` and `doc.fonts.programs.download()`: the fonts text can be written in, what a write would draw each run in, and a font program's facts and file. A manifest carries `fontsVersion` and `serverFonts`, a change's cache delta `fontsVersion`, and a write's meta the `missingCharacters` it drew in no font.
+
+- [#940](https://github.com/embedpdf/embed-pdf-viewer/pull/940) by [@bobsingor](https://github.com/bobsingor) – Add the `pages.copy` change op and `objectNumbers` on `pages.insert`, and the page label sections (`labels`) in every page list answer.
+
+- [#924](https://github.com/embedpdf/embed-pdf-viewer/pull/924) by [@bobsingor](https://github.com/bobsingor) – `new CloudPDFClient({ token })` reaches CloudPDF SaaS: `baseUrl` is only needed for your own CloudPDF server. `CloudPDFEnvironment.Saas` names the SaaS address. Proxy uploads go to the same address, with the client's token.
+
+- [#925](https://github.com/embedpdf/embed-pdf-viewer/pull/925) by [@bobsingor](https://github.com/bobsingor) – `import { upload } from '@cloudpdf/sdk/upload'` uploads a PDF from the browser with an upload token from your server: `upload(file, { token, name?, onProgress?, signal?, baseUrl? })`. The entry is about 3 KB gzipped and has no Node imports. It sends the file with XHR, so `onProgress` follows the bytes. `uploads.create` on a server now reports progress as the bytes go too, instead of only at the start and the end. `Uploads` takes the source reader as a second argument.
+
+### Patch Changes
+
+- [#944](https://github.com/embedpdf/embed-pdf-viewer/pull/944) by [@bobsingor](https://github.com/bobsingor) – `tokens.issue` and `grants.create` say that a tenant token gives only document permissions it holds itself, and `grants.update` can answer `403`.
+
 ## 3.0.0-next.19
 
 ### Minor Changes

@@ -1,5 +1,23 @@
 # @embedpdf/engine
 
+## 3.0.0-next.20
+
+### Minor Changes
+
+- [#941](https://github.com/embedpdf/embed-pdf-viewer/pull/941) by [@bobsingor](https://github.com/bobsingor) – `doc.fonts` on a local document lists, resolves and serves the document's fonts: `list()`, `resolve(request)`, `getProgram(displayHash)` and `downloadProgram(displayHash)`. The standard fonts and the last resort are served from `@embedpdf/core-fonts`, loaded the first time a document's fonts are asked for. Once a document's fonts have been listed, `fonts.changed` says when a write adds a font to it, and every document says so when the engine's fonts are registered, cleared or given fallbacks.
+
+  A form field font a browser can't load as it is (Type 1 or bare CFF) is listed with a display program, which `downloadProgram()` returns: the same glyphs at the same advances as the engine draws them, so a field typed in such a font shows in it.
+
+  Hebrew and Arabic work with no setup: `localEngine()` loads Noto Sans Hebrew and Noto Naskh Arabic (`@embedpdf/default-fallback-fonts`, about 320 KB as lazy chunks of your build) while it starts and adds them as fallback fonts, tried after your `fallbackFonts` whatever their style. `localEngine({ defaultFallbackFonts: false })` leaves them out, and `engine.fonts.clearFallbacks()` removes them with yours. A character no font has is drawn with the last-resort font, as a box, on every engine. Filling in a form field and drawing a redaction label report the characters they drew with no font in `meta.missingCharacters`.
+
+  A write that changes the fonts the document's list shows ends its own events with `fonts.changed`, published before the write settles, once the document's fonts were listed; the engine no longer lists them again after every write to find out.
+
+- [#931](https://github.com/embedpdf/embed-pdf-viewer/pull/931) by [@bobsingor](https://github.com/bobsingor) – Pages render thumbnails: `page.render.image({ viewport: { kind: 'thumbnail' } })` is the whole page at 512 pixels on its long side, and needs only `doc.render.thumbnail`, which `doc.render` includes. Each picture now needs only its own permission: print pictures need `doc.print` (and `doc.print.high` at 300 DPI) without `doc.render`, and a scope without `doc.render` is refused screen pictures, as on a CloudPDF server.
+
+- [#936](https://github.com/embedpdf/embed-pdf-viewer/pull/936) by [@bobsingor](https://github.com/bobsingor) – `doc.security.allows()` answers for a plugin's own permission: it holds when the document's scope names it, or `*`. The core never grants one.
+
+- [#926](https://github.com/embedpdf/embed-pdf-viewer/pull/926) by [@bobsingor](https://github.com/bobsingor) – `LocalPageRenderService` is renamed `RawPageRenderService`: the page rendering that also gives the raw pixels (`raw()`). The local engine's pages have it, as before.
+
 ## 3.0.0-next.19
 
 ## 3.0.0-next.18

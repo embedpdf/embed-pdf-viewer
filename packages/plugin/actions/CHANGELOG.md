@@ -1,5 +1,11 @@
 # @embedpdf/plugin-actions
 
+## 3.0.0-next.20
+
+### Minor Changes
+
+- [#942](https://github.com/embedpdf/embed-pdf-viewer/pull/942) by [@bobsingor](https://github.com/bobsingor) – A script's `field.setFocus()` reaches the form plugin, which puts the cursor in the field (`registerFormFocus`); when the form can't, a `ui-effect-suppressed` diagnostic says so.
+
 ## 3.0.0-next.19
 
 ## 3.0.0-next.18

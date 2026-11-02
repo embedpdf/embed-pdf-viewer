@@ -1,5 +1,29 @@
 # @embedpdf/angular
 
+## 3.0.0-next.20
+
+### Minor Changes
+
+- [#941](https://github.com/embedpdf/embed-pdf-viewer/pull/941) by [@bobsingor](https://github.com/bobsingor) – `injectFontCss(font)` from `/fonts`: a signal of the CSS to draw text in a font as the engine draws it, with its programs mounted while the injector lives. `EpdfFonts.fontCss(font)` is the same signal without the mounting.
+
+- [#941](https://github.com/embedpdf/embed-pdf-viewer/pull/941) by [@bobsingor](https://github.com/bobsingor) – A `fonts` entry: `withFonts()` and the `EpdfFonts` service (the list and its status as signals), and `injectFontMounts(programs)` in `/runtime`. A free text box mounts the programs its text is drawn in, a text field's editor is laid out again once its fonts are found, and a list box draws its rows in the widget's font. `mountWebFont` is no longer exported from `/runtime`.
+
+- [#942](https://github.com/embedpdf/embed-pdf-viewer/pull/942) by [@bobsingor](https://github.com/bobsingor) – `EpdfForm` has `focus()`, `focusNext()`, `getFocusedField()`, the `focusedField()` signal and `focusChanged$`, and `<epdf-form-layer>` fields take the form's cursor: Tab and Shift+Tab move through the fields in the document's order across pages that aren't on screen, and the arrow keys move between a radio group's buttons.
+
+- [#939](https://github.com/embedpdf/embed-pdf-viewer/pull/939) by [@bobsingor](https://github.com/bobsingor) – `injectPictureState()` from `@embedpdf/angular/render` gives a component drawn on a page whether that page's picture is on screen in its view, as a signal of `{ status, slow }`, from the render plugin's `getPictureState`. Show a loading indicator while `status` is `'loading'` and `slow` is true. `<epdf-render-layer>` reports its page `loading` until its whole-page picture is on screen, and a render that fails; the box it lends a plugin that paints the pictures hands that plugin the page's report.
+
+- [#936](https://github.com/embedpdf/embed-pdf-viewer/pull/936) by [@bobsingor](https://github.com/bobsingor) – `<epdf-render-layer>` lends its box to the plugin that paints its view's pictures (`handOverPictures` in the render plugin): it calls the painter's `paint` once per page, `update` as the page moves, and `destroy` when the page goes or the pictures are given back, and fetches no picture of its own meanwhile.
+
+- [#931](https://github.com/embedpdf/embed-pdf-viewer/pull/931) by [@bobsingor](https://github.com/bobsingor) – `<epdf-render-layer thumbnail />` draws the page's thumbnail instead of its full picture: one small picture of the whole page, without tiles, which needs only `doc.render.thumbnail`. Use it in a strip of thumbnails or a page picker, so they show for sessions that may have thumbnails but not render pages.
+
+### Patch Changes
+
+- [#941](https://github.com/embedpdf/embed-pdf-viewer/pull/941) by [@bobsingor](https://github.com/bobsingor) – A text field's editor mounts every program its layout names: with the fonts plugin, its own font's program, the fallbacks and the last resort.
+
+  Scene shapes apply their whole `style`, not only a blend mode, so form text draws as runs.
+
+  The viewer's kernel measures text with the browser (`browserTextMeasurer()`), so a form field's text draws in the fonts the engine writes it in before the engine's picture arrives.
+
 ## 3.0.0-next.19
 
 ### Minor Changes

@@ -1,5 +1,21 @@
 # @cloudpdf/contract
 
+## 3.0.0-next.20
+
+### Minor Changes
+
+- [#941](https://github.com/embedpdf/embed-pdf-viewer/pull/941) by [@bobsingor](https://github.com/bobsingor) – The contract gains `doc.fonts.list`, `doc.fonts.resolve`, `doc.fonts.programs.get` and `doc.fonts.programs.download`. A program's file needs a token that may write text: any one of the listed capabilities. The fonts models are named once in the OpenAPI document.
+
+- [#940](https://github.com/embedpdf/embed-pdf-viewer/pull/940) by [@bobsingor](https://github.com/bobsingor) – Add the `pages.copy` change op and `objectNumbers` on `pages.insert`, and the page label sections (`labels`) in every page list answer.
+
+- [#924](https://github.com/embedpdf/embed-pdf-viewer/pull/924) by [@bobsingor](https://github.com/bobsingor) – The OpenAPI document names CloudPDF SaaS (`https://engine.cloudpdf.com`) as its server, so the SDKs generated from it reach SaaS when they're given no address, as the browser engine does.
+
+- [#925](https://github.com/embedpdf/embed-pdf-viewer/pull/925) by [@bobsingor](https://github.com/bobsingor) – `tokens.issue` makes upload tokens: `{ kind: 'upload', sub, folderId?, metadata?, maxFiles?, maxBytes?, origins?, expiresIn }`. A key needs `docs.create` to make one. `documents.init`, `documents.commit` and `documents.uploadProxy` accept them as a new `upload-jwt` credential (OpenAPI scheme `uploadToken`).
+
+### Patch Changes
+
+- [#944](https://github.com/embedpdf/embed-pdf-viewer/pull/944) by [@bobsingor](https://github.com/bobsingor) – `tokens.issue` and `grants.create` describe the cap: a tenant token gives only document permissions it holds itself. `grants.update` lists its `403` response.
+
 ## 3.0.0-next.19
 
 ### Minor Changes

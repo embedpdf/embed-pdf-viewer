@@ -1,5 +1,15 @@
 # @embedpdf/viewer
 
+## 3.0.0-next.20
+
+### Minor Changes
+
+- [#941](https://github.com/embedpdf/embed-pdf-viewer/pull/941) by [@bobsingor](https://github.com/bobsingor) – `fonts` is a top-level setting: `EmbedPDF.init({ fonts: [{ key, url, label }] })`. The local door's `engine` options no longer take `fonts`, and a door's engine provider returns no fonts (`DoorEngine`). Depends on `@embedpdf/core-fonts`, which the viewer's chrome now imports.
+
+### Patch Changes
+
+- [#941](https://github.com/embedpdf/embed-pdf-viewer/pull/941) by [@bobsingor](https://github.com/bobsingor) – Depends on `@embedpdf/plugin-fonts`: the viewer installs the fonts plugin, so text typed in a free text box or a text field shows in the font program the engine writes with.
+
 ## 3.0.0-next.19
 
 ### Minor Changes

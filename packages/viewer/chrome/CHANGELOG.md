@@ -1,5 +1,19 @@
 # @embedpdf/viewer-chrome
 
+## 3.0.0-next.20
+
+### Minor Changes
+
+- [#941](https://github.com/embedpdf/embed-pdf-viewer/pull/941) by [@bobsingor](https://github.com/bobsingor) – The viewer installs the fonts plugin: text typed in a free text box or a text field shows in the font program the engine writes with, a document's own fonts included. `viewer.get('fonts')` returns it.
+
+- [#941](https://github.com/embedpdf/embed-pdf-viewer/pull/941) by [@bobsingor](https://github.com/bobsingor) – `fonts` is a setting of the viewer's own (`ViewerCustomization`, with `ViewerFont.label`): each font is read once and registered on a local engine, and the fonts plugin draws it by program; a cloud engine's fonts are its server's, so the setting is ignored there, with a warning. The style panel's font picker lists every font text can be written in, for text boxes, form fields and redaction labels alike: In this document, Your fonts (Server fonts on the cloud), then the standard fonts; a font that can't be chosen shows greyed with why, and a box's own font shows either way. A typed signature's font goes to the stamp plugin, which registers it where the mark is written, and the maker shows the typed name in it.
+
+- [#939](https://github.com/embedpdf/embed-pdf-viewer/pull/939) by [@bobsingor](https://github.com/bobsingor) – A page whose picture takes more than 400 milliseconds to arrive shows a spinner, in the main view and in the thumbnails, in the middle of the part of the page on screen; a page that can't load says so ("This page couldn't load.", or "You don't have access to this page." without `doc.render`), in all 15 languages. Restyle or hide them with the `page-loading` and `page-error` parts, and change the wait with `plugins.render.slowAfterMs`.
+
+- [#931](https://github.com/embedpdf/embed-pdf-viewer/pull/931) by [@bobsingor](https://github.com/bobsingor) – The thumbnails panel follows its own permission: its rail draws each page's thumbnail, and the panel is there only when the session may have thumbnails (`doc.render.thumbnail`, which `doc.render` includes), like any command the session may not run. The reason it's missing is translated into every language the viewer ships.
+
+- [#933](https://github.com/embedpdf/embed-pdf-viewer/pull/933) by [@bobsingor](https://github.com/bobsingor) – The facing-pages, scroll direction and view rotation commands follow setting locks: while a plugin or your app locks the setting one changes, its menu rows and buttons show greyed out, the current choice still checked, with the lock's reason as the tooltip. The general sentence, for a lock without a reason of its own, is translated into every language the viewer ships.
+
 ## 3.0.0-next.19
 
 ### Minor Changes
