@@ -63,6 +63,7 @@ Everything the viewer can do is one config object. In a framework, every key is 
 | `fetch` | Your own `fetch` for documents at a URL, to add headers or cookies | [Documents](documents#files-that-need-a-sign-in) |
 | `layout` | Where every toolbar, button, menu and panel goes | [Layout](customize/layout) |
 | `commands` | Your own actions | [Buttons & commands](customize/commands) |
+| `appState` | Your app's state, which your commands read | [Buttons & commands](customize/commands#your-apps-state) |
 | `icons` | Your own icons | [Buttons & commands](customize/commands#icons) |
 | `theme` | `'light'`, `'dark'`, `'system'`, or your colors | [Theming](customize/theming) |
 | `locale` | `'auto'` or a language code | [Translations](customize/translations) |
@@ -89,6 +90,7 @@ Everything the viewer can do is one config object. In a framework, every key is 
 | `documents` | Several documents, shown as tabs | [Documents](documents#several-documents) |
 | `layout` | Where every toolbar, button, menu and panel goes | [Layout](customize/layout) |
 | `commands` | Your own actions | [Buttons & commands](customize/commands) |
+| `appState` | Your app's state, which your commands read | [Buttons & commands](customize/commands#your-apps-state) |
 | `icons` | Your own icons | [Buttons & commands](customize/commands#icons) |
 | `theme` | `'light'`, `'dark'`, `'system'`, or your colors | [Theming](customize/theming) |
 | `locale` | `'auto'` or a language code | [Translations](customize/translations) |
@@ -160,9 +162,10 @@ carries.
 
 ## Change the config later
 
-Five keys follow their prop while the viewer runs: `src` opens the new document in place of the
+Six keys follow their prop while the viewer runs: `src` opens the new document in place of the
 old one; `theme` and `locale` switch the look and the language; `disable` and `readOnly` take tools
-away or bring them back.
+away or bring them back; `appState` gives [your commands](customize/commands#your-apps-state) your
+app's state as it is now.
 
 <Engine local>
 

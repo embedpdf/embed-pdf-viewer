@@ -52,9 +52,9 @@ shortcuts](/docs/headless/ui/commands#define-a-command).
 
 ## Enabled, active and visible
 
-`enabled`, `active` and `visible` are functions of the viewer's state. They get `get`, which gives
-you any plugin by its name, and the viewer asks them again whenever something changes, so a
-button is always right:
+`enabled`, `active` and `visible` say how a command's button looks now. They get `get`, which gives
+you any plugin by its name, and `appState`, your app's own state. The viewer asks them again
+whenever either changes, and after the command runs, so a button is always right:
 
 ```js
 {
@@ -62,12 +62,28 @@ button is always right:
   label: 'Flag for review',
   icon: 'eye',
   enabled: ({ get }) => get('selection').hasSelection(),
-  active: ({ documentId }) => flagged.has(documentId),
-  run: ({ documentId }) => toggleFlag(documentId),
+  active: ({ appState, documentId }) => appState.flagged.includes(documentId),
+  run: ({ appState, documentId }) => appState.toggleFlag(documentId),
 }
 ```
 
-`run` gets the same: `get`, the `viewer`, and the `documentId` of the document it runs for.
+`run` gets the same: `get`, `appState`, the `viewer`, and the `documentId` of the document it runs
+for.
+
+### Your app's state
+
+Give the viewer what your commands read as `appState`: values, and functions that change them. It
+follows its prop like `theme` does: give it a new value, and every button asks its command again.
+Here **Approve** stays greyed out until every item of the app's checklist is ticked, and shows as
+pressed once the document is approved:
+
+<Snippet name="viewer/commands/app-state" />
+
+Because the commands read your state from `appState`, never from a variable they closed over, they
+can be a constant outside your component and never see an old value. Give it a new value when
+something changes, as you do with any prop: the viewer sees a new object, not a change inside the
+one it has (`[...done, item]`, not `done.push(item)`). In TypeScript, `ViewerConfig<AppState>` gives
+`appState` its type in every command.
 
 ## Change what a built-in button does
 

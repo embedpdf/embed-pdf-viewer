@@ -132,6 +132,7 @@ const CONFIG_PROPS = {
   documents: null,
   engine: null,
   commands: null,
+  appState: null,
   icons: null,
   strings: null,
   locale: null,
@@ -186,6 +187,7 @@ const LIVE_PROPS: Readonly<Record<LiveConfigKey, true>> = {
   disable: true,
   readOnly: true,
   fetch: true,
+  appState: true,
 };
 
 /** The config as the props give it, each value raw: a reactive copy is another object. */
@@ -258,7 +260,15 @@ export function setupPDFViewer(
   // The live props, on every change of one: the element compares them by value, so an unchanged
   // one (an inline `:disable="['forms']"` too) changes nothing.
   watch(
-    () => [props.src, props.theme, props.locale, props.disable, props.readOnly, props.fetch],
+    () => [
+      props.src,
+      props.theme,
+      props.locale,
+      props.disable,
+      props.readOnly,
+      props.fetch,
+      props.appState,
+    ],
     () => {
       const target = element.value;
       if (!target) return;
@@ -268,6 +278,7 @@ export function setupPDFViewer(
       target.disable = toRaw(props.disable);
       target.readOnly = toRaw(props.readOnly);
       target.fetch = props.fetch;
+      target.appState = toRaw(props.appState);
     },
   );
 

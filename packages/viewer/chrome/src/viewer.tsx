@@ -14,9 +14,9 @@
  * The engine stays a prop — choosing local-wasm vs cloud is the host's
  * decision, and each delivery wires its own. The chrome — toolbars,
  * translations, theme — renders at t≈0; only the pages wait on the engine.
- * Customization is mount-time, except `theme`, `locale`, `disable` and
- * `readOnly`, which follow their props (see {@link FollowProps}); changing any
- * other prop on a mounted viewer does not rebuild the workspace.
+ * Customization is mount-time, except `theme`, `locale`, `disable`,
+ * `readOnly` and `appState`, which follow their props (see {@link FollowProps});
+ * changing any other prop on a mounted viewer does not rebuild the workspace.
  */
 // One import line per feature: each subpath carries the
 // plugin and its UI; delete a line and the feature leaves the bundle.
@@ -101,13 +101,19 @@ import { SlottedEdgesProvider, createSlottedEdges } from './ui/slotted-edges';
  * The customization surface — identical in the vanilla snippet and every
  * framework wrapper. See README.md for the ladder this implements.
  */
-export interface ViewerCustomization {
+export interface ViewerCustomization<AppState = any> {
   /**
    * Your commands, beside the built-in ones. One with a built-in id changes that one, field by
    * field: what it leaves out stays. A shortcut of yours wins over a built-in one with the same
    * keys.
    */
-  commands?: readonly CommandDef[];
+  commands?: readonly CommandDef<AppState>[];
+  /**
+   * Your app's state, which your commands' functions get as `appState`: values, and functions
+   * that change them. Follows its prop: a new value, and every button asks its command again.
+   * Its type is `any` until you give yours (`ViewerConfig<Review>`), which every command then gets.
+   */
+  appState?: AppState;
   /** Your icons by name: 24×24 path data. One with a built-in icon's name replaces it. */
   icons?: Readonly<Record<string, IconDef>>;
   /**
@@ -283,16 +289,19 @@ function FollowProps({
   locale,
   disable,
   readOnly,
+  appState,
 }: {
   registered: {
     readonly locale: string;
     readonly disabled: DisabledSettings;
     readonly byHand: ByHandSettings;
+    readonly appState: unknown;
   };
   settings: PluginsConfigRead['settings'];
   locale: string;
   disable: ViewerCustomization['disable'];
   readOnly: ViewerCustomization['readOnly'];
+  appState: unknown;
 }) {
   const kernel = useKernel();
   // The kernel starts after the first render, so a prop may have changed before this mounts.
@@ -301,7 +310,11 @@ function FollowProps({
   useLayoutEffect(() => {
     const { disabled, byHand } = turnedOffOf(disable, readOnly, settings);
     const previous = applied.current;
-    applied.current = { locale, disabled, byHand };
+    applied.current = { locale, disabled, byHand, appState };
+    // Your app's state, which the commands read: a new value, and every button asks again.
+    if (!Object.is(previous.appState, appState)) {
+      kernel.capability(CommandsToken).updateSettings({ appState });
+    }
     // What a turned-off feature made stays in the document, frozen: no one changes it by hand.
     if (!sameByHand(previous.byHand.editable, byHand.editable)) {
       kernel.settingsOf(AnnotationToken).updateSettings({ editable: byHand.editable });
@@ -341,6 +354,7 @@ export function FullViewer({
   fetch,
   fallback,
   commands,
+  appState,
   icons,
   strings,
   locale = 'auto',
@@ -404,6 +418,7 @@ export function FullViewer({
       plugins: pluginsRead,
       tokens: tokens as PluginTokens,
       ...turnedOffOf(disable, readOnly, pluginsRead.settings),
+      appState,
     };
   });
 
@@ -553,6 +568,7 @@ export function FullViewer({
     commandsPlugin({
       ...settings.commands,
       commands: [...resolved.viewerCommands.commands, ...(settings.commands?.commands ?? [])],
+      ...(resolved.appState === undefined ? {} : { appState: resolved.appState }),
       ...resolved.disabled,
       ...(notAllowed ? { notAllowed } : {}),
     }),
@@ -582,11 +598,13 @@ export function FullViewer({
               locale: resolved.i18n.initial,
               disabled: resolved.disabled,
               byHand: resolved.byHand,
+              appState: resolved.appState,
             }}
             settings={settings}
             locale={localeCodeOf(locale, resolved.i18n.codes)}
             disable={disable}
             readOnly={readOnly}
+            appState={appState}
           />
           <HandleBridge
             slot={resolved.slot}
