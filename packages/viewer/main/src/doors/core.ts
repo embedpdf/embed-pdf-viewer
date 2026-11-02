@@ -35,7 +35,7 @@ export * from '../kernel';
  * engine you give opens: a URL, a file or bytes, or its own open input
  * (`{ kind: 'token', token }` for the cloud engine).
  */
-export interface ViewerConfig extends ViewerConfigBase<ElementSrc> {
+export interface ViewerConfig<AppState = any> extends ViewerConfigBase<ElementSrc, AppState> {
   engine: Engine | EngineFactory;
 }
 

@@ -113,6 +113,7 @@ const LIVE_PROPS: Readonly<Record<LiveConfigKey, true>> = {
   disable: true,
   readOnly: true,
   fetch: true,
+  appState: true,
 };
 
 /** Every other prop is read once: a changed one is ignored, and development warns once. */
@@ -209,6 +210,7 @@ export function PDFViewer({
     element.disable = config.disable;
     element.readOnly = config.readOnly;
     element.fetch = config.fetch;
+    element.appState = config.appState;
   });
 
   return createElement(

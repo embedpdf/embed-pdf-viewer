@@ -42,7 +42,10 @@ export type DocumentEntry = ViewerDocumentEntry<DocumentSrc>;
  * settings: `baseUrl` (CloudPDF SaaS when left out), the engine's own `token`, and the `fetch` it
  * reaches CloudPDF with. An engine you made yourself, or a function that makes one, goes there too.
  */
-export interface ViewerConfig extends Omit<ViewerConfigBase<DocumentSrc>, 'scope' | 'fetch'> {
+export interface ViewerConfig<AppState = any> extends Omit<
+  ViewerConfigBase<DocumentSrc, AppState>,
+  'scope' | 'fetch'
+> {
   engine?: CloudEngineOptions | Engine | EngineFactory;
 }
 

@@ -34,7 +34,10 @@ export interface DocumentEntry<Src = DocumentSrc> {
 /** Everything a delivery needs except the engine seam — the part every door
  *  agrees on. Doors extend this and add their own `engine` field, and a door
  *  whose engine opens other documents names them as its `Src`. */
-export interface ViewerConfigBase<Src = DocumentSrc> extends ViewerCustomization {
+export interface ViewerConfigBase<
+  Src = DocumentSrc,
+  AppState = any,
+> extends ViewerCustomization<AppState> {
   /** One document: a URL, a `File`, or bytes. Follows its prop: another one
    *  opens in its place, and `null` closes it. */
   src?: Src | null;
@@ -74,7 +77,14 @@ export interface ElementConfig extends ViewerConfigBase<ElementSrc> {
 }
 
 /** The config keys a running viewer follows; a change to any other key mounts a new viewer. */
-export type LiveConfigKey = 'src' | 'theme' | 'locale' | 'disable' | 'readOnly' | 'fetch';
+export type LiveConfigKey =
+  | 'src'
+  | 'theme'
+  | 'locale'
+  | 'disable'
+  | 'readOnly'
+  | 'fetch'
+  | 'appState';
 
 const LIVE_CONFIG_KEYS: ReadonlySet<string> = new Set<LiveConfigKey>([
   'src',
@@ -83,6 +93,7 @@ const LIVE_CONFIG_KEYS: ReadonlySet<string> = new Set<LiveConfigKey>([
   'disable',
   'readOnly',
   'fetch',
+  'appState',
 ]);
 
 export const isLiveConfigKey = (key: string): key is LiveConfigKey => LIVE_CONFIG_KEYS.has(key);

@@ -32,6 +32,7 @@ import {
   mergeCommand,
   resolveViewerCommands,
   toPluginCommand,
+  type CommandDef as ViewerCommandDef,
   type CommandScope,
 } from '../../../chrome/src/config/viewer-commands';
 import type { PluginTokens, Viewer } from '../../../chrome/src/handle';
@@ -48,12 +49,13 @@ const StageToken = createCapabilityToken<{ zoomIn(): void }>('stage');
 const stage = { zoomIn: vi.fn() };
 const PLUGINS: PluginTokens = { stage: StageToken as CapabilityToken<unknown> };
 
-/** A command context over one capability, for the document `doc`. */
-function pluginContext(args?: unknown): PluginCommandContext {
+/** A command context over one capability, for the document `doc`, with the app's state. */
+function pluginContext(args?: unknown, appState?: unknown): PluginCommandContext {
   const tryGet = <T>(token: CapabilityToken<T>): T | null =>
     token === (StageToken as CapabilityToken<unknown>) ? (stage as T) : null;
   return {
     documentId: 'doc',
+    appState,
     ...(args === undefined ? {} : { args }),
     tryGet,
     get: <T>(token: CapabilityToken<T>): T => {
@@ -91,6 +93,27 @@ describe('a command of yours', () => {
     command.run?.(pluginContext({ page: 2 }));
     expect(stage.zoomIn).toHaveBeenCalledTimes(1);
     expect(heard).toEqual([{ viewer: true, documentId: 'doc', args: { page: 2 }, token: stage }]);
+  });
+
+  it("gets your app's state, typed by the command, and runs what it gives", () => {
+    interface Review {
+      done: string[];
+      approve(): void;
+    }
+    const approve = vi.fn();
+    // A command typed for your state goes where any command does.
+    const typed: ViewerCommandDef<Review> = {
+      id: 'acme:approve',
+      enabled: ({ appState }) => appState.done.length === 4,
+      run: ({ appState }) => appState.approve(),
+    };
+    const anyCommand: ViewerCommandDef = typed;
+    const command = toPluginCommand(anyCommand, scope);
+    expect(command.enabled?.(pluginContext(undefined, { done: [], approve }))).toBe(false);
+    const review: Review = { done: ['a', 'b', 'c', 'd'], approve };
+    expect(command.enabled?.(pluginContext(undefined, review))).toBe(true);
+    command.run?.(pluginContext(undefined, review));
+    expect(approve).toHaveBeenCalledTimes(1);
   });
 
   it('throws for a plugin name the viewer has, naming the ones it has, and before the viewer is live', () => {
