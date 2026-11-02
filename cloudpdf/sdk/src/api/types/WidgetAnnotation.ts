@@ -8,6 +8,7 @@ export interface WidgetAnnotation {
     page: CloudPDF.PageRef;
     hasAppearance: boolean;
     appearanceState: string | null;
+    structurePosition: number[] | null;
     nm: string | null;
     rect: WidgetAnnotation.Rect;
     contents: string | null;

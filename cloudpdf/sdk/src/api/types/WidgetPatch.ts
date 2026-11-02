@@ -8,6 +8,7 @@ export interface WidgetPatch {
     page?: unknown | undefined;
     hasAppearance?: unknown | undefined;
     appearanceState?: unknown | undefined;
+    structurePosition?: unknown | undefined;
     nm?: (string | null) | undefined;
     rect?: WidgetPatch.Rect | undefined;
     contents?: (string | null) | undefined;

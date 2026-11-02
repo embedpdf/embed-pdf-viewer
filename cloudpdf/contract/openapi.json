@@ -10298,6 +10298,14 @@
                 "type": "string",
                 "nullable": true
               },
+              "structurePosition": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "nullable": true
+              },
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -10500,6 +10508,7 @@
               "page",
               "hasAppearance",
               "appearanceState",
+              "structurePosition",
               "nm",
               "rect",
               "contents",
@@ -10552,6 +10561,14 @@
                 "type": "string",
                 "nullable": true
               },
+              "structurePosition": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/structurePosition"
+                  }
+                ],
+                "nullable": true
+              },
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -10684,6 +10701,7 @@
               "page",
               "hasAppearance",
               "appearanceState",
+              "structurePosition",
               "nm",
               "rect",
               "contents",
@@ -10736,6 +10754,14 @@
                 "type": "string",
                 "nullable": true
               },
+              "structurePosition": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/structurePosition"
+                  }
+                ],
+                "nullable": true
+              },
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -10868,6 +10894,7 @@
               "page",
               "hasAppearance",
               "appearanceState",
+              "structurePosition",
               "nm",
               "rect",
               "contents",
@@ -10918,6 +10945,14 @@
               },
               "appearanceState": {
                 "type": "string",
+                "nullable": true
+              },
+              "structurePosition": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/structurePosition"
+                  }
+                ],
                 "nullable": true
               },
               "nm": {
@@ -11057,6 +11092,7 @@
               "page",
               "hasAppearance",
               "appearanceState",
+              "structurePosition",
               "nm",
               "rect",
               "contents",
@@ -11108,6 +11144,14 @@
               },
               "appearanceState": {
                 "type": "string",
+                "nullable": true
+              },
+              "structurePosition": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/structurePosition"
+                  }
+                ],
                 "nullable": true
               },
               "nm": {
@@ -11276,6 +11320,7 @@
               "page",
               "hasAppearance",
               "appearanceState",
+              "structurePosition",
               "nm",
               "rect",
               "contents",
@@ -11332,6 +11377,14 @@
               },
               "appearanceState": {
                 "type": "string",
+                "nullable": true
+              },
+              "structurePosition": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/structurePosition"
+                  }
+                ],
                 "nullable": true
               },
               "nm": {
@@ -11500,6 +11553,7 @@
               "page",
               "hasAppearance",
               "appearanceState",
+              "structurePosition",
               "nm",
               "rect",
               "contents",
@@ -11556,6 +11610,14 @@
               },
               "appearanceState": {
                 "type": "string",
+                "nullable": true
+              },
+              "structurePosition": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/structurePosition"
+                  }
+                ],
                 "nullable": true
               },
               "nm": {
@@ -11871,6 +11933,7 @@
               "page",
               "hasAppearance",
               "appearanceState",
+              "structurePosition",
               "nm",
               "rect",
               "contents",
@@ -11931,6 +11994,14 @@
               },
               "appearanceState": {
                 "type": "string",
+                "nullable": true
+              },
+              "structurePosition": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/structurePosition"
+                  }
+                ],
                 "nullable": true
               },
               "nm": {
@@ -12144,6 +12215,7 @@
               "page",
               "hasAppearance",
               "appearanceState",
+              "structurePosition",
               "nm",
               "rect",
               "contents",
@@ -12204,6 +12276,14 @@
               },
               "appearanceState": {
                 "type": "string",
+                "nullable": true
+              },
+              "structurePosition": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/structurePosition"
+                  }
+                ],
                 "nullable": true
               },
               "nm": {
@@ -12429,6 +12509,7 @@
               "page",
               "hasAppearance",
               "appearanceState",
+              "structurePosition",
               "nm",
               "rect",
               "contents",
@@ -12491,6 +12572,14 @@
               },
               "appearanceState": {
                 "type": "string",
+                "nullable": true
+              },
+              "structurePosition": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/structurePosition"
+                  }
+                ],
                 "nullable": true
               },
               "nm": {
@@ -12624,6 +12713,7 @@
               "page",
               "hasAppearance",
               "appearanceState",
+              "structurePosition",
               "nm",
               "rect",
               "contents",
@@ -12672,6 +12762,14 @@
               },
               "appearanceState": {
                 "type": "string",
+                "nullable": true
+              },
+              "structurePosition": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/structurePosition"
+                  }
+                ],
                 "nullable": true
               },
               "nm": {
@@ -12836,6 +12934,7 @@
               "page",
               "hasAppearance",
               "appearanceState",
+              "structurePosition",
               "nm",
               "rect",
               "contents",
@@ -12891,6 +12990,14 @@
               },
               "appearanceState": {
                 "type": "string",
+                "nullable": true
+              },
+              "structurePosition": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/structurePosition"
+                  }
+                ],
                 "nullable": true
               },
               "nm": {
@@ -13304,6 +13411,7 @@
               "page",
               "hasAppearance",
               "appearanceState",
+              "structurePosition",
               "nm",
               "rect",
               "contents",
@@ -13369,6 +13477,14 @@
               },
               "appearanceState": {
                 "type": "string",
+                "nullable": true
+              },
+              "structurePosition": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/structurePosition"
+                  }
+                ],
                 "nullable": true
               },
               "nm": {
@@ -13512,6 +13628,7 @@
               "page",
               "hasAppearance",
               "appearanceState",
+              "structurePosition",
               "nm",
               "rect",
               "contents",
@@ -13564,6 +13681,14 @@
               },
               "appearanceState": {
                 "type": "string",
+                "nullable": true
+              },
+              "structurePosition": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/structurePosition"
+                  }
+                ],
                 "nullable": true
               },
               "nm": {
@@ -13712,6 +13837,7 @@
               "page",
               "hasAppearance",
               "appearanceState",
+              "structurePosition",
               "nm",
               "rect",
               "contents",
@@ -13765,6 +13891,14 @@
               },
               "appearanceState": {
                 "type": "string",
+                "nullable": true
+              },
+              "structurePosition": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/structurePosition"
+                  }
+                ],
                 "nullable": true
               },
               "nm": {
@@ -13911,6 +14045,7 @@
               "page",
               "hasAppearance",
               "appearanceState",
+              "structurePosition",
               "nm",
               "rect",
               "contents",
@@ -13963,6 +14098,14 @@
               },
               "appearanceState": {
                 "type": "string",
+                "nullable": true
+              },
+              "structurePosition": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/structurePosition"
+                  }
+                ],
                 "nullable": true
               },
               "nm": {
@@ -14106,6 +14249,7 @@
               "page",
               "hasAppearance",
               "appearanceState",
+              "structurePosition",
               "nm",
               "rect",
               "contents",
@@ -14160,6 +14304,14 @@
               },
               "appearanceState": {
                 "type": "string",
+                "nullable": true
+              },
+              "structurePosition": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/structurePosition"
+                  }
+                ],
                 "nullable": true
               },
               "nm": {
@@ -14326,6 +14478,7 @@
               "page",
               "hasAppearance",
               "appearanceState",
+              "structurePosition",
               "nm",
               "rect",
               "contents",
@@ -14383,6 +14536,14 @@
               },
               "appearanceState": {
                 "type": "string",
+                "nullable": true
+              },
+              "structurePosition": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/structurePosition"
+                  }
+                ],
                 "nullable": true
               },
               "nm": {
@@ -14519,6 +14680,7 @@
               "page",
               "hasAppearance",
               "appearanceState",
+              "structurePosition",
               "nm",
               "rect",
               "contents",
@@ -14568,6 +14730,14 @@
               },
               "appearanceState": {
                 "type": "string",
+                "nullable": true
+              },
+              "structurePosition": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/structurePosition"
+                  }
+                ],
                 "nullable": true
               },
               "nm": {
@@ -14700,6 +14870,7 @@
               "page",
               "hasAppearance",
               "appearanceState",
+              "structurePosition",
               "nm",
               "rect",
               "contents",
@@ -14787,6 +14958,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -14957,6 +15129,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -15054,6 +15227,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -15151,6 +15325,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -15253,6 +15428,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -15384,6 +15560,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -15515,6 +15692,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -15800,6 +15978,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -15977,6 +16156,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -16165,6 +16345,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -16261,6 +16442,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -16391,6 +16573,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -16754,6 +16937,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -16860,6 +17044,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -16971,6 +17156,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -17080,6 +17266,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -17198,6 +17385,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -17385,6 +17573,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -17513,6 +17702,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -17611,6 +17801,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -17780,6 +17971,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -17876,6 +18068,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -17972,6 +18165,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -18073,6 +18267,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -18211,6 +18406,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -18348,6 +18544,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -18649,6 +18846,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -18842,6 +19040,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -19036,6 +19235,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -19143,6 +19343,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -19300,6 +19501,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -19677,6 +19879,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -19782,6 +19985,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -19892,6 +20096,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -20000,6 +20205,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -20120,6 +20326,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -20248,6 +20455,7 @@
               "page": {},
               "hasAppearance": {},
               "appearanceState": {},
+              "structurePosition": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -22168,6 +22376,14 @@
             "type": "string",
             "nullable": true
           },
+          "structurePosition": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "nullable": true
+          },
           "nm": {
             "type": "string",
             "nullable": true
@@ -22433,6 +22649,7 @@
           "page",
           "hasAppearance",
           "appearanceState",
+          "structurePosition",
           "nm",
           "rect",
           "contents",
@@ -22488,6 +22705,7 @@
           "page": {},
           "hasAppearance": {},
           "appearanceState": {},
+          "structurePosition": {},
           "nm": {
             "type": "string",
             "nullable": true
