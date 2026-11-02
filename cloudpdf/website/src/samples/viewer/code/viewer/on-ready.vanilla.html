@@ -21,13 +21,12 @@
     const { viewer } = element;
     print.disabled = false;
     print.onclick = () => viewer.commands.execute('document:print');
-    // The pages are the document's: follow the current one once it has opened.
-    viewer.documents.onOpened(() => {
-      const stage = viewer.get('stage');
-      const show = (index) => (page.textContent = `Page ${index + 1}`);
-      show(stage.getCurrentPageIndex());
-      viewer.watch(() => stage.getCurrentPageIndex(), show);
-    });
+    // The pages are the document's: `watch` waits for it to open, then follows the current page.
+    viewer.watch(
+      () => viewer.get('stage').getCurrentPageIndex(),
+      (index) => (page.textContent = `Page ${index + 1}`),
+      { immediate: true },
+    );
   });
   element.config = { src: article };
 </script>

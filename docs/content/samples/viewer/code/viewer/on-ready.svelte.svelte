@@ -12,15 +12,12 @@
 
   function onready(ready: Viewer) {
     viewer = ready;
-    // The pages are the document's: follow the current one once it has opened.
-    ready.documents.onOpened(() => {
-      const stage = ready.get('stage');
-      page = stage.getCurrentPageIndex() + 1;
-      ready.watch(
-        () => stage.getCurrentPageIndex(),
-        (index) => (page = index + 1),
-      );
-    });
+    // The pages are the document's: `watch` waits for it to open, then follows the current page.
+    ready.watch(
+      () => ready.get('stage').getCurrentPageIndex(),
+      (index) => (page = index + 1),
+      { immediate: true },
+    );
   }
 </script>
 

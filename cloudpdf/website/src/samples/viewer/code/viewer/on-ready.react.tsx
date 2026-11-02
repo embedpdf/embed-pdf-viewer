@@ -11,15 +11,12 @@ export default function App() {
 
   function onReady(viewer: Viewer) {
     setViewer(viewer);
-    // The pages are the document's: follow the current one once it has opened.
-    viewer.documents.onOpened(() => {
-      const stage = viewer.get('stage');
-      setPage(stage.getCurrentPageIndex() + 1);
-      viewer.watch(
-        () => stage.getCurrentPageIndex(),
-        (index) => setPage(index + 1),
-      );
-    });
+    // The pages are the document's: `watch` waits for it to open, then follows the current page.
+    viewer.watch(
+      () => viewer.get('stage').getCurrentPageIndex(),
+      (index) => setPage(index + 1),
+      { immediate: true },
+    );
   }
 
   return (

@@ -9,34 +9,6 @@
     <p class="kiosk-progress" id="progress" hidden></p>
   </header>
 
-  <!-- The kiosk's commands, drawn big enough for a finger. -->
-  <div slot="item:kiosk-actions" class="kiosk-actions">
-    <button type="button" class="kiosk-button" id="next">
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M5 12l14 0" />
-        <path d="M13 18l6 -6" />
-        <path d="M13 6l6 6" />
-      </svg>
-      Next field
-    </button>
-    <button type="button" class="kiosk-button" id="clear">
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path
-          d="M19 20h-10.5l-4.21 -4.3a1 1 0 0 1 0 -1.41l10 -10a1 1 0 0 1 1.41 0l5 5a1 1 0 0 1 0 1.41l-9.2 9.3"
-        />
-        <path d="M18 13.3l-6.3 -6.3" />
-      </svg>
-      Clear
-    </button>
-    <button type="button" class="kiosk-button primary" id="done">
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" />
-        <path d="M9 12l2 2l4 -4" />
-      </svg>
-      Done
-    </button>
-  </div>
-
   <div slot="panel:kiosk-check">
     <div class="kiosk-check" id="thanks" hidden>
       <h2>Thank you!</h2>
@@ -58,57 +30,32 @@
   const element = document.getElementById('viewer');
   const line = document.getElementById('line');
   const progress = document.getElementById('progress');
-  const buttons = [
-    { id: 'kiosk:next', button: document.getElementById('next') },
-    { id: 'kiosk:clear', button: document.getElementById('clear') },
-    { id: 'kiosk:done', button: document.getElementById('done') },
-  ];
 
   /** People fill in the form, and nothing else changes it. */
   const FILLING_ONLY = { except: ['forms.filling'] };
 
-  /** The kinds of field people answer: not buttons or signatures. */
-  const ANSWERABLE = new Set(['text', 'checkbox', 'radio', 'combobox', 'listbox']);
-
-  let last = null; // the field Next field went to
-  let sent = false; // whether the form is done: it's locked until Clear
-
-  /** A field's question: its name, and what the form calls it. */
-  const questionOf = (field) => ({ name: field.name, label: field.alternateName ?? field.name });
+  /** What the form calls a question: its tooltip, else its field's name. */
+  const labelOf = (field) => field.alternateName ?? field.name;
 
   /** Whether a value from `exportValues()` is an answer: text, a choice, a ticked box. */
   const isAnswer = (value) => (Array.isArray(value) ? value.length > 0 : Boolean(value));
 
-  /** The first field after `after` with no answer yet, in the form's order, then from the top. */
-  function nextEmpty(form, after) {
-    const values = form.exportValues();
-    const fields = form.list().filter((field) => ANSWERABLE.has(field.family) && !field.readOnly);
-    const start = fields.findIndex((field) => field.name === after) + 1;
-    return [...fields.slice(start), ...fields.slice(0, start)].find(
-      (field) => !isAnswer(values[field.name]),
-    );
-  }
+  // What the commands read from the app: whether the form is done (it's locked until Clear), and
+  // how to change that and the header's line.
+  let kiosk = {
+    sent: false,
+    setSent: (sent) => update({ sent }),
+    say: (text) => (line.textContent = text),
+  };
 
-  /** Scroll to a field, so it sits a third of the way down. */
-  function reveal(viewer, name) {
-    const form = viewer.get('form');
-    const box = form.list({ name })[0]?.widgets[0];
-    const widget = box ? form.getWidget(box) : null;
-    if (widget) {
-      viewer.get('stage').reveal(widget.page, {
-        rect: widget.rect,
-        anchor: { y: 0.3 },
-        behavior: 'smooth',
-      });
-    }
-  }
-
-  /** Lock the form once it's complete and handed in; unlock it for the next person. */
-  function send(done) {
-    sent = done;
-    element.readOnly = done ? true : FILLING_ONLY;
-    document.getElementById('thanks').hidden = !done;
-    document.getElementById('missing').hidden = done;
+  // Each change is a new value: the viewer's buttons ask their commands again. Done locks the
+  // form and says thank you; Clear unlocks it for the next person.
+  function update(changes) {
+    kiosk = { ...kiosk, ...changes };
+    element.appState = kiosk;
+    element.readOnly = kiosk.sent ? true : FILLING_ONLY;
+    document.getElementById('thanks').hidden = !kiosk.sent;
+    document.getElementById('missing').hidden = kiosk.sent;
   }
 
   /** The header's count, and the check's list: the required questions still empty. */
@@ -119,10 +66,10 @@
     progress.textContent = `${required - missing.length} of ${required} required`;
     progress.classList.toggle('complete', missing.length === 0);
     document.getElementById('questions').replaceChildren(
-      ...missing.map(questionOf).map((question) => {
+      ...missing.map((question) => {
         const button = document.createElement('button');
         button.type = 'button';
-        button.textContent = question.label;
+        button.textContent = labelOf(question);
         button.onclick = () => pick(question);
         const item = document.createElement('li');
         item.append(button);
@@ -131,16 +78,17 @@
     );
   }
 
-  /** Close the check, and go to a question it lists. */
-  function pick({ name, label }) {
+  /** Close the check, and put the cursor in a question it lists. */
+  function pick(question) {
     element.viewer.get('shell').close('kiosk-check');
-    reveal(element.viewer, name);
-    line.textContent = `Next: ${label}`;
+    element.viewer.get('form').focus(question.ref);
   }
 
-  // The front desk's viewer: the form, a header and three big buttons, nothing else.
+  // The front desk's viewer: the form, a header and three buttons, nothing else. The commands read
+  // the app from `appState`.
   document.getElementById('viewer').config = {
     src: forms,
+    appState: kiosk,
     readOnly: FILLING_ONLY,
     theme: {
       preference: 'light',
@@ -158,6 +106,10 @@
         font: "ui-rounded, 'SF Pro Rounded', 'Segoe UI', system-ui, sans-serif",
       },
     },
+    // Every button and menu row a finger's size, even with a mouse plugged in.
+    touch: true,
+    // A kiosk fills in forms all day and never keeps them: leaving the page asks nothing.
+    warnBeforeLeaving: false,
     // No opening, saving or printing files, no search, and no selecting text: a long press is
     // only ever a tap on the form.
     disable: ['documents', 'search', 'text'],
@@ -178,19 +130,13 @@
         id: 'kiosk:next',
         label: 'Next field',
         icon: 'next',
-        run: ({ viewer }) => {
-          if (sent) {
-            line.textContent = 'This form is done. Tap Clear for the next person.';
-            return;
+        // The header names the field once the cursor is in it.
+        run: ({ appState, viewer }) => {
+          if (appState.sent) {
+            appState.say('This form is done. Tap Clear for the next person.');
+          } else if (!viewer.get('form').focusNext({ empty: true, wrap: true })) {
+            appState.say('Every question has an answer. Tap Done.');
           }
-          const field = nextEmpty(viewer.get('form'), last);
-          if (!field) {
-            line.textContent = 'Every question has an answer. Tap Done.';
-            return;
-          }
-          last = field.name;
-          reveal(viewer, field.name);
-          line.textContent = `Next: ${questionOf(field).label}`;
         },
       },
       {
@@ -198,30 +144,39 @@
         label: 'Clear',
         icon: 'clear',
         enabled: ({ get }) => Object.values(get('form').exportValues()).some(isAnswer),
-        run: async ({ viewer }) => {
-          send(false);
+        run: async ({ appState, viewer }) => {
+          appState.setSent(false);
           await viewer.get('form').reset();
           viewer.get('stage').goToPage(0);
-          last = null;
-          line.textContent = 'Cleared, ready for the next person.';
+          appState.say('Cleared, ready for the next person.');
         },
       },
       {
         id: 'kiosk:done',
         label: 'Done',
         icon: 'done',
-        run: ({ viewer }) => {
+        run: ({ appState, viewer }) => {
           const { valid } = viewer.get('form').validate();
-          send(valid);
-          line.textContent = valid ? 'All done. Thank you!' : 'A few answers are still missing.';
+          appState.setSent(valid);
+          appState.say(valid ? 'All done. Thank you!' : 'A few answers are still missing.');
           viewer.get('shell').open('kiosk-check');
         },
       },
     ],
-    // A layout of its own: one bar at the bottom for the buttons, and the check as a sheet.
+    // A layout of its own: one bar at the bottom with the three buttons and their labels, Done
+    // filled in, and the check as a sheet.
     layout: {
       bars: {
-        kiosk: { place: 'bottom', center: [[{ custom: 'kiosk-actions' }]] },
+        kiosk: {
+          place: 'bottom',
+          center: [
+            [
+              { command: 'kiosk:next', variants: ['icon+label', 'icon'] },
+              { command: 'kiosk:clear', variants: ['icon+label', 'icon'] },
+              { command: 'kiosk:done', emphasis: 'primary', variants: ['icon+label', 'icon'] },
+            ],
+          ],
+        },
       },
       panels: {
         'kiosk-check': { title: 'Your application', present: 'sheet', resizable: false },
@@ -231,23 +186,19 @@
 
   element.addEventListener('epdf:ready', () => {
     const { viewer } = element;
-    // Each button runs its command, and is greyed out while the command can't run.
-    for (const { id, button } of buttons) {
-      button.onclick = () => viewer.commands.execute(id);
-      button.disabled = !viewer.commands.canExecute(id);
-      viewer.watch(
-        () => viewer.commands.canExecute(id),
-        (can) => (button.disabled = !can),
-      );
-    }
-    // Follow the form as people fill it in, for the header and the check.
-    viewer.documents.onOpened(({ documentId }) => {
-      const form = viewer.forDocument(documentId).get('form');
-      show(form);
-      viewer.watch(
-        () => form.list(),
-        () => show(form),
-      );
+    // The form is the document's: `watch` waits for it to open, then follows it as people fill
+    // it in, for the header's count and the check.
+    viewer.watch(
+      () => viewer.get('form').list(),
+      () => show(viewer.get('form')),
+      { immediate: true },
+    );
+    // The header's line names the question the cursor is in, whether Next field or a tap put it
+    // there.
+    viewer.documents.onOpened(() => {
+      viewer.get('form').onFocusChanged(({ field }) => {
+        if (field) line.textContent = `Answering: ${labelOf(field)}`;
+      });
     });
   });
 </script>

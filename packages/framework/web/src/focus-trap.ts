@@ -3,8 +3,10 @@
  * focus when the trap starts, unless focus is inside already (the control you
  * name, else its first one that Tab stops at, else the container itself); Tab
  * and Shift+Tab go round its controls without leaving it; focus that lands
- * outside comes back; and when the trap is released, focus returns to where it
- * was before. Traps nest: only the one started last acts, until it's released.
+ * outside comes back, unless the trap is released by then; and when the trap
+ * is released, focus returns to where it was before, unless it's somewhere
+ * else already. Traps nest: only the one started last acts, until it's
+ * released.
  */
 import { containsFocus, deepActiveElementOf, tabbablesIn } from './focusable';
 
@@ -51,6 +53,7 @@ export function attachFocusTrap(
   const isInnermost = () => activeTraps[activeTraps.length - 1] === container;
   /** The control that had focus last inside the trap, to go back to. */
   let last: HTMLElement | null = null;
+  let released = false;
 
   const focusInside = (edge: 'first' | 'last') => {
     const tabbables = tabbablesIn(container);
@@ -79,7 +82,8 @@ export function attachFocusTrap(
   };
 
   // Where focus lands is read from the composed path: at the document, focus inside a shadow
-  // root targets its host.
+  // root targets its host. Focus outside comes back a moment later, unless the trap is gone by
+  // then: code that closes a sheet and puts the cursor in a field in one click keeps it there.
   const onFocusIn = (event: FocusEvent) => {
     if (!isInnermost()) return;
     const path = event.composedPath();
@@ -87,8 +91,11 @@ export function attachFocusTrap(
       last = path[0] as HTMLElement;
       return;
     }
-    if (last?.isConnected && container.contains(last)) last.focus();
-    else focusInside('first');
+    queueMicrotask(() => {
+      if (released || !isInnermost() || containsFocus(container)) return;
+      if (last?.isConnected && container.contains(last)) last.focus();
+      else focusInside('first');
+    });
   };
 
   activeTraps.push(container);
@@ -99,10 +106,14 @@ export function attachFocusTrap(
   if (last === null && containsFocus(container)) last = deepActiveElementOf(doc) as HTMLElement;
 
   return () => {
+    released = true;
     const index = activeTraps.lastIndexOf(container);
     if (index >= 0) activeTraps.splice(index, 1);
     container.removeEventListener('keydown', onKeyDown);
     doc.removeEventListener('focusin', onFocusIn, true);
-    if (options.returnFocus !== false && before?.isConnected) before.focus();
+    if (options.returnFocus === false || !before?.isConnected) return;
+    // Back where it was, from inside or from nowhere; focus your code moved on stays.
+    const active = deepActiveElementOf(doc); // null on the body
+    if (active === null || containsFocus(container)) before.focus();
   };
 }

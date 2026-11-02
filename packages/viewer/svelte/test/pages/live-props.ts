@@ -1,5 +1,5 @@
 /**
- * The live props: `src`, `theme`, `locale`, `disable` and `readOnly` change on a running viewer
+ * The live props: `src`, `theme`, `locale`, `disable`, `readOnly` and `appState` change on a running viewer
  * without mounting a new one, a callback prop calls its latest function, and a changed prop of any
  * other key is ignored with one warning in development (`LiveProps.svelte`).
  * `live-props.test.ts` drives it.
@@ -18,6 +18,7 @@ export interface LiveConfig {
   locale: string;
   disable: string[];
   readOnly: boolean;
+  appState: { approved: boolean };
 }
 
 export interface LivePropsRecord {

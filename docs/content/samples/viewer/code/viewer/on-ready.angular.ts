@@ -34,14 +34,11 @@ export class App {
 
   onReady(viewer: Viewer) {
     this.viewer.set(viewer);
-    // The pages are the document's: follow the current one once it has opened.
-    viewer.documents.onOpened(() => {
-      const stage = viewer.get('stage');
-      this.page.set(stage.getCurrentPageIndex() + 1);
-      viewer.watch(
-        () => stage.getCurrentPageIndex(),
-        (index) => this.page.set(index + 1),
-      );
-    });
+    // The pages are the document's: `watch` waits for it to open, then follows the current page.
+    viewer.watch(
+      () => viewer.get('stage').getCurrentPageIndex(),
+      (index) => this.page.set(index + 1),
+      { immediate: true },
+    );
   }
 }

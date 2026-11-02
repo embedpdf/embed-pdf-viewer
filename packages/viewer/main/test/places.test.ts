@@ -106,6 +106,12 @@ const PAGES = {
   '/hide-wide.html': page(`{
     layout: (layout) => layout.place('pager', { float: 'bottom', hideWhileScrolling: true }),
   }`),
+  '/hide-clicked.html': page(`{
+    layout: (layout) =>
+      layout
+        .place('pager', { float: 'bottom', hideWhileScrolling: true })
+        .add('zoom:in', { to: 'pager' }),
+  }`),
   '/keep-phone.html': page(
     `{ layout: (layout) => layout.place('pager', { float: 'bottom', hideWhileScrolling: false }) }`,
     PHONE,
@@ -410,6 +416,29 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('where the bars go', () 
     await scroll(phone, PHONE);
     expect(await pagerHidden(phone)).toBe(false);
     await phone.close();
+  });
+
+  it('hides it after a click on one of its buttons, and keeps it while its field is typed in', async () => {
+    const tab = await open('/hide-clicked.html');
+    // The button keeps focus after the click: that doesn't hold the bar.
+    await tab.locator('embedpdf-viewer [data-bar="pager"] [aria-label="Zoom In"]:visible').click();
+    await tab.waitForTimeout(400);
+    await scroll(tab, WIDTH);
+    expect(await pagerHidden(tab)).toBe(true);
+    await tab.waitForTimeout(1200);
+    expect(await pagerHidden(tab)).toBe(false);
+    // The page number's field, being typed in, does.
+    await tab
+      .locator('embedpdf-viewer [data-bar="pager"] [data-epdf-toolbar-item] button')
+      .first()
+      .click();
+    await tab.waitForFunction(
+      () =>
+        document.querySelector('embedpdf-viewer')!.shadowRoot!.activeElement?.tagName === 'INPUT',
+    );
+    await scroll(tab, WIDTH);
+    expect(await pagerHidden(tab)).toBe(false);
+    await tab.close();
   });
 
   it('shows the page number in the pager over the pages, and goes to the page typed into it', async () => {

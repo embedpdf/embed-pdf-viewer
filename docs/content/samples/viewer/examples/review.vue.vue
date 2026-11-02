@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import {
   Panel,
   PDFViewer,
@@ -16,6 +16,13 @@ const proposal = '/pdfs/proposal.pdf';
 
 type Status = 'review' | 'approved' | 'changes';
 
+// What the commands read from the app: the ticked checks, the status and how to set it.
+interface Review {
+  done: string[];
+  status: Status;
+  setStatus(status: Status): void;
+}
+
 const STATUS: Record<Status, string> = {
   review: 'In review',
   approved: 'Approved',
@@ -30,8 +37,9 @@ const CHECKS = [
   'Every review note has an answer',
 ];
 
-// The review's look, words, tools and layout.
-const design: ViewerConfig = {
+// The review's look, words, tools, verdict and layout. The commands read the app from
+// `appState`, so they never hold an old value.
+const config: ViewerConfig<Review> = {
   theme: {
     preference: 'light',
     accent: '#4f46e5',
@@ -71,7 +79,8 @@ const design: ViewerConfig = {
   // The words of a review.
   strings: {
     en: {
-      'acme.reviewNotes': 'Review notes',
+      // The comments panel's button and its header.
+      'panel:comments': 'Review notes',
       'tool:note': 'Review note',
       'annotation:comment': 'Review note',
       'tool:strikeout': 'Suggest a deletion',
@@ -102,16 +111,32 @@ const design: ViewerConfig = {
       ],
     },
   },
+  commands: [
+    {
+      id: 'acme:approve',
+      label: 'Approve',
+      icon: 'approve',
+      shortcut: 'Mod+Enter',
+      // Greyed out until every check is ticked, and pressed once approved.
+      enabled: ({ appState }) => appState.done.length === CHECKS.length,
+      active: ({ appState }) => appState.status === 'approved',
+      run: ({ appState }) => appState.setStatus('approved'),
+    },
+    {
+      id: 'acme:request-changes',
+      label: 'Request changes',
+      icon: 'requestChanges',
+      // The status, then the note tool, to say what should change.
+      run: ({ appState, viewer }) => {
+        appState.setStatus('changes');
+        void viewer.commands.execute('tool:note');
+      },
+    },
+  ],
   layout: (layout, env) =>
     layout
-      // Your own bars take the place of the toolbar and the mode bars along it.
+      // Your own bars take the place of the toolbar, and the mode bars along it go with it.
       .removeBar('main')
-      .removeBar('annotate')
-      .removeBar('shapes')
-      .removeBar('insert')
-      .removeBar('form')
-      .removeBar('redact')
-      .removeBar('measure')
       // The review bar: the document and its status, then the verdict.
       .addBar('review', {
         place: 'top',
@@ -125,8 +150,13 @@ const design: ViewerConfig = {
           ['panel:comments'],
           {
             items: [
-              { command: 'acme:request-changes', variants: ['icon+label', 'icon'] },
-              { command: 'acme:approve', variants: ['icon+label', 'icon'] },
+              // Short of room, Request changes gives up its label first: Approve keeps its own.
+              {
+                command: 'acme:request-changes',
+                variants: ['icon+label', 'icon'],
+                importance: 4,
+              },
+              { command: 'acme:approve', emphasis: 'primary', variants: ['icon+label', 'icon'] },
             ],
             importance: 5,
           },
@@ -150,46 +180,24 @@ const design: ViewerConfig = {
       .panel('search', { side: 'start' })
       .panel('style', { side: 'start' })
       .panels({ present: { medium: 'dock' } })
-      .panel('comments', { titleKey: 'acme.reviewNotes', width: 340 }),
+      // The review notes are open from the start, and stay open where they dock.
+      .panel('comments', { open: true, closable: false, width: 340 }),
 };
 
 const status = ref<Status>('review');
 const title = ref('');
 const author = ref('');
 const done = ref<string[]>([]);
-
-const config: ViewerConfig = {
-  ...design,
-  commands: [
-    {
-      id: 'acme:approve',
-      label: 'Approve',
-      icon: 'approve',
-      shortcut: 'Mod+Enter',
-      run: () => {
-        status.value = 'approved';
-      },
-    },
-    {
-      id: 'acme:request-changes',
-      label: 'Request changes',
-      icon: 'requestChanges',
-      // The status, then the note tool, to say what should change.
-      run: ({ viewer }) => {
-        status.value = 'changes';
-        void viewer.commands.execute('tool:note');
-      },
-    },
-  ],
-};
+const appState = computed<Review>(() => ({
+  done: done.value,
+  status: status.value,
+  setStatus: (value) => (status.value = value),
+}));
 
 function onReady(viewer: Viewer) {
   viewer.documents.onOpened(async ({ documentId }) => {
-    const opened = viewer.forDocument(documentId);
-    // The review notes are open from the start.
-    opened.get('shell').open('comments');
     // The title and the author come from the PDF itself.
-    const metadata = opened.get('metadata');
+    const metadata = viewer.forDocument(documentId).get('metadata');
     await metadata.ensureLoaded();
     const fields = metadata.getSnapshot();
     title.value = fields?.title ?? 'Untitled';
@@ -199,7 +207,13 @@ function onReady(viewer: Viewer) {
 </script>
 
 <template>
-  <PDFViewer :src="proposal" v-bind="config" style="height: 100%" @ready="onReady">
+  <PDFViewer
+    :src="proposal"
+    v-bind="config"
+    :app-state="appState"
+    style="height: 100%"
+    @ready="onReady"
+  >
     <ToolbarItem id="title">
       <div class="review-title">
         <strong>{{ title }}</strong>

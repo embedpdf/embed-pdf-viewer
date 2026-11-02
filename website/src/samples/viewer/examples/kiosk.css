@@ -1,6 +1,6 @@
-/* The kiosk's own parts, in the viewer's places: the header, the three big buttons in the bottom
-   bar, and what's in the check sheet. They use the viewer's colors (its theme's tokens), so one
-   theme colors both. */
+/* The kiosk's own parts, in the viewer's places: the header, and what's in the check sheet. They
+   use the viewer's colors (its theme's tokens), so one theme colors both. The bottom bar's
+   buttons are the viewer's own, made big through their parts. */
 
 /* The header */
 .kiosk-header {
@@ -64,72 +64,35 @@
   background: var(--epdf-accent);
 }
 
-/* The three big buttons */
-.kiosk-actions {
-  display: flex;
-  gap: 16px;
-  padding: 8px 0;
+/* The bottom bar: big outlined pills, Done filled in. The kiosk's only bar, so these are its
+   three buttons. */
+embedpdf-viewer {
+  /* Sized by the viewer's own width, as the viewer sizes itself: smaller on a phone. */
+  container-type: inline-size;
 }
 
-.kiosk-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
+embedpdf-viewer::part(toolbar-button) {
   min-width: 184px;
   height: 72px;
+  margin: 8px;
   padding: 0 28px;
-  font: inherit;
-  font-size: 20px;
   font-weight: 700;
-  color: var(--epdf-text);
-  background: var(--epdf-surface);
   border: 2px solid var(--epdf-border);
   border-radius: 999px;
-  cursor: pointer;
-  touch-action: manipulation;
 }
 
-.kiosk-button svg {
-  width: 28px;
-  height: 28px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.kiosk-button:active:not(:disabled) {
-  background: var(--epdf-hover);
-}
-
-.kiosk-button:disabled {
-  cursor: default;
-  opacity: 0.45;
-}
-
-.kiosk-button:focus-visible {
-  outline: 3px solid var(--epdf-accent);
-  outline-offset: 3px;
-}
-
-.kiosk-button.primary {
-  color: var(--epdf-surface);
-  background: var(--epdf-accent);
+embedpdf-viewer::part(toolbar-button-primary) {
   border-color: var(--epdf-accent);
 }
 
-/* On a phone, the viewer marks the item `data-size="compact"`: three buttons still fit. */
-[data-size='compact'] .kiosk-actions {
-  gap: 8px;
-}
-
-[data-size='compact'] .kiosk-button {
-  min-width: 0;
-  height: 60px;
-  padding: 0 16px;
-  font-size: 16px;
+/* On a phone, three buttons still fit. */
+@container (width < 600px) {
+  embedpdf-viewer::part(toolbar-button) {
+    min-width: 0;
+    height: 60px;
+    margin: 6px 4px;
+    padding: 0 16px;
+  }
 }
 
 /* The check, in its sheet */

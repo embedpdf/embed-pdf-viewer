@@ -7,22 +7,6 @@
   </div>
   <span slot="item:status" id="status" class="review-status" data-status="review">In review</span>
   <div slot="panel:checklist" id="checklist" class="review-checklist">
-    <label class="review-check">
-      <input type="checkbox" />
-      The problem is stated clearly
-    </label>
-    <label class="review-check">
-      <input type="checkbox" />
-      The phases and weeks add up
-    </label>
-    <label class="review-check">
-      <input type="checkbox" />
-      Each open question has an owner
-    </label>
-    <label class="review-check">
-      <input type="checkbox" />
-      Every review note has an answer
-    </label>
     <p id="count" class="review-count">0 of 4 done</p>
   </div>
 </embedpdf-viewer>
@@ -38,23 +22,48 @@
     changes: 'Changes requested',
   };
 
-  const status = document.getElementById('status');
-  function setStatus(value) {
-    status.dataset.status = value;
-    status.textContent = STATUS[value];
+  // What the reviewer checks before a verdict, in the Checklist panel.
+  const CHECKS = [
+    'The problem is stated clearly',
+    'The phases and weeks add up',
+    'Each open question has an owner',
+    'Every review note has an answer',
+  ];
+
+  // What the commands read from the app: the ticked checks, the status and how to set it.
+  let review = {
+    done: [],
+    status: 'review',
+    setStatus: (status) => update({ status }),
+  };
+
+  // Each change is a new value: the viewer's buttons ask their commands again.
+  function update(changes) {
+    review = { ...review, ...changes };
+    document.getElementById('viewer').appState = review;
+    const status = document.getElementById('status');
+    status.dataset.status = review.status;
+    status.textContent = STATUS[review.status];
+    document.getElementById('count').textContent = `${review.done.length} of ${CHECKS.length} done`;
   }
 
-  // What the reviewer checks before a verdict, in the Checklist panel.
+  // The checklist: ticking an item gives `done` a new value.
   const checklist = document.getElementById('checklist');
+  for (const check of CHECKS) {
+    const box = Object.assign(document.createElement('input'), { type: 'checkbox', value: check });
+    const label = Object.assign(document.createElement('label'), { className: 'review-check' });
+    label.append(box, check);
+    document.getElementById('count').before(label);
+  }
   checklist.addEventListener('change', () => {
-    const boxes = [...checklist.querySelectorAll('input')];
-    const done = boxes.filter((box) => box.checked).length;
-    document.getElementById('count').textContent = `${done} of ${boxes.length} done`;
+    const ticked = checklist.querySelectorAll('input:checked');
+    update({ done: Array.from(ticked, (box) => box.value) });
   });
 
   document.getElementById('viewer').config = {
     src: proposal,
-    // The review's look, words, tools and layout.
+    appState: review,
+    // The review's look, words, tools, verdict and layout.
     theme: {
       preference: 'light',
       accent: '#4f46e5',
@@ -94,7 +103,8 @@
     // The words of a review.
     strings: {
       en: {
-        'acme.reviewNotes': 'Review notes',
+        // The comments panel's button and its header.
+        'panel:comments': 'Review notes',
         'tool:note': 'Review note',
         'annotation:comment': 'Review note',
         'tool:strikeout': 'Suggest a deletion',
@@ -125,16 +135,32 @@
         ],
       },
     },
+    commands: [
+      {
+        id: 'acme:approve',
+        label: 'Approve',
+        icon: 'approve',
+        shortcut: 'Mod+Enter',
+        // Greyed out until every check is ticked, and pressed once approved.
+        enabled: ({ appState }) => appState.done.length === CHECKS.length,
+        active: ({ appState }) => appState.status === 'approved',
+        run: ({ appState }) => appState.setStatus('approved'),
+      },
+      {
+        id: 'acme:request-changes',
+        label: 'Request changes',
+        icon: 'requestChanges',
+        // The status, then the note tool, to say what should change.
+        run: ({ appState, viewer }) => {
+          appState.setStatus('changes');
+          void viewer.commands.execute('tool:note');
+        },
+      },
+    ],
     layout: (layout, env) =>
       layout
-        // Your own bars take the place of the toolbar and the mode bars along it.
+        // Your own bars take the place of the toolbar, and the mode bars along it go with it.
         .removeBar('main')
-        .removeBar('annotate')
-        .removeBar('shapes')
-        .removeBar('insert')
-        .removeBar('form')
-        .removeBar('redact')
-        .removeBar('measure')
         // The review bar: the document and its status, then the verdict.
         .addBar('review', {
           place: 'top',
@@ -148,8 +174,13 @@
             ['panel:comments'],
             {
               items: [
-                { command: 'acme:request-changes', variants: ['icon+label', 'icon'] },
-                { command: 'acme:approve', variants: ['icon+label', 'icon'] },
+                // Short of room, Request changes gives up its label first: Approve keeps its own.
+                {
+                  command: 'acme:request-changes',
+                  variants: ['icon+label', 'icon'],
+                  importance: 4,
+                },
+                { command: 'acme:approve', emphasis: 'primary', variants: ['icon+label', 'icon'] },
               ],
               importance: 5,
             },
@@ -173,33 +204,12 @@
         .panel('search', { side: 'start' })
         .panel('style', { side: 'start' })
         .panels({ present: { medium: 'dock' } })
-        .panel('comments', { titleKey: 'acme.reviewNotes', width: 340 }),
-    commands: [
-      {
-        id: 'acme:approve',
-        label: 'Approve',
-        icon: 'approve',
-        shortcut: 'Mod+Enter',
-        run: () => setStatus('approved'),
-      },
-      {
-        id: 'acme:request-changes',
-        label: 'Request changes',
-        icon: 'requestChanges',
-        // The status, then the note tool, to say what should change.
-        run: ({ viewer }) => {
-          setStatus('changes');
-          void viewer.commands.execute('tool:note');
-        },
-      },
-    ],
+        // The review notes are open from the start, and stay open where they dock.
+        .panel('comments', { open: true, closable: false, width: 340 }),
     onReady: (viewer) =>
       viewer.documents.onOpened(async ({ documentId }) => {
-        const opened = viewer.forDocument(documentId);
-        // The review notes are open from the start.
-        opened.get('shell').open('comments');
         // The title and the author come from the PDF itself.
-        const metadata = opened.get('metadata');
+        const metadata = viewer.forDocument(documentId).get('metadata');
         await metadata.ensureLoaded();
         const fields = metadata.getSnapshot();
         document.getElementById('title').textContent = fields?.title ?? 'Untitled';

@@ -18,7 +18,8 @@ feature's plugin, and follow what happens. Inside the viewer, any component of y
 [Plugins come with the document](#plugins-come-with-the-document).
 
 The bar above this viewer is the app's own. Its **Print** button waits for `onReady`, and its page
-number starts when the document opens, since `stage` belongs to the document:
+number follows `stage` with [`watch()`](#follow-a-value), which waits for the document to open, since
+`stage` belongs to the document:
 
 <Example name="viewer/code/viewer/on-ready" />
 

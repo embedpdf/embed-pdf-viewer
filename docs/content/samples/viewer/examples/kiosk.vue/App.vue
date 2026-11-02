@@ -1,16 +1,13 @@
 <script setup lang="ts">
-import { ref, shallowRef } from 'vue';
+import { computed, ref, shallowRef } from 'vue';
 import {
   PDFViewer,
   Panel,
   Region,
-  ToolbarItem,
   type Viewer,
   type ViewerConfig,
   type ViewerPlugins,
 } from '@embedpdf/viewer-vue';
-import BigButton from './BigButton.vue';
-import { ICONS } from './icons';
 
 import '../kiosk.css';
 
@@ -20,11 +17,8 @@ const forms = '/pdfs/forms.pdf';
 
 type Form = ViewerPlugins['form'];
 
-/** A question on the form: its field's name, and what the form calls it. */
-interface Question {
-  readonly name: string;
-  readonly label: string;
-}
+/** A question on the form: one of its fields. */
+type Question = ReturnType<Form['list']>[number];
 
 /** How far along the form is: how many questions are required, and which of them are empty. */
 interface Answers {
@@ -32,59 +26,33 @@ interface Answers {
   readonly missing: readonly Question[];
 }
 
+// What the commands read from the app: whether the form is done, and how to change that and the
+// header's line.
+interface Kiosk {
+  /** Whether the form is complete and handed in: it's locked until Clear. */
+  sent: boolean;
+  setSent(sent: boolean): void;
+  /** Write the header's line. */
+  say(line: string): void;
+}
+
 /** People fill in the form, and nothing else changes it. */
 const FILLING_ONLY = { except: ['forms.filling'] };
 
-/** The kinds of field people answer: not buttons or signatures. */
-const ANSWERABLE = new Set(['text', 'checkbox', 'radio', 'combobox', 'listbox']);
-
-const questionOf = (field: { name: string; alternateName: string | null }): Question => ({
-  name: field.name,
-  label: field.alternateName ?? field.name,
-});
+/** What the form calls a question: its tooltip, else its field's name. */
+const labelOf = (question: Question) => question.alternateName ?? question.name;
 
 /** Whether a value from `exportValues()` is an answer: text, a choice, a ticked box. */
 const isAnswer = (value: unknown) => (Array.isArray(value) ? value.length > 0 : Boolean(value));
 
 const answersOf = (form: Form): Answers => ({
   required: form.list().filter((field) => field.required).length,
-  missing: form.validate().missing.map(questionOf),
+  missing: form.validate().missing,
 });
 
-/** The first field after `after` with no answer yet, in the form's order, then from the top. */
-function nextEmpty(form: Form, after: string | null) {
-  const values = form.exportValues();
-  const fields = form.list().filter((field) => ANSWERABLE.has(field.family) && !field.readOnly);
-  const start = fields.findIndex((field) => field.name === after) + 1;
-  return [...fields.slice(start), ...fields.slice(0, start)].find(
-    (field) => !isAnswer(values[field.name]),
-  );
-}
-
-/** Scroll to a field, so it sits a third of the way down. */
-function reveal(viewer: Viewer, name: string) {
-  const form = viewer.get('form');
-  const box = form.list({ name })[0]?.widgets[0];
-  const widget = box ? form.getWidget(box) : null;
-  if (widget) {
-    viewer.get('stage').reveal(widget.page, {
-      rect: widget.rect,
-      anchor: { y: 0.3 },
-      behavior: 'smooth',
-    });
-  }
-}
-
-const viewer = shallowRef<Viewer | null>(null);
-const answers = shallowRef<Answers | null>(null);
-/** The header's line. */
-const line = ref('Tap a box to answer it, or tap Next field.');
-/** Whether the form is complete and handed in: it's locked until Clear. */
-const sent = ref(false);
-let last: string | null = null; // the field Next field went to
-
-// The front desk's viewer: the form, a header and three big buttons, nothing else.
-const config: ViewerConfig = {
+// The front desk's viewer: the form, a header and three buttons, nothing else. A constant: the
+// commands read the app from `appState`, so they never hold an old value.
+const config: ViewerConfig<Kiosk> = {
   theme: {
     preference: 'light',
     accent: '#b5500e',
@@ -101,6 +69,10 @@ const config: ViewerConfig = {
       font: "ui-rounded, 'SF Pro Rounded', 'Segoe UI', system-ui, sans-serif",
     },
   },
+  // Every button and menu row a finger's size, even with a mouse plugged in.
+  touch: true,
+  // A kiosk fills in forms all day and never keeps them: leaving the page asks nothing.
+  warnBeforeLeaving: false,
   // No opening, saving or printing files, no search, and no selecting text: a long press is only
   // ever a tap on the form.
   disable: ['documents', 'search', 'text'],
@@ -108,25 +80,26 @@ const config: ViewerConfig = {
     stage: { zoom: { mode: 'fit-width' } },
     form: { fields: { background: 'rgb(253 239 225 / 0.9)' } },
   },
-  icons: ICONS,
+  icons: {
+    next: ['M5 12l14 0', 'M13 18l6 -6', 'M13 6l6 6'],
+    clear: [
+      'M19 20h-10.5l-4.21 -4.3a1 1 0 0 1 0 -1.41l10 -10a1 1 0 0 1 1.41 0l5 5a1 1 0 0 1 0 1.41l-9.2 9.3',
+      'M18 13.3l-6.3 -6.3',
+    ],
+    done: ['M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0', 'M9 12l2 2l4 -4'],
+  },
   commands: [
     {
       id: 'kiosk:next',
       label: 'Next field',
       icon: 'next',
-      run: ({ viewer }) => {
-        if (sent.value) {
-          line.value = 'This form is done. Tap Clear for the next person.';
-          return;
+      // The header names the field once the cursor is in it.
+      run: ({ appState, viewer }) => {
+        if (appState.sent) {
+          appState.say('This form is done. Tap Clear for the next person.');
+        } else if (!viewer.get('form').focusNext({ empty: true, wrap: true })) {
+          appState.say('Every question has an answer. Tap Done.');
         }
-        const field = nextEmpty(viewer.get('form'), last);
-        if (!field) {
-          line.value = 'Every question has an answer. Tap Done.';
-          return;
-        }
-        last = field.name;
-        reveal(viewer, field.name);
-        line.value = `Next: ${questionOf(field).label}`;
       },
     },
     {
@@ -134,30 +107,39 @@ const config: ViewerConfig = {
       label: 'Clear',
       icon: 'clear',
       enabled: ({ get }) => Object.values(get('form').exportValues()).some(isAnswer),
-      run: async ({ viewer }) => {
-        sent.value = false;
+      run: async ({ appState, viewer }) => {
+        appState.setSent(false);
         await viewer.get('form').reset();
         viewer.get('stage').goToPage(0);
-        last = null;
-        line.value = 'Cleared, ready for the next person.';
+        appState.say('Cleared, ready for the next person.');
       },
     },
     {
       id: 'kiosk:done',
       label: 'Done',
       icon: 'done',
-      run: ({ viewer }) => {
+      run: ({ appState, viewer }) => {
         const { valid } = viewer.get('form').validate();
-        sent.value = valid;
-        line.value = valid ? 'All done. Thank you!' : 'A few answers are still missing.';
+        appState.setSent(valid);
+        appState.say(valid ? 'All done. Thank you!' : 'A few answers are still missing.');
         viewer.get('shell').open('kiosk-check');
       },
     },
   ],
-  // A layout of its own: one bar at the bottom for the buttons, and the check as a sheet.
+  // A layout of its own: one bar at the bottom with the three buttons and their labels, Done
+  // filled in, and the check as a sheet.
   layout: {
     bars: {
-      kiosk: { place: 'bottom', center: [[{ custom: 'kiosk-actions' }]] },
+      kiosk: {
+        place: 'bottom',
+        center: [
+          [
+            { command: 'kiosk:next', variants: ['icon+label', 'icon'] },
+            { command: 'kiosk:clear', variants: ['icon+label', 'icon'] },
+            { command: 'kiosk:done', emphasis: 'primary', variants: ['icon+label', 'icon'] },
+          ],
+        ],
+      },
     },
     panels: {
       'kiosk-check': { title: 'Your application', present: 'sheet', resizable: false },
@@ -165,25 +147,42 @@ const config: ViewerConfig = {
   },
 };
 
-// Follow the form as people fill it in, for the header and the check.
+const viewer = shallowRef<Viewer | null>(null);
+const answers = shallowRef<Answers | null>(null);
+/** The header's line. */
+const line = ref('Tap a box to answer it, or tap Next field.');
+/** Whether the form is complete and handed in: it's locked until Clear. */
+const sent = ref(false);
+
+const appState = computed<Kiosk>(() => ({
+  sent: sent.value,
+  setSent: (value) => (sent.value = value),
+  say: (text) => (line.value = text),
+}));
+
 function onReady(ready: Viewer) {
   viewer.value = ready;
-  ready.documents.onOpened(({ documentId }) => {
-    const form = ready.forDocument(documentId).get('form');
-    answers.value = answersOf(form);
-    ready.watch(
-      () => form.list(),
-      () => (answers.value = answersOf(form)),
-    );
+  // The form is the document's: `watch` waits for it to open, then follows it as people fill it
+  // in, for the header's count and the check.
+  ready.watch(
+    () => ready.get('form').list(),
+    () => (answers.value = answersOf(ready.get('form'))),
+    { immediate: true },
+  );
+  // The header's line names the question the cursor is in, whether Next field or a tap put it
+  // there.
+  ready.documents.onOpened(() => {
+    ready.get('form').onFocusChanged(({ field }) => {
+      if (field) line.value = `Answering: ${labelOf(field)}`;
+    });
   });
 }
 
-/** Close the check, and go to a question it lists. */
-function pick({ name, label }: Question) {
+/** Close the check, and put the cursor in a question it lists. */
+function pick(question: Question) {
   if (!viewer.value) return;
   viewer.value.get('shell').close('kiosk-check');
-  reveal(viewer.value, name);
-  line.value = `Next: ${label}`;
+  viewer.value.get('form').focus(question.ref);
 }
 </script>
 
@@ -191,6 +190,7 @@ function pick({ name, label }: Question) {
   <PDFViewer
     :src="forms"
     v-bind="config"
+    :app-state="appState"
     :read-only="sent ? true : FILLING_ONLY"
     style="height: 100%"
     @ready="onReady"
@@ -207,13 +207,6 @@ function pick({ name, label }: Question) {
         </p>
       </header>
     </Region>
-    <ToolbarItem id="kiosk-actions">
-      <div class="kiosk-actions">
-        <BigButton id="kiosk:next" />
-        <BigButton id="kiosk:clear" />
-        <BigButton id="kiosk:done" primary />
-      </div>
-    </ToolbarItem>
     <Panel id="kiosk-check">
       <div v-if="sent" class="kiosk-check">
         <h2>Thank you!</h2>
@@ -224,7 +217,7 @@ function pick({ name, label }: Question) {
         <p>These questions still need an answer:</p>
         <ul>
           <li v-for="question in answers?.missing" :key="question.name">
-            <button type="button" @click="pick(question)">{{ question.label }}</button>
+            <button type="button" @click="pick(question)">{{ labelOf(question) }}</button>
           </li>
         </ul>
       </div>

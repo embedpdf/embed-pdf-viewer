@@ -3,10 +3,11 @@ import { EpdfPdfViewer, type ThemeConfig } from '@embedpdf/viewer-angular';
 
 const welcome = '/pdfs/welcome.pdf';
 
-// Your colors for both modes, and what's different in dark.
+// What both modes share, then the colors of each.
 const brand: ThemeConfig = {
   accent: '#0f6e56',
-  tokens: { surface: '#fbfaf7', canvas: '#ece8df', radius: '2px' },
+  tokens: { radius: '2px' },
+  light: { surface: '#fbfaf7', canvas: '#ece8df' },
   dark: {
     accent: '#4fbf98',
     surface: '#16201c',
