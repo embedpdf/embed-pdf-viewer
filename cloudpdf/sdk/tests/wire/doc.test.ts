@@ -321,6 +321,8 @@ describe("DocClient", () => {
             annotationsVersion: 1,
             formsVersion: 1,
             outlineVersion: 1,
+            fontsVersion: 1,
+            serverFonts: "serverFonts",
             auditHead: 1,
             baseSha: "baseSha",
             layerVersion: 1,

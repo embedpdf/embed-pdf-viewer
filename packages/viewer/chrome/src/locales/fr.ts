@@ -499,6 +499,25 @@ export const fr: Locale = {
       selected: 'Sélection : {count}',
       toolDefaults: 'Valeurs par défaut : {tool}',
       defaults: 'Valeurs par défaut',
+      fontGroups: {
+        document: 'Dans ce document',
+        yours: 'Vos polices',
+        server: 'Polices du serveur',
+        standard: 'Standard',
+      },
+      fontStyles: {
+        bold: 'Gras',
+        italic: 'Italique',
+        boldItalic: 'Gras italique',
+      },
+      fontRestrictions: {
+        notEmbedded: 'Le document la nomme seulement',
+        subset: 'Le document ne contient que les caractères utilisés',
+        previewAndPrint: 'Sa licence n’autorise que l’affichage et l’impression',
+        unsupportedFormat: 'Impossible d’écrire du nouveau texte dans ce type de police',
+        noUnicodeMap: 'Elle n’indique pas quels caractères elle dessine',
+        other: 'Impossible d’y écrire du nouveau texte',
+      },
     },
     // The flags section of the style panel: its title, and what each flag does.
     annotationFlags: {

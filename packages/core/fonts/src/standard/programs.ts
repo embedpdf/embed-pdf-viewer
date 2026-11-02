@@ -25,7 +25,7 @@ const PROGRAMS: Readonly<Record<StandardFont, () => Promise<{ default: string }>
 };
 
 /** A font program a browser can mount: its bytes, the CSS family it goes by, and its style. */
-export interface FontProgram {
+export interface MountableFontProgram {
   /** SHA-256 of the bytes, hex. */
   readonly hash: string;
   /** The CSS family to mount it under ({@link fontProgramFamily}). */
@@ -39,14 +39,14 @@ export interface FontProgram {
 /** The CSS family a mounted program goes by: named by its hash, it can't shadow any other font. */
 export const fontProgramFamily = (hash: string): string => `epdf-${hash.slice(0, 16)}`;
 
-const programs = new Map<StandardFont, FontProgram>();
+const programs = new Map<StandardFont, MountableFontProgram>();
 
-export function standardFontProgram(font: StandardFont): FontProgram {
+export function standardFontProgram(font: StandardFont): MountableFontProgram {
   const known = programs.get(font);
   if (known) return known;
   const hash = FACES[font].programHash;
   let bytes: Promise<Uint8Array> | null = null;
-  const program: FontProgram = {
+  const program: MountableFontProgram = {
     hash,
     family: fontProgramFamily(hash),
     weight: STANDARD_FACES[font].weight,

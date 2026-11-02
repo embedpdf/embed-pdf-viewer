@@ -220,6 +220,20 @@ export type {
   FontSpec,
 } from './dto/FontSpec';
 export type {
+  CodePointRange,
+  Font,
+  FontFormat,
+  FontList,
+  FontProgram,
+  FontProgramInfo,
+  FontResolution,
+  FontResolveRequest,
+  FontResolveRun,
+  FontRestriction,
+  FontSource,
+  ResolvedFontRun,
+} from './dto/DocumentFonts';
+export type {
   RichTextAlign,
   RichTextBody,
   RichTextDecoration,
@@ -283,7 +297,7 @@ export type {
   WidgetBorderStyle,
   WidgetCheckStyle,
   StandardFont,
-  FreeTextFont,
+  FontName,
   TextAlignment,
   VerticalAlignment,
   FreeTextIntent,
@@ -589,10 +603,11 @@ export {
   type AnnotationDefaults,
 } from './annotation/defaults';
 export {
-  faceForFreeTextFont,
+  faceForFontName,
   familyKey,
-  freeTextFontForFace,
+  fontNameForFace,
   isStandardFontName,
+  standardFamilyOf,
   STANDARD_FACES,
   type DescribeFont,
   type FaceRequest,

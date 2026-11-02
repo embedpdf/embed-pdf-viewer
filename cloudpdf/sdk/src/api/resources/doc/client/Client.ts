@@ -11,6 +11,7 @@ import * as errors from "../../../../errors/index.js";
 import * as CloudPDF from "../../../index.js";
 import { AnnotationsClient } from "../resources/annotations/client/Client.js";
 import { AttachmentsClient } from "../resources/attachments/client/Client.js";
+import { FontsClient } from "../resources/fonts/client/Client.js";
 import { FormsClient } from "../resources/forms/client/Client.js";
 import { MetadataClient } from "../resources/metadata/client/Client.js";
 import { OutlineClient } from "../resources/outline/client/Client.js";
@@ -29,6 +30,7 @@ export class DocClient {
     protected readonly _options: NormalizedClientOptionsWithAuth<DocClient.Options>;
     protected _annotations: AnnotationsClient | undefined;
     protected _attachments: AttachmentsClient | undefined;
+    protected _fonts: FontsClient | undefined;
     protected _forms: FormsClient | undefined;
     protected _metadata: MetadataClient | undefined;
     protected _outline: OutlineClient | undefined;
@@ -47,6 +49,10 @@ export class DocClient {
 
     public get attachments(): AttachmentsClient {
         return (this._attachments ??= new AttachmentsClient(this._options));
+    }
+
+    public get fonts(): FontsClient {
+        return (this._fonts ??= new FontsClient(this._options));
     }
 
     public get forms(): FormsClient {

@@ -1,4 +1,4 @@
-import type { DocumentFontSettings } from './DocumentFontSettings';
+import type { LocalDocumentFontsService } from './DocumentFontsService';
 import type { DocumentHandle } from './DocumentHandle';
 import { hasLocalEngineBrand } from './localEngineBrand';
 import type { LocalPageHandle } from './LocalPageHandle';
@@ -15,8 +15,8 @@ import type { BaseVersionInfo } from '../signature/types';
  * document checks with {@link isLocalDocument}.
  */
 export interface LocalDocumentHandle extends DocumentHandle {
-  /** Font embedding and text layout settings of this document (session state). */
-  readonly fonts: DocumentFontSettings;
+  /** As {@link DocumentHandle.fonts}, with the session's font settings. */
+  readonly fonts: LocalDocumentFontsService;
   /**
    * Catalog-level `/PieceInfo` private application data (ISO 32000 §14.5),
    * such as a stamp library's display name. Per-page piece data lives on

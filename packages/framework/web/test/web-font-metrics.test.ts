@@ -8,6 +8,9 @@ const measured: Record<string, { ascent: number; descent: number }> = {
   '"roboto", sans-serif': { ascent: 0.927, descent: 0.244 }, // an approximate browser measurement
 };
 const measure = (family: string) => measured[family] ?? null;
+/** A host that reads the standard programs' families back to their faces' families. */
+const familyOf = (family: string) =>
+  ({ 'epdf-times': 'Times', 'epdf-courier': 'Courier' })[family] ?? family;
 
 describe('lineModelFor', () => {
   it('uses the engine metrics for the standard families, whatever the browser substitutes', () => {
@@ -16,8 +19,18 @@ describe('lineModelFor', () => {
       descent: 0.17,
       lineHeight: 1.2,
     });
-    expect(lineModelFor('"Times New Roman", Times, serif', measure).lineHeight).toBe(1.2);
-    expect(lineModelFor('"Courier New", Courier, monospace', measure).ascent).toBe(0.627);
+    expect(lineModelFor('"epdf-times", "Times New Roman", serif', measure, familyOf)).toEqual({
+      ascent: 0.784,
+      descent: 0.216,
+      lineHeight: 1.2,
+    });
+    expect(lineModelFor('"epdf-courier", Courier, monospace', measure, familyOf).ascent).toBe(
+      0.627,
+    );
+  });
+
+  it('measures a family the host reads back to no standard family, a look-alike too', () => {
+    expect(lineModelFor('"Courier New", Courier, monospace', measure, familyOf).ascent).toBe(0.833);
   });
 
   it('uses browser measurements plus leading for a registered font', () => {
@@ -39,7 +52,11 @@ describe('firstLineShiftFor', () => {
     // + 0.905 = 0.9465 em; the engine's Helvetica baseline = 0.83 em.
     expect(firstLineShiftFor('Helvetica, Arial, sans-serif', 100, measure)).toBeCloseTo(11.65, 2);
     // Courier New's box is far taller than the engine's Courier ascent.
-    expect(firstLineShiftFor('"Courier New", Courier, monospace', 100, measure)).toBeCloseTo(
+    const courier = (family: string) =>
+      family === '"epdf-courier", Courier New'
+        ? measured['"Courier New", Courier, monospace']!
+        : null;
+    expect(firstLineShiftFor('"epdf-courier", Courier New', 100, courier, familyOf)).toBeCloseTo(
       ((1.2 - 1.133) / 2 + 0.833 - 0.627) * 100,
       1,
     );

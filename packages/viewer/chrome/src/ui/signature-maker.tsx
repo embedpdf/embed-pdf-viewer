@@ -8,7 +8,8 @@
  * unless it's saving.
  */
 import { useEffect, useId, useRef, useState } from 'react';
-import { useKernel } from '@embedpdf/react/runtime';
+import type { MountableFontProgram } from '@embedpdf/core-fonts';
+import { useFontMounts } from '@embedpdf/react/fonts';
 import { useSurface } from '@embedpdf/react/shell';
 import { useT } from '@embedpdf/react/i18n';
 import { useStamp, type MarkSource } from '@embedpdf/react/stamp';
@@ -20,9 +21,11 @@ import {
 import { useSignatureSettings } from '../config-context';
 import { Dialog } from './dialog';
 import { Icon } from './icons';
-import { markFontsOf, registerMarkFont, type MarkFont } from './signature-fonts';
+import { markFontProgram, markFontsOf, type MarkFont } from './signature-fonts';
 
 type Tab = 'draw' | 'type' | 'upload';
+
+const NO_PROGRAMS: readonly MountableFontProgram[] = [];
 type Stroke = Array<{ x: number; y: number }>;
 
 const PAD = { width: 360, height: 120 };
@@ -32,12 +35,10 @@ function MarkPad({
   value,
   onChange,
   fonts,
-  registerFont,
 }: {
   value: MarkSource | null;
   onChange: (mark: MarkSource | null) => void;
   fonts: readonly MarkFont[];
-  registerFont: (key: string) => Promise<void>;
 }) {
   const t = useT();
   const [tab, setTab] = useState<Tab>('draw');
@@ -47,6 +48,21 @@ function MarkPad({
   const [fileName, setFileName] = useState<string | null>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const drawing = useRef<Stroke | null>(null);
+  // The typed name shows in the font the mark is written in: read when the Type tab opens on it.
+  const [program, setProgram] = useState<MountableFontProgram | null>(null);
+  useEffect(() => {
+    const chosen = tab === 'type' ? fonts.find((each) => each.key === font) : undefined;
+    if (!chosen) return;
+    let current = true;
+    markFontProgram(chosen).then(
+      (made) => current && setProgram(made),
+      (error: unknown) => console.error('[embedpdf] loading the signature font failed:', error),
+    );
+    return () => {
+      current = false;
+    };
+  }, [tab, font, fonts]);
+  useFontMounts(program ? [program] : NO_PROGRAMS);
 
   // Paint the strokes (device-pixel sharp).
   useEffect(() => {
@@ -83,15 +99,15 @@ function MarkPad({
       next.length ? { kind: 'ink', strokes: next, color: '#000000', strokeWidth: 2.5 } : null,
     );
   };
-  const commitText = async (next: string, key: string) => {
+  // The stamp plugin registers the font where the mark is written, when it's saved.
+  const commitText = (next: string, key: string) => {
     setText(next);
     setFont(key);
-    if (!next.trim()) {
-      onChange(null);
-      return;
-    }
-    await registerFont(key);
-    onChange({ kind: 'text', text: next.trim(), fontFamily: key, color: '#000000', fontSize: 36 });
+    onChange(
+      next.trim()
+        ? { kind: 'text', text: next.trim(), fontFamily: key, color: '#000000', fontSize: 36 }
+        : null,
+    );
   };
   const pickFile = (file: File) => {
     setFileName(file.name);
@@ -111,17 +127,7 @@ function MarkPad({
           {t('demo.makerDraw')}
         </button>
         {fonts.length > 0 ? (
-          <button
-            type="button"
-            className={tabClass('type')}
-            onClick={() => {
-              setTab('type');
-              // The font is read while the name is typed, so the mark is ready when it is.
-              registerFont(font).catch((error: unknown) =>
-                console.error('[embedpdf] loading the signature font failed:', error),
-              );
-            }}
-          >
+          <button type="button" className={tabClass('type')} onClick={() => setTab('type')}>
             {t('demo.makerType')}
           </button>
         ) : null}
@@ -175,14 +181,17 @@ function MarkPad({
           <input
             value={text}
             placeholder={t('demo.makerTypePlaceholder')}
-            onChange={(event) => void commitText(event.target.value, font)}
+            onChange={(event) => commitText(event.target.value, font)}
+            style={
+              program ? { fontFamily: `"${program.family}", cursive`, fontSize: 22 } : undefined
+            }
             className="border-border bg-surface text-fg w-full rounded border px-2 py-1.5 text-sm"
           />
           <label className="text-fg-muted flex items-center gap-2 text-xs">
             {t('demo.makerFont')}
             <select
               value={font}
-              onChange={(event) => void commitText(text, event.target.value)}
+              onChange={(event) => commitText(text, event.target.value)}
               className="border-border bg-surface text-fg rounded border px-2 py-1 text-xs"
             >
               {fonts.map((fontOption) => (
@@ -216,7 +225,6 @@ export function SignatureMakerModal() {
   const t = useT();
   const surface = useSurface('signature-maker');
   const stamp = useStamp();
-  const kernel = useKernel();
   const config = useSignatureSettings();
   const [name, setName] = useState('');
   const [signatureMark, setSignatureMark] = useState<MarkSource | null>(null);
@@ -229,12 +237,6 @@ export function SignatureMakerModal() {
   const existing = existingId ? stamp.getLibrary(existingId) : null;
   const wantsInitials = (config.kinds ?? ['signature', 'initials']).includes('initials');
   const [fonts] = useState(() => markFontsOf(config.fonts));
-  // A font is registered on the engine the stamp plugin authors with (the viewer's own) the
-  // first time the Type tab opens on it, or a typed mark uses it.
-  const registerFont = async (key: string) => {
-    const font = fonts.find((each) => each.key === key);
-    if (font) await registerMarkFont(kernel.engine, font);
-  };
 
   if (!surface.isOpen) return null;
 
@@ -319,12 +321,7 @@ export function SignatureMakerModal() {
           <p className="text-fg mb-1 text-xs font-semibold uppercase tracking-wide">
             {t('demo.signatureLabel')}
           </p>
-          <MarkPad
-            value={signatureMark}
-            onChange={setSignatureMark}
-            fonts={fonts}
-            registerFont={registerFont}
-          />
+          <MarkPad value={signatureMark} onChange={setSignatureMark} fonts={fonts} />
         </div>
       )}
       {wantsInitials ? (
@@ -337,12 +334,7 @@ export function SignatureMakerModal() {
               </span>
             )}
           </p>
-          <MarkPad
-            value={initialsMark}
-            onChange={setInitialsMark}
-            fonts={fonts}
-            registerFont={registerFont}
-          />
+          <MarkPad value={initialsMark} onChange={setInitialsMark} fonts={fonts} />
         </div>
       ) : null}
       {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}

@@ -138,6 +138,7 @@ export class ChangeApplier {
   ): AppliedChange<Out> {
     const ctx = this.context(authority, signal, (self) => opsFillOwnField(self, ops));
     return collect(
+      this.session,
       authority,
       ops.map((op, at) => () => runOp(ctx, space.opInFileSpace(op), at)),
       space,
@@ -153,6 +154,7 @@ export class ChangeApplier {
   ): AppliedChange<Out> {
     const ctx = this.context(authority, signal, (self) => stepsFillOwnField(self, record.steps));
     return collect(
+      this.session,
       authority,
       record.steps.map((step) => () => runStep(ctx, step)),
       space,
@@ -182,9 +184,11 @@ export class ChangeApplier {
 
 /**
  * Runs each in order, its item measured as soon as it ran; the record
- * reverses them in the opposite order.
+ * reverses them in the opposite order. Each item says what its run drew with
+ * no font for a character.
  */
 function collect<Out extends Coordinates>(
+  session: DocumentSession,
   authority: ChangeAuthority,
   runs: readonly (() => Done)[],
   space: Pick<ChangeSpace<Coordinates, Out>, 'itemOut'>,
@@ -194,8 +198,17 @@ function collect<Out extends Coordinates>(
   const reverses: (readonly ReverseStep[])[] = [];
   for (const run of runs) {
     throwIfAborted(signal);
+    session.clearMissingCharacters();
     const done = run();
-    items.push(space.itemOut(done.item));
+    const missingCharacters = session.missingCharacters();
+    const item =
+      missingCharacters.length === 0
+        ? done.item
+        : ({
+            ...done.item,
+            meta: { ...done.item.meta, missingCharacters },
+          } as ChangeItem<PdfCoordinates>);
+    items.push(space.itemOut(item));
     reverses.push(done.reverse);
   }
   return {

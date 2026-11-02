@@ -17,6 +17,9 @@ import {
   type CustomMetadata,
   type DocumentMetadata,
   type DocumentOutline,
+  type FontListFacts,
+  type FontResolveRequest,
+  type WorkerJobRequest,
   type DocumentActionsSnapshot,
   type DocumentSecurityProbeInfo,
   type PageListSnapshot,
@@ -59,6 +62,7 @@ import type { BaseFileCache, LocalFileHandle } from '../storage/BaseFileCache';
 import { StorageKeys } from '../storage/keys';
 import { readLayerArtifactHeader } from '../storage/layerArtifact';
 import type { ObjectStore } from '../storage/ObjectStore';
+import type { ServerFonts } from './ServerFonts';
 
 /**
  * Public head shape returned by `GET /v1/docs/:docId/head`.
@@ -126,6 +130,8 @@ export interface DocumentServiceOptions {
    * CdnSigner.
    */
   cdnAccessRequired?: boolean;
+  /** The server's fonts: their fingerprint goes in every manifest. */
+  serverFonts: ServerFonts;
   /**
    * How long a layer's worker session may go unasked before the idle sweep
    * ({@link DocumentService.closeIdleLayerSessions}) closes it. The next
@@ -231,6 +237,8 @@ export class DocumentService {
   private readonly storage: ObjectStore;
   private readonly pool: EnginePool;
   private readonly layerState: LayerStateService;
+  /** The server's fonts (see {@link DocumentServiceOptions.serverFonts}). */
+  readonly serverFonts: ServerFonts;
   private readonly passwordVerifications: PdfPasswordVerificationsRepo | null;
   private readonly passwordSessions: PdfPasswordSessionsRepo | null;
   private readonly passwordSessionServerSecret: { id: string; secret: string | Buffer } | null;
@@ -315,6 +323,7 @@ export class DocumentService {
     this.storage = opts.storage;
     this.pool = opts.pool;
     this.layerState = opts.layerState;
+    this.serverFonts = opts.serverFonts;
     this.passwordVerifications = opts.passwordVerifications ?? null;
     this.passwordSessions = opts.passwordSessions ?? null;
     this.passwordSessionServerSecret = opts.passwordSessionServerSecret ?? null;
@@ -576,7 +585,13 @@ export class DocumentService {
       await this.requireReadyRow(ctx, docId),
       head.baseSha,
     );
-    return this.layerState.buildBaseManifest(head, pages, version, protection);
+    return this.layerState.buildBaseManifest(
+      head,
+      pages,
+      version,
+      protection,
+      await this.serverFonts.fingerprint(),
+    );
   }
 
   async getLayerHead(ctx: OpenContext, docId: string, layerName: string): Promise<DocumentHead> {
@@ -657,12 +672,14 @@ export class DocumentService {
           annotationsVersion: headVersion.annotationsVersion,
           formsVersion: headVersion.formsVersion,
           outlineVersion: headVersion.outlineVersion,
+          fontsVersion: headVersion.fontsVersion,
           lastAuditId: 0,
           currentVersion: 0,
           currentArtifactKey: null,
         },
         pages,
         this.layerState.computeLayerScopes(null, [], []),
+        await this.serverFonts.fingerprint(),
       );
     }
 
@@ -689,6 +706,7 @@ export class DocumentService {
       layer,
       pages,
       this.layerState.computeLayerScopes(layer, pages, basePages, headVersion),
+      await this.serverFonts.fingerprint(),
     );
   }
 
@@ -1136,6 +1154,94 @@ export class DocumentService {
       );
     }
     return result.metadata;
+  }
+
+  /** What the document's font list is made from, read the same way as `readLayerOutline`. */
+  async readLayerFontFacts(
+    ctx: OpenContext,
+    docId: string,
+    /** Omit for the base view (shared reads use no layer session). */
+    layerName?: string,
+    signal?: AbortSignal,
+  ): Promise<FontListFacts> {
+    const result = await this.readFonts(
+      ctx,
+      docId,
+      layerName,
+      { kind: 'document.fonts.list' },
+      'document.fonts.list',
+      signal,
+    );
+    return result.facts;
+  }
+
+  /** The fonts a write would draw each of `request`'s runs in, and the characters no font has. */
+  async resolveLayerFonts(
+    ctx: OpenContext,
+    docId: string,
+    layerName: string,
+    request: FontResolveRequest,
+    signal?: AbortSignal,
+  ): Promise<Extract<WorkerResultPayload, { tag: 'document.fonts.resolve' }>> {
+    return this.readFonts(
+      ctx,
+      docId,
+      layerName,
+      {
+        kind: 'document.fonts.resolve',
+        runs: request.runs,
+        ...(request.annotation ? { annotation: request.annotation } : {}),
+      },
+      'document.fonts.resolve',
+      signal,
+    );
+  }
+
+  /** A program the document's fonts name: its facts, and with `data` its bytes. */
+  async readLayerFontProgram(
+    ctx: OpenContext,
+    docId: string,
+    layerName: string,
+    displayHash: string,
+    part: 'info' | 'data',
+    signal?: AbortSignal,
+  ): Promise<Extract<WorkerResultPayload, { tag: 'document.fonts.program' }>> {
+    return this.readFonts(
+      ctx,
+      docId,
+      layerName,
+      { kind: 'document.fonts.program', displayHash, part },
+      'document.fonts.program',
+      signal,
+    );
+  }
+
+  private async readFonts<Tag extends WorkerResultPayload['tag']>(
+    ctx: OpenContext,
+    docId: string,
+    layerName: string | undefined,
+    request: DistributiveOmit<
+      Extract<WorkerJobRequest, { kind: Tag }>,
+      'effect' | 'jobId' | 'docId' | 'layerName'
+    >,
+    tag: Tag,
+    signal?: AbortSignal,
+  ): Promise<Extract<WorkerResultPayload, { tag: Tag }>> {
+    if (layerName !== undefined) await this.ensureLayerOnPool(ctx, docId, layerName);
+    else await this.openOnPool(ctx, docId);
+    const build = (jobId: WorkerJobId) =>
+      wirePack({
+        ...request,
+        effect: 'read' as const,
+        jobId,
+        docId,
+        ...(layerName !== undefined ? { layerName } : {}),
+      } as WorkerJobRequest);
+    const result = await this.readOnPool(ctx, docId, layerName, build, signal);
+    if (result.tag !== tag) {
+      throw new EngineError(EngineErrorCode.WireFormat, `unexpected fonts payload: ${result.tag}`);
+    }
+    return result as Extract<WorkerResultPayload, { tag: Tag }>;
   }
 
   /** The document's outline, read the same way as `readLayerMetadata`. */
@@ -2627,6 +2733,7 @@ function legacyVersionRow(row: DocumentRow, sha: string): BaseVersionRow {
     annotationsVersion: 1,
     formsVersion: 1,
     outlineVersion: 1,
+    fontsVersion: 1,
     createdAt: row.createdAt,
   };
 }
@@ -2741,6 +2848,7 @@ function safeFilePart(value: string): string {
   return cleaned.length > 0 ? cleaned : 'document';
 }
 
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 /** A byte range of a local file. */
 interface FileRange {
   path: string;

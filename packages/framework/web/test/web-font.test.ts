@@ -1,13 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  createFontMounts,
-  fontKeyOfWebFamily,
-  mountFontProgram,
-  mountWebFont,
-  observeWebFonts,
-  webFontFamily,
-} from '../src/web-font';
+import { createFontMounts, mountFontProgram, observeWebFonts } from '../src/web-font';
 
 /** A `Document` with a font set, and a `FontFace` that loads at once. */
 function fakeDocument() {
@@ -36,7 +29,15 @@ class FakeFontFace {
 
 afterEach(() => vi.unstubAllGlobals());
 
-describe('mountWebFont', () => {
+/** A regular program under `family`, with these bytes. */
+const programOf = (family: string, bytes: Uint8Array, weight = 400) => ({
+  family,
+  weight,
+  style: 'normal' as const,
+  load: async () => bytes,
+});
+
+describe('mountFontProgram', () => {
   it('notifies only the owning document on mounts, final unmounts and CSS loads', async () => {
     vi.stubGlobal('FontFace', FakeFontFace);
     const { doc } = fakeDocument();
@@ -45,8 +46,9 @@ describe('mountWebFont', () => {
     const otherChanged = vi.fn();
     const stop = observeWebFonts(doc, changed);
     const stopOther = observeWebFonts(other, otherChanged);
-    const first = await mountWebFont('brand-sans', new Uint8Array([1]), { document: doc });
-    const second = await mountWebFont('brand-sans', new Uint8Array([1]), { document: doc });
+    const program = programOf('epdf-0123456789abcdef', new Uint8Array([1]));
+    const first = await mountFontProgram(program, { document: doc });
+    const second = await mountFontProgram(program, { document: doc });
     expect(changed).toHaveBeenCalledTimes(1);
     first();
     expect(changed).toHaveBeenCalledTimes(1);
@@ -58,26 +60,22 @@ describe('mountWebFont', () => {
     expect(otherChanged).not.toHaveBeenCalled();
     stop();
     doc.fonts.dispatchEvent(new Event('loadingdone'));
-    const unmount = await mountWebFont('brand-sans', new Uint8Array([1]), { document: doc });
+    const unmount = await mountFontProgram(program, { document: doc });
     unmount();
     expect(changed).toHaveBeenCalledTimes(4);
     stopOther();
   });
-  it("mounts the bytes as a @font-face in the viewer's namespace, refcounted per document", async () => {
+  it('mounts the bytes as a @font-face under the program’s family, refcounted per document', async () => {
     vi.stubGlobal('FontFace', FakeFontFace);
     const { doc, faces } = fakeDocument();
-    const data = new Uint8Array([1, 2, 3]);
-    const first = await mountWebFont('brand-sans', data, { document: doc, weight: 700 });
+    const program = programOf('epdf-0123456789abcdef', new Uint8Array([1, 2, 3]), 700);
+    const first = await mountFontProgram(program, { document: doc });
     const face = [...faces][0] as unknown as FakeFontFace;
-    // Namespaced: the page's own `brand-sans` family never stands in for it.
-    expect(face.family).toBe('epdf-brand-sans');
-    expect(webFontFamily('brand-sans')).toBe('epdf-brand-sans');
-    expect(fontKeyOfWebFamily('epdf-brand-sans')).toBe('brand-sans');
-    expect(fontKeyOfWebFamily('Helvetica')).toBe('Helvetica');
+    expect(face.family).toBe('epdf-0123456789abcdef');
     expect(face.descriptors?.weight).toBe('700');
     expect(face.status).toBe('loaded');
-    // A second mount of the same key adds nothing and holds its own reference.
-    const second = await mountWebFont('brand-sans', data, { document: doc });
+    // A second mount of the same program adds nothing and holds its own reference.
+    const second = await mountFontProgram(program, { document: doc });
     expect(faces.size).toBe(1);
     first();
     expect(faces.size).toBe(1); // the second holder keeps it
@@ -130,9 +128,31 @@ describe('mountWebFont', () => {
     expect(sans.load).toHaveBeenCalledTimes(2);
   });
 
+  it('rejects a program the browser refuses, and holds nothing of it', async () => {
+    class RefusedFontFace extends FakeFontFace {
+      override async load(): Promise<this> {
+        throw new DOMException('Invalid font data in ArrayBuffer.');
+      }
+    }
+    vi.stubGlobal('FontFace', RefusedFontFace);
+    const { doc, faces } = fakeDocument();
+    const program = {
+      family: 'epdf-0123456789abcdef',
+      weight: 400,
+      style: 'normal' as const,
+      load: async () => new Uint8Array([1]),
+    };
+    await expect(mountFontProgram(program, { document: doc })).rejects.toThrow('Invalid font data');
+    expect(faces.size).toBe(0);
+    // Asked again, it's tried again.
+    await expect(mountFontProgram(program, { document: doc })).rejects.toThrow();
+  });
+
   it('is a no-op without the FontFace API', async () => {
     const { doc, faces } = fakeDocument();
-    const unmount = await mountWebFont('x', new Uint8Array([0]), { document: doc });
+    const unmount = await mountFontProgram(programOf('epdf-x', new Uint8Array([0])), {
+      document: doc,
+    });
     expect(faces.size).toBe(0);
     expect(() => unmount()).not.toThrow();
   });

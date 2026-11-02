@@ -45,6 +45,7 @@ import type { DocumentService, OpenContext } from '../services/DocumentService';
 import type { LayerService } from '../services/LayerService';
 import type { SharpImageEncoder } from '../render/SharpImageEncoder';
 import {
+  assertServerFonts,
   abortSignalOf,
   parseOrInvalidArg,
   parseTokenOrInvalidArg,
@@ -545,6 +546,9 @@ async function renderPageImage(input: {
       `render ${pin} ${requested} no longer current (current=${page.cache[pin]}) for page ${input.pageObjectNumber}`,
     );
   }
+  // ...and the server's fonts it was drawn with: fallback fonts draw page
+  // text, so another server's fonts are another picture.
+  await assertServerFonts(input.documentService, parsedQuery.serverFonts, input.reply);
 
   // ── The derived-artifact plane ───────────────────────────────────────
   // Lattice renders are durable: URL space == artifact space at canonical

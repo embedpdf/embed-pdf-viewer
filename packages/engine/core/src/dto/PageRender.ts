@@ -270,6 +270,11 @@ export interface PageRenderQuery {
   contentVersion?: number;
   annotationVersion?: number;
   widgetVersion?: number;
+  /**
+   * The server's fonts it was drawn with (`DocumentManifest.serverFonts`):
+   * required with the pins, since fallback fonts draw page text.
+   */
+  serverFonts?: string;
 }
 
 /**

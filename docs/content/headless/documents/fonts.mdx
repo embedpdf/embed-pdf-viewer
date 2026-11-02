@@ -1,0 +1,122 @@
+---
+title: Fonts
+description: "List the fonts a document can be written in, see what each one allows, and draw text in a browser in the font the engine writes it with."
+---
+
+# Fonts
+
+Text the engine writes, in a free text box, a form field or a redaction label, is in the font its
+`fontFamily` names. Register `fontsPlugin()` to list the fonts a document can be written in, and to
+draw text in a browser in the very font the engine will write it with:
+
+<Snippet name="documents/font-select" />
+
+The annotation and form layers use the plugin by themselves: with it, text being typed shows in
+the fonts the engine writes it with; without it, in the standard font the engine falls back to.
+Nothing is read when a document opens: the fonts are read the first time something asks for them.
+
+## The fonts you can use
+
+<Fw only={['react', 'vue', 'svelte']}>`fonts`</Fw><Fw only="angular">`fonts.list()`</Fw> has
+every font, with where it comes from:
+
+| `source`     | The fonts                                                                       |
+| :----------- | :------------------------------------------------------------------------------ |
+| `'standard'` | The 14 standard PDF fonts, drawn the same everywhere. They only cover Latin text. |
+| `'engine'`   | The engine's own fonts: the ones you register locally, your server's on the cloud. |
+| `'document'` | The fonts the PDF already has.                                                  |
+
+A font's `name` is what `fontFamily` takes. `canChoose` says whether new text can be written in it,
+and when it can't, `restrictions` says why:
+
+| Restriction            | Why                                                                    |
+| :--------------------- | :--------------------------------------------------------------------- |
+| `'subset'`             | The PDF holds only the characters its text uses.                       |
+| `'not-embedded'`       | The PDF only names the font.                                           |
+| `'preview-and-print'`  | Its licence allows showing and printing, not editing.                  |
+| `'unsupported-format'` | A Type 1, CFF or Type 3 font: new text is written in TrueType or OpenType. |
+| `'no-unicode-map'`     | The font doesn't say which character each of its letters is.           |
+| `'not-served'`         | A server font whose file stays on the server. It can still be chosen.  |
+
+A box keeps the font it has either way. Every field of a font is on the engine's
+[Fonts](/docs/engine/documents/fonts#the-fonts-you-can-use) page.
+
+The list keeps up by itself. A write that puts a font in the document, such as Hebrew typed in a
+box, which the engine fills in from a Hebrew font, reads it again:
+
+<Example name="fonts/list" />
+
+## Draw text in a font
+
+<Fw only={['react', 'vue', 'svelte']}>`useFontCss(font)`</Fw><Fw only="angular">`injectFontCss(() => font)`</Fw>
+gives the CSS a font is drawn with, and mounts its programs (the font files) while your component
+lives:
+
+<Snippet name="documents/font-preview" />
+
+Draw with `font-synthesis: none`, so the browser never fakes a bold or an italic the engine won't
+draw. The CSS names the engine's own programs, then the same fallback fonts the engine fills
+missing characters from, in its order, then a font that draws a character no font has as a box,
+as the engine writes it. Until the browser has every program, it names the system's closest fonts
+instead, and the CSS changes when they arrive.
+
+<Example name="fonts/draw" />
+
+## Your own editor
+
+To lay text out yourself, ask what the engine will do. `resolve()` says which font a write will
+draw each run of text in; `getRunCss(run)` gives the CSS for a run as it answered.
+`getPaintFonts(font, text)` gives the fonts themselves, measured as the browser draws them: what
+`@embedpdf/core-text` lays text out with, so it breaks lines where the engine will. See
+[Show typed text in a browser](/docs/engine/documents/fonts#show-typed-text-in-a-browser) for what
+each answer holds.
+
+## Methods
+
+Everything `useFonts()` gives you.
+
+| Method                          | What it does                                                                                                  |
+| :------------------------------ | :------------------------------------------------------------------------------------------------------------ |
+| `ensureLoaded()`                | Reads the document's fonts unless they're loaded or loading. Resolves once they're there.                    |
+| `refresh()`                     | Reads them again. Rarely needed: the list keeps up by itself.                                                 |
+| `resolve(request)`              | The fonts a write would draw each run in, without writing. [Your own editor](#your-own-editor)                |
+| `getProgram(displayHash)`       | A font file's facts: the characters it covers and its line metrics.                                          |
+| `getFontCss(font)`              | The CSS text in a font is drawn with, and the programs it names. [Draw text in a font](#draw-text-in-a-font) |
+| `getFaceCss(face)`              | The same for a face, as rich text names one: `{ family, weight, italic }`.                                    |
+| `getRunCss(run)`                | The same for a run as `resolve()` answered it.                                                               |
+| `getPaintFonts(font, text)`     | The fonts a box in `font` draws `text` in, measured; `null` while they load. [Your own editor](#your-own-editor) |
+| `getPaintFontsEpoch()`          | A number that moves when any of the answers above may change: ask again when it does.                        |
+| `getFaceOfCssFamily(cssFamily)` | The face a program's CSS family stands for, to read back text the browser drew itself.                       |
+
+`resolve()` and `getProgram()` also take a `signal` in their options, to cancel them.
+
+## State
+
+<StateIntro hook="useFontsState()" />
+
+| Field    | What it is                                                                                  | Read once       |
+| :------- | :------------------------------------------------------------------------------------------ | :-------------- |
+| `fonts`  | Every font the document can be written in, as listed under [The fonts you can use](#the-fonts-you-can-use), or `null` until the list has loaded | `getFontList()` |
+| `status` | `'idle'` until something asks for the list, then `'loading'`, `'ready'`, `'forbidden'` or `'error'` | `getStatus()`   |
+
+<Fw only="angular">In Angular, `fonts` is `list()`.</Fw>
+
+## Events
+
+| Event               | Fires when                                                                          | Carries |
+| :------------------ | :---------------------------------------------------------------------------------- | :------ |
+| `onFontListChanged` | The list was loaded, or changed: a write put a font in the document, or the engine's fonts changed | `fonts` |
+
+## Good to know
+
+### Fonts that stay on the engine
+
+A font whose file can't go to a browser, one the PDF only names or a server font kept on the
+server, is drawn in the standard font the engine falls back to for it while text is typed. The
+engine's own picture of the box follows the write.
+
+### On the cloud
+
+Downloading a font file needs a token that may write text in the document. With a read-only token
+the list is still there; the standard fonts, which come with the viewer, show as they are, and
+any other font in the system's closest font.

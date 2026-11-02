@@ -502,6 +502,27 @@ export const en: Locale = {
       selected: '{count} selected',
       toolDefaults: '{tool} defaults',
       defaults: 'Defaults',
+      // The font picker's groups, a font's style after its family's name, and why a font can't be
+      // chosen for new text.
+      fontGroups: {
+        document: 'In this document',
+        yours: 'Your fonts',
+        server: 'Server fonts',
+        standard: 'Standard',
+      },
+      fontStyles: {
+        bold: 'Bold',
+        italic: 'Italic',
+        boldItalic: 'Bold Italic',
+      },
+      fontRestrictions: {
+        notEmbedded: 'The document only names it',
+        subset: 'The document holds only the characters it uses',
+        previewAndPrint: 'Its licence allows viewing and printing only',
+        unsupportedFormat: 'New text can’t be written in this kind of font',
+        noUnicodeMap: 'It doesn’t say which characters it draws',
+        other: 'New text can’t be written in it',
+      },
     },
     // The flags section of the style panel: its title, and what each flag does.
     annotationFlags: {

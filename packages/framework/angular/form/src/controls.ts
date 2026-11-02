@@ -20,26 +20,23 @@
  * The text-editing, toggle and list policies, the field looks, the controls' styles and the
  * colors are `@embedpdf/web`'s, the same for every framework.
  */
-import { isPlatformBrowser } from '@angular/common';
 import {
   afterRenderEffect,
   ChangeDetectionStrategy,
   Component,
   computed,
-  DestroyRef,
   effect,
   ElementRef,
   inject,
   input,
-  PLATFORM_ID,
   signal,
   untracked,
   viewChild,
 } from '@angular/core';
-import { CapabilityBinding, injectKernelHost } from '@embedpdf/angular/runtime';
+import { CapabilityBinding, injectFontMounts, injectKernelHost } from '@embedpdf/angular/runtime';
+import { FontsToken } from '@embedpdf/plugin-fonts/contract';
 import { SignatureToken } from '@embedpdf/plugin-signature/contract';
 import {
-  createFontMounts,
   createTextFieldEditor,
   FORM_CONTROL_FILL,
   formFocusRingStyleOf,
@@ -127,8 +124,16 @@ export class FormTextControl extends FormWidgetBox<WidgetOf<'text'>> {
 
   protected readonly state = signal<TextFieldEditorState>({ focused: false, draft: '' });
 
-  /** The text being typed, where the engine will draw it, in its face. */
+  /** The fonts plugin's epoch: the field's fonts were found, so it's laid out again. */
+  private readonly paintFonts = new CapabilityBinding(
+    injectKernelHost('<epdf-form-layer>'),
+    () => FontsToken,
+    () => this.page.documentId,
+  ).select((fonts) => fonts.getPaintFontsEpoch(), 0, Object.is);
+
+  /** The text being typed, where the engine will draw it, in its fonts. */
   private readonly layout = computed(() => {
+    this.paintFonts();
     const form = this.form();
     const widget = this.item().annotationRef;
     return form && widget ? form.getTextEditorLayout(widget, this.state().draft) : null;
@@ -146,14 +151,7 @@ export class FormTextControl extends FormWidgetBox<WidgetOf<'text'>> {
 
   constructor() {
     super();
-    if (isPlatformBrowser(inject(PLATFORM_ID))) {
-      const mounts = createFontMounts();
-      inject(DestroyRef).onDestroy(() => mounts.release());
-      effect(() => {
-        const layout = this.layout();
-        if (layout) mounts.mount([layout.program]);
-      });
-    }
+    injectFontMounts(() => this.layout()?.programs ?? []);
     effect((onCleanup) => {
       const editor = this.editor();
       if (!editor) return;
@@ -277,7 +275,10 @@ export class FormComboControl extends FormWidgetBox<WidgetOf<'choice'>> {
   }
 }
 
-/** A list: a visible native select in the field's own look, the settings where it has none. */
+/**
+ * A list: a visible native select in the field's own look, the settings where it has none, in
+ * the widget's font as the engine picks it.
+ */
 @Component({
   selector: 'div[epdfFormList]',
   imports: [FormFocusRing, FormListBox],
@@ -305,9 +306,29 @@ export class FormListControl extends FormWidgetBox<WidgetOf<'choice'>> {
   protected override readonly drawsEdge = false;
   protected readonly focused = signal(false);
 
+  /** The fonts plugin's epoch: the widget's font is read again once its fonts are read or loaded. */
+  private readonly fontsEpoch = new CapabilityBinding(
+    injectKernelHost('<epdf-form-layer>'),
+    () => FontsToken,
+    () => this.page.documentId,
+  ).select((fonts) => fonts.getPaintFontsEpoch(), 0, Object.is);
+
+  /** The rows' font, as the engine picks it. */
+  private readonly font = computed(() => {
+    this.fontsEpoch();
+    const form = this.form();
+    const widget = this.item().annotationRef;
+    return form && widget ? form.getWidgetFontCss(widget) : null;
+  });
+
   protected readonly listStyle = computed(() =>
-    listBoxControlStyleOf(this.item(), this.frame(), this.colors()),
+    listBoxControlStyleOf(this.item(), this.frame(), this.colors(), this.font()),
   );
+
+  constructor() {
+    super();
+    injectFontMounts(() => this.font()?.programs ?? []);
+  }
 
   /** The list's write: the selection it shows at once, and the engine's once this resolves. */
   protected readonly write = (values: string[]) =>

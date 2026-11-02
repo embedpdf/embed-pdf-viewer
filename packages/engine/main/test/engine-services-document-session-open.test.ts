@@ -81,6 +81,9 @@ function createFakeRuntime(): PdfRuntimeModule & {
     fn: {
       FPDF_InitLibrary: () => undefined,
       FPDF_DestroyLibrary: () => undefined,
+      // Every thread registers the last-resort font.
+      EPDFFont_RegisterMemFont64: () => 1,
+      EPDFFont_SetLastResortFont: () => true,
       EPDF_InitThread: () => undefined,
       EPDF_ShutdownThread: () => undefined,
       FPDF_LoadMemDocument64: (dataPtr: Ptr, size: number, password: string) => {

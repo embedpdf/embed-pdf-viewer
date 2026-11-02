@@ -4,7 +4,6 @@ import {
   bindWidgetEvents,
   createOptimisticSelection,
   createTextFieldEditor,
-  cssFontOf,
   formColorsOf,
   listBoxStyleOf,
   pressToggle,
@@ -42,27 +41,11 @@ describe('formColorsOf', () => {
 });
 
 describe('field looks', () => {
-  it('maps the 14 standard fonts to CSS', () => {
-    expect(cssFontOf(null)).toEqual({
-      fontFamily: 'Helvetica, Arial, sans-serif',
-      fontWeight: 400,
-      fontStyle: 'normal',
-    });
-    expect(cssFontOf('courier-oblique')).toEqual({
-      fontFamily: '"Courier New", Courier, monospace',
-      fontWeight: 400,
-      fontStyle: 'italic',
-    });
-    expect(cssFontOf('times-bold').fontWeight).toBe(700);
-  });
-
   it('sizes a text field’s font with the page, and fits an unsized one to its box', () => {
     const frame = { left: 0, top: 0, width: 200, height: 20 };
     const field = { box: { width: 100 }, look, multiline: false, comb: false, maxLength: null };
+    // The font is the editor layout's: nothing is read off the font's name.
     expect(textFieldStyleOf(field, frame, colors)).toEqual({
-      fontFamily: '"Times New Roman", Times, serif',
-      fontWeight: 700,
-      fontStyle: 'normal',
       fontSize: '20px',
       textAlign: 'right',
       color: 'T',
@@ -84,17 +67,27 @@ describe('field looks', () => {
     });
   });
 
-  it('draws a list box’s border at least a pixel wide, in the field’s own style', () => {
+  it('draws a list box’s border at least a pixel wide, in the field’s own style and font', () => {
+    const font = {
+      fontFamily: '"epdf-times", serif',
+      fontWeight: 700,
+      fontStyle: 'normal' as const,
+    };
     const style = listBoxStyleOf(
       { box: { width: 100 }, look: { ...look, borderWidth: 0.25, fontSize: null } },
       { left: 0, top: 0, width: 200, height: 50 },
       colors,
+      { ...font, programs: [] } as typeof font,
     );
-    expect(style).toMatchObject({
+    expect(style).toEqual({
+      ...font,
+      fontSize: '24px',
+      textAlign: 'right',
+      color: 'T',
+      background: 'BG',
       borderWidth: '1px',
       borderStyle: 'dashed',
       borderColor: 'B',
-      fontSize: '24px',
     });
   });
 });
