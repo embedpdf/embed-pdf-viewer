@@ -230,10 +230,18 @@ samples/viewer/<page>/<name>.cloud.react.tsx   cloudpdf.com's own version, where
 
 The page shows one with `<Example name="viewer/<page>/<name>" />`, like any other. The viewer fills
 its box, so a viewer example gives it `height: 100%` and the docs give the box: a frame that suits
-the docs column, or a bigger one with `size="tall"`, or `size="wide"`, as tall and on a wide screen
-over the table of contents' column too (`src/components/docs/example.tsx`, the kit's
+the docs column, or a bigger one with `size="tall"` (`src/components/docs/example.tsx`, the kit's
 `CodeExampleCard` `frame`). A page may show several: each starts its own viewer, when it scrolls
-near. Its document is a `[!doc-source]` block holding a constant (`const ebook = '…';`, in a plain
+near.
+
+An app that needs the whole window, one of the Examples section's (`viewer/examples/<slug>`), is
+`size="page"`: it opens on a page of its own, `/examples/<slug>` (`src/lib/examples.ts`), and its
+docs page shows a screenshot of it that links there, with its code under it. The page runs the
+plain HTML build, since every integration's looks the same, and its code slides in beside it, in
+the integration the reader picks (`/api/examples/<slug>/<integration>`, built once).
+`pnpm --filter @embedpdf/docs-content screenshots` takes the screenshots from a running
+embedpdf.com into both sites' `public/screenshots/`, and `docs:check` fails while one is missing.
+Take them again when such an example changes. Its document is a `[!doc-source]` block holding a constant (`const ebook = '…';`, in a plain
 HTML page inside its module script), which cloudpdf.com's copy gives in the cloud viewer's form.
 
 The plain HTML page loads the viewer from its CDN script, as a reader's does. Its demo

@@ -231,6 +231,39 @@ export function sitePages(section, engine) {
   }));
 }
 
+// ── examples on a page of their own ─────────────────────────────────────────
+
+/** Where a site serves the examples' screenshots (`docs/content/screenshots/build.mjs`). */
+export const SCREENSHOTS_DIR = 'public/screenshots';
+
+/**
+ * The examples a flavor's viewer pages show as a screenshot (`<Example name size="page">`), as
+ * `{ name, slug, source }`. Such an example is an app that needs the whole window: it opens on a
+ * page of its own, `/examples/<slug>`, and its docs page shows a picture of it that links there.
+ * It's one of the Examples section's, `viewer/examples/<slug>`, shown by that section's page of
+ * the same name.
+ */
+export function pageExamples(engine) {
+  const examples = [];
+  for (const page of sitePages('viewer', engine)) {
+    for (const [tag] of page.mdx.matchAll(/<Example\b[^>]*>/g)) {
+      const attributes = Object.fromEntries(
+        [...tag.matchAll(/(\w+)="([^"]*)"/g)].map(([, key, value]) => [key, value]),
+      );
+      if (attributes.size !== 'page') continue;
+      const slug = attributes.name?.match(/^viewer\/examples\/([\w-]+)$/)?.[1];
+      if (!slug || page.name !== `examples/${slug}`) {
+        throw new Error(
+          `${page.source}: <Example name="${attributes.name}" size="page"> is an example of the ` +
+            'Examples section (viewer/examples/<slug>), shown by its page there',
+        );
+      }
+      examples.push({ name: attributes.name, slug, source: page.source });
+    }
+  }
+  return examples;
+}
+
 // ── engine lines (headless samples, engine pages) ───────────────────────────
 
 /**
@@ -558,6 +591,15 @@ async function main() {
         console.error(`- ${file}`);
       }
       console.error('Run: pnpm docs:sync');
+      process.exit(1);
+    }
+    const unpictured = pageExamples(args.engine).filter(
+      ({ name }) => !fs.existsSync(path.join(args.target, SCREENSHOTS_DIR, `${name}.webp`)),
+    );
+    if (unpictured.length) {
+      console.error('Examples on a page of their own with no screenshot:');
+      for (const { name } of unpictured) console.error(`- ${SCREENSHOTS_DIR}/${name}.webp`);
+      console.error('Run: pnpm --filter @embedpdf/docs-content screenshots');
       process.exit(1);
     }
     console.log(`Docs content is current (${expected.size} files, engine=${args.engine}).`);

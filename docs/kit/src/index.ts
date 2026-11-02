@@ -67,8 +67,10 @@ export {
 } from './release';
 export {
   CodeExampleCard,
+  CodeFiles,
   type ExampleFile,
   type ExampleFrame,
   type ExampleMode,
 } from './code-example-card';
 export { CodeExample } from './code-example';
+export { ExamplePoster } from './example-poster';
