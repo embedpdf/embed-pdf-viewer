@@ -155,6 +155,7 @@ export class TenantsRepo {
     // security-events trail deliberately survives (no FK, by design).
     await this.db.deleteFrom('grants').where('tenant_id', '=', tenantId).execute();
     await this.db.deleteFrom('tenant_usage_counter').where('tenant_id', '=', tenantId).execute();
+    await this.db.deleteFrom('tenant_usage_once').where('tenant_id', '=', tenantId).execute();
 
     await this.db
       .deleteFrom('layer_pages')

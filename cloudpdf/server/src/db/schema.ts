@@ -447,10 +447,20 @@ export interface DocumentImportsTable {
 
 export interface TenantUsageCounterTable {
   tenant_id: string;
-  metric: 'pdf.uploads' | 'pdf.views';
-  period_start: string;
+  /** A core meter (`pdf.views`) or a module's (`protected-display.views`). */
+  metric: string;
+  /** The UTC day, `YYYY-MM-DD`. Rows from before days hold a month on its first day. */
+  day: string;
   value: number;
   updated_at: number;
+}
+
+/** The keys a meter counted once on a day (`oncePerDay`), as sha-256 hex. */
+export interface TenantUsageOnceTable {
+  tenant_id: string;
+  metric: string;
+  day: string;
+  key_hash: string;
 }
 
 export interface SchemaMigrationsTable {
@@ -760,6 +770,7 @@ export interface Database {
   grant_visitors: GrantVisitorsTable;
   document_imports: DocumentImportsTable;
   tenant_usage_counter: TenantUsageCounterTable;
+  tenant_usage_once: TenantUsageOnceTable;
   engine_crashes: EngineCrashesTable;
   engine_crash_suspects: EngineCrashSuspectsTable;
   engine_quarantine: EngineQuarantineTable;

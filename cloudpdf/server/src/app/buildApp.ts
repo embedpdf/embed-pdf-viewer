@@ -60,7 +60,7 @@ import type { ConnectedUsageReporter } from '../licensing/ConnectedUsageReporter
 import type { LicenseGate } from '../licensing/LicenseRuntime';
 import { licenseRuntimeOf, type CloudPdfLicenseRuntime } from '../licensing/public';
 import { UsageMeters } from '../licensing/UsageMeters';
-import { declareModules, mountModules } from '../modules/host';
+import { declareModules, moduleManifests, moduleMeterNames, mountModules } from '../modules/host';
 import type { HostedModule } from '../modules/protocol';
 import { InProcessRealtimeBus, type RealtimeBus } from '../realtime/RealtimeBus';
 import { SharpImageEncoder } from '../render/SharpImageEncoder';
@@ -761,6 +761,8 @@ async function buildAppUnchecked(opts: LicensedAppOptions): Promise<AppBundle> {
   // Tenant features: which modules a tenant may use, asked on every
   // module route. Like suspension, the operator's switch.
   const tenantFeaturesGuard = opts.db ? new TenantFeaturesGuard({ db: opts.db }) : undefined;
+  // What each tenant used, per UTC day: the core's meters and modules'.
+  const tenantUsage = opts.db ? new TenantUsageRepo(opts.db) : undefined;
 
   // The deployment can sign iff it verifies with the shared secret —
   // the one condition gating every minting surface: tokens.issue, the
@@ -1084,6 +1086,16 @@ async function buildAppUnchecked(opts: LicensedAppOptions): Promise<AppBundle> {
       };
     },
   });
+  const modules = moduleManifests(declaredModules, permissions);
+  const modulesOp = adminOperations['deployment.modules'];
+  app.route({
+    method: modulesOp.method,
+    url: modulesOp.path,
+    handler: async (request) => {
+      requireApiToken(request);
+      return { modules };
+    },
+  });
 
   // Drift detection at boot. Production deployments should supply
   // `expectedMigrations` — if the DB has a checksum mismatch or an
@@ -1179,7 +1191,7 @@ async function buildAppUnchecked(opts: LicensedAppOptions): Promise<AppBundle> {
       ...(baseFileCache ? { fileCache: baseFileCache } : {}),
       ...(derivedRenders ? { derivedRenders } : {}),
       ...(usageMeters ? { usageMeters } : {}),
-      tenantUsage: new TenantUsageRepo(opts.db),
+      tenantUsage: tenantUsage!,
       grants: new GrantsRepo(opts.db),
     });
     await registerAdminDocumentsRoutes(app, {
@@ -1233,15 +1245,15 @@ async function buildAppUnchecked(opts: LicensedAppOptions): Promise<AppBundle> {
       });
       importWorker.start();
     }
-    const tenantUsage = new TenantUsageRepo(opts.db);
     await registerAdminTenantsRoutes(app, {
       tenants: new TenantsRepo(opts.db),
       storage: opts.objectStore,
       securityEvents: new SecurityEventsRepo(opts.db),
       suspendedTenants: suspendedTenantsGuard!,
       tenantFeatures: tenantFeaturesGuard!,
-      tenantUsage,
+      tenantUsage: tenantUsage!,
       modules: declaredModules.map(({ module }) => module.id),
+      moduleMeters: moduleMeterNames(declaredModules),
     });
     // Issue mounts only when the deployment can sign (HS256 — the
     // verifier secret doubles as signing material); revoke only when
@@ -1278,7 +1290,7 @@ async function buildAppUnchecked(opts: LicensedAppOptions): Promise<AppBundle> {
         deleteLayer,
         suspendedTenants: suspendedTenantsGuard!,
         ...(usageMeters ? { usageMeters } : {}),
-        tenantUsage,
+        tenantUsage: tenantUsage!,
       });
     }
 
@@ -1471,7 +1483,7 @@ async function buildAppUnchecked(opts: LicensedAppOptions): Promise<AppBundle> {
         cdnSigner: opts.cdnSigner ?? new NoneCdnSigner(),
         ...(derivedRenders ? { derivedRenders } : {}),
         ...(usageMeters ? { usageMeters } : {}),
-        tenantUsage: new TenantUsageRepo(opts.db),
+        tenantUsage: tenantUsage!,
         bundleLimits: opts.bundleLimits ?? DEFAULT_BUNDLE_LIMITS,
       });
       await registerObjectNumberRoutes(app, { documentService, layerService });
@@ -1548,6 +1560,7 @@ async function buildAppUnchecked(opts: LicensedAppOptions): Promise<AppBundle> {
         documentService
           ?.closeIdleLayerSessions(Date.now())
           .catch((err) => app.log.error({ err }, 'closeIdleLayerSessions failed'));
+        tenantUsage?.sweepOnceKeys().catch((err) => app.log.error({ err }, 'sweepOnceKeys failed'));
       }, sweepIntervalMs);
       sweeperTimer.unref();
     }
@@ -1558,6 +1571,7 @@ async function buildAppUnchecked(opts: LicensedAppOptions): Promise<AppBundle> {
     permissions,
     ...(documentService ? { documentService } : {}),
     ...(tenantFeaturesGuard ? { tenantFeatures: tenantFeaturesGuard } : {}),
+    ...(tenantUsage ? { tenantUsage } : {}),
     ...(derivedRenders ? { derivedRenders } : {}),
     ...(signer ? { sign: signer } : {}),
   });

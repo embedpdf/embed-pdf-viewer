@@ -44,6 +44,8 @@ A module that's wrong stops the server before it listens, and the error says why
 - a required setting that isn't set (the error names the variable);
 - two modules with the same id, or an id that's one of the core's names (`doc`, `pdf`,
   `annotations`…);
+- a module without a `name`, or a meter without a `label` and a `unit`;
+- a `replaces` or `bypassedBy` that isn't one of the core's document permissions;
 - a permission outside the module's id, or a route that needs a permission the module doesn't
   declare;
 - something other than the core's document permissions in `requires.document`.
@@ -62,6 +64,33 @@ server. Each module the server mounts is in the log:
 }
 ```
 
+## List the installed modules
+
+`GET /v1/deployment/modules`, with the deployment's API token, lists each installed module as it
+declares itself: what it's called, its permissions with what a dialog says for them, its meters,
+and what it does beyond its callers. A dashboard of your own builds its lists, its grant dialog and
+its usage page from it, so a new module shows up there without a change to the dashboard.
+
+```json
+{
+  "modules": [
+    {
+      "id": "snapshot",
+      "name": "Snapshots",
+      "description": "Save a page as an image.",
+      "permissions": [
+        { "name": "snapshot.create", "level": "document", "label": "Save a page as an image" }
+      ],
+      "meters": [{ "name": "snapshot.saved", "label": "Pages saved", "unit": "pages" }],
+      "requires": { "document": ["doc.render"] }
+    }
+  ]
+}
+```
+
+The SDKs call it `deployment.modules()`. Which tenants may use a module is in each tenant's
+`features`, and what it costs, if anything, is yours to decide: the server knows no prices.
+
 ## Permissions
 
 A module's permissions start with its id, like `snapshot.create`. With the module installed, they
@@ -76,12 +105,36 @@ word, so tokens and grants can carry it.
 ```ts
 export default defineServerModule({
   id: 'reading-progress',
+  name: 'Reading progress',
   permissions: { track: { level: 'document', label: 'Record reading progress' } },
   setup() {}, // no routes: the viewer plugin checks the permission
 });
 ```
 
 See [Plugins' permissions](/docs/engine/concepts/permissions#plugins-permissions).
+
+A permission can say how it relates to the core's, for whoever builds a dialog that grants it:
+
+```ts
+permissions: {
+  view: {
+    level: 'document',
+    label: 'Protected',
+    description: 'Screenshots, recordings and shared screens show the pages black.',
+    replaces: 'doc.render',
+    bypassedBy: ['doc.download', 'doc.print', 'doc.text.copy', 'doc.render.thumbnail'],
+  },
+},
+```
+
+- **`replaces`** names a core document permission this one is another way of doing. A dialog can
+  offer the two as a choice: pages as pictures, or protected. A token may hold both; then the core
+  one has its usual effect.
+- **`bypassedBy`** names core document permissions that let out what this one protects: with
+  `doc.download`, the file leaves anyway. A dialog can turn them off when this one is chosen, and
+  say why when someone turns one back on.
+
+Both are facts for a dialog to show. The server enforces neither: a token holds what it was given.
 
 ## Routes
 
@@ -165,6 +218,62 @@ server keeps no caps and knows no prices; it does what the list says.
 - **After the token.** A caller learns about a tenant's features only with a valid token for one
   of its documents, so the refusals say nothing to anyone else.
 
+## Count usage
+
+A module counts its own meters, which it declares with a label and a unit. Its routes count them
+for the document's tenant, per UTC day:
+
+```ts
+export default defineServerModule({
+  id: 'snapshot',
+  name: 'Snapshots',
+  meters: { saved: { label: 'Pages saved', unit: 'pages' } },
+  setup(host) {
+    host.docRoute({
+      method: 'GET',
+      path: 'pages/:page',
+      permission: 'create',
+      async handler(req) {
+        // Once a day per person and document, however often they save.
+        await req.meters.count('saved', { oncePerDay: `${req.session.sub}:${req.docId}` });
+        // …
+      },
+    });
+  },
+});
+```
+
+`req.meters.count(meter)` adds one to the meter, written without the module's id. With
+`oncePerDay`, only the first count with that key each UTC day adds one; the server keeps the key as
+its hash, for that day only. A meter the module didn't declare is an error in the module.
+
+The tenant's usage reports each installed module's meter by its whole name, next to the core's,
+and `0` when nothing counted it:
+
+```sh
+curl "localhost:3000/v1/tenants/fernquill/usage?from=2026-11-03&to=2026-12-03" \
+  -H "Authorization: Bearer $API_TOKEN"
+```
+
+```json
+{
+  "tenantId": "fernquill",
+  "periodStart": "2026-11-03",
+  "periodEnd": "2026-12-03",
+  "metrics": {
+    "pdf.views": 1840,
+    "pdf.uploads": 52,
+    "storage.bytes": 73400320,
+    "snapshot.saved": 311
+  }
+}
+```
+
+Usage is counted per UTC day, so it adds up over any window: `from` the first day and `to` the
+day after the last, up to 366 days, or `period=2026-11` for a calendar month (the current one by
+default). `storage.bytes` is what the tenant stores now, whatever the window. The server records
+and reports; limits and prices are yours.
+
 ## From the viewer
 
 The browser side of a plugin calls its module through the document it has open on the cloud
@@ -210,6 +319,7 @@ import {
 
 export default defineServerModule({
   id: 'snapshot',
+  name: 'Snapshots',
   permissions: {
     create: { level: 'document', label: 'Save a page as an image' },
   },
@@ -265,8 +375,11 @@ export default defineServerModule({
 
 | Field                 | What it is                                                                                                                                                                                                                                                  |
 | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `id`                  | The module's namespace: lowercase words joined by `-`. Its permissions, routes and settings all carry it.                                                                                                                                                   |
+| `id`                  | The module's namespace: lowercase words joined by `-`. Its permissions, meters, routes and settings all carry it.                                                                                                                                            |
+| `name`                | What people call it, in lists of modules: `Snapshots`. Required.                                                                                                                                                                                            |
+| `description`         | What it does, in a sentence.                                                                                                                                                                                                                                |
 | `permissions`         | The permissions its routes need, written without the id: `create` is `snapshot.create`. `level: 'document'` goes in viewer tokens and grants, `level: 'tenant'` in tenant tokens and API keys.                                                              |
+| `meters`              | What it counts, written without the id: `saved` is `snapshot.saved`. Each has a `label` and a `unit`; its routes count them with `req.meters`, and the tenants' usage reports them.                                                                          |
 | `requires`            | What it does beyond whoever calls it. `document` lists the core's document permissions the module holds itself (`doc.render`, `doc.text.copy`…): its own token carries these and `doc.open`, and nothing more. This is the list a workspace admin approves. |
 | `config`              | Its settings, each read from `CLOUDPDF_<ID>_<KEY>`. A setting without a `default` is required; `secret: true` keeps it out of the logs.                                                                                                                     |
 | `setup(host, config)` | Runs once while the server starts. `host.docRoute(…)` adds a route; `host.log` writes to the server's log with the module's id on each line.                                                                                                                |
@@ -282,6 +395,7 @@ A route's handler gets the request, already checked:
 | `req.params`, `req.query`                    | The route's path parameters and query.                                                                                                                           |
 | `req.body`                                   | Bytes for `application/octet-stream`, the parsed value for `application/json`.                                                                                   |
 | `req.signal`                                 | Aborts when the caller goes away.                                                                                                                                |
+| `req.meters.count(meter, { oncePerDay })`    | Counts one of the module's meters for the document's tenant, today (UTC). See [Count usage](#count-usage).                                                       |
 
 Both documents open on first use and close when the handler returns. Their requests go through
 the server's own routes and checks without leaving its process. They always read from the server
@@ -363,11 +477,12 @@ the `licenseKey` option. It checks the key online as it starts, so CI needs the 
 and access to `api.keygen.sh`. Without a key, or with one that isn't valid, `startTestServer`
 throws and says why; `describe.skipIf` keeps a suite from running where there's no key.
 
-Everything else is the test server's own, and goes when it closes: a SQLite database in memory,
-files in a temporary folder, one engine worker, a random JWT secret and API token. It listens on
-`127.0.0.1`, on a port that's free. It checks the modules as a server does when it starts, so a
-module that's wrong makes `startTestServer` throw the error the server would stop with. Its
-modules read their settings from `env` alone, never from `process.env`.
+Its tenant has every module you give it turned on. Everything else is the test server's own, and
+goes when it closes: a SQLite database in memory, files in a temporary folder, one engine worker, a
+random JWT secret and API token. It listens on `127.0.0.1`, on a port that's free. It checks the
+modules as a server does when it starts, so a module that's wrong makes `startTestServer` throw the
+error the server would stop with. Its modules read their settings from `env` alone, never from
+`process.env`.
 
 | Option       | What it is                                                                                                |
 | ------------ | --------------------------------------------------------------------------------------------------------- |

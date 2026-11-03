@@ -15,7 +15,12 @@ import { requireApiToken, requireTenantAccess } from '../../app/jwt-plugin';
 import type { SuspendedTenantsGuard } from '../../auth/SuspendedTenantsGuard';
 import type { TenantFeaturesGuard } from '../../auth/TenantFeaturesGuard';
 import type { SecurityEventsRepo } from '../../db/repos/security-events.repo';
-import type { TenantUsageRepo } from '../../db/repos/tenant_usage.repo';
+import {
+  monthWindow,
+  utcDay,
+  type TenantUsageRepo,
+  type UsageWindow,
+} from '../../db/repos/tenant_usage.repo';
 import type { TenantRow, TenantsRepo } from '../../db/repos/tenants.repo';
 import { StorageKeys } from '../../storage/keys';
 import type { ObjectStore } from '../../storage/ObjectStore';
@@ -29,6 +34,8 @@ export interface AdminTenantsRouteDeps {
   tenantUsage: TenantUsageRepo;
   /** The ids of the installed modules: the features a tenant may be given. */
   modules: ReadonlyArray<string>;
+  /** The installed modules' meters (`protected-display.views`): usage reports each one. */
+  moduleMeters: ReadonlyArray<string>;
 }
 
 /**
@@ -217,11 +224,45 @@ export async function registerAdminTenantsRoutes(
         .code(404)
         .send({ error: { code: 'NotFound', message: `tenant does not exist: ${tenantId}` } });
     }
-    // `period=YYYY-MM` reports a historical month; monthPeriod works
-    // from any date inside it.
-    const at = parsed.data.period ? new Date(`${parsed.data.period}-01T00:00:00Z`) : new Date();
-    return reply.send(await tenantUsage.snapshot(tenantId, at));
+    const window = usageWindow(parsed.data);
+    if (typeof window === 'string') {
+      return reply.code(400).send({ error: { code: 'InvalidArg', message: window } });
+    }
+    return reply.send(await tenantUsage.snapshot(tenantId, window, deps.moduleMeters));
   });
+}
+
+/** The longest window a usage request may ask for: a year, leap day included. */
+const MAX_USAGE_DAYS = 366;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * The days a usage request asks for: `from` to `to`, `period`'s month, or
+ * this month. A string says what's wrong with the request.
+ */
+function usageWindow(query: {
+  period?: string | undefined;
+  from?: string | undefined;
+  to?: string | undefined;
+}): UsageWindow | string {
+  const { period, from, to } = query;
+  if (from === undefined && to === undefined) {
+    return monthWindow(period ? new Date(`${period}-01T00:00:00Z`) : new Date());
+  }
+  if (period !== undefined) return 'ask for a period or for from and to, not both';
+  if (from === undefined || to === undefined) return 'from and to go together';
+  const start = Date.parse(`${from}T00:00:00Z`);
+  const end = Date.parse(`${to}T00:00:00Z`);
+  // `2026-02-31` matches the pattern but isn't a day.
+  const isDay = (ms: number, day: string) => !Number.isNaN(ms) && utcDay(new Date(ms)) === day;
+  if (!isDay(start, from) || !isDay(end, to)) {
+    return 'from and to are days on the calendar';
+  }
+  if (end <= start) return 'to is after from';
+  if ((end - start) / DAY_MS > MAX_USAGE_DAYS) {
+    return `a window is at most ${MAX_USAGE_DAYS} days`;
+  }
+  return { from, to };
 }
 
 function tenantPublic(t: TenantRow): Record<string, unknown> {

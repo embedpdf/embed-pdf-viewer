@@ -26,6 +26,7 @@ const SAMPLE = resolve(here, '../../../examples/engine-runtime-demo/public/sampl
 /** Stamps a page as the caller, and says who asked, where, with which label. */
 const stamp = defineServerModule({
   id: 'stamp',
+  name: 'Stamp',
   permissions: { add: { level: 'document', label: 'Stamp pages' } },
   config: { LABEL: { description: 'What the stamp says' } },
   setup(host, config) {

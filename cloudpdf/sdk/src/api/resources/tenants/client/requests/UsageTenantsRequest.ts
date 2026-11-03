@@ -9,4 +9,6 @@
 export interface UsageTenantsRequest {
     tenantId: string;
     period?: string;
+    from?: string;
+    to?: string;
 }

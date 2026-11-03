@@ -9,6 +9,7 @@ import { postgresMigrations } from '../src/db/migrations/postgres/index';
 import type { Database as Schema } from '../src/db/schema';
 import { checkDocumentNamesMigration } from './_helpers/document-names-migration';
 import { checkGrantsMigration } from './_helpers/grants-migration';
+import { checkUsageDaysMigration } from './_helpers/usage-days-migration';
 import { checkVersionsByLayerMigration } from './_helpers/versions-by-layer-migration';
 
 /**
@@ -114,6 +115,15 @@ describe('migrateDown [sqlite]', () => {
     const db = createSqliteDb({ path: ':memory:' });
     try {
       await checkGrantsMigration(db, sqliteMigrations);
+    } finally {
+      await db.destroy();
+    }
+  });
+
+  test('migration 051 counts usage per day and adds days back into months', async () => {
+    const db = createSqliteDb({ path: ':memory:' });
+    try {
+      await checkUsageDaysMigration(db, sqliteMigrations);
     } finally {
       await db.destroy();
     }
@@ -386,6 +396,15 @@ describe.runIf(RUN_PG)('migrateDown [postgres]', () => {
     const db = await makeDb();
     try {
       await checkGrantsMigration(db, postgresMigrations);
+    } finally {
+      await db.destroy();
+    }
+  });
+
+  test('migration 051 counts usage per day and adds days back into months', async () => {
+    const db = await makeDb();
+    try {
+      await checkUsageDaysMigration(db, postgresMigrations);
     } finally {
       await db.destroy();
     }

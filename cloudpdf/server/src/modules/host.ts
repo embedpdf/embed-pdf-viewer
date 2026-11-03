@@ -7,6 +7,7 @@
 import { Buffer } from 'node:buffer';
 import { randomUUID } from 'node:crypto';
 
+import type { ModuleManifest } from '@cloudpdf/contract';
 import {
   EngineError,
   EngineErrorCode,
@@ -37,6 +38,7 @@ import type {
   HostedRequest,
   ModuleConnection,
   ModuleLog,
+  ModuleMeters,
   ModuleResponse,
   ModuleSession,
 } from './protocol';
@@ -46,8 +48,9 @@ import {
   requireLayerDocAccessOnly,
 } from '../app/jwt-plugin';
 import type { SignDevTokenInput } from '../auth/JwtVerifier';
-import type { PermissionRegistry } from '../auth/permission-registry';
+import { isCoreCapability, type PermissionRegistry } from '../auth/permission-registry';
 import type { TenantFeaturesGuard } from '../auth/TenantFeaturesGuard';
+import type { TenantUsageRepo } from '../db/repos/tenant_usage.repo';
 import { abortSignalOf } from '../routes/_helpers';
 import type { DerivedRenderService } from '../services/DerivedRenderService';
 import type { DocumentService } from '../services/DocumentService';
@@ -65,6 +68,8 @@ export interface ModuleHostDeps {
    * document plane needs too.
    */
   readonly tenantFeatures?: TenantFeaturesGuard;
+  /** Where modules' meters are counted, next to the core's. Present with the database. */
+  readonly tenantUsage?: TenantUsageRepo;
   /** The deployment's render policy: its output-pixel budget binds module renders too. */
   readonly derivedRenders?: DerivedRenderService;
   /**
@@ -81,6 +86,7 @@ export interface DeclaredModule {
 }
 
 const CONFIG_KEY = /^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$/;
+const METER_KEY = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
 const ROUTE_SEGMENT = /^(:[a-zA-Z][a-zA-Z0-9]*|[a-z0-9][a-z0-9._-]*)$/;
 /** How long a module's own token lives, and how much of that is left when a new one is made. */
 const MODULE_TOKEN_TTL_SECONDS = 300;
@@ -109,6 +115,17 @@ export function declareModules(
         "isn't a module id: lowercase words joined by '-', not a core name",
       );
     }
+    if (typeof module.name !== 'string' || module.name.trim() === '') {
+      throw moduleError(module.id, 'needs a name, what people call it');
+    }
+    for (const [key, meter] of Object.entries(module.meters ?? {})) {
+      if (!METER_KEY.test(key)) {
+        throw moduleError(module.id, `meter "${key}" isn't lowercase words joined by '-'`);
+      }
+      if (!meter.label?.trim() || !meter.unit?.trim()) {
+        throw moduleError(module.id, `meter "${key}" needs a label and a unit`);
+      }
+    }
     for (const word of module.requires?.document ?? []) {
       if (!isCoreCapability(word)) {
         throw moduleError(
@@ -124,6 +141,46 @@ export function declareModules(
     }
     return { module, config: readConfig(module, env) };
   });
+}
+
+/**
+ * What each declared module is and adds, as it declares it, in load order:
+ * `GET /v1/deployment/modules`.
+ */
+export function moduleManifests(
+  declared: ReadonlyArray<DeclaredModule>,
+  permissions: PermissionRegistry,
+): ModuleManifest[] {
+  return declared.map(({ module }) => ({
+    id: module.id,
+    name: module.name,
+    ...(module.description !== undefined ? { description: module.description } : {}),
+    permissions: permissions
+      .list()
+      .filter((permission) => permission.plugin === module.id)
+      .map(({ name, level, label, description, replaces, bypassedBy }) => ({
+        name,
+        level,
+        label,
+        ...(description !== undefined ? { description } : {}),
+        ...(replaces !== undefined ? { replaces } : {}),
+        ...(bypassedBy !== undefined ? { bypassedBy: [...bypassedBy] } : {}),
+      })),
+    meters: Object.entries(module.meters ?? {}).map(([key, { label, unit, description }]) => ({
+      name: `${module.id}.${key}`,
+      label,
+      unit,
+      ...(description !== undefined ? { description } : {}),
+    })),
+    requires: { document: [...(module.requires?.document ?? [])] },
+  }));
+}
+
+/** Every declared module's meters, by their whole names: `protected-display.views`. */
+export function moduleMeterNames(declared: ReadonlyArray<DeclaredModule>): string[] {
+  return declared.flatMap(({ module }) =>
+    Object.keys(module.meters ?? {}).map((key) => `${module.id}.${key}`),
+  );
 }
 
 /**
@@ -143,10 +200,11 @@ export async function mountModules(
 }
 
 type MountDeps = ModuleHostDeps & { readonly fetch: typeof globalThis.fetch };
-/** What a module's routes need: the document plane and the tenants' features, present. */
+/** What a module's routes need: the document plane, the tenants' features and usage, present. */
 type RouteDeps = MountDeps & {
   readonly documentService: DocumentService;
   readonly tenantFeatures: TenantFeaturesGuard;
+  readonly tenantUsage: TenantUsageRepo;
 };
 
 async function mountModule(
@@ -162,14 +220,23 @@ async function mountModule(
     {
       docRoute(route) {
         if (!settingUp) throw moduleError(module.id, 'adds its routes in setup, not after it');
-        const { documentService, tenantFeatures } = deps;
-        if (documentService === undefined || tenantFeatures === undefined) {
+        const { documentService, tenantFeatures, tenantUsage } = deps;
+        if (
+          documentService === undefined ||
+          tenantFeatures === undefined ||
+          tenantUsage === undefined
+        ) {
           throw moduleError(
             module.id,
             'adds routes, which need the document plane: workerEntry, db and objectStore',
           );
         }
-        mountDocRoute(app, module, route, tokens, { ...deps, documentService, tenantFeatures });
+        mountDocRoute(app, module, route, tokens, {
+          ...deps,
+          documentService,
+          tenantFeatures,
+          tenantUsage,
+        });
         routes += 1;
       },
       log: moduleLog(app, module.id),
@@ -186,14 +253,6 @@ async function mountModule(
     },
     'module mounted',
   );
-}
-
-function isCoreCapability(word: string): boolean {
-  try {
-    return parseScope(word).kind === 'capability';
-  } catch {
-    return false;
-  }
 }
 
 /** `CLOUDPDF_<ID>_<KEY>` for each declared key; an empty variable counts as unset. */
@@ -316,6 +375,7 @@ function mountDocRoute(
         signal,
         caller: callerToken === null ? null : connection(deps.fetch, async () => callerToken),
         module: connection(deps.fetch, async () => tokens(target)),
+        meters: moduleMeters(module, ctx.tenantId, deps.tenantUsage),
         // Stops when the caller goes away, or when the module stops waiting.
         renderRaw: (page, options, renderSignal) =>
           renderRawAsModule(
@@ -330,6 +390,22 @@ function mountDocRoute(
       return send(reply, await route.handler(request));
     },
   });
+}
+
+/** Counts a module's own meters, for one tenant. */
+function moduleMeters(
+  module: HostedModule,
+  tenantId: string,
+  tenantUsage: TenantUsageRepo,
+): ModuleMeters {
+  return {
+    async count(meter, options) {
+      if (module.meters?.[meter] === undefined) {
+        throw moduleError(module.id, `counts "${meter}", which isn't one of its meters`);
+      }
+      await tenantUsage.count(tenantId, `${module.id}.${meter}`, options);
+    },
+  };
 }
 
 /** A document the request may open, and what it took to decide that. */

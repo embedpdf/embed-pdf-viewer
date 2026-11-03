@@ -22,6 +22,7 @@ import { buildAppForTesting } from '../src/app/buildApp';
 import { createValidTestLicenseGate } from '../src/licensing/testing';
 import { PermissionRegistry } from '../src/auth/permission-registry';
 import { TenantFeaturesGuard } from '../src/auth/TenantFeaturesGuard';
+import type { TenantUsageRepo } from '../src/db/repos/tenant_usage.repo';
 import { declareModules, mountModules } from '../src/modules/host';
 import { loadModules } from '../src/modules/load';
 import type { HostedModule, ModuleConnection, ModuleResponse } from '../src/modules/index';
@@ -65,10 +66,12 @@ async function effectiveScope(
 /** Saves pages as images: draws them as itself, beyond what its callers may render. */
 const snapshot: HostedModule = {
   id: 'snapshot',
+  name: 'Snapshots',
   permissions: {
     create: { level: 'document', label: 'Save a page as an image' },
     settings: { level: 'tenant', label: 'Change snapshot settings' },
   },
+  meters: { saved: { label: 'Pages saved', unit: 'pages' } },
   requires: { document: ['doc.render'] },
   config: {
     MAX_SCALE: { description: 'The largest scale a snapshot is drawn at', default: '2' },
@@ -98,6 +101,19 @@ const snapshot: HostedModule = {
             'x-label': config['LABEL']!,
           },
         };
+      },
+    });
+    host.docRoute({
+      method: 'POST',
+      path: 'count',
+      permission: 'create',
+      async handler(req) {
+        const { meter, once } = req.query;
+        await req.meters.count(
+          typeof meter === 'string' ? meter : 'saved',
+          typeof once === 'string' ? { oncePerDay: once } : {},
+        );
+        return { status: 204 };
       },
     });
     host.docRoute({
@@ -164,6 +180,7 @@ const snapshot: HostedModule = {
 /** Holds what drawing annotations takes, so its pictures draw them by default. */
 const annotated: HostedModule = {
   id: 'annotated',
+  name: 'Annotated',
   permissions: { peek: { level: 'document', label: 'Peek at a page' } },
   requires: { document: ['doc.render', 'doc.annotate.read'] },
   setup(host) {
@@ -182,6 +199,7 @@ const annotated: HostedModule = {
 /** Renders without holding `doc.render`. */
 const careless: HostedModule = {
   id: 'careless',
+  name: 'Careless',
   permissions: { peek: { level: 'document', label: 'Peek at a page' } },
   setup(host) {
     host.docRoute({
@@ -207,12 +225,14 @@ describe('mounting a module checks it while the server starts', () => {
       permissions,
       documentService: {} as DocumentService,
       tenantFeatures: {} as TenantFeaturesGuard,
+      tenantUsage: {} as TenantUsageRepo,
     });
     return permissions;
   }
 
   const minimal = (overrides: Partial<HostedModule>): HostedModule => ({
     id: 'snapshot',
+    name: 'Snapshots',
     permissions: { create: { level: 'document', label: 'x' } },
     setup() {},
     ...overrides,
@@ -259,6 +279,43 @@ describe('mounting a module checks it while the server starts', () => {
     await expect(mount([minimal({ id: 'layer' })])).rejects.toThrow(/isn't a module id/); // the core's events
     await expect(mount([minimal({}), minimal({})])).rejects.toThrow(
       'module snapshot is installed twice',
+    );
+  });
+
+  test('it has a name, and meters with a label and a unit', async () => {
+    await expect(mount([minimal({ name: ' ' })])).rejects.toThrow(
+      'module snapshot needs a name, what people call it',
+    );
+    const meter = (key: string, label: string, unit: string) =>
+      minimal({ meters: { [key]: { label, unit } } });
+    await expect(mount([meter('views', 'Views', 'views')])).resolves.toBeDefined();
+    await expect(mount([meter('Views', 'Views', 'views')])).rejects.toThrow(
+      `meter "Views" isn't lowercase words joined by '-'`,
+    );
+    await expect(mount([meter('views', '', 'views')])).rejects.toThrow(
+      'meter "views" needs a label and a unit',
+    );
+  });
+
+  test('replaces and bypassedBy name core document permissions', async () => {
+    const relating = (declaration: object) =>
+      minimal({
+        permissions: { view: { level: 'document', label: 'x', ...declaration } as never },
+      });
+    await expect(
+      mount([relating({ replaces: 'doc.render', bypassedBy: ['doc.download', 'doc.print'] })]),
+    ).resolves.toBeDefined();
+    await expect(mount([relating({ replaces: 'doc.nope' })])).rejects.toThrow(
+      `"doc.nope" isn't one of the core's document permissions`,
+    );
+    await expect(mount([relating({ bypassedBy: ['other.view'] })])).rejects.toThrow(
+      `"other.view" isn't one of the core's document permissions`,
+    );
+    await expect(
+      mount([relating({ replaces: 'doc.render', bypassedBy: ['doc.render'] })]),
+    ).rejects.toThrow('"doc.render" is what it replaces, not a bypass');
+    await expect(mount([relating({ level: 'tenant', replaces: 'doc.render' })])).rejects.toThrow(
+      'only a document permission replaces or is bypassed by one',
     );
   });
 
@@ -379,6 +436,7 @@ describe('CLOUDPDF_MODULES', () => {
       modules: [
         {
           id: 'reading-progress',
+          name: 'Reading progress',
           permissions: { track: { level: 'document', label: 'Record reading progress' } },
           setup() {},
         },
@@ -493,6 +551,88 @@ describe('a mounted module', () => {
     expect(bundle.permissions.documentPermissions()).toEqual(
       new Set(['snapshot.create', 'annotated.peek', 'careless.peek']),
     );
+  });
+
+  test('the deployment lists its modules, as they declare themselves', async () => {
+    const response = await fetch(`${baseUrl}/v1/deployment/modules`, {
+      headers: { Authorization: `Bearer ${API_TOKEN}` },
+    });
+    expect(response.status).toBe(200);
+    const { modules } = (await response.json()) as { modules: Array<Record<string, unknown>> };
+    expect(modules.map((m) => m['id'])).toEqual(['snapshot', 'annotated', 'careless']);
+    expect(modules[0]).toEqual({
+      id: 'snapshot',
+      name: 'Snapshots',
+      permissions: [
+        { name: 'snapshot.create', level: 'document', label: 'Save a page as an image' },
+        { name: 'snapshot.settings', level: 'tenant', label: 'Change snapshot settings' },
+      ],
+      meters: [{ name: 'snapshot.saved', label: 'Pages saved', unit: 'pages' }],
+      requires: { document: ['doc.render'] },
+    });
+
+    const viewer = signDevToken(SECRET, {
+      sub: 'viewer-1',
+      tenant_id: TENANT,
+      doc_id: DOC,
+      layer_name: LAYER,
+      scope: ['*'],
+      jti: `jti-${randomBytes(8).toString('hex')}`,
+    });
+    const refused = await fetch(`${baseUrl}/v1/deployment/modules`, {
+      headers: { Authorization: `Bearer ${viewer}` },
+    });
+    expect(refused.status).toBe(403);
+  });
+
+  test('it counts its meters per tenant and day, and the usage reports them', async () => {
+    const usage = async (query = '') => {
+      const response = await fetch(`${baseUrl}/v1/tenants/${TENANT}/usage${query}`, {
+        headers: { Authorization: `Bearer ${API_TOKEN}` },
+      });
+      expect(response.status, await response.clone().text()).toBe(200);
+      return (await response.json()) as {
+        periodStart: string;
+        periodEnd: string;
+        metrics: Record<string, number>;
+      };
+    };
+    // Installed, so reported before anything counted it.
+    expect((await usage()).metrics['snapshot.saved']).toBe(0);
+
+    const count = (query: string) => call(`snapshot/count${query}`, SNAPSHOT, { method: 'POST' });
+    expect((await count('')).status).toBe(204);
+    expect((await count('')).status).toBe(204);
+    // Once a day per key: a person reading a document counts once.
+    expect((await count('?once=viewer-1:doc')).status).toBe(204);
+    expect((await count('?once=viewer-1:doc')).status).toBe(204);
+    expect((await count('?once=viewer-2:doc')).status).toBe(204);
+    // A meter it didn't declare is the module's mistake.
+    expect((await count('?meter=pages')).status).toBe(500);
+
+    const month = await usage();
+    expect(month.metrics['snapshot.saved']).toBe(4);
+    expect(month.metrics['pdf.views']).toBeTypeOf('number');
+
+    const day = (offset: number) =>
+      new Date(Date.now() + offset * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const today = await usage(`?from=${day(0)}&to=${day(1)}`);
+    expect(today).toMatchObject({ periodStart: day(0), periodEnd: day(1) });
+    expect(today.metrics['snapshot.saved']).toBe(4);
+    expect((await usage(`?from=${day(1)}&to=${day(2)}`)).metrics['snapshot.saved']).toBe(0);
+
+    const refused = async (query: string) =>
+      (
+        await fetch(`${baseUrl}/v1/tenants/${TENANT}/usage${query}`, {
+          headers: { Authorization: `Bearer ${API_TOKEN}` },
+        })
+      ).status;
+    expect(await refused(`?from=${day(0)}`)).toBe(400);
+    expect(await refused(`?from=${day(1)}&to=${day(0)}`)).toBe(400);
+    expect(await refused(`?from=${day(0)}&to=${day(0)}`)).toBe(400);
+    expect(await refused('?from=2026-02-31&to=2026-03-02')).toBe(400);
+    expect(await refused('?from=2025-01-01&to=2026-01-03')).toBe(400);
+    expect(await refused(`?period=2026-11&from=${day(0)}&to=${day(1)}`)).toBe(400);
   });
 
   test("a route needs the module's permission, and the document open", async () => {

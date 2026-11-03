@@ -142,6 +142,7 @@ export const adminWirePaths = {
   grantSessions: '/v1/grant-sessions',
   /** Deployment-global singletons: API-token only, no tenant context. */
   deploymentLicenseStatus: '/v1/deployment/license/status',
+  deploymentModules: '/v1/deployment/modules',
 } as const;
 
 export const DedupModeSchema = z
@@ -1333,33 +1334,107 @@ export type GrantSessionResponse = z.infer<typeof GrantSessionResponseSchema>;
 // Tenant usage + suspension
 // ---------------------------------------------------------------------------
 
+const utcDayPattern = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
+
 export const TenantUsageQuerySchema = z.object({
   /** UTC month to report, `YYYY-MM`. Defaults to the current month. */
   period: z
     .string()
     .regex(/^\d{4}-(0[1-9]|1[0-2])$/)
     .optional(),
+  /**
+   * The first UTC day to report, `YYYY-MM-DD`, with `to` in place of
+   * `period`: a billing period that starts mid-month, say.
+   */
+  from: z.string().regex(utcDayPattern).optional(),
+  /** The UTC day after the last one reported, `YYYY-MM-DD`: at most 366 days after `from`. */
+  to: z.string().regex(utcDayPattern).optional(),
 });
 export type TenantUsageQuery = z.infer<typeof TenantUsageQuerySchema>;
 
 /**
- * Per-tenant usage facts for one UTC month. Deliberately opinion-free:
- * no limits, no plans, no billing state — those belong to whoever
- * operates the deployment. `pdf.views` counts grant exchanges plus
- * authorized `/v1/access` requests, deduplicated (a grant session that
- * later establishes access is not counted twice).
+ * Per-tenant usage facts for a window of UTC days: a month, or `from` to
+ * `to`. Deliberately opinion-free: no limits, no plans, no billing state —
+ * those belong to whoever operates the deployment. `pdf.views` counts
+ * grant exchanges plus authorized `/v1/access` requests, deduplicated (a
+ * grant session that later establishes access is not counted twice).
+ * `storage.bytes` is what the tenant stores now, whatever the window.
  */
 export const TenantUsageResponseSchema = z.object({
   tenantId: z.string(),
+  /** The first day reported, `YYYY-MM-DD`. */
   periodStart: z.string(),
+  /** The day after the last one reported, `YYYY-MM-DD`. */
   periodEnd: z.string(),
-  metrics: z.object({
-    'pdf.views': z.number(),
-    'pdf.uploads': z.number(),
-    'storage.bytes': z.number(),
-  }),
+  /**
+   * The core's meters, then each installed module's (`protected-display.views`),
+   * 0 when nothing counted it, and any other module meter counted in the window.
+   */
+  metrics: z
+    .object({
+      'pdf.views': z.number(),
+      'pdf.uploads': z.number(),
+      'storage.bytes': z.number(),
+    })
+    .catchall(z.number()),
 });
 export type TenantUsageResponse = z.infer<typeof TenantUsageResponseSchema>;
+
+/** One of a module's permissions, as the module declares it. */
+export const ModulePermissionSchema = z.object({
+  /** The whole permission: `protected-display.view`. */
+  name: z.string(),
+  /** `document`: in viewer tokens and grants; `tenant`: in tenant tokens and API keys. */
+  level: z.enum(['document', 'tenant']),
+  /** What a grant or API key dialog says for it. */
+  label: z.string(),
+  description: z.string().optional(),
+  /**
+   * The core document permission this one is another way of doing:
+   * protected display's `view` replaces `doc.render`. A dialog can offer
+   * the two as a choice. A scope may hold both; the core one then has its
+   * usual effect, and a viewer plugin uses it.
+   */
+  replaces: z.string().optional(),
+  /**
+   * Core document permissions that let out what this one protects, like
+   * `doc.download`. Facts for a dialog to show; the server enforces none.
+   */
+  bypassedBy: z.array(z.string()).optional(),
+});
+export type ModulePermission = z.infer<typeof ModulePermissionSchema>;
+
+/** One of a module's meters, counted per tenant and UTC day and reported in the tenants' usage. */
+export const ModuleMeterSchema = z.object({
+  /** The whole meter: `protected-display.views`. */
+  name: z.string(),
+  /** What a usage page calls it: `Protected views`. */
+  label: z.string(),
+  /** What one counts as, plural: `views`. */
+  unit: z.string(),
+  description: z.string().optional(),
+});
+export type ModuleMeter = z.infer<typeof ModuleMeterSchema>;
+
+/** A server module this deployment has installed: what it is and what it adds, as it declares it. */
+export const ModuleManifestSchema = z.object({
+  /** Its id, the namespace of everything it adds: `protected-display`. */
+  id: z.string(),
+  /** What people call it: `Screenshot protection`. */
+  name: z.string(),
+  description: z.string().optional(),
+  permissions: z.array(ModulePermissionSchema),
+  meters: z.array(ModuleMeterSchema),
+  /** What it does beyond whoever calls it: the core document permissions it holds itself. */
+  requires: z.object({ document: z.array(z.string()) }),
+});
+export type ModuleManifest = z.infer<typeof ModuleManifestSchema>;
+
+export const DeploymentModulesResponseSchema = z.object({
+  /** In the order the server loads them. */
+  modules: z.array(ModuleManifestSchema),
+});
+export type DeploymentModulesResponse = z.infer<typeof DeploymentModulesResponseSchema>;
 
 export const TenantSuspendRequestSchema = z.object({
   /** Optional operator reason, written to the security-events trail. */
@@ -1869,6 +1944,23 @@ export const adminOperations = {
     responses: {
       200: { contentType: 'application/json', schema: AdminLicenseStatusResponseSchema },
     },
+  },
+  'deployment.modules': {
+    operationId: 'deployment.modules',
+    title: 'Installed modules',
+    summary:
+      "The server modules this deployment has installed: each one's name, permissions and meters.",
+    method: 'GET',
+    path: adminWirePaths.deploymentModules,
+    credentials: ['api-token'],
+    scope: [],
+    responses: {
+      200: { contentType: 'application/json', schema: DeploymentModulesResponseSchema },
+    },
+    notes:
+      'What each module declares, for a dashboard or a script that lists modules, offers their ' +
+      'permissions in its dialogs and shows their meters. Which tenants may use one is in ' +
+      "their `features` (`tenants.get`); what it costs, if anything, is the operator's.",
   },
   'tokens.issue': {
     operationId: 'tokens.issue',
@@ -2550,7 +2642,7 @@ export const docOperations = {
     },
     notes:
       '`cms` is the detached CMS over the prepared digest, base64. `expectedVersion` must be what prepare returned. ' +
-      'Idempotent by signing id: the same CMS again answers `already-completed`. The new version is the layer\'s own: only this layer moves ' +
+      "Idempotent by signing id: the same CMS again answers `already-completed`. The new version is the layer's own: only this layer moves " +
       'to it, and the document and every other layer stay as they were. Refetch the manifest after a completion.',
   },
   'doc.signatures.cancel': {

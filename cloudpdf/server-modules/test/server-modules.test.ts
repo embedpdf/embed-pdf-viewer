@@ -40,11 +40,22 @@ const json = (value: unknown): ModuleResponse => ({
   body: JSON.stringify(value),
 });
 
-/** Acts only as the person using it. */
+/** Acts only as the person using it, and counts who reads. */
 const review = defineServerModule({
   id: 'review',
+  name: 'Review',
   permissions: { approve: { level: 'document', label: 'Approve documents' } },
+  meters: { reads: { label: 'Documents read', unit: 'reads' } },
   setup(host) {
+    host.docRoute({
+      method: 'GET',
+      path: 'seen',
+      permission: 'approve',
+      async handler(req) {
+        await req.meters.count('reads', { oncePerDay: `${req.session.sub}:${req.docId}` });
+        return { status: 204 };
+      },
+    });
     host.docRoute({
       method: 'POST',
       path: 'approve',
@@ -67,6 +78,7 @@ const review = defineServerModule({
 /** Reads text its askers may only look at. */
 const reader = defineServerModule({
   id: 'reader',
+  name: 'Reader',
   permissions: { ask: { level: 'document', label: 'Ask about the document' } },
   requires: { document: ['doc.text.copy'] },
   setup(host) {
@@ -88,6 +100,7 @@ const reader = defineServerModule({
 /** Draws pages its viewers may not render. */
 const frames = defineServerModule({
   id: 'frames',
+  name: 'Frames',
   permissions: { view: { level: 'document', label: 'See protected pages' } },
   requires: { document: ['doc.render'] },
   config: { WIDTH: { description: 'Frame width in pixels', default: '320' } },
@@ -236,6 +249,19 @@ describe('req.document() acts as the caller', () => {
     expect(((await response.json()) as { error: { message: string } }).error.message).toMatch(
       /deployment's API token/,
     );
+  });
+});
+
+describe('req.meters counts for the tenant', () => {
+  test('once a day per reader, reported in the tenant usage', async () => {
+    const scope = ['doc.open', 'review.approve'];
+    expect((await call('review/seen', scope)).status).toBe(204);
+    expect((await call('review/seen', scope)).status).toBe(204);
+    const usage = await fetch(`${baseUrl}/v1/tenants/${TENANT}/usage`, {
+      headers: { Authorization: `Bearer ${API_TOKEN}` },
+    });
+    const { metrics } = (await usage.json()) as { metrics: Record<string, number> };
+    expect(metrics['review.reads']).toBe(1);
   });
 });
 

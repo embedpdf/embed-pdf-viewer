@@ -54,6 +54,44 @@
         }
       }
     },
+    "/v1/deployment/modules": {
+      "get": {
+        "operationId": "deployment.modules",
+        "x-fern-sdk-group-name": ["deployment"],
+        "x-fern-sdk-method-name": "modules",
+        "x-docs-title": "Installed modules",
+        "summary": "The server modules this deployment has installed: each one's name, permissions and meters.",
+        "description": "What each module declares, for a dashboard or a script that lists modules, offers their permissions in its dialogs and shows their meters. Which tenants may use one is in their `features` (`tenants.get`); what it costs, if anything, is the operator's.",
+        "security": [
+          {
+            "apiToken": []
+          }
+        ],
+        "x-required-scope": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeploymentModulesResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminErrorPayload"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/docs/{docId}/head": {
       "get": {
         "operationId": "doc.head",
@@ -8716,6 +8754,24 @@
               "type": "string",
               "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
             }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$"
+            }
           }
         ],
         "responses": {
@@ -8951,6 +9007,95 @@
           }
         },
         "required": ["id"],
+        "additionalProperties": false
+      },
+      "ModuleManifest": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ModulePermission"
+            }
+          },
+          "meters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ModuleMeter"
+            }
+          },
+          "requires": {
+            "type": "object",
+            "properties": {
+              "document": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": ["document"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["id", "name", "permissions", "meters", "requires"],
+        "additionalProperties": false
+      },
+      "ModulePermission": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "level": {
+            "type": "string",
+            "enum": ["document", "tenant"]
+          },
+          "label": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "replaces": {
+            "type": "string"
+          },
+          "bypassedBy": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": ["name", "level", "label"],
+        "additionalProperties": false
+      },
+      "ModuleMeter": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "required": ["name", "label", "unit"],
         "additionalProperties": false
       },
       "PageRef": {
@@ -27299,6 +27444,19 @@
         },
         "additionalProperties": false
       },
+      "DeploymentModulesResponse": {
+        "type": "object",
+        "properties": {
+          "modules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ModuleManifest"
+            }
+          }
+        },
+        "required": ["modules"],
+        "additionalProperties": false
+      },
       "TokensIssueRequest": {
         "anyOf": [
           {
@@ -27498,7 +27656,9 @@
               }
             },
             "required": ["pdf.views", "pdf.uploads", "storage.bytes"],
-            "additionalProperties": false
+            "additionalProperties": {
+              "type": "number"
+            }
           }
         },
         "required": ["tenantId", "periodStart", "periodEnd", "metrics"],

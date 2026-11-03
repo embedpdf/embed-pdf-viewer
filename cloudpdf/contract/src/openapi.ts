@@ -25,6 +25,9 @@ import { ignoreOverride, zodToJsonSchema } from 'zod-to-json-schema';
 
 import {
   AdminErrorPayloadSchema,
+  ModuleManifestSchema,
+  ModuleMeterSchema,
+  ModulePermissionSchema,
   TenantFeatureSchema,
   allOperations,
   docsGroups,
@@ -66,6 +69,9 @@ const SHARED_COMPONENT_SCHEMAS = sharedComponents([
     AdminErrorPayload: AdminErrorPayloadSchema,
     EngineErrorPayload: EngineErrorPayloadSchema,
     TenantFeature: TenantFeatureSchema,
+    ModuleManifest: ModuleManifestSchema,
+    ModulePermission: ModulePermissionSchema,
+    ModuleMeter: ModuleMeterSchema,
   },
   DocumentWireComponents,
   PdfActionWireComponents,
