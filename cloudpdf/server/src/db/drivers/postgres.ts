@@ -41,6 +41,13 @@ export interface CreatePostgresDbOptions {
   statementTimeoutMs?: number;
   /** Query log hook. */
   logQueries?: (sql: string) => void;
+  /**
+   * Called when an idle pooled connection fails: the database restarted
+   * or failed over, an admin ran `pg_terminate_backend`, a proxy closed
+   * it. The pool has already dropped that connection and opens a new one
+   * for the next query, so this is for logging. Default: ignored.
+   */
+  onIdleConnectionError?: (err: Error) => void;
 }
 
 /**
@@ -72,6 +79,12 @@ export function createPostgresDb(opts: CreatePostgresDbOptions): Kysely<Schema> 
     application_name: 'cloudpdf-server',
     statement_timeout: statementTimeoutMs > 0 ? statementTimeoutMs : undefined,
   });
+  // `pg.Pool` re-emits an idle connection's error on the pool. With no
+  // listener, Node throws it as an uncaught exception and the process
+  // dies. That includes connections `pool.end()` is still closing: it
+  // resolves before their sockets close, so a database that shuts down
+  // right after `db.destroy()` still reaches them (57P01).
+  pool.on('error', (err) => opts.onIdleConnectionError?.(err));
 
   return new Kysely<Schema>({
     dialect: new PostgresDialect({ pool }),
