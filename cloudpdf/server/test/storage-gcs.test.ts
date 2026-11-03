@@ -7,8 +7,8 @@
  * stores bytes + custom metadata, so the adapter's real logic
  * (sha-in-metadata, content-length guard, ranged materialize, prefix
  * delete) is exercised end-to-end. It's a `__mocks__` file and not a
- * `vi.mock` factory because a factory misses whenever two stores'
- * imports of the SDK overlap (see that file).
+ * `vi.mock` factory: see "Faking an SDK in tests" in
+ * `docs/conventions/server-adapters.md`.
  *
  * Live GCS acceptance runs out-of-band against a real bucket / the
  * fake-gcs-server emulator (STORAGE_LIVE=1), not in CI.
