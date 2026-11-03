@@ -155,6 +155,28 @@ stagePlugin({ layout: 'grid', columns: 'auto', zoom: { pageWidth: 150 } });
 `columns` applies to the grid: `'auto'` wraps to fit, `'square'` aims for a square grid, and a
 number fixes the count.
 
+## One page at a time
+
+With `flow: 'paged'`, the Stage shows one page, or one spread, and pushing past its edge turns it,
+the way a reader expects from a wheel, a trackpad and a finger:
+
+- **Scroll or swipe past the bottom** and the next page comes, at its top. Past the top, the
+  previous page comes, at its bottom.
+- **Swipe sideways past the edge** to turn it, as in an e-reader. A right-to-left document turns
+  the other way.
+- **It stops at the edge first.** Scrolling down a tall page stops at its bottom, and the next push
+  turns it. A page that fits on screen turns at the first push.
+- **One gesture, one page.** A hard flick turns one page, and its momentum doesn't scroll the page
+  that arrives.
+- **`layout` has no effect.** There is only one page or spread on screen.
+
+Buttons, keys and links turn pages with `nextPage()` and `previousPage()`. To leave turning to them,
+as in a presentation where only the presenter moves on, set `turnGestures` to `false`:
+
+```ts
+stagePlugin({ flow: 'paged', turnGestures: false });
+```
+
 ## Space around pages
 
 - **`padding`** is the space between the pages and the edge of the Stage, in screen pixels. Fit
@@ -252,7 +274,8 @@ Touch works out of the box, tuned to feel like the platform rather than a web pa
 - **One finger scrolls**, with momentum: flick and the page glides to a stop.
 - **Two fingers pinch-zoom** around the point between them, and pan at the same time.
 - **Double-tap zooms in steps**: the whole page, the text at full width, closer, and back out.
-- **Edges are elastic.** Pulling past the end stretches and springs back.
+- **Edges are elastic.** Pulling past the end stretches and springs back. With `flow: 'paged'`, it
+  [turns the page](#one-page-at-a-time).
 - **Long-press selects a word** when the [Selection](../text/selection) plugin is registered.
 
 For a Stage that should scroll but not zoom under a pinch or Ctrl+wheel, such as a thumbnail strip,
@@ -575,6 +598,7 @@ Set them when you register the plugin, and change them while the app runs with
 | `interaction`    | Drags reach the active tool, such as text selection; `false` for a view that only scrolls | `true`                         |
 | `panFallback`    | A drag in the space between pages scrolls, whatever the tool                              | `true`                         |
 | `zoomGestures`   | A pinch or Ctrl+wheel zooms; `false` keeps the zoom fixed                                 | `true`                         |
+| `turnGestures`   | With `flow: 'paged'`, scrolling or swiping past a page's edge [turns it](#one-page-at-a-time); `false` leaves turning to buttons and keys | `true` |
 | `zoomBox`        | The colors of the [zoom tool's box](#zoom-to-a-box): `fill` and `stroke`; `null` follows the accent | `{ fill: null, stroke: null }` |
 | `viewUnitsPerPoint` | Screen pixels per PDF point at 100%, so 100% is the page's real size; a native app sets its own | `96 / 72` on the web           |
 
