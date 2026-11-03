@@ -151,6 +151,17 @@ page.
 
 Rotation is a field too: `update(ref, { rotation: 90 })` turns a shape or a stamp to 90° clockwise.
 
+A highlight can become an underline, a squiggly line or a strikeout, and a rectangle an ellipse:
+send the new `subtype`. It stays the same annotation, with its replies and its place in the
+drawing order:
+
+```ts
+await annotation.update(ref, { subtype: 'squiggly' });
+```
+
+Which kinds can become which, and what happens to a value the new kind has no field for, is on the
+engine's [Change the kind](/docs/engine/annotations#change-the-kind).
+
 ## Delete an annotation
 
 ```ts

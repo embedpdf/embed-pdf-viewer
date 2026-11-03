@@ -45,6 +45,15 @@ The line is drawn inside `box`, so a thick border doesn't make the shape bigger.
 `rect`: where the shape sits on the page, the upright box around all it draws. The engine works
 it out; see [The shape's rect](#the-shapes-rect).
 
+Both take the same fields, so a rectangle can become an ellipse and back. It stays the same
+annotation, with its `box`, its style and its replies:
+
+```ts
+await page.annotations.update(square.ref, { subtype: 'circle' });
+```
+
+The other shapes keep their kind; see [Change the kind](/docs/engine/annotations#change-the-kind).
+
 ## Lines and arrows
 
 A `line` goes from one point to another, with an optional ending at each end:

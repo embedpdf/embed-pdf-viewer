@@ -100,7 +100,13 @@ shows both:
 | `'textFormat'`  | A bold, italic or underline toggle for text boxes. Write it with `annotation.text.toggleFormat(property.format)`. | `format`             |
 | `'link'`        | Where the annotation links to. Write it with `annotation.selection.updateLink(target)`, or `null` to remove it. |                      |
 
+Marks over text, and rectangles and ellipses, also have `subtype`: a `'choice'` of the kinds they
+can become, such as highlight, underline, squiggly and strikeout. Choosing one turns each selected
+annotation into that kind, as the same annotation. A strikeout that is part of a replacement has no
+`subtype` property, because it keeps its kind while it belongs to the suggestion.
+
 `selection.update()` gives each selected annotation the properties its kind has, and skips the rest.
+A new `subtype` goes to each annotation that can become that kind, and the rest keep theirs.
 To change each annotation relative to itself, pass a function. For example, to set only the end
 arrow of lines that keep their own start:
 
@@ -276,7 +282,8 @@ annotation.updateSettings({ editable: true }); // everything again, the default
 The list names kinds by their `subtype`. A measurement goes by its `intent` instead
 (`'line-dimension'`, `'polyline-dimension'` or `'polygon-dimension'`), so `['line']` keeps
 measurements still and `['line-dimension']` lets only them change. `annotation.isEditable(ref)` says
-whether people may change one.
+whether people may change one. Changing a kind by hand needs both kinds in the list: with
+`['highlight']`, people restyle highlights but can't turn one into an underline.
 
 It's only about people: your code still changes any annotation with `update()` and `delete()`, and
 `canUpdate(ref)` and `canDelete(ref)` stay the same. To stop your code too, leave the permission out
