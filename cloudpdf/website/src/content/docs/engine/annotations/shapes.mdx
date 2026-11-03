@@ -207,8 +207,9 @@ points, of line then gap.
 await page.annotations.update(shape.ref, { borderStyle: 'dashed', dashArray: [6, 3] });
 ```
 
-`[6, 3]` draws 6 points of line, then 3 points of gap. Without a `dashArray`, dashes are 3 points
-on, 3 off. A `dashArray` on a `'solid'` border is kept, and draws when the border becomes dashed.
+`[6, 3]` draws 6 points of line, then 3 points of gap. Without a `dashArray`, the border gets the
+default, `[3, 3]`: 3 points on, 3 off, written into the file so every PDF app draws it dashed. A
+`dashArray` on a `'solid'` border is kept, and draws when the border becomes dashed.
 
 ## Cloudy borders
 

@@ -66,6 +66,32 @@ describe('annotationOfDraft', () => {
     expect(text).toMatchObject({ color: '#0000FF', fontColor: '#000000', intent: 'free-text' });
   });
 
+  test('a dashed border with no pattern of its own states the default, 3 on and 3 off', () => {
+    const dashed = annotationOfDraft({ subtype: 'square', box, borderStyle: 'dashed' }, { ref });
+    expect(dashed).toMatchObject({ borderStyle: 'dashed', dashArray: [3, 3] });
+    const empty = annotationOfDraft(
+      { subtype: 'ink', inkList: [[box, box]], borderStyle: 'dashed', dashArray: [] },
+      { ref },
+    );
+    expect(empty).toMatchObject({ borderStyle: 'dashed', dashArray: [3, 3] });
+    // Its own pattern stays; a solid border states none.
+    expect(
+      annotationOfDraft(
+        {
+          subtype: 'line',
+          linePoints: { start: box, end: box },
+          borderStyle: 'dashed',
+          dashArray: [6, 2],
+        },
+        { ref },
+      ),
+    ).toMatchObject({ dashArray: [6, 2] });
+    expect(annotationOfDraft({ subtype: 'circle', box }, { ref })).toMatchObject({
+      borderStyle: 'solid',
+      dashArray: null,
+    });
+  });
+
   test('a note’s standard review state brings its model; a custom one without is refused', () => {
     const note = resolveAnnotationDraft({
       subtype: 'text',

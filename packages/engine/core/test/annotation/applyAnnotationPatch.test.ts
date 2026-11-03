@@ -199,4 +199,34 @@ describe('a callout line follows its box', () => {
     const untouched = applyAnnotationPatch(callout, { opacity: 0.5 });
     expect(lineOf(untouched)).toBe(lineOf(callout));
   });
+
+  test('a border made dashed, or cleared of its pattern while dashed, states the default', () => {
+    expect(applyAnnotationPatch(square, { borderStyle: 'dashed' })).toMatchObject({
+      borderStyle: 'dashed',
+      dashArray: [3, 3],
+    });
+    const patterned = {
+      ...square,
+      borderStyle: 'dashed',
+      dashArray: [6, 2],
+    } as unknown as Annotation;
+    expect(applyAnnotationPatch(patterned, { dashArray: null })).toMatchObject({
+      dashArray: [3, 3],
+    });
+    // A pattern stored on a solid border is kept and draws once it is dashed.
+    const kept = { ...square, dashArray: [6, 2] } as unknown as Annotation;
+    expect(applyAnnotationPatch(kept, { borderStyle: 'dashed' })).toMatchObject({
+      dashArray: [6, 2],
+    });
+    // Back to solid, or another app's dashed border without /D left alone: nothing stated.
+    expect(resolveAnnotationPatch(patterned, { borderStyle: 'solid' })).toEqual({
+      subtype: 'square',
+      borderStyle: 'solid',
+    });
+    const foreign = { ...square, borderStyle: 'dashed' } as unknown as Annotation;
+    expect(resolveAnnotationPatch(foreign, { color: '#00ff00' })).toEqual({
+      subtype: 'square',
+      color: '#00ff00',
+    });
+  });
 });
