@@ -20,6 +20,7 @@ import {
   type AnnotationReplyType,
   type AnnotationUpdateResult,
   type PageObjectNumber,
+  PDF_SUBTYPE_TO_CODE,
   PdfAnnotationSubtypeCode,
   toPageRef,
 } from '@embedpdf/engine-core/runtime';
@@ -222,6 +223,14 @@ export class AnnotationMutator {
       // turn the annotation reads: our keys record it first.
       const impact = resources?.appearance ? 'regenerate' : appearanceImpactOf(currentDto, patch);
       if (impact !== 'inert') settleAnnotationTurn(fn, mem, annotPtr);
+
+      // A sibling kind (the resolver allows no other) is named first: its
+      // fields are then written as its own, and its appearance drawn below.
+      if (patch.subtype !== undefined && patch.subtype !== currentDto.subtype) {
+        if (!fn.EPDFAnnot_SetSubtype(annotPtr, PDF_SUBTYPE_TO_CODE[patch.subtype])) {
+          throw new EngineError(EngineErrorCode.Unknown, 'EPDFAnnot_SetSubtype returned false');
+        }
+      }
 
       // Apply caller-supplied subtype-specific writes.
       applyPatch(fn, mem, annotPtr, patch, writeCtx);
