@@ -25,6 +25,9 @@ export default {
   tools: {
     display: 'hidden',
   },
+  examples: {
+    display: 'hidden',
+  },
   docs: {
     title: 'Documentation',
     type: 'page',
