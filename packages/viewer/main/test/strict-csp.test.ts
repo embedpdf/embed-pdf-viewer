@@ -157,7 +157,7 @@ async function launch(): Promise<Browser> {
 /** True once the chrome shows the page count and a page picture has loaded. */
 function pageRendered(): boolean {
   const root = document.querySelector('embedpdf-viewer')?.shadowRoot;
-  if (!root || !/Page 1 of \d+/.test(root.textContent ?? '')) return false;
+  if (!root || !/1 \/ \d+/.test(root.textContent ?? '')) return false;
   return [...root.querySelectorAll('img')].some(
     (image) => image.src.startsWith('blob:') && image.complete && image.naturalWidth > 0,
   );

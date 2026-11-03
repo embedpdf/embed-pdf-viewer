@@ -3,10 +3,10 @@
  * toolbar along the left edge and moves to the right in a right-to-left
  * language, bars on one edge stack from the outside in, a floating bar sits
  * over the pages in its corner, bars floating on one edge share it or stack
- * and never cover each other, a floating bar hides while the pages scroll as
- * its place says, the `pager` bar shows the page number and goes to the page
- * typed into it, and the document tabs show only while more than one document
- * is open.
+ * and never cover each other, a floating bar rests out of sight while nothing
+ * moves as its place says, the `pager` bar shows the page number between the
+ * previous and next page buttons and goes to the page typed into it, and the
+ * document tabs show only while more than one document is open.
  *
  * Runs against the built snippet (`pnpm build` first).
  */
@@ -103,20 +103,23 @@ const PAGES = {
     layout: (layout) =>
       layout.addBar('zoom', { place: { float: 'bottom-end' }, center: [[{ custom: 'zoom' }]] }),
   }`),
-  '/hide-wide.html': page(`{
-    layout: (layout) => layout.place('pager', { float: 'bottom', hideWhileScrolling: true }),
-  }`),
-  '/hide-clicked.html': page(`{
+  '/idle-zoom.html': page(`{
     layout: (layout) =>
-      layout
-        .place('pager', { float: 'bottom', hideWhileScrolling: true })
-        .add('zoom:in', { to: 'pager' }),
+      layout.addBar('zoom', {
+        place: { float: 'bottom-end', hideWhenIdle: true },
+        center: [['zoom:out', 'zoom:in']],
+      }),
   }`),
-  '/keep-phone.html': page(
-    `{ layout: (layout) => layout.place('pager', { float: 'bottom', hideWhileScrolling: false }) }`,
-    PHONE,
+  '/idle-menu.html': page(`{
+    layout: (layout) => layout.add('zoom:in', { to: 'pager' }).add('menu:zoom', { to: 'pager' }),
+  }`),
+  '/keep.html': page(
+    `{ layout: (layout) => layout.place('pager', { float: 'bottom', hideWhenIdle: false }) }`,
   ),
 };
+
+/** How long the pages and the pointer stay still before a bar rests out of sight. */
+const IDLE_MS = 2000;
 
 interface Box {
   readonly left: number;
@@ -129,7 +132,11 @@ interface Box {
 
 type ViewerWindow = Window & {
   viewer: {
-    get(name: 'stage'): { getCurrentPageIndex(): number; getZoomLevel(): number };
+    get(name: 'stage'): {
+      getCurrentPageIndex(): number;
+      getZoomLevel(): number;
+      goToPage(index: number): void;
+    };
     get(name: 'i18n'): {
       updateSettings(patch: {
         locales: { code: string; name: string; direction: string; translations: object }[];
@@ -385,75 +392,119 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('where the bars go', () 
     await tab.close();
   });
 
-  /** Scroll the pages with the wheel, a few steps down. */
-  const scroll = async (tab: Page, width: number) => {
-    await tab.mouse.move(width / 2, HEIGHT / 2);
-    for (let i = 0; i < 4; i += 1) {
-      await tab.mouse.wheel(0, 120);
-      await tab.waitForTimeout(40);
-    }
-  };
-
-  const pagerHidden = (tab: Page) =>
+  /** Whether the bar `id` rests out of sight now. */
+  const idleHidden = (tab: Page, id = 'pager') =>
     tab.evaluate(
-      () =>
+      (bar) =>
         document
           .querySelector('embedpdf-viewer')!
-          .shadowRoot!.querySelector('[data-bar="pager"]')
-          ?.hasAttribute('data-scroll-hidden') ?? null,
+          .shadowRoot!.querySelector(`[data-bar="${bar}"]`)
+          ?.hasAttribute('data-idle-hidden') ?? null,
+      id,
     );
+  /** Wait for the bar `id` to rest out of sight, or come back. */
+  const until = (tab: Page, hidden: boolean, id = 'pager') =>
+    expect.poll(() => idleHidden(tab, id), { timeout: IDLE_MS + 2000 }).toBe(hidden);
 
-  it('hides a floating bar while the pages scroll as its place says, at any size', async () => {
-    const wide = await open('/hide-wide.html');
-    expect(await pagerHidden(wide)).toBe(false);
-    await scroll(wide, WIDTH);
-    expect(await pagerHidden(wide)).toBe(true);
-    await wide.waitForTimeout(1200);
-    expect(await pagerHidden(wide)).toBe(false);
-    await wide.close();
+  it('rests a floating bar out of sight once nothing moves, as its place says, and wakes it', async () => {
+    const tab = await open('/idle-zoom.html');
+    // Shown when the document opens; then out of sight, the pager by default and a bar of yours
+    // as its place says.
+    expect(await idleHidden(tab)).toBe(false);
+    await until(tab, true);
+    expect(await idleHidden(tab, 'zoom')).toBe(true);
+    // Out of sight it takes no presses, but keeps its place in the keyboard's order.
+    expect(
+      await tab.evaluate(() => {
+        const button = document
+          .querySelector('embedpdf-viewer')!
+          .shadowRoot!.querySelector('[data-bar="pager"] button')!;
+        const { pointerEvents, visibility } = getComputedStyle(button);
+        return { pointerEvents, visibility };
+      }),
+    ).toEqual({ pointerEvents: 'none', visibility: 'visible' });
+    // A pointer moving over the pages wakes it.
+    await tab.mouse.move(WIDTH / 2, HEIGHT / 2);
+    await until(tab, false);
+    await until(tab, true);
+    // So do the pages moving, from code too.
+    await tab.evaluate(() => (window as unknown as ViewerWindow).viewer.get('stage').goToPage(3));
+    await until(tab, false);
+    await tab.close();
 
-    const phone = await open('/keep-phone.html', PHONE);
-    await scroll(phone, PHONE);
-    expect(await pagerHidden(phone)).toBe(false);
-    await phone.close();
+    // `false` keeps a bar on screen.
+    const kept = await open('/keep.html');
+    await kept.waitForTimeout(IDLE_MS + 500);
+    expect(await idleHidden(kept)).toBe(false);
+    await kept.close();
   });
 
-  it('hides it after a click on one of its buttons, and keeps it while its field is typed in', async () => {
-    const tab = await open('/hide-clicked.html');
-    // The button keeps focus after the click: that doesn't hold the bar.
-    await tab.locator('embedpdf-viewer [data-bar="pager"] [aria-label="Zoom In"]:visible').click();
-    await tab.waitForTimeout(400);
-    await scroll(tab, WIDTH);
-    expect(await pagerHidden(tab)).toBe(true);
-    await tab.waitForTimeout(1200);
-    expect(await pagerHidden(tab)).toBe(false);
-    // The page number's field, being typed in, does.
-    await tab
-      .locator('embedpdf-viewer [data-bar="pager"] [data-epdf-toolbar-item] button')
-      .first()
-      .click();
+  it('keeps it while the pointer is on it, the keyboard or a field is in it, or its menu is open', async () => {
+    const tab = await open('/idle-menu.html');
+    const pager = 'embedpdf-viewer [data-bar="pager"]';
+    // The pointer on it holds it.
+    await tab.locator(`${pager} [aria-label="Next Page"]:visible`).hover();
+    await tab.waitForTimeout(IDLE_MS + 400);
+    expect(await idleHidden(tab)).toBe(false);
+    // A button keeps focus after a click, but that doesn't hold it once the pointer leaves.
+    await tab.locator(`${pager} [aria-label="Zoom In"]:visible`).click();
+    await tab.mouse.move(WIDTH / 2, 100);
+    await until(tab, true);
+    // Focus from the keyboard brings it back, and holds it: out of the bar and back in, to the
+    // button it left from.
+    await tab.keyboard.press('Shift+Tab');
+    await tab.keyboard.press('Tab');
+    await until(tab, false);
+    await tab.waitForTimeout(IDLE_MS + 400);
+    expect(await idleHidden(tab)).toBe(false);
+    // So does the page number's field, being typed in.
+    await tab.locator(`${pager} [data-epdf-toolbar-item] button:visible`, { hasText: '/' }).click();
     await tab.waitForFunction(
       () =>
         document.querySelector('embedpdf-viewer')!.shadowRoot!.activeElement?.tagName === 'INPUT',
     );
-    await scroll(tab, WIDTH);
-    expect(await pagerHidden(tab)).toBe(false);
+    await tab.mouse.move(WIDTH / 2, 100);
+    await tab.waitForTimeout(IDLE_MS + 400);
+    expect(await idleHidden(tab)).toBe(false);
+    await tab.keyboard.press('Escape');
+    // And a menu open from it, wherever the pointer goes.
+    await tab.locator(`${pager} [aria-label="Zoom"]:visible`).click();
+    await tab.mouse.move(WIDTH / 2, 100);
+    await tab.waitForTimeout(IDLE_MS + 400);
+    expect(await idleHidden(tab)).toBe(false);
     await tab.close();
   });
 
   it('shows the page number in the pager over the pages, and goes to the page typed into it', async () => {
     const tab = await open('/default.html');
-    /** What the pager says: its words, without a tooltip showing beside the number. */
+    /** What the page number says, without a tooltip showing beside it. */
     const pagerText = () =>
       tab.evaluate(() => {
         const item = document
           .querySelector('embedpdf-viewer')!
-          .shadowRoot!.querySelector('[data-bar="pager"] [data-epdf-toolbar-item]')!
+          .shadowRoot!.querySelector(
+            '[data-bar="pager"] [data-epdf-toolbar-item]:has(> span > button:not([aria-label]))',
+          )!
           .cloneNode(true) as HTMLElement;
         for (const tooltip of item.querySelectorAll('[role="tooltip"]')) tooltip.remove();
         return item.textContent;
       });
-    expect(await pagerText()).toMatch(/^Page 1 of \d+$/);
+    expect(await pagerText()).toMatch(/^1 \/ \d+$/);
+    // Between the previous and the next page buttons.
+    const labels = await tab.evaluate(() =>
+      [
+        ...document
+          .querySelector('embedpdf-viewer')!
+          .shadowRoot!.querySelectorAll('[data-bar="pager"] button'),
+      ]
+        .filter((button) => !button.closest('[aria-hidden="true"]'))
+        .map((button) => button.getAttribute('aria-label') ?? button.textContent),
+    );
+    expect(labels.slice(0, 3)).toEqual([
+      'Previous Page',
+      expect.stringMatching(/^1 \/ /),
+      'Next Page',
+    ]);
     const { bars, pages } = await boxes(tab);
     const pager = bars.pager!;
     // Floating at the bottom of the pages, in the middle.
@@ -469,19 +520,21 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('where the bars go', () 
       return (pill.left + pill.right) / 2;
     });
     expect(Math.abs(middle - (pages.left + pages.right) / 2)).toBeLessThan(2);
-    // The page number is drawn once: the pager is all there is.
+    // The page count is drawn once: the pager is all there is.
     const drawn = await tab.evaluate(
       () =>
         [...document.querySelector('embedpdf-viewer')!.shadowRoot!.querySelectorAll('*')].filter(
           (element) =>
             !element.closest('[aria-hidden]') &&
-            [...element.childNodes].some((node) => node instanceof Text && /Page/.test(node.data)),
+            [...element.childNodes].some(
+              (node) => node instanceof Text && /^ \/ \d+$/.test(node.data),
+            ),
         ).length,
     );
     expect(drawn).toBe(1);
 
     const number = tab.locator(
-      'embedpdf-viewer [data-bar="pager"] [data-epdf-toolbar-item] button',
+      'embedpdf-viewer [data-bar="pager"] [data-epdf-toolbar-item] button:not([aria-label])',
     );
     /** Press the number, and wait for the field that takes its place to have focus. */
     const openField = async () => {
@@ -497,14 +550,14 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('where the bars go', () 
     await tab.waitForFunction(
       () => (window as unknown as ViewerWindow).viewer.get('stage').getCurrentPageIndex() === 2,
     );
-    await expect.poll(pagerText).toMatch(/^Page 3 of/);
+    await expect.poll(pagerText).toMatch(/^3 \//);
     // Back on the number, so the keyboard carries on from there.
     expect(
       await tab.evaluate(
         () =>
           document.querySelector('embedpdf-viewer')!.shadowRoot!.activeElement?.textContent ?? '',
       ),
-    ).toBe('3');
+    ).toMatch(/^3 \//);
 
     // Escape keeps the page.
     await openField();
@@ -516,7 +569,7 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('where the bars go', () 
         (window as unknown as ViewerWindow).viewer.get('stage').getCurrentPageIndex(),
       ),
     ).toBe(2);
-    expect(await pagerText()).toMatch(/^Page 3 of/);
+    expect(await pagerText()).toMatch(/^3 \//);
     await tab.close();
   });
 

@@ -33,7 +33,7 @@ and nothing else changes. Every change returns a new layout, so changes chain:
 | :-- | :-- | :-- |
 | `main` | `top` | The document menu, thumbnails, view menu, zoom and tools; the mode tabs in the middle; search and comments at the end |
 | `annotate`, `shapes`, `insert`, `form`, `redact`, `measure` | Along `main`, one at a time | The tools of the mode whose tab is selected |
-| `pager` | Floating at the bottom | The page number |
+| `pager` | Floating at the bottom | The page number between the previous and next page buttons; nothing for a document of one page |
 | `selection` | Over selected text | Copy, highlight, underline, strike out |
 | `annotation` | Over selected annotations | Comment, style, delete |
 | `thumbnails` | In the thumbnails panel | Insert, rotate and delete pages, and undo and redo |
@@ -50,7 +50,7 @@ The ids of every bar, group, menu and button are at the [end of this page](#ever
 | :-- | :-- |
 | `'top'`, `'bottom'` | Along the top or bottom edge, horizontal |
 | `'start'`, `'end'` | Along the left or right edge, vertical. In a right-to-left language they swap sides. |
-| `{ float: 'bottom' }` | Floating over the pages: `'top-start'`, `'top'`, `'top-end'`, `'start'`, `'end'`, `'bottom-start'`, `'bottom'` or `'bottom-end'`. Add `hideWhileScrolling` to [hide it while the pages scroll](#out-of-the-way-while-reading). |
+| `{ float: 'bottom' }` | Floating over the pages: `'top-start'`, `'top'`, `'top-end'`, `'start'`, `'end'`, `'bottom-start'`, `'bottom'` or `'bottom-end'`. Add `hideWhenIdle` to [rest it out of sight while nothing moves](#out-of-the-way-while-reading). |
 | `{ with: 'main' }` | Along another bar, on the side of the pages. The mode bars ride along `main` this way, so they follow it wherever it goes. |
 | `{ at: 'selection' }`, `{ at: 'annotation' }` | Over selected text, or over selected annotations |
 | `{ panel: 'thumbnails' }` | At the top of a panel, under its title: any panel's id, your own too. See [A bar in a panel](panels#a-bar-in-a-panel). |
@@ -135,16 +135,28 @@ own:
 
 ### Out of the way while reading
 
-`hideWhileScrolling: true` fades a floating bar out while the pages scroll, and brings it back once
-they've been still for a moment, at every size:
+`hideWhenIdle: true` fades a floating bar out once the pages and the pointer have been still for
+two seconds, and brings it back when the pages move, the pointer moves over them or touches them,
+or the keyboard reaches the bar, at every size:
 
 ```js
-layout.place('pager', { float: 'bottom', hideWhileScrolling: true });
+layout.addBar('zoom', {
+  place: { float: 'bottom-end', hideWhenIdle: true },
+  center: [['zoom:out', 'zoom:in']],
+});
 ```
 
-`false` keeps a bar on screen. Without either, the bar with the page number hides on a phone, and
-every other bar stays. A bar you're using from the keyboard, or typing in, like the page number,
-stays too; a button you clicked doesn't keep it.
+`false` keeps a bar on screen. Without either, the bar with the page number rests out of sight like
+this, and every other bar stays:
+
+```js
+layout.place('pager', { float: 'bottom', hideWhenIdle: false });
+```
+
+A bar stays while the pointer is on it, while you're using it from the keyboard or typing in it,
+like the page number, and while a menu from it is open; a button you clicked doesn't keep it. Out of
+sight, it takes no clicks, so a click there reaches the page, and it keeps its place in the
+keyboard's order.
 
 ## Add a button
 
@@ -336,8 +348,9 @@ page's, in the thumbnails panel). Their buttons are `menu:document`, `menu:view`
 `menu:outline-item`, `menu:attachment-item`, `menu:comment-item` and `menu:page`. See [Menus](menus).
 
 **Your own components the viewer ships**: `{ custom: 'zoom' }` (the zoom field),
-`{ custom: 'page-number' }` (the page number and count, and both numbers while two pages sit side
-by side: "Pages 2–3 of 10"), `{ custom: 'quick-stamps' }` (the stamps
+`{ custom: 'page-number' }` (the page number and count, "3 / 10", one button that turns into a field
+to type a page, and both numbers while a spread fits across the view: "2–3 / 10"; nothing for a
+document of one page), `{ custom: 'quick-stamps' }` (the stamps
 bar of the Insert mode), `{ custom: 'measurement-scale' }` (the scale of the Measure mode),
 `{ custom: 'view-only' }` (the [View only](../features/turning-off#read-only) label, in the main bar's
 `panels` group), `{ custom: 'outline-filter' }` (the outline's filter field, in its panel's bar) and

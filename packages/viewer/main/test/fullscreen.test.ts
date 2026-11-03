@@ -133,10 +133,7 @@ const factsOf = (scope: Page | Frame) =>
 /** Wait until the viewer in `scope` shows the opened document: the chrome reports its page count. */
 const waitForDocumentIn = (scope: Page | Frame) =>
   scope.waitForFunction(
-    () =>
-      /Page 1 of \d+/.test(
-        document.querySelector('embedpdf-viewer')?.shadowRoot?.textContent ?? '',
-      ),
+    () => /1 \/ \d+/.test(document.querySelector('embedpdf-viewer')?.shadowRoot?.textContent ?? ''),
     null,
     { timeout: 60_000 },
   );

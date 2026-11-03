@@ -39,7 +39,7 @@ import {
 } from 'react';
 
 import { useBarEdge } from './bar-edge';
-import { Icon } from './icons';
+import { Icon, readingDirectionClass } from './icons';
 import {
   menuPlacementOf,
   submenuKeysOf,
@@ -594,7 +594,7 @@ export function MenuItem({
             name={command.icon}
             size={16}
             accent={command.iconAccent}
-            className={checked ? 'text-accent' : 'text-fg-muted'}
+            className={`${checked ? 'text-accent' : 'text-fg-muted'} ${readingDirectionClass(command.icon)}`}
           />
         )}
         <span className="flex-1 truncate">{command.label}</span>
@@ -652,7 +652,7 @@ function SubmenuItem({
             name={command.icon}
             size={16}
             accent={command.iconAccent}
-            className="text-fg-muted"
+            className={`text-fg-muted ${readingDirectionClass(command.icon)}`}
           />
         )}
         <span className="flex-1 truncate">{command.label}</span>

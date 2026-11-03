@@ -583,8 +583,8 @@ export const pl: Locale = {
       update: 'Aktualizuj łącze',
     },
     pageNumber: {
-      page: 'Strona {current} z {total}',
-      pages: 'Strony {first}–{last} z {total}',
+      page: '{current} / {total}',
+      pages: '{first}–{last} / {total}',
       goToPage: 'Przejdź do strony',
     },
     comments: {

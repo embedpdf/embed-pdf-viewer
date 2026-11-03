@@ -543,8 +543,7 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('translations', () => {
     expect(await buttonOf(tab, 'Menu')).not.toBeNull();
     expect(await buttonOf(tab, 'Search')).not.toBeNull();
     expect(await buttonOf(tab, 'Pointer')).not.toBeNull();
-    const text = await tab.evaluate(() => window.element.shadowRoot!.textContent ?? '');
-    expect(text).toMatch(/Page 1 of \d+/);
+    expect(await buttonOf(tab, 'Next Page', '[data-bar="pager"]')).not.toBeNull();
     await close(tab);
   });
 
@@ -587,8 +586,8 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('translations', () => {
     // The same as the locale prop: the bars and the pager in French.
     await frames(tab);
     expect(await buttonOf(tab, stringOf(fr.translations, 'panels.search'))).not.toBeNull();
-    const text = await tab.evaluate(() => window.element.shadowRoot!.textContent ?? '');
-    expect(text).toMatch(/Page 1 sur \d+/);
+    const next = stringOf(fr.translations, 'commands.page.next');
+    expect(await buttonOf(tab, next, '[data-bar="pager"]')).not.toBeNull();
     await close(tab);
   });
 

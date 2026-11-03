@@ -62,8 +62,7 @@ const config: ViewerConfig = {
   layout: {
     bars: {
       reader: {
-        // Out of the way while the pages move, back once they're still.
-        place: { float: 'bottom', hideWhileScrolling: true },
+        place: { float: 'bottom' },
         center: [
           ['panel:outline', 'panel:thumbnails'],
           { items: ['page:previous', { custom: 'page-number' }, 'page:next'], importance: 5 },

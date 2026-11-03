@@ -619,6 +619,16 @@ export interface IconProps {
 
 /** One SVG renderer for every icon. Unknown names render nothing (caller shows
  *  a text fallback), so a missing glyph never throws. */
+/** The icons that point along the reading direction: a chevron to the next or previous page. */
+const READING_DIRECTION_ICONS: ReadonlySet<string> = new Set(['chevronLeft', 'chevronRight']);
+
+/**
+ * The class that turns a command's icon `name` the other way in a right-to-left language, where
+ * the bar it sits in mirrors, when it points along the reading direction; empty otherwise.
+ */
+export const readingDirectionClass = (name: string): string =>
+  READING_DIRECTION_ICONS.has(name) ? 'rtl:-scale-x-100' : '';
+
 export function Icon({ name, size = 20, strokeWidth = 2, className, title, accent }: IconProps) {
   // Registry semantics: user icons are additive and a colliding name wins —
   // re-skinning a built-in glyph is a supported move, not an accident.

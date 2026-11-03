@@ -223,12 +223,22 @@ body {
   font-size: 16px;
 }
 
-/* A floating bar that gets out of the way while the pages scroll (places.tsx, its place's
-   `hideWhileScrolling`): it fades out, then takes no presses or focus until it fades back in. */
-[data-scroll-hidden] {
+/* A floating bar that rests out of sight while nothing moves (places.tsx, its place's
+   `hideWhenIdle`): it fades out slowly and comes back quickly. Out of sight it takes no presses,
+   so a press there reaches the page and wakes it, but it keeps its place in the keyboard's order:
+   focus coming into it brings it back. */
+[data-float] [data-bar] {
+  transition: opacity 150ms;
+}
+[data-float] [data-idle-hidden] {
   opacity: 0;
-  visibility: hidden;
-  transition:
-    opacity 200ms,
-    visibility 0s 200ms;
+  transition: opacity 500ms;
+}
+[data-idle-hidden] * {
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-float] [data-bar] {
+    transition: none;
+  }
 }

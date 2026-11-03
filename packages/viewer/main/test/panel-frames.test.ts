@@ -197,7 +197,6 @@ const execute = (tab: Page, command: string) =>
     command,
   );
 
-
 const widthOf = (box: Box) => Math.round(box.right - box.left);
 
 /** The open thumbnails panel's thumbs that show a page: how many columns, and how wide each is. */
@@ -517,7 +516,7 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('panel frames', () => {
     await frames(tab);
     expect(await frameOf(tab, 'thumbnails')).toBeNull();
     await tab.waitForFunction(() =>
-      /Page 2 of/.test(document.querySelector('embedpdf-viewer')?.shadowRoot?.textContent ?? ''),
+      /2 \/ \d+/.test(document.querySelector('embedpdf-viewer')?.shadowRoot?.textContent ?? ''),
     );
     await tab.close();
   });

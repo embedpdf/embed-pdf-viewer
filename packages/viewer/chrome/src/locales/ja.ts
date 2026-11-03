@@ -583,8 +583,8 @@ export const ja: Locale = {
       update: 'リンクを更新',
     },
     pageNumber: {
-      page: '{current} / {total} ページ',
-      pages: '{first}–{last} / {total} ページ',
+      page: '{current} / {total}',
+      pages: '{first}–{last} / {total}',
       goToPage: 'ページへ移動',
     },
     comments: {

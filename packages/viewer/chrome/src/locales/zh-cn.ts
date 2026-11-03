@@ -581,8 +581,8 @@ export const zhCN: Locale = {
       update: '更新链接',
     },
     pageNumber: {
-      page: '第 {current} 页，共 {total} 页',
-      pages: '第 {first}–{last} 页，共 {total} 页',
+      page: '{current} / {total}',
+      pages: '{first}–{last} / {total}',
       goToPage: '转到页面',
     },
     comments: {

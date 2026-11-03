@@ -160,8 +160,6 @@ const waitForTabs = (tab: Page, expected: readonly string[]) =>
     { timeout: 30_000 },
   );
 
-const shadowText = (tab: Page) => tab.evaluate(() => window.element.shadowRoot!.textContent ?? '');
-
 describe('a running viewer follows its live config', () => {
   let host: ViewerHost;
   let browser: Browser;
@@ -200,12 +198,12 @@ describe('a running viewer follows its live config', () => {
 
   it('switches the language in place', async () => {
     await tab.evaluate(() => (window.element.locale = 'es'));
-    await tab.waitForFunction(() =>
-      /Página 1 de \d+/.test(window.element.shadowRoot!.textContent ?? ''),
+    await tab.waitForFunction(
+      () => window.element.shadowRoot!.querySelector('[aria-label="Página siguiente"]') !== null,
     );
     await tab.evaluate(() => (window.element.locale = 'en'));
-    await tab.waitForFunction(() =>
-      /Page 1 of \d+/.test(window.element.shadowRoot!.textContent ?? ''),
+    await tab.waitForFunction(
+      () => window.element.shadowRoot!.querySelector('[aria-label="Next Page"]') !== null,
     );
     expect(await sameViewer(tab)).toBe(true);
   });
@@ -382,8 +380,8 @@ describe('a declarative viewer follows its attributes', () => {
     expect(await isDark(tab)).toBe(true);
 
     await tab.evaluate(() => window.element.setAttribute('locale', 'es'));
-    await tab.waitForFunction(() =>
-      /Página 1 de \d+/.test(window.element.shadowRoot!.textContent ?? ''),
+    await tab.waitForFunction(
+      () => window.element.shadowRoot!.querySelector('[aria-label="Página siguiente"]') !== null,
     );
 
     await tab.evaluate(() => window.element.setAttribute('src', '/sample.pdf?second'));
@@ -391,7 +389,11 @@ describe('a declarative viewer follows its attributes', () => {
     const id = await tab.evaluate(() => window.element.viewer.documents.getActiveId());
     expect(id).toBe('/sample.pdf?second');
     expect(await sameViewer(tab)).toBe(true);
-    expect(await shadowText(tab)).toMatch(/Página 1 de \d+/);
+    expect(
+      await tab.evaluate(
+        () => window.element.shadowRoot!.querySelector('[aria-label="Página siguiente"]') !== null,
+      ),
+    ).toBe(true);
   });
 
   it('replaces what the properties set with .config, and keeps the attributes', async () => {
@@ -403,8 +405,8 @@ describe('a declarative viewer follows its attributes', () => {
     await frames(tab);
     expect(await isDark(tab)).toBe(true);
     await tab.evaluate(() => (window.element.config = { locale: 'es' }));
-    await tab.waitForFunction(() =>
-      /Página 1 de \d+/.test(window.element.shadowRoot!.textContent ?? ''),
+    await tab.waitForFunction(
+      () => window.element.shadowRoot!.querySelector('[aria-label="Página siguiente"]') !== null,
     );
     expect(await isDark(tab)).toBe(false);
     expect(
@@ -580,9 +582,9 @@ describe('a change before the viewer is ready', () => {
   it('takes a change made before the viewer was ready', async () => {
     const tab = await browser.newPage({ viewport: { width: 1200, height: 800 } });
     await tab.goto(`${host.origin}/early.html`);
-    // Spanish, so the document shows as "Página 1 de …".
+    // Spanish, so the pager's next page button reads "Página siguiente".
     await tab.waitForFunction(
-      () => /Página 1 de \d+/.test(window.element.shadowRoot?.textContent ?? ''),
+      () => window.element.shadowRoot?.querySelector('[aria-label="Página siguiente"]') != null,
       null,
       { timeout: 60_000 },
     );
