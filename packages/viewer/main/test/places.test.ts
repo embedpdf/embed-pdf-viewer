@@ -450,10 +450,10 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('where the bars go', () 
     await tab.locator(`${pager} [aria-label="Zoom In"]:visible`).click();
     await tab.mouse.move(WIDTH / 2, 100);
     await until(tab, true);
-    // Focus from the keyboard brings it back, and holds it: out of the bar and back in, to the
-    // button it left from.
-    await tab.keyboard.press('Shift+Tab');
-    await tab.keyboard.press('Tab');
+    // Focus from the keyboard brings it back, and holds it: an arrow key along the bar, from the
+    // button the click left focus on. Not Tab: the bar is one tab stop, and what's before it
+    // depends on the document (a form's fields come first).
+    await tab.keyboard.press('ArrowLeft');
     await until(tab, false);
     await tab.waitForTimeout(IDLE_MS + 400);
     expect(await idleHidden(tab)).toBe(false);
