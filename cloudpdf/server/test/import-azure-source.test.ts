@@ -1,10 +1,12 @@
 /**
- * Azure Blob import source: shared conformance over in-memory SDK
- * fakes (keyless DefaultAzureCredential path), plus version-id
- * revision semantics and the archived-blob mapping.
+ * Azure Blob import source: shared conformance over the in-memory SDK
+ * fakes (`__mocks__/@azure/`, keyless DefaultAzureCredential path), plus
+ * version-id revision semantics and the archived-blob mapping.
  */
-import { Readable } from 'node:stream';
 import { describe, expect, test, vi } from 'vitest';
+
+import { identity } from '../__mocks__/@azure/identity';
+import { FakeBlobClient, blobError, blobs } from '../__mocks__/@azure/storage-blob';
 
 import {
   ImportConnectionSchema,
@@ -14,73 +16,10 @@ import { ImportPolicySchema, type ImportPolicy } from '../src/import/config/Impo
 import { ImportSourceError } from '../src/import/ImportSource';
 import { runImportSourceConformance } from './_helpers/import-source-conformance';
 
-const az = vi.hoisted(() => {
-  interface Obj {
-    bytes: Buffer;
-    contentType?: string;
-    versionId?: string;
-  }
-  return { objects: new Map<string, Obj>(), credentials: 0 };
-});
-
-vi.mock('@azure/identity', () => ({
-  DefaultAzureCredential: class {
-    constructor() {
-      az.credentials++;
-    }
-  },
-}));
-
-vi.mock('@azure/storage-blob', () => {
-  const azErr = (message: string, statusCode: number, code?: string): Error =>
-    Object.assign(new Error(message), { statusCode, ...(code ? { code } : {}) });
-  class FakeBlobClient {
-    constructor(
-      readonly key: string,
-      readonly versionId?: string,
-    ) {}
-    withVersion(v: string): FakeBlobClient {
-      return new FakeBlobClient(this.key, v);
-    }
-    async download(
-      _offset?: number,
-      _count?: number,
-      opts?: { abortSignal?: AbortSignal },
-    ): Promise<Record<string, unknown>> {
-      if (opts?.abortSignal?.aborted) throw azErr('aborted', 0, 'AbortError');
-      if (this.key === 'err/denied') throw azErr('denied', 403);
-      if (this.key === 'err/archived') throw azErr('archived', 409, 'BlobArchived');
-      if (this.key === 'err/flaky') throw azErr('server error', 500);
-      const o = az.objects.get(this.key);
-      if (!o) throw azErr('BlobNotFound', 404, 'BlobNotFound');
-      if (this.versionId !== undefined && this.versionId !== o.versionId) {
-        throw azErr('BlobNotFound', 404, 'BlobNotFound');
-      }
-      return {
-        contentLength: o.bytes.byteLength,
-        readableStreamBody: Readable.from([o.bytes]),
-        ...(o.contentType ? { contentType: o.contentType } : {}),
-        ...(o.versionId ? { versionId: o.versionId } : {}),
-      };
-    }
-  }
-  class FakeContainerClient {
-    getBlobClient(key: string): FakeBlobClient {
-      return new FakeBlobClient(key);
-    }
-  }
-  return {
-    BlobServiceClient: class {
-      constructor(
-        readonly url: string,
-        readonly credential: unknown,
-      ) {}
-      getContainerClient(): FakeContainerClient {
-        return new FakeContainerClient();
-      }
-    },
-  };
-});
+// No factories: vitest serves __mocks__/@azure/identity.ts and
+// __mocks__/@azure/storage-blob.ts.
+vi.mock('@azure/identity');
+vi.mock('@azure/storage-blob');
 
 const { AzureBlobImportSource } = await import('../src/import/adapters/AzureBlobImportSource');
 
@@ -104,25 +43,37 @@ function sourceFor(key: string, opts: { revision?: string; maxBytes?: number } =
   });
 }
 
+/** The source's SDK blob client, made without calling it: a real one would call Azure. */
+function blobOf(source: ReturnType<typeof sourceFor>): Promise<unknown> {
+  return (source as unknown as { blob(): Promise<unknown> }).blob();
+}
+
 async function openErr(key: string, opts: { revision?: string } = {}): Promise<ImportSourceError> {
   const err = await sourceFor(key, opts)
     .open({ signal: new AbortController().signal })
-    .then(() => null, (e: unknown) => e);
+    .then(
+      () => null,
+      (e: unknown) => e,
+    );
   expect(err).toBeInstanceOf(ImportSourceError);
   return err as ImportSourceError;
 }
 
 runImportSourceConformance('azure-blob', () => {
-  az.objects.clear();
+  blobs.objects.clear();
+  blobs.failures.clear();
   return {
     seed(name, bytes, opts) {
-      az.objects.set(name, {
+      blobs.objects.set(name, {
         bytes: Buffer.from(bytes),
         ...(opts?.contentType ? { contentType: opts.contentType } : {}),
+        metadata: {},
       });
     },
     source(name, opts) {
-      return sourceFor(name, { ...(opts?.maxBytes !== undefined ? { maxBytes: opts.maxBytes } : {}) });
+      return sourceFor(name, {
+        ...(opts?.maxBytes !== undefined ? { maxBytes: opts.maxBytes } : {}),
+      });
     },
     missingName: () => 'definitely-missing',
   };
@@ -130,7 +81,11 @@ runImportSourceConformance('azure-blob', () => {
 
 describe('AzureBlobImportSource specifics', () => {
   test('revisions pin version ids and resolvedRevision reports what was served', async () => {
-    az.objects.set('inv/a.pdf', { bytes: Buffer.from('%PDF azure'), versionId: '2026-08-19T00:00:00.000Z' });
+    blobs.objects.set('inv/a.pdf', {
+      bytes: Buffer.from('%PDF azure'),
+      metadata: {},
+      versionId: '2026-08-19T00:00:00.000Z',
+    });
     const opened = await sourceFor('inv/a.pdf', { revision: '2026-08-19T00:00:00.000Z' }).open({
       signal: new AbortController().signal,
     });
@@ -140,16 +95,31 @@ describe('AzureBlobImportSource specifics', () => {
   });
 
   test('denied and archived blobs map to their terminal classes', async () => {
-    expect((await openErr('err/denied')).code).toBe('denied');
-    const archived = await openErr('err/archived');
+    blobs.failures.set('inv/denied.pdf', blobError('denied', 403));
+    blobs.failures.set('inv/archived.pdf', blobError('archived', 409, 'BlobArchived'));
+    expect((await openErr('inv/denied.pdf')).code).toBe('denied');
+    const archived = await openErr('inv/archived.pdf');
     expect(archived.code).toBe('unsupported');
     expect(archived.message).toMatch(/archived/);
   });
 
   test('source 5xx maps to retryable upstream', async () => {
-    const err = await openErr('err/flaky');
+    blobs.failures.set('inv/flaky.pdf', blobError('server error', 500));
+    const err = await openErr('inv/flaky.pdf');
     expect(err.code).toBe('upstream');
     expect(err.retryable).toBe(true);
+  });
+
+  test('sources opened back to back all get the fake SDKs', async () => {
+    // Each source starts its own imports of both SDKs on first use, so
+    // these imports overlap. A vi.mock factory hands some of them the
+    // real clients.
+    identity.credentials = 0;
+    const clients = await Promise.all(
+      Array.from({ length: 8 }, () => blobOf(sourceFor('inv/a.pdf'))),
+    );
+    expect(clients.every((c) => c instanceof FakeBlobClient)).toBe(true);
+    expect(identity.credentials).toBe(8);
   });
 
   test('info uses the account endpoint and never credentials', () => {

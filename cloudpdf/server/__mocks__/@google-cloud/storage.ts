@@ -1,57 +1,77 @@
 /**
- * In-memory stand-in for `@google-cloud/storage`. A test file that calls
- * `vi.mock('@google-cloud/storage')` without a factory gets this module
- * wherever the SDK is imported, including the adapters' lazy
- * `await import('@google-cloud/storage')`.
+ * In-memory stand-in for `@google-cloud/storage`, served to every test file
+ * that calls `vi.mock('@google-cloud/storage')` without a factory (see
+ * "Faking an SDK in tests" in `docs/conventions/server-adapters.md`).
  *
- * It's a file rather than a `vi.mock` factory so that it always applies.
- * vitest 2 skips a factory mock for an import that overlaps another
- * import of the same module from the same file, and every adapter
- * instance starts its own import, so a store built while another
- * store's import is in flight gets the real client, which calls
- * storage.googleapis.com. A `__mocks__` file is served by path, with no
- * such window.
- *
- * The fake keeps bytes and custom metadata, so an adapter's real logic
- * (sha-in-metadata, content-length guard, ranged reads, prefix delete)
- * runs end to end. Tests read and reset {@link gcs} directly.
+ * The fake keeps bytes, custom metadata and a generation per object, so the
+ * adapters' real logic (sha-in-metadata, content-length guard, ranged reads,
+ * prefix delete, generation pinning) runs end to end. Tests read and reset
+ * {@link gcs} directly.
  */
 import { Readable, Writable } from 'node:stream';
 
 interface FakeObject {
   bytes: Buffer;
-  contentType: string;
+  contentType?: string;
   metadata: Record<string, string>;
+  generation: number;
 }
 
-/** Every bucket's objects, by key, and the signed-URL requests made. */
 export const gcs = {
+  /** Every bucket's objects, by key. */
   objects: new Map<string, FakeObject>(),
   signedUrlCalls: [] as unknown[],
+  /** A key here fails every read with this GCS error code. */
+  failures: new Map<string, number>(),
+  /** The last generation handed out; each write takes the next one. */
+  generation: 0,
 };
 
-function notFound(): Error & { code: number } {
-  const err = new Error('Not Found') as Error & { code: number };
-  err.code = 404;
-  return err;
+export function gcsError(code: number): Error & { code: number } {
+  return Object.assign(new Error(code === 404 ? 'Not Found' : `GCS error ${code}`), { code });
 }
 
 export class FakeFile {
   constructor(
     readonly bucketName: string,
     readonly key: string,
+    readonly generation?: number,
   ) {}
+  /** The object this handle reads; throws as GCS would when there is none. */
+  private stored(): FakeObject {
+    const failure = gcs.failures.get(this.key);
+    if (failure !== undefined) throw gcsError(failure);
+    const o = gcs.objects.get(this.key);
+    if (!o || (this.generation !== undefined && this.generation !== o.generation)) {
+      throw gcsError(404);
+    }
+    return o;
+  }
+  private write(bytes: Buffer, contentType?: string, metadata?: Record<string, string>): void {
+    gcs.objects.set(this.key, {
+      bytes,
+      contentType: contentType ?? 'application/octet-stream',
+      metadata: metadata ?? {},
+      generation: ++gcs.generation,
+    });
+  }
   async exists(): Promise<[boolean]> {
-    return [gcs.objects.has(this.key)];
+    try {
+      this.stored();
+      return [true];
+    } catch (err) {
+      if ((err as { code?: number }).code === 404) return [false];
+      throw err;
+    }
   }
   async getMetadata(): Promise<[Record<string, unknown>]> {
-    const o = gcs.objects.get(this.key);
-    if (!o) throw notFound();
+    const o = this.stored();
     return [
       {
         size: String(o.bytes.byteLength),
         etag: `etag-${o.bytes.byteLength}`,
-        contentType: o.contentType,
+        generation: String(o.generation),
+        ...(o.contentType ? { contentType: o.contentType } : {}),
         metadata: o.metadata,
       },
     ];
@@ -60,22 +80,18 @@ export class FakeFile {
     buf: Buffer,
     opts: { contentType?: string; metadata?: { metadata?: Record<string, string> } },
   ): Promise<void> {
-    gcs.objects.set(this.key, {
-      bytes: Buffer.from(buf),
-      contentType: opts.contentType ?? 'application/octet-stream',
-      metadata: opts.metadata?.metadata ?? {},
-    });
+    this.write(Buffer.from(buf), opts.contentType, opts.metadata?.metadata);
   }
   async download(): Promise<[Buffer]> {
-    const o = gcs.objects.get(this.key);
-    if (!o) throw notFound();
-    return [o.bytes];
+    return [this.stored().bytes];
   }
   createReadStream(opts?: { start?: number; end?: number }): Readable {
-    const o = gcs.objects.get(this.key);
-    if (!o) {
+    let o: FakeObject;
+    try {
+      o = this.stored();
+    } catch (err) {
       const r = new Readable({ read() {} });
-      process.nextTick(() => r.destroy(notFound()));
+      process.nextTick(() => r.destroy(err as Error));
       return r;
     }
     const start = opts?.start ?? 0;
@@ -91,25 +107,19 @@ export class FakeFile {
     // Commit-on-finish mirrors real GCS: a destroyed stream (source
     // error, length violation) must leave no visible object.
     const chunks: Buffer[] = [];
-    const key = this.key;
     return new Writable({
       write(chunk, _enc, cb) {
         chunks.push(Buffer.from(chunk as Uint8Array));
         cb();
       },
-      final(cb) {
-        gcs.objects.set(key, {
-          bytes: Buffer.concat(chunks),
-          contentType: opts?.contentType ?? 'application/octet-stream',
-          metadata: opts?.metadata?.metadata ?? {},
-        });
+      final: (cb) => {
+        this.write(Buffer.concat(chunks), opts?.contentType, opts?.metadata?.metadata);
         cb();
       },
     });
   }
   async setMetadata(meta: { metadata?: Record<string, string> }): Promise<void> {
-    const o = gcs.objects.get(this.key);
-    if (!o) throw notFound();
+    const o = this.stored();
     o.metadata = { ...o.metadata, ...(meta.metadata ?? {}) };
   }
   async getSignedUrl(opts: {
@@ -125,7 +135,7 @@ export class FakeFile {
   async delete(opts?: { ignoreNotFound?: boolean }): Promise<void> {
     if (!gcs.objects.has(this.key)) {
       if (opts?.ignoreNotFound) return;
-      throw notFound();
+      throw gcsError(404);
     }
     gcs.objects.delete(this.key);
   }
@@ -133,8 +143,8 @@ export class FakeFile {
 
 export class FakeBucket {
   constructor(readonly name: string) {}
-  file(key: string): FakeFile {
-    return new FakeFile(this.name, key);
+  file(key: string, opts?: { generation?: number }): FakeFile {
+    return new FakeFile(this.name, key, opts?.generation);
   }
   async getFiles({ prefix }: { prefix: string }): Promise<[FakeFile[]]> {
     const matching = [...gcs.objects.keys()]

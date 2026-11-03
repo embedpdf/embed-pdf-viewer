@@ -3,8 +3,8 @@
  *
  * No first-party Azure mock library, so we `vi.mock` both
  * `@azure/storage-blob` and `@azure/identity` with a faithful
- * in-memory fake. The fake stores bytes + metadata and records how
- * SAS was signed, so we verify both presigning paths:
+ * in-memory fake (`__mocks__/@azure/`). The fake stores bytes + metadata
+ * and records how SAS was signed, so we verify both presigning paths:
  *   - keyless (no accountKey)  → DefaultAzureCredential + user-delegation SAS
  *   - keyed   (accountKey set) → StorageSharedKeyCredential + account-key SAS
  *
@@ -12,163 +12,17 @@
  * Azurite emulator (STORAGE_LIVE=1), not in CI.
  */
 import { createHash } from 'node:crypto';
-import { Readable } from 'node:stream';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { DefaultAzureCredential, identity } from '../__mocks__/@azure/identity';
+import { BlobServiceClient, blobs } from '../__mocks__/@azure/storage-blob';
 
-const az = vi.hoisted(() => {
-  interface Obj {
-    bytes: Buffer;
-    contentType: string;
-    metadata: Record<string, string>;
-  }
-  return {
-    objects: new Map<string, Obj>(),
-    delegationKeyRequests: 0,
-    defaultCredentialCount: 0,
-    sharedKeyCount: 0,
-    lastSasCredentialKind: '' as 'shared-key' | 'user-delegation' | '',
-  };
-});
-
-vi.mock('@azure/identity', () => ({
-  DefaultAzureCredential: class {
-    constructor() {
-      az.defaultCredentialCount++;
-    }
-  },
-}));
-
-vi.mock('@azure/storage-blob', () => {
-  class FakeBlockBlobClient {
-    constructor(
-      readonly accountUrl: string,
-      readonly container: string,
-      readonly key: string,
-    ) {}
-    get url(): string {
-      return `${this.accountUrl}/${this.container}/${this.key}`;
-    }
-    async exists(): Promise<boolean> {
-      return az.objects.has(this.key);
-    }
-    async getProperties(): Promise<Record<string, unknown>> {
-      const o = az.objects.get(this.key);
-      if (!o) throw Object.assign(new Error('BlobNotFound'), { statusCode: 404 });
-      return {
-        contentLength: o.bytes.byteLength,
-        etag: `"etag-${o.bytes.byteLength}"`,
-        metadata: o.metadata,
-        blobType: 'BlockBlob',
-      };
-    }
-    async upload(
-      body: Buffer,
-      _len: number,
-      opts: { blobHTTPHeaders?: { blobContentType?: string }; metadata?: Record<string, string> },
-    ): Promise<void> {
-      az.objects.set(this.key, {
-        bytes: Buffer.from(body),
-        contentType: opts.blobHTTPHeaders?.blobContentType ?? 'application/octet-stream',
-        metadata: opts.metadata ?? {},
-      });
-    }
-    async uploadStream(
-      stream: Readable,
-      _bufferSize?: number,
-      _maxConcurrency?: number,
-      opts?: { blobHTTPHeaders?: { blobContentType?: string } },
-    ): Promise<void> {
-      // Drain-then-commit mirrors real Azure block staging: a stream
-      // error rejects before commitBlockList, no visible blob.
-      const chunks: Buffer[] = [];
-      for await (const c of stream) chunks.push(Buffer.from(c as Uint8Array));
-      az.objects.set(this.key, {
-        bytes: Buffer.concat(chunks),
-        contentType: opts?.blobHTTPHeaders?.blobContentType ?? 'application/octet-stream',
-        metadata: {},
-      });
-    }
-    async setMetadata(metadata: Record<string, string>): Promise<void> {
-      const o = az.objects.get(this.key);
-      if (!o) throw Object.assign(new Error('BlobNotFound'), { statusCode: 404 });
-      o.metadata = { ...metadata };
-    }
-    async downloadToBuffer(): Promise<Buffer> {
-      const o = az.objects.get(this.key);
-      if (!o) throw Object.assign(new Error('BlobNotFound'), { statusCode: 404 });
-      return o.bytes;
-    }
-    async download(offset = 0, count?: number): Promise<{ readableStreamBody: Readable }> {
-      const o = az.objects.get(this.key);
-      if (!o) throw Object.assign(new Error('BlobNotFound'), { statusCode: 404 });
-      const end = count === undefined ? o.bytes.byteLength : offset + count;
-      return { readableStreamBody: Readable.from([o.bytes.subarray(offset, end)]) };
-    }
-    async deleteIfExists(): Promise<{ succeeded: boolean }> {
-      return { succeeded: az.objects.delete(this.key) };
-    }
-  }
-
-  class FakeContainerClient {
-    constructor(
-      readonly accountUrl: string,
-      readonly container: string,
-    ) {}
-    getBlockBlobClient(key: string): FakeBlockBlobClient {
-      return new FakeBlockBlobClient(this.accountUrl, this.container, key);
-    }
-    async *listBlobsFlat({ prefix }: { prefix: string }): AsyncGenerator<{ name: string }> {
-      for (const k of [...az.objects.keys()]) {
-        if (k.startsWith(prefix)) yield { name: k };
-      }
-    }
-  }
-
-  class FakeBlobServiceClient {
-    constructor(
-      readonly url: string,
-      readonly credential: unknown,
-    ) {}
-    getContainerClient(container: string): FakeContainerClient {
-      return new FakeContainerClient(this.url, container);
-    }
-    async getUserDelegationKey(_start: Date, _end: Date): Promise<{ value: string }> {
-      az.delegationKeyRequests++;
-      return { value: 'fake-user-delegation-key' };
-    }
-  }
-
-  class StorageSharedKeyCredential {
-    constructor(
-      readonly accountName: string,
-      readonly accountKey: string,
-    ) {
-      az.sharedKeyCount++;
-    }
-  }
-
-  return {
-    BlobServiceClient: FakeBlobServiceClient,
-    StorageSharedKeyCredential,
-    BlobSASPermissions: { parse: (p: string) => ({ toString: () => p }) },
-    SASProtocol: { Https: 'https' },
-    generateBlobSASQueryParameters: (
-      opts: { blobName: string; permissions: { toString(): string } },
-      credential: unknown,
-      _accountName?: string,
-    ) => {
-      az.lastSasCredentialKind =
-        credential instanceof StorageSharedKeyCredential ? 'shared-key' : 'user-delegation';
-      return {
-        toString: () =>
-          `sv=2023-11-03&sp=${opts.permissions.toString()}&sig=fake-signature-for-${opts.blobName}`,
-      };
-    },
-  };
-});
+// No factories: vitest serves __mocks__/@azure/identity.ts and
+// __mocks__/@azure/storage-blob.ts.
+vi.mock('@azure/identity');
+vi.mock('@azure/storage-blob');
 
 const { AzureBlobObjectStore } = await import('../src/storage/adapters/AzureBlobObjectStore');
 const { runObjectStoreConformance } = await import('./_helpers/object-store-conformance');
@@ -176,8 +30,8 @@ const { runObjectStoreConformance } = await import('./_helpers/object-store-conf
 // Same contract suite the FS oracle runs — proves the Azure adapter
 // doesn't diverge. Uses the keyless variant (managed-identity path).
 runObjectStoreConformance('azure-blob', () => {
-  az.objects.clear();
-  az.delegationKeyRequests = 0;
+  blobs.objects.clear();
+  blobs.delegationKeyRequests = 0;
   return new AzureBlobObjectStore({ container: 'c', accountName: 'acct' });
 });
 
@@ -189,14 +43,20 @@ function bytes(n: number): Uint8Array {
   for (let i = 0; i < n; i++) a[i] = (i * 7) % 256;
   return a;
 }
+/** The store's SDK service client, read without calling it: a real one would call Azure. */
+function serviceOf(store: InstanceType<typeof AzureBlobObjectStore>): Promise<unknown> {
+  const client = (store as unknown as { clientPromise: Promise<{ service: unknown }> })
+    .clientPromise;
+  return client.then((c) => c.service);
+}
 
 let tmp: string;
 beforeEach(async () => {
-  az.objects.clear();
-  az.delegationKeyRequests = 0;
-  az.defaultCredentialCount = 0;
-  az.sharedKeyCount = 0;
-  az.lastSasCredentialKind = '';
+  blobs.objects.clear();
+  blobs.delegationKeyRequests = 0;
+  identity.credentials = 0;
+  blobs.sharedKeyCount = 0;
+  blobs.lastSasCredentialKind = '';
   tmp = await mkdtemp(join(tmpdir(), 'azure-test-'));
 });
 afterEach(async () => {
@@ -213,12 +73,24 @@ describe('AzureBlobObjectStore', () => {
     expect(keyed().info).toMatchObject({ kind: 'azure-blob', auth: 'account-key' });
   });
 
+  test('stores built back to back all get the fake SDKs', async () => {
+    // Each constructor starts its own imports of both SDKs, so these
+    // imports overlap. A vi.mock factory hands some of them the real
+    // clients.
+    const services = await Promise.all(Array.from({ length: 8 }, () => serviceOf(keyless())));
+    expect(
+      services.every(
+        (s) => s instanceof BlobServiceClient && s.credential instanceof DefaultAzureCredential,
+      ),
+    ).toBe(true);
+  });
+
   test('put records SHA-256 in metadata (hyphen-free Azure key) and returns it', async () => {
     const store = keyless();
     const b = bytes(512);
     const r = await store.put('t/x/base.pdf', b, { contentLength: b.byteLength });
     expect(r.sha256).toBe(sha256Hex(b));
-    expect(az.objects.get('t/x/base.pdf')?.metadata).toEqual({
+    expect(blobs.objects.get('t/x/base.pdf')?.metadata).toEqual({
       xembedpdfsha256: sha256Hex(b),
     });
   });
@@ -227,7 +99,7 @@ describe('AzureBlobObjectStore', () => {
     const store = keyless();
     const b = bytes(64);
     await expect(store.put('k', b, { contentLength: 1 })).rejects.toThrow(/contentLength/);
-    expect(az.objects.has('k')).toBe(false);
+    expect(blobs.objects.has('k')).toBe(false);
   });
 
   test('getSha256 / stat / exists reflect stored object; missing → null', async () => {
@@ -250,9 +122,9 @@ describe('AzureBlobObjectStore', () => {
     expect(up?.method).toBe('PUT');
     expect(up?.headers['x-ms-blob-type']).toBe('BlockBlob');
     expect(up?.url).toContain('sig=fake-signature');
-    expect(az.lastSasCredentialKind).toBe('user-delegation');
-    expect(az.delegationKeyRequests).toBe(1);
-    expect(az.defaultCredentialCount).toBe(1); // no account key → AAD credential
+    expect(blobs.lastSasCredentialKind).toBe('user-delegation');
+    expect(blobs.delegationKeyRequests).toBe(1);
+    expect(identity.credentials).toBe(1); // no account key → AAD credential
   });
 
   test('keyed presignUpload uses an account-key SAS (no delegation key, no AAD)', async () => {
@@ -262,10 +134,10 @@ describe('AzureBlobObjectStore', () => {
       contentType: 'application/pdf',
     });
     expect(up?.url).toContain('sig=fake-signature');
-    expect(az.lastSasCredentialKind).toBe('shared-key');
-    expect(az.delegationKeyRequests).toBe(0);
-    expect(az.defaultCredentialCount).toBe(0);
-    expect(az.sharedKeyCount).toBe(1);
+    expect(blobs.lastSasCredentialKind).toBe('shared-key');
+    expect(blobs.delegationKeyRequests).toBe(0);
+    expect(identity.credentials).toBe(0);
+    expect(blobs.sharedKeyCount).toBe(1);
   });
 
   test('user-delegation key is cached across presigns', async () => {
@@ -273,7 +145,7 @@ describe('AzureBlobObjectStore', () => {
     await store.presignUpload('a', 900, { contentLength: 1, contentType: 'application/pdf' });
     await store.presignDownload('b', 900);
     await store.presignDownload('c', 900);
-    expect(az.delegationKeyRequests).toBe(1); // fetched once, reused
+    expect(blobs.delegationKeyRequests).toBe(1); // fetched once, reused
   });
 
   test('delete returns true when present, false when missing', async () => {
@@ -290,7 +162,7 @@ describe('AzureBlobObjectStore', () => {
     await store.put('t/b/1', bytes(4), { contentLength: 4 });
     const r = await store.deletePrefix('t/a/');
     expect(r.deleted).toBe(2);
-    expect(az.objects.has('t/b/1')).toBe(true);
+    expect(blobs.objects.has('t/b/1')).toBe(true);
   });
 
   test('materializeLocal fans out ranges, verifies sha, writes atomically', async () => {
