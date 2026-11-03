@@ -1,5 +1,11 @@
 # @embedpdf/engine-services
 
+## 3.0.0-next.21
+
+### Patch Changes
+
+- [#950](https://github.com/embedpdf/embed-pdf-viewer/pull/950) by [@KleiKodesh](https://github.com/KleiKodesh) – An `/XYZ` destination that leaves out trailing parameters, such as `[page /XYZ 10 700]`, keeps the left and top it has instead of reading all three as `null`. `/XYZ` is now read through `FPDFDest_GetView` and the null-parameter mask like every other view type. A `0` zoom still reads as `null`, which means the same.
+
 ## 3.0.0-next.20
 
 ### Minor Changes

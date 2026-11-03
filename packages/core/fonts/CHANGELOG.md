@@ -1,5 +1,7 @@
 # @embedpdf/core-fonts
 
+## 3.0.0-next.21
+
 ## 3.0.0-next.20
 
 ### Minor Changes

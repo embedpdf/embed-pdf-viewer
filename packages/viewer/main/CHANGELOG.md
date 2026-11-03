@@ -1,5 +1,13 @@
 # @embedpdf/viewer
 
+## 3.0.0-next.21
+
+### Minor Changes
+
+- [#957](https://github.com/embedpdf/embed-pdf-viewer/pull/957) by [@bobsingor](https://github.com/bobsingor) – The page number floating over the pages has previous and next page buttons around it, reads "3 / 12", and draws nothing for a document of one page. With pages side by side it reads "2–3 / 12" while the spread fits across the view, and Next goes to the next spread; zoomed in past it, it names the one page, and Next goes to the page beside it. It fades out once the pages and the pointer have been still for two seconds, at every size, and comes back when they move or the keyboard reaches it; a floating bar of yours does the same with `hideWhenIdle: true` in its place, which replaces `hideWhileScrolling`. Floating bars have the theme's corners instead of round ones.
+
+- [#963](https://github.com/embedpdf/embed-pdf-viewer/pull/963) by [@bobsingor](https://github.com/bobsingor) – The bar over selected text sits below it, like the one over a selected annotation, and above it only without room below. The style panel no longer shows an annotation's flags; the `annotationFlags.*` keys in `strings` are gone with it.
+
 ## 3.0.0-next.20
 
 ### Minor Changes

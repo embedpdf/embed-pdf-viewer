@@ -1,5 +1,11 @@
 # @embedpdf/core-ui
 
+## 3.0.0-next.21
+
+### Minor Changes
+
+- [#957](https://github.com/embedpdf/embed-pdf-viewer/pull/957) by [@bobsingor](https://github.com/bobsingor) – A floating bar's place takes `hideWhenIdle` (`FloatPlace`) in place of `hideWhileScrolling`, and `hideWhenIdleOf(data, id)` reads it in place of `hideWhileScrollingOf`, through the bar it rides along: the bar rests out of sight while nothing moves, instead of hiding while the pages scroll.
+
 ## 3.0.0-next.20
 
 ### Minor Changes

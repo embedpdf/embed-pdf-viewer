@@ -1,5 +1,11 @@
 # @cloudpdf/sdk
 
+## 3.0.0-next.21
+
+### Minor Changes
+
+- [#956](https://github.com/embedpdf/embed-pdf-viewer/pull/956) by [@bobsingor](https://github.com/bobsingor) – `tenants.update({ tenantId, features })` sets the server modules a tenant may use, and tenant records have `features`.
+
 ## 3.0.0-next.20
 
 ### Minor Changes
