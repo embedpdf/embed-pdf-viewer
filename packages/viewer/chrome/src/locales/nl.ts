@@ -71,6 +71,7 @@ export const nl: Locale = {
         group: 'Schuiven',
         vertical: 'Verticaal',
         horizontal: 'Horizontaal',
+        paged: 'Per pagina',
       },
       rotate: {
         group: 'Draaien',

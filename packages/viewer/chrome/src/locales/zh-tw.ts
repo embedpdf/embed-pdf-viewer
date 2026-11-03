@@ -73,6 +73,7 @@ export const zhTW: Locale = {
         group: '捲動',
         vertical: '垂直',
         horizontal: '水平',
+        paged: '逐頁',
       },
       rotate: {
         group: '旋轉',

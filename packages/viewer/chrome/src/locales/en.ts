@@ -64,7 +64,12 @@ export const en: Locale = {
       print: 'Print',
       fullscreen: 'Full Screen',
       spread: { group: 'Page Layout', none: 'Single Page', odd: 'Two Page', even: 'Cover Page' },
-      scroll: { group: 'Scrolling', vertical: 'Vertical', horizontal: 'Horizontal' },
+      scroll: {
+        group: 'Scrolling',
+        vertical: 'Vertical',
+        horizontal: 'Horizontal',
+        paged: 'Page by page',
+      },
       rotate: {
         group: 'Rotate',
         clockwise: 'Rotate Clockwise',

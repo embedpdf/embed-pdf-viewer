@@ -276,6 +276,12 @@ export interface StageSettings {
    */
   zoomGestures: boolean;
   /**
+   * With `flow: 'paged'`: scrolling, swiping or flicking past the page's edge
+   * turns to the next or previous page. Off, only `nextPage()`,
+   * `previousPage()` and navigation turn pages, which suits a presentation.
+   */
+  turnGestures: boolean;
+  /**
    * The look of the box you drag with the `zoom` tool. A color left `null`
    * follows the viewer's accent (the fill at 8%); CSS `--epdf-zoom-box-fill`
    * and `--epdf-zoom-box-stroke` win over both.

@@ -71,6 +71,7 @@ export const pl: Locale = {
         group: 'Przewijanie',
         vertical: 'Pionowe',
         horizontal: 'Poziome',
+        paged: 'Strona po stronie',
       },
       rotate: {
         group: 'Obróć',

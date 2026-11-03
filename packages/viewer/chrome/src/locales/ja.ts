@@ -71,6 +71,7 @@ export const ja: Locale = {
         group: 'スクロール',
         vertical: '縦方向',
         horizontal: '横方向',
+        paged: '1ページずつ',
       },
       rotate: {
         group: '回転',

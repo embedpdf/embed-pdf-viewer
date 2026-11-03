@@ -71,6 +71,7 @@ export const es: Locale = {
         group: 'Desplazamiento',
         vertical: 'Vertical',
         horizontal: 'Horizontal',
+        paged: 'Página a página',
       },
       rotate: {
         group: 'Girar',

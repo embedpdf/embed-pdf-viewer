@@ -71,6 +71,7 @@ export const zhCN: Locale = {
         group: '滚动',
         vertical: '垂直',
         horizontal: '水平',
+        paged: '逐页',
       },
       rotate: {
         group: '旋转',

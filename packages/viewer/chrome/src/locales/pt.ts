@@ -71,6 +71,7 @@ export const pt: Locale = {
         group: 'Rolagem',
         vertical: 'Vertical',
         horizontal: 'Horizontal',
+        paged: 'Página por página',
       },
       rotate: {
         group: 'Girar',

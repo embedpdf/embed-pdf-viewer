@@ -348,6 +348,7 @@ describe('the built-in commands', () => {
           'view:cover-page',
           'view:scroll-vertical',
           'view:scroll-horizontal',
+          'view:scroll-paged',
           'view:rotate-clockwise',
           'view:rotate-counterclockwise',
         ].map((id) => [id, holderOf(id)]),
@@ -356,13 +357,48 @@ describe('the built-in commands', () => {
       'view:single-page': 'spread',
       'view:two-pages': 'spread',
       'view:cover-page': 'spread',
-      'view:scroll-vertical': 'layout',
-      'view:scroll-horizontal': 'layout',
+      'view:scroll-vertical': 'flow',
+      'view:scroll-horizontal': 'flow',
+      'view:scroll-paged': 'flow',
       'view:rotate-clockwise': 'viewRotation',
       'view:rotate-counterclockwise': 'viewRotation',
     });
     // The zoom can't be locked: its commands say nothing of locks.
     expect(defaultCommands.find((command) => command.id === 'zoom:in')?.locked).toBeUndefined();
+  });
+
+  it('pick how the pages come: down, across or one at a time', () => {
+    const settings = { flow: 'continuous', layout: 'vertical' } as Record<string, unknown>;
+    const locks: Record<string, { by: string }> = {};
+    const fakeStage = {
+      getSettings: () => settings,
+      updateSettings: (changes: Record<string, unknown>) => Object.assign(settings, changes),
+      getLock: (setting: string) => locks[setting] ?? null,
+    };
+    const context = {
+      documentId: 'doc',
+      tryGet: (token: CapabilityToken<unknown>) => (token.name === 'stage' ? fakeStage : null),
+      get: (token: CapabilityToken<unknown>) => (token.name === 'stage' ? fakeStage : null),
+    } as unknown as PluginCommandContext;
+    const command = (id: string) => defaultCommands.find((candidate) => candidate.id === id)!;
+    const active = () =>
+      ['view:scroll-vertical', 'view:scroll-horizontal', 'view:scroll-paged'].filter((id) =>
+        command(id).active?.(context),
+      );
+
+    expect(active()).toEqual(['view:scroll-vertical']);
+    void command('view:scroll-paged').run?.(context);
+    // Paged flow leaves the layout alone, and down is no longer the choice.
+    expect(settings).toEqual({ flow: 'paged', layout: 'vertical' });
+    expect(active()).toEqual(['view:scroll-paged']);
+    void command('view:scroll-horizontal').run?.(context);
+    expect(settings).toEqual({ flow: 'continuous', layout: 'horizontal' });
+    expect(active()).toEqual(['view:scroll-horizontal']);
+
+    // Down and across change both settings, so a lock on either holds them.
+    locks.layout = { by: 'kiosk' };
+    expect(command('view:scroll-vertical').locked?.(context)?.by).toBe('kiosk');
+    expect(command('view:scroll-paged').locked?.(context)).toBeNull();
   });
 
   it('are every one the page lists, with the panels and modes the default layout brings', () => {

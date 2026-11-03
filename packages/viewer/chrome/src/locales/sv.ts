@@ -72,6 +72,7 @@ export const sv: Locale = {
         group: 'Rullning',
         vertical: 'Vertikal',
         horizontal: 'Horisontell',
+        paged: 'Sida för sida',
       },
       rotate: {
         group: 'Rotera',

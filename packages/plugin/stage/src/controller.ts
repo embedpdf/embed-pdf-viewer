@@ -24,6 +24,7 @@ import type { StageHostCapability } from './host-contract';
 import type { StageModel } from './model';
 import { createArrival } from './navigation/arrive';
 import { createReveal } from './navigation/reveal';
+import { createTurns } from './navigation/turn';
 import { createZoom } from './navigation/zoom';
 import { createZoomDrag } from './navigation/zoom-drag';
 import { createPageReads } from './read/pages';
@@ -38,13 +39,16 @@ export function createStageController(ctx: PluginContext<StageModel>, config: St
   // Reads: pure projections of the scene and the camera.
   const reads = createPageReads(ctx, services);
 
-  // The camera: the one write path, motion over the clock's frames, gestures.
+  // The camera: the one write path and motion over the clock's frames.
   const write = createCameraWrite(ctx, services);
   const animation = createAnimation(services, write);
-  const gestures = createGestures(ctx, services, write, animation, reads);
 
-  // Navigation, settings, zoom and the view lifecycle.
+  // Navigation, then gestures: a push past a paged view's edge turns the page.
   const arrive = createArrival(ctx, services, write, animation);
+  const turns = createTurns(ctx, services, reads, arrive.api);
+  const gestures = createGestures(ctx, services, write, animation, reads, turns);
+
+  // Settings, zoom and the view lifecycle.
   const reveal = createReveal(ctx, services, write, animation, arrive);
   const settings = createSettings(ctx, services, config, write, animation, arrive);
   const zoom = createZoom(ctx, services, write, animation, gestures.api, settings);
