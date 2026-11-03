@@ -1,7 +1,12 @@
 import { describe, expect, test } from 'vitest';
 
 import { ANNOTATION_KIND_FACTS } from '../../src/annotation/kind-facts.generated';
-import { SIBLING_KINDS, siblingKindsOf } from '../../src/annotation/siblings';
+import {
+  canChangeKind,
+  fieldTheKindCannotHold,
+  SIBLING_KINDS,
+  siblingKindsOf,
+} from '../../src/annotation/siblings';
 
 describe('SIBLING_KINDS', () => {
   test.each(SIBLING_KINDS.map((group) => [group.join(', '), group]))(
@@ -39,5 +44,24 @@ describe('siblingKindsOf', () => {
       expect(siblingKindsOf(kind)).toEqual([]);
     }
     expect(siblingKindsOf('no-such-kind')).toEqual([]);
+  });
+});
+
+describe('canChangeKind', () => {
+  const highlight = { subtype: 'highlight', color: '#ffff00', quadPoints: [] };
+  const replacement = { subtype: 'strikeout', intent: 'strikeout-text-edit', quadPoints: [] };
+
+  test('a sibling, holding nothing the new kind lacks', () => {
+    const cleared = { ...replacement, intent: null };
+    expect(canChangeKind(highlight, 'underline')).toBe(true);
+    expect(canChangeKind(cleared, 'highlight')).toBe(true);
+    expect(fieldTheKindCannotHold(highlight, 'strikeout')).toBeNull();
+  });
+
+  test('not another family, nor over a value the new kind lacks', () => {
+    expect(canChangeKind(highlight, 'ink')).toBe(false);
+    expect(canChangeKind(highlight, 'highlight')).toBe(false);
+    expect(canChangeKind(replacement, 'highlight')).toBe(false);
+    expect(fieldTheKindCannotHold(replacement, 'highlight')).toBe('intent');
   });
 });

@@ -332,7 +332,7 @@ export {
 export type { AnnotationSubtype } from './annotation/subtype';
 export { familyOfSubtype } from './annotation/family';
 export type { AnnotationFamily } from './annotation/family';
-export { siblingKindsOf } from './annotation/siblings';
+export { canChangeKind, fieldTheKindCannotHold, siblingKindsOf } from './annotation/siblings';
 
 // Binary payloads — zod-free.
 export type {

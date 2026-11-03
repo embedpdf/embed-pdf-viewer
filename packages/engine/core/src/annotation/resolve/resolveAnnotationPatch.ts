@@ -14,9 +14,8 @@ import { EngineErrorCode } from '../../errors/EngineErrorCode';
 import type { PdfCoordinates } from '../../pageSpace/coordinates';
 import { ANNOTATION_FIELD_NAMES } from '../field-names';
 import type { DescribeFont } from '../fontFaces';
-import { kindFactsOf } from '../kind-facts';
 import type { Annotation, AnnotationPatch } from '../kinds';
-import { siblingKindsOf } from '../siblings';
+import { fieldTheKindCannotHold, siblingKindsOf } from '../siblings';
 import type { AnnotationSubtype } from '../subtype';
 import { calloutEndFollows, freeTextFollows } from './freeText';
 import { measurementFollows } from './measurement';
@@ -63,15 +62,13 @@ function kindAfter(
       { details: { field: 'subtype' } },
     );
   }
-  const kept = kindFactsOf(requested)?.owners ?? {};
-  const read = current as unknown as Record<string, unknown>;
-  for (const name of Object.keys(kindFactsOf(current.subtype)?.owners ?? {})) {
-    const value = read[name];
-    if (name in kept || value === null || value === undefined) continue;
+  const held = fieldTheKindCannotHold(current, requested);
+  if (held !== null) {
+    const value = (current as unknown as Record<string, unknown>)[held];
     throw new EngineError(
       EngineErrorCode.InvalidArg,
-      `${current.subtype} field '${name}' holds ${typeof value === 'string' ? `'${value}'` : JSON.stringify(value)}, and ${requested} has no such field: clear it first, in the same change`,
-      { details: { field: name } },
+      `${current.subtype} field '${held}' holds ${typeof value === 'string' ? `'${value}'` : JSON.stringify(value)}, and ${requested} has no such field: clear it first, in the same change`,
+      { details: { field: held } },
     );
   }
   return requested as AnnotationSubtype;

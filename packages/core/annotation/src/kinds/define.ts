@@ -80,9 +80,10 @@ export type AnnotationProperty =
       readonly options: readonly AnnotationOption[];
       readonly cloudy: boolean;
     }
-  /** A value from a list: line endings, a font, an alignment, a blend mode, an icon. */
+  /** A value from a list: line endings, a font, an alignment, a blend mode, an icon, or the
+   *  kind the annotation becomes (`subtype`, only over a selection: `selectionProperties`). */
   | {
-      readonly key: 'lineEndings' | 'fontFamily' | 'textAlign' | 'blendMode' | 'icon';
+      readonly key: 'lineEndings' | 'fontFamily' | 'textAlign' | 'blendMode' | 'icon' | 'subtype';
       readonly control: 'choice';
       readonly label: string;
       readonly labelKey: string;

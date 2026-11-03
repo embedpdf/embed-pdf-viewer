@@ -44,17 +44,22 @@ function changeRecords(
 /**
  * Write engine fields to records, a patch per id, each through `withValues`:
  * a record takes the fields its kind has and may change now, so one message
- * restyles a mixed selection, and a `rect` the engine would refuse throws.
- * The tool defaults are never touched: editing existing annotations doesn't
+ * restyles a mixed selection, and a `rect` the engine would refuse throws. A
+ * new kind is taken by hand only when people may change that kind too. The
+ * tool defaults are never touched: editing existing annotations doesn't
  * change the next one drawn.
  */
 export function setFields(
   model: Model,
   patches: Readonly<Record<Id, FieldValues>>,
 ): [Model, Effect[]] {
-  const next = changeRecords(model, Object.keys(patches), (record) =>
-    withValues(record, patches[record.id]!),
-  );
+  const next = changeRecords(model, Object.keys(patches), (record) => {
+    const { subtype, ...fields } = patches[record.id]!;
+    const byHand =
+      subtype === undefined ||
+      isEditableByHand(model, { ...record.annotation, subtype } as ModelAnnotation['annotation']);
+    return withValues(record, byHand ? { subtype, ...fields } : fields);
+  });
   return [next, []];
 }
 

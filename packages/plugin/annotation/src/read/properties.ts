@@ -1,11 +1,10 @@
 import {
   isEditableByHand,
-  kindOf,
   linkOf,
   type Model,
   type ModelAnnotation,
   richDocOf,
-  sharedProperties,
+  selectionProperties,
   textOf,
 } from '@embedpdf/core-annotation';
 
@@ -56,7 +55,10 @@ export function createPropertyReads(
         (record): record is ModelAnnotation =>
           !!record && isEditableByHand(model, record.annotation),
       );
-    const properties = sharedProperties(members.map((record) => kindOf(record.annotation)));
+    const properties = selectionProperties(
+      model,
+      members.map((record) => record.annotation),
+    );
     const sources = members.map((record) => sourcesOf(model, record));
     const values = sources.length ? propertyValues(properties, sources[0]!) : {};
     const mixed: string[] = [];
