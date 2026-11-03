@@ -518,20 +518,6 @@ export const sv: Locale = {
         other: 'Ny text kan inte skrivas med det',
       },
     },
-    // The flags section of the style panel: its title, and what each flag does.
-    annotationFlags: {
-      title: 'Flaggor (/F)',
-      print: 'Ta med när sidan skrivs ut',
-      hidden: 'Borta överallt: skärm, klick, utskrift',
-      noView: 'Dold på skärmen, kan ändå skrivas ut',
-      toggleNoView: 'Visa en kommentar med ingen visning medan den är markerad',
-      readOnly: 'Synlig men inte klickbar',
-      locked: 'Ingen flytt / storleksändring / borttagning / stiländring',
-      lockedContents: 'Texten kan inte ändras; geometrin kan',
-      noZoom: 'Konstant storlek på skärmen (förankrad uppe till vänster)',
-      noRotate: 'Förblir upprätt när sidan roteras',
-      invisible: 'Äldre: dölj okända undertyper',
-    },
     // The link editor over a selected annotation.
     attachments: {
       loading: 'Läser in bilagor…',

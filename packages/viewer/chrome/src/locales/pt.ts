@@ -518,20 +518,6 @@ export const pt: Locale = {
         other: 'Não é possível escrever texto novo nela',
       },
     },
-    // The flags section of the style panel: its title, and what each flag does.
-    annotationFlags: {
-      title: 'Sinalizadores (/F)',
-      print: 'Incluir quando a página for impressa',
-      hidden: 'Some em todo lugar: tela, cliques, impressão',
-      noView: 'Oculta na tela, ainda pode ser impressa',
-      toggleNoView: 'Revelar uma anotação não exibida enquanto estiver selecionada',
-      readOnly: 'Visível, mas não clicável',
-      locked: 'Sem mover / redimensionar / excluir / mudar estilo',
-      lockedContents: 'O texto não pode mudar; a geometria pode',
-      noZoom: 'Tamanho constante na tela (ancorada no canto superior esquerdo)',
-      noRotate: 'Fica na vertical quando a página gira',
-      invisible: 'Legado: ocultar subtipos desconhecidos',
-    },
     // The link editor over a selected annotation.
     attachments: {
       loading: 'Carregando anexos…',

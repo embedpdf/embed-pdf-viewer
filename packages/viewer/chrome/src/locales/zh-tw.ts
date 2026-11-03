@@ -518,20 +518,6 @@ export const zhTW: Locale = {
         other: '無法用它書寫新文字',
       },
     },
-    // The flags section of the style panel: its title, and what each flag does.
-    annotationFlags: {
-      title: '旗標 (/F)',
-      print: '列印頁面時包含',
-      hidden: '在螢幕、按一下和列印中皆隱藏',
-      noView: '在螢幕上隱藏，但仍可能列印',
-      toggleNoView: '選取時顯示設為「不顯示」的註解',
-      readOnly: '可見但無法按一下',
-      locked: '無法移動、調整大小、刪除或變更樣式',
-      lockedContents: '文字無法變更；幾何形狀可以變更',
-      noZoom: '螢幕上大小固定（錨定於左上角）',
-      noRotate: '頁面旋轉時保持直立',
-      invisible: '舊版：隱藏未知的子類型',
-    },
     // The link editor over a selected annotation.
     attachments: {
       loading: '正在載入附件…',

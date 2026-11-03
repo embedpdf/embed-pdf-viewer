@@ -5,8 +5,8 @@
  *   each command's visible/enabled       decides which items show
  *   <SelectionMenu>                      solves where (settles on pointer-up,
  *                                        camera transform, pointer isolation):
- *                                        above the selection, below it without
- *                                        room above
+ *                                        below the selection, above it without
+ *                                        room below, like the annotation strip
  *
  * `useStripView` is the live intersection: with copy denied (no
  * doc.text.copy) every command drops out and this renders nothing — no
@@ -35,7 +35,7 @@ export function SelectionStrip() {
   const view = useStripView(bar);
   if (!bar || !view) return null;
   return (
-    <SelectionMenu placement="top" gap={touch ? TOUCH_GAP_PX : GAP_PX}>
+    <SelectionMenu placement="bottom" gap={touch ? TOUCH_GAP_PX : GAP_PX}>
       <StripBar bar={bar} view={view} label={t('commands.selection.strip')} />
     </SelectionMenu>
   );

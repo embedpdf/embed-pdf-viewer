@@ -517,20 +517,6 @@ export const he: Locale = {
         other: 'לא ניתן לכתוב בו טקסט חדש',
       },
     },
-    // The flags section of the style panel: its title, and what each flag does.
-    annotationFlags: {
-      title: 'דגלים (/F)',
-      print: 'כלול בעת הדפסת העמוד',
-      hidden: 'נעלם בכל מקום: מסך, לחיצות, הדפסה',
-      noView: 'מוסתר במסך, ייתכן שיודפס',
-      toggleNoView: 'הצג ביאור ללא תצוגה כשהוא נבחר',
-      readOnly: 'גלוי אך לא ניתן ללחוץ עליו',
-      locked: 'ללא הזזה / שינוי גודל / מחיקה / שינוי סגנון',
-      lockedContents: 'לא ניתן לשנות את הטקסט; את הצורה ניתן',
-      noZoom: 'גודל קבוע במסך (מעוגן לפינה השמאלית העליונה)',
-      noRotate: 'נשאר זקוף כשהעמוד מסתובב',
-      invisible: 'מדור קודם: הסתר תת־סוגים לא ידועים',
-    },
     // The link editor over a selected annotation.
     attachments: {
       loading: 'טוען קבצים מצורפים…',
