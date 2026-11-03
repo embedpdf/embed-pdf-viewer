@@ -1,5 +1,11 @@
 # @cloudpdf/contract
 
+## 3.0.0-next.21
+
+### Minor Changes
+
+- [#956](https://github.com/embedpdf/embed-pdf-viewer/pull/956) by [@bobsingor](https://github.com/bobsingor) – `tenants.update` (`PATCH /v1/tenants/:tenantId`) sets a tenant's `features`, the server modules it may use, and tenant records carry `features`. `TenantFeature` (`{ id, stopped?: 'cap' }`) is a named component.
+
 ## 3.0.0-next.20
 
 ### Minor Changes

@@ -1,5 +1,11 @@
 # @embedpdf/angular
 
+## 3.0.0-next.21
+
+### Minor Changes
+
+- [#957](https://github.com/embedpdf/embed-pdf-viewer/pull/957) by [@bobsingor](https://github.com/bobsingor) – The Stage ref from `@embedpdf/angular/stage` has `listCurrentPages()`: the pages you're on, the current spread while it fits across the view, else the current page.
+
 ## 3.0.0-next.20
 
 ### Minor Changes

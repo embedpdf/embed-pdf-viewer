@@ -1,5 +1,13 @@
 # @embedpdf/plugin-stage
 
+## 3.0.0-next.21
+
+### Minor Changes
+
+- [#958](https://github.com/embedpdf/embed-pdf-viewer/pull/958) by [@bobsingor](https://github.com/bobsingor) – In paged flow, pushing past the edge of the page turns it, as readers expect from a wheel, a trackpad and a finger. Scroll or swipe past the bottom for the next page, at its top; past the top for the previous page, at its bottom; or swipe sideways past the edge (the other way in a right-to-left document). A tall page stops at its bottom first, and the next push turns it. One gesture turns one page, and its momentum doesn't scroll the page that arrives. The new `turnGestures` setting (default `true`) turns this off, leaving page turns to `nextPage()`, `previousPage()` and navigation. Nothing changes in continuous flow.
+
+- [#957](https://github.com/embedpdf/embed-pdf-viewer/pull/957) by [@bobsingor](https://github.com/bobsingor) – `listCurrentPages()` gives the pages you're on: the current spread while it fits across the view, its two pages side by side however tall they are, else the current page alone. `nextPage()` and `previousPage()` step past those pages, and `canGoNext()` and `canGoPrevious()` say whether there's a page after or before them. A spread that fits across the view but is taller than it used to step one page at a time, so Next from 1–2 went to page 2, already on screen, and nothing moved; and on the second page of the first or last spread, Previous or Next was enabled and did nothing. A spread that fits across the view also lands at its top, like a page.
+
 ## 3.0.0-next.20
 
 ### Minor Changes

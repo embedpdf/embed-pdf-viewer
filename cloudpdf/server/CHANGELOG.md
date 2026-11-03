@@ -1,5 +1,15 @@
 # @cloudpdf/server
 
+## 3.0.0-next.21
+
+### Minor Changes
+
+- [#964](https://github.com/embedpdf/embed-pdf-viewer/pull/964) by [@bobsingor](https://github.com/bobsingor) – A Postgres connection that fails while idle in the pool no longer crashes the server. A database restart or failover, `pg_terminate_backend`, or a proxy closing the connection used to reach Node as an uncaught `error` event from `pg.Pool`. The pool now drops that connection and opens a new one for the next query. `createPostgresDb` takes `onIdleConnectionError` to report these, and `cloudpdf-server` logs each one's message as a warning.
+
+- [#955](https://github.com/embedpdf/embed-pdf-viewer/pull/955) by [@bobsingor](https://github.com/bobsingor) – `buildApp` takes the deployment's license as `license`: the runtime `createLicenseRuntime` made, and nothing else. It replaces `licenseGate`. Any other object, including a copy of a runtime, stops the build with an error naming `createLicenseRuntime`. The runtime is sealed: its methods can't be replaced, and `buildApp` enforces the license from the runtime behind it. `createLicenseRuntime` takes only `db`, `env`, `secretResolver` and `startTimer`, and passes nothing else on, so license verification always uses the identity compiled into the package.
+
+- [#956](https://github.com/embedpdf/embed-pdf-viewer/pull/956) by [@bobsingor](https://github.com/bobsingor) – Tenants have `features`: the server modules each tenant may use, by module id. A module's routes answer only tenants whose features hold it; others get `403 FeatureNotEnabled`, and a feature held as `{ id, stopped: 'cap' }` answers `402 FeatureStopped`. A new tenant has none: the operator turns modules on per tenant with `PATCH /v1/tenants/:tenantId` (API token only, every id an installed module), and other replicas follow within 30 seconds. Migration 050 adds the column on SQLite and Postgres.
+
 ## 3.0.0-next.20
 
 ### Minor Changes

@@ -1,5 +1,25 @@
 # @embedpdf/viewer-chrome
 
+## 3.0.0-next.21
+
+### Minor Changes
+
+- [#958](https://github.com/embedpdf/embed-pdf-viewer/pull/958) by [@bobsingor](https://github.com/bobsingor) – The View menu's Scrolling group gains Page by page (`view:scroll-paged`, icon `pageByPage`), next to Vertical and Horizontal: one page or spread at a time, turned by scrolling or swiping past its edge. Vertical and Horizontal now also switch back to scrolling every page, and a lock on `flow` or `layout` greys them out. The label is in all 15 languages.
+
+- [#957](https://github.com/embedpdf/embed-pdf-viewer/pull/957) by [@bobsingor](https://github.com/bobsingor) – The page number:
+  - The `pager` bar holds the previous and next page buttons around the page number, one group that never moves into "More". The number and the count are one button, "3 / 12", that turns the number into a field to type a page: `pageNumber.page` and `pageNumber.pages` say `{current} / {total}` and `{first}–{last} / {total}` in every language. It names the pages the buttons step past, the Stage's `listCurrentPages()`: "2–3 / 12" while a spread fits across the view, so Next goes to 4–5, and the one page once you zoom in past it. A document of one page has no page number, and `page:next`, `page:previous`, `page:first` and `page:last` don't show for it.
+  - A floating bar whose place says `hideWhenIdle: true`, and by default the bar with the page number, at every size, fades out once the pages and the pointer have been still for two seconds, and comes back when the pages move, the pointer moves over them or presses them, or the keyboard reaches it. It stays while the pointer is on it, while you're using it from the keyboard or typing in it, and while a menu from it is open. Out of sight it takes no clicks and keeps its place in the keyboard's order. `hideWhileScrolling` is gone.
+  - A floating bar's corners follow the theme's `radius`, like its buttons, instead of being round.
+  - A command's chevron to the next or previous page points the other way in a right-to-left language, in a bar, a menu and a strip bar, where the row mirrors.
+
+- [#963](https://github.com/embedpdf/embed-pdf-viewer/pull/963) by [@bobsingor](https://github.com/bobsingor) – The strip over selected text sits below it, as the annotation strip does, and above it only when there's no room below. Its menus open on the strip's side, away from the text.
+
+- [#963](https://github.com/embedpdf/embed-pdf-viewer/pull/963) by [@bobsingor](https://github.com/bobsingor) – The style panel shows only styles: the flags section (`/F`) is gone, with its title and hints (`annotationFlags.*`) in the language packs. A selection with nothing to style shows the panel's empty state.
+
+### Patch Changes
+
+- [#952](https://github.com/embedpdf/embed-pdf-viewer/pull/952) by [@bobsingor](https://github.com/bobsingor) – The spinner on a page whose picture is on its way turns in place. It slid across the page instead, because its placement and its spin shared one `transform`. The `page-loading` part is still the circle, so restyling it works as before.
+
 ## 3.0.0-next.20
 
 ### Minor Changes

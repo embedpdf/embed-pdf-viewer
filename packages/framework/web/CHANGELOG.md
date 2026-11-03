@@ -1,5 +1,11 @@
 # @embedpdf/web
 
+## 3.0.0-next.21
+
+### Patch Changes
+
+- [#962](https://github.com/embedpdf/embed-pdf-viewer/pull/962) by [@bobsingor](https://github.com/bobsingor) – `createSurfaceFocusFollower()` puts the cursor in its element without scrolling. A panel that takes focus as it opens, such as Find, no longer shifts the page around the viewer sideways when the viewer sits in a box that can scroll, such as one with `overflow: hidden` and content off to one side.
+
 ## 3.0.0-next.20
 
 ### Minor Changes
