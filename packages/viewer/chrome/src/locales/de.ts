@@ -71,6 +71,7 @@ export const de: Locale = {
         group: 'Bildlauf',
         vertical: 'Vertikal',
         horizontal: 'Horizontal',
+        paged: 'Seitenweise',
       },
       rotate: {
         group: 'Drehen',

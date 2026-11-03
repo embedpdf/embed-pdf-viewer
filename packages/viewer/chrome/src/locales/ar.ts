@@ -72,6 +72,7 @@ export const ar: Locale = {
         group: 'التمرير',
         vertical: 'عمودي',
         horizontal: 'أفقي',
+        paged: 'صفحة بصفحة',
       },
       rotate: {
         group: 'تدوير',

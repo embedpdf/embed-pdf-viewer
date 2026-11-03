@@ -30,7 +30,7 @@ import { FormToken } from '@embedpdf/react/form';
 import { HistoryToken } from '@embedpdf/react/history';
 import { DocumentsToken } from '@embedpdf/react/runtime';
 import { StageToken, ZoomMode } from '@embedpdf/react/stage';
-import type { SpreadMode } from '@embedpdf/react/stage';
+import type { LayoutKind, SpreadMode } from '@embedpdf/react/stage';
 import { InteractionToken } from '@embedpdf/react/interaction';
 import { ShellToken } from '@embedpdf/react/shell';
 import { AnnotationToken } from '@embedpdf/react/annotation';
@@ -311,6 +311,25 @@ const spread = (id: string, mode: SpreadMode, labelKey: string, icon: string): C
   locked: (commandContext) => stage(commandContext)?.getLock('spread') ?? null,
 });
 
+const scroll = (
+  id: string,
+  layout: Exclude<LayoutKind, 'grid'>,
+  labelKey: string,
+  icon: string,
+): CommandDef => ({
+  id,
+  labelKey,
+  icon,
+  run: (commandContext) => stage(commandContext)?.updateSettings({ flow: 'continuous', layout }),
+  active: (commandContext) => {
+    const settings = stage(commandContext)?.getSettings();
+    return settings?.flow === 'continuous' && settings.layout === layout;
+  },
+  enabled: (commandContext) => stage(commandContext) != null,
+  locked: (commandContext) =>
+    stage(commandContext)?.getLock('flow') ?? stage(commandContext)?.getLock('layout') ?? null,
+});
+
 export const defaultCommands: CommandDef[] = [
   // ── zoom ───────────────────────────────────────────────────────────────
   {
@@ -513,23 +532,19 @@ export const defaultCommands: CommandDef[] = [
   spread('view:single-page', 'none', 'commands.spread.none', 'singlePage'),
   spread('view:two-pages', 'odd', 'commands.spread.odd', 'doublePage'),
   spread('view:cover-page', 'even', 'commands.spread.even', 'book2'),
+  // Scrolling is one choice of how the pages come: down, across, or one at a
+  // time. Down and across set `flow` with `layout`; one at a time leaves
+  // `layout` alone, as it does nothing in paged flow.
+  scroll('view:scroll-vertical', 'vertical', 'commands.scroll.vertical', 'vertical'),
+  scroll('view:scroll-horizontal', 'horizontal', 'commands.scroll.horizontal', 'horizontal'),
   {
-    id: 'view:scroll-vertical',
-    labelKey: 'commands.scroll.vertical',
-    icon: 'vertical',
-    run: (commandContext) => stage(commandContext)?.updateSettings({ layout: 'vertical' }),
-    active: (commandContext) => stage(commandContext)?.getSettings().layout === 'vertical',
+    id: 'view:scroll-paged',
+    labelKey: 'commands.scroll.paged',
+    icon: 'pageByPage',
+    run: (commandContext) => stage(commandContext)?.updateSettings({ flow: 'paged' }),
+    active: (commandContext) => stage(commandContext)?.getSettings().flow === 'paged',
     enabled: (commandContext) => stage(commandContext) != null,
-    locked: (commandContext) => stage(commandContext)?.getLock('layout') ?? null,
-  },
-  {
-    id: 'view:scroll-horizontal',
-    labelKey: 'commands.scroll.horizontal',
-    icon: 'horizontal',
-    run: (commandContext) => stage(commandContext)?.updateSettings({ layout: 'horizontal' }),
-    active: (commandContext) => stage(commandContext)?.getSettings().layout === 'horizontal',
-    enabled: (commandContext) => stage(commandContext) != null,
-    locked: (commandContext) => stage(commandContext)?.getLock('layout') ?? null,
+    locked: (commandContext) => stage(commandContext)?.getLock('flow') ?? null,
   },
   // View rotation (Adobe's "Rotate View"): rotates how every page displays in
   // the main stage lens — non-persistent, nothing written to the PDF. The

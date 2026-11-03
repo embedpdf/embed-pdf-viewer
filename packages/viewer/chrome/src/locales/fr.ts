@@ -72,6 +72,7 @@ export const fr: Locale = {
         group: 'Défilement',
         vertical: 'Vertical',
         horizontal: 'Horizontal',
+        paged: 'Page par page',
       },
       rotate: {
         group: 'Faire pivoter',

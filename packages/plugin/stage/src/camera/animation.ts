@@ -259,7 +259,6 @@ export function createAnimation(
     animateZoomAnchored,
     startCameraPhysics,
     api: {
-      fling: (velocityX, velocityY) => startCameraPhysics(velocityX, velocityY),
       isMoving: () => cancelFrame !== null,
       stopMotion: () => {
         if (!cancelFrame) return;

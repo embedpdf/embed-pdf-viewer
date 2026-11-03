@@ -71,6 +71,7 @@ export const it: Locale = {
         group: 'Scorrimento',
         vertical: 'Verticale',
         horizontal: 'Orizzontale',
+        paged: 'Pagina per pagina',
       },
       rotate: {
         group: 'Ruota',

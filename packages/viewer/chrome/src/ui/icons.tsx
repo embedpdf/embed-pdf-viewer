@@ -356,6 +356,12 @@ export const ICON_PATHS = {
     'M8 13h6',
     'M18 4a3 3 0 0 1 3 3v8a3 3 0 0 1 -3 3h-5l-5 3v-3h-2a3 3 0 0 1 -3 -3v-8a3 3 0 0 1 3 -3h12',
   ],
+  // One page between a step back and a step on: one page at a time.
+  pageByPage: [
+    'M8 4m0 1a1 1 0 0 1 1 -1h6a1 1 0 0 1 1 1v14a1 1 0 0 1 -1 1h-6a1 1 0 0 1 -1 -1z',
+    'M5 9l-3 3l3 3',
+    'M19 9l3 3l-3 3',
+  ],
   // Turning a page in the file: a page under the arrow, apart from the view's rotation.
   pageRotateClockwise: [
     'M5 9h7a1 1 0 0 1 1 1v10a1 1 0 0 1 -1 1h-7a1 1 0 0 1 -1 -1v-10a1 1 0 0 1 1 -1z',

@@ -287,7 +287,7 @@ export const DEFAULT_LAYOUT: LayoutData = {
       },
       {
         titleKey: 'commands.scroll.group',
-        items: ['view:scroll-vertical', 'view:scroll-horizontal'],
+        items: ['view:scroll-vertical', 'view:scroll-horizontal', 'view:scroll-paged'],
       },
       {
         titleKey: 'commands.rotate.group',

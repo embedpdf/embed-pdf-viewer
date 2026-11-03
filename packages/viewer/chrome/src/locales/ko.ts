@@ -71,6 +71,7 @@ export const ko: Locale = {
         group: '스크롤',
         vertical: '세로',
         horizontal: '가로',
+        paged: '한 페이지씩',
       },
       rotate: {
         group: '회전',

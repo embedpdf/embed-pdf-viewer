@@ -72,6 +72,7 @@ export const he: Locale = {
         group: 'גלילה',
         vertical: 'אנכית',
         horizontal: 'אופקית',
+        paged: 'עמוד אחר עמוד',
       },
       rotate: {
         group: 'סובב',
