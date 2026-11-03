@@ -154,7 +154,7 @@ function paintAttributes(
   const attributes: Record<string, string | number> = {
     fill: nodePaint.fill ?? 'none',
     stroke: nodePaint.stroke ?? 'none',
-    // Unset joins are sharp miters; round joins and caps are only for ink.
+    // Unset joins are sharp miters; round joins are for clouds and icons.
     'stroke-linejoin': nodePaint.join ?? 'miter',
     'stroke-miterlimit': miterLimit,
   };

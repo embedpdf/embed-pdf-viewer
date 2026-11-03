@@ -1581,12 +1581,15 @@ describe('annotation-core', () => {
     // a short tap (no travel) is discarded, not committed
     const tap = run(initialModel, [ink('down', 5, 5), ink('up', 5, 5)]);
     expect(tap.order).toHaveLength(0);
-    // scene: each stroke is a stroke-only open polyline, with round caps (pen ends)
+    // scene: each stroke is the stroke-only curves Acrobat draws it with,
+    // with round caps (pen ends) and no join
     const node = scene(pageItems(model, PAGE)[0])[0];
-    expect(node.kind).toBe('poly');
+    expect(node.kind).toBe('path');
+    expect(node.kind === 'path' && node.d).toMatch(/^M 10 10 C /);
     expect(node.paint.fill).toBeUndefined();
     expect(node.paint.stroke).toBe(styleOf(record.annotation).color);
     expect(node.paint.lineCap).toBe('round');
+    expect(node.paint.join).toBeUndefined();
   });
 
   it('groups deferred ink strokes, straightens each stroke, and commits one intent-bearing annotation', () => {
@@ -3123,7 +3126,7 @@ describe('annotation-core — join-aware stroke bounds', () => {
     expect(sb.height).toBeGreaterThan(tight.height);
   });
 
-  it('ink bounds are unchanged — a plain half-width grow of the freehand hull (round, never spikes)', () => {
+  it("ink bounds are what its curves paint: half the width round Acrobat's curve, which swings past the points", () => {
     const geometry: Shape = {
       kind: 'ink',
       inkList: [
@@ -3139,12 +3142,13 @@ describe('annotation-core — join-aware stroke bounds', () => {
     const halfWidth = sw / 2;
     const rect = geomVisualBounds(geometry, { strokeWidth: sw });
     const hull = geomBounds(geometry);
-    expect(rect).toEqual({
-      x: hull.x - halfWidth,
-      y: hull.y - halfWidth,
-      width: hull.width + sw,
-      height: hull.height + sw,
-    });
+    // The round caps at the two ends.
+    expect(rect.x).toBeCloseTo(hull.x - halfWidth, 9);
+    expect(rect.y + rect.height).toBeCloseTo(hull.y + hull.height + halfWidth, 9);
+    // The curve rises to 6.9448 between the first two points and swings out
+    // to 62.1363 past the second.
+    expect(rect.y).toBeCloseTo(6.9448 - halfWidth, 3);
+    expect(rect.x + rect.width).toBeCloseTo(62.1363 + halfWidth, 3);
   });
 
   it('a mitred arrowhead tip is fully enclosed — the box reaches ~sw past the tip vertex', () => {
@@ -3162,7 +3166,7 @@ describe('annotation-core — join-aware stroke bounds', () => {
     expect(rect.x + rect.width).toBeGreaterThanOrEqual(100 + sw - 1e-6);
   });
 
-  it('scene paint: only ink rounds its joins; shapes and polys stay sharp (miter)', () => {
+  it('scene paint: shapes, polys and ink keep the miter join; only ink rounds its caps', () => {
     const mk = (subtype: KindName, geometry: Shape): RenderItem =>
       placed({
         id: 'x',
@@ -3226,7 +3230,9 @@ describe('annotation-core — join-aware stroke bounds', () => {
     expect(scene(square)[0].paint.join).toBeUndefined();
     expect(scene(polyline)[0].paint.join).toBeUndefined();
     expect(scene(polygon)[0].paint.join).toBeUndefined();
-    expect(scene(ink)[0].paint.join).toBe('round');
+    // Ink's curves meet smoothly: Acrobat sets no join, only round caps.
+    expect(scene(ink)[0].paint.join).toBeUndefined();
+    expect(scene(ink)[0].paint.lineCap).toBe('round');
   });
 });
 

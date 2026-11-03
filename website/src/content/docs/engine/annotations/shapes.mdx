@@ -144,8 +144,10 @@ await page.annotations.create({
 | `intent`      | `'ink-highlight'` labels it as a freehand highlighter.                        | none    |
 | `rotation`    | Turns the drawing, in degrees clockwise; see [Turned shapes](#turned-shapes). | none    |
 
-Ink has no fill, and its strokes have round ends. An `inkList` without strokes, or with a stroke
-without points, fails with `InvalidArg`. For a highlighter pen, combine
+Ink has no fill. The engine draws each stroke as Acrobat does: smooth curves fitted to its points,
+never more than about 1.4 points from any of them, with round ends, and a stroke of one point as
+a dot. A drawing looks the same whichever of the two draws it. An `inkList` without strokes, or
+with a stroke without points, fails with `InvalidArg`. For a highlighter pen, combine
 `intent: 'ink-highlight'` with a wide `strokeWidth`, a light `color` and `blendMode: 'multiply'`,
 so the text under it stays readable.
 

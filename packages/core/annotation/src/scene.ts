@@ -356,7 +356,7 @@ export function scene(item: RenderItem): SceneNode[] {
       },
     })) as SceneNode[];
   }
-  const ink = item.geometry.kind === 'ink'; // freehand: round the pen-stroke ends (caps)
+  const ink = item.geometry.kind === 'ink';
   // A line, polyline or ink at width 0 is a hairline, as the engine and Acrobat
   // draw it; a square, circle or polygon at width 0 has no outline.
   const hairline = item.style.strokeWidth === 0 && HAIRLINE_KINDS.has(item.subtype);
@@ -364,19 +364,22 @@ export function scene(item: RenderItem): SceneNode[] {
     const closed =
       node.kind === 'rect' ||
       node.kind === 'ellipse' ||
-      node.kind === 'path' ||
+      (node.kind === 'path' && !ink) ||
       (node.kind === 'poly' && node.closed);
     const paint = {
       ...shapePaint(item.style, closed),
       blend: blendFor(item.style),
       ...(hairline ? { hairline: true as const } : {}),
     };
-    // Ink is freehand: round the pen-stroke ends and joins. Every other kind keeps
-    // the default butt caps + sharp (miter) joins — square corners and poly knees
-    // stay crisp.
+    // Ink is drawn as Acrobat draws it: round caps and no join (its curves
+    // meet smoothly), and a stroke of one point is a dot filled in the
+    // stroke's colour. Every other kind keeps the default butt caps and
+    // miter joins: square corners and poly knees stay crisp.
     return {
       ...node,
-      paint: ink ? { ...paint, lineCap: 'round', join: 'round' } : paint,
+      paint: ink
+        ? { ...paint, fill: closed ? (item.style.color ?? undefined) : undefined, lineCap: 'round' }
+        : paint,
     } as SceneNode;
   });
   if (item.measure) {
