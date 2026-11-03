@@ -87,7 +87,7 @@ export {
   edgeStackOf,
   floatOf,
   floatStackOf,
-  hideWhileScrollingOf,
+  hideWhenIdleOf,
   menuOf,
   modeCommandOf,
   modesOf,

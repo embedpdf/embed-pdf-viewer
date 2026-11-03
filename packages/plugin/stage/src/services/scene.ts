@@ -255,6 +255,34 @@ export function createScene(ctx: PluginContext<StageModel>) {
     return paged() ? scene.items[0] : scene.items[itemIndexOfPage(state().cursor)];
   };
 
+  /** Whether an item is one navigation unit now: it fits across the view, or fit-all shows all. */
+  const isWhole = (item: SceneItem): boolean =>
+    isFitAll() || fitsAcross(itemRect(item), camera().zoom);
+
+  /**
+   * The pages you're on, the navigation unit: the cursor's item while it is
+   * whole (a spread you see side by side), else the cursor page alone. The
+   * page number names them, and nextPage and previousPage step past them.
+   */
+  const currentPages = (): readonly number[] => {
+    const item = cursorItem();
+    if (!item) return [];
+    return isWhole(item) ? item.pageIndexes : [state().cursor];
+  };
+
+  /**
+   * Where the unit that holds `pageIndex` starts: its item's first page while
+   * that item is whole, else the page itself. A paged scene holds only the
+   * cursor's item, so there it measures that one.
+   */
+  const unitStartOf = (pageIndex: number): number => {
+    const group = grouping().grouping[itemIndexOfPage(pageIndex)];
+    if (!group || group.length === 1) return pageIndex;
+    const scene = buildScene();
+    const item = paged() ? scene.items[0] : scene.items[itemIndexOfPage(pageIndex)];
+    return item && isWhole(item) ? group[0] : pageIndex;
+  };
+
   /**
    * A page-space rect on a page → a world rect: the same quarter-turn
    * matrix `pageRectToViewport` uses, minus the camera, so a positioned
@@ -268,16 +296,14 @@ export function createScene(ctx: PluginContext<StageModel>) {
     return { x: box.x + world.x, y: box.y + world.y, width: world.width, height: world.height };
   };
 
-  // Does this rect fit the padded viewport at this zoom? It decides the
-  // navigation step size and the arrival subject, never the alignment.
-  const fits = (rect: StageRect, zoom: number): boolean => {
+  // Does this rect fit across the padded viewport at this zoom: its width, the
+  // axis an item's pages sit side by side on? An item that fits across is seen
+  // whole, however tall it is, the way a tall page is still one page. It
+  // decides the navigation unit and the arrival subject, never the alignment.
+  const fitsAcross = (rect: StageRect, zoom: number): boolean => {
     const size = viewport();
     const inset = padding();
-    const tolerance = 0.5;
-    return (
-      rect.width * zoom <= size.width - inset.left - inset.right + tolerance &&
-      rect.height * zoom <= size.height - inset.top - inset.bottom + tolerance
-    );
+    return rect.width * zoom <= size.width - inset.left - inset.right + 0.5;
   };
   // An alignment policy → a concrete viewport point: a fraction per axis
   // (start = 0, center = ½, end = 1; named x stops are logical under RTL).
@@ -363,8 +389,10 @@ export function createScene(ctx: PluginContext<StageModel>) {
     itemRect,
     pageRectOf,
     cursorItem,
+    currentPages,
+    unitStartOf,
     worldRectForContent,
-    fits,
+    fitsAcross,
     alignPoint,
     anchorPoint,
     fitBox,

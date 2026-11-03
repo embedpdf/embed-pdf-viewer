@@ -596,8 +596,8 @@ export const en: Locale = {
     },
     // The page number in the pager, and the field it turns into to go to a page.
     pageNumber: {
-      page: 'Page {current} of {total}',
-      pages: 'Pages {first}–{last} of {total}',
+      page: '{current} / {total}',
+      pages: '{first}–{last} / {total}',
       goToPage: 'Go to page',
     },
     // The comments panel: its states, its cards and their statuses.

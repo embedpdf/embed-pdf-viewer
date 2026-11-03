@@ -527,6 +527,13 @@ export interface StageCapability {
   getPageCount(): number;
   /** Pages of the current item (one page, or a spread / grid row). */
   listCurrentItemPages(): readonly PageInfo[];
+  /**
+   * The pages you're on: the current item's pages while the item fits across
+   * the view (a spread you see side by side, however tall), else the current
+   * page alone. What a page number names, and what `nextPage` and
+   * `previousPage` step past.
+   */
+  listCurrentPages(): readonly PageInfo[];
   /** Pages on screen, with their viewport rects and visible page-space rect. Reference-stable. */
   listVisiblePages(): readonly VisiblePage[];
   /** Is any part of the page (its ref or its index) on screen. False for a page that isn't in the document. */
@@ -595,12 +602,15 @@ export interface StageCapability {
   goToDestination(destination: PageDestination, options?: GoToDestinationOptions): void;
   goToFirstPage(options?: GoToOptions): void;
   goToLastPage(options?: GoToOptions): void;
-  /** Step forward / backward by the navigation unit (the item if it fits the viewport, else the page). */
+  /**
+   * Step past the pages you're on (`listCurrentPages`): forward to the page
+   * after them, back to the spread or page before them.
+   */
   nextPage(options?: GoToOptions): void;
   previousPage(options?: GoToOptions): void;
-  /** The cursor is before the last page. */
+  /** There's a page after the pages you're on. */
   canGoNext(): boolean;
-  /** The cursor is after the first page. */
+  /** There's a page before the pages you're on. */
   canGoPrevious(): boolean;
   /**
    * Bring a page, or a spot on it, into view: its `PageRef` or its display

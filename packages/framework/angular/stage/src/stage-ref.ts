@@ -120,6 +120,7 @@ export class EpdfStageRef {
   readonly getCurrentPageIndex = this.binding.method('getCurrentPageIndex');
   readonly getPageCount = this.binding.method('getPageCount');
   readonly listCurrentItemPages = this.binding.method('listCurrentItemPages');
+  readonly listCurrentPages = this.binding.method('listCurrentPages');
   readonly listVisiblePages = this.binding.method('listVisiblePages');
   readonly isPageVisible = this.binding.method('isPageVisible');
   readonly getViewpoint = this.binding.method('getViewpoint');

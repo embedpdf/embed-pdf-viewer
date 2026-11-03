@@ -8,8 +8,8 @@
  * what the document says (its file name, its form fields' names, tooltips and options, and the
  * text its pages draw: a field's painted value or caption, an annotation's label), keys (key caps
  * and a shortcut's keys), and the names the stamp and signature-font libraries give (in their own
- * languages). A string split around a control (the pager's "⟦Page [3] of 8⟧") counts as wrapped by
- * either bracket.
+ * languages). A string split around a control (the Go to Page dialog's "⟦[3] / 8⟧") counts as wrapped
+ * by either bracket.
  *
  * Runs against the built snippet (`pnpm build` first).
  */

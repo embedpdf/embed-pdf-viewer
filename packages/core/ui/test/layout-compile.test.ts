@@ -14,7 +14,7 @@ import {
   edgeStackOf,
   floatOf,
   floatStackOf,
-  hideWhileScrollingOf,
+  hideWhenIdleOf,
   menuOf,
   modesOf,
   omittedCommandsOf,
@@ -354,24 +354,24 @@ describe('floating bars', () => {
     expect(edgeStackOf(floating, 'bottom')).toEqual([]);
   });
 
-  it('reads whether a bar hides while the pages scroll: its own place, or its host’s', () => {
+  it('reads whether a bar hides while nothing moves: its own place, or its host’s', () => {
     const floating: LayoutData = {
       bars: {
-        pager: { place: { float: 'bottom', hideWhileScrolling: true } },
+        pager: { place: { float: 'bottom', hideWhenIdle: true } },
         notes: { place: { with: 'pager' } },
-        zoom: { place: { float: 'bottom-end', hideWhileScrolling: false } },
+        zoom: { place: { float: 'bottom-end', hideWhenIdle: false } },
         corner: { place: { float: 'top-start' } },
         main: { place: 'top' },
         loop: { place: { with: 'loop' } },
       },
     };
-    expect(hideWhileScrollingOf(floating, 'pager')).toBe(true);
-    expect(hideWhileScrollingOf(floating, 'notes')).toBe(true);
-    expect(hideWhileScrollingOf(floating, 'zoom')).toBe(false);
-    expect(hideWhileScrollingOf(floating, 'corner')).toBeUndefined();
-    expect(hideWhileScrollingOf(floating, 'main')).toBeUndefined();
-    expect(hideWhileScrollingOf(floating, 'loop')).toBeUndefined();
-    expect(hideWhileScrollingOf(floating, 'nothing')).toBeUndefined();
+    expect(hideWhenIdleOf(floating, 'pager')).toBe(true);
+    expect(hideWhenIdleOf(floating, 'notes')).toBe(true);
+    expect(hideWhenIdleOf(floating, 'zoom')).toBe(false);
+    expect(hideWhenIdleOf(floating, 'corner')).toBeUndefined();
+    expect(hideWhenIdleOf(floating, 'main')).toBeUndefined();
+    expect(hideWhenIdleOf(floating, 'loop')).toBeUndefined();
+    expect(hideWhenIdleOf(floating, 'nothing')).toBeUndefined();
   });
 });
 

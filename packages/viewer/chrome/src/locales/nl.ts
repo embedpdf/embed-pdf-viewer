@@ -585,8 +585,8 @@ export const nl: Locale = {
       update: 'Koppeling bijwerken',
     },
     pageNumber: {
-      page: 'Pagina {current} van {total}',
-      pages: 'Pagina’s {first}–{last} van {total}',
+      page: '{current} / {total}',
+      pages: '{first}–{last} / {total}',
       goToPage: 'Ga naar pagina',
     },
     comments: {

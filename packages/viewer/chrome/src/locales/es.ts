@@ -583,8 +583,8 @@ export const es: Locale = {
       update: 'Actualizar enlace',
     },
     pageNumber: {
-      page: 'Página {current} de {total}',
-      pages: 'Páginas {first}–{last} de {total}',
+      page: '{current} / {total}',
+      pages: '{first}–{last} / {total}',
       goToPage: 'Ir a la página',
     },
     comments: {

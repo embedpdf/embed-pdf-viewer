@@ -584,8 +584,8 @@ export const zhTW: Locale = {
       update: '更新連結',
     },
     pageNumber: {
-      page: '第 {current} 頁，共 {total} 頁',
-      pages: '第 {first}–{last} 頁，共 {total} 頁',
+      page: '{current} / {total}',
+      pages: '{first}–{last} / {total}',
       goToPage: '移至頁面',
     },
     comments: {

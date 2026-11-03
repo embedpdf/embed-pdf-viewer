@@ -583,8 +583,8 @@ export const he: Locale = {
       update: 'עדכן קישור',
     },
     pageNumber: {
-      page: 'עמוד {current} מתוך {total}',
-      pages: 'עמודים {first}–{last} מתוך {total}',
+      page: '{current} / {total}',
+      pages: '{first}–{last} / {total}',
       goToPage: 'עבור לעמוד',
     },
     comments: {

@@ -17,7 +17,7 @@ import type { BarSchema, useStripView } from '@embedpdf/react/toolbar';
 import { Fragment, useMemo } from 'react';
 
 import { BarEdgeProvider } from './bar-edge';
-import { Icon } from './icons';
+import { Icon, readingDirectionClass } from './icons';
 import { MenuAnchor } from './menu';
 import { barPartOf, buttonClass, buttonPart, commandTooltipOf, primaryCommandsOf } from './toolbar';
 import { useTooltip } from './tooltip';
@@ -47,7 +47,14 @@ function StripButton({
         part={buttonPart(active, emphasis)}
         className={buttonClass(active, cmd.enabled, emphasis)}
       >
-        {cmd.icon && <Icon name={cmd.icon} size={20} accent={cmd.iconAccent} />}
+        {cmd.icon && (
+          <Icon
+            name={cmd.icon}
+            size={20}
+            accent={cmd.iconAccent}
+            className={readingDirectionClass(cmd.icon)}
+          />
+        )}
       </button>
       {tooltip.element}
     </>

@@ -583,8 +583,8 @@ export const ko: Locale = {
       update: '링크 업데이트',
     },
     pageNumber: {
-      page: '{current} / {total}페이지',
-      pages: '{first}–{last} / {total}페이지',
+      page: '{current} / {total}',
+      pages: '{first}–{last} / {total}',
       goToPage: '페이지로 이동',
     },
     comments: {

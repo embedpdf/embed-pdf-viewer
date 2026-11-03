@@ -585,8 +585,8 @@ export const sv: Locale = {
       update: 'Uppdatera länk',
     },
     pageNumber: {
-      page: 'Sida {current} av {total}',
-      pages: 'Sidor {first}–{last} av {total}',
+      page: '{current} / {total}',
+      pages: '{first}–{last} / {total}',
       goToPage: 'Gå till sida',
     },
     comments: {

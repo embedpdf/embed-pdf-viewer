@@ -185,9 +185,16 @@ export const DEFAULT_LAYOUT: LayoutData = {
       ],
     },
     // ── over the pages ────────────────────────────────────────────────────────
+    // The page number and its arrows are one: none of them moves into "More".
     pager: {
       place: { float: 'bottom' },
-      center: [{ id: 'pages', items: [{ custom: 'page-number' }] }],
+      center: [
+        {
+          id: 'pages',
+          items: ['page:previous', { custom: 'page-number' }, 'page:next'],
+          importance: 5,
+        },
+      ],
     },
     // Which actions show is each command's `visible` (group only when
     // groupable, style only when the kind has editable properties…), so one
