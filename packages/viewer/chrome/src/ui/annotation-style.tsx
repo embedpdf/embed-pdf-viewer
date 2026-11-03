@@ -476,8 +476,8 @@ interface FontOption {
 /**
  * Every font a text box, a form field or a redaction label can be written in, as the fonts
  * plugin lists them: the document's, the engine's (yours on a local engine, the server's on the
- * cloud), then the standard fonts the property offers. A font that can't be chosen shows greyed,
- * with why; the box's own font shows even then.
+ * cloud), then the standard fonts the property offers. A font that can't be chosen isn't
+ * offered, but the box's own font shows whatever it is, greyed with why when it can't be chosen.
  */
 function FontFamilySelect({
   value,
@@ -516,7 +516,9 @@ function FontFamilySelect({
     };
   };
   const listed = (source: Font['source']) =>
-    (list?.fonts ?? []).filter((font) => font.source === source).map(fontOption);
+    (list?.fonts ?? [])
+      .filter((font) => font.source === source && (font.canChoose || font.name === value))
+      .map(fontOption);
   const groups: { readonly title: string; readonly options: readonly FontOption[] }[] = [
     { title: t('stylePanel.fontGroups.document'), options: listed('document') },
     {
