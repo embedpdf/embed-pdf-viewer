@@ -1,4 +1,5 @@
 import type { AnnotationList } from '../annotation/AnnotationList';
+import type { AnnotationOrder } from '../annotation/AnnotationOrder';
 import type { AnnotationFamily } from '../annotation/family';
 import type { AnnotationDraft, AnnotationPatch } from '../annotation/kinds';
 import type { WidgetPatch } from '../annotation/kinds/widget';
@@ -679,6 +680,16 @@ export interface AnnotationsReadAppearanceWorkerRequest {
   layerName?: string;
   page: PageRef;
   ref: AnnotationRef;
+}
+
+/** A page's `/Annots` in array order, both families, read off its dictionaries. */
+export interface AnnotationsOrderWorkerRequest {
+  kind: 'annotations.order';
+  effect: 'read';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  page: PageRef;
 }
 
 /** A page's annotations' stacking order: `refs` go together to `position`. */
@@ -1616,6 +1627,7 @@ export type WorkerRequest<C extends Coordinates = PageCoordinates> =
   | AttachmentsReadFileWorkerRequest
   | AnnotationsReadFileWorkerRequest
   | AnnotationsReadAppearanceWorkerRequest
+  | AnnotationsOrderWorkerRequest
   | AnnotationsExportWorkerRequest
   | AnnotationsImportWorkerRequest
   | MeasureViewportsWorkerRequest
@@ -1764,6 +1776,7 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
     } & WritePayloadFacts)
   | { tag: 'annotations.exportAppearance'; bytes: ArrayBuffer; size: number }
   | { tag: 'annotations.readAppearance'; bytes: ArrayBuffer; size: number }
+  | { tag: 'annotations.order'; order: AnnotationOrder }
   /** A bundle is page space on both sides: the exporter measures what leaves. */
   | { tag: 'annotations.export'; bundle: WireAnnotationBundle }
   | ({

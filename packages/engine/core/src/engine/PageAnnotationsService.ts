@@ -1,4 +1,5 @@
 import type { AnnotationList } from '../annotation/AnnotationList';
+import type { AnnotationOrder } from '../annotation/AnnotationOrder';
 import type { AnnotationDraft, AnnotationPatch } from '../annotation/kinds';
 import type { AnnotationResourceRole } from '../annotation/resources';
 import type {
@@ -133,6 +134,15 @@ export interface PageAnnotationsService {
 
 /** A local engine page's annotations: the shared service and the raw appearance pixels. */
 export interface LocalPageAnnotationsService extends PageAnnotationsService {
+  /**
+   * The page's `/Annots` in array order, annotations and widgets together,
+   * each entry with its family; `null` for an entry that isn't an annotation
+   * dictionary. `list()` and `doc.forms.list()` give each family's paint
+   * order; this is the order a viewer stacking an HTML layer over the page
+   * follows (PDF.js renders its annotation layer in `/Annots` order).
+   * A raw read (the page isn't loaded), gated by `doc.annotate.read`.
+   */
+  order(): AbortablePromise<AnnotationOrder>;
   /**
    * The same appearances as `renderAppearances()`, each as its own raw RGBA
    * raster instead of an encoded image.

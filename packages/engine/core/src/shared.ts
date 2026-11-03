@@ -332,6 +332,7 @@ export {
 export type { AnnotationSubtype } from './annotation/subtype';
 export { familyOfSubtype } from './annotation/family';
 export type { AnnotationFamily } from './annotation/family';
+export type { AnnotationOrder, AnnotationOrderEntry } from './annotation/AnnotationOrder';
 
 // Binary payloads — zod-free.
 export type {
