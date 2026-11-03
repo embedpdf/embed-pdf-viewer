@@ -1075,6 +1075,74 @@ await client.tenants.delete({
 </dl>
 </details>
 
+<details><summary><code>client.tenants.<a href="/src/api/resources/tenants/client/Client.ts">update</a>({ ...params }) -> CloudPDF.TenantsUpdate200Response</code></summary>
+<dl>
+<dd>
+
+#### 📝 Description
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+A feature names an installed module; any other id is a 400. A module route answers a tenant without its feature 403 FeatureNotEnabled, and one whose feature is stopped 402 FeatureStopped (details.feature, details.stopped). Other replicas apply a change within 30 seconds.
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.tenants.update({
+    tenantId: "tenantId",
+    features: [{
+            id: "id"
+        }]
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `CloudPDF.TenantsUpdateRequest` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `TenantsClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
 <details><summary><code>client.tenants.<a href="/src/api/resources/tenants/client/Client.ts">resume</a>({ ...params }) -> void</code></summary>
 <dl>
 <dd>

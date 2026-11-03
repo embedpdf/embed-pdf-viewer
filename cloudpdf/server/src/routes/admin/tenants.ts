@@ -1,6 +1,7 @@
 import {
   AdminTenantCreateRequestSchema,
   AdminTenantListQuerySchema,
+  AdminTenantUpdateRequestSchema,
   TenantSuspendRequestSchema,
   TenantUsageQuerySchema,
   adminOperations,
@@ -12,6 +13,7 @@ import { decodeListCursor, encodeListCursor } from './_cursor';
 import { formatIssues } from './_issues';
 import { requireApiToken, requireTenantAccess } from '../../app/jwt-plugin';
 import type { SuspendedTenantsGuard } from '../../auth/SuspendedTenantsGuard';
+import type { TenantFeaturesGuard } from '../../auth/TenantFeaturesGuard';
 import type { SecurityEventsRepo } from '../../db/repos/security-events.repo';
 import type { TenantUsageRepo } from '../../db/repos/tenant_usage.repo';
 import type { TenantRow, TenantsRepo } from '../../db/repos/tenants.repo';
@@ -23,7 +25,10 @@ export interface AdminTenantsRouteDeps {
   storage: ObjectStore;
   securityEvents: SecurityEventsRepo;
   suspendedTenants: SuspendedTenantsGuard;
+  tenantFeatures: TenantFeaturesGuard;
   tenantUsage: TenantUsageRepo;
+  /** The ids of the installed modules: the features a tenant may be given. */
+  modules: ReadonlyArray<string>;
 }
 
 /**
@@ -40,7 +45,8 @@ export async function registerAdminTenantsRoutes(
   app: FastifyInstance,
   deps: AdminTenantsRouteDeps,
 ): Promise<void> {
-  const { tenants, storage, securityEvents, suspendedTenants, tenantUsage } = deps;
+  const { tenants, storage, securityEvents, suspendedTenants, tenantFeatures, tenantUsage } = deps;
+  const installed = new Set(deps.modules);
 
   const mount = (
     op: AdminOperation,
@@ -90,6 +96,42 @@ export async function registerAdminTenantsRoutes(
         .code(404)
         .send({ error: { code: 'NotFound', message: `tenant does not exist: ${tenantId}` } });
     }
+    return reply.send({ tenant: tenantPublic(tenant) });
+  });
+
+  const updateOp = adminOperations['tenants.update'];
+  mount(updateOp, async (req, reply) => {
+    requireApiToken(req);
+    const { tenantId } = req.params as { tenantId: string };
+    const parsed = AdminTenantUpdateRequestSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return reply
+        .code(400)
+        .send({ error: { code: 'InvalidArg', message: formatIssues(parsed.error.issues) } });
+    }
+    const { features } = parsed.data;
+    // A feature switches a module, so it names one this server runs: a typo
+    // never passes for a module that's on.
+    const unknown = features.find((feature) => !installed.has(feature.id));
+    if (unknown) {
+      const modules = installed.size > 0 ? [...installed].join(', ') : 'none';
+      return reply.code(400).send({
+        error: {
+          code: 'InvalidArg',
+          message: `no installed module is ${unknown.id} (installed: ${modules})`,
+        },
+      });
+    }
+    const existed = await tenants.setFeatures(tenantId, features);
+    const tenant = existed ? await tenants.findById(tenantId) : null;
+    if (!tenant) {
+      return reply
+        .code(404)
+        .send({ error: { code: 'NotFound', message: `tenant does not exist: ${tenantId}` } });
+    }
+    // Prime this replica so the next module request sees the change;
+    // siblings converge within the guard's TTL.
+    tenantFeatures.prime(tenantId, features);
     return reply.send({ tenant: tenantPublic(tenant) });
   });
 
@@ -188,6 +230,7 @@ function tenantPublic(t: TenantRow): Record<string, unknown> {
     name: t.name,
     autoProvisioned: t.autoProvisioned,
     status: t.status,
+    features: t.features,
     createdAt: t.createdAt,
   };
 }

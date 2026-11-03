@@ -10,7 +10,16 @@ describe("TenantsClient", () => {
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
         const rawResponseBody = {
-            tenants: [{ id: "id", name: "name", autoProvisioned: true, status: "active", createdAt: 1.1 }],
+            tenants: [
+                {
+                    id: "id",
+                    name: "name",
+                    autoProvisioned: true,
+                    status: "active",
+                    features: [{ id: "id" }],
+                    createdAt: 1.1,
+                },
+            ],
             nextCursor: "nextCursor",
         };
 
@@ -38,7 +47,14 @@ describe("TenantsClient", () => {
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { id: "id" };
         const rawResponseBody = {
-            tenant: { id: "id", name: "name", autoProvisioned: true, status: "active", createdAt: 1.1 },
+            tenant: {
+                id: "id",
+                name: "name",
+                autoProvisioned: true,
+                status: "active",
+                features: [{ id: "id" }],
+                createdAt: 1.1,
+            },
             created: true,
         };
 
@@ -84,7 +100,14 @@ describe("TenantsClient", () => {
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
         const rawResponseBody = {
-            tenant: { id: "id", name: "name", autoProvisioned: true, status: "active", createdAt: 1.1 },
+            tenant: {
+                id: "id",
+                name: "name",
+                autoProvisioned: true,
+                status: "active",
+                features: [{ id: "id" }],
+                createdAt: 1.1,
+            },
         };
 
         server
@@ -151,6 +174,101 @@ describe("TenantsClient", () => {
         await expect(async () => {
             return await client.tenants.delete({
                 tenantId: "tenantId",
+            });
+        }).rejects.toThrow(CloudPDF.NotFoundError);
+    });
+
+    test("update (1)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = { features: [{ id: "id" }] };
+        const rawResponseBody = {
+            tenant: {
+                id: "id",
+                name: "name",
+                autoProvisioned: true,
+                status: "active",
+                features: [{ id: "id" }],
+                createdAt: 1.1,
+            },
+        };
+
+        server
+            .mockEndpoint()
+            .patch("/v1/tenants/tenantId")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(200)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        const response = await client.tenants.update({
+            tenantId: "tenantId",
+            features: [
+                {
+                    id: "id",
+                },
+            ],
+        });
+        expect(response).toEqual(rawResponseBody);
+    });
+
+    test("update (2)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = { features: [{ id: "id" }, { id: "id" }] };
+        const rawResponseBody = { key: "value" };
+
+        server
+            .mockEndpoint()
+            .patch("/v1/tenants/tenantId")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(400)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        await expect(async () => {
+            return await client.tenants.update({
+                tenantId: "tenantId",
+                features: [
+                    {
+                        id: "id",
+                    },
+                    {
+                        id: "id",
+                    },
+                ],
+            });
+        }).rejects.toThrow(CloudPDF.BadRequestError);
+    });
+
+    test("update (3)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = { features: [{ id: "id" }, { id: "id" }] };
+        const rawResponseBody = { key: "value" };
+
+        server
+            .mockEndpoint()
+            .patch("/v1/tenants/tenantId")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(404)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        await expect(async () => {
+            return await client.tenants.update({
+                tenantId: "tenantId",
+                features: [
+                    {
+                        id: "id",
+                    },
+                    {
+                        id: "id",
+                    },
+                ],
             });
         }).rejects.toThrow(CloudPDF.NotFoundError);
     });

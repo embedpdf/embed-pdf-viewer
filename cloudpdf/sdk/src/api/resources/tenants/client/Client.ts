@@ -302,6 +302,84 @@ export class TenantsClient {
     }
 
     /**
+     * A feature names an installed module; any other id is a 400. A module route answers a tenant without its feature 403 FeatureNotEnabled, and one whose feature is stopped 402 FeatureStopped (details.feature, details.stopped). Other replicas apply a change within 30 seconds.
+     *
+     * @param {CloudPDF.TenantsUpdateRequest} request
+     * @param {TenantsClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link CloudPDF.BadRequestError}
+     * @throws {@link CloudPDF.NotFoundError}
+     * @throws {@link errors.CloudPDFError}
+     * @throws {@link errors.CloudPDFTimeoutError}
+     *
+     * @example
+     *     await client.tenants.update({
+     *         tenantId: "tenantId",
+     *         features: [{
+     *                 id: "id"
+     *             }]
+     *     })
+     */
+    public update(
+        request: CloudPDF.TenantsUpdateRequest,
+        requestOptions?: TenantsClient.RequestOptions,
+    ): core.HttpResponsePromise<CloudPDF.TenantsUpdate200Response> {
+        return core.HttpResponsePromise.fromPromise(this.__update(request, requestOptions));
+    }
+
+    private async __update(
+        request: CloudPDF.TenantsUpdateRequest,
+        requestOptions?: TenantsClient.RequestOptions,
+    ): Promise<core.WithRawResponse<CloudPDF.TenantsUpdate200Response>> {
+        const { tenantId, ..._body } = request;
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)) ??
+                    environments.CloudPDFEnvironment.Saas,
+                `v1/tenants/${core.url.encodePathParam(tenantId)}`,
+            ),
+            method: "PATCH",
+            headers: _headers,
+            contentType: "application/json",
+            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            requestType: "json",
+            body: mergeAdditionalBodyParameters(_body, requestOptions?.additionalBodyParameters),
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: _response.body as CloudPDF.TenantsUpdate200Response, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 400:
+                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                case 404:
+                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                default:
+                    throw new errors.CloudPDFError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(_response.error, _response.rawResponse, "PATCH", "/v1/tenants/{tenantId}");
+    }
+
+    /**
      * @param {CloudPDF.ResumeTenantsRequest} request
      * @param {TenantsClient.RequestOptions} requestOptions - Request-specific configuration.
      *

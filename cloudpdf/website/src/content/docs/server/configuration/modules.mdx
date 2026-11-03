@@ -33,6 +33,9 @@ directory) to a module's file. A module reads its settings from `CLOUDPDF_<ID>_<
 capitals, with `_` for `-`. So the `AXINOM_COM_KEY` setting of a `protected-display` module is
 `CLOUDPDF_PROTECTED_DISPLAY_AXINOM_COM_KEY`. An empty variable counts as unset.
 
+Then [turn it on](#turn-a-module-on-for-a-tenant) for the tenants that use it: an installed
+module's routes answer no tenant until you do.
+
 ## What the server checks when it starts
 
 A module that's wrong stops the server before it listens, and the error says why:
@@ -89,8 +92,78 @@ Every route a module adds is on a document's layer:
 ```
 
 Before the module's code runs, the server checks what it checks for its own routes: the token,
-the document and layer it's for, `doc.open`, and the permission the route needs. A response is
-`Cache-Control: no-store` unless the module sets its own.
+the document and layer it's for, and `doc.open`. Then whether the document's tenant has the module
+[turned on](#turn-a-module-on-for-a-tenant), and last the permission the route needs. A response
+is `Cache-Control: no-store` unless the module sets its own.
+
+## Turn a module on for a tenant
+
+Installing a module puts it on the server; each tenant still has to have it turned on. A tenant's
+`features` list names the modules it may use, by their ids, so one server can run a module for
+some tenants and not for others. A new tenant has none, and the server never turns one on by
+itself: on a server you run, you decide which tenants get a module.
+
+Set the list with the deployment's API token:
+
+```sh
+curl -X PATCH localhost:3000/v1/tenants/fernquill \
+  -H "Authorization: Bearer $API_TOKEN" -H 'content-type: application/json' \
+  -d '{"features":[{"id":"snapshot"}]}'
+```
+
+The SDKs call it `tenants.update({ tenantId, features })`. The list you send replaces the
+tenant's list: send every feature the tenant keeps, and `[]` to turn them all off. The answer is
+the tenant's record, which `tenants.get` and `tenants.list` show too:
+
+```json
+{
+  "tenant": {
+    "id": "fernquill",
+    "name": "Fernquill",
+    "status": "active",
+    "features": [{ "id": "snapshot" }],
+    "autoProvisioned": false,
+    "createdAt": 1793664000000
+  }
+}
+```
+
+Every feature you send names a module the server has installed; any other id is refused with
+`400`, so a typo doesn't pass for a module that's on. Uninstalling a module leaves its id in the
+lists that hold it, doing nothing; the next list you send without it drops it. Only the API token
+may change features: no tenant can turn a module on for itself.
+
+What a module's route answers, by the tenant's feature:
+
+| The tenant's `features`                        | The module's routes answer      |
+| ---------------------------------------------- | ------------------------------- |
+| holds `{ "id": "snapshot" }`                   | what the module answers         |
+| doesn't hold `snapshot`                        | `403`, code `FeatureNotEnabled` |
+| holds `{ "id": "snapshot", "stopped": "cap" }` | `402`, code `FeatureStopped`    |
+
+Both refusals carry the module's id in `details.feature`, and `FeatureStopped` the reason in
+`details.stopped`. A stopped feature is still the tenant's: `stopped: "cap"` says the tenant
+reached a spending cap, so its routes stop until whoever sets the list takes the stop off. The
+server keeps no caps and knows no prices; it does what the list says.
+
+```json
+{
+  "error": {
+    "code": "FeatureStopped",
+    "message": "The snapshot module is stopped for this tenant: it reached its cap",
+    "details": { "feature": "snapshot", "stopped": "cap" }
+  }
+}
+```
+
+- **On every replica within 30 seconds.** The server that takes the change applies it at once;
+  the others read the tenant again within 30 seconds, as they do for a suspension.
+- **Only routes.** A token or grant may carry a module's permissions whether its tenant has the
+  feature or not, and `/access` lists them; without the feature, the routes that need them refuse.
+  A module that adds no routes, whose permission a viewer plugin checks, isn't switched by
+  features.
+- **After the token.** A caller learns about a tenant's features only with a valid token for one
+  of its documents, so the refusals say nothing to anyone else.
 
 ## From the viewer
 

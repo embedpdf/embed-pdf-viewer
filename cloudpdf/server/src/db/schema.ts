@@ -24,6 +24,12 @@ export type DocumentPdfOpenedAs = 'none' | 'user' | 'owner';
 
 export type TenantStatus = 'active' | 'suspended';
 
+/** A server module the tenant may use, by the module's id; `stopped` keeps it listed but stops its routes. */
+export interface TenantFeature {
+  id: string;
+  stopped?: 'cap';
+}
+
 export interface TenantsTable {
   id: string;
   name: string;
@@ -38,6 +44,12 @@ export interface TenantsTable {
    */
   status: TenantStatus;
   suspended_at: number | null;
+  /**
+   * JSON array of `{ id, stopped? }`: the server modules the tenant may
+   * use. A module's routes refuse a tenant without its feature (403) and
+   * one whose feature is stopped (402). `'[]'` until the operator sets it.
+   */
+  features_json: string;
 }
 
 /** A folder stores only its parent; see migration 046 for the tree model. */
@@ -723,6 +735,7 @@ export interface Database {
     auto_provisioned: Generated<number>;
     status: Generated<TenantStatus>;
     suspended_at: Generated<number | null>;
+    features_json: Generated<string>;
   };
   documents: DocumentsTable & {
     created_at: Generated<number>;
