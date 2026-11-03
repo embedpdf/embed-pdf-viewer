@@ -10,9 +10,9 @@
  * edge share it without covering each other (`ui/floating-row.ts`). Each bar
  * tells what opens from it where it is ({@link BarEdgeProvider}). A bar with
  * nothing visible draws nothing, and a bar with a mode shows while that mode is
- * open. A floating bar hides while the pages scroll as its place says
- * (`ui/scroll-hiding.ts`). A panel's bars sit under its title, each in a band
- * across the panel.
+ * open. A floating bar rests out of sight while nothing moves as its place
+ * says (`ui/idle-hiding.ts`). A panel's bars sit under its title, each in a
+ * band across the panel.
  */
 import {
   barsInPanel,
@@ -20,7 +20,7 @@ import {
   edgeStackOf,
   floatStackOf,
   hasVisibleUnits,
-  hideWhileScrollingOf,
+  hideWhenIdleOf,
   hostOf,
   modeCommandOf,
   normalizeBar,
@@ -46,9 +46,9 @@ import {
 } from 'react';
 
 import { openModeSurfaceOf } from './config/modes';
-import { useLayoutEnv, useResolvedLayout } from './config-context';
+import { useResolvedLayout } from './config-context';
 import { BarEdgeProvider, type BarEdge } from './ui/bar-edge';
-import { useHiddenWhileScrolling } from './ui/compact';
+import { useHiddenWhenIdle } from './ui/compact';
 import {
   FLOATING_ROWS,
   arrangeEdgeRow,
@@ -57,7 +57,7 @@ import {
   type FloatingRowName,
   type FloatingSpot,
 } from './ui/floating-row';
-import { hidesWhileScrolling } from './ui/scroll-hiding';
+import { hidesWhenIdle } from './ui/idle-hiding';
 import { AppToolbar, barPartOf } from './ui/toolbar';
 
 /** Whether anything in the bar is visible now: a bar with nothing visible draws nothing. */
@@ -195,11 +195,7 @@ function FloatingBar({ id, position }: { id: string; position: FloatPosition }) 
   const lane = useRef<HTMLDivElement>(null);
   const drawn = placed !== null && shows;
   useEffect(() => (drawn && lane.current ? isolatePointerDown(lane.current) : undefined), [drawn]);
-  const { size } = useLayoutEnv();
-  const hidden = useHiddenWhileScrolling(
-    hidesWhileScrolling(hideWhileScrollingOf(data, id), bar, size),
-    lane,
-  );
+  const hidden = useHiddenWhenIdle(drawn && hidesWhenIdle(hideWhenIdleOf(data, id), bar), lane);
   const reportPillWidth = useContext(PillWidthContext);
   // The pill, the bar's `toolbar` part, is the section of the toolbar that holds the bar. The
   // headless toolbar draws its sections first, in order and without attributes of ours, and
@@ -226,12 +222,12 @@ function FloatingBar({ id, position }: { id: string; position: FloatPosition }) 
       <div
         ref={lane}
         data-bar={id}
-        data-scroll-hidden={hidden ? '' : undefined}
-        className="flex w-full transition-opacity duration-200"
+        data-idle-hidden={hidden ? '' : undefined}
+        className="flex w-full"
       >
         <AppToolbar
           bar={placed}
-          className="float-pill:pointer-events-auto float-pill:rounded-full float-pill:border float-pill:border-border-subtle float-pill:bg-elevated/95 float-pill:p-0.5 float-pill:shadow-lg pointer-events-none w-full"
+          className="float-pill:pointer-events-auto float-pill:rounded-lg float-pill:border float-pill:border-border-subtle float-pill:bg-elevated/95 float-pill:p-0.5 float-pill:shadow-lg pointer-events-none w-full"
         />
       </div>
     </BarEdgeProvider>

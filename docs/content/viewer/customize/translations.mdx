@@ -79,18 +79,18 @@ The ones you're most likely to change:
 
 | Key | What it says |
 | :-- | :-- |
-| `pageNumber.page` | `Page {current} of {total}` |
-| `pageNumber.pages` | `Pages {first}–{last} of {total}`, with two pages side by side (`spread`) |
-| `pageNumber.goToPage` | The label of the field the number turns into |
+| `pageNumber.page` | `{current} / {total}` |
+| `pageNumber.pages` | `{first}–{last} / {total}`, while a spread fits across the view (`spread`) |
+| `pageNumber.goToPage` | The tooltip of the page number, and the label of the field it turns into |
 | `comments.empty`, `comments.emptyReadOnly` | What the panel says while the document has no comments, when the user can add some and when not |
 | `comments.addPlaceholder`, `comments.replyPlaceholder`, `comments.reply` | The field for a new comment, and for a reply |
 | `comments.statusAccepted`, `comments.statusRejected`, `comments.statusCancelled`, `comments.statusCompleted`, `comments.statusNone` | A thread's status |
 
-A word in braces is filled in as the viewer writes it: keep it in your words. The number you click
-to type a page is `{current}`, or `{first}`:
+A word in braces is filled in as the viewer writes it: keep it in your words. The number that turns
+into a field to type a page is `{current}`, or `{first}`:
 
 ```js
-{ strings: { en: { 'pageNumber.page': '{current} / {total}', 'comments.empty': 'No notes yet.' } } }
+{ strings: { en: { 'pageNumber.page': 'Page {current} of {total}', 'comments.empty': 'No notes yet.' } } }
 ```
 
 ## A language of your own

@@ -114,8 +114,9 @@ stage.goToLastPage();
 
 - **A page is its `ref` or its index.** Every call that takes a page takes either. An index counts
   from 0, so page "1" in your UI is `goToPage(0)`, and an index past the end goes to the last page.
-- **`nextPage()` and `previousPage()` follow spreads.** When two facing pages fit, they move a whole
-  spread; zoomed in, one page.
+- **`nextPage()` and `previousPage()` step past the pages you're on.** While a spread fits across
+  the view, its two pages side by side however tall they are, they move a whole spread; zoomed in
+  past it, one page. `listCurrentPages()` gives those pages, for your page number.
 - **`reveal()` scrolls only as far as needed.** It makes a page visible and does nothing if it
   already is. Use it for a thumbnail strip that follows along without jumping.
 - **You can navigate as soon as the document opens.** A call made before the Stage is on screen
@@ -483,9 +484,9 @@ from around it, or through `inject(EpdfStageRef)` from inside it.
 | `zoomTo(zoom, { around? })`                              | Zooms to a level (`1.5`), a mode (`{ mode: 'fit-width' }`) or a page size (`{ pageWidth }`, `{ pageHeight }`). `around` is a point in the Stage that stays put.     |
 | `zoomBy(factor, { around? })`                            | Multiplies the zoom: `1.25` is 25% closer                                                                                                                         |
 | `goToPage(page, options?)`                               | Goes to a page, by its ref or its index. [Move through pages](#move-through-pages)                                                                                |
-| `nextPage(options?)`, `previousPage(options?)`           | Goes to the next or previous page, or a whole spread when two facing pages fit                                                                                    |
+| `nextPage(options?)`, `previousPage(options?)`           | Goes past the pages you're on, to the next or previous page, or a whole spread while a spread fits across the view                                                |
 | `goToFirstPage(options?)`, `goToLastPage(options?)`      | Goes to the first or the last page                                                                                                                                |
-| `canGoNext()`, `canGoPrevious()`                         | Whether there's a page after or before the current one, to disable your buttons                                                                                   |
+| `canGoNext()`, `canGoPrevious()`                         | Whether there's a page after or before the pages you're on, to disable your buttons                                                                               |
 | `reveal(page, options?)`                                 | Brings a page into view, scrolling only as far as needed. With `rect`, `zoom` or `anchor`, it lands on that spot. [Jump to an exact spot](#jump-to-an-exact-spot) |
 | `goToDestination(destination)`                           | Goes where a link, a bookmark or the document's opening view points. [Follow a destination](#follow-a-destination)                                                |
 | `getCurrentDestination()`                                | Where the view is now, as a destination that keeps the zoom; `null` before a page shows. [Follow a destination](#follow-a-destination)                          |
@@ -501,7 +502,8 @@ from around it, or through `inject(EpdfStageRef)` from inside it.
 | `setResponsiveRules(rules)`                              | Replaces the responsive rules while the app runs. [Adapt to the space you have](#adapt-to-the-space-you-have)                                                     |
 | `lockSettings(lock)`, `getLock(setting)`                 | Holds settings at a value for this document until the function it returns is called, and who holds a setting, or `null`. [Lock a setting](#lock-a-setting)        |
 | `listVisiblePages()`, `isPageVisible(page)`              | The pages on screen, each with its box in the Stage and the part of it that shows, and whether one page is on screen                                             |
-| `listCurrentItemPages()`                                 | The pages of the current spread, or the current page alone                                                                                                        |
+| `listCurrentItemPages()`                                 | The pages of the spread the current page is in, or the current page alone, at any zoom                                                                            |
+| `listCurrentPages()`                                     | The pages you're on: the current spread while it fits across the view, else the current page. What a page number names, and what `nextPage()` and `previousPage()` step past |
 | `getPageAt(point)`                                       | The page under a point in the Stage and the point on that page, or `null` over the space between pages                                                            |
 | `viewportToPage(page, point)`, `pageToViewport(page, point)`, `pageRectToViewport(page, rect)` | Converts a point between the Stage and a page, and a box on a page to the Stage. `null` when the page isn't laid out. [Page coordinates](#page-coordinates) |
 | `getPageFrame(page)`                                     | Where a page is laid out in the Stage, on screen or not, or `null` before it's placed                                                                            |

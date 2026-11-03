@@ -80,18 +80,26 @@ export async function launchChromium(): Promise<Browser> {
 }
 
 /**
- * Wait until the viewer shows the opened document: the chrome reports its page count, as
- * "Page 1 of 8", or "Pages 1–2 of 8" for a spread.
+ * Wait until the viewer shows the opened document: its pages are counted, where the page number
+ * reads them (a document of one page has no page number to show), and the chrome has drawn them.
  */
-export function waitForDocument(page: Page): Promise<unknown> {
-  return page.waitForFunction(
-    () =>
-      /Pages? 1(–\d+)? of \d+/.test(
-        document.querySelector('embedpdf-viewer')?.shadowRoot?.textContent ?? '',
-      ),
+export async function waitForDocument(page: Page): Promise<void> {
+  await page.waitForFunction(
+    () => {
+      const element = document.querySelector('embedpdf-viewer') as
+        | (Element & { viewer?: { get(name: 'stage'): { getPageCount(): number } } | null })
+        | null;
+      try {
+        return (element?.viewer?.get('stage').getPageCount() ?? 0) > 0;
+      } catch {
+        // While the document loads, the Stage isn't there to ask.
+        return false;
+      }
+    },
     null,
     { timeout: 60_000 },
   );
+  await frames(page);
 }
 
 /** Let the viewer render and run its effects: two frames. */

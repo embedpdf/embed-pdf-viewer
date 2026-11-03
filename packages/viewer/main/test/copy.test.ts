@@ -170,7 +170,7 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('copying', () => {
     await tab.waitForFunction(
       () =>
         ['a', 'b'].every((name) =>
-          /Page 1 of \d+/.test(document.getElementById(name)?.shadowRoot?.textContent ?? ''),
+          /1 \/ \d+/.test(document.getElementById(name)?.shadowRoot?.textContent ?? ''),
         ),
       null,
       { timeout: 60_000 },

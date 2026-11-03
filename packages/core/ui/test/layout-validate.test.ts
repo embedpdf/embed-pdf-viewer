@@ -130,11 +130,11 @@ describe('validateLayout', () => {
     expect(validateLayout(layout, { commands })).toEqual([]);
   });
 
-  it('checks hideWhileScrolling and grow: true or false, and grow on your own components only', () => {
+  it('checks hideWhenIdle and grow: true or false, and grow on your own components only', () => {
     const flags: LayoutData = {
       bars: {
-        pager: { place: { float: 'bottom', hideWhileScrolling: 'yes' as never } },
-        zoom: { place: { float: 'bottom-end', hideWhileScrolling: false } },
+        pager: { place: { float: 'bottom', hideWhenIdle: 'yes' as never } },
+        zoom: { place: { float: 'bottom-end', hideWhenIdle: false } },
         main: {
           place: 'top',
           start: [
@@ -148,7 +148,7 @@ describe('validateLayout', () => {
       },
     };
     expect(validateLayout(flags, { commands })).toEqual([
-      'bar "pager": hideWhileScrolling "yes" is not true or false',
+      'bar "pager": hideWhenIdle "yes" is not true or false',
       'bar "main": "status" has grow 1, which is not true or false',
       'bar "main": "tool:pan" has grow, which only your own components take',
     ]);

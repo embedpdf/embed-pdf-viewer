@@ -582,8 +582,8 @@ export const ar: Locale = {
       update: 'تحديث الارتباط',
     },
     pageNumber: {
-      page: 'الصفحة {current} من {total}',
-      pages: 'الصفحات {first}–{last} من {total}',
+      page: '{current} / {total}',
+      pages: '{first}–{last} / {total}',
       goToPage: 'الانتقال إلى الصفحة',
     },
     comments: {

@@ -92,6 +92,8 @@ export const isDesigningForm = (commandContext: Pick<Ctx, 'tryGet'>): boolean =>
 const CUSTOM_LIBRARY_ID = 'embedpdf-custom';
 
 const stage = (commandContext: Ctx) => commandContext.tryGet(StageToken);
+/** Whether the document has more than one page: the commands that step between pages show then. */
+const manyPages = (commandContext: Ctx) => (stage(commandContext)?.getPageCount() ?? 0) > 1;
 const interaction = (commandContext: Ctx) => commandContext.tryGet(InteractionToken);
 const anno = (commandContext: Ctx) => commandContext.tryGet(AnnotationToken);
 const textSelection = (commandContext: Ctx) => commandContext.tryGet(SelectionToken);
@@ -372,6 +374,7 @@ export const defaultCommands: CommandDef[] = [
     shortcut: 'ArrowRight',
     run: (commandContext) => stage(commandContext)?.nextPage(),
     enabled: (commandContext) => stage(commandContext)?.canGoNext() ?? false,
+    visible: manyPages,
   },
   {
     id: 'page:previous',
@@ -380,6 +383,7 @@ export const defaultCommands: CommandDef[] = [
     shortcut: 'ArrowLeft',
     run: (commandContext) => stage(commandContext)?.previousPage(),
     enabled: (commandContext) => stage(commandContext)?.canGoPrevious() ?? false,
+    visible: manyPages,
   },
   {
     id: 'page:first',
@@ -387,6 +391,7 @@ export const defaultCommands: CommandDef[] = [
     shortcut: 'Home',
     run: (commandContext) => stage(commandContext)?.goToFirstPage(),
     enabled: (commandContext) => stage(commandContext)?.canGoPrevious() ?? false,
+    visible: manyPages,
   },
   {
     id: 'page:last',
@@ -394,6 +399,7 @@ export const defaultCommands: CommandDef[] = [
     shortcut: 'End',
     run: (commandContext) => stage(commandContext)?.goToLastPage(),
     enabled: (commandContext) => stage(commandContext)?.canGoNext() ?? false,
+    visible: manyPages,
   },
   {
     // `execute('page:go-to', { args: { page: 3 } })` goes to page 3 (people count from 1; past

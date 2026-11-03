@@ -38,14 +38,14 @@ export function createArrival(
     zoomLimits,
     paged,
     isFitAll,
-    grouping,
     itemIndexOfPage,
     buildScene,
     sceneRect,
     itemRect,
     pageRectOf,
-    cursorItem,
-    fits,
+    currentPages,
+    unitStartOf,
+    fitsAcross,
     alignPoint,
     fitBox,
     boundsFor,
@@ -118,7 +118,7 @@ export function createArrival(
       const zoom = resolveZoom(state().zoom, fitBox(item), viewport(), padding(), zoomLimits());
       const subject = isFitAll()
         ? sceneRect()
-        : fits(itemRect(item), zoom)
+        : fitsAcross(itemRect(item), zoom)
           ? itemRect(item)
           : pageRectOf(item, target);
       // The landing policy: a per-call override beats the setting, and 'keep'
@@ -163,19 +163,20 @@ export function createArrival(
     }
   };
 
-  /** Step by the navigation unit: the item when it fits the viewport, else the page. */
+  /**
+   * Step past the pages you're on (`currentPages`): forward to the page after
+   * them, back to the unit before them, so a step always reaches a page you
+   * weren't on. Nothing past either end.
+   */
   const step = (direction: 1 | -1, options?: GoToOptions) => {
-    const item = cursorItem();
-    if (!item) return;
-    const { grouping: groups } = grouping();
-    if (isFitAll() || fits(itemRect(item), camera().zoom)) {
-      const index = Math.max(
-        0,
-        Math.min(itemIndexOfPage(state().cursor) + direction, groups.length - 1),
-      );
-      goToTarget(groups[index][0], options);
+    const pages = currentPages();
+    if (!pages.length) return;
+    if (direction === 1) {
+      const next = Math.max(...pages) + 1;
+      if (next < pageCount()) goToTarget(next, options);
     } else {
-      goToTarget(state().cursor + direction, options);
+      const before = Math.min(...pages) - 1;
+      if (before >= 0) goToTarget(unitStartOf(before), options);
     }
   };
 
@@ -199,8 +200,14 @@ export function createArrival(
         whenPlaced(placement, options, (go) =>
           goToTarget(Math.max(0, (ctx.document()?.pageCount ?? 1) - 1), go),
         ),
-      canGoNext: () => state().cursor < pageCount() - 1,
-      canGoPrevious: () => state().cursor > 0,
+      canGoNext: () => {
+        const pages = currentPages();
+        return pages.length > 0 && Math.max(...pages) < pageCount() - 1;
+      },
+      canGoPrevious: () => {
+        const pages = currentPages();
+        return pages.length > 0 && Math.min(...pages) > 0;
+      },
       nextPage: (options) => whenPlaced(placement, options, (go) => step(1, go)),
       previousPage: (options) => whenPlaced(placement, options, (go) => step(-1, go)),
       resetView,

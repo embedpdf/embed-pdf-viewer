@@ -145,9 +145,9 @@ function placeProblems(
       : [
           `${where}: "${place.float}" is not a floating position${didYouMean(place.float, FLOAT_POSITIONS)}`,
         ];
-    const hide: unknown = place.hideWhileScrolling;
+    const hide: unknown = place.hideWhenIdle;
     if (hide !== undefined && typeof hide !== 'boolean')
-      problems.push(`${where}: hideWhileScrolling ${JSON.stringify(hide)} is not true or false`);
+      problems.push(`${where}: hideWhenIdle ${JSON.stringify(hide)} is not true or false`);
     return problems;
   }
   if ('with' in place) {

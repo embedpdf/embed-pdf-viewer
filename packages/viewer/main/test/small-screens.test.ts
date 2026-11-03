@@ -3,8 +3,8 @@
  * bottom of the viewer, a submenu slides in over its menu and goes back, the
  * whole viewer dims behind a sheet, less as its handle drags it down, and a
  * sheet closes on a tap above it, Escape or a drag down its handle; the mode
- * tabs after the first fold behind a chevron; the page
- * number hides while the pages scroll; every button and menu row is 44 px
+ * tabs after the first fold behind a chevron; the page number rests out of
+ * sight once still, and a touch wakes it; every button and menu row is 44 px
  * tall when the main pointer is a finger; `size` and `touch` give the phone's
  * layout and a finger's sizes at any width and pointer, or keep them away;
  * the viewer keeps clear of the
@@ -501,39 +501,21 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('small screens', () => {
     await tab.close();
   });
 
-  it('hides the page number while the pages scroll on a phone, and brings it back after', async () => {
+  it('rests the page number out of sight once still on a phone too, and a touch wakes it', async () => {
     const pagerHidden = (tab: Page) =>
       tab.evaluate(() => {
         const root = document.querySelector('embedpdf-viewer')!.shadowRoot!;
         const pager = root.querySelector('[data-bar="pager"]');
-        return pager ? pager.hasAttribute('data-scroll-hidden') : null;
+        return pager ? pager.hasAttribute('data-idle-hidden') : null;
       });
-    const scroll = async (tab: Page, width: number) => {
-      await tab.mouse.move(width / 2, 400);
-      for (let i = 0; i < 4; i += 1) {
-        await tab.mouse.wheel(0, 120);
-        await tab.waitForTimeout(40);
-      }
-    };
 
-    const phone = await open('/whole.html');
+    const phone = await open('/whole.html', 375, { touch: true });
     expect(await pagerHidden(phone)).toBe(false);
-    await scroll(phone, 375);
-    expect(await pagerHidden(phone)).toBe(true);
-    const shown = await phone.evaluate(() => {
-      const root = document.querySelector('embedpdf-viewer')!.shadowRoot!;
-      return getComputedStyle(root.querySelector('[data-bar="pager"]')!).visibility;
-    });
-    // Still fading out; then it takes no presses.
-    expect(['visible', 'hidden']).toContain(shown);
-    await phone.waitForTimeout(1200);
-    expect(await pagerHidden(phone)).toBe(false);
+    await expect.poll(() => pagerHidden(phone), { timeout: 4000 }).toBe(true);
+    // A finger on the pages wakes it, where a mouse would move.
+    await phone.touchscreen.tap(375 / 2, 300);
+    await expect.poll(() => pagerHidden(phone)).toBe(false);
     await phone.close();
-
-    const wide = await open('/whole.html', 1280);
-    await scroll(wide, 1280);
-    expect(await pagerHidden(wide)).toBe(false);
-    await wide.close();
   });
 
   it('makes every bar button and menu row 44 px tall when the main pointer is a finger', async () => {

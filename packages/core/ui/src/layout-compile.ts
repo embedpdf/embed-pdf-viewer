@@ -174,17 +174,17 @@ export function floatStackOf(data: LayoutData, position: FloatPosition): string[
 }
 
 /**
- * Whether a floating bar's place says it hides while the pages scroll: its own place's
- * `hideWhileScrolling`, or that of the floating bar it rides along; `undefined` when it says
- * neither, or the bar doesn't float.
+ * Whether a floating bar's place says it hides while nothing moves: its own place's
+ * `hideWhenIdle`, or that of the floating bar it rides along; `undefined` when it says neither,
+ * or the bar doesn't float.
  */
-export function hideWhileScrollingOf(data: LayoutData, id: string): boolean | undefined {
+export function hideWhenIdleOf(data: LayoutData, id: string): boolean | undefined {
   const seen = new Set<string>();
   for (let current: string | null = id; current !== null && !seen.has(current); ) {
     seen.add(current);
     const place = data.bars?.[current]?.place;
     if (floatOf(place) !== null) {
-      const hide: unknown = (place as FloatPlace).hideWhileScrolling;
+      const hide: unknown = (place as FloatPlace).hideWhenIdle;
       return typeof hide === 'boolean' ? hide : undefined;
     }
     current = hostOf(place);

@@ -50,6 +50,7 @@ export function createPageReads(
     cacheKey,
     stayBounds,
     cursorItem,
+    currentPages,
     currentAnchor,
   } = scene;
   const state = () => ctx.state.get();
@@ -249,6 +250,12 @@ export function createPageReads(
         return item
           ? item.pageIndexes.map((index) => pages[index]).filter((page) => page !== undefined)
           : [];
+      },
+      listCurrentPages: () => {
+        const pages = ctx.document()?.pages ?? [];
+        return currentPages()
+          .map((index) => pages[index])
+          .filter((page) => page !== undefined);
       },
       getPageFrame,
       getPageAt: (point) => {

@@ -129,7 +129,7 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('keyboard shortcuts', ()
     await tab.waitForFunction(
       () =>
         Object.values((window as unknown as PageRecord).viewers).every((element) =>
-          /Page 1 of \d+/.test(element.shadowRoot?.textContent ?? ''),
+          /1 \/ \d+/.test(element.shadowRoot?.textContent ?? ''),
         ),
       null,
       { timeout: 60_000 },

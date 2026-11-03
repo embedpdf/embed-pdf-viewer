@@ -957,6 +957,71 @@ describe('navigation units: spread when it fits, page when zoomed in', () => {
   });
 });
 
+describe('the pages you are on: a spread seen side by side, else the page', () => {
+  // Taller than the view at fit width, so only the width decides.
+  const TALL = Array.from({ length: 4 }, () => ({ width: 600, height: 1000 }));
+  const instant = { behavior: 'instant' } as const;
+  const current = (stage: StageHostCapability) =>
+    stage.listCurrentPages().map((page) => page.index);
+
+  it('a spread that fits across but not down is one unit: 1–2 → 3–4 and back', () => {
+    const { stage } = harness(TALL, { spread: 'odd' });
+    stage.fitWidth();
+    stage.goToPage(0, instant);
+    expect(current(stage)).toEqual([0, 1]);
+    expect(stage.canGoPrevious()).toBe(false);
+    const before = stage.getCamera();
+    stage.nextPage(instant);
+    expect(current(stage)).toEqual([2, 3]);
+    expect(stage.getCamera().y).toBeGreaterThan(before.y); // a step always moves the view
+    expect(stage.canGoNext()).toBe(false);
+    stage.previousPage(instant);
+    expect(current(stage)).toEqual([0, 1]);
+  });
+
+  it('on the second page of a spread, the arrows still name the spread: no dead step', () => {
+    const { stage } = harness(TALL, { spread: 'odd' });
+    stage.fitWidth();
+    stage.goToPage(3, instant);
+    expect(stage.getCurrentPageIndex()).toBe(3);
+    expect(current(stage)).toEqual([2, 3]);
+    expect(stage.canGoNext()).toBe(false);
+    stage.goToPage(1, instant);
+    expect(current(stage)).toEqual([0, 1]);
+    expect(stage.canGoPrevious()).toBe(false);
+  });
+
+  it('zoomed in past the spread, the page is the unit: 1 → 2 → 3, and back to 2', () => {
+    const { stage } = harness(TALL, { spread: 'odd' });
+    stage.zoomTo({ level: 2 });
+    stage.goToPage(0, instant);
+    expect(current(stage)).toEqual([0]);
+    expect(stage.listCurrentItemPages().map((page) => page.index)).toEqual([0, 1]);
+    stage.nextPage(instant);
+    expect(current(stage)).toEqual([1]);
+    stage.nextPage(instant);
+    expect(current(stage)).toEqual([2]);
+    stage.previousPage(instant);
+    expect(current(stage)).toEqual([1]);
+  });
+
+  it('a cover page then spreads: 1 → 2–3 → 4–5, and back', () => {
+    const { stage } = harness(PORTRAIT, { spread: 'even' });
+    stage.fitWidth();
+    stage.goToPage(0, instant);
+    expect(current(stage)).toEqual([0]);
+    stage.nextPage(instant);
+    expect(current(stage)).toEqual([1, 2]);
+    stage.nextPage(instant);
+    expect(current(stage)).toEqual([3, 4]);
+    expect(stage.canGoNext()).toBe(false);
+    stage.previousPage(instant);
+    expect(current(stage)).toEqual([1, 2]);
+    stage.previousPage(instant);
+    expect(current(stage)).toEqual([0]);
+  });
+});
+
 describe('cursor is THE current page in both flows', () => {
   it('continuous: scrolling syncs the cursor (indicator follows the camera)', () => {
     const { stage } = harness(PORTRAIT);
