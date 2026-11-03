@@ -516,20 +516,6 @@ export const ko: Locale = {
         other: '새 텍스트를 쓸 수 없습니다',
       },
     },
-    // The flags section of the style panel: its title, and what each flag does.
-    annotationFlags: {
-      title: '플래그 (/F)',
-      print: '페이지를 인쇄할 때 포함',
-      hidden: '모든 곳에서 숨김: 화면, 클릭, 인쇄',
-      noView: '화면에서는 숨김, 인쇄는 될 수 있음',
-      toggleNoView: '선택한 동안 보기 안 함 주석 표시',
-      readOnly: '표시되지만 클릭할 수 없음',
-      locked: '이동/크기 조정/삭제/스타일 변경 불가',
-      lockedContents: '텍스트는 변경 불가, 형태는 변경 가능',
-      noZoom: '화면에서 크기 고정(왼쪽 위 기준)',
-      noRotate: '페이지를 회전해도 똑바로 유지',
-      invisible: '레거시: 알 수 없는 하위 유형 숨김',
-    },
     // The link editor over a selected annotation.
     attachments: {
       loading: '첨부 파일 불러오는 중…',

@@ -517,20 +517,6 @@ export const it: Locale = {
         other: 'Non è possibile scrivervi nuovo testo',
       },
     },
-    // The flags section of the style panel: its title, and what each flag does.
-    annotationFlags: {
-      title: 'Indicatori (/F)',
-      print: 'Includi quando la pagina viene stampata',
-      hidden: 'Nascosta ovunque: schermo, clic, stampa',
-      noView: 'Nascosta a schermo, può comunque essere stampata',
-      toggleNoView: 'Mostra un’annotazione non visualizzata quando è selezionata',
-      readOnly: 'Visibile ma non cliccabile',
-      locked: 'Impossibile spostare / ridimensionare / eliminare / cambiare stile',
-      lockedContents: 'Il testo non può cambiare; la geometria sì',
-      noZoom: 'Dimensione fissa a schermo (ancorata in alto a sinistra)',
-      noRotate: 'Resta dritta quando la pagina ruota',
-      invisible: 'Obsoleto: nascondi i sottotipi sconosciuti',
-    },
     // The link editor over a selected annotation.
     attachments: {
       loading: 'Caricamento degli allegati…',

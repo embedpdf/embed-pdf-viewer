@@ -517,20 +517,6 @@ export const ar: Locale = {
         other: 'لا يمكن كتابة نص جديد به',
       },
     },
-    // The flags section of the style panel: its title, and what each flag does.
-    annotationFlags: {
-      title: 'العلامات (/F)',
-      print: 'تضمينه عند طباعة الصفحة',
-      hidden: 'مخفي في كل مكان: الشاشة والنقر والطباعة',
-      noView: 'مخفي على الشاشة، وقد يُطبع',
-      toggleNoView: 'إظهار التعليق التوضيحي غير المعروض أثناء تحديده',
-      readOnly: 'مرئي لكن لا يمكن النقر عليه',
-      locked: 'لا يمكن نقله أو تغيير حجمه أو حذفه أو تغيير نمطه',
-      lockedContents: 'لا يمكن تغيير النص؛ يمكن تغيير الشكل',
-      noZoom: 'حجم ثابت على الشاشة (مثبت من أعلى اليسار)',
-      noRotate: 'يبقى قائمًا عند تدوير الصفحة',
-      invisible: 'قديم: إخفاء الأنواع الفرعية غير المعروفة',
-    },
     // The link editor over a selected annotation.
     attachments: {
       loading: 'جارٍ تحميل المرفقات…',

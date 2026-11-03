@@ -21,8 +21,8 @@ export type MenuDirection = 'ltr' | 'rtl';
 export type MenuAlign = 'start' | 'end';
 
 /**
- * Where a bar over a selection sits: above what's selected, or below it when
- * there's no room above.
+ * Where a bar over a selection sits: below what's selected, or above it when
+ * there's no room below.
  */
 export type SelectionBarSide = 'above' | 'below';
 

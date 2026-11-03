@@ -517,20 +517,6 @@ export const ja: Locale = {
         other: '新しいテキストを書けません',
       },
     },
-    // The flags section of the style panel: its title, and what each flag does.
-    annotationFlags: {
-      title: 'フラグ (/F)',
-      print: 'ページの印刷時に含める',
-      hidden: 'どこにも現れない：画面、クリック、印刷',
-      noView: '画面では非表示、印刷はされる場合あり',
-      toggleNoView: '「表示しない」注釈を選択中だけ表示',
-      readOnly: '表示されるがクリックできない',
-      locked: '移動・サイズ変更・削除・スタイル変更ができない',
-      lockedContents: 'テキストは変更不可、形状は変更可',
-      noZoom: '画面上のサイズが一定（左上を基準に固定）',
-      noRotate: 'ページを回転しても正立したまま',
-      invisible: '旧仕様：不明なサブタイプを非表示',
-    },
     // The link editor over a selected annotation.
     attachments: {
       loading: '添付ファイルを読み込み中…',

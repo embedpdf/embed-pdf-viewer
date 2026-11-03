@@ -516,20 +516,6 @@ export const zhCN: Locale = {
         other: '无法用它书写新文本',
       },
     },
-    // The flags section of the style panel: its title, and what each flag does.
-    annotationFlags: {
-      title: '标志 (/F)',
-      print: '打印页面时包含',
-      hidden: '在屏幕、单击和打印中均隐藏',
-      noView: '在屏幕上隐藏，但仍可能打印',
-      toggleNoView: '选中时显示设为“不显示”的注释',
-      readOnly: '可见但不可单击',
-      locked: '不可移动、调整大小、删除或更改样式',
-      lockedContents: '文本不可更改；几何形状可以更改',
-      noZoom: '屏幕上大小固定（锚定于左上角）',
-      noRotate: '页面旋转时保持直立',
-      invisible: '旧版：隐藏未知的子类型',
-    },
     // The link editor over a selected annotation.
     attachments: {
       loading: '正在加载附件…',

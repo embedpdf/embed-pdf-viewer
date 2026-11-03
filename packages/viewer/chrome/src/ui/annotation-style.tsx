@@ -46,7 +46,6 @@ import { useT } from '@embedpdf/react/i18n';
 import { observeOutsidePress } from '@embedpdf/web';
 import { Icon } from './icons';
 import { useConfiguredFonts } from '../config-context';
-import { AnnotationFlagsSection } from './annotation-flags';
 import { useLabel } from './labels';
 import { TooltipButton, WithTooltip } from './tooltip';
 
@@ -966,7 +965,7 @@ export function AnnotationStylePanel() {
 
   const hasSel = selection.properties.length > 0;
   const { properties, values, mixed } = hasSel ? selection : tool;
-  // The flags have their own section below, and a redaction's label its own.
+  // The flags aren't styles, and a redaction's label has its own section below.
   const fields = properties.filter(
     (property) => property.control !== 'flag' && property.control !== 'text',
   );
@@ -988,9 +987,8 @@ export function AnnotationStylePanel() {
     });
   };
 
-  // A selection with no editable fields (e.g. a stamp, or a locked annotation —
-  // its style is frozen) still shows its flags: that's how you unlock it.
-  if (fields.length === 0 && selected.length === 0) return <EmptyState />;
+  // Nothing to edit: no tool with styles, or a selection whose style is frozen (locked).
+  if (fields.length === 0) return <EmptyState />;
 
   const context = hasSel
     ? t('stylePanel.selected', { params: { count: selected.length } })
@@ -1026,8 +1024,6 @@ export function AnnotationStylePanel() {
       {/* Redaction label (`/OverlayText` + `/Repeat`) — kind content, not a
           style field, so it writes through the redaction plugin's updateLabel. */}
       <RedactionLabelSection />
-      {/* `/F` flags for whatever is selected — the live flags test surface. */}
-      <AnnotationFlagsSection />
     </div>
   );
 }

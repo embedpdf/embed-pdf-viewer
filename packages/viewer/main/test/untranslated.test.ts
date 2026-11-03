@@ -270,7 +270,7 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('the words the viewer sh
       annotation.selection.set([made.ref]);
     });
     await visit('a selected annotation', async () => {});
-    await visit('its style and flags', () => run(tab, 'panel:style'), 'Flags (/F)');
+    await visit('its style', () => run(tab, 'panel:style'), 'Stroke width');
     await closeEverything(tab);
     await visit('its link editor', () => run(tab, 'annotation:link'), 'URL');
     await closeEverything(tab);
