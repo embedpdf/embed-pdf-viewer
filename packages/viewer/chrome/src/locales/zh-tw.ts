@@ -348,6 +348,7 @@ export const zhTW: Locale = {
       // The style panel's labels, as the annotation kinds name them (`labelKey`), by wording:
       // one field is called different things by different kinds.
       style: {
+        kind: '類型',
         opacity: '不透明度',
         stroke: '筆畫',
         fill: '填色',
