@@ -57,7 +57,7 @@ import { ImportConnectionRegistry } from '../import/ImportConnectionRegistry';
 import { ImportWorker } from '../import/ImportWorker';
 import type { ConnectedUsageReporter } from '../licensing/ConnectedUsageReporter';
 import type { LicenseGate } from '../licensing/LicenseRuntime';
-import { isLicenseGateTrusted } from '../licensing/trusted-license-gates';
+import { licenseRuntimeOf, type CloudPdfLicenseRuntime } from '../licensing/public';
 import { UsageMeters } from '../licensing/UsageMeters';
 import { declareModules, mountModules } from '../modules/host';
 import type { HostedModule } from '../modules/protocol';
@@ -127,8 +127,11 @@ export interface MountedRoute {
 }
 
 export interface BuildAppOptions {
-  /** Required commercial gate for every server construction. */
-  licenseGate: LicenseGate;
+  /**
+   * The deployment's license: the runtime `createLicenseRuntime` made, and
+   * nothing else. Any other object stops the build.
+   */
+  license: CloudPdfLicenseRuntime;
   /**
    * The installed plugins, as server modules (`CLOUDPDF_MODULES` in the CLI),
    * in order. Their permissions are the plugin permissions this server knows:
@@ -496,7 +499,10 @@ export interface AppBundle {
 /** Engine-shard validation runs before any machinery (license gate included)
  *  boots, so a bad shard config fails instantly with only this message.
  *  Called by both public and testing entries. */
-function validateShardOptions(opts: BuildAppOptions): void {
+/** What the app is built from: the options, with the license already resolved to its gate. */
+type LicensedAppOptions = Omit<BuildAppOptions, 'license'> & { licenseGate: LicenseGate };
+
+function validateShardOptions(opts: Omit<BuildAppOptions, 'license'>): void {
   const shardCount = opts.engineShards ?? 1;
   if (!Number.isInteger(shardCount) || shardCount < 1) {
     throw new Error(`buildApp: engineShards must be an integer ≥ 1, got ${shardCount}`);
@@ -520,16 +526,15 @@ function validateShardOptions(opts: BuildAppOptions): void {
 
 export async function buildApp(opts: BuildAppOptions): Promise<AppBundle> {
   validateShardOptions(opts);
-  if (!isLicenseGateTrusted(opts.licenseGate)) {
-    throw new Error(
-      'buildApp: licenseGate must be created by createLicenseRuntime from @cloudpdf/server',
-    );
-  }
-  return buildAppUnchecked(opts);
+  const { license, ...options } = opts;
+  return buildAppUnchecked({ ...options, licenseGate: licenseRuntimeOf(license) });
 }
 
-/** Internal test-only construction seam. Not exported by the npm package. */
-export async function buildAppForTesting(opts: BuildAppOptions): Promise<AppBundle> {
+/**
+ * Internal test-only construction seam: builds with any gate. Not exported by
+ * the npm package, nor named in its types.
+ */
+export async function buildAppForTesting(opts: LicensedAppOptions): Promise<AppBundle> {
   // The isolation matrix: CLOUDPDF_TEST_ISOLATION=host runs the whole
   // suite against the child-process engine host (same tests, same
   // assertions — byte-identical results is the acceptance bar).
@@ -571,7 +576,7 @@ export async function buildAppForTesting(opts: BuildAppOptions): Promise<AppBund
   return buildAppUnchecked({ ...opts, engineIsolation, shutdownTimeoutMs });
 }
 
-async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
+async function buildAppUnchecked(opts: LicensedAppOptions): Promise<AppBundle> {
   validateShardOptions(opts);
   // The cross-replica doorbell exists for the whole app lifetime: mutation
   // signals for SSE, revocation pushes for the auth guard + open streams.

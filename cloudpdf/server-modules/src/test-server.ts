@@ -82,7 +82,7 @@ type TestDb = NonNullable<BuildAppOptions['db']>;
 
 /** A server's license: what builds the app with it, and closes it. */
 export interface TestLicense {
-  build(options: Omit<BuildAppOptions, 'licenseGate'>): Promise<AppBundle>;
+  build(options: Omit<BuildAppOptions, 'license'>): Promise<AppBundle>;
   close(): Promise<void>;
 }
 

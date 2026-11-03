@@ -9,7 +9,8 @@ import { LicenseRuntime } from '../src/licensing/LicenseRuntime';
 import { verifyMachineCertificate } from '../src/licensing/offline-certificate';
 import type { CloudPdfLicenseIdentity } from '../src/licensing/product';
 import { UsageLimitError, UsageMeters } from '../src/licensing/UsageMeters';
-import type { LicenseGate } from '../src/licensing/LicenseRuntime';
+import type { LicenseGate, LicenseGateStatus } from '../src/licensing/LicenseRuntime';
+import { createLicenseRuntime } from '../src/licensing/public';
 import { ConnectedUsageReporter } from '../src/licensing/ConnectedUsageReporter';
 import { LicenseStateRepository } from '../src/licensing/LicenseStateRepository';
 import { deriveConnectedReportingCredential } from '../src/licensing/reporting-credential';
@@ -864,25 +865,134 @@ test('restricted licensing keeps reads and readiness available while blocking mu
   }
 });
 
-test('public buildApp rejects a caller-supplied license decision', async () => {
-  const forgedGate: LicenseGate = {
-    getStatus: () => ({
-      access: 'full',
-      code: 'VALID',
-      expiresAt: null,
-      lastValidatedAt: new Date().toISOString(),
-      licenseKind: 'subscription',
-      message: 'forged',
-      meters: [],
-      mode: 'connected',
-      telemetryProfile: 'none',
-    }),
+describe('the public API has no way around the license key', () => {
+  const full: LicenseGateStatus = {
+    access: 'full',
+    code: 'VALID',
+    expiresAt: null,
+    lastValidatedAt: new Date().toISOString(),
+    licenseKind: 'subscription',
+    message: 'forged',
+    meters: [],
+    mode: 'connected',
+    telemetryProfile: 'none',
   };
-  await expect(
-    buildApp({
-      licenseGate: forgedGate,
-      verifier: { mode: 'hs256', secret: 'test-secret' },
-      workerEntry: null,
-    }),
-  ).rejects.toThrow(/created by createLicenseRuntime/);
+  const options = {
+    verifier: { mode: 'hs256' as const, secret: 'test-secret' },
+    workerEntry: null,
+  };
+
+  /** A real license, made the public way, with no key: access none. */
+  async function keyless() {
+    const db = createSqliteDb({ path: ':memory:' });
+    await migrate(db, { source: { kind: 'inline', migrations: sqliteMigrations } });
+    const license = await createLicenseRuntime({ db, env: {}, startTimer: false });
+    return {
+      license,
+      close: async () => {
+        await license.close();
+        await db.destroy();
+      },
+    };
+  }
+
+  test('buildApp refuses a license createLicenseRuntime did not make', async () => {
+    const handMade = {
+      getStatus: () => full,
+      close: async () => {},
+      createActivationRequest: async () => ({}),
+      installCertificate: async () => ({}),
+      refresh: async () => {},
+    };
+    for (const license of [handMade, undefined, null]) {
+      await expect(buildApp({ ...options, license: license as never })).rejects.toThrow(
+        /createLicenseRuntime/,
+      );
+    }
+  });
+
+  test('and a copy of one it made', async () => {
+    const { license, close } = await keyless();
+    try {
+      const copies = [
+        { ...license },
+        Object.create(license),
+        { ...license, getStatus: () => full },
+      ];
+      for (const copy of copies) {
+        await expect(buildApp({ ...options, license: copy })).rejects.toThrow(
+          /createLicenseRuntime/,
+        );
+      }
+    } finally {
+      await close();
+    }
+  });
+
+  test("a license can't be changed once made, and buildApp enforces the runtime behind it", async () => {
+    const { license, close } = await keyless();
+    try {
+      expect(license.getStatus().access).toBe('none');
+      expect(() => {
+        (license as { getStatus: () => LicenseGateStatus }).getStatus = () => full;
+      }).toThrow(TypeError);
+      const bundle = await buildApp({ ...options, license });
+      try {
+        const write = await bundle.app.inject({ method: 'POST', url: '/unknown-write' });
+        expect(write.statusCode).toBe(403);
+        expect(write.json().error.code).toBe(license.getStatus().code);
+      } finally {
+        await bundle.shutdown();
+      }
+    } finally {
+      await close();
+    }
+  });
+
+  test('createLicenseRuntime keeps the compiled identity, whatever else it is handed', async () => {
+    const urls: string[] = [];
+    vi.stubGlobal('fetch', async (input: string | URL) => {
+      urls.push(String(input));
+      return new Response('{}', { status: 500 });
+    });
+    const db = createSqliteDb({ path: ':memory:' });
+    try {
+      await migrate(db, { source: { kind: 'inline', migrations: sqliteMigrations } });
+      const license = await createLicenseRuntime({
+        db,
+        env: { CLOUDPDF_LICENSE_KEY: 'key/test' },
+        startTimer: false,
+        // Not an option: the runtime's internal test seam, which must stay out of reach.
+        identity: {
+          accountId: 'someone-else',
+          apiUrl: 'https://licenses.example.test',
+          productId: 'someone-else',
+          publicKeyHex: '00'.repeat(32),
+        },
+      } as Parameters<typeof createLicenseRuntime>[0]);
+      await license.close();
+      expect(urls.length).toBeGreaterThan(0);
+      for (const url of urls) {
+        expect(url.startsWith('https://api.keygen.sh/')).toBe(true);
+        expect(url).not.toContain('someone-else');
+      }
+      expect(license.getStatus().access).not.toBe('full');
+    } finally {
+      vi.unstubAllGlobals();
+      await db.destroy();
+    }
+  });
+
+  test('the package entry exports no gate, test seam, or runtime accessor', async () => {
+    const entry = await import('../src/index');
+    for (const name of [
+      'buildAppForTesting',
+      'createValidTestLicenseGate',
+      'licenseRuntimeOf',
+      'LicenseRuntime',
+      'ConnectedUsageReporter',
+    ]) {
+      expect(entry).not.toHaveProperty(name);
+    }
+  });
 });

@@ -6,7 +6,12 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { buildAppForTesting } from '../../server/src/app/buildApp';
 import { createValidTestLicenseGate } from '../../server/src/licensing/testing';
 import { decodePageKey, defineServerModule, EngineError, EngineErrorCode } from '../src/index';
-import { launchTestServer, type TestDocument, type TestServer } from '../src/test-server';
+import {
+  launchTestServer,
+  type TestDocument,
+  type TestLicense,
+  type TestServer,
+} from '../src/test-server';
 import { startTestServer } from '../src/testing';
 
 /**
@@ -45,10 +50,10 @@ const stamp = defineServerModule({
   },
 });
 
-const testGate = () =>
+/** The server's test gate, through its internal seam: no key needed. */
+const testGate = (): Promise<TestLicense> =>
   Promise.resolve({
-    build: (app: Parameters<typeof buildAppForTesting>[0]) =>
-      buildAppForTesting({ ...app, licenseGate: createValidTestLicenseGate() }),
+    build: (app) => buildAppForTesting({ ...app, licenseGate: createValidTestLicenseGate() }),
     close: async () => {},
   });
 

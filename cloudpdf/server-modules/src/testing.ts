@@ -29,7 +29,7 @@ export async function startTestServer(options: TestServerOptions): Promise<TestS
       );
     }
     return {
-      build: (app) => buildApp({ ...app, licenseGate: license }),
+      build: (app) => buildApp({ ...app, license }),
       close: () => license.close(),
     };
   });

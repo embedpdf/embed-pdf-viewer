@@ -321,10 +321,12 @@ If you embed the server with `buildApp` instead of running the CLI, pass the mod
 like, where their settings come from (`process.env` by default):
 
 ```ts
-import { buildApp } from '@cloudpdf/server';
+import { buildApp, createLicenseRuntime } from '@cloudpdf/server';
 import snapshot from '@acme/snapshot-module';
 
 const { app } = await buildApp({
+  license: await createLicenseRuntime({ db }),
+  db,
   workerEntry,
   modules: [snapshot],
   moduleEnv: { CLOUDPDF_SNAPSHOT_LABEL: 'fernquill' },
