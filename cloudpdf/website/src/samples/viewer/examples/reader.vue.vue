@@ -61,7 +61,8 @@ const config: ViewerConfig = {
   layout: {
     bars: {
       reader: {
-        place: { float: 'bottom' },
+        // Stays on screen: a bar with the page number would otherwise fade while nothing moves.
+        place: { float: 'bottom', hideWhenIdle: false },
         center: [
           ['panel:outline', 'panel:thumbnails'],
           { items: ['page:previous', { custom: 'page-number' }, 'page:next'], importance: 5 },
