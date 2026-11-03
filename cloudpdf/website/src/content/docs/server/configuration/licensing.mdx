@@ -109,6 +109,30 @@ limit are refused with `403`), `soft-limit`, or `notify-only`. Counters live in
 your own database and are enforced consistently across replicas. The admin
 `deployment.licenseStatus` operation shows where you stand.
 
+## Embedding via `buildApp`
+
+If you embed the server with `buildApp` instead of running the CLI, the license comes from
+`createLicenseRuntime`, which reads `CLOUDPDF_LICENSE_KEY` and `CLOUDPDF_LICENSE_MODE` as the CLI
+does and keeps its state in your database:
+
+```ts
+import { buildApp, createLicenseRuntime } from '@cloudpdf/server';
+
+const license = await createLicenseRuntime({ db });
+if (license.getStatus().access === 'none') {
+  throw new Error(license.getStatus().message);
+}
+
+const { app } = await buildApp({ license, db, workerEntry /* … */ });
+```
+
+`license` is the only way to license `buildApp`, and it takes only a runtime `createLicenseRuntime`
+made: any other object is refused when `buildApp` starts. The runtime can't be changed after it's
+made. `buildApp` builds with a runtime of any status, as the server keeps running when a license
+lapses: with `access: 'none'` it answers everything but its health checks with `403`, so check the
+status first, as the CLI does when it refuses to boot. `close()` stops the runtime's background
+checks when you shut down.
+
 ## Where to go next
 
 <Cards>

@@ -25,6 +25,7 @@ import { ignoreOverride, zodToJsonSchema } from 'zod-to-json-schema';
 
 import {
   AdminErrorPayloadSchema,
+  TenantFeatureSchema,
   allOperations,
   docsGroups,
   type AdminCredential,
@@ -61,7 +62,11 @@ const ENGINE_ERROR_REF = '#/components/schemas/EngineErrorPayload';
  * generators make one type per model, not one per place it appears.
  */
 const SHARED_COMPONENT_SCHEMAS = sharedComponents([
-  { AdminErrorPayload: AdminErrorPayloadSchema, EngineErrorPayload: EngineErrorPayloadSchema },
+  {
+    AdminErrorPayload: AdminErrorPayloadSchema,
+    EngineErrorPayload: EngineErrorPayloadSchema,
+    TenantFeature: TenantFeatureSchema,
+  },
   DocumentWireComponents,
   PdfActionWireComponents,
   AnnotationWireComponents,

@@ -79,8 +79,13 @@ jobs:
       - name: Verify published license API boundary
         run: >-
           node --input-type=module -e "const m=await import('./cloudpdf/server/dist/index.js');
-          const forbidden=['LicenseRuntime','buildAppForTesting','ConnectedUsageReporter'];
+          const forbidden=['LicenseRuntime','buildAppForTesting','ConnectedUsageReporter','createValidTestLicenseGate','licenseRuntimeOf'];
           const leaked=forbidden.filter((name)=>name in m);
           if(leaked.length) throw new Error('internal exports leaked: '+leaked.join(','));
           if(typeof m.createLicenseRuntime!=='function'||typeof m.buildApp!=='function')
-          throw new Error('public license API missing');"
+          throw new Error('public license API missing');
+          const fs=await import('node:fs');
+          const dts=fs.readdirSync('./cloudpdf/server/dist',{recursive:true}).filter((f)=>String(f).endsWith('.d.ts'))
+          .map((f)=>fs.readFileSync('./cloudpdf/server/dist/'+f,'utf8')).join('\n');
+          const named=['buildAppForTesting','createValidTestLicenseGate','licenseRuntimeOf'].filter((name)=>dts.includes(name));
+          if(named.length) throw new Error('published declarations name internal license seams: '+named.join(','));"

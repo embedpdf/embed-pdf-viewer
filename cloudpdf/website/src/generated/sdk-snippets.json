@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "canonicalVersion": "3.0.0-next.20",
-  "openapiSha256": "47d739acb956ce8ba0c3990117e505be2e9406038d9e0cd1729608921a40b2d9",
+  "openapiSha256": "24e492d474a0492c8c2e52c657d1db53874ce70e0fac77aff48877e3ca1d2dd0",
   "languages": {
     "typescript": {
       "label": "TypeScript",
@@ -2167,6 +2167,43 @@
       "ruby": {
         "status": "available",
         "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\"\n)\n\nclient.tenants.get(tenant_id: \"tenantId\")",
+        "frameLines": 6
+      }
+    },
+    "tenants.update": {
+      "typescript": {
+        "status": "available",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  token: \"<token>\",\n});\n\nawait client.tenants.update({\n  tenantId: \"tenantId\",\n  features: [{\n      id: \"id\"\n    }]\n});",
+        "frameLines": 6
+      },
+      "python": {
+        "status": "available",
+        "source": "from cloudpdf import CloudPDFClient\nfrom cloudpdf import CloudPDFClient, TenantFeature\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n)\n\nclient.tenants.update(\n    tenant_id=\"tenantId\",\n    features=[\n        TenantFeature(\n            id=\"id\",\n        )\n    ],\n)",
+        "frameLines": 7
+      },
+      "php": {
+        "status": "available",
+        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n);\n\n$client->tenants->update(\n    'tenantId',\n    new TenantsUpdateRequest([\n        'features' => [\n            new TenantFeature([\n                'id' => 'id',\n            ]),\n        ],\n    ]),\n);",
+        "frameLines": 6
+      },
+      "csharp": {
+        "status": "available",
+        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\"\n);\n\nawait client.Tenants.UpdateAsync(\n    new TenantsUpdateRequest\n    {\n        TenantId = \"tenantId\",\n        Features = new List<TenantFeature>() { new TenantFeature { Id = \"id\" } },\n    }\n);",
+        "frameLines": 6
+      },
+      "go": {
+        "status": "available",
+        "source": "import (\n    \"context\"\n\n    cloudpdf \"github.com/embedpdf/cloudpdf-sdk-go/v3\"\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n)\n\nrequest := &cloudpdf.TenantsUpdateRequest{\n    TenantID: \"tenantId\",\n    Features: []*cloudpdf.TenantFeature{\n        &cloudpdf.TenantFeature{\n            ID: \"id\",\n        },\n    },\n}\nclient.Tenants.Update(\n    context.TODO(),\n    request,\n)",
+        "frameLines": 12
+      },
+      "java": {
+        "status": "available",
+        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .build();\n\nclient.tenants().update(\n    \"tenantId\",\n    TenantsUpdateRequest\n        .builder()\n        .features(\n            Arrays.asList(\n                TenantFeature\n                    .builder()\n                    .id(\"id\")\n                    .build()\n            )\n        )\n        .build()\n);",
+        "frameLines": 7
+      },
+      "ruby": {
+        "status": "available",
+        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\"\n)\n\nclient.tenants.update(\n  tenant_id: \"tenantId\",\n  features: [{\n    id: \"id\"\n  }]\n)",
         "frameLines": 6
       }
     },

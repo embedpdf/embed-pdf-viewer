@@ -700,6 +700,23 @@ export const AdminLicenseStatusResponseSchema = z.object({
 });
 export type AdminLicenseStatusResponse = z.infer<typeof AdminLicenseStatusResponseSchema>;
 
+/**
+ * One server module a tenant may use, named by the module's id. A
+ * module's routes answer only tenants whose `features` hold it.
+ * `stopped` keeps the feature but stops its routes (`402`): `'cap'` is
+ * a spending cap reached, set by whoever bills the tenant; the server
+ * keeps no caps itself.
+ */
+export const TenantFeatureSchema = z.object({
+  /** The module's id: lowercase words joined by `-`. */
+  id: z
+    .string()
+    .max(64)
+    .regex(/^[a-z][a-z0-9]*(-[a-z0-9]+)*$/),
+  stopped: z.enum(['cap']).optional(),
+});
+export type TenantFeature = z.infer<typeof TenantFeatureSchema>;
+
 export const AdminTenantRecordSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -712,9 +729,28 @@ export const AdminTenantRecordSchema = z.object({
    * suspended tenant. Optional because older servers omit it.
    */
   status: z.enum(['active', 'suspended']).optional(),
+  /**
+   * The server modules this tenant may use; empty for a new tenant.
+   * Optional because older servers omit it.
+   */
+  features: z.array(TenantFeatureSchema).optional(),
   createdAt: z.number(),
 });
 export type AdminTenantRecord = z.infer<typeof AdminTenantRecordSchema>;
+
+export const AdminTenantUpdateRequestSchema = z.object({
+  /**
+   * The tenant's whole list, replacing the one it had: `[]` turns every
+   * module off. Each id must name a module the server has installed.
+   */
+  features: z
+    .array(TenantFeatureSchema)
+    .max(64)
+    .refine((features) => new Set(features.map((f) => f.id)).size === features.length, {
+      message: 'a feature is listed once',
+    }),
+});
+export type AdminTenantUpdateRequest = z.infer<typeof AdminTenantUpdateRequestSchema>;
 
 export const AdminTenantCreateRequestSchema = z.object({
   id: z.string().regex(tenantIdPattern),
@@ -1463,6 +1499,27 @@ export const adminOperations = {
       200: { contentType: 'application/json', schema: AdminTenantResponseSchema },
       404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
     },
+  },
+  'tenants.update': {
+    operationId: 'tenants.update',
+    title: 'Update tenant',
+    summary: 'Set the server modules a tenant may use: its whole features list.',
+    method: 'PATCH',
+    path: '/v1/tenants/:tenantId',
+    credentials: ['api-token'],
+    scope: [],
+    params: AdminTenantParamsSchema,
+    body: { contentType: 'application/json', schema: AdminTenantUpdateRequestSchema },
+    responses: {
+      200: { contentType: 'application/json', schema: AdminTenantResponseSchema },
+      400: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+      404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
+    },
+    notes:
+      'A feature names an installed module; any other id is a 400. A module route answers a ' +
+      'tenant without its feature 403 FeatureNotEnabled, and one whose feature is stopped 402 ' +
+      'FeatureStopped (details.feature, details.stopped). Other replicas apply a change within ' +
+      '30 seconds.',
   },
   'tenants.delete': {
     operationId: 'tenants.delete',

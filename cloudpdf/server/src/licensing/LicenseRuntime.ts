@@ -24,7 +24,6 @@ import { LicenseStateRepository } from './LicenseStateRepository';
 import { verifyMachineCertificate, type VerifiedMachineCertificate } from './offline-certificate';
 import { resolveCloudPdfLicenseIdentity, type CloudPdfLicenseIdentity } from './product';
 import { deriveConnectedReportingCredential } from './reporting-credential';
-import { markLicenseGateTrusted } from './trusted-license-gates';
 import { parseSecretRefUri } from '../config/secrets/parseSecretRefUri';
 import type { Database } from '../db/schema';
 import type { SecretResolver } from '../security/secrets/SecretResolver';
@@ -123,7 +122,6 @@ export class LicenseRuntime implements LicenseGate {
       key,
     );
     await runtime.refresh();
-    markLicenseGateTrusted(runtime);
     if (input.startTimer !== false) runtime.start();
     return runtime;
   }

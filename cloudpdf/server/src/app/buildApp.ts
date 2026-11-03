@@ -32,6 +32,7 @@ import {
 import { PermissionRegistry } from '../auth/permission-registry';
 import { RevokedJtisGuard } from '../auth/RevokedJtisGuard';
 import { SuspendedTenantsGuard } from '../auth/SuspendedTenantsGuard';
+import { TenantFeaturesGuard } from '../auth/TenantFeaturesGuard';
 import { VisitorHandles } from '../auth/visitor-handle';
 import { NoneCdnSigner } from '../cdn/adapters/NoneCdnSigner';
 import type { CdnSigner } from '../cdn/CdnSigner';
@@ -57,7 +58,7 @@ import { ImportConnectionRegistry } from '../import/ImportConnectionRegistry';
 import { ImportWorker } from '../import/ImportWorker';
 import type { ConnectedUsageReporter } from '../licensing/ConnectedUsageReporter';
 import type { LicenseGate } from '../licensing/LicenseRuntime';
-import { isLicenseGateTrusted } from '../licensing/trusted-license-gates';
+import { licenseRuntimeOf, type CloudPdfLicenseRuntime } from '../licensing/public';
 import { UsageMeters } from '../licensing/UsageMeters';
 import { declareModules, mountModules } from '../modules/host';
 import type { HostedModule } from '../modules/protocol';
@@ -127,8 +128,11 @@ export interface MountedRoute {
 }
 
 export interface BuildAppOptions {
-  /** Required commercial gate for every server construction. */
-  licenseGate: LicenseGate;
+  /**
+   * The deployment's license: the runtime `createLicenseRuntime` made, and
+   * nothing else. Any other object stops the build.
+   */
+  license: CloudPdfLicenseRuntime;
   /**
    * The installed plugins, as server modules (`CLOUDPDF_MODULES` in the CLI),
    * in order. Their permissions are the plugin permissions this server knows:
@@ -448,6 +452,8 @@ export interface AppBundle {
   revokedJtisGuard?: RevokedJtisGuard;
   /** Present whenever a `db` is configured; tests use it to clear the TTL cache. */
   suspendedTenantsGuard?: SuspendedTenantsGuard;
+  /** Present whenever a `db` is configured: the tenants' features, which gate module routes. */
+  tenantFeaturesGuard?: TenantFeaturesGuard;
   /** Present only when `cacheRoot` is set (+ pool + db). */
   documentService?: DocumentService;
   /** Write-side lazy layer materialization service. */
@@ -496,7 +502,10 @@ export interface AppBundle {
 /** Engine-shard validation runs before any machinery (license gate included)
  *  boots, so a bad shard config fails instantly with only this message.
  *  Called by both public and testing entries. */
-function validateShardOptions(opts: BuildAppOptions): void {
+/** What the app is built from: the options, with the license already resolved to its gate. */
+type LicensedAppOptions = Omit<BuildAppOptions, 'license'> & { licenseGate: LicenseGate };
+
+function validateShardOptions(opts: Omit<BuildAppOptions, 'license'>): void {
   const shardCount = opts.engineShards ?? 1;
   if (!Number.isInteger(shardCount) || shardCount < 1) {
     throw new Error(`buildApp: engineShards must be an integer ≥ 1, got ${shardCount}`);
@@ -520,16 +529,15 @@ function validateShardOptions(opts: BuildAppOptions): void {
 
 export async function buildApp(opts: BuildAppOptions): Promise<AppBundle> {
   validateShardOptions(opts);
-  if (!isLicenseGateTrusted(opts.licenseGate)) {
-    throw new Error(
-      'buildApp: licenseGate must be created by createLicenseRuntime from @cloudpdf/server',
-    );
-  }
-  return buildAppUnchecked(opts);
+  const { license, ...options } = opts;
+  return buildAppUnchecked({ ...options, licenseGate: licenseRuntimeOf(license) });
 }
 
-/** Internal test-only construction seam. Not exported by the npm package. */
-export async function buildAppForTesting(opts: BuildAppOptions): Promise<AppBundle> {
+/**
+ * Internal test-only construction seam: builds with any gate. Not exported by
+ * the npm package, nor named in its types.
+ */
+export async function buildAppForTesting(opts: LicensedAppOptions): Promise<AppBundle> {
   // The isolation matrix: CLOUDPDF_TEST_ISOLATION=host runs the whole
   // suite against the child-process engine host (same tests, same
   // assertions — byte-identical results is the acceptance bar).
@@ -571,7 +579,7 @@ export async function buildAppForTesting(opts: BuildAppOptions): Promise<AppBund
   return buildAppUnchecked({ ...opts, engineIsolation, shutdownTimeoutMs });
 }
 
-async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
+async function buildAppUnchecked(opts: LicensedAppOptions): Promise<AppBundle> {
   validateShardOptions(opts);
   // The cross-replica doorbell exists for the whole app lifetime: mutation
   // signals for SSE, revocation pushes for the auth guard + open streams.
@@ -750,6 +758,9 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
   // Tenant suspension gate: consulted by the auth hook for every JWT
   // and by the grant exchange. API-token requests never touch it.
   const suspendedTenantsGuard = opts.db ? new SuspendedTenantsGuard({ db: opts.db }) : undefined;
+  // Tenant features: which modules a tenant may use, asked on every
+  // module route. Like suspension, the operator's switch.
+  const tenantFeaturesGuard = opts.db ? new TenantFeaturesGuard({ db: opts.db }) : undefined;
 
   // The deployment can sign iff it verifies with the shared secret —
   // the one condition gating every minting surface: tokens.issue, the
@@ -1228,7 +1239,9 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       storage: opts.objectStore,
       securityEvents: new SecurityEventsRepo(opts.db),
       suspendedTenants: suspendedTenantsGuard!,
+      tenantFeatures: tenantFeaturesGuard!,
       tenantUsage,
+      modules: declaredModules.map(({ module }) => module.id),
     });
     // Issue mounts only when the deployment can sign (HS256 — the
     // verifier secret doubles as signing material); revoke only when
@@ -1544,6 +1557,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
   await mountModules(app, declaredModules, {
     permissions,
     ...(documentService ? { documentService } : {}),
+    ...(tenantFeaturesGuard ? { tenantFeatures: tenantFeaturesGuard } : {}),
     ...(derivedRenders ? { derivedRenders } : {}),
     ...(signer ? { sign: signer } : {}),
   });
@@ -1610,6 +1624,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
     lifecycle,
     revokedJtisGuard,
     suspendedTenantsGuard,
+    tenantFeaturesGuard,
     documentService,
     layerService,
     derivedRenders,
