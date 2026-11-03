@@ -7,9 +7,8 @@
  * stores bytes + custom metadata, so the adapter's real logic
  * (sha-in-metadata, content-length guard, ranged materialize, prefix
  * delete) is exercised end-to-end. It's a `__mocks__` file and not a
- * `vi.mock` factory because a factory missed whenever two stores'
- * imports of the SDK overlapped (see that file), and the late store
- * called the real GCS.
+ * `vi.mock` factory because a factory misses whenever two stores'
+ * imports of the SDK overlap (see that file).
  *
  * Live GCS acceptance runs out-of-band against a real bucket / the
  * fake-gcs-server emulator (STORAGE_LIVE=1), not in CI.
@@ -73,8 +72,8 @@ describe('GcsObjectStore', () => {
 
   test('stores built back to back all get the fake SDK', async () => {
     // Each constructor starts its own import of the SDK, so these
-    // imports overlap. Under a vi.mock factory about half of them
-    // got the real client.
+    // imports overlap. A vi.mock factory hands about half of them the
+    // real client.
     const stores = Array.from({ length: 8 }, newStore);
     const buckets = await Promise.all(stores.map(bucketOf));
     expect(buckets.every((b) => b instanceof FakeBucket)).toBe(true);

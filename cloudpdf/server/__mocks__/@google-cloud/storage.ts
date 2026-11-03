@@ -7,10 +7,10 @@
  * It's a file rather than a `vi.mock` factory so that it always applies.
  * vitest 2 skips a factory mock for an import that overlaps another
  * import of the same module from the same file, and every adapter
- * instance starts its own import. A store built while an earlier store's
- * import was still in flight got the real client, which called
- * storage.googleapis.com for the test bucket. A `__mocks__` file is
- * served by path, with no such window.
+ * instance starts its own import, so a store built while another
+ * store's import is in flight gets the real client, which calls
+ * storage.googleapis.com. A `__mocks__` file is served by path, with no
+ * such window.
  *
  * The fake keeps bytes and custom metadata, so an adapter's real logic
  * (sha-in-metadata, content-length guard, ranged reads, prefix delete)

@@ -96,10 +96,10 @@ describe.runIf(RUN_PG)('postgres conformance', () => {
 
 describe.runIf(RUN_PG)('postgres driver', () => {
   // A database restart, a failover or `pg_terminate_backend` ends an idle
-  // pooled connection with error 57P01. The pool re-emits that on itself;
-  // with no listener there it was an uncaught exception, which crashes a
-  // server (and failed vitest runs whose container stopped while a pool
-  // was still closing).
+  // pooled connection with error 57P01. The pool re-emits that on itself,
+  // and with no listener there it is an uncaught exception: it crashes a
+  // server, or fails a vitest run whose container stops while a pool is
+  // still closing.
   test('an idle connection the database ends is reported, and the next query reconnects', async () => {
     const errors: Error[] = [];
     const db = createPostgresDb({
