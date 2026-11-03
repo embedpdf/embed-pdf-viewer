@@ -96,7 +96,7 @@ describe.runIf(RUN_PG)('postgres conformance', () => {
 
 describe.runIf(RUN_PG)('postgres driver', () => {
   // A database restart, a failover or `pg_terminate_backend` ends an idle
-  // pooled connection with FATAL 57P01. The pool re-emits that on itself;
+  // pooled connection with error 57P01. The pool re-emits that on itself;
   // with no listener there it was an uncaught exception, which crashes a
   // server (and failed vitest runs whose container stopped while a pool
   // was still closing).
