@@ -3,7 +3,6 @@ import type { WorkerResultPayload } from '@embedpdf/engine-core/runtime';
 import type { EngineHostClient } from '../src/runtime/EngineHostClient';
 import type { BuildPack } from '../src/runtime/EnginePool';
 import { pickShard, ShardedEnginePool } from '../src/runtime/ShardedEnginePool';
-import { createValidTestLicenseGate } from '../src/licensing/testing';
 import {
   buildHostFixture,
   createAnnotation,
@@ -227,10 +226,15 @@ describe('ShardedEnginePool (fake shards)', () => {
     // Raw buildApp, not buildAppForTesting: the test helper deliberately
     // rounds poolSize up for the CLOUDPDF_TEST_SHARDS matrix leg, which
     // would mask exactly this validation.
-    const { buildApp } = await import('../src/index');
+    const { buildApp, createLicenseRuntime, createSqliteDb, migrate, sqliteMigrations } =
+      await import('../src/index');
+    const db = createSqliteDb({ path: ':memory:' });
+    await migrate(db, { source: { kind: 'inline', migrations: sqliteMigrations } });
+    // A real license, made the public way; keyless is enough to reach the shard checks.
+    const license = await createLicenseRuntime({ db, env: {}, startTimer: false });
     await expect(
       buildApp({
-        licenseGate: createValidTestLicenseGate(),
+        license,
         verifier: { mode: 'hs256', secret: 's' },
         workerEntry: new URL('./_helpers/stub-worker-entry.cjs', import.meta.url),
         engineIsolation: 'host',
@@ -241,13 +245,15 @@ describe('ShardedEnginePool (fake shards)', () => {
     ).rejects.toThrow(/divide evenly/);
     await expect(
       buildApp({
-        licenseGate: createValidTestLicenseGate(),
+        license,
         verifier: { mode: 'hs256', secret: 's' },
         workerEntry: new URL('./_helpers/stub-worker-entry.cjs', import.meta.url),
         engineIsolation: 'inline',
         engineShards: 2,
       }),
     ).rejects.toThrow(/requires engineIsolation 'host'/);
+    await license.close();
+    await db.destroy();
   });
 });
 

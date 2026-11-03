@@ -94,9 +94,11 @@ If you embed the server with `buildApp` instead of running the CLI, pass the sam
 programmatically:
 
 ```ts
-import { buildApp, loadServerFontsFromEnv } from '@cloudpdf/server';
+import { buildApp, createLicenseRuntime, loadServerFontsFromEnv } from '@cloudpdf/server';
 
 const { app } = await buildApp({
+  license: await createLicenseRuntime({ db }),
+  db,
   workerEntry,
   fonts: [
     { key: 'noto-sc', path: '/srv/fonts/NotoSansSC-Regular.otf', familyName: 'Noto Sans SC' },

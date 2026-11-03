@@ -222,6 +222,8 @@ async function openDocument(
 
 export type {
   DocumentHandle,
+  // What `defineServerModule` returns: a module's declarations name it from here.
+  HostedModule,
   ModuleConfigEntry,
   ModuleLog,
   ModuleRequirements,
