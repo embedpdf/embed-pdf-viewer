@@ -134,6 +134,11 @@ export interface ResolvedFontRun {
   substituted: boolean;
   /** The program's display hash; `null` when a browser can't get one. */
   program: string | null;
-  /** The fallback fonts' display hashes, in the order the engine tries them for this run's style. */
+  /**
+   * The display hashes of the fonts that draw what the run's font lacks, in
+   * the order the engine tries them: the fallback fonts for this run's style,
+   * then the standard font that stands in for its font (Helvetica for most;
+   * absent when the run is drawn in it), so Latin is never missing.
+   */
   fallbacks: string[];
 }

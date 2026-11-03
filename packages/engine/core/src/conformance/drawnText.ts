@@ -46,7 +46,7 @@ export async function drawnTextOf(pdf: Uint8Array): Promise<DrawnText[]> {
     if (!(dict instanceof Map) || nameOf(dict.get('Subtype')) !== 'Form' || !object.stream) {
       continue;
     }
-    const runs = runsOf(await file.streamData(object.number), file.fontsOf(dict));
+    const runs = runsOf(await file.streamData(object.number), await file.fontsOf(dict));
     if (runs.length === 0) continue;
     const [left = 0, bottom = 0, right = 0, top = 0] = numbersOf(file.resolve(dict.get('BBox')));
     drawn.push({ box: { left, bottom, right, top }, runs });
@@ -322,14 +322,23 @@ class PdfFile {
     return ref === undefined ? value : this.byNumber.get(ref)?.value;
   }
 
-  /** The fonts a form's resources name, by resource name. */
-  fontsOf(form: PdfDict): Map<string, DrawnFont> {
+  /**
+   * The fonts a form's resources name, by resource name: a font object, or a
+   * dictionary written in the resources themselves (as a standard font is).
+   */
+  async fontsOf(form: PdfDict): Promise<Map<string, DrawnFont>> {
     const fonts = new Map<string, DrawnFont>();
     const resources = this.resolve(form.get('Resources'));
     const dict = resources instanceof Map ? this.resolve(resources.get('Font')) : undefined;
     if (!(dict instanceof Map)) return fonts;
     for (const [alias, value] of dict) {
-      const font = this.fonts.get(refOf(value) ?? -1);
+      const ref = refOf(value);
+      const font =
+        ref !== undefined
+          ? this.fonts.get(ref)
+          : value instanceof Map
+            ? await this.drawnFontOf(value)
+            : undefined;
       if (font) fonts.set(alias, font);
     }
     return fonts;
@@ -358,24 +367,28 @@ class PdfFile {
     );
   }
 
-  /** Every font in the file: its name, its codes' widths and their text. */
+  /** Every font object in the file: its name, its codes' widths and their text. */
   private async readFonts(): Promise<void> {
     for (const object of this.byNumber.values()) {
       const font = object.value;
       if (!(font instanceof Map) || nameOf(font.get('Type')) !== 'Font') continue;
-      const subtype = nameOf(font.get('Subtype'));
-      if (subtype === 'CIDFontType0' || subtype === 'CIDFontType2') continue;
-      const toUnicode = refOf(font.get('ToUnicode'));
-      this.fonts.set(object.number, {
-        name: (nameOf(font.get('BaseFont')) ?? '').replace(/^[A-Z]{6}\+/, ''),
-        twoByte: subtype === 'Type0',
-        toUnicode:
-          toUnicode === undefined
-            ? new Map()
-            : toUnicodeOf(binary(await this.streamData(toUnicode))),
-        width: this.widthsOf(font, subtype === 'Type0'),
-      });
+      const drawn = await this.drawnFontOf(font);
+      if (drawn) this.fonts.set(object.number, drawn);
     }
+  }
+
+  /** A font dictionary as text is drawn in it; `undefined` for a CIDFont, which a Type 0 font holds. */
+  private async drawnFontOf(font: PdfDict): Promise<DrawnFont | undefined> {
+    const subtype = nameOf(font.get('Subtype'));
+    if (subtype === 'CIDFontType0' || subtype === 'CIDFontType2') return undefined;
+    const toUnicode = refOf(font.get('ToUnicode'));
+    return {
+      name: (nameOf(font.get('BaseFont')) ?? '').replace(/^[A-Z]{6}\+/, ''),
+      twoByte: subtype === 'Type0',
+      toUnicode:
+        toUnicode === undefined ? new Map() : toUnicodeOf(binary(await this.streamData(toUnicode))),
+      width: this.widthsOf(font, subtype === 'Type0'),
+    };
   }
 
   /** A code's width in 1/1000 em, as the font's /Widths or its CIDFont's /W say. */

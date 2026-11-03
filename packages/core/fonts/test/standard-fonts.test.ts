@@ -17,7 +17,6 @@ import {
   LAST_RESORT_METRICS,
   lastResortFontBytes,
   standardFontCss,
-  standardFontForFace,
   standardFontMetrics,
   standardFontOf,
   standardFontOfProgramFamily,
@@ -163,9 +162,6 @@ describe('the standard faces', () => {
   it('draw any font without its program in the standard font the engine falls back to', () => {
     expect(standardFontOf('courier-bold')).toBe('courier-bold');
     expect(standardFontOf('Roboto-Regular')).toBe('helvetica');
-    expect(standardFontForFace({ family: 'Arial', weight: 700 })).toBe('helvetica-bold');
-    expect(standardFontForFace({ family: 'Times New Roman', italic: true })).toBe('times-italic');
-    expect(standardFontForFace({ family: 'Nowhere Sans' })).toBe('helvetica');
   });
 
   it('read a standard program back from its CSS family', () => {

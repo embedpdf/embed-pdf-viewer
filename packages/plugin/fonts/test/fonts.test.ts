@@ -19,6 +19,7 @@ import {
   type FontProgram,
   type FontResolveRequest,
 } from '@embedpdf/engine-core/runtime';
+import { matchGrapheme } from '@embedpdf/core-text';
 import { describe, expect, it, vi } from 'vitest';
 
 import { createFontsController } from '../src/controller';
@@ -198,13 +199,15 @@ describe('the fonts controller', () => {
     expect(fonts.list).not.toHaveBeenCalled();
   });
 
-  it("draws a document font in its own program, then the list's fallbacks, and loads it from the engine once", async () => {
+  it("draws a document font in its own program, then the list's fallbacks, then the standard font that stands in for it, and loads it from the engine once", async () => {
     const { fonts, api } = harness();
     await api.ensureLoaded();
     const css = api.getFontCss('Roboto-Regular');
+    // Latin Roboto lacked would be drawn in Helvetica, as the engine writes it.
     expect(css.programs.map((mounted) => mounted.hash)).toEqual([
       hashOf('a'),
       hashOf('c'),
+      standardFontProgram('helvetica').hash,
       LAST_RESORT_HASH,
     ]);
     expect(css.fontFamily.startsWith(`"epdf-${hashOf('a').slice(0, 16)}", "epdf-`)).toBe(true);
@@ -331,7 +334,11 @@ describe('the fonts controller', () => {
     await settle();
     const after = api.getFontCss('Roboto-Regular');
     expect(after).not.toBe(before);
-    expect(after.programs.map((mounted) => mounted.hash)).toEqual([hashOf('a'), LAST_RESORT_HASH]);
+    expect(after.programs.map((mounted) => mounted.hash)).toEqual([
+      hashOf('a'),
+      standardFontProgram('helvetica').hash,
+      LAST_RESORT_HASH,
+    ]);
   });
 
   it("says which face a program's CSS family stands for, and nothing for any other family", async () => {
@@ -472,6 +479,31 @@ describe("a box's paint fonts", () => {
     });
     expect(roboto.face.width('Hi', false)).toBe(1200);
     expect(api.getPaintFonts('Minion', 'Hi שלום')!.face.key).toBe('helvetica');
+  });
+
+  it('paints Latin a font lacks in the standard font the engine ends its fallbacks with', async () => {
+    const host = fakeMeasurer();
+    host.load(HEBREW_FAMILY);
+    const { fonts, api } = harness({ measurer: host.measurer });
+    fonts.resolve.mockImplementation(async (request: FontResolveRequest) => ({
+      runs: request.runs.map(() => ({
+        font: 'noto-hebrew',
+        weight: 400,
+        italic: false,
+        substituted: false,
+        program: hashOf('c'),
+        fallbacks: [standardFontProgram('helvetica').hash],
+      })),
+      missingCharacters: [],
+    }));
+    api.getPaintFonts('noto-hebrew', 'Hi שלום');
+    await settle();
+    const found = api.getPaintFonts('noto-hebrew', 'Hi שלום')!;
+    expect(found.face.key).toBe(hashOf('c'));
+    // One glyph per character through its encoding, as the engine writes it: no program to wait for.
+    expect(found.fallbacks.map((font) => [font.key, font.standard])).toEqual([['helvetica', true]]);
+    expect(matchGrapheme('H', found)).toEqual({ font: found.fallbacks[0], covered: true });
+    expect(matchGrapheme('ש', found)).toEqual({ font: found.face, covered: true });
   });
 
   it('names the programs once the host has them all: until then the look-alikes, never the last resort’s boxes', async () => {

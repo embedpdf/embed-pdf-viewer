@@ -58,7 +58,8 @@ lives:
 
 Draw with `font-synthesis: none`, so the browser never fakes a bold or an italic the engine won't
 draw. The CSS names the engine's own programs, then the same fallback fonts the engine fills
-missing characters from, in its order, then a font that draws a character no font has as a box,
+missing characters from, in its order, then the standard font that stands in for the font (so
+Latin a font lacks shows in Helvetica), then a font that draws a character no font has as a box,
 as the engine writes it. Until the browser has every program, it names the system's closest fonts
 instead, and the CSS changes when they arrive.
 

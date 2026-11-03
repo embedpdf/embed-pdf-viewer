@@ -169,7 +169,11 @@ The engine picks a font for each character:
 
 - the font you named, when it has the character;
 - otherwise the first fallback font that has it. Yours come before the ones the engine comes with;
-  among each, the closest in style (weight, then italic) first, then the order they were added in.
+  among each, the closest in style (weight, then italic) first, then the order they were added in;
+- otherwise the standard font that stands in for the font you named, in its weight and italic:
+  Times for a Times New Roman, Courier for a Courier New, Helvetica for any other. So Latin is
+  never lost, even in a font that has none: "Hello" in Noto Sans Hebrew is written in Helvetica,
+  in a bold font in Helvetica Bold.
 
 It then lays the text out the way the language needs: Hebrew and Arabic right to left, mixed
 with numbers and Latin words in the right order; Arabic letters joined, Devanagari letters
@@ -271,7 +275,7 @@ Each run you send comes back with the font the engine will use for it:
 | `italic`      | Whether it's an italic.                                                                            |
 | `substituted` | `true` when it isn't the font you asked for.                                                       |
 | `program`     | The font file the engine will use, by hash; `null` when a browser can't get one.                   |
-| `fallbacks`   | The fallback fonts' files, by hash, in the order the engine tries them for this run's style.      |
+| `fallbacks`   | The files of the fonts that fill in what the run's font lacks, by hash, in the order the engine tries them: the fallback fonts for this run's style, then the standard font that stands in for its font. |
 
 `missingCharacters` lists the characters no font has, which the engine will draw as boxes.
 

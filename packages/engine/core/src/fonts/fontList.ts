@@ -6,7 +6,12 @@
  * and the fonts `doc.fonts.resolve()` answers with. Both engines call them,
  * so a font allows the same on either.
  */
-import { STANDARD_FACES, fontNameForFace, standardFamilyOf } from '../annotation/fontFaces';
+import {
+  STANDARD_FACES,
+  fontNameForFace,
+  standardFamilyOf,
+  standardFontForFace,
+} from '../annotation/fontFaces';
 import { STANDARD_FONTS, type FontName, type StandardFont } from '../annotation/primitives';
 import type { DocCapability } from '../auth/scope/types';
 import type {
@@ -475,7 +480,8 @@ export function fontResolutionOf(
       }
     }
   }
-  const resolvedRun = (run: ResolvedRunFacts): ResolvedFontRun => {
+  /** A run as the font list names its font, with the engine's fallback fonts. */
+  const namedRun = (run: ResolvedRunFacts): ResolvedFontRun => {
     const fallbacks = run.fallbacks.flatMap((key) => {
       const hash = engineHash.get(key);
       return hash ? [hash] : [];
@@ -502,6 +508,20 @@ export function fontResolutionOf(
     }
     // The box's own font, which the PDF only names.
     return { ...base, font: run.baseFontName ?? run.familyName, program: null };
+  };
+  /**
+   * Then, last, what the engine draws in what the face lacks and no fallback
+   * has: the standard face that stands in for the face (none when the run is
+   * drawn in it), so Latin never needs the last resort.
+   */
+  const resolvedRun = (run: ResolvedRunFacts): ResolvedFontRun => {
+    const named = namedRun(run);
+    const standard = builtIn.standardDisplayHash(
+      standardFontForFace({ family: run.familyName, weight: run.weight, italic: run.italic }),
+    );
+    return named.program === standard
+      ? named
+      : { ...named, fallbacks: [...named.fallbacks, standard] };
   };
   return { runs: runs.map(resolvedRun), missingCharacters: [...missingCharacters] };
 }

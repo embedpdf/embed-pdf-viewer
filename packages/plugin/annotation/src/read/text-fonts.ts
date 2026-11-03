@@ -20,16 +20,12 @@ import {
   STANDARD_FACES,
   faceForFontName,
   familyKey,
+  standardFontForFace,
   type FontResolveRun,
   type ResolvedFontRun,
   type RichTextBody,
 } from '@embedpdf/engine-core/runtime';
-import {
-  standardFontCss,
-  standardFontForFace,
-  standardFontOf,
-  standardFontOfProgramFamily,
-} from '@embedpdf/core-fonts';
+import { standardFontCss, standardFontOf, standardFontOfProgramFamily } from '@embedpdf/core-fonts';
 import { FontsToken, type FontCss, type FontsCapability } from '@embedpdf/plugin-fonts/contract';
 
 import type { AnnotationContext } from '../services/context';

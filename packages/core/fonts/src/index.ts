@@ -16,7 +16,6 @@ export { LAST_RESORT_HASH, LAST_RESORT_METRICS, lastResortFontProgram } from './
 export { lastResortFontBytes } from './last-resort-bytes';
 export {
   standardFontCss,
-  standardFontForFace,
   standardFontOf,
   standardFontOfProgramFamily,
   standardFontStack,
