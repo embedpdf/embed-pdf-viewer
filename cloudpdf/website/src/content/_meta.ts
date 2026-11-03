@@ -1,7 +1,11 @@
 export default {
-  // The marketing homepage (app/page.tsx) shows up as a root "index" page.
-  // Hide it so it never leaks into the docs sidebar navigation.
+  // Nextra puts every app-dir page in the root page map, so the homepage
+  // (app/page.tsx) and the examples gallery would leak into the docs
+  // sidebar. Hide them.
   index: {
+    display: 'hidden',
+  },
+  examples: {
     display: 'hidden',
   },
   docs: {
