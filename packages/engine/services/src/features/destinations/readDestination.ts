@@ -50,10 +50,13 @@ export function readDestination(
     i < view.params.length && (nulls & (1 << i)) === 0 ? view.params[i]! : null;
 
   switch (view.code) {
-    case DEST_VIEW.xyz:
-      // `/XYZ left top zoom`, null-aware like every other view: a literal 0
-      // zoom reads as 0, only a null one as null.
-      return { kind: 'xyz', page, left: at(0), top: at(1), zoom: at(2) };
+    case DEST_VIEW.xyz: {
+      // `/XYZ left top zoom`, read like every other view, so a short array
+      // keeps the params it has. A zoom of 0 means the same as null and reads
+      // as null, the one form `createDestination` writes.
+      const zoom = at(2);
+      return { kind: 'xyz', page, left: at(0), top: at(1), zoom: zoom === 0 ? null : zoom };
+    }
     case DEST_VIEW.fit:
       return { kind: 'fit', page };
     case DEST_VIEW.fitH:

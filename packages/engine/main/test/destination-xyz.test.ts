@@ -40,12 +40,21 @@ describe('/XYZ destinations', () => {
     }
   }
 
-  test('a literal 0 zoom reads as 0, not as an absent zoom', async () => {
+  test('a short array keeps the parameters it has', async () => {
+    expect(await openDestination('[3 0 R /XYZ 10 700]')).toMatchObject({
+      kind: 'xyz',
+      x: 10,
+      y: 92,
+      zoom: null,
+    });
+  });
+
+  test('a 0 zoom reads as null, which means the same', async () => {
     expect(await openDestination('[3 0 R /XYZ 10 700 0]')).toMatchObject({
       kind: 'xyz',
       x: 10,
       y: 92,
-      zoom: 0,
+      zoom: null,
     });
   });
 
