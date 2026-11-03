@@ -49,7 +49,9 @@ export function createSurfaceFocusFollower(): SurfaceFocusFollower {
       // is a new request: also one read after a close and a reopen that came in together.
       if (request === taken || !element) return;
       taken = request;
-      element.focus();
+      // Without scrolling: a panel can still be sliding in, outside the viewer's box, and the
+      // browser would scroll whatever box around the viewer can scroll to bring it into view.
+      element.focus({ preventScroll: true });
       if (options.select && hasSelectableText(element)) element.select();
     },
   };
