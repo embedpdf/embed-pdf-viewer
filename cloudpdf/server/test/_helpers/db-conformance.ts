@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { type Kysely } from 'kysely';
 import { DocumentsRepo } from '../../src/db/repos/documents.repo';
+import { TenantUsageRepo } from '../../src/db/repos/tenant_usage.repo';
 import { TenantsRepo } from '../../src/db/repos/tenants.repo';
 import type { Database } from '../../src/db/schema';
 import type { MigrationSource } from '../../src/db/migrator/runner';
@@ -347,6 +348,49 @@ export function runDbConformance(fx: DialectFixture): void {
         expect((await docs.findByBaseSha('tenant-a', 'b'.repeat(64)))?.id).toBe('doc12345');
         expect(await docs.findByBaseSha('tenant-a', 'c'.repeat(64))).toBeNull();
         expect(await docs.findByBaseSha('tenant-b', 'b'.repeat(64))).toBeNull();
+      } finally {
+        await fx.destroyDb(db);
+      }
+    });
+  });
+
+  describe(`TenantUsageRepo [${dialect}]`, () => {
+    test('counts per UTC day, once per key when asked, and adds up any window', async () => {
+      const db = await fx.makeDb();
+      try {
+        await new TenantsRepo(db).ensure({ id: 'tenant-1', name: 'Acme' });
+        const usage = new TenantUsageRepo(db);
+        const nov3 = new Date('2026-11-03T10:00:00Z');
+        const nov4 = new Date('2026-11-04T09:00:00Z');
+        await usage.recordView('tenant-1', nov3);
+        await usage.recordView('tenant-1', nov4);
+        const meter = 'protected-display.views';
+        expect(await usage.count('tenant-1', meter, { oncePerDay: 'p1:doc' }, nov3)).toBe(true);
+        expect(await usage.count('tenant-1', meter, { oncePerDay: 'p1:doc' }, nov3)).toBe(false);
+        expect(await usage.count('tenant-1', meter, { oncePerDay: 'p1:doc' }, nov4)).toBe(true);
+        expect(await usage.count('tenant-1', meter, {}, nov4)).toBe(true);
+
+        const month = await usage.snapshot('tenant-1', { from: '2026-11-01', to: '2026-12-01' });
+        expect(month.metrics).toMatchObject({ 'pdf.views': 2, 'pdf.uploads': 0, [meter]: 3 });
+        const day = await usage.snapshot('tenant-1', { from: '2026-11-04', to: '2026-11-05' }, [
+          meter,
+          'other-module.pages',
+        ]);
+        expect(day.metrics).toMatchObject({
+          'pdf.views': 1,
+          [meter]: 2,
+          'other-module.pages': 0,
+        });
+
+        // A day's keys go once the day is over; its count stays.
+        await usage.sweepOnceKeys(nov4);
+        const left = await db.selectFrom('tenant_usage_once').select('day').execute();
+        expect(left.map((row) => row.day)).toEqual(['2026-11-04']);
+        expect(
+          (await usage.snapshot('tenant-1', { from: '2026-11-03', to: '2026-11-04' })).metrics[
+            meter
+          ],
+        ).toBe(1);
       } finally {
         await fx.destroyDb(db);
       }

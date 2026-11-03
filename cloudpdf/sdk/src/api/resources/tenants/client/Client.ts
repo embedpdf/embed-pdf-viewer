@@ -555,9 +555,11 @@ export class TenantsClient {
         request: CloudPDF.UsageTenantsRequest,
         requestOptions?: TenantsClient.RequestOptions,
     ): Promise<core.WithRawResponse<CloudPDF.TenantsUsage200Response>> {
-        const { tenantId, period } = request;
+        const { tenantId, period, from: from_, to } = request;
         const _queryParams: Record<string, unknown> = {
             period,
+            from: from_,
+            to,
         };
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(

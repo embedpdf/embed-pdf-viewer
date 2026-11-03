@@ -110,6 +110,15 @@ export async function launchTestServer(
   let url: string;
   try {
     await migrate(db, { source: { kind: 'inline', migrations: sqliteMigrations } });
+    // Its tenant has every module turned on, as an operator turns them on for theirs.
+    await db
+      .insertInto('tenants')
+      .values({
+        id: TENANT,
+        name: TENANT,
+        features_json: JSON.stringify(options.modules.map(({ id }) => ({ id }))),
+      })
+      .execute();
     licensed = await license(db);
     bundle = await licensed.build({
       verifier: { mode: 'hs256', secret },

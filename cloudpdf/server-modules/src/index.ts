@@ -11,9 +11,11 @@ import { cloudEngine, type CloudEngine, type RawPageSource } from '@cloudpdf/eng
 import type {
   HostedModule,
   HostedRequest,
+  MeterDeclaration,
   ModuleConfigEntry,
   ModuleConnection,
   ModuleLog,
+  ModuleMeters,
   ModuleRequirements,
   ModuleResponse,
   ModuleSession,
@@ -35,8 +37,18 @@ import {
 export interface ServerModule<ConfigKey extends string = string> {
   /** The namespace: lowercase words joined by `-`, like `protected-display`. */
   readonly id: string;
+  /** What people call it, in lists of modules: `Screenshot protection`. */
+  readonly name: string;
+  /** What it does, in a sentence. */
+  readonly description?: string;
   /** The permissions the module's routes need, written without the id: `view` is `<id>.view`. */
   readonly permissions?: Readonly<Record<string, PermissionDeclaration>>;
+  /**
+   * What it counts, written without the id: `views` is `<id>.views`. Its
+   * routes count them (`req.meters`), per tenant and UTC day, and the
+   * tenants' usage reports them next to the core's.
+   */
+  readonly meters?: Readonly<Record<string, MeterDeclaration>>;
   /** What the module does beyond whoever calls it: the list a workspace admin approves. */
   readonly requires?: ModuleRequirements;
   /**
@@ -98,6 +110,8 @@ export interface ModuleRequest {
   document(): Promise<DocumentHandle>;
   /** What the module does as itself. */
   readonly module: ModuleSelf;
+  /** The module's meters, counted for the document's tenant. */
+  readonly meters: ModuleMeters;
 }
 
 /** The module acting as itself: with `doc.open` and what `requires.document` lists, nothing more. */
@@ -132,7 +146,10 @@ export function defineServerModule<ConfigKey extends string = never>(
 ): HostedModule {
   return {
     id: module.id,
+    name: module.name,
+    ...(module.description !== undefined ? { description: module.description } : {}),
     ...(module.permissions !== undefined ? { permissions: module.permissions } : {}),
+    ...(module.meters !== undefined ? { meters: module.meters } : {}),
     ...(module.requires !== undefined ? { requires: module.requires } : {}),
     ...(module.config !== undefined ? { config: module.config } : {}),
     setup: (host, config) =>
@@ -166,6 +183,7 @@ async function handle(route: DocRoute, hosted: HostedRequest): Promise<ModuleRes
     query: hosted.query,
     body: hosted.body,
     signal: hosted.signal,
+    meters: hosted.meters,
     document: once(() => openDocument(hosted.caller, hosted, engines)),
     module: {
       // Its pages draw raw pixels: this engine was given the server's source.
@@ -224,8 +242,10 @@ export type {
   DocumentHandle,
   // What `defineServerModule` returns: a module's declarations name it from here.
   HostedModule,
+  MeterDeclaration,
   ModuleConfigEntry,
   ModuleLog,
+  ModuleMeters,
   ModuleRequirements,
   ModuleResponse,
   ModuleSession,

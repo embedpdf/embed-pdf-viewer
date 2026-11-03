@@ -16,6 +16,7 @@ import { defineServerModule } from '@cloudpdf/server-modules';
 
 export default defineServerModule({
   id: 'review',
+  name: 'Review',
   permissions: {
     approve: { level: 'document', label: 'Approve documents' },
   },

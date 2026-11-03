@@ -5,7 +5,12 @@
  * effect here, what `*` grants, and which ones people may grant. The core's
  * own words never come through here: the core knows them already.
  */
-import { InvalidScope, parseScope, pluginOfPermission } from '@embedpdf/engine-core/runtime';
+import {
+  InvalidScope,
+  parseScope,
+  pluginOfPermission,
+  type DocCapability,
+} from '@embedpdf/engine-core/runtime';
 
 /** Where a permission is held: in a document token, or in a tenant token or API key. */
 export type PermissionLevel = 'document' | 'tenant';
@@ -15,6 +20,20 @@ export interface PermissionDeclaration {
   /** What the grant and API key dialogs say. */
   readonly label: string;
   readonly description?: string;
+  /**
+   * A core document permission this one is another way of doing:
+   * protected display's `view` replaces `doc.render`. A dialog can offer the
+   * two as a choice. A scope may hold both: the server refuses neither, and
+   * the core one has its usual effect, which a viewer plugin then uses.
+   */
+  readonly replaces?: DocCapability;
+  /**
+   * Core document permissions that let out what this one protects: with
+   * `doc.download`, the file leaves anyway. Facts for a dialog to show (turn
+   * them off with this one, say why when someone turns one back on); the
+   * server enforces none of it.
+   */
+  readonly bypassedBy?: ReadonlyArray<DocCapability>;
 }
 
 export interface RegisteredPermission extends PermissionDeclaration {
@@ -40,6 +59,7 @@ export class PermissionRegistry {
         throw new InvalidScope(name, `a plugin's permissions start with its id, "${plugin}."`);
       }
       if (this.permissions.has(name)) throw new InvalidScope(name, 'declared twice');
+      assertRelations(name, declaration);
       this.permissions.set(name, { ...declaration, name, plugin });
     }
     this.documentLevel = new Set(
@@ -78,5 +98,37 @@ export class PermissionRegistry {
         throw new InvalidScope(entry, `a ${declared.level} permission can't be granted here`);
       }
     }
+  }
+}
+
+/** `replaces` and `bypassedBy` name core document permissions, on a document permission. */
+function assertRelations(name: string, declaration: PermissionDeclaration): void {
+  const related = [
+    ...(declaration.replaces !== undefined ? [declaration.replaces] : []),
+    ...(declaration.bypassedBy ?? []),
+  ];
+  if (related.length === 0) return;
+  if (declaration.level !== 'document') {
+    throw new InvalidScope(name, 'only a document permission replaces or is bypassed by one');
+  }
+  for (const word of related) {
+    if (!isCoreCapability(word)) {
+      throw new InvalidScope(name, `"${word}" isn't one of the core's document permissions`);
+    }
+  }
+  if (
+    declaration.replaces !== undefined &&
+    declaration.bypassedBy?.includes(declaration.replaces)
+  ) {
+    throw new InvalidScope(name, `"${declaration.replaces}" is what it replaces, not a bypass`);
+  }
+}
+
+/** Whether `word` is one of the core's document permissions (`doc.render`). */
+export function isCoreCapability(word: string): boolean {
+  try {
+    return parseScope(word).kind === 'capability';
+  } catch {
+    return false;
   }
 }

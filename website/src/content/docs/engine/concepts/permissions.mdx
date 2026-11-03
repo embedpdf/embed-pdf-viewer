@@ -134,6 +134,11 @@ declare module '@embedpdf/core' {
 }
 ```
 
+Some plugin permissions are another way of doing what a core one does: `protected-display.view`
+shows the pages as protected video, where `doc.render` shows them as pictures. A token may hold
+both, and then the core one has its usual effect: a reader who may render the pages sees them the
+usual way, and the plugin stays out of it. To protect a reader's pages, leave `doc.render` out.
+
 </Engine>
 
 ## Annotations

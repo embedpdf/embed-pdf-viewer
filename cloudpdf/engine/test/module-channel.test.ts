@@ -45,6 +45,7 @@ const json = (value: unknown) => ({ type: 'application/json', body: JSON.stringi
 /** A module with two routes: one that says who asked and what, one that echoes bytes. */
 const echo: HostedModule = {
   id: 'echo',
+  name: 'Echo',
   permissions: { read: { level: 'document', label: 'Read the echo' } },
   setup(host) {
     host.docRoute({

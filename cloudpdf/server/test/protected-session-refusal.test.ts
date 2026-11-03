@@ -121,6 +121,7 @@ beforeAll(async () => {
     modules: [
       {
         id: 'protected-display',
+        name: 'Screenshot protection',
         permissions: {
           view: { level: 'document', label: 'See pages with screenshot protection' },
         },

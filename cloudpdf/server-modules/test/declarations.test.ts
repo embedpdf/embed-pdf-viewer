@@ -66,7 +66,7 @@ function emitModule(declarations: string): { output: string; errors: string[] } 
     source,
     [
       "import { defineServerModule } from '@cloudpdf/server-modules';",
-      "export default defineServerModule({ id: 'review', setup() {} });",
+      "export default defineServerModule({ id: 'review', name: 'Review', setup() {} });",
     ].join('\n'),
   );
 

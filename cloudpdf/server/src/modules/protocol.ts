@@ -9,7 +9,8 @@
  * request the engine's document API over the connections below.
  *
  * The module's id is its namespace: its permissions are `<id>.<action>`, its
- * routes live under `…/<id>/`, and its config is read from `CLOUDPDF_<ID>_*`.
+ * meters `<id>.<meter>`, its routes live under `…/<id>/`, and its config is
+ * read from `CLOUDPDF_<ID>_*`.
  */
 import type {
   DocCapability,
@@ -24,8 +25,18 @@ import type { PermissionDeclaration } from '../auth/permission-registry';
 export interface HostedModule {
   /** The namespace: lowercase words joined by `-`, like `protected-display`. */
   readonly id: string;
+  /** What people call it, in lists of modules: `Screenshot protection`. */
+  readonly name: string;
+  /** What it does, in a sentence. */
+  readonly description?: string;
   /** The permissions the module's routes need, written without the id: `view` is `<id>.view`. */
   readonly permissions?: Readonly<Record<string, PermissionDeclaration>>;
+  /**
+   * What it counts, written without the id: `views` is `<id>.views`. Its
+   * routes count them (`req.meters`), per tenant and UTC day, and the
+   * tenants' usage reports them next to the core's.
+   */
+  readonly meters?: Readonly<Record<string, MeterDeclaration>>;
   /** What the module does beyond whoever calls it. */
   readonly requires?: ModuleRequirements;
   /**
@@ -47,6 +58,14 @@ export interface ModuleRequirements {
    * list is what a workspace admin approves.
    */
   readonly document?: ReadonlyArray<DocCapability>;
+}
+
+export interface MeterDeclaration {
+  /** What a usage page calls it: `Protected views`. */
+  readonly label: string;
+  /** What one counts as, plural: `views`. */
+  readonly unit: string;
+  readonly description?: string;
 }
 
 export interface ModuleConfigEntry {
@@ -104,6 +123,8 @@ export interface HostedRequest {
    * `doc.open` and `requires.document`.
    */
   readonly module: ModuleConnection;
+  /** The module's meters, counted for the document's tenant. */
+  readonly meters: ModuleMeters;
   /**
    * One page as raw pixels, drawn as the module: what the local engine's
    * `page(ref).render.raw(options)` gives, with the same options and
@@ -117,6 +138,18 @@ export interface HostedRequest {
     options: PageRenderOptions,
     signal?: AbortSignal,
   ): Promise<PageRenderRaster>;
+}
+
+/** A module's own meters, for the tenant a request is about. */
+export interface ModuleMeters {
+  /**
+   * Add one to one of the module's meters, written without the id
+   * (`views`), for today (UTC). With `oncePerDay`, only the first count with
+   * that key each UTC day adds one: `${req.session.sub}:${req.docId}`
+   * counts a person once a day per document. The key is kept as its hash,
+   * for that day only.
+   */
+  count(meter: string, options?: { readonly oncePerDay?: string }): Promise<void>;
 }
 
 /** The server's own API, from inside it. */
