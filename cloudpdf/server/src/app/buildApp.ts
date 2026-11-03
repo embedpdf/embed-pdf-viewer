@@ -32,6 +32,7 @@ import {
 import { PermissionRegistry } from '../auth/permission-registry';
 import { RevokedJtisGuard } from '../auth/RevokedJtisGuard';
 import { SuspendedTenantsGuard } from '../auth/SuspendedTenantsGuard';
+import { TenantFeaturesGuard } from '../auth/TenantFeaturesGuard';
 import { VisitorHandles } from '../auth/visitor-handle';
 import { NoneCdnSigner } from '../cdn/adapters/NoneCdnSigner';
 import type { CdnSigner } from '../cdn/CdnSigner';
@@ -448,6 +449,8 @@ export interface AppBundle {
   revokedJtisGuard?: RevokedJtisGuard;
   /** Present whenever a `db` is configured; tests use it to clear the TTL cache. */
   suspendedTenantsGuard?: SuspendedTenantsGuard;
+  /** Present whenever a `db` is configured: the tenants' features, which gate module routes. */
+  tenantFeaturesGuard?: TenantFeaturesGuard;
   /** Present only when `cacheRoot` is set (+ pool + db). */
   documentService?: DocumentService;
   /** Write-side lazy layer materialization service. */
@@ -750,6 +753,9 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
   // Tenant suspension gate: consulted by the auth hook for every JWT
   // and by the grant exchange. API-token requests never touch it.
   const suspendedTenantsGuard = opts.db ? new SuspendedTenantsGuard({ db: opts.db }) : undefined;
+  // Tenant features: which modules a tenant may use, asked on every
+  // module route. Like suspension, the operator's switch.
+  const tenantFeaturesGuard = opts.db ? new TenantFeaturesGuard({ db: opts.db }) : undefined;
 
   // The deployment can sign iff it verifies with the shared secret —
   // the one condition gating every minting surface: tokens.issue, the
@@ -1228,7 +1234,9 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       storage: opts.objectStore,
       securityEvents: new SecurityEventsRepo(opts.db),
       suspendedTenants: suspendedTenantsGuard!,
+      tenantFeatures: tenantFeaturesGuard!,
       tenantUsage,
+      modules: declaredModules.map(({ module }) => module.id),
     });
     // Issue mounts only when the deployment can sign (HS256 — the
     // verifier secret doubles as signing material); revoke only when
@@ -1544,6 +1552,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
   await mountModules(app, declaredModules, {
     permissions,
     ...(documentService ? { documentService } : {}),
+    ...(tenantFeaturesGuard ? { tenantFeatures: tenantFeaturesGuard } : {}),
     ...(derivedRenders ? { derivedRenders } : {}),
     ...(signer ? { sign: signer } : {}),
   });
@@ -1610,6 +1619,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
     lifecycle,
     revokedJtisGuard,
     suspendedTenantsGuard,
+    tenantFeaturesGuard,
     documentService,
     layerService,
     derivedRenders,

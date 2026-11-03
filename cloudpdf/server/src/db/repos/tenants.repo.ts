@@ -1,6 +1,6 @@
 import type { Kysely } from 'kysely';
 
-import type { Database as Schema, TenantStatus } from '../schema';
+import type { Database as Schema, TenantFeature, TenantStatus } from '../schema';
 
 export interface TenantRow {
   id: string;
@@ -11,6 +11,8 @@ export interface TenantRow {
   /** `suspended` fails the namespace closed for every JWT and grant exchange. */
   status: TenantStatus;
   suspendedAt: number | null;
+  /** The server modules the tenant may use; empty until the operator sets them. */
+  features: TenantFeature[];
   createdAt: number;
 }
 
@@ -126,6 +128,19 @@ export class TenantsRepo {
   }
 
   /**
+   * Replace the tenant's features with `features`. Returns false when the
+   * tenant does not exist.
+   */
+  async setFeatures(tenantId: string, features: ReadonlyArray<TenantFeature>): Promise<boolean> {
+    const res = await this.db
+      .updateTable('tenants')
+      .set({ features_json: JSON.stringify(features) })
+      .where('id', '=', tenantId)
+      .execute();
+    return Number(res[0]?.numUpdatedRows ?? 0) > 0;
+  }
+
+  /**
    * Remove every DB row in the tenant's namespace, children before
    * parents, ending with the tenant row itself. Storage bytes are the
    * caller's job (one `deletePrefix(tenantRoot)` sweep) — kept out of
@@ -179,6 +194,7 @@ function mapRow(r: {
   auto_provisioned: number;
   status: TenantStatus;
   suspended_at: number | null;
+  features_json: string;
 }): TenantRow {
   return {
     id: r.id,
@@ -187,6 +203,7 @@ function mapRow(r: {
     autoProvisioned: r.auto_provisioned !== 0,
     status: r.status,
     suspendedAt: r.suspended_at === null ? null : Number(r.suspended_at),
+    features: JSON.parse(r.features_json) as TenantFeature[],
     createdAt: r.created_at,
   };
 }

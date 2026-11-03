@@ -47,6 +47,7 @@ import {
 } from '../app/jwt-plugin';
 import type { SignDevTokenInput } from '../auth/JwtVerifier';
 import type { PermissionRegistry } from '../auth/permission-registry';
+import type { TenantFeaturesGuard } from '../auth/TenantFeaturesGuard';
 import { abortSignalOf } from '../routes/_helpers';
 import type { DerivedRenderService } from '../services/DerivedRenderService';
 import type { DocumentService } from '../services/DocumentService';
@@ -58,6 +59,12 @@ export interface ModuleHostDeps {
    * database): a module that adds routes then stops the server.
    */
   readonly documentService?: DocumentService;
+  /**
+   * The tenants' features: a module's routes answer only tenants whose
+   * features hold the module's id. Present with the database, which the
+   * document plane needs too.
+   */
+  readonly tenantFeatures?: TenantFeaturesGuard;
   /** The deployment's render policy: its output-pixel budget binds module renders too. */
   readonly derivedRenders?: DerivedRenderService;
   /**
@@ -136,8 +143,11 @@ export async function mountModules(
 }
 
 type MountDeps = ModuleHostDeps & { readonly fetch: typeof globalThis.fetch };
-/** What a module's routes need: the document plane, present. */
-type RouteDeps = MountDeps & { readonly documentService: DocumentService };
+/** What a module's routes need: the document plane and the tenants' features, present. */
+type RouteDeps = MountDeps & {
+  readonly documentService: DocumentService;
+  readonly tenantFeatures: TenantFeaturesGuard;
+};
 
 async function mountModule(
   app: FastifyInstance,
@@ -152,14 +162,14 @@ async function mountModule(
     {
       docRoute(route) {
         if (!settingUp) throw moduleError(module.id, 'adds its routes in setup, not after it');
-        const { documentService } = deps;
-        if (documentService === undefined) {
+        const { documentService, tenantFeatures } = deps;
+        if (documentService === undefined || tenantFeatures === undefined) {
           throw moduleError(
             module.id,
             'adds routes, which need the document plane: workerEntry, db and objectStore',
           );
         }
-        mountDocRoute(app, module, route, tokens, { ...deps, documentService });
+        mountDocRoute(app, module, route, tokens, { ...deps, documentService, tenantFeatures });
         routes += 1;
       },
       log: moduleLog(app, module.id),
@@ -284,6 +294,8 @@ function mountDocRoute(
     handler: async (req, reply) => {
       const { docId, layerName, ...params } = req.params as Record<string, string>;
       const access = requireLayerDocAccessOnly(req, docId!, layerName!);
+      // Whether the tenant may use the module at all, before anything is read.
+      await deps.tenantFeatures.require(access.tenantId, module.id);
       const pdfBits = await deps.documentService.getEffectivePdfBits(access, docId!, layerName!);
       const ctx = requireLayerCapability(req, docId!, layerName!, 'doc.open', pdfBits);
       if (

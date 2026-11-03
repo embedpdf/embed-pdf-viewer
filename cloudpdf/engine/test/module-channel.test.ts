@@ -72,6 +72,12 @@ let fx: DbSeededFixture | undefined;
 beforeAll(async () => {
   fx = await buildDbSeededFixture({ secret: 'cloud-module-channel-secret', modules: [echo] });
   await seedDocumentFromBytes(fx, TENANT_ID, DOC_ID, fixturePath, 8);
+  // A module answers only a tenant that has it turned on.
+  await fx.db
+    .updateTable('tenants')
+    .set({ features_json: JSON.stringify([{ id: 'echo' }]) })
+    .where('id', '=', TENANT_ID)
+    .execute();
 });
 
 afterAll(async () => {

@@ -3,6 +3,7 @@ export default {
   list: 'List',
   create: 'Create',
   get: 'Get',
+  update: 'Update',
   delete: 'Delete',
   resume: 'Resume',
   suspend: 'Suspend',

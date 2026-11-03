@@ -164,7 +164,12 @@ beforeAll(async () => {
   await new FsObjectStore({ root: storageRoot }).put(StorageKeys.basePdf(TENANT, DOC), bytes, {
     contentLength: bytes.byteLength,
   });
-  await db.insertInto('tenants').values({ id: TENANT, name: TENANT }).execute();
+  // The tenant has each module here turned on: a module answers no tenant without it.
+  const features = [{ id: 'review' }, { id: 'reader' }, { id: 'frames' }];
+  await db
+    .insertInto('tenants')
+    .values({ id: TENANT, name: TENANT, features_json: JSON.stringify(features) })
+    .execute();
   const now = Date.now();
   await db
     .insertInto('documents')

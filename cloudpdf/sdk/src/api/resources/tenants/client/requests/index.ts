@@ -4,4 +4,5 @@ export type { ListTenantsRequest } from "./ListTenantsRequest.js";
 export type { ResumeTenantsRequest } from "./ResumeTenantsRequest.js";
 export type { TenantsCreateRequest } from "./TenantsCreateRequest.js";
 export type { TenantsSuspendRequest } from "./TenantsSuspendRequest.js";
+export type { TenantsUpdateRequest } from "./TenantsUpdateRequest.js";
 export type { UsageTenantsRequest } from "./UsageTenantsRequest.js";

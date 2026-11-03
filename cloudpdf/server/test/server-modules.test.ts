@@ -6,7 +6,7 @@ import { pathToFileURL } from 'node:url';
 import { decodePageKey, EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 import Fastify from 'fastify';
 import type { Kysely } from 'kysely';
-import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest';
 import {
   createSqliteDb,
   FsObjectStore,
@@ -21,6 +21,7 @@ import {
 import { buildAppForTesting } from '../src/app/buildApp';
 import { createValidTestLicenseGate } from '../src/licensing/testing';
 import { PermissionRegistry } from '../src/auth/permission-registry';
+import { TenantFeaturesGuard } from '../src/auth/TenantFeaturesGuard';
 import { declareModules, mountModules } from '../src/modules/host';
 import { loadModules } from '../src/modules/load';
 import type { HostedModule, ModuleConnection, ModuleResponse } from '../src/modules/index';
@@ -205,6 +206,7 @@ describe('mounting a module checks it while the server starts', () => {
     await mountModules(Fastify(), declared, {
       permissions,
       documentService: {} as DocumentService,
+      tenantFeatures: {} as TenantFeaturesGuard,
     });
     return permissions;
   }
@@ -395,6 +397,8 @@ const API_TOKEN = 'server-modules-root-token';
 const TENANT = 'modules-t';
 const DOC = 'docmodules1';
 const LAYER = 'default';
+/** The tenant has every module here turned on, unless a test says otherwise. */
+const ON = [{ id: 'snapshot' }, { id: 'annotated' }, { id: 'careless' }];
 
 describe('a mounted module', () => {
   let bundle: AppBundle;
@@ -433,7 +437,10 @@ describe('a mounted module', () => {
     await new FsObjectStore({ root: storageRoot }).put(StorageKeys.basePdf(TENANT, DOC), bytes, {
       contentLength: bytes.byteLength,
     });
-    await db.insertInto('tenants').values({ id: TENANT, name: TENANT }).execute();
+    await db
+      .insertInto('tenants')
+      .values({ id: TENANT, name: TENANT, features_json: JSON.stringify(ON) })
+      .execute();
     const now = Date.now();
     await db
       .insertInto('documents')
@@ -597,6 +604,129 @@ describe('a mounted module', () => {
       bytes: null,
       parsed: { hello: 'world' },
       mayEditAnnotations: true,
+    });
+  });
+
+  describe("the tenant's features", () => {
+    function setFeatures(features: unknown, bearer = API_TOKEN, tenant = TENANT) {
+      return fetch(`${baseUrl}/v1/tenants/${tenant}`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${bearer}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ features }),
+      });
+    }
+
+    async function errorOf(response: Response) {
+      return ((await response.json()) as { error: Record<string, unknown> }).error;
+    }
+
+    afterEach(async () => {
+      expect((await setFeatures(ON)).status).toBe(200);
+    });
+
+    test('a module answers only a tenant that has it turned on', async () => {
+      const update = await setFeatures([{ id: 'annotated' }]);
+      expect(update.status).toBe(200);
+      expect(await update.json()).toMatchObject({
+        tenant: { id: TENANT, features: [{ id: 'annotated' }] },
+      });
+
+      // At once on the server that took the change.
+      const refused = await call('snapshot/echo', SNAPSHOT, { method: 'POST' });
+      expect(refused.status).toBe(403);
+      expect(await errorOf(refused)).toEqual({
+        code: 'FeatureNotEnabled',
+        message: "The snapshot module isn't turned on for this tenant",
+        details: { feature: 'snapshot' },
+      });
+      // A feature is the tenant's, whoever asks: the API token too.
+      expect((await call('snapshot/scopes', 'api-token')).status).toBe(403);
+      // The module the tenant keeps still answers.
+      expect((await call('annotated/pages/obj:1', ['doc.open', 'annotated.peek'])).status).toBe(
+        204,
+      );
+    });
+
+    test('a stopped feature stays listed, and its routes answer 402', async () => {
+      const update = await setFeatures([...ON.slice(1), { id: 'snapshot', stopped: 'cap' }]);
+      expect(update.status).toBe(200);
+      const stopped = await call('snapshot/echo', SNAPSHOT, { method: 'POST' });
+      expect(stopped.status).toBe(402);
+      expect(await errorOf(stopped)).toEqual({
+        code: 'FeatureStopped',
+        message: 'The snapshot module is stopped for this tenant: it reached its cap',
+        details: { feature: 'snapshot', stopped: 'cap' },
+      });
+
+      const tenant = await fetch(`${baseUrl}/v1/tenants/${TENANT}`, {
+        headers: { Authorization: `Bearer ${API_TOKEN}` },
+      });
+      expect(((await tenant.json()) as { tenant: { features: unknown } }).tenant.features).toEqual([
+        { id: 'annotated' },
+        { id: 'careless' },
+        { id: 'snapshot', stopped: 'cap' },
+      ]);
+    });
+
+    test('the token is checked first, so a refusal tells no one else about features', async () => {
+      expect((await setFeatures([])).status).toBe(200);
+      const anonymous = await fetch(`${baseUrl}/v1/docs/${DOC}/layers/${LAYER}/snapshot/echo`, {
+        method: 'POST',
+      });
+      expect(anonymous.status).toBe(401);
+      const otherDocument = await fetch(
+        `${baseUrl}/v1/docs/docmodules2/layers/${LAYER}/snapshot/echo`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${signDevToken(SECRET, {
+              sub: 'viewer-1',
+              tenant_id: TENANT,
+              doc_id: DOC,
+              layer_name: LAYER,
+              scope: SNAPSHOT,
+              jti: 'jti-other-document',
+            })}`,
+          },
+        },
+      );
+      expect(otherDocument.status).toBe(403);
+      expect((await errorOf(otherDocument))['code']).toBe('Forbidden');
+    });
+
+    test('only the API token sets them, and only to installed modules', async () => {
+      const tenantToken = signDevToken(SECRET, {
+        sub: 'admin-1',
+        tenant_id: TENANT,
+        scope: ['*'],
+        jti: 'jti-tenant-admin',
+      });
+      expect((await setFeatures([{ id: 'snapshot' }], tenantToken)).status).toBe(403);
+
+      const unknown = await setFeatures([{ id: 'snapshot' }, { id: 'protected-display' }]);
+      expect(unknown.status).toBe(400);
+      expect((await errorOf(unknown))['message']).toBe(
+        'no installed module is protected-display (installed: snapshot, annotated, careless)',
+      );
+      expect((await setFeatures([{ id: 'snapshot' }, { id: 'snapshot' }])).status).toBe(400);
+      expect((await setFeatures([{ id: 'Snapshot' }])).status).toBe(400);
+      expect((await setFeatures([{ id: 'snapshot', stopped: 'budget' }])).status).toBe(400);
+      expect((await setFeatures([{ id: 'snapshot' }], API_TOKEN, 'no-such-tenant')).status).toBe(
+        404,
+      );
+    });
+
+    test('another replica sees a change once its cached answer runs out', async () => {
+      const replica = new TenantFeaturesGuard({ db, ttlMs: 60_000 });
+      await expect(replica.require(TENANT, 'snapshot')).resolves.toBeUndefined();
+      expect((await setFeatures([])).status).toBe(200);
+      // Within its TTL the other replica still answers what it read.
+      await expect(replica.require(TENANT, 'snapshot')).resolves.toBeUndefined();
+      replica.clearCache();
+      await expect(replica.require(TENANT, 'snapshot')).rejects.toMatchObject({
+        status: 403,
+        code: 'FeatureNotEnabled',
+      });
     });
   });
 });

@@ -96,6 +96,8 @@ import down048 from './048_upload_tokens.down.sql';
 import sql048 from './048_upload_tokens.sql';
 import down049 from './049_fonts_version.down.sql';
 import sql049 from './049_fonts_version.sql';
+import down050 from './050_tenant_features.down.sql';
+import sql050 from './050_tenant_features.sql';
 import type { MigrationSource } from '../../migrator/runner';
 
 /**
@@ -253,5 +255,11 @@ export const postgresMigrations: ReadonlyArray<MigrationSource> = [
     name: '049_fonts_version.sql',
     sql: sql049,
     down: down049,
+  },
+  {
+    version: '050',
+    name: '050_tenant_features.sql',
+    sql: sql050,
+    down: down050,
   },
 ];
