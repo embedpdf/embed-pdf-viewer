@@ -152,7 +152,13 @@ function readDbConfig(): {
     }
     return {
       dialect: 'postgres',
-      pgOpts: { connectionString: url! },
+      pgOpts: {
+        connectionString: url!,
+        // The message only: pg-pool hangs the client, with its
+        // connection parameters (password included), on the error.
+        onIdleConnectionError: (err) =>
+          console.warn(`[cloudpdf] idle database connection closed: ${err.message}`),
+      },
       describe: `postgres ${redact(url!)}`,
     };
   }
