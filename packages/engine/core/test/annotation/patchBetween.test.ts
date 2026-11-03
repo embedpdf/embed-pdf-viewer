@@ -55,6 +55,19 @@ const square = {
 const box = (square as Extract<Annotation, { subtype: 'square' }>).box;
 
 describe('annotationPatchBetween', () => {
+  test('states a new kind, with what changed beside it, both ways', () => {
+    const circle = mergeAnnotationPatch(square, { subtype: 'circle', color: '#00ff00' });
+    expect(circle).toMatchObject({ subtype: 'circle', color: '#00ff00', box });
+    expect(annotationPatchBetween(square, circle)).toEqual({
+      subtype: 'circle',
+      color: '#00ff00',
+    });
+    expect(annotationPatchBetween(circle, square)).toEqual({
+      subtype: 'square',
+      color: '#ff0000',
+    });
+  });
+
   test('states each data field that changed, whole', () => {
     const after = { ...square, box: { ...box, x: 50 }, locked: true } as Annotation;
     expect(annotationPatchBetween(square, after)).toEqual({

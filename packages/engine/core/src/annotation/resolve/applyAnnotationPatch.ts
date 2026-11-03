@@ -67,16 +67,20 @@ export function readValueOf(name: string, value: unknown, current: unknown): unk
  * `current` with a resolved patch's data fields in place, each as a read
  * spells it. Fields the engine works out or stamps itself (a drawn kind's
  * `rect`, the modified date and author) keep
- * the value `current` has: the engine's answer brings the new one. Works in
- * either space: it only moves values by field name.
+ * the value `current` has: the engine's answer brings the new one. A patch
+ * that names a sibling kind makes it that kind, read as one: a field only the
+ * new kind has reads `null`. Works in either space: it only moves values by
+ * field name.
  */
 export function applyResolvedPatch<A extends Annotation<Coordinates>>(
   current: A,
   resolved: AnnotationPatch<Coordinates>,
 ): A {
-  const owners = kindFactsOf(current.subtype)?.owners ?? {};
+  const subtype = resolved.subtype ?? current.subtype;
+  const owners = kindFactsOf(subtype)?.owners ?? {};
   const read = current as unknown as Record<string, unknown>;
-  const next: Record<string, unknown> = { ...read };
+  const next: Record<string, unknown> =
+    subtype === current.subtype ? { ...read } : asKind(read, subtype, owners);
   for (const [name, value] of Object.entries(resolved)) {
     if (name === 'subtype' || value === undefined) continue;
     // Fields the engine owns, stamps or keeps as found are accepted and ignored.
@@ -84,6 +88,27 @@ export function applyResolvedPatch<A extends Annotation<Coordinates>>(
     next[name] = readValueOf(name, value, read[name]);
   }
   return { ...next, ...followingReads(current, resolved) } as unknown as A;
+}
+
+/**
+ * A read of one kind as a read of its sibling `subtype`: the fields that kind
+ * declares, a field only it has `null` (as the engine reads an entry the file
+ * doesn't have). The resolver has refused a value the new kind can't hold.
+ */
+function asKind(
+  read: Record<string, unknown>,
+  subtype: string,
+  owners: Readonly<Record<string, string>>,
+): Record<string, unknown> {
+  const before = kindFactsOf(String(read.subtype))?.owners ?? {};
+  const next: Record<string, unknown> = { subtype };
+  for (const [name, value] of Object.entries(read)) {
+    if (name !== 'subtype' && (name in owners || !(name in before))) next[name] = value;
+  }
+  for (const name of Object.keys(owners)) {
+    if (!(name in before)) next[name] = null;
+  }
+  return next;
 }
 
 /**

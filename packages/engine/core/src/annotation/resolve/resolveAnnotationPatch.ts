@@ -13,9 +13,11 @@ import { EngineError } from '../../errors/EngineError';
 import { EngineErrorCode } from '../../errors/EngineErrorCode';
 import type { PdfCoordinates } from '../../pageSpace/coordinates';
 import { ANNOTATION_FIELD_NAMES } from '../field-names';
-import type { Annotation, AnnotationPatch } from '../kinds';
-import type { AnnotationSubtype } from '../subtype';
 import type { DescribeFont } from '../fontFaces';
+import { kindFactsOf } from '../kind-facts';
+import type { Annotation, AnnotationPatch } from '../kinds';
+import { siblingKindsOf } from '../siblings';
+import type { AnnotationSubtype } from '../subtype';
 import { calloutEndFollows, freeTextFollows } from './freeText';
 import { measurementFollows } from './measurement';
 import { pdfResolveRectCommand } from './rectCommand';
@@ -34,19 +36,58 @@ export function assertDeclaredFields(subtype: AnnotationSubtype, write: object):
   }
 }
 
+/** `['a', 'b', 'c']` as "a, b or c". */
+function orList(names: readonly string[]): string {
+  return names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} or ${names.at(-1)}`;
+}
+
 /**
- * The patch as the target's kind: its subtype filled in from the target, which
- * a caller may leave out. A different subtype, a changed name, a field the
- * kind doesn't declare, or any change to an annotation of a type the engine
- * doesn't model is refused.
+ * The kind an update leaves the annotation: its own, or the sibling the patch
+ * names (`siblingKindsOf`), which takes the same fields. Any other subtype is
+ * refused, naming the kinds it can become. A value the new kind has no field
+ * for is refused, never dropped: the caller clears it first, in the same
+ * change.
+ */
+function kindAfter(
+  current: Annotation<PdfCoordinates>,
+  requested: string | undefined,
+): AnnotationSubtype {
+  if (requested === undefined || requested === current.subtype) return current.subtype;
+  const siblings = siblingKindsOf(current.subtype);
+  if (!siblings.includes(requested as AnnotationSubtype)) {
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      siblings.length === 0
+        ? `${current.subtype} has no other kind it can become`
+        : `${current.subtype} can become ${orList(siblings)}, not ${requested}`,
+      { details: { field: 'subtype' } },
+    );
+  }
+  const kept = kindFactsOf(requested)?.owners ?? {};
+  const read = current as unknown as Record<string, unknown>;
+  for (const name of Object.keys(kindFactsOf(current.subtype)?.owners ?? {})) {
+    const value = read[name];
+    if (name in kept || value === null || value === undefined) continue;
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      `${current.subtype} field '${name}' holds ${typeof value === 'string' ? `'${value}'` : JSON.stringify(value)}, and ${requested} has no such field: clear it first, in the same change`,
+      { details: { field: name } },
+    );
+  }
+  return requested as AnnotationSubtype;
+}
+
+/**
+ * The patch as the kind it leaves the annotation (`kindAfter`): its subtype
+ * filled in, which a caller may leave out. A subtype the annotation can't
+ * become, a changed name, a field the kind doesn't declare, or any change to
+ * an annotation of a type the engine doesn't model is refused.
  */
 function annotationPatchForTarget(
   current: Annotation<PdfCoordinates>,
   patch: AnnotationPatch<PdfCoordinates>,
 ): AnnotationPatch<PdfCoordinates> {
-  if (patch.subtype !== undefined && patch.subtype !== current.subtype) {
-    throw new EngineError(EngineErrorCode.InvalidArg, 'Annotation subtype cannot change');
-  }
+  const subtype = kindAfter(current, patch.subtype);
   if (current.subtype === 'unsupported') {
     throw new EngineError(
       EngineErrorCode.InvalidArg,
@@ -59,16 +100,17 @@ function annotationPatchForTarget(
       "an annotation's nm can't change after create",
     );
   }
-  assertDeclaredFields(current.subtype, patch);
-  return { ...patch, subtype: current.subtype } as AnnotationPatch<PdfCoordinates>;
+  assertDeclaredFields(subtype, patch);
+  return { ...patch, subtype } as AnnotationPatch<PdfCoordinates>;
 }
 
 /**
  * The patch an update writes before anything follows from it, in the file's
  * coordinates, the same on the page and in the engine:
  *
- * - its subtype filled in from `current` (a different one is refused, as is
- *   a field the kind doesn't declare and a changed `nm`);
+ * - its subtype filled in from `current`, or a sibling kind it names (any
+ *   other is refused, as is a field the kind doesn't declare and a changed
+ *   `nm`);
  * - a drawn kind's `rect`: the rect it reads, sent back, dropped; another one
  *   the shape fields that put the drawing there (`pdfResolveRectCommand`);
  * - a color sent back as it reads dropped, so the file keeps it as it has it;
@@ -123,8 +165,8 @@ export function pdfDeriveAnnotationPatch(
  * refused when the update reaches it.
  *
  * Throws `InvalidArg` for what preparation and derivation refuse: a field the
- * kind doesn't declare, a changed subtype or name, a rect with a new shape or
- * that isn't finite, and where nothing can follow.
+ * kind doesn't declare, a subtype the annotation can't become, a changed name,
+ * a rect with a new shape or that isn't finite, and where nothing can follow.
  */
 export function pdfPredictAnnotationPatch(
   current: Annotation<PdfCoordinates>,

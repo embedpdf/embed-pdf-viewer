@@ -21,12 +21,13 @@ function sameValue(left: unknown, right: unknown): boolean {
 }
 
 /**
- * What `after` changed from `before`, as `update` takes it: each data field
- * whose value differs, whole. Fields the engine works out, stamps or keeps as
- * found (a drawn kind's `rect`, the dates and authors, the refs it keeps) are
- * left out. Values are compared exactly, so a value rebuilt with the same
- * content is no change. Works in either space: it only compares values by
- * field name.
+ * What `after` changed from `before`, as `update` takes it: its `subtype`
+ * when it became a sibling kind, and each data field whose value differs,
+ * whole. A field only the new kind has was `null` before. Fields the engine
+ * works out, stamps or keeps as found (a drawn kind's `rect`, the dates and
+ * authors, the refs it keeps) are left out. Values are compared exactly, so a
+ * value rebuilt with the same content is no change. Works in either space: it
+ * only compares values by field name.
  */
 export function annotationPatchBetween<C extends Coordinates>(
   before: Annotation<C>,
@@ -35,10 +36,14 @@ export function annotationPatchBetween<C extends Coordinates>(
   const patch: Record<string, unknown> = {};
   if (before === after) return patch as AnnotationPatch<C>;
   const owners = kindFactsOf(after.subtype)?.owners ?? {};
+  const had = kindFactsOf(before.subtype)?.owners ?? {};
+  const retyped = before.subtype !== after.subtype;
+  if (retyped) patch.subtype = after.subtype;
   const was = before as unknown as Record<string, unknown>;
   const now = after as unknown as Record<string, unknown>;
   for (const [name, owner] of Object.entries(owners)) {
-    if (owner !== 'data' || sameValue(was[name], now[name])) continue;
+    const value = retyped && !(name in had) ? null : was[name];
+    if (owner !== 'data' || sameValue(value, now[name])) continue;
     // A field `after` doesn't have any more is removed.
     patch[name] = now[name] === undefined ? null : now[name];
   }
