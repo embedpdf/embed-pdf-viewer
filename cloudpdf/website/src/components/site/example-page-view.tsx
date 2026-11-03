@@ -135,7 +135,9 @@ export function ExamplePageView({
         </div>
       </div>
 
-      <div className="relative min-h-0 flex-1 overflow-hidden">
+      {/* Clipped, not hidden: a hidden box can still be scrolled, and the code waiting off to
+          its right gives it room to, so a panel the example focuses would shift it sideways. */}
+      <div className="relative min-h-0 flex-1 overflow-clip">
         <div
           data-example
           className={`absolute inset-y-0 left-0 right-0 ${docked ? 'xl:right-[min(760px,50%)]' : ''}`}
