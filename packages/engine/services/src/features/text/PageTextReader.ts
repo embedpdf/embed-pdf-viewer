@@ -91,7 +91,7 @@ export class PageTextReader {
  * the returned requirement always fits and the measure round-trip is
  * skipped. The return value counts UTF-16 units including the terminator.
  */
-function readTextFull(runtime: PdfRuntimeModule, textPagePtr: Ptr, charCount: number): string {
+export function readTextFull(runtime: PdfRuntimeModule, textPagePtr: Ptr, charCount: number): string {
   if (charCount <= 0) return '';
   const { fn, mem } = runtime;
   const bufUnits = charCount * 2 + 1;

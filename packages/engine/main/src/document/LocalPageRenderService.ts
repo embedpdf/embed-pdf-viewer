@@ -10,6 +10,7 @@ import {
   type PageImageOptions,
   type PageRenderImage,
   type PageRenderOptions,
+  type RawPageRenderOptions,
   type PageRenderRaster,
   type RawPageRenderService,
   type PageRef,
@@ -39,7 +40,7 @@ export class LocalPageRenderService implements RawPageRenderService {
     private readonly policy: EngineRenderPolicy = CONTINUOUS_RENDER_POLICY,
   ) {}
 
-  raw(options?: PageRenderOptions): AbortablePromise<PageRenderRaster> {
+  raw(options?: RawPageRenderOptions): AbortablePromise<PageRenderRaster> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),

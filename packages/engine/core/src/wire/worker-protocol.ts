@@ -1,4 +1,5 @@
 import type { AnnotationList } from '../annotation/AnnotationList';
+import type { AnnotationAppearanceText } from '../dto/AnnotationAppearanceText';
 import type { AnnotationFamily } from '../annotation/family';
 import type { AnnotationDraft, AnnotationPatch } from '../annotation/kinds';
 import type { WidgetPatch } from '../annotation/kinds/widget';
@@ -7,6 +8,7 @@ import type { AnnotationActor, AnnotationAuthority, ChangeAuthority } from '../a
 import type {
   AnnotationAppearanceMode,
   AnnotationAppearanceRenderOptions,
+  LocalAnnotationAppearanceRenderOptions,
   AnnotationAppearancesResult,
 } from '../dto/AnnotationRender';
 import type { Attachment, AttachmentRef } from '../dto/Attachment';
@@ -21,7 +23,12 @@ import type { MetadataPatch } from '../dto/MetadataPatch';
 import type { PageExtractFlatten } from '../dto/PageExtract';
 import type { PageGeometrySnapshot } from '../dto/PageGeometrySnapshot';
 import type { PageListSnapshot } from '../dto/PageListSnapshot';
-import type { PageNetworkRenderFormat, PageRaster, PageRenderOptions } from '../dto/PageRender';
+import type {
+  PageNetworkRenderFormat,
+  PageRaster,
+  PageRenderOptions,
+  RawPageRenderOptions,
+} from '../dto/PageRender';
 import type { PageTextSnapshot } from '../dto/PageTextSnapshot';
 import type { DocumentActionsSnapshot } from '../dto/PdfAction';
 import type { PdfSaveMode } from '../dto/PdfSaveMode';
@@ -451,7 +458,7 @@ export interface AnnotationsRenderAppearancesWorkerRequest {
   page: PageRef;
   /** The page's annotations except widgets, or its widgets (`page.forms`). */
   family: AnnotationFamily;
-  options?: AnnotationAppearanceRenderOptions;
+  options?: LocalAnnotationAppearanceRenderOptions;
 }
 
 export interface AnnotationsCreateWorkerRequest<
@@ -668,6 +675,17 @@ export interface AnnotationsImportWorkerRequest extends WriteJobFields {
   /** The limits the bundle must stay within; the defaults otherwise. */
   limits?: BundleLimits;
   artifactPath?: string;
+}
+
+/** The text an annotation's normal appearance shows. A read. */
+export interface AnnotationsReadAppearanceTextWorkerRequest {
+  kind: 'annotations.readAppearanceText';
+  effect: 'read';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  page: PageRef;
+  ref: AnnotationRef;
 }
 
 /** An annotation's `appearance` resource: its drawing, as a one-page PDF (bytes). A read. */
@@ -1004,7 +1022,7 @@ export interface PagesRenderWorkerRequest<C extends Coordinates = PageCoordinate
   docId: string;
   layerName?: string;
   page: PageRef;
-  options?: PageRenderOptions<C>;
+  options?: RawPageRenderOptions<C>;
 }
 
 /**
@@ -1616,6 +1634,7 @@ export type WorkerRequest<C extends Coordinates = PageCoordinates> =
   | AttachmentsReadFileWorkerRequest
   | AnnotationsReadFileWorkerRequest
   | AnnotationsReadAppearanceWorkerRequest
+  | AnnotationsReadAppearanceTextWorkerRequest
   | AnnotationsExportWorkerRequest
   | AnnotationsImportWorkerRequest
   | MeasureViewportsWorkerRequest
@@ -1764,6 +1783,7 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
     } & WritePayloadFacts)
   | { tag: 'annotations.exportAppearance'; bytes: ArrayBuffer; size: number }
   | { tag: 'annotations.readAppearance'; bytes: ArrayBuffer; size: number }
+  | { tag: 'annotations.readAppearanceText'; text: AnnotationAppearanceText<C> }
   /** A bundle is page space on both sides: the exporter measures what leaves. */
   | { tag: 'annotations.export'; bundle: WireAnnotationBundle }
   | ({

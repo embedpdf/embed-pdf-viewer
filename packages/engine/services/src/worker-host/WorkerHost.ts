@@ -88,6 +88,7 @@ import {
   type AttachmentsReadFileWorkerRequest,
   type AnnotationsReadFileWorkerRequest,
   type AnnotationsReadAppearanceWorkerRequest,
+  type AnnotationsReadAppearanceTextWorkerRequest,
   type AnnotationsExportWorkerRequest,
   type AnnotationsImportWorkerRequest,
   type PagesFlattenWorkerRequest,
@@ -671,6 +672,9 @@ export class WorkerHost {
           break;
         case 'annotations.exportAppearance':
           resultPack = this.handleAnnotationsExportAppearance(msg, ctrl.signal);
+          break;
+        case 'annotations.readAppearanceText':
+          resultPack = this.handleAnnotationsReadAppearanceText(msg, ctrl.signal);
           break;
         case 'annotations.readAppearance':
           resultPack = this.handleAnnotationsReadAppearance(msg, ctrl.signal);
@@ -1310,6 +1314,20 @@ export class WorkerHost {
       { tag: 'annotations.flatten', result, wrote },
       req.artifactPath,
     );
+  }
+
+  private handleAnnotationsReadAppearanceText(
+    req: AnnotationsReadAppearanceTextWorkerRequest,
+    signal: AbortSignal,
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
+    const session = this.requireSession(req);
+    const pageObjectNumber = session.resolvePageRef(req.page).pageObjectNumber;
+    const read = new AnnotationFlattener(this.runtime, session).appearanceText(
+      pageObjectNumber,
+      req.ref,
+      signal,
+    );
+    return wirePack({ tag: 'annotations.readAppearanceText', text: { ref: req.ref, ...read } });
   }
 
   private handleAnnotationsExportAppearance(

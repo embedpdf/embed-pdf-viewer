@@ -3,6 +3,7 @@ import type {
   PageRenderImage,
   PageRenderOptions,
   PageRenderRaster,
+  RawPageRenderOptions,
 } from '../dto/PageRender';
 import { AbortablePromise } from '../promise/AbortablePromise';
 
@@ -16,5 +17,5 @@ export interface PageRenderService {
  */
 export interface RawPageRenderService extends PageRenderService {
   /** The page's pixels, with the transform they were made with, not encoded as an image. */
-  raw(options?: PageRenderOptions): AbortablePromise<PageRenderRaster>;
+  raw(options?: RawPageRenderOptions): AbortablePromise<PageRenderRaster>;
 }

@@ -1,7 +1,8 @@
 import type {
   PageObjectNumber,
+  AnnotationRef,
   PageRaster,
-  PageRenderOptions,
+  RawPageRenderOptions,
   PageRenderTarget,
   PdfCoordinates,
   PdfRect,
@@ -9,14 +10,18 @@ import type {
 import {
   EngineError,
   EngineErrorCode,
+  annotationKey,
   checkRenderUsage,
+  toPageRef,
   normalizePdfRect,
   resolvePageLayers,
 } from '@embedpdf/engine-core/runtime';
-import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
+import type { Ptr, PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
 import { FPDF_REVERSE_BYTE_ORDER, rasterizeAsync, readPageBox } from './deviceRaster';
 import type { DocumentSession } from '../../document-session/DocumentSession';
+import { familyOfCode } from '../annotations/internal/familyOfCode';
+import { annotationRefOf } from '../annotations/internal/identity/annotationName';
 import { throwIfAborted } from '../../shared/abort';
 import type { Slices } from '../../shared/slices';
 
@@ -29,6 +34,14 @@ const EPDF_RENDER_WIDGETS = 0x8000;
  * annotations and widgets draw by their `print` flag (no-view ones too).
  */
 const FPDF_PRINTING = 0x800;
+/** Annotation flags (ISO 32000-2 12.5.3) a picture draws by. */
+const ANNOT_FLAG_HIDDEN = 0x02;
+const ANNOT_FLAG_PRINT = 0x04;
+const ANNOT_FLAG_NO_VIEW = 0x20;
+/** `FPDF_ANNOT_POPUP`: drawn by the viewer, never into the page. */
+const ANNOT_SUBTYPE_POPUP = 16;
+/** `FPDF_ANNOT_APPEARANCEMODE_NORMAL`. */
+const APPEARANCE_NORMAL = 0;
 const FPDF_RENDER_TOBECONTINUED = 1;
 const FPDF_RENDER_DONE = 2;
 
@@ -45,7 +58,7 @@ export class PageRenderReader {
    */
   async render(
     pageObjectNumber: PageObjectNumber,
-    options: PageRenderOptions<PdfCoordinates>,
+    options: RawPageRenderOptions<PdfCoordinates>,
     signal: AbortSignal,
     slices: Slices,
   ): Promise<{ raster: PageRaster; area: PdfRect }> {
@@ -71,9 +84,14 @@ export class PageRenderReader {
       const viewport = options.viewport ?? { kind: 'scale', scale: 1 };
 
       const layers = resolvePageLayers(options, { annotations: true, formFields: true });
+      // Leaving some out, the page draws bare and the rest are drawn over it
+      // one by one, in PDFium's order: every annotation, then every widget.
+      const excluded = options.excludeAnnotations?.length
+        ? new Set<string>(options.excludeAnnotations.map(annotationKey))
+        : null;
       let flags = FPDF_REVERSE_BYTE_ORDER;
-      if (layers.includeAnnotations) flags |= FPDF_RENDER_ANNOT;
-      if (layers.includeFormFields) flags |= EPDF_RENDER_WIDGETS;
+      if (layers.includeAnnotations && !excluded) flags |= FPDF_RENDER_ANNOT;
+      if (layers.includeFormFields && !excluded) flags |= EPDF_RENDER_WIDGETS;
       if (print) flags |= FPDF_PRINTING;
 
       const raster = await rasterizeAsync(this.runtime, {
@@ -106,7 +124,17 @@ export class PageRenderReader {
             // draws into the bitmap until it is closed.
             fn.FPDF_RenderPage_Close(pagePtr);
           }
-          return status === FPDF_RENDER_DONE;
+          if (status !== FPDF_RENDER_DONE) return false;
+          if (excluded) {
+            throwIfAborted(signal);
+            this.drawAnnotations(pagePtr, pageObjectNumber, bitmapPtr, matrixPtr, {
+              excluded,
+              annotations: layers.includeAnnotations,
+              widgets: layers.includeFormFields,
+              print,
+            });
+          }
+          return true;
         },
       });
       if (!raster) {
@@ -119,6 +147,57 @@ export class PageRenderReader {
     } finally {
       pool.release(pageObjectNumber);
     }
+  }
+
+  /**
+   * Draws the page's annotations and widgets over a bare page render, the
+   * ones in `excluded` left out, by the same rules as PDFium's own pass:
+   * annotations before widgets, each in `/Annots` order; no popups; hidden
+   * ones never; no-view ones only in print, where only printable ones draw.
+   */
+  private drawAnnotations(
+    pagePtr: Ptr,
+    pageObjectNumber: PageObjectNumber,
+    bitmapPtr: Ptr,
+    matrixPtr: Ptr,
+    pass: {
+      excluded: ReadonlySet<string>;
+      annotations: boolean;
+      widgets: boolean;
+      print: boolean;
+    },
+  ): void {
+    const { fn, mem } = this.runtime;
+    const docPtr = this.session.requireDocPtr();
+    const page = toPageRef(pageObjectNumber);
+    const count = fn.FPDFPage_GetAnnotCount(pagePtr);
+    const draw = (index: number, family: 'annotations' | 'widgets'): void => {
+      const annotPtr = fn.FPDFPage_GetAnnot(pagePtr, index);
+      if (!annotPtr) return;
+      try {
+        const subtype = fn.FPDFAnnot_GetSubtype(annotPtr);
+        if (subtype === ANNOT_SUBTYPE_POPUP || familyOfCode(subtype) !== family) return;
+        if (!(family === 'annotations' ? pass.annotations : pass.widgets)) return;
+        const flags = fn.FPDFAnnot_GetFlags(annotPtr);
+        if (flags & ANNOT_FLAG_HIDDEN) return;
+        if (pass.print ? !(flags & ANNOT_FLAG_PRINT) : flags & ANNOT_FLAG_NO_VIEW) return;
+        const ref: AnnotationRef = annotationRefOf(fn, mem, docPtr, page, annotPtr, index);
+        if (pass.excluded.has(annotationKey(ref))) return;
+        fn.EPDF_RenderAnnotBitmap(
+          bitmapPtr,
+          pagePtr,
+          annotPtr,
+          APPEARANCE_NORMAL,
+          '',
+          matrixPtr,
+          FPDF_REVERSE_BYTE_ORDER,
+        );
+      } finally {
+        fn.FPDFPage_CloseAnnot(annotPtr);
+      }
+    };
+    for (let i = 0; i < count; i++) draw(i, 'annotations');
+    for (let i = 0; i < count; i++) draw(i, 'widgets');
   }
 }
 
