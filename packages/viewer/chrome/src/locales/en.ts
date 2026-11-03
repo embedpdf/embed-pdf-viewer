@@ -529,20 +529,6 @@ export const en: Locale = {
         other: 'New text can’t be written in it',
       },
     },
-    // The flags section of the style panel: its title, and what each flag does.
-    annotationFlags: {
-      title: 'Flags (/F)',
-      print: 'Include when the page is printed',
-      hidden: 'Gone everywhere: screen, clicks, print',
-      noView: 'Hidden on screen, may still print',
-      toggleNoView: 'Reveal a no-view annotation while selected',
-      readOnly: 'Visible but not clickable',
-      locked: 'No move / resize / delete / restyle',
-      lockedContents: 'Text cannot change; geometry can',
-      noZoom: 'Screen-constant size (anchored top-left)',
-      noRotate: 'Stays upright when the page rotates',
-      invisible: 'Legacy: hide unknown subtypes',
-    },
     // The link editor over a selected annotation.
     attachments: {
       loading: 'Loading attachments…',

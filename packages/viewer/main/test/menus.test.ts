@@ -4,7 +4,7 @@
  * nothing around them clips them, take the menu keys (arrows, typeahead,
  * Escape back to the button), mark the current choice in the accent look, open a
  * submenu beside its row, and say why a row can't run. The bars over selected
- * text and a selected annotation sit above it, below it without room, and
+ * text and a selected annotation sit below it, above it without room, and
  * open their menus away from it.
  *
  * Runs against the built snippet (`pnpm build` first).
@@ -613,23 +613,23 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('menus', () => {
     await tab.close();
   });
 
-  it('sits above selected text, and opens its menus above it, away from the selection', async () => {
+  it('sits below selected text, and opens its menus below it, away from the selection', async () => {
     const tab = await open('/selection.html');
     await tab.waitForTimeout(1500);
-    // The "Start here" line, low on the first page: room above it.
-    await selectText(tab, 554, 125, 360);
+    // The document's title, just under the main bar: room below it.
+    await selectText(tab, 196, 310, 600);
     const text = await highlightOf(tab);
     const bar = await selectionBarOf(tab);
     expect(text, 'the selected text').not.toBeNull();
-    expect(bar?.placement).toBe('top');
-    expect(bar!.bottom).toBeLessThanOrEqual(text!.top);
+    expect(bar?.placement).toBe('bottom');
+    expect(bar!.top).toBeGreaterThanOrEqual(text!.bottom);
     const share = await buttonOf(tab, 'Share');
     expect(share, 'the Share button in the selection bar').not.toBeNull();
     await click(tab, 'Share');
     const [menu] = await menusOf(tab);
     expect(menu).toBeDefined();
     expect(menu!.rows.map((row) => row.label)).toEqual(['Copy link']);
-    expect(menu!.box.bottom).toBeLessThanOrEqual(share!.top);
+    expect(menu!.box.top).toBeGreaterThanOrEqual(share!.bottom);
     await tab.close();
   });
 
@@ -637,30 +637,30 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('menus', () => {
     const gapOver = async (touch: boolean) => {
       const tab = await open('/selection.html', 1280, touch);
       await tab.waitForTimeout(1500);
-      await selectText(tab, 554, 125, 360);
+      await selectText(tab, 196, 310, 600);
       const text = await highlightOf(tab);
       const bar = await selectionBarOf(tab);
       await tab.close();
-      return text!.top - bar!.bottom;
+      return bar!.top - text!.bottom;
     };
     // Each handle's 12 px head and the 14 px a finger grabs around it, beyond the usual 12 px.
     expect(Math.round(await gapOver(false))).toBe(12);
     expect(Math.round(await gapOver(true))).toBe(12 + 12 + 14);
   });
 
-  it('sits below selected text without room above it, and opens its menus below it', async () => {
+  it('sits above selected text without room below it, and opens its menus above it', async () => {
     const tab = await open('/selection.html');
     await tab.waitForTimeout(1500);
-    // The document's title, just under the main bar: no room above it for the bar.
-    await selectText(tab, 196, 310, 600);
+    // "Are you a nonprofit…", at the bottom of the view: no room below it for the bar.
+    await selectText(tab, 654, 505, 690);
     const text = await highlightOf(tab);
     const bar = await selectionBarOf(tab);
-    expect(bar?.placement).toBe('bottom');
-    expect(bar!.top).toBeGreaterThanOrEqual(text!.bottom);
+    expect(bar?.placement).toBe('top');
+    expect(bar!.bottom).toBeLessThanOrEqual(text!.top);
     const share = await buttonOf(tab, 'Share');
     await click(tab, 'Share');
     const [menu] = await menusOf(tab);
-    expect(menu!.box.top).toBeGreaterThanOrEqual(share!.bottom);
+    expect(menu!.box.bottom).toBeLessThanOrEqual(share!.top);
     await tab.close();
   });
 

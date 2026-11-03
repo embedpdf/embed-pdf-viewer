@@ -113,7 +113,6 @@ const PAGES = {
     strings: {
       en: {
         'annotation.style.stroke': 'Line',
-        'annotation.flags.noView': 'Not on screen',
         'annotation.lineEndings.openArrow': 'Plain arrow',
         'form.settings.tooltip': 'Hint',
       },
@@ -480,25 +479,6 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('translations', () => {
     expect(words).not.toContain('Open arrow');
     await tab.keyboard.press('Escape');
     await run(tab, 'tool:pointer');
-
-    // A selected annotation's flags: `annotation.flags.noView`.
-    await tab.evaluate(async () => {
-      const annotation = window.element.viewer.get('annotation');
-      const { annotation: made } = await annotation.create(0, {
-        subtype: 'square',
-        box: { x: 120, y: 160, width: 160, height: 100 },
-      });
-      annotation.selection.set([made.ref]);
-      // Open, or left open: its command would close it.
-      window.element.viewer.get('shell').open('style');
-    });
-    await tab.waitForFunction(() =>
-      window.element.shadowRoot!.textContent?.includes('Not on screen'),
-    );
-    words = await wordsIn(tab, 'style');
-    expect(words).toContain('Not on screen');
-    expect(words).not.toContain('No view');
-    await tab.evaluate(() => window.element.viewer.get('annotation').selection.set([]));
 
     // A form field's settings: `form.settings.tooltip`.
     await run(tab, 'mode:form');

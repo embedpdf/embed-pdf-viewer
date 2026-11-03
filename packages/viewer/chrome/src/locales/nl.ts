@@ -518,20 +518,6 @@ export const nl: Locale = {
         other: 'Er kan geen nieuwe tekst in worden geschreven',
       },
     },
-    // The flags section of the style panel: its title, and what each flag does.
-    annotationFlags: {
-      title: 'Vlaggen (/F)',
-      print: 'Opnemen wanneer de pagina wordt afgedrukt',
-      hidden: 'Overal weg: scherm, klikken, afdrukken',
-      noView: 'Verborgen op het scherm, kan nog worden afgedrukt',
-      toggleNoView: 'Een niet-weergegeven annotatie tonen zolang deze is geselecteerd',
-      readOnly: 'Zichtbaar maar niet klikbaar',
-      locked: 'Niet verplaatsen / formaat wijzigen / verwijderen / opmaak wijzigen',
-      lockedContents: 'Tekst kan niet veranderen; geometrie wel',
-      noZoom: 'Vaste grootte op het scherm (verankerd linksboven)',
-      noRotate: 'Blijft rechtop staan als de pagina draait',
-      invisible: 'Verouderd: onbekende subtypen verbergen',
-    },
     // The link editor over a selected annotation.
     attachments: {
       loading: 'Bijlagen laden…',

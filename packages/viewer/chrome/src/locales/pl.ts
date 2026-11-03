@@ -517,20 +517,6 @@ export const pl: Locale = {
         other: 'Nie można nią pisać nowego tekstu',
       },
     },
-    // The flags section of the style panel: its title, and what each flag does.
-    annotationFlags: {
-      title: 'Flagi (/F)',
-      print: 'Uwzględniaj podczas drukowania strony',
-      hidden: 'Niewidoczna nigdzie: ekran, kliknięcia, wydruk',
-      noView: 'Ukryta na ekranie, ale może zostać wydrukowana',
-      toggleNoView: 'Pokazuj niewyświetlaną adnotację, gdy jest zaznaczona',
-      readOnly: 'Widoczna, ale nie reaguje na kliknięcia',
-      locked: 'Bez przenoszenia / zmiany rozmiaru / usuwania / zmiany stylu',
-      lockedContents: 'Tekst nie może się zmienić; geometria tak',
-      noZoom: 'Stały rozmiar na ekranie (zakotwiczona w lewym górnym rogu)',
-      noRotate: 'Pozostaje pionowo, gdy strona się obraca',
-      invisible: 'Przestarzała: ukrywa nieznane podtypy',
-    },
     // The link editor over a selected annotation.
     attachments: {
       loading: 'Wczytywanie załączników…',
