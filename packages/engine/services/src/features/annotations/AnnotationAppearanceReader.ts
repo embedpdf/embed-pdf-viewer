@@ -2,7 +2,7 @@ import type {
   AnnotationFamily,
   AnnotationAppearanceMode,
   AnnotationAppearanceRaster,
-  AnnotationAppearanceRenderOptions,
+  LocalAnnotationAppearanceRenderOptions,
   AnnotationAppearancesResult,
   PageObjectNumber,
   PageRaster,
@@ -12,6 +12,7 @@ import type {
   PdfRotation,
 } from '@embedpdf/engine-core/runtime';
 import {
+  annotationKey,
   appearanceModesOf,
   pdfAppearanceTurnOf,
   EngineError,
@@ -100,7 +101,7 @@ export class AnnotationAppearanceReader {
   async render(
     pageObjectNumber: PageObjectNumber,
     family: AnnotationFamily,
-    options: AnnotationAppearanceRenderOptions,
+    options: LocalAnnotationAppearanceRenderOptions,
     signal: AbortSignal,
     slices: Slices,
   ): Promise<AnnotationAppearancesResult<PdfCoordinates>> {
@@ -115,6 +116,7 @@ export class AnnotationAppearanceReader {
     const pageRef = toPageRef(pageObjectNumber);
 
     const appearances: AnnotationAppearanceRaster<PdfCoordinates>[] = [];
+    const wanted = options.refs ? new Set(options.refs.map(annotationKey)) : null;
 
     try {
       const page = readPageBox(this.runtime, pagePtr);
@@ -140,6 +142,7 @@ export class AnnotationAppearanceReader {
           if (!available && !drawn) continue;
 
           const ref = annotationRefOf(fn, mem, docPtr, pageRef, annotPtr, i);
+          if (wanted && !wanted.has(annotationKey(ref))) continue;
           // Rotation-stripped rendering (`pdfAppearanceTurnOf`, the rule the
           // viewer mirrors from the DTO): a box kind drawn turned
           // (`readAnnotationTurn`: ours, a stamp Acrobat turned, a text box

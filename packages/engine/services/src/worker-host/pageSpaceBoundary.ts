@@ -10,6 +10,7 @@ import {
   pageListOf,
   pageOutlineItemOf,
   pageOutlineOf,
+  pagePointOf,
   pageSearchSliceOf,
   pageViewportsOf,
   pdfAnnotationDraftOf,
@@ -88,6 +89,11 @@ export function resultInPageSpace(
       return { ...payload, snapshot: mapDocumentActions(payload.snapshot, toPage) };
     case 'outline.read':
       return { ...payload, outline: pageOutlineOf(payload.outline, boxOf) };
+    case 'annotations.readAppearanceText': {
+      const { firstOrigin, ref } = payload.text;
+      const origin = firstOrigin && pagePointOf(firstOrigin, boxOf(ref.page));
+      return { ...payload, text: { ...payload.text, firstOrigin: origin } };
+    }
     case 'annotations.list':
       return {
         ...payload,

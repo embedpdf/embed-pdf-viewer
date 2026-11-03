@@ -14,9 +14,10 @@ import {
   type EngineRenderPolicy,
   type AnnotationAppearanceImageOptions,
   type AnnotationAppearanceImagesResult,
-  type AnnotationAppearanceRenderOptions,
+  type LocalAnnotationAppearanceRenderOptions,
   type AnnotationAppearancesResult,
   type AnnotationDraft,
+  type AnnotationAppearanceText,
   type AnnotationList,
   type AnnotationPatch,
   type AnnotationRef,
@@ -103,6 +104,42 @@ export class LocalPageAnnotationsService implements LocalPageAnnotationsServiceC
     });
   }
 
+  readAppearanceText(ref: AnnotationRef): AbortablePromise<AnnotationAppearanceText> {
+    if (this.view.isClosed()) {
+      return AbortablePromise.rejectReason(
+        new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
+      );
+    }
+    try {
+      this.guard.assertCapability('doc.annotate.read');
+    } catch (err) {
+      return AbortablePromise.rejectReason(err);
+    }
+    const docId = this.docId;
+    const page = this.ref;
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({
+          kind: 'annotations.readAppearanceText',
+          effect: 'read',
+          jobId,
+          docId,
+          page,
+          ref,
+        }),
+    });
+    return AbortablePromise.run<AnnotationAppearanceText>(async (signal) => {
+      const onAbort = () => submission.abort(signal.reason);
+      if (signal.aborted) onAbort();
+      else signal.addEventListener('abort', onAbort, { once: true });
+      const payload = await submission;
+      if (payload.tag !== 'annotations.readAppearanceText') {
+        throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
+      }
+      return payload.text;
+    });
+  }
+
   downloadResource(ref: AnnotationRef, role: AnnotationResourceRole): AbortablePromise<Uint8Array> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
@@ -155,7 +192,7 @@ export class LocalPageAnnotationsService implements LocalPageAnnotationsServiceC
   }
 
   renderAppearancesRaw(
-    options?: AnnotationAppearanceRenderOptions,
+    options?: LocalAnnotationAppearanceRenderOptions,
   ): AbortablePromise<AnnotationAppearancesResult> {
     return renderAppearanceRasters(this.appearanceBatch(), 'annotations', options);
   }

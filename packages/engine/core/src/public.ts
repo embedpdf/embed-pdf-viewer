@@ -177,6 +177,8 @@ export type {
   SearchMatch,
   SearchSnippet,
   PageRenderOptions,
+  RawPageRenderOptions,
+  AnnotationAppearanceText,
   PageImageOptions,
   PrintDpi,
   PageImageHandle,

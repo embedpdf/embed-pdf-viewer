@@ -84,6 +84,15 @@ export interface AnnotationAppearanceRenderOptions {
  * the worker render options with image-encoding controls, mirroring the
  * `PageRenderOptions` -> `PageImageOptions` split.
  */
+/**
+ * `renderAppearancesRaw()`'s options (local engines): the render options,
+ * and which annotations to render.
+ */
+export interface LocalAnnotationAppearanceRenderOptions extends AnnotationAppearanceRenderOptions {
+  /** Only these annotations of the page, as one each; every one when omitted. */
+  refs?: AnnotationRef[];
+}
+
 export interface AnnotationAppearanceImageOptions extends AnnotationAppearanceRenderOptions {
   format?: PageNetworkRenderFormat;
   /** WebP quality from 0 (smallest) to 1 (best); PNG ignores it. */

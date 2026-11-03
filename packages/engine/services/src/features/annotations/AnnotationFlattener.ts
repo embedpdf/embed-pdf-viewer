@@ -4,11 +4,13 @@ import type {
   MutationMeta,
   PageFlattenUsage,
   PageObjectNumber,
+  PdfRect,
 } from '@embedpdf/engine-core/runtime';
 import {
   ANNOTATION_RESOURCE_ROLES,
   EngineError,
   EngineErrorCode,
+  normalizePdfRect,
   subtypeFromCode,
   toPageRef,
 } from '@embedpdf/engine-core/runtime';
@@ -18,8 +20,11 @@ import { resolveAnnotPtr } from './internal/identity/resolveAnnotationPointer';
 import { exportUnturnedAppearance } from './internal/read/exportUnturnedAppearance';
 import { promoteInlineAnnotations } from './internal/write/promoteInlineAnnotations';
 import { saveDocumentToBuffer } from './internal/saveDocumentToBuffer';
+import { readPageBox } from '../render/deviceRaster';
+import { readTextFull } from '../text/PageTextReader';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { withScratch } from '../../runtime/memory/scratch';
+import { RECTF_BYTES, readRectF } from '../../runtime/memory/structs';
 import { throwIfAborted } from '../../shared/abort';
 
 // `FLATTEN_*` / `EPDF_FLATTEN_STATUS_*` from public/fpdf_flatten.h.
@@ -98,7 +103,11 @@ export class AnnotationFlattener {
       }));
       // A promotion with nothing to flatten still changed the page.
       if (code !== FLATTEN_SUCCESS && !promoted) {
-        const meta: MutationMeta = { affectedPages: [], cacheDelta: null, ...this.session.writeStamp() };
+        const meta: MutationMeta = {
+          affectedPages: [],
+          cacheDelta: null,
+          ...this.session.writeStamp(),
+        };
         return { page: toPageRef(pageObjectNumber), usage, results, meta };
       }
 
@@ -111,6 +120,82 @@ export class AnnotationFlattener {
       };
       return { page: toPageRef(pageObjectNumber), usage, results, meta };
     } finally {
+      pool.release(pageObjectNumber);
+    }
+  }
+
+  /**
+   * The text an annotation's normal appearance shows, read from its
+   * appearance flattened onto a page of its own (as `exportAppearance`), so
+   * it is the text a viewer sees: its lines, and the first glyph's origin, in
+   * the file's coordinates.
+   */
+  appearanceText(
+    pageObjectNumber: PageObjectNumber,
+    ref: AnnotationRef,
+    signal: AbortSignal,
+  ): { lines: string[]; firstOrigin: { x: number; y: number } | null } {
+    throwIfAborted(signal);
+    this.requireRefs('annotations.readAppearanceText', pageObjectNumber, [ref]);
+    const { fn, mem } = this.runtime;
+    const pool = this.session.pagePool();
+    const pagePtr = pool.acquire(pageObjectNumber);
+    let exportedPtr: Ptr | null = null;
+    try {
+      const [annotPtr] = this.resolveAll(pagePtr, [ref]);
+      let rect: PdfRect | null;
+      try {
+        rect = withScratch(mem, RECTF_BYTES, (buf) =>
+          fn.FPDFAnnot_GetRect(annotPtr!, buf) ? normalizePdfRect(readRectF(mem, buf)) : null,
+        );
+        exportedPtr = this.withHandleArray([annotPtr!], (arrayPtr) =>
+          fn.EPDFPage_ExportAnnotationsAsDocument(pagePtr, arrayPtr, 1),
+        );
+      } finally {
+        fn.FPDFPage_CloseAnnot(annotPtr!);
+      }
+      if (!exportedPtr || !rect) {
+        throw new EngineError(
+          EngineErrorCode.InvalidArg,
+          'annotations.readAppearanceText: the ref must be a visible annotation of this page with a normal appearance',
+        );
+      }
+      const exportedPage = fn.FPDF_LoadPage(exportedPtr, 0);
+      if (!exportedPage) return { lines: [], firstOrigin: null };
+      try {
+        // The exported page is the annotation's rect: its box maps onto it.
+        const box = readPageBox(this.runtime, exportedPage);
+        const textPage = fn.FPDFText_LoadPage(exportedPage);
+        if (!textPage) return { lines: [], firstOrigin: null };
+        try {
+          const count = Math.max(fn.FPDFText_CountChars(textPage), 0);
+          const text = readTextFull(this.runtime, textPage, count);
+          const lines = text.split(/\r\n|\r|\n/).map((line) => line.trimEnd());
+          while (lines.length && !lines[lines.length - 1]) lines.pop();
+          let firstOrigin: { x: number; y: number } | null = null;
+          for (let i = 0; i < count && !firstOrigin; i++) {
+            if (fn.FPDFText_IsGenerated(textPage, i) === 1) continue;
+            const at = rect;
+            firstOrigin = withScratch(mem, 8, (xPtr) =>
+              withScratch(mem, 8, (yPtr) =>
+                fn.FPDFText_GetCharOrigin(textPage, i, xPtr, yPtr)
+                  ? {
+                      x: Number(mem.peek(xPtr, 'f64')) - box.left + at.left,
+                      y: Number(mem.peek(yPtr, 'f64')) - box.bottom + at.bottom,
+                    }
+                  : null,
+              ),
+            );
+          }
+          return { lines, firstOrigin };
+        } finally {
+          fn.FPDFText_ClosePage(textPage);
+        }
+      } finally {
+        fn.FPDF_ClosePage(exportedPage);
+      }
+    } finally {
+      if (exportedPtr) fn.FPDF_CloseDocument(exportedPtr);
       pool.release(pageObjectNumber);
     }
   }

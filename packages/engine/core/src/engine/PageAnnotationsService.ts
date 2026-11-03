@@ -1,10 +1,12 @@
 import type { AnnotationList } from '../annotation/AnnotationList';
+import type { AnnotationAppearanceText } from '../dto/AnnotationAppearanceText';
 import type { AnnotationDraft, AnnotationPatch } from '../annotation/kinds';
 import type { AnnotationResourceRole } from '../annotation/resources';
 import type {
   AnnotationAppearanceImageOptions,
   AnnotationAppearanceImagesResult,
   AnnotationAppearanceRenderOptions,
+  LocalAnnotationAppearanceRenderOptions,
   AnnotationAppearancesResult,
 } from '../dto/AnnotationRender';
 import type { AnnotationRef } from '../identity/AnnotationRef';
@@ -134,10 +136,18 @@ export interface PageAnnotationsService {
 /** A local engine page's annotations: the shared service and the raw appearance pixels. */
 export interface LocalPageAnnotationsService extends PageAnnotationsService {
   /**
+   * The text `ref`'s normal appearance shows: its lines, and where its
+   * first glyph sits on the page. A viewer that edits the text in place puts
+   * it there, as PDF.js does with a free text's appearance. An annotation
+   * without a normal appearance, or not on this page, is `InvalidArg`.
+   * Gated by `doc.annotate.read`.
+   */
+  readAppearanceText(ref: AnnotationRef): AbortablePromise<AnnotationAppearanceText>;
+  /**
    * The same appearances as `renderAppearances()`, each as its own raw RGBA
-   * raster instead of an encoded image.
+   * raster instead of an encoded image; `refs` renders only those.
    */
   renderAppearancesRaw(
-    options?: AnnotationAppearanceRenderOptions,
+    options?: LocalAnnotationAppearanceRenderOptions,
   ): AbortablePromise<AnnotationAppearancesResult>;
 }

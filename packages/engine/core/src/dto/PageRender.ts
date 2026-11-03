@@ -3,6 +3,7 @@ import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import type { PageRenderTransform } from '../geometry/pageTransform';
 import type { PdfRotation } from '../geometry/primitives';
+import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { PageFlattenUsage } from '../mutation/PageFlattenResult';
 import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 import { AbortablePromise } from '../promise/AbortablePromise';
@@ -244,6 +245,20 @@ export interface PageRenderOptions<C extends Coordinates = PageCoordinates> {
    * the local product promise).
    */
   maxOutputPixels?: number;
+}
+
+/**
+ * A raw render's options (`page.render.raw()`, local engines): the picture's
+ * options, and annotations to leave out of it.
+ */
+export interface RawPageRenderOptions<C extends Coordinates = PageCoordinates>
+  extends PageRenderOptions<C> {
+  /**
+   * Annotations or widgets of this page not to draw, the others drawn as
+   * always: for a viewer that shows these itself, as an editor over the
+   * page. A ref that isn't on the page leaves nothing out.
+   */
+  excludeAnnotations?: AnnotationRef[];
 }
 
 export interface PageImageOptions<

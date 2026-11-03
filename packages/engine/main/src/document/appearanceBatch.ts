@@ -8,7 +8,7 @@ import {
   type AnnotationAppearanceImage,
   type AnnotationAppearanceImageOptions,
   type AnnotationAppearanceImagesResult,
-  type AnnotationAppearanceRenderOptions,
+  type LocalAnnotationAppearanceRenderOptions,
   type AnnotationAppearancesResult,
   type AnnotationFamily,
   type DocCapability,
@@ -43,7 +43,7 @@ export interface AppearanceBatchContext {
 export function renderAppearanceRasters(
   ctx: AppearanceBatchContext,
   family: AnnotationFamily,
-  options?: AnnotationAppearanceRenderOptions,
+  options?: LocalAnnotationAppearanceRenderOptions,
 ): AbortablePromise<AnnotationAppearancesResult> {
   if (ctx.isClosed()) {
     return AbortablePromise.rejectReason(
