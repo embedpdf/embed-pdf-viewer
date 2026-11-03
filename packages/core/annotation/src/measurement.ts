@@ -549,7 +549,7 @@ export function distanceScene(
   }
 
   const paint: Paint = {
-    stroke: style.color,
+    stroke: style.color ?? undefined,
     width: style.strokeWidth,
     opacity: style.opacity,
     dash: dashOf(style),

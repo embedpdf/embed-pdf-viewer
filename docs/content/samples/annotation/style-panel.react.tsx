@@ -65,7 +65,7 @@ function Control({ property }: { property: AnnotationProperty }) {
             value={typeof value === 'string' ? value : '#ffffff'}
             onChange={(event) => update(event.target.value)}
           />
-          {property.key === 'interiorColor' && (
+          {property.allowsNone && (
             <button type="button" className="link" onClick={() => update(null)}>
               {value === null ? 'none' : 'remove'}
             </button>

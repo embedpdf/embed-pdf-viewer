@@ -515,7 +515,7 @@ export namespace AnnotationPatch {
         modifiedBy?: unknown | undefined;
         importedBy?: unknown | undefined;
         actions?: unknown | undefined;
-        color?: string | undefined;
+        color?: (string | null) | undefined;
         opacity?: number | undefined;
         strokeWidth?: number | undefined;
         borderStyle?: AnnotationPatchCircle.BorderStyle | undefined;
@@ -610,7 +610,7 @@ export namespace AnnotationPatch {
         modifiedBy?: unknown | undefined;
         importedBy?: unknown | undefined;
         actions?: unknown | undefined;
-        color?: string | undefined;
+        color?: (string | null) | undefined;
         opacity?: number | undefined;
         strokeWidth?: number | undefined;
         borderStyle?: AnnotationPatchSquare.BorderStyle | undefined;
@@ -705,7 +705,7 @@ export namespace AnnotationPatch {
         modifiedBy?: unknown | undefined;
         importedBy?: unknown | undefined;
         actions?: unknown | undefined;
-        color?: string | undefined;
+        color?: (string | null) | undefined;
         opacity?: number | undefined;
         strokeWidth?: number | undefined;
         borderStyle?: AnnotationPatchPolygon.BorderStyle | undefined;
@@ -817,7 +817,7 @@ export namespace AnnotationPatch {
         modifiedBy?: unknown | undefined;
         importedBy?: unknown | undefined;
         actions?: unknown | undefined;
-        color?: string | undefined;
+        color?: (string | null) | undefined;
         opacity?: number | undefined;
         strokeWidth?: number | undefined;
         borderStyle?: AnnotationPatchPolyline.BorderStyle | undefined;
@@ -962,7 +962,7 @@ export namespace AnnotationPatch {
         modifiedBy?: unknown | undefined;
         importedBy?: unknown | undefined;
         actions?: unknown | undefined;
-        color?: string | undefined;
+        color?: (string | null) | undefined;
         opacity?: number | undefined;
         strokeWidth?: number | undefined;
         borderStyle?: AnnotationPatchLine.BorderStyle | undefined;
@@ -1209,7 +1209,7 @@ export namespace AnnotationPatch {
         modifiedBy?: unknown | undefined;
         importedBy?: unknown | undefined;
         actions?: unknown | undefined;
-        color?: string | undefined;
+        color?: (string | null) | undefined;
         opacity?: number | undefined;
         strokeWidth?: number | undefined;
         borderStyle?: AnnotationPatchInk.BorderStyle | undefined;

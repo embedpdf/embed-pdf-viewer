@@ -64,6 +64,7 @@ const TEXT_BOX_FIELDS: readonly AnnotationProperty[] = [
     control: 'color',
     label: 'Background',
     labelKey: 'annotation.style.background',
+    allowsNone: true,
   },
   { key: 'color', control: 'color', label: 'Border', labelKey: 'annotation.style.border' },
   {

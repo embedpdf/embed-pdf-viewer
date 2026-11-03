@@ -78,7 +78,7 @@ export function runColorConformance(
         // The whole read sent back, the colors in the other case, with one change.
         await page.annotations.update(square.ref, {
           ...square,
-          color: square.color.toUpperCase(),
+          color: square.color?.toUpperCase() ?? null,
           interiorColor: square.interiorColor?.toUpperCase() ?? null,
           contents: 'kept',
         });

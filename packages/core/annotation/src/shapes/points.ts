@@ -402,6 +402,9 @@ export function strokedOutlineOf(nodes: readonly RenderNode[], strokeWidth: numb
 
 type EndingSeg = { tip: Point; angle: number; ending: LineEnding | undefined };
 
+/** The width a line's endings are sized by: a hairline (width 0) has a 1 pt line's, as the engine draws them. */
+const endingWidth = (strokeWidth: number): number => (strokeWidth > 0 ? strokeWidth : 1);
+
 /** The start/end tips of a line / open poly as drawn, each with the segment angle
  *  pointing out of the body into the tip (so an arrowhead opens back toward the line). */
 function endingSegs(shape: PointsShape): EndingSeg[] {
@@ -445,7 +448,7 @@ function pointsDrawnBounds(shape: PointsShape, stroke: Stroke): Rect {
   // Arrowheads, diamonds and squares are stroked polys whose sharp corners
   // miter like the body; a circle ending grows by half the stroke.
   const endings = endingSegs(shape).flatMap((seg) =>
-    endingNodes(seg.tip, seg.angle, seg.ending, strokeWidth),
+    endingNodes(seg.tip, seg.angle, seg.ending, endingWidth(strokeWidth)),
   );
   return unionRect([
     ...strokeOutlinePoints(points, closed, strokeWidth),
@@ -495,7 +498,10 @@ function pointsPainted(shape: PointsShape, stroke: Stroke, filled: boolean): Pai
   for (const points of strokes) pieces.push({ kind: 'stroke', points, closed, halfWidth });
   for (const seg of endingSegs(shape))
     pieces.push(
-      ...endingPieces(endingNodes(seg.tip, seg.angle, seg.ending, strokeWidth), strokeWidth),
+      ...endingPieces(
+        endingNodes(seg.tip, seg.angle, seg.ending, endingWidth(strokeWidth)),
+        strokeWidth,
+      ),
     );
   return pieces;
 }
@@ -518,7 +524,7 @@ function pointsScene(shape: PointsShape, stroke: Stroke): RenderNode[] {
       ? [{ kind: 'line', a: points[0]!, b: points[1]! }]
       : [{ kind: 'poly', points, closed: shape.closed }];
   for (const seg of endingSegs(shape))
-    nodes.push(...endingNodes(seg.tip, seg.angle, seg.ending, strokeWidth));
+    nodes.push(...endingNodes(seg.tip, seg.angle, seg.ending, endingWidth(strokeWidth)));
   return nodes;
 }
 

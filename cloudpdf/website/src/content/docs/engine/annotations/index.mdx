@@ -263,6 +263,9 @@ never include transparency: that's what `opacity` is for. The default color depe
 (yellow for a highlight, red for a shape, black for free text); each kind's page lists its
 defaults.
 
+On a shape, a line or ink, `color: null` draws no line at all, and `strokeWidth` keeps its value:
+see [Without a line](/docs/engine/annotations/shapes#without-a-line).
+
 A PDF can store a color as gray or CMYK. It reads as the same color in `'#rrggbb'`, and sent back
 unchanged it stays as the file has it, so passing a read straight back rewrites nothing.
 

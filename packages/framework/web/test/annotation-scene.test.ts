@@ -38,6 +38,24 @@ describe('svgShapesOf', () => {
     });
   });
 
+  it('draws a hairline one pixel wide at any zoom', () => {
+    const [shape] = svgShapesOf(
+      [
+        {
+          kind: 'line',
+          a: { x: 0, y: 0 },
+          b: { x: 10, y: 0 },
+          paint: { stroke: '#f00', width: 0, hairline: true },
+        },
+      ],
+      options,
+    );
+    expect(shape!.attributes).toMatchObject({
+      'stroke-width': 1,
+      'vector-effect': 'non-scaling-stroke',
+    });
+  });
+
   it('carries every paint field under its SVG name, and the blend mode apart', () => {
     const [shape] = svgShapesOf(
       [

@@ -1436,6 +1436,73 @@ describe('annotation-core', () => {
     expect(scene(item)[0].paint.join).toBeUndefined(); // solid border → default miter joins
   });
 
+  it('scene() paints a shape with no stroke color as its fill alone, inset where the stroke would be', () => {
+    const item: RenderItem = placed({
+      id: 's',
+      ref: null,
+      subtype: 'square',
+      geometry: {
+        kind: 'box',
+        box: { x: 0, y: 0, width: 50, height: 40 },
+        rotation: 0,
+        ellipse: false,
+      },
+      box: { x: 0, y: 0, width: 50, height: 40 },
+      style: {
+        color: null,
+        interiorColor: '#eeeeee',
+        strokeWidth: 4,
+        opacity: 1,
+        blendMode: 'normal',
+        borderStyle: 'solid',
+        dashArray: null,
+        cloudyIntensity: null,
+      },
+      source: 'vector',
+      selected: false,
+    });
+    const [rect] = scene(item);
+    expect(rect).toMatchObject({ kind: 'rect', rect: { x: 2, y: 2, width: 46, height: 36 } });
+    expect(rect!.paint.fill).toBe('#eeeeee');
+    expect(rect!.paint.stroke).toBeUndefined();
+  });
+
+  it('scene() draws a line at width 0 as a hairline, with the endings of a 1 pt line', () => {
+    const lineAt = (strokeWidth: number): RenderItem =>
+      placed({
+        id: 'l',
+        ref: null,
+        subtype: 'line',
+        geometry: {
+          kind: 'line',
+          linePoints: { start: { x: 0, y: 0 }, end: { x: 100, y: 0 } },
+          lineEndings: { start: 'none', end: 'open-arrow' },
+          rotation: 0,
+        },
+        box: { x: 0, y: -10, width: 100, height: 20 },
+        style: {
+          color: '#ff0000',
+          interiorColor: null,
+          strokeWidth,
+          opacity: 1,
+          blendMode: 'normal',
+          borderStyle: 'solid',
+          dashArray: null,
+          cloudyIntensity: null,
+        },
+        source: 'vector',
+        selected: false,
+      });
+    const hairline = scene(lineAt(0));
+    const onePoint = scene(lineAt(1));
+    expect(hairline.every((node) => node.paint.hairline === true)).toBe(true);
+    expect(onePoint.some((node) => node.paint.hairline)).toBe(false);
+    // The arrowhead is where a 1 pt line's is.
+    expect(hairline.slice(1).map((node) => ({ ...node, paint: undefined }))).toEqual(
+      onePoint.slice(1).map((node) => ({ ...node, paint: undefined })),
+    );
+  });
+
   it('scene() strokes a cloudy border with ROUND joins (PDFium `1 j` parity) — polygon and box alike', () => {
     // The curl tails reverse direction by design; a miter join spikes at every
     // seam. PDFium bakes cloudy APs with `1 j`, so the live paint must match.

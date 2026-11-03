@@ -112,6 +112,12 @@ export const colorStyleFields = {
 
 export const geometryStyleFields = {
   ...colorStyleFields,
+  /**
+   * `/C`, the stroke. `null` draws none and keeps `strokeWidth`: `/C []`, ISO 32000's "no
+   * colour". A file's `/C` left out reads as `null` too, as Acrobat draws it.
+   */
+  color: field.data(ColorSchema).nullable().optional(),
+  /** Still places the outline, sizes line endings and clouds when `color` is `null`. */
   strokeWidth: field.data(z.number().nonnegative()).optional(),
   /** `beveled` and `inset` are read from other apps' files and kept; only widgets draw them. */
   borderStyle: field

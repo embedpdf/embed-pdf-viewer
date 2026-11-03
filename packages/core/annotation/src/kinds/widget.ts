@@ -32,12 +32,14 @@ const BOX_FIELDS: readonly AnnotationProperty[] = [
     control: 'color',
     label: 'Border color',
     labelKey: 'annotation.style.borderColor',
+    allowsNone: true,
   },
   {
     key: 'interiorColor',
     control: 'color',
     label: 'Background',
     labelKey: 'annotation.style.background',
+    allowsNone: true,
   },
   {
     key: 'strokeWidth',

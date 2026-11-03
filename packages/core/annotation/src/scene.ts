@@ -40,13 +40,16 @@ import type {
 
 const num = (value: number): number => Number(value.toFixed(3));
 
+/** The kinds a width of 0 draws as a hairline. */
+const HAIRLINE_KINDS: ReadonlySet<KindName> = new Set(['line', 'polyline', 'ink']);
+
 /** Uniform paint for a shape/line/poly node. Fill only lands on closed nodes; the
  *  dash comes solely from the border style — so a live draft (ghost) previews
  *  exactly how the committed annotation will look, not as a dashed hint. */
 function shapePaint(style: Style, closed: boolean): Paint {
   return {
     fill: closed ? (style.interiorColor ?? undefined) : undefined,
-    stroke: style.color,
+    stroke: style.color ?? undefined,
     width: style.strokeWidth,
     opacity: style.opacity,
     dash: dashOf(style),
@@ -90,7 +93,7 @@ function squigglePath(
  *  sheared cells draw along their true baselines; upright output is identical
  *  to the old axis-aligned math. */
 function markupScene(subtype: KindName, quads: Quad[], style: Style): SceneNode[] {
-  const color = style.color;
+  const color = style.color ?? undefined;
   const opacity = style.opacity;
   const nodes: SceneNode[] = [];
   for (const quad of quads) {
@@ -288,7 +291,7 @@ function redactScene(item: RenderItem): SceneNode[] {
   const regions = redactRegions(item.geometry);
   if (!item.hovered) {
     const paint = {
-      stroke: item.style.color,
+      stroke: item.style.color ?? undefined,
       width: item.style.strokeWidth || 1.5,
       opacity: item.style.opacity,
     };
@@ -346,21 +349,28 @@ export function scene(item: RenderItem): SceneNode[] {
     return geomScene(item.geometry, item.style).map((node) => ({
       ...node,
       paint: {
-        fill: item.style.color,
-        stroke: item.style.color,
+        fill: item.style.color ?? undefined,
+        stroke: item.style.color ?? undefined,
         width: CARET_STROKE_WIDTH,
         opacity: item.style.opacity,
       },
     })) as SceneNode[];
   }
   const ink = item.geometry.kind === 'ink'; // freehand: round the pen-stroke ends (caps)
+  // A line, polyline or ink at width 0 is a hairline, as the engine and Acrobat
+  // draw it; a square, circle or polygon at width 0 has no outline.
+  const hairline = item.style.strokeWidth === 0 && HAIRLINE_KINDS.has(item.subtype);
   const nodes = geomScene(item.geometry, item.style).map((node) => {
     const closed =
       node.kind === 'rect' ||
       node.kind === 'ellipse' ||
       node.kind === 'path' ||
       (node.kind === 'poly' && node.closed);
-    const paint = { ...shapePaint(item.style, closed), blend: blendFor(item.style) };
+    const paint = {
+      ...shapePaint(item.style, closed),
+      blend: blendFor(item.style),
+      ...(hairline ? { hairline: true as const } : {}),
+    };
     // Ink is freehand: round the pen-stroke ends and joins. Every other kind keeps
     // the default butt caps + sharp (miter) joins — square corners and poly knees
     // stay crisp.
