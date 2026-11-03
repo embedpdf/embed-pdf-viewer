@@ -88,6 +88,7 @@ import {
   type AttachmentsReadFileWorkerRequest,
   type AnnotationsReadFileWorkerRequest,
   type AnnotationsReadAppearanceWorkerRequest,
+  type AnnotationsOrderWorkerRequest,
   type AnnotationsExportWorkerRequest,
   type AnnotationsImportWorkerRequest,
   type PagesFlattenWorkerRequest,
@@ -158,6 +159,7 @@ import {
   AnnotationFlattener,
   RawAnnotationReader,
 } from '../features/annotations';
+import { readPageStack } from '../features/annotations/internal/stackingOrder';
 import { AttachmentReader } from '../features/attachments';
 import {
   ChangeApplier,
@@ -671,6 +673,9 @@ export class WorkerHost {
           break;
         case 'annotations.exportAppearance':
           resultPack = this.handleAnnotationsExportAppearance(msg, ctrl.signal);
+          break;
+        case 'annotations.order':
+          resultPack = this.handleAnnotationsOrder(msg);
           break;
         case 'annotations.readAppearance':
           resultPack = this.handleAnnotationsReadAppearance(msg, ctrl.signal);
@@ -1190,6 +1195,17 @@ export class WorkerHost {
     const session = this.requireSession(req);
     const outline = new OutlineReader(this.runtime, session).read(signal);
     return wirePack({ tag: 'outline.read', outline });
+  }
+
+  private handleAnnotationsOrder(
+    req: AnnotationsOrderWorkerRequest,
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
+    const session = this.requireSession(req);
+    const stack = readPageStack(this.runtime, session, req.page);
+    return wirePack({
+      tag: 'annotations.order',
+      order: { page: stack.page, entries: stack.entries.map((entry) => entry && { ...entry }) },
+    });
   }
 
   private handleAnnotationsList(

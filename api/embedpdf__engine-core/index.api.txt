@@ -52,6 +52,8 @@ AnnotationKindModule [InterfaceDeclaration] (from packages/engine/core/src/annot
 AnnotationList [InterfaceDeclaration] (from packages/engine/core/src/annotation/AnnotationList.ts): export interface AnnotationList<C extends Coordinates = PageCoordinates>{ annotations: Annotation<C>[]; pages: PageRef[]; auditHead?: number; }
 AnnotationListMutationMeta [InterfaceDeclaration] (from packages/engine/core/src/mutation/AnnotationListMutationMeta.ts): export interface AnnotationListMutationMeta extends MutationMeta{ changed: AnnotationRef[]; }
 AnnotationListOptions [InterfaceDeclaration] (from packages/engine/core/src/annotation/AnnotationList.ts): export interface AnnotationListOptions{ pages?: readonly PageRef[]; }
+AnnotationOrder [InterfaceDeclaration] (from packages/engine/core/src/annotation/AnnotationOrder.ts): export interface AnnotationOrder{ page: PageRef; entries: (AnnotationOrderEntry | null)[]; }
+AnnotationOrderEntry [InterfaceDeclaration] (from packages/engine/core/src/annotation/AnnotationOrder.ts): export interface AnnotationOrderEntry{ ref: AnnotationRef; family: AnnotationFamily; }
 AnnotationPatch [TypeAliasDeclaration] (from packages/engine/core/src/annotation/kinds/declarations.ts): export type AnnotationPatch<C extends Coordinates = PageCoordinates> = UpdateOf< WritableAnnotationDeclaration, C >;
 AnnotationPatchBase [TypeAliasDeclaration] (from packages/engine/core/src/annotation/patch-base.ts): export type AnnotationPatchBase<C extends Coordinates = PageCoordinates> = Omit< UpdateShape<typeof annotationBaseFields, C>, 'rect' >;
 AnnotationPosition [TypeAliasDeclaration] (from packages/engine/core/src/mutation/ListPosition.ts): export type AnnotationPosition = ListPosition<AnnotationRef>;

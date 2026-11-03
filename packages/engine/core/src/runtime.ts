@@ -225,6 +225,7 @@ export type {
   AttachmentsReadFileWorkerRequest,
   AnnotationsReadFileWorkerRequest,
   AnnotationsReadAppearanceWorkerRequest,
+  AnnotationsOrderWorkerRequest,
   AnnotationsExportWorkerRequest,
   AnnotationsImportWorkerRequest,
   AttachmentFileWorkerPayload,

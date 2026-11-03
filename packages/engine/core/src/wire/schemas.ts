@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { DateInputSchema, IsoDateTimeSchema } from '../dto/IsoDateTime.schema';
 
 import type { AnnotationList } from '../annotation/AnnotationList';
+import type { AnnotationOrder } from '../annotation/AnnotationOrder';
 import { AnnotationRefSchema } from '../annotation/base.schema';
 import {
   AnnotationDraftSchema,
@@ -1220,6 +1221,14 @@ export const AnnotationWireComponents = {
   AnnotationMutationMeta: AnnotationListMutationMetaSchema,
   AnnotationPosition: AnnotationPositionSchema,
 } as const satisfies Record<string, z.ZodTypeAny>;
+
+/** A page's `/Annots` in array order (`page.annotations.order()`). */
+export const AnnotationOrderSchema: z.ZodType<AnnotationOrder> = z.object({
+  page: PageRefSchema,
+  entries: z.array(
+    z.object({ ref: AnnotationRefSchema, family: z.enum(['annotations', 'widgets']) }).nullable(),
+  ),
+});
 
 /** What `page.annotations.reorder` takes on the wire. */
 export const AnnotationReorderBodySchema = z

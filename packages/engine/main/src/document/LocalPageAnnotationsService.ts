@@ -18,6 +18,7 @@ import {
   type AnnotationAppearancesResult,
   type AnnotationDraft,
   type AnnotationList,
+  type AnnotationOrder,
   type AnnotationPatch,
   type AnnotationRef,
   type AnnotationResourceRole,
@@ -100,6 +101,35 @@ export class LocalPageAnnotationsService implements LocalPageAnnotationsServiceC
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
       return payload.list;
+    });
+  }
+
+  order(): AbortablePromise<AnnotationOrder> {
+    if (this.view.isClosed()) {
+      return AbortablePromise.rejectReason(
+        new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
+      );
+    }
+    try {
+      this.guard.assertCapability('doc.annotate.read');
+    } catch (err) {
+      return AbortablePromise.rejectReason(err);
+    }
+    const docId = this.docId;
+    const page = this.ref;
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({ kind: 'annotations.order', effect: 'read', jobId, docId, page }),
+    });
+    return AbortablePromise.run<AnnotationOrder>(async (signal) => {
+      const onAbort = () => submission.abort(signal.reason);
+      if (signal.aborted) onAbort();
+      else signal.addEventListener('abort', onAbort, { once: true });
+      const payload = await submission;
+      if (payload.tag !== 'annotations.order') {
+        throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
+      }
+      return payload.order;
     });
   }
 
