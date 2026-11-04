@@ -64,8 +64,17 @@ export const tilingReducer: Reducer<TilingState, TilingAction> = (state, action)
           /* 2️⃣  decide which fallback tiles to keep           */
           const fallbackToCarry = promoted.length > 0 ? [] : prevTiles.filter((t) => t.isFallback);
 
-          /* 3️⃣  final list = (maybe-kept fallback) + promoted + newTiles */
-          nextPages[pageIndex] = [...fallbackToCarry, ...promoted, ...newTiles];
+          /* 3️⃣  final list = (maybe-kept fallback) + promoted + newTiles.
+                 Tile ids encode page/scale/rect but not rotation, so a carried
+                 tile can share an id with a new tile (e.g. rotating 90° → 270°
+                 under a fit zoom mode revisits the same scale and rects while
+                 old fallbacks are still alive). Keyed renderers crash on
+                 duplicate ids, so the fresh tile wins. */
+          const newIds = new Set(newTiles.map((t) => t.id));
+          nextPages[pageIndex] = [
+            ...[...fallbackToCarry, ...promoted].filter((t) => !newIds.has(t.id)),
+            ...newTiles,
+          ];
         } else {
           /* same zoom → keep current fallback, replace visible */
           const newIds = new Set(newTiles.map((t) => t.id));
