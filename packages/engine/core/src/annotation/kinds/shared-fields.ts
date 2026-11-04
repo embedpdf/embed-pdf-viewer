@@ -17,6 +17,7 @@ import {
 import { PageRefSchema } from '../../identity/PageRef.schema';
 import {
   AnnotationBorderStyleSchema,
+  DashArrayWriteSchema,
   DrawnBorderStyleSchema,
   AnnotationRefSchema,
   BlendModeSchema,
@@ -125,7 +126,11 @@ export const geometryStyleFields = {
     .writes(DrawnBorderStyleSchema)
     .readBack()
     .optional(),
-  dashArray: field.data(z.array(z.number().nonnegative())).nullable().optional(),
+  dashArray: field
+    .data(z.array(z.number().nonnegative()))
+    .writes(DashArrayWriteSchema)
+    .nullable()
+    .optional(),
 };
 
 export const filledStyleFields = {

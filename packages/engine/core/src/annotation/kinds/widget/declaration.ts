@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import {
   ColorSchema,
+  DashArrayWriteSchema,
   TextAlignmentSchema,
   WidgetBorderStyleSchema,
   WidgetCheckStyleSchema,
@@ -22,7 +23,11 @@ export const WidgetDeclaration = defineKind('widget', {
   strokeWidth: field.data(z.number().nonnegative()).optional(),
   borderStyle: field.data(WidgetBorderStyleSchema).optional(),
   /** The border's dash pattern (`/BS /D`), for a dashed border; `null` for the default (3 on, 3 off). */
-  dashArray: field.data(z.array(z.number().nonnegative())).nullable().optional(),
+  dashArray: field
+    .data(z.array(z.number().nonnegative()))
+    .writes(DashArrayWriteSchema)
+    .nullable()
+    .optional(),
   /**
    * The font `/DA` names, as a free text names its font: a standard font's
    * name, a registered font's key, or the family of a font the document has.

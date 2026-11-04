@@ -9,15 +9,18 @@ import type { PageBox } from '../geometry/pageSpace';
 
 /**
  * One 300 × 300 page with what other apps write and the engine only reads:
- * a typewriter box (`/IT /FreeTextTypeWriter`) and a square with a beveled
- * border.
+ * a typewriter box (`/IT /FreeTextTypeWriter`), a square with a beveled
+ * border, and two dashed squares that name no pattern: one without `/D`, one
+ * with an empty one.
  */
 export const DRAWING_FIXTURE_PDF = pdfOf([
   '<< /Type /Catalog /Pages 2 0 R >>',
   '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
-  '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 300] /Annots [4 0 R 5 0 R] >>',
+  '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 300] /Annots [4 0 R 5 0 R 6 0 R 7 0 R] >>',
   '<< /Type /Annot /Subtype /FreeText /IT /FreeTextTypeWriter /Rect [20 240 180 270] /DA (0 0 1 rg /Helv 12 Tf) /Contents (typed) /NM (typewriter) /F 4 >>',
   '<< /Type /Annot /Subtype /Square /Rect [20 20 120 120] /BS << /S /B /W 2 >> /C [1 0 0] /NM (beveled) /F 4 >>',
+  '<< /Type /Annot /Subtype /Square /Rect [140 20 240 120] /BS << /S /D /W 2 >> /C [1 0 0] /NM (dashed-no-pattern) /F 4 >>',
+  '<< /Type /Annot /Subtype /Square /Rect [140 140 240 220] /BS << /S /D /W 2 /D [] >> /C [1 0 0] /NM (dashed-empty-pattern) /F 4 >>',
 ]);
 
 /** The fixtures the suite opens: its own, and Acrobat's text boxes (`freetext-rotated-acrobat.pdf`). */
@@ -251,7 +254,7 @@ export function runDrawingDetailsConformance(
       }
     });
 
-    test('borders: only a widget writes beveled or inset; a pattern alone keeps a border solid', async () => {
+    test('borders: only a widget writes beveled or inset; a pattern alone keeps a border solid; dashed states its pattern, never an empty one', async () => {
       const doc = await opts.open(engine, 'drawing');
       try {
         const { page } = await firstPage(doc);
@@ -283,6 +286,10 @@ export function runDrawingDetailsConformance(
         expect(patterned.annotation.borderStyle).toBe('solid');
         expect(patterned.annotation.dashArray).toEqual([2, 2]);
 
+        // A dashed border whose pattern is left out is written with the
+        // default, so every app draws it dashed (Acrobat draws a dashed
+        // border without /D solid). null is no pattern: written as none, it
+        // reads back null.
         const dashed = await page.annotations.create({
           subtype: 'square',
           box: BOX,
@@ -290,7 +297,48 @@ export function runDrawingDetailsConformance(
         });
         if (dashed.annotation.subtype !== 'square') throw new Error('expected a square');
         expect(dashed.annotation.borderStyle).toBe('dashed');
-        expect(dashed.annotation.dashArray).toBe(null);
+        expect(dashed.annotation.dashArray).toEqual([3, 3]);
+        const none = await page.annotations.create({
+          subtype: 'square',
+          box: BOX,
+          borderStyle: 'dashed',
+          dashArray: null,
+        });
+        if (none.annotation.subtype !== 'square') throw new Error('expected a square');
+        expect(none.annotation.borderStyle).toBe('dashed');
+        expect(none.annotation.dashArray).toBe(null);
+        const cleared = await page.annotations.update(patterned.annotation.ref, {
+          borderStyle: 'dashed',
+          dashArray: null,
+        });
+        if (cleared.annotation.subtype !== 'square') throw new Error('expected a square');
+        expect(cleared.annotation.borderStyle).toBe('dashed');
+        expect(cleared.annotation.dashArray).toBe(null);
+
+        // An empty pattern is a solid line, which is borderStyle 'solid': a
+        // write refuses it, on create and update alike.
+        await expect(
+          page.annotations.create({
+            subtype: 'square',
+            box: BOX,
+            borderStyle: 'dashed',
+            dashArray: [],
+          }),
+        ).rejects.toMatchObject(invalid);
+        await expect(
+          page.annotations.update(dashed.annotation.ref, { dashArray: [] }),
+        ).rejects.toMatchObject(invalid);
+
+        // Another app's dashed border without /D draws ISO 32000's default
+        // and reads as it stands; an empty /D is a solid line and reads solid.
+        const noPattern = await byNm(doc, 'dashed-no-pattern');
+        if (noPattern.subtype !== 'square') throw new Error('expected a square');
+        expect(noPattern.borderStyle).toBe('dashed');
+        expect(noPattern.dashArray).toBe(null);
+        const emptyPattern = await byNm(doc, 'dashed-empty-pattern');
+        if (emptyPattern.subtype !== 'square') throw new Error('expected a square');
+        expect(emptyPattern.borderStyle).toBe('solid');
+        expect(emptyPattern.dashArray).toBe(null);
       } finally {
         await doc.close();
       }

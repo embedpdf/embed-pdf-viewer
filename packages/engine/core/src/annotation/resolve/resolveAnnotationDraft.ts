@@ -2,6 +2,7 @@ import type { PdfCoordinates } from '../../pageSpace/coordinates';
 import type { DescribeFont } from '../fontFaces';
 import type { AnnotationDraft } from '../kinds';
 import { boxDraftFollows } from './box';
+import { dashDraftFollows } from './dash';
 import { freeTextDraftFollows } from './freeText';
 import { resolveMeasurementDraft } from './measurement';
 import { redactDraftFollows } from './redact';
@@ -45,6 +46,7 @@ export function pdfPrepareAnnotationDraft(
  * file's coordinates:
  *
  * - a note's standard review state brings its state model;
+ * - a dashed border with its pattern left out states the default, `[3, 3]`;
  * - a free text states its intent, and its text as rich text carrying its
  *   text style, with `contents` its plain projection;
  * - a redaction over text without a `rect` covers its quads;
@@ -63,7 +65,7 @@ export function pdfDeriveAnnotationDraft(
 ): AnnotationDraft<PdfCoordinates> {
   assertRichTextAgreement(prepared);
   const followed = redactDraftFollows(
-    freeTextDraftFollows(noteDraftStateFollows(prepared), options.describeFont),
+    freeTextDraftFollows(dashDraftFollows(noteDraftStateFollows(prepared)), options.describeFont),
   );
   return resolveMeasurementDraft(followed);
 }

@@ -4,6 +4,7 @@ import {
   FormFieldDTOSchema,
   FormFieldValueSchema,
   FormSnapshotSchema,
+  WidgetPlacementSchema,
 } from '../../src/forms/schema';
 import type { FormFieldDTO, FormSnapshot } from '../../src/shared';
 
@@ -124,5 +125,16 @@ describe('form schemas', () => {
     expect(() => FormFieldValueSchema.parse({ type: 'text', value: 'A' })).toThrow();
     expect(() => FormFieldValueSchema.parse({ value: 'A', checked: true })).toThrow();
     expect(() => FormFieldValueSchema.parse({ selectedValues: 'A' })).toThrow();
+  });
+
+  test('a widget placement takes a dash pattern of at least one length', () => {
+    const placement = {
+      page: { kind: 'objectNumber', objectNumber: 3 },
+      rect: { x: 72, y: 72, width: 120, height: 24 },
+      borderStyle: 'dashed',
+    };
+    expect(WidgetPlacementSchema.safeParse({ ...placement, dashArray: [6, 3] }).success).toBe(true);
+    expect(WidgetPlacementSchema.safeParse({ ...placement, dashArray: null }).success).toBe(true);
+    expect(WidgetPlacementSchema.safeParse({ ...placement, dashArray: [] }).success).toBe(false);
   });
 });
