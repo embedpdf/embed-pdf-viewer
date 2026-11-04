@@ -19,6 +19,7 @@ import { memo, type Mirror } from '@embedpdf/core';
 import {
   type AnnotationView,
   drawnAfter,
+  drawsLive,
   fromDTO,
   type Id,
   type Model,
@@ -169,8 +170,9 @@ export function createView(
         shown === truth
           ? base
           : { ...base, annotation: shown, ...drawnAfter(base, patch as AnnotationPatch) };
-      // A new look the lender made itself (a setting, a value): drawn live until its picture is there.
-      if (lender.pending(shown.ref)) record = { ...record, source: 'vector' };
+      // A new look the lender made itself (a setting, a value): drawn live until its picture is
+      // there, by a record with a live drawing; one without keeps its picture.
+      if (lender.pending(shown.ref) && drawsLive(record)) record = { ...record, source: 'vector' };
     }
     lent.set(shown, { truth, record });
     return record;

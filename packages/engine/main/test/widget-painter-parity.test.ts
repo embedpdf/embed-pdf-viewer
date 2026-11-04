@@ -1,8 +1,9 @@
 /**
  * The parity gate: the widget painter (`@embedpdf/core-form`) draws what the
  * engine's appearance generator writes. For a matrix of widgets (family,
- * font, size, fitted size, alignment, lines, comb, password, border style
- * and width, colours, check style, turn), the engine writes the appearance;
+ * a signature field's box among them, font, size, fitted size, alignment,
+ * lines, comb, password, border style and width, colours, check style,
+ * turn), the engine writes the appearance;
  * the test reads its content stream back as what it paints and compares it
  * with the painter's drawing, item by item, within 0.01 pt.
  *
@@ -286,6 +287,29 @@ const CASES: Case[] = [
       {},
       { width: 100, height: 30 },
     ),
+  ),
+  // A signature field: its box, in every border, with no colours, and turned.
+  ...[...BORDERS, { color: undefined, interiorColor: undefined }].map(
+    (look): Case => ({
+      name: `signature: ${JSON.stringify(look)}`,
+      draft: (page) =>
+        ({
+          family: 'signature',
+          name: named('signature'),
+          widgets: [{ page, box: box(140, 50), ...LOOK, ...look }],
+        }) as FormFieldDraft,
+    }),
+  ),
+  ...ROTATIONS.slice(1).map(
+    (rotation): Case => ({
+      name: `signature: turned ${rotation}`,
+      draft: (page) =>
+        ({
+          family: 'signature',
+          name: named('turned_signature'),
+          widgets: [{ page, box: box(140, 50), ...LOOK, rotation }],
+        }) as FormFieldDraft,
+    }),
   ),
   ...ROTATIONS.slice(1).flatMap((rotation) => [
     {

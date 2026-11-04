@@ -229,7 +229,9 @@ export class SignatureMutator {
         );
       }
       if (input.appearance && field.widget) {
-        bakeWidgetAppearance(this.runtime, candidate.docPtr, field.widget, input.appearance.pdf);
+        bakeWidgetAppearance(this.runtime, candidate.docPtr, field.widget, input.appearance.pdf, {
+          recordFit: false,
+        });
       }
 
       const store = this.storeFor();

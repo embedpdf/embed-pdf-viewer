@@ -202,6 +202,9 @@ that has no key, use `setSignatureAppearance()`. The field stays unsigned:
 await doc.forms.setSignatureAppearance(field.ref, { pdf: artworkPdf });
 ```
 
+The mark takes the place of the field's box: from then on its widgets read `hasMark: true`, and
+their style can't change (see [Move and style widgets](/docs/engine/forms/authoring#move-and-style-widgets)).
+
 Once a field is signed, its look is part of what the signature seals, so
 `setSignatureAppearance()` fails with `ProtectedDocument`. To sign with artwork, pass `appearance` to
 `sign()` or `prepare()`.

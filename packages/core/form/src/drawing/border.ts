@@ -2,8 +2,9 @@
  * The pieces every widget's appearance shares, ported from the generator:
  * rectangles as PDFium shrinks them, the border style's numbers
  * (`GetBorderStyleInfo`: a beveled or inset border counts double), the
- * border itself (`GenerateBorderAP`), and the box a check box or a push
- * button draws (`BuildCheckboxBoxStream`).
+ * border itself (`GenerateBorderAP`), the box a check box or a push button
+ * draws (`BuildCheckboxBoxStream`), and the one a text field draws under its
+ * text, all a signature field's box is (`WriteFieldBox`).
  */
 import type { WidgetBorderStyle } from '@embedpdf/engine-core/runtime';
 import type { PdfRect } from '@embedpdf/engine-core/runtime';
@@ -176,6 +177,35 @@ export function boxOps(
     ops.push({ kind: 'fill', path: [rectPath(stroke)], color: background, evenOdd: true });
   if (border && width > 0) {
     ops.push({ kind: 'stroke', path: [rectPath(stroke)], color: border, width, dash: null });
+  }
+  return ops;
+}
+
+/**
+ * `WriteFieldBox`: the background over the whole box, and the border: a solid
+ * one stroked inside it, any other drawn as `GenerateBorderAP` draws it.
+ */
+export function fieldBoxOps(
+  bbox: PdfRect,
+  info: BorderStyleInfo,
+  background: Rgb | null,
+  border: Rgb | null,
+): DrawOp[] {
+  const width = info.width;
+  const ops: DrawOp[] = [];
+  if (background) {
+    ops.push({ kind: 'fill', path: [rectPath(bbox)], color: background, evenOdd: true });
+  }
+  if (info.style !== 'solid') {
+    ops.push(...borderOps(bbox, info, border));
+  } else if (border && width > 0) {
+    ops.push({
+      kind: 'stroke',
+      path: [rectPath(deflate(bbox, f32(width / 2)))],
+      color: border,
+      width,
+      dash: null,
+    });
   }
   return ops;
 }

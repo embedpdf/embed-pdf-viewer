@@ -1876,6 +1876,7 @@ export namespace AnnotationDraft {
         checkStyle?: (AnnotationDraftWidget.CheckStyle | null) | undefined;
         field?: unknown | undefined;
         fieldFamily?: unknown | undefined;
+        hasMark?: unknown | undefined;
     }
 
     export namespace AnnotationDraftWidget {

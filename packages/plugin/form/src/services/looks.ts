@@ -214,11 +214,13 @@ export function createWidgetLooks({
     },
     /**
      * How the painter draws a widget row live, upright in a box (where a gesture has it); `null`
-     * for one whose field it doesn't draw (a signature).
+     * for one whose field it doesn't draw, or with a mark in it, which only its picture shows.
      */
     painterOf: (row: WidgetAnnotation): ((box: Box) => readonly SceneNode[]) | null => {
       const field = fieldForWidget(fields.view(), numberOf(row.ref));
-      return field && paints(field) ? (box) => paint(row, box, 0, true) ?? [] : null;
+      return field && paints(field) && !row.hasMark
+        ? (box) => paint(row, box, 0, true) ?? []
+        : null;
     },
     getTextEditorLayout: (ref: AnnotationRef, text: string): TextEditorLayout | null => {
       const view = fields.view();

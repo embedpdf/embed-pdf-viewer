@@ -8,7 +8,7 @@
  */
 import { createKernel, type DocumentHandle, type Engine } from '@embedpdf/core';
 import { createLocalEngine } from '@embedpdf/engine';
-import { CHANGE_FIXTURE_PDF } from '@embedpdf/engine-core/conformance';
+import { BANDS_PDF, CHANGE_FIXTURE_PDF } from '@embedpdf/engine-core/conformance';
 import {
   annotationKey,
   type AnnotationRef,
@@ -39,7 +39,38 @@ afterAll(async () => {
 /** The fixture's merged text field and widget `name`, and its square, on page 1. */
 const NAME: FormFieldRef = { kind: 'fqn', name: 'name' };
 
-async function boot(scope?: readonly string[]) {
+/**
+ * The fixture with two signature fields on `name`'s page: `approval`, empty,
+ * and `marked`, with a mark drawn in without signing.
+ */
+async function withSignatureFields(): Promise<Uint8Array> {
+  const doc = await engine.open(
+    { kind: 'bytes', id: 'signature-fields', bytes: CHANGE_FIXTURE_PDF.slice() },
+    { scope: ['*'] } as never,
+  );
+  const name = (await doc.forms.list()).fields.find((field) => field.name === 'name')!;
+  const page = name.widgets[0]!.page!;
+  const look = { color: '#1a1a1a', interiorColor: '#eeeeee' };
+  await doc.forms.create({
+    family: 'signature',
+    name: 'approval',
+    widgets: [{ page, rect: { x: 40, y: 300, width: 160, height: 50 }, ...look }],
+  });
+  await doc.forms.create({
+    family: 'signature',
+    name: 'marked',
+    widgets: [{ page, rect: { x: 40, y: 380, width: 160, height: 50 }, ...look }],
+  });
+  await doc.forms.setSignatureAppearance!(
+    { kind: 'fqn', name: 'marked' },
+    { pdf: BANDS_PDF.slice() },
+  );
+  const bytes = await doc.download();
+  await doc.close();
+  return bytes;
+}
+
+async function boot(scope?: readonly string[], bytes: Uint8Array = CHANGE_FIXTURE_PDF) {
   const held: HeldChange[] = [];
   let holding = false;
   let inner: DocumentHandle | null = null;
@@ -59,7 +90,7 @@ async function boot(scope?: readonly string[]) {
     ],
   });
   await kernel.documents.open(
-    { kind: 'bytes', id: `design-${Math.random()}`, bytes: CHANGE_FIXTURE_PDF.slice() },
+    { kind: 'bytes', id: `design-${Math.random()}`, bytes: bytes.slice() },
     scope ? ({ scope } as never) : undefined,
   );
   const form = kernel.capability(FormToken);
@@ -378,6 +409,43 @@ describe('design through lending', () => {
       expect(confirmed.source).toBe('baked');
       expect(confirmed.pictureVersion).toBeGreaterThan(version ?? 0);
       expect(hasLiveDrawing(confirmed)).toBe(true);
+    } finally {
+      await booted.destroy();
+    }
+  });
+
+  it('a restyled signature field draws its box live, and one with a mark in it has no style', async () => {
+    const booted = await boot(undefined, await withSignatureFields());
+    try {
+      const { annotation, form, page } = booted;
+      booted.design();
+      const itemOf = (ref: AnnotationRef) =>
+        annotation
+          .listPageItems(page)
+          .find((item) => item.ref && annotationKey(item.ref) === annotationKey(ref))!;
+      const empty = booted.widgetOf({ kind: 'fqn', name: 'approval' });
+      expect(itemOf(empty)).toMatchObject({ subtype: 'widget-box', source: 'baked' });
+
+      booted.hold();
+      void form.updateWidget(empty, { interiorColor: '#d43c2c' }).catch(() => {});
+      // At once, drawn by the form's painter: its box, in the new background.
+      const live = itemOf(empty);
+      expect(live.source).toBe('vector');
+      expect(scene(live).some((node) => node.paint.fill === '#d43c2c')).toBe(true);
+      await booted.release();
+      await settled(booted);
+      // Confirmed: the engine has drawn the box again.
+      expect(itemOf(empty).source).toBe('baked');
+      expect(await booted.truthOf(empty)).toMatchObject({
+        interiorColor: '#d43c2c',
+        hasAppearance: true,
+        hasMark: false,
+      });
+
+      // With a mark in it: no style to change, and only its picture draws it.
+      const marked = itemOf(booted.widgetOf({ kind: 'fqn', name: 'marked' }));
+      expect(marked).toMatchObject({ subtype: 'widget-mark', source: 'baked' });
+      expect(hasLiveDrawing(marked)).toBe(false);
     } finally {
       await booted.destroy();
     }

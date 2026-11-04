@@ -10,7 +10,15 @@ import { layoutField, type FieldText, type FieldTextOptions } from '@embedpdf/co
 import type { PaintFont, PaintFonts } from '@embedpdf/core-text';
 import type { PdfRect } from '@embedpdf/engine-core/runtime';
 
-import { BLACK, borderOps, boxOps, deflate, rectPath, type BorderStyleInfo } from './border';
+import {
+  BLACK,
+  borderOps,
+  boxOps,
+  deflate,
+  fieldBoxOps,
+  rectPath,
+  type BorderStyleInfo,
+} from './border';
 import type { DrawOp, Rgb, TextRun } from './types';
 
 const f32 = Math.fround;
@@ -106,23 +114,7 @@ export function textFieldLayout(
 export function textFieldOps(look: TextLook, field: TextFieldText): Drawn {
   const { bbox, border } = look;
   const width = border.width;
-  const ops: DrawOp[] = [];
-  if (look.background) {
-    ops.push({ kind: 'fill', path: [rectPath(bbox)], color: look.background, evenOdd: true });
-  }
-  if (border.style === 'solid') {
-    if (look.borderColor && width > 0) {
-      ops.push({
-        kind: 'stroke',
-        path: [rectPath(deflate(bbox, f32(width / 2)))],
-        color: look.borderColor,
-        width,
-        dash: null,
-      });
-    }
-  } else {
-    ops.push(...borderOps(bbox, border, look.borderColor));
-  }
+  const ops = fieldBoxOps(bbox, border, look.background, look.borderColor);
   const { laid } = textFieldLayout(look, field);
   const text = textOp(laid, look.textColor ?? BLACK);
   ops.push({

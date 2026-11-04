@@ -50,6 +50,7 @@ export interface WidgetPatch {
     checkStyle?: (WidgetPatch.CheckStyle | null) | undefined;
     field?: unknown | undefined;
     fieldFamily?: unknown | undefined;
+    hasMark?: unknown | undefined;
 }
 
 export namespace WidgetPatch {

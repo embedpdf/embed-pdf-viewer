@@ -88,8 +88,11 @@ describe('the painter', () => {
     );
   });
 
-  it("doesn't draw a signature or an unknown family", () => {
-    expect(widgetDrawing(widget(), { family: 'signature' } as FormFieldDTO)).toBeNull();
+  it("draws a signature field's box, and nothing of an unknown family", () => {
+    const box = widgetDrawing(widget(), { family: 'signature' } as FormFieldDTO)!;
+    // The background over the whole box, then the border inside it; no text.
+    expect(box.ops.map((op) => op.kind)).toEqual(['fill', 'stroke']);
+    expect(box.approximate).toBeNull();
     expect(widgetDrawing(widget(), { family: 'unknown' } as FormFieldDTO)).toBeNull();
   });
 

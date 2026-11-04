@@ -55,15 +55,15 @@ with `InvalidArg` too.
 
 Each family adds its own settings:
 
-| Family       | Settings                                                                                               |
-| :----------- | :----------------------------------------------------------------------------------------------------- |
-| `text`       | `defaultValue`, `maxLength`, `multiline`, `password`, `comb` (one character per box, with `maxLength`) |
-| `checkbox`   | Each widget's `exportValue`: what the form data holds when it's checked. Default `'Yes'`.              |
-| `radio`      | Each widget's `exportValue` (one widget per button), `noToggleToOff`, `radiosInUnison`                 |
-| `combobox`   | `options`, `defaultValue`, `edit` (the user may also type their own text)                              |
-| `listbox`    | `options`, `multiSelect`, `defaultValue` (option values; more than one needs `multiSelect`)            |
-| `pushbutton` | Only widgets, each with its `caption`. See [A push button](#a-push-button).                            |
-| `signature`  | Only widgets. Signing it is on [Digital signatures](/docs/engine/forms/signatures).                    |
+| Family       | Settings                                                                                                                         |
+| :----------- | :------------------------------------------------------------------------------------------------------------------------------- |
+| `text`       | `defaultValue`, `maxLength`, `multiline`, `password`, `comb` (one character per box, with `maxLength`)                           |
+| `checkbox`   | Each widget's `exportValue`: what the form data holds when it's checked. Default `'Yes'`.                                        |
+| `radio`      | Each widget's `exportValue` (one widget per button), `noToggleToOff`, `radiosInUnison`                                           |
+| `combobox`   | `options`, `defaultValue`, `edit` (the user may also type their own text)                                                        |
+| `listbox`    | `options`, `multiSelect`, `defaultValue` (option values; more than one needs `multiSelect`)                                      |
+| `pushbutton` | Only widgets, each with its `caption`. See [A push button](#a-push-button).                                                      |
+| `signature`  | Only widgets, each drawn as its box until a mark is in it. Signing it is on [Digital signatures](/docs/engine/forms/signatures). |
 
 ### A radio group
 
@@ -136,19 +136,19 @@ submits the form or opens a web address needs `doc.forms.script` too.
 Next to `page` and `rect`, each entry of `widgets` takes the widget's style. These are the same
 fields you change later with `doc.forms.updateWidget()`:
 
-| Field           | What it is                                                                                       |
-| :-------------- | :----------------------------------------------------------------------------------------------- |
-| `color`         | Border color, `'#rrggbb'`                                                                        |
-| `interiorColor` | Background color                                                                                 |
-| `strokeWidth`   | Border width in points                                                                           |
-| `borderStyle`   | `'solid'`, `'dashed'`, `'beveled'`, `'inset'` or `'underline'` (a line under the field)          |
-| `dashArray`     | A dashed border's dash and gap lengths in points, such as `[3, 2]`                               |
+| Field           | What it is                                                                                                   |
+| :-------------- | :----------------------------------------------------------------------------------------------------------- |
+| `color`         | Border color, `'#rrggbb'`                                                                                    |
+| `interiorColor` | Background color                                                                                             |
+| `strokeWidth`   | Border width in points                                                                                       |
+| `borderStyle`   | `'solid'`, `'dashed'`, `'beveled'`, `'inset'` or `'underline'` (a line under the field)                      |
+| `dashArray`     | A dashed border's dash and gap lengths in points, such as `[3, 2]`                                           |
 | `fontFamily`    | The `name` of a font in `doc.fonts.list()`, such as `'helvetica'`; see [Fonts](/docs/engine/documents/fonts) |
-| `fontSize`      | Text size in points                                                                              |
-| `fontColor`     | Text color                                                                                       |
-| `textAlign`     | `'left'`, `'center'` or `'right'`                                                                |
-| `caption`       | A push button's caption; other widgets take none                                                 |
-| `checkStyle`    | A checkbox's or radio button's mark; other widgets take none                                     |
+| `fontSize`      | Text size in points                                                                                          |
+| `fontColor`     | Text color                                                                                                   |
+| `textAlign`     | `'left'`, `'center'` or `'right'`                                                                            |
+| `caption`       | A push button's caption; other widgets take none                                                             |
+| `checkStyle`    | A checkbox's or radio button's mark; other widgets take none                                                 |
 
 ```ts
 widgets: [
@@ -306,6 +306,12 @@ as `hidden` and `print`, work as for other annotations; see
 field's `readOnly`: PDF apps ignore a widget annotation's own `readOnly`.
 
 A widget is the form's, so `page.annotations.update()` refuses one with `InvalidArg`.
+
+A signature field's widget draws its box: its background and border, in the style above. Once a
+mark is in it, because the field is signed or a mark was drawn in with
+[`setSignatureAppearance()`](/docs/engine/forms/signatures), the widget reads `hasMark: true` and
+shows that mark instead. Its style no longer applies, so changing it fails with `InvalidArg`;
+moving or resizing the widget keeps the mark.
 
 ### Turned widgets
 

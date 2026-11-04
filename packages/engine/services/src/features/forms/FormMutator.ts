@@ -568,7 +568,7 @@ export class FormMutator {
       );
     }
     for (const widget of before.widgets) {
-      bakeWidgetAppearance(this.runtime, docPtr, widget, pdf);
+      bakeWidgetAppearance(this.runtime, docPtr, widget, pdf, { recordFit: true });
     }
     this.session.invalidateDerived();
     return { field: this.readBackField(resolved.fieldObjectNumber) };

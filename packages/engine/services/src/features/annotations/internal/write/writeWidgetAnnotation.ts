@@ -1,4 +1,6 @@
 import type {
+  Annotation,
+  AnnotationPatch,
   WidgetDraft,
   WidgetPatch,
   WidgetStyleDraftFields,
@@ -10,6 +12,7 @@ import type {
 import {
   EngineError,
   EngineErrorCode,
+  WIDGET_STYLE_NAMES,
   faceForFontName,
   familyKey,
   normalizePdfRect,
@@ -55,6 +58,29 @@ const MK_CAPTION = 0; // EPDF_MK_TEXT_CA
 
 export function isWidgetSubtype(subtype: string): subtype is 'widget' {
   return subtype === 'widget';
+}
+
+/**
+ * A widget with a mark in it (`hasMark`: a signature, or one drawn in) shows
+ * the mark, not its box: a change to its style, which only the box shows, is
+ * refused before anything is written. A style sent back as it reads is no
+ * change.
+ */
+export function assertMarkKeepsItsLook(
+  current: Annotation<PdfCoordinates>,
+  patch: AnnotationPatch<PdfCoordinates>,
+): void {
+  if (current.subtype !== 'widget' || !current.hasMark) return;
+  const sent = patch as Partial<Record<(typeof WIDGET_STYLE_NAMES)[number], unknown>>;
+  const changed = WIDGET_STYLE_NAMES.filter(
+    (name) => sent[name] !== undefined && !semanticEqual(sent[name], current[name]),
+  );
+  if (changed.length > 0) {
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      `the widget has a mark in it, which its style doesn't draw: ${changed.join(', ')} can't change`,
+    );
+  }
 }
 
 /**

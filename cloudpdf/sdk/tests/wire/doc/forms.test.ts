@@ -93,6 +93,7 @@ describe("FormsClient", () => {
                     checkStyle: "check",
                     field: { kind: "objectNumber", objectNumber: 1 },
                     fieldFamily: "text",
+                    hasMark: true,
                 },
             ],
             calculationOrder: [{ kind: "objectNumber", objectNumber: 1 }],
@@ -364,6 +365,7 @@ describe("FormsClient", () => {
                     checkStyle: "check",
                     field: { kind: "objectNumber", objectNumber: 1 },
                     fieldFamily: "text",
+                    hasMark: true,
                 },
             ],
             meta: {
@@ -560,6 +562,7 @@ describe("FormsClient", () => {
                     checkStyle: "check",
                     field: { kind: "objectNumber", objectNumber: 1 },
                     fieldFamily: "text",
+                    hasMark: true,
                 },
             ],
             meta: {
@@ -857,6 +860,7 @@ describe("FormsClient", () => {
                 checkStyle: "check",
                 field: { kind: "objectNumber", objectNumber: 1 },
                 fieldFamily: "text",
+                hasMark: true,
             },
             appearance: { action: "preserved", changed: true },
             meta: {

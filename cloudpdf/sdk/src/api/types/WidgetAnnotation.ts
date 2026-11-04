@@ -50,6 +50,7 @@ export interface WidgetAnnotation {
     checkStyle: WidgetAnnotation.CheckStyle | null;
     field: CloudPDF.FormFieldRef | null;
     fieldFamily: WidgetAnnotation.FieldFamily;
+    hasMark: boolean;
 }
 
 export namespace WidgetAnnotation {

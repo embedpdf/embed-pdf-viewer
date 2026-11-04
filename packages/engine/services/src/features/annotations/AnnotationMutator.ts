@@ -50,6 +50,7 @@ import { RawAnnotationReader } from './RawAnnotationReader';
 import { generateAppearance } from './internal/write/generateAppearance';
 import { writeAnnotationModified } from './internal/write/writeAnnotationBase';
 import { promoteInlineAnnotations } from './internal/write/promoteInlineAnnotations';
+import { assertMarkKeepsItsLook } from './internal/write/writeWidgetAnnotation';
 import {
   writeAnnotationRelationship,
   writeLinkedOpen,
@@ -211,6 +212,7 @@ export class AnnotationMutator {
       patch = pdfResolveAnnotationPatch(currentDto, patch, {
         describeFont: writeCtx.describeFont,
       });
+      assertMarkKeepsItsLook(currentDto, patch);
       assertAnnotationResources(currentDto.subtype, resources, 'update');
       preflightPatch(patch, writeCtx);
 
@@ -321,12 +323,14 @@ export class AnnotationMutator {
       } else {
         const ok =
           currentDto.subtype === 'widget'
-            ? // Drawn as its field's family draws it; a widget in no field has none.
-              fn.EPDFAnnot_GenerateFormFieldAP(annotPtr)
+            ? // Drawn as its field's family draws it: a signature field's and
+              // one in no field, their box. A mark in the widget stays: the
+              // file places it in the moved or resized box.
+              !currentDto.hasMark && fn.EPDFAnnot_GenerateFormFieldAP(annotPtr)
             : generateAppearance(fn, annotPtr, patch.blendMode ?? previousBlendMode);
         appearance = ok
           ? { action: 'regenerated', changed: true }
-          : // No generator for this annotation (a widget in no field). The
+          : // Not drawn (a mark kept, a field type with no generator). The
             // dictionary still changed when the patch was appearance-relevant,
             // so `changed` stays true in that case — form-layer renderers may
             // paint differently even though no /AP was written.
