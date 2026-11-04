@@ -21,6 +21,8 @@ export interface FontVariant {
  */
 export type FontEntry = string | FontVariant | FontVariant[];
 
+export type LatinFontFamily = 'serif' | 'sans-serif' | 'monospace';
+
 /**
  * Custom font loader function type
  * Used to load font data from custom sources (e.g., file system in Node.js)
@@ -40,6 +42,9 @@ export interface FontFallbackConfig {
    * Can be a simple URL string, a FontVariant, or an array of FontVariants
    */
   fonts: Partial<Record<FontCharset, FontEntry>>;
+
+  /** Optional family-specific fallbacks for ANSI and default charsets. */
+  fontFamilies?: Partial<Record<LatinFontFamily, FontEntry>>;
 
   /**
    * Optional default font entry for unspecified charsets
@@ -425,7 +430,12 @@ export class FontFallbackManager {
       face,
     });
 
-    const result = this.findBestFontMatch(charset, weight, italic);
+    const family =
+      charset === FontCharset.ANSI || charset === FontCharset.DEFAULT
+        ? this.getLatinFontFamily(face)
+        : null;
+    const entry = (family && this.fontConfig.fontFamilies?.[family]) || undefined;
+    const result = this.findBestFontMatch(charset, weight, italic, entry);
     if (!result) {
       this.logger.debug(LOG_SOURCE, LOG_CATEGORY, `No font configured for charset ${charset}`);
       return 0;
@@ -543,10 +553,11 @@ export class FontFallbackManager {
     charset: number,
     requestedWeight: number,
     requestedItalic: boolean,
+    familyEntry?: FontEntry,
   ): { url: string; matchedWeight: number; matchedItalic: boolean } | null {
     const { fonts, defaultFont, baseUrl } = this.fontConfig;
 
-    const entry = fonts[charset as FontCharset] ?? defaultFont;
+    const entry = familyEntry ?? fonts[charset as FontCharset] ?? defaultFont;
     if (!entry) {
       return null;
     }
@@ -576,6 +587,43 @@ export class FontFallbackManager {
       matchedWeight: best.weight ?? 400,
       matchedItalic: best.italic ?? false,
     };
+  }
+
+  /** Match familiar Latin faces without changing fallback for unknown names. */
+  private getLatinFontFamily(face: string): LatinFontFamily | null {
+    const name = face
+      .replace(/^[A-Z]{6}\+/, '')
+      .toLowerCase()
+      .replace(/[^a-z]/g, '');
+    if (
+      [
+        'courier',
+        'consolas',
+        'menlo',
+        'liberationmono',
+        'nimbusmono',
+        'notomono',
+        'monospace',
+        'mono',
+      ].some((prefix) => name.startsWith(prefix))
+    ) {
+      return 'monospace';
+    }
+    if (
+      ['helvetica', 'arial', 'calibri', 'liberationsans', 'nimbussans', 'notosans', 'sans'].some(
+        (prefix) => name.startsWith(prefix),
+      )
+    ) {
+      return 'sans-serif';
+    }
+    if (
+      ['times', 'georgia', 'cambria', 'liberationserif', 'nimbusroman', 'notoserif', 'serif'].some(
+        (prefix) => name.startsWith(prefix),
+      )
+    ) {
+      return 'serif';
+    }
+    return null;
   }
 
   /**

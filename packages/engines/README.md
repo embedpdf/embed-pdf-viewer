@@ -18,6 +18,26 @@ For complete guides, examples, and full API reference, visit:
 
 **[Official Documentation](https://www.embedpdf.com/docs/engines/introduction)**
 
+When a PDF uses an unembedded Latin font, the fallback configuration can match
+common face names to serif, sans-serif, or monospace fonts. For example:
+
+```typescript
+import { FontCharset } from '@embedpdf/models';
+
+const fontFallback = {
+  fonts: { [FontCharset.ANSI]: 'NotoSans-Regular.ttf' },
+  fontFamilies: {
+    serif: 'LiberationSerif-Regular.ttf',
+    'sans-serif': 'LiberationSans-Regular.ttf',
+    monospace: 'LiberationMono-Regular.ttf',
+  },
+  baseUrl: '/fonts',
+};
+```
+
+Pass `fontFallback` to `PdfiumNative` or the browser engine configuration. If
+the requested face is unfamiliar, EmbedPDF uses the charset or default font.
+
 ## Why `@embedpdf/engines`?
 
 - **High‑level abstraction** – handles tasks, DPR scaling, annotation colour resolution, range/linearised loading.
