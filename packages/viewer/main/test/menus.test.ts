@@ -546,6 +546,7 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('menus', () => {
       ['Download', null],
       ['Share', 'menu'],
       ['Print', null],
+      ['Take a Snapshot', null],
       ['Full Screen', null],
     ]);
     expect(await focused(tab)).toBe('Open');
@@ -694,7 +695,9 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('menus', () => {
     const [menu] = await menusOf(tab);
     const download = menu!.rows.find((row) => row.label === 'Download')!;
     const print = menu!.rows.find((row) => row.label === 'Print')!;
-    for (const row of [download, print]) {
+    // Without doc.content.copy there are no snapshots either.
+    const snapshot = menu!.rows.find((row) => row.label === 'Take a Snapshot')!;
+    for (const row of [download, print, snapshot]) {
       expect(row.disabled).toBe(true);
       // Why, in the viewer's own tooltip beside the row (buttons.test.ts), not the browser's.
       expect(row.title).toBeNull();
