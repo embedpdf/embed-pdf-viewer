@@ -1,15 +1,16 @@
 /**
  * @embedpdf/vue/render: the Vue view of `@embedpdf/plugin-render`.
- * `<RenderLayer>` draws a page; `useRender()` renders pages yourself, for
- * previews and exports; `useRenderSettings()` and `useRenderEvent()` read and
- * follow the plugin; `usePictureState()` tells a layer whether its page's
- * picture is on screen.
+ * `<RenderLayer>` draws a page and `<SnapshotLayer>` the snapshot tool's box
+ * on it, with `<SnapshotMenu>` beside it; `useRender()` renders pages yourself, for previews and exports;
+ * `useRenderSettings()` and `useRenderEvent()` read and follow the plugin;
+ * `usePictureState()` tells a layer whether its page's picture is on screen;
+ * `useSnapshot()` is the snapshot the tool holds.
  */
 
 // One line per feature: registration travels with the UI.
 export * from '@embedpdf/plugin-render';
 import { RenderToken } from '@embedpdf/plugin-render';
-import type { PictureState, RenderCapability } from '@embedpdf/plugin-render';
+import type { PictureState, RenderCapability, Snapshot } from '@embedpdf/plugin-render';
 import type { EventHook } from '@embedpdf/core';
 import type { Ref } from 'vue';
 import { useCapability, useCapabilityEvent, useOptionalSelector } from './runtime/capabilities';
@@ -17,6 +18,8 @@ import { usePage } from './runtime/page';
 import { settingsComposable } from './state';
 
 export { default as RenderLayer } from './render/RenderLayer.vue';
+export { default as SnapshotLayer } from './render/SnapshotLayer.vue';
+export { default as SnapshotMenu } from './render/SnapshotMenu.vue';
 
 /** The render API (renderPage, renderThumbnail, invalidation, settings) for app code. The object never changes. */
 export function useRender(): RenderCapability {
@@ -48,4 +51,12 @@ export function usePictureState(): Readonly<Ref<PictureState>> {
     (render) => render.getPictureState(page.value.ref, page.value.view),
     NO_PICTURE,
   );
+}
+
+/**
+ * The snapshot the `snapshot` tool holds, or `null`, as a ref: `{ page, rect, image }`, the same
+ * object while it's held. Copy it with `copyImage(snapshot.image)`, in the click itself.
+ */
+export function useSnapshot(): Readonly<Ref<Snapshot | null>> {
+  return useOptionalSelector(RenderToken, (render) => render.getSnapshot(), null);
 }

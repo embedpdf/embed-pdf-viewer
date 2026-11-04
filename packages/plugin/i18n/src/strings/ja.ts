@@ -14,10 +14,12 @@ export const ja: EmbedpdfStrings = {
     selection: { copy: 'コピー' },
     annotation: { delete: '削除' },
     document: { download: 'ダウンロード', print: '印刷' },
+    snapshot: { copy: 'コピー', save: '画像を保存', clear: 'スナップショットを解除' },
     tool: {
       pointer: '選択',
       pan: 'パン',
       zoom: '範囲選択ズーム',
+      snapshot: 'スナップショット',
       highlight: 'ハイライト',
       underline: '下線',
       strikeout: '取り消し線',

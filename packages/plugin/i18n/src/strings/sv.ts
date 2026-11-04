@@ -19,10 +19,12 @@ export const sv: EmbedpdfStrings = {
     selection: { copy: 'Kopiera' },
     annotation: { delete: 'Ta bort' },
     document: { download: 'Ladda ned', print: 'Skriv ut' },
+    snapshot: { copy: 'Kopiera', save: 'Spara bild', clear: 'Rensa ögonblicksbild' },
     tool: {
       pointer: 'Välj',
       pan: 'Panorera',
       zoom: 'Zooma till markering',
+      snapshot: 'Ögonblicksbild',
       highlight: 'Markera',
       underline: 'Stryk under',
       strikeout: 'Stryk över',

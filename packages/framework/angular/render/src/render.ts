@@ -4,7 +4,8 @@
  *   withRender(options)    the plugin, for provideEmbedPdf()
  *   inject(EpdfRender)     pictures of pages on demand (`renderPage`, `renderPages`), redraws
  *                          (`invalidate`, `invalidated$`), whether a page's picture is on screen
- *                          (`getPictureState`, `pictureStateChanged$`), and the settings (`settings()`)
+ *                          (`getPictureState`, `pictureStateChanged$`), the snapshot
+ *                          (`getSnapshot`, `snapshotChanged$`), and the settings (`settings()`)
  *   injectPictureState()   whether the picture of the page a component is drawn on is on screen
  */
 import { Injectable, type Signal } from '@angular/core';
@@ -44,8 +45,11 @@ export class EpdfRender extends pluginService({
     'getRenderEpoch',
     'invalidate',
     'getPictureState',
+    'canSnapshot',
+    'getSnapshot',
+    'clearSnapshot',
   ],
-  events: ['onInvalidated', 'onPictureStateChanged'],
+  events: ['onInvalidated', 'onPictureStateChanged', 'onSnapshotChanged'],
 }) {}
 
 /**

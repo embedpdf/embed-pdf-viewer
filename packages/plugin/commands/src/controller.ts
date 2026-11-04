@@ -458,19 +458,29 @@ export function createCommandsController(ctx: PluginContext<void, CommandsSettin
     onExecutionFailed: executionFailed.on,
     // ── host lens ──
     matchStroke: (stroke: KeyStroke, options) => {
+      let waiting: ShortcutMatch | null = null;
       let refused: ShortcutMatch | null = null;
       for (const entry of definedCommands()) {
         if (options.inTextField && !entry.definition.shortcutInTextFields) continue;
         if (!entry.parsed.some((shortcut) => matchShortcut(shortcut, stroke, options))) continue;
         const context = commandContext();
         const refusal = refusalOf(entry.definition, context);
-        if (!refusal) return { commandId: entry.definition.id, refusal: null };
+        const visible = derive(entry.definition.visible, context, true);
+        if (!refusal) {
+          // Commands that share keys take turns: Escape cancels a drawing while there is one,
+          // and lets a snapshot go while there is one.
+          if (visible && derive(entry.definition.enabled, context, true)) {
+            return { commandId: entry.definition.id, refusal: null };
+          }
+          waiting ??= { commandId: entry.definition.id, refusal: null };
+          continue;
+        }
         // A refused command takes its keys only where it would show: Delete with nothing
         // selected stays the page's, even where deleting is turned off.
-        if (!derive(entry.definition.visible, context, true)) continue;
+        if (!visible) continue;
         refused ??= { commandId: entry.definition.id, refusal };
       }
-      return refused;
+      return waiting ?? refused;
     },
     getMenuTarget: (id) => {
       const entry = entryOf(id);

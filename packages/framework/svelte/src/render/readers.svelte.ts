@@ -1,7 +1,7 @@
 /** The render plugin's readers: its API, its settings, its events and a page's picture state. */
 import type { EventHook } from '@embedpdf/core';
 import { RenderToken } from '@embedpdf/plugin-render';
-import type { PictureState, RenderCapability } from '@embedpdf/plugin-render';
+import type { PictureState, RenderCapability, Snapshot } from '@embedpdf/plugin-render';
 import { usePage } from '../runtime/page';
 import { useCapability, useCapabilityEvent, useOptionalSelector } from '../runtime/readers.svelte';
 import { settingsReader } from '../runtime/state.svelte';
@@ -38,4 +38,12 @@ export function usePictureState(): CurrentValue<PictureState> {
     (render) => render.getPictureState(page.ref, page.view),
     NO_PICTURE,
   );
+}
+
+/**
+ * The snapshot the `snapshot` tool holds, or `null`, as `{ current }`: `{ page, rect, image }`,
+ * the same object while it's held. Copy it with `copyImage(snapshot.image)`, in the click itself.
+ */
+export function useSnapshot(): CurrentValue<Snapshot | null> {
+  return useOptionalSelector(RenderToken, (render) => render.getSnapshot(), null);
 }

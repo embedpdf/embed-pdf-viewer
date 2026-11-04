@@ -19,10 +19,12 @@ export const es: EmbedpdfStrings = {
     selection: { copy: 'Copiar' },
     annotation: { delete: 'Eliminar' },
     document: { download: 'Descargar', print: 'Imprimir' },
+    snapshot: { copy: 'Copiar', save: 'Guardar imagen', clear: 'Descartar instantánea' },
     tool: {
       pointer: 'Seleccionar',
       pan: 'Desplazar',
       zoom: 'Zoom de selección',
+      snapshot: 'Instantánea',
       highlight: 'Resaltar',
       underline: 'Subrayar',
       strikeout: 'Tachar',
