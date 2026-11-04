@@ -280,7 +280,7 @@ describe('search session', () => {
     await kernel.destroy();
   });
 
-  it('drops snippets when they are denied, unless snippets are pinned', async () => {
+  it('drops snippets when the engine denies them although the session looked allowed to copy', async () => {
     const { kernel, api, requests } = await boot([
       new PermissionDenied('doc.text.copy'),
       slice([], null, 2),
@@ -290,6 +290,28 @@ describe('search session', () => {
     expect(requests.map((request) => request.snippets)).toEqual([true, false]);
     await api.findAll({ text: 'x' }, { snippets: false });
     expect(requests[2].snippets).toBe(false);
+    await kernel.destroy();
+  });
+
+  it('asks without snippets from the start when the session may not copy text', async () => {
+    const { kernel, api, requests } = await boot([slice([], null, 2), slice([], null, 2)], {
+      allows: (permission) => permission === 'doc.text.search',
+    });
+    await api.search({ text: 'x' });
+    await api.findAll({ text: 'x' });
+    // One request each: no refused snippet request first.
+    expect(requests.map((request) => request.snippets)).toEqual([false, false]);
+    await kernel.destroy();
+  });
+
+  it('refuses findAll with snippets pinned on without doc.text.copy, before the engine is asked', async () => {
+    const { kernel, api, requests } = await boot([], {
+      allows: (permission) => permission === 'doc.text.search',
+    });
+    await expect(api.findAll({ text: 'x' }, { snippets: true })).rejects.toSatisfy(
+      (error) => isPluginError(error, 'permission-denied') && error.permission === 'doc.text.copy',
+    );
+    expect(requests).toEqual([]);
     await kernel.destroy();
   });
 
