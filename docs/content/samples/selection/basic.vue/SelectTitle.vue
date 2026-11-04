@@ -3,7 +3,7 @@ import { computed, watch } from 'vue';
 import { usePageList } from '@embedpdf/vue/runtime';
 import { useSelection } from '@embedpdf/vue/selection';
 
-// Something to see on load: the title on the cover, selected from code.
+// Something to see on load: "Documents", the first word on the cover, selected from code.
 const selection = useSelection();
 const pages = usePageList();
 const cover = computed(() => pages.value[0]?.ref);
@@ -11,7 +11,9 @@ const cover = computed(() => pages.value[0]?.ref);
 watch(
   cover,
   (page) => {
-    if (page) selection.select({ page, start: 28, count: 30 });
+    // [!doc-range welcome firstWord]
+    if (page) selection.select({ page, start: 28, count: 9 });
+    // [!/doc-range]
   },
   { immediate: true },
 );

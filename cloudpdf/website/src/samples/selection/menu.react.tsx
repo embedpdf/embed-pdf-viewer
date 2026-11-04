@@ -48,13 +48,13 @@ function SelectionActions() {
   );
 }
 
-// Something selected on load, so the menu shows: the title on the cover.
+// Something selected on load, so the menu shows: "Documents", the first word on the cover.
 function SelectTitle() {
   const selection = useSelection();
   const cover = usePageList()[0]?.ref;
 
   useEffect(() => {
-    if (cover) selection.select({ page: cover, start: 28, count: 30 });
+    if (cover) selection.select({ page: cover, start: 36, count: 9 });
   }, [selection, cover]);
 
   return null;

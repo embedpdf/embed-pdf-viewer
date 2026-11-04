@@ -25,7 +25,7 @@ watch(
 watch(
   cover,
   (page) => {
-    if (page) selection.select({ page, start: 28, count: 30 });
+    if (page) selection.select({ page, start: 36, count: 9 });
   },
   { immediate: true },
 );

@@ -1,4 +1,4 @@
-<!-- Something to see on load: the title on the cover, selected from code. -->
+<!-- Something to see on load: "Documents", the first word on the cover, selected from code. -->
 <script lang="ts">
   import { usePageList } from '@embedpdf/svelte/runtime';
   import { useSelection } from '@embedpdf/svelte/selection';
@@ -8,6 +8,8 @@
   const cover = $derived(pages.current[0]?.ref);
 
   $effect(() => {
-    if (cover) selection.select({ page: cover, start: 28, count: 30 });
+    // [!doc-range welcome firstWord]
+    if (cover) selection.select({ page: cover, start: 28, count: 9 });
+    // [!/doc-range]
   });
 </script>

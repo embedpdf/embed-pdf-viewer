@@ -1,9 +1,9 @@
 <script lang="ts" module>
-  // The characters of the cover's title.
-  const TITLE = { start: 28, count: 30 };
+  // The characters of "Documents", the first word on the cover.
+  const FIRST_WORD = { start: 36, count: 9 };
 </script>
 
-<!-- The cover's title is selected on load, so the accent shows; drag over any text to see more. -->
+<!-- The first word is selected on load, so the accent shows; drag over any text to see more. -->
 <script lang="ts">
   import { usePageList } from '@embedpdf/svelte/runtime';
   import { useSelection } from '@embedpdf/svelte/selection';
@@ -13,6 +13,6 @@
   const cover = $derived(pages.current[0]?.ref);
 
   $effect(() => {
-    if (cover) selection.select({ page: cover, ...TITLE });
+    if (cover) selection.select({ page: cover, ...FIRST_WORD });
   });
 </script>

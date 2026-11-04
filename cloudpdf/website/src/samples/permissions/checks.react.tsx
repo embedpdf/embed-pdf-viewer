@@ -77,7 +77,7 @@ function Controls() {
     if (search.canSearch()) void search.search({ text });
   }, [search, text]);
   useEffect(() => {
-    if (cover) selection.select({ page: cover, start: 28, count: 30 });
+    if (cover) selection.select({ page: cover, start: 36, count: 9 });
   }, [selection, cover]);
 
   const copy = async () => {

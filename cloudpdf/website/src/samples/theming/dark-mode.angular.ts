@@ -16,11 +16,11 @@ import { EpdfSelection, EpdfSelectionLayer, withSelection } from '@embedpdf/angu
 import { EpdfSearch, EpdfSearchLayer, withSearch } from '@embedpdf/angular/search';
 import { cloudEngine } from '@cloudpdf/engine';
 
-const TITLE = { start: 28, count: 30 };
+const FIRST_WORD = { start: 36, count: 9 };
 
 const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
-// On load: the cover's title is selected and "PDF" is found, so every color below has something to paint.
+// On load: the first word is selected and "PDF" is found, so every color below has something to paint.
 @Component({
   selector: 'demo-show-colors',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -33,7 +33,7 @@ export class ShowColors {
     void inject(EpdfSearch).search({ text: 'PDF' });
     effect(() => {
       const cover = document.pages()[0]?.ref;
-      if (cover) untracked(() => selection.select({ page: cover, ...TITLE }));
+      if (cover) untracked(() => selection.select({ page: cover, ...FIRST_WORD }));
     });
   }
 }

@@ -84,10 +84,10 @@ export class App {
   private readonly document = inject(EpdfDocument);
 
   constructor() {
-    // A word selected on load, as a long-press selects one: "Viewers", on the cover.
+    // A word selected on load, as a long-press selects one: "Documents", on the cover.
     effect(() => {
       const cover = this.document.pages()[0]?.ref;
-      if (cover) this.selection.select({ page: cover, start: 14, count: 7 });
+      if (cover) this.selection.select({ page: cover, start: 36, count: 9 });
     });
   }
 }

@@ -21,7 +21,7 @@
     if (canSearch) void search.search({ text });
   });
   $effect(() => {
-    if (cover) selection.select({ page: cover, start: 28, count: 30 });
+    if (cover) selection.select({ page: cover, start: 36, count: 9 });
   });
 
   async function copy() {

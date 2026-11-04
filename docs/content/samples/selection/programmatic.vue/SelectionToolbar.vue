@@ -3,8 +3,11 @@ import { computed, watch } from 'vue';
 import { usePageList } from '@embedpdf/vue/runtime';
 import { useSelection, useSelectionState } from '@embedpdf/vue/selection';
 
-// On the cover: the characters of its title, and a point on its word "Viewers", in page coordinates.
-const TITLE = { start: 28, count: 30 };
+// On the cover: the characters of its first word, "Documents", and a point on its word "web",
+// in page coordinates.
+// [!doc-range welcome firstWord]
+const FIRST_WORD = { start: 28, count: 9 };
+// [!/doc-range]
 const POINT = { x: 260, y: 242 };
 
 // Every button selects on the cover, the first page: by its ref, or by its index, 0.
@@ -13,17 +16,17 @@ const { hasSelection, range, pages } = useSelectionState();
 const pageList = usePageList();
 const cover = computed(() => pageList.value[0]?.ref);
 
-// The title is selected on load.
+// The first word is selected on load.
 watch(
   cover,
   (page) => {
-    if (page) selection.select({ page, ...TITLE });
+    if (page) selection.select({ page, ...FIRST_WORD });
   },
   { immediate: true },
 );
 
-function selectTitle() {
-  if (cover.value) selection.select({ page: cover.value, ...TITLE });
+function selectCharacters() {
+  if (cover.value) selection.select({ page: cover.value, ...FIRST_WORD });
 }
 
 const summary = computed(() => {
@@ -39,9 +42,9 @@ const summary = computed(() => {
       type="button"
       class="button"
       :disabled="!selection.canSelect() || !cover"
-      @click="selectTitle"
+      @click="selectCharacters"
     >
-      Title
+      Characters
     </button>
     <button
       type="button"

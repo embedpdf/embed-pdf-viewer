@@ -3,8 +3,9 @@
   import { usePageList } from '@embedpdf/svelte/runtime';
   import { useSelection, useSelectionState } from '@embedpdf/svelte/selection';
 
-  // On the cover: the characters of its title, and a point on its word "Viewers", in page coordinates.
-  const TITLE = { start: 28, count: 30 };
+  // On the cover: the characters of its first word, "Documents", and a point on its word "web",
+  // in page coordinates.
+  const FIRST_WORD = { start: 28, count: 9 };
   const POINT = { x: 260, y: 242 };
 
   const selection = useSelection();
@@ -12,9 +13,9 @@
   const pages = usePageList();
   const cover = $derived(pages.current[0]?.ref);
 
-  // The title is selected on load.
+  // The first word is selected on load.
   $effect(() => {
-    if (cover) selection.select({ page: cover, ...TITLE });
+    if (cover) selection.select({ page: cover, ...FIRST_WORD });
   });
 
   const summary = $derived.by(() => {
@@ -29,9 +30,9 @@
     type="button"
     class="button"
     disabled={!selection.canSelect() || !cover}
-    onclick={() => cover && selection.select({ page: cover, ...TITLE })}
+    onclick={() => cover && selection.select({ page: cover, ...FIRST_WORD })}
   >
-    Title
+    Characters
   </button>
   <button
     type="button"

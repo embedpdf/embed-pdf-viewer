@@ -26,7 +26,7 @@ const plugins = [
 
 const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
 
-// Something on every layer on load: the matches of a search, and the title selected.
+// Something on every layer on load: the matches of a search, and the first word selected.
 function OnLoad() {
   const search = useSearch();
   const selection = useSelection();
@@ -36,7 +36,7 @@ function OnLoad() {
     void search.search({ text: 'PDF' });
   }, [search]);
   useEffect(() => {
-    if (cover) selection.select({ page: cover, start: 28, count: 30 });
+    if (cover) selection.select({ page: cover, start: 36, count: 9 });
   }, [selection, cover]);
 
   return null;

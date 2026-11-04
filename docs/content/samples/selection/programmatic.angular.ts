@@ -14,8 +14,11 @@ import { withInteraction } from '@embedpdf/angular/interaction';
 import { EpdfSelection, EpdfSelectionLayer, withSelection } from '@embedpdf/angular/selection';
 import { localEngine } from '@embedpdf/engine';
 
-// On the cover: the characters of its title, and a point on its word "Viewers", in page coordinates.
-const TITLE = { start: 28, count: 30 };
+// On the cover: the characters of its first word, "Documents", and a point on its word "web",
+// in page coordinates.
+// [!doc-range welcome firstWord]
+const FIRST_WORD = { start: 28, count: 9 };
+// [!/doc-range]
 const POINT = { x: 260, y: 242 };
 
 // [!doc-source welcome]
@@ -35,9 +38,9 @@ const welcome = async (): Promise<OpenInput> => {
         type="button"
         class="button"
         [disabled]="!selection.canSelect() || !cover()"
-        (click)="selectTitle()"
+        (click)="selectCharacters()"
       >
-        Title
+        Characters
       </button>
       <button
         type="button"
@@ -98,15 +101,15 @@ export class SelectionToolbar {
   });
 
   constructor() {
-    // The title is selected on load.
+    // The first word is selected on load.
     effect(() => {
-      if (this.cover()) this.selectTitle();
+      if (this.cover()) this.selectCharacters();
     });
   }
 
-  protected selectTitle() {
+  protected selectCharacters() {
     const cover = this.cover();
-    if (cover) this.selection.select({ page: cover, ...TITLE });
+    if (cover) this.selection.select({ page: cover, ...FIRST_WORD });
   }
 }
 

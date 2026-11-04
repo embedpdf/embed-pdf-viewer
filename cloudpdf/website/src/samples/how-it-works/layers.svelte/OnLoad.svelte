@@ -1,4 +1,4 @@
-<!-- Something on every layer on load: the matches of a search, and the title selected. -->
+<!-- Something on every layer on load: the matches of a search, and the first word selected. -->
 <script lang="ts">
   import { usePageList } from '@embedpdf/svelte/runtime';
   import { useSearch } from '@embedpdf/svelte/search';
@@ -13,6 +13,6 @@
     void search.search({ text: 'PDF' });
   });
   $effect(() => {
-    if (cover) selection.select({ page: cover, start: 28, count: 30 });
+    if (cover) selection.select({ page: cover, start: 36, count: 9 });
   });
 </script>
