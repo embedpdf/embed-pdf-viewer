@@ -80,8 +80,8 @@ export class ImageEncoderWorkerPool {
     if (response.type === 'result') {
       task.resolve(response.data as Blob);
     } else {
-      const errorData = response.data as { message: string };
-      task.reject(new Error(errorData.message));
+      const errorData = response.data as { message: string; imageData?: unknown };
+      task.reject(Object.assign(new Error(errorData.message), { imageData: errorData.imageData }));
     }
   }
 

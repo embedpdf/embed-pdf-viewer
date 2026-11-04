@@ -255,7 +255,12 @@ export class PdfiumNativeRunner {
    */
   private respond(response: WorkerResponse): void {
     this.logger.debug(LOG_SOURCE, LOG_CATEGORY, 'Sending response:', response.type);
-    self.postMessage(response);
+    const pixels = response.data?.data;
+    const transfer =
+      pixels instanceof Uint8ClampedArray && pixels.buffer instanceof ArrayBuffer
+        ? [pixels.buffer]
+        : [];
+    self.postMessage(response, transfer);
   }
 
   /**

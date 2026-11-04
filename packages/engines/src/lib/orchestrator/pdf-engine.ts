@@ -484,9 +484,9 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
     const imageType = options?.imageType ?? 'image/png';
     const quality = options?.quality;
 
-    // Convert to plain object for encoding
+    // The worker transferred these pixels, so the converter may take them without a copy
     const plainImageData = {
-      data: new Uint8ClampedArray(rawImageData.data),
+      data: rawImageData.data,
       width: rawImageData.width,
       height: rawImageData.height,
     };

@@ -1,4 +1,4 @@
-import type { ImageConversionTypes } from '@embedpdf/models';
+import type { ImageConversionTypes, PdfImage } from '@embedpdf/models';
 import type { ImageDataConverter, LazyImageData } from './types';
 import { ImageEncoderWorkerPool } from '../image-encoder';
 import { rgbaToBmpBlob } from '../image-encoder/bmp';
@@ -136,12 +136,11 @@ export function createHybridImageConverter(
     }
 
     try {
-      // Try worker pool encoding first (OffscreenCanvas in worker)
-      const dataCopy = new Uint8ClampedArray(pdfImage.data);
-
+      // Try worker pool encoding first (OffscreenCanvas in worker).
+      // The pool transfers the pixels; a failed encode hands them back on the error.
       return await workerPool.encode(
         {
-          data: dataCopy,
+          data: pdfImage.data,
           width: pdfImage.width,
           height: pdfImage.height,
         },
@@ -151,7 +150,8 @@ export function createHybridImageConverter(
     } catch (error) {
       // Fallback to main-thread Canvas
       console.warn('Worker encoding failed, falling back to main-thread Canvas:', error);
-      return browserImageDataToBlobConverter(getImageData, imageType, quality);
+      const returned = (error as { imageData?: PdfImage } | null)?.imageData;
+      return browserImageDataToBlobConverter(() => returned ?? pdfImage, imageType, quality);
     }
   };
 
