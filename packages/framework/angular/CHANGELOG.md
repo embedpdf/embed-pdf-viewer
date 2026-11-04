@@ -1,5 +1,11 @@
 # @embedpdf/angular
 
+## 3.0.0-next.22
+
+### Minor Changes
+
+- [#980](https://github.com/embedpdf/embed-pdf-viewer/pull/980) by [@bobsingor](https://github.com/bobsingor) – New `<epdf-snapshot-layer>` in `/render`: the snapshot tool's box on each page, in the `snapshot.box` colors. New `<epdf-snapshot-menu>`: your UI by the snapshot, once it's taken. `EpdfRender` has `canSnapshot()`, `getSnapshot()`, `clearSnapshot()` and `snapshotChanged$`. `copyImage` comes from `/runtime`, beside `saveFile`.
+
 ## 3.0.0-next.21
 
 ### Minor Changes

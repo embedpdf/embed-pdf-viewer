@@ -1,5 +1,21 @@
 # @cloudpdf/contract
 
+## 3.0.0-next.22
+
+### Minor Changes
+
+- [#978](https://github.com/embedpdf/embed-pdf-viewer/pull/978) by [@bobsingor](https://github.com/bobsingor) – Every markup annotation carries `richText`, its comment with formatting, or
+  `null` for a plain comment, in reads, creates and updates. The rich text model
+  is named once, as `RichTextDocument` and `RichTextDocumentInput`.
+
+- [#967](https://github.com/embedpdf/embed-pdf-viewer/pull/967) by [@bobsingor](https://github.com/bobsingor) – `deployment.modules` (`GET /v1/deployment/modules`, API token) lists the installed server modules: `ModuleManifest` with its `ModulePermission`s and `ModuleMeter`s, all named components. `tenants.usage` takes `from` and `to` (UTC days, `to` the day after the last) in place of `period`, and its `metrics` hold modules' meters next to the core's.
+
+- [#971](https://github.com/embedpdf/embed-pdf-viewer/pull/971) by [@bobsingor](https://github.com/bobsingor) – A square, circle, polygon, polyline, line or ink annotation's `color` may be `null`: no stroke. A read gives `null` for a file's empty or missing stroke color.
+
+### Patch Changes
+
+- [#972](https://github.com/embedpdf/embed-pdf-viewer/pull/972) by [@bobsingor](https://github.com/bobsingor) – `dashArray` on an annotation's create and update and on a widget placement takes at least one length (`minItems: 1`): an empty pattern is refused.
+
 ## 3.0.0-next.21
 
 ### Minor Changes

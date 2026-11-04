@@ -1,5 +1,23 @@
 # @embedpdf/engine-core
 
+## 3.0.0-next.22
+
+### Minor Changes
+
+- [#973](https://github.com/embedpdf/embed-pdf-viewer/pull/973) by [@bobsingor](https://github.com/bobsingor) – An update can change an annotation's kind to a sibling: a highlight, underline, squiggly line or strikeout into another of the four, and a square into a circle and back, the kinds ISO 32000-2 describes with one table of entries. New `siblingKindsOf(subtype)` lists the kinds an annotation can become, `canChangeKind(annotation, subtype)` says whether it can become one now, and `fieldTheKindCannotHold(annotation, subtype)` names the value in the way. The patch is the new kind's patch, checked against its schema, and the annotation stays itself: its ref, `nm`, replies, popup, group and author. Any other subtype is refused with `InvalidArg` (`details.field` `'subtype'`), naming the kinds it can become. A value the new kind has no field for is refused, never dropped (`details.field` names it): clear it first, in the same change, as a replacement's strikeout clears its `intent`.
+
+  `applyAnnotationPatch` and `mergeAnnotationPatch` predict the new kind, a field only it has reading `null`, and `annotationPatchBetween` states `subtype` when the kind changed.
+
+- [#974](https://github.com/embedpdf/embed-pdf-viewer/pull/974) by [@bobsingor](https://github.com/bobsingor) – Latin a font lacks is never a box. After the fallback fonts, the engine draws a character the run's font doesn't have in the standard font that stands in for that font, in its weight and italic (Times for Times New Roman, Courier for Courier New, Helvetica for any other), and only then in the last resort. `doc.fonts.resolve()` says so: each run's `fallbacks` ends with that standard font's program, unless the run is drawn in it. `standardFontForFace(face)`, the rule that picks it, is exported from `@embedpdf/engine-core/runtime`.
+
+- [#978](https://github.com/embedpdf/embed-pdf-viewer/pull/978) by [@bobsingor](https://github.com/bobsingor) – Every markup annotation has `richText`, its comment with formatting (`/RC`, ISO 32000-2 §12.5.6.2): a note, a highlight, a shape, a line, ink, a stamp, a caret, a file attachment or a redaction. It is the `RichTextDocument` a free text has, or `null` when the comment is plain text, and `contents` is its plain projection. A create or update with `richText` brings its `contents`; `contents` alone on a formatted comment replaces its paragraphs with plain ones and keeps its body; `richText: null` keeps the text and drops the formatting. `contents` and `richText` given together must say the same text, line breaks however spelled, for every kind. Links, popups and widgets have no `richText`. The rich text schemas are named `RichTextDocument` and `RichTextDocumentInput` among the annotation wire components.
+
+- [#971](https://github.com/embedpdf/embed-pdf-viewer/pull/971) by [@bobsingor](https://github.com/bobsingor) – A square, circle, polygon, polyline, line or ink annotation takes `color: null` for no stroke, and keeps its `strokeWidth`. A shape whose file gives it no stroke color reads `color: null`. `runNoStrokeConformance` and `NO_STROKE_FIXTURE_PDF` check both engines read, write and draw it as Acrobat does.
+
+### Patch Changes
+
+- [#972](https://github.com/embedpdf/embed-pdf-viewer/pull/972) by [@bobsingor](https://github.com/bobsingor) – A dashed border whose `dashArray` is left out, on create or by an update that makes it dashed while it has no pattern, now states the default `[3, 3]` and reads it back, for every kind with a border and for widget placements. The pattern is written into the file because Acrobat redraws a dashed border whose file names none as a solid line. `dashArray: null` is no pattern: written as none, it reads back `null`. A write refuses an empty `dashArray`: an empty pattern is a solid line, which is `borderStyle: 'solid'`.
+
 ## 3.0.0-next.21
 
 ## 3.0.0-next.20

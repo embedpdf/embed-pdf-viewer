@@ -1,5 +1,21 @@
 # @embedpdf/engine-runtime
 
+## 3.0.0-next.22
+
+### Minor Changes
+
+- [#973](https://github.com/embedpdf/embed-pdf-viewer/pull/973) by [@bobsingor](https://github.com/bobsingor) – The runtime has `EPDFAnnot_SetSubtype`: an annotation's kind changed in place, its `/Subtype` written and every other entry kept.
+
+- [#974](https://github.com/embedpdf/embed-pdf-viewer/pull/974) by [@bobsingor](https://github.com/bobsingor) – The runtime draws Latin a font lacks in the standard font that stands in for that font (its own standard family, else Helvetica, in its weight and italic), after the fallback fonts and before the last-resort box, in free text, form fields and redaction labels: text in a font without Latin, such as Noto Sans Hebrew, keeps its Latin letters. A registered font's `/BaseFont` is its PostScript name rather than the family it was registered under, so two weights of one family are two fonts in the PDF and in `EPDFFont_GetPostScriptName()`; a variable-font instance is named as the font names that instance, and each subset has its own tag.
+
+- [#971](https://github.com/embedpdf/embed-pdf-viewer/pull/971) by [@bobsingor](https://github.com/bobsingor) – A square, circle, polygon, polyline, line or ink whose `/C` is empty or left out draws no stroke, as Acrobat does: the fill alone, still inset half the border width, and only the filled line endings. A line, polyline or ink at border width 0 draws a hairline. Adds the `EPDFAnnot_SetNoColor` binding, which writes a color entry as an empty array.
+
+### Patch Changes
+
+- [#971](https://github.com/embedpdf/embed-pdf-viewer/pull/971) by [@bobsingor](https://github.com/bobsingor) – An ink annotation's appearance draws each stroke as Acrobat does: the cubic Béziers Acrobat fits to its points, never more than about 1.4 points from any of them, with round caps and no join, and a stroke of one point as a dot of radius 0.5. `/Rect` follows the curves.
+
+- [#972](https://github.com/embedpdf/embed-pdf-viewer/pull/972) by [@bobsingor](https://github.com/bobsingor) – An empty dash pattern (`/BS /D []`) is a solid line, as ISO 32000 says: a shape's, line's, ink's or form widget's border with one draws no dashes and reads solid. A dashed border without `/D` still draws the default dash.
+
 ## 3.0.0-next.21
 
 ## 3.0.0-next.20

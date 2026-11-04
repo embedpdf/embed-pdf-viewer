@@ -1,5 +1,11 @@
 # @embedpdf/core-ui
 
+## 3.0.0-next.22
+
+### Minor Changes
+
+- [#980](https://github.com/embedpdf/embed-pdf-viewer/pull/980) by [@bobsingor](https://github.com/bobsingor) – A bar can sit by the snapshot tool's box: `{ at: 'snapshot' }`, beside `{ at: 'selection' }` and `{ at: 'annotation' }`.
+
 ## 3.0.0-next.21
 
 ### Minor Changes

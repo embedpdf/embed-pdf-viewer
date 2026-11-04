@@ -1,5 +1,17 @@
 # @cloudpdf/sdk
 
+## 3.0.0-next.22
+
+### Minor Changes
+
+- [#978](https://github.com/embedpdf/embed-pdf-viewer/pull/978) by [@bobsingor](https://github.com/bobsingor) – Annotations, drafts and patches of every markup kind have `richText`, the
+  comment with formatting (`RichTextDocument`, `RichTextDocumentInput`), or
+  `null` for a plain comment.
+
+- [#967](https://github.com/embedpdf/embed-pdf-viewer/pull/967) by [@bobsingor](https://github.com/bobsingor) – `deployment.modules()` lists the installed server modules: their names, permissions and meters. `tenants.usage` takes `from` and `to` for a window of UTC days, and its `metrics` include modules' meters.
+
+- [#971](https://github.com/embedpdf/embed-pdf-viewer/pull/971) by [@bobsingor](https://github.com/bobsingor) – A square, circle, polygon, polyline, line or ink annotation's `color` may be `null`: no stroke.
+
 ## 3.0.0-next.21
 
 ### Minor Changes

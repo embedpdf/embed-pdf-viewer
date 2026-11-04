@@ -1,5 +1,11 @@
 # @embedpdf/svelte
 
+## 3.0.0-next.22
+
+### Minor Changes
+
+- [#980](https://github.com/embedpdf/embed-pdf-viewer/pull/980) by [@bobsingor](https://github.com/bobsingor) – New `<SnapshotLayer>` in `/render`: the snapshot tool's box on each page, in the `snapshot.box` colors. New `<SnapshotMenu>`: your UI by the snapshot, once it's taken. New `useSnapshot()`: the snapshot the tool holds, or `null`. `copyImage` comes from `/runtime`, beside `saveFile`.
+
 ## 3.0.0-next.21
 
 ## 3.0.0-next.20

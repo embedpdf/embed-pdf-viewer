@@ -1,5 +1,11 @@
 # @cloudpdf/server-modules
 
+## 3.0.0-next.22
+
+### Minor Changes
+
+- [#967](https://github.com/embedpdf/embed-pdf-viewer/pull/967) by [@bobsingor](https://github.com/bobsingor) – `defineServerModule` takes a `name` (required), a `description` and `meters`; a request counts the module's meters with `req.meters.count(meter, { oncePerDay })`. Permissions take `replaces` and `bypassedBy`. `startTestServer`'s tenant has the given modules turned on, so their routes answer instead of `403 FeatureNotEnabled`.
+
 ## 3.0.0-next.21
 
 ### Minor Changes
