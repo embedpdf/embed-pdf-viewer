@@ -117,7 +117,7 @@ describe('validateLayout', () => {
       'bar "orphan" rides along "mian": no such bar (did you mean "main"?)',
       'bar "loopA" rides along a bar that rides along it',
       'bar "loopB" rides along a bar that rides along it',
-      'bar "selected": "everything" is not selection or annotation',
+      'bar "selected": "everything" is not selection, annotation or snapshot',
       'bar "paneled" goes in "coments": no such panel (did you mean "comments"?)',
       'bar "unknown": {"near":"main"} is not a place (an edge, { edge, before | after }, { float }, { with }, { at } or { panel })',
     ]);

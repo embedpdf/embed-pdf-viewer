@@ -41,7 +41,9 @@ import { RedactionToken } from '@embedpdf/react/redaction';
 import { StampToken } from '@embedpdf/react/stamp';
 import { SignatureToken } from '@embedpdf/react/signature';
 import { I18nToken } from '@embedpdf/react/i18n';
-import { saveFile } from '@embedpdf/web';
+import { RenderToken, SNAPSHOT_TOOL } from '@embedpdf/react/render';
+import type { PageRef } from '@embedpdf/react/runtime';
+import { copyImage, saveFile } from '@embedpdf/web';
 
 import type { Feature } from '../features';
 import { attachmentCommands } from './attachments';
@@ -97,6 +99,19 @@ const manyPages = (commandContext: Ctx) => (stage(commandContext)?.getPageCount(
 const interaction = (commandContext: Ctx) => commandContext.tryGet(InteractionToken);
 const anno = (commandContext: Ctx) => commandContext.tryGet(AnnotationToken);
 const textSelection = (commandContext: Ctx) => commandContext.tryGet(SelectionToken);
+const renderOf = (commandContext: Ctx) => commandContext.tryGet(RenderToken);
+/** The snapshot the snapshot tool holds: the snapshot strip's verbs show while there is one. */
+const snapshotOf = (commandContext: Ctx) => renderOf(commandContext)?.getSnapshot() ?? null;
+
+/** A snapshot's file name: the document's name and the page's number, as a PNG (`Report p3.png`). */
+const snapshotFileName = (commandContext: Ctx, page: PageRef): string => {
+  const documents = commandContext.tryGet(DocumentsToken);
+  const id = commandContext.documentId ?? undefined;
+  const name = (documents?.get(id)?.name ?? 'document').replace(/\.pdf$/i, '');
+  const index =
+    documents?.listPages(id).findIndex((info) => info.ref.objectNumber === page.objectNumber) ?? -1;
+  return `${name} p${index + 1}.png`;
+};
 
 /**
  * Whether the session may run a command, as the plugin that owns its verb says, and the
@@ -463,6 +478,19 @@ export const defaultCommands: CommandDef[] = [
     run: (commandContext) => interaction(commandContext)?.activateTool('zoom'),
     active: (commandContext) => interaction(commandContext)?.getActiveToolId() === 'zoom',
     enabled: (commandContext) => interaction(commandContext) != null,
+  },
+  // Drag a box to take that part of a page as a picture, or click for the whole page. A PDF
+  // that forbids copying forbids it, as in Acrobat (`render.canSnapshot()`).
+  {
+    id: 'tool:snapshot',
+    labelKey: 'commands.snapshot.tool',
+    icon: 'screenshot',
+    categories: ['snapshots'],
+    allowed: (commandContext) => renderOf(commandContext)?.canSnapshot() ?? true,
+    notAllowedKey: 'commands.notAllowed.doc-content-copy',
+    run: (commandContext) => interaction(commandContext)?.activateTool(SNAPSHOT_TOOL),
+    active: (commandContext) => interaction(commandContext)?.getActiveToolId() === SNAPSHOT_TOOL,
+    enabled: (commandContext) => interaction(commandContext)?.hasTool(SNAPSHOT_TOOL) ?? false,
   },
 
   // The panels' `panel:<id>` commands come from the layout's panels (config/panels.ts).
@@ -1053,6 +1081,55 @@ export const defaultCommands: CommandDef[] = [
     'strikethrough',
     'annotations.markup',
   ),
+
+  // ── the snapshot (the snapshot strip's verbs) ───────────────────────────
+  {
+    id: 'snapshot:copy',
+    labelKey: 'commands.snapshot.copy',
+    icon: 'copy',
+    shortcut: 'Mod+C',
+    categories: ['snapshots'],
+    visible: (commandContext) => snapshotOf(commandContext) != null,
+    // Straight to the clipboard, in the click itself: the picture follows when it's there. A
+    // copy lets the snapshot go, which also dismisses its strip, as copying text does.
+    run: (commandContext) => {
+      const render = renderOf(commandContext);
+      const snapshot = render?.getSnapshot();
+      if (!render || !snapshot) return;
+      void copyImage(snapshot.image).then(
+        () => {
+          // A copy can outlive the click: never let it go of a newer snapshot.
+          if (render.getSnapshot() === snapshot) render.clearSnapshot();
+        },
+        () => {}, // Copy failed: keep the snapshot, to copy again or save.
+      );
+    },
+  },
+  {
+    id: 'snapshot:save',
+    labelKey: 'commands.snapshot.save',
+    icon: 'download',
+    categories: ['snapshots'],
+    visible: (commandContext) => snapshotOf(commandContext) != null,
+    run: (commandContext) => {
+      const snapshot = snapshotOf(commandContext);
+      if (!snapshot) return;
+      const name = snapshotFileName(commandContext, snapshot.page);
+      snapshot.image
+        .then((image) => image.blob())
+        .then((blob) => saveFile(blob, name, 'image/png'))
+        .catch((error) => console.warn('[snippet-react] snapshot save failed', error));
+    },
+  },
+  {
+    id: 'snapshot:clear',
+    labelKey: 'commands.snapshot.clear',
+    icon: 'x',
+    shortcut: 'Escape',
+    categories: ['snapshots'],
+    visible: (commandContext) => snapshotOf(commandContext) != null,
+    run: (commandContext) => renderOf(commandContext)?.clearSnapshot(),
+  },
 
   // ── link strip items: Link / Go to link / Remove link ────────────────────
   {

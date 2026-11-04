@@ -115,6 +115,13 @@ export const de: Locale = {
         copy: 'Kopieren',
         strip: 'Aktionen für Textauswahl',
       },
+      snapshot: {
+        tool: 'Schnappschuss erstellen',
+        copy: 'Kopieren',
+        save: 'Bild speichern',
+        clear: 'Schnappschuss verwerfen',
+        strip: 'Aktionen für Schnappschuss',
+      },
       shapes: {
         rectangle: 'Rechteck',
         circle: 'Ellipse',
@@ -162,6 +169,7 @@ export const de: Locale = {
         'doc-annotate-modify': 'Ändern von Anmerkungen ist nicht zulässig',
         'doc-annotate-read': 'Anzeigen von Anmerkungen ist nicht zulässig',
         'doc-attachments-modify': 'Das Hinzufügen von Dateien ist nicht erlaubt',
+        'doc-content-copy': 'Schnappschüsse sind nicht zulässig',
         'doc-download': 'Herunterladen ist nicht zulässig',
         'doc-forms-modify': 'Bearbeiten von Formularfeldern ist nicht zulässig',
         'doc-outline-modify': 'Das Ändern der Lesezeichen ist nicht erlaubt',

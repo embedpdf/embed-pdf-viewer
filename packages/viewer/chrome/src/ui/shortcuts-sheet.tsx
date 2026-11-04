@@ -40,14 +40,23 @@ const GROUPS: readonly { readonly titleKey: string; readonly areas: readonly str
   },
   {
     titleKey: 'shortcuts.editing',
-    areas: ['history', 'tool', 'selection', 'annotation', 'redaction', 'measurement', 'outline'],
+    areas: [
+      'history',
+      'tool',
+      'selection',
+      'annotation',
+      'snapshot',
+      'redaction',
+      'measurement',
+      'outline',
+    ],
   },
 ];
 /** Every other command, yours among them. */
 const OTHER_GROUP = 'shortcuts.other';
 
 /** The areas whose commands act on what's selected: there whether or not anything is now. */
-const ON_A_SELECTION = new Set(['selection', 'annotation']);
+const ON_A_SELECTION = new Set(['selection', 'annotation', 'snapshot']);
 
 const areaOf = (commandId: string): string => commandId.split(':')[0] ?? commandId;
 

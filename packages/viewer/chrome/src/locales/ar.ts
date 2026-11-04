@@ -116,6 +116,13 @@ export const ar: Locale = {
         copy: 'نسخ',
         strip: 'إجراءات تحديد النص',
       },
+      snapshot: {
+        tool: 'التقاط لقطة',
+        copy: 'نسخ',
+        save: 'حفظ الصورة',
+        clear: 'مسح اللقطة',
+        strip: 'إجراءات اللقطة',
+      },
       shapes: {
         rectangle: 'مستطيل',
         circle: 'دائرة',
@@ -163,6 +170,7 @@ export const ar: Locale = {
         'doc-annotate-modify': 'لا يُسمح بتغيير التعليقات التوضيحية',
         'doc-annotate-read': 'لا يُسمح بعرض التعليقات التوضيحية',
         'doc-attachments-modify': 'لا يُسمح بإضافة ملفات',
+        'doc-content-copy': 'لا يُسمح بالتقاط اللقطات',
         'doc-download': 'لا يُسمح بالتنزيل',
         'doc-forms-modify': 'لا يُسمح بتحرير حقول النماذج',
         'doc-outline-modify': 'لا يُسمح بتغيير المخطط',

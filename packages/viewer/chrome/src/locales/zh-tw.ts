@@ -117,6 +117,13 @@ export const zhTW: Locale = {
         copy: '複製',
         strip: '文字選取動作',
       },
+      snapshot: {
+        tool: '拍快照',
+        copy: '複製',
+        save: '儲存影像',
+        clear: '清除快照',
+        strip: '快照動作',
+      },
       shapes: {
         rectangle: '矩形',
         circle: '橢圓形',
@@ -164,6 +171,7 @@ export const zhTW: Locale = {
         'doc-annotate-modify': '不允許變更註解',
         'doc-annotate-read': '不允許檢視註解',
         'doc-attachments-modify': '不允許新增檔案',
+        'doc-content-copy': '不允許拍快照',
         'doc-download': '不允許下載',
         'doc-forms-modify': '不允許編輯表單欄位',
         'doc-outline-modify': '不允許變更書籤',

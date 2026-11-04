@@ -214,6 +214,11 @@ export const DEFAULT_LAYOUT: LayoutData = {
         },
       ],
     },
+    // Under the box the snapshot tool holds: copy it, or save it as a PNG.
+    snapshot: {
+      place: { at: 'snapshot' },
+      center: [{ id: 'snapshot', items: ['snapshot:copy', 'snapshot:save'], importance: 4 }],
+    },
     annotation: {
       place: { at: 'annotation' },
       center: [
@@ -279,7 +284,10 @@ export const DEFAULT_LAYOUT: LayoutData = {
   },
 
   menus: {
-    document: [['document:open', 'document:download', 'document:print'], ['view:fullscreen']],
+    document: [
+      ['document:open', 'document:download', 'document:print', 'tool:snapshot'],
+      ['view:fullscreen'],
+    ],
     view: [
       {
         titleKey: 'commands.spread.group',

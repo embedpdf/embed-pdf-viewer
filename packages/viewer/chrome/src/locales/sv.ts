@@ -116,6 +116,13 @@ export const sv: Locale = {
         copy: 'Kopiera',
         strip: 'Åtgärder för markerad text',
       },
+      snapshot: {
+        tool: 'Ta en ögonblicksbild',
+        copy: 'Kopiera',
+        save: 'Spara bild',
+        clear: 'Rensa ögonblicksbild',
+        strip: 'Åtgärder för ögonblicksbild',
+      },
       shapes: {
         rectangle: 'Rektangel',
         circle: 'Ellips',
@@ -163,6 +170,7 @@ export const sv: Locale = {
         'doc-annotate-modify': 'Du får inte ändra kommentarer',
         'doc-annotate-read': 'Du får inte visa kommentarer',
         'doc-attachments-modify': 'Du får inte lägga till filer',
+        'doc-content-copy': 'Du får inte ta ögonblicksbilder',
         'doc-download': 'Du får inte ladda ned',
         'doc-forms-modify': 'Du får inte redigera formulärfält',
         'doc-outline-modify': 'Du får inte ändra bokmärkena',

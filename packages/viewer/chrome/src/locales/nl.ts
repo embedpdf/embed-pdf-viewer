@@ -115,6 +115,13 @@ export const nl: Locale = {
         copy: 'Kopiëren',
         strip: 'Acties voor tekstselectie',
       },
+      snapshot: {
+        tool: 'Momentopname maken',
+        copy: 'Kopiëren',
+        save: 'Afbeelding opslaan',
+        clear: 'Momentopname wissen',
+        strip: 'Acties voor momentopname',
+      },
       shapes: {
         rectangle: 'Rechthoek',
         circle: 'Ellips',
@@ -162,6 +169,7 @@ export const nl: Locale = {
         'doc-annotate-modify': 'Annotaties wijzigen is niet toegestaan',
         'doc-annotate-read': 'Annotaties bekijken is niet toegestaan',
         'doc-attachments-modify': 'Bestanden toevoegen is niet toegestaan',
+        'doc-content-copy': 'Momentopnamen zijn niet toegestaan',
         'doc-download': 'Downloaden is niet toegestaan',
         'doc-forms-modify': 'Formuliervelden bewerken is niet toegestaan',
         'doc-outline-modify': 'Bladwijzers wijzigen is niet toegestaan',
