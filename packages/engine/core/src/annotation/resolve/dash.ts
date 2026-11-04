@@ -11,16 +11,18 @@ import type { AnnotationDraft, Annotation, AnnotationPatch } from '../kinds';
 export const DEFAULT_DASH_ARRAY: readonly number[] = [3, 3];
 
 /**
- * Whether a border written as `borderStyle` with `dashArray` must state the
- * default pattern: a dashed one that names none of its own (no pattern, or
- * an empty one). ISO 32000 draws such a border with the default, but Acrobat,
- * redrawing it, draws it solid; written out as `/D [3 3]`, both draw it dashed.
+ * Whether a border written as `borderStyle` with `dashArray` takes the
+ * default pattern: a dashed one whose write leaves its pattern out. ISO 32000
+ * draws a dashed border without `/D` with the default, but Acrobat, redrawing
+ * it, draws it solid; written out as `/D [3 3]`, both draw it dashed. `null`
+ * is no pattern, as everywhere: written as none, it reads back `null`. (An
+ * empty pattern is no write's: `DashArrayWriteSchema` refuses it.)
  */
 export function needsDefaultDash(
   borderStyle: unknown,
   dashArray: readonly number[] | null | undefined,
 ): boolean {
-  return borderStyle === 'dashed' && (dashArray == null || dashArray.length === 0);
+  return borderStyle === 'dashed' && dashArray === undefined;
 }
 
 /** A border's own fields, on a kind that has a dash pattern. */
@@ -32,7 +34,7 @@ interface BorderFields {
 const hasDashPattern = (subtype: string): boolean =>
   kindFactsOf(subtype)?.owners.dashArray !== undefined;
 
-/** A draft whose border is dashed with no pattern of its own states the default (`needsDefaultDash`). */
+/** A draft whose border is dashed with its pattern left out states the default (`needsDefaultDash`). */
 export function dashDraftFollows(
   draft: AnnotationDraft<PdfCoordinates>,
 ): AnnotationDraft<PdfCoordinates> {
@@ -44,9 +46,10 @@ export function dashDraftFollows(
 }
 
 /**
- * A patch that changes a border's style or pattern and leaves it dashed with
- * no pattern of its own states the default, as a draft does. A patch that
- * touches neither leaves the border as the file has it.
+ * A patch that makes a border dashed and leaves its pattern out, on a border
+ * that has none, states the default, as a draft does. A pattern the patch
+ * gives, `null` among them, is written as given, and a patch that leaves the
+ * style alone leaves the border as the file has it.
  */
 export function dashPatchFollows(
   current: Annotation<PdfCoordinates>,
@@ -54,10 +57,7 @@ export function dashPatchFollows(
 ): AnnotationPatch<PdfCoordinates> {
   if (!hasDashPattern(current.subtype)) return patch;
   const change = patch as BorderFields;
-  if (change.borderStyle === undefined && change.dashArray === undefined) return patch;
-  const now = current as BorderFields;
-  const style = change.borderStyle ?? now.borderStyle;
-  const dashArray = change.dashArray !== undefined ? change.dashArray : now.dashArray;
-  if (!needsDefaultDash(style, dashArray)) return patch;
+  if (!needsDefaultDash(change.borderStyle, change.dashArray)) return patch;
+  if ((current as BorderFields).dashArray != null) return patch;
   return { ...patch, dashArray: [...DEFAULT_DASH_ARRAY] } as AnnotationPatch<PdfCoordinates>;
 }

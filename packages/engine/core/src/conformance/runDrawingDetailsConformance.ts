@@ -254,7 +254,7 @@ export function runDrawingDetailsConformance(
       }
     });
 
-    test('borders: only a widget writes beveled or inset; a pattern alone keeps a border solid; dashed states its pattern', async () => {
+    test('borders: only a widget writes beveled or inset; a pattern alone keeps a border solid; dashed states its pattern, never an empty one', async () => {
       const doc = await opts.open(engine, 'drawing');
       try {
         const { page } = await firstPage(doc);
@@ -286,9 +286,10 @@ export function runDrawingDetailsConformance(
         expect(patterned.annotation.borderStyle).toBe('solid');
         expect(patterned.annotation.dashArray).toEqual([2, 2]);
 
-        // A dashed border with no pattern of its own is written with the
+        // A dashed border whose pattern is left out is written with the
         // default, so every app draws it dashed (Acrobat draws a dashed
-        // border without /D solid).
+        // border without /D solid). null is no pattern: written as none, it
+        // reads back null.
         const dashed = await page.annotations.create({
           subtype: 'square',
           box: BOX,
@@ -297,12 +298,36 @@ export function runDrawingDetailsConformance(
         if (dashed.annotation.subtype !== 'square') throw new Error('expected a square');
         expect(dashed.annotation.borderStyle).toBe('dashed');
         expect(dashed.annotation.dashArray).toEqual([3, 3]);
+        const none = await page.annotations.create({
+          subtype: 'square',
+          box: BOX,
+          borderStyle: 'dashed',
+          dashArray: null,
+        });
+        if (none.annotation.subtype !== 'square') throw new Error('expected a square');
+        expect(none.annotation.borderStyle).toBe('dashed');
+        expect(none.annotation.dashArray).toBe(null);
         const cleared = await page.annotations.update(patterned.annotation.ref, {
           borderStyle: 'dashed',
           dashArray: null,
         });
         if (cleared.annotation.subtype !== 'square') throw new Error('expected a square');
-        expect(cleared.annotation.dashArray).toEqual([3, 3]);
+        expect(cleared.annotation.borderStyle).toBe('dashed');
+        expect(cleared.annotation.dashArray).toBe(null);
+
+        // An empty pattern is a solid line, which is borderStyle 'solid': a
+        // write refuses it, on create and update alike.
+        await expect(
+          page.annotations.create({
+            subtype: 'square',
+            box: BOX,
+            borderStyle: 'dashed',
+            dashArray: [],
+          }),
+        ).rejects.toMatchObject(invalid);
+        await expect(
+          page.annotations.update(dashed.annotation.ref, { dashArray: [] }),
+        ).rejects.toMatchObject(invalid);
 
         // Another app's dashed border without /D draws ISO 32000's default
         // and reads as it stands; an empty /D is a solid line and reads solid.

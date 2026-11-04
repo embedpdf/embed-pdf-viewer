@@ -15795,6 +15795,7 @@
                   "type": "number",
                   "minimum": 0
                 },
+                "minItems": 1,
                 "nullable": true
               },
               "interiorColor": {
@@ -17165,11 +17166,11 @@
                 "$ref": "#/components/schemas/AnnotationDraft/anyOf/4/properties/borderStyle"
               },
               "dashArray": {
-                "type": "array",
-                "items": {
-                  "type": "number",
-                  "minimum": 0
-                },
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/AnnotationDraft/anyOf/4/properties/dashArray"
+                  }
+                ],
                 "nullable": true
               },
               "cloudyIntensity": {
@@ -17813,11 +17814,11 @@
                 "enum": ["solid", "dashed", "beveled", "inset", "underline"]
               },
               "dashArray": {
-                "type": "array",
-                "items": {
-                  "type": "number",
-                  "minimum": 0
-                },
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/AnnotationDraft/anyOf/4/properties/dashArray"
+                  }
+                ],
                 "nullable": true
               },
               "fontFamily": {
@@ -18672,6 +18673,7 @@
                   "type": "number",
                   "minimum": 0
                 },
+                "minItems": 1,
                 "nullable": true
               },
               "interiorColor": {
@@ -20138,11 +20140,11 @@
                 ]
               },
               "dashArray": {
-                "type": "array",
-                "items": {
-                  "type": "number",
-                  "minimum": 0
-                },
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/AnnotationPatch/anyOf/4/properties/dashArray"
+                  }
+                ],
                 "nullable": true
               },
               "cloudyIntensity": {
@@ -22647,6 +22649,7 @@
               "type": "number",
               "minimum": 0
             },
+            "minItems": 1,
             "nullable": true
           },
           "fontFamily": {
@@ -23217,6 +23220,7 @@
               "type": "number",
               "minimum": 0
             },
+            "minItems": 1,
             "nullable": true
           },
           "fontFamily": {

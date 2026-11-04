@@ -254,13 +254,15 @@ Most kinds share the same style fields:
 | `dashArray`     | The pattern a `'dashed'` border draws, such as `[3, 2]` | `[3, 3]`  |
 
 A pattern alone doesn't make a border dashed: a `'solid'` border keeps its `dashArray` and draws
-solid. A dashed border written without a pattern, or with `dashArray: null`, gets the default
-`[3, 3]`, 3 points on and 3 off, and reads it back: the engine writes it into the file, because
-Acrobat redraws a dashed border whose file names no pattern as a solid line. A border from another
-app that names no pattern reads `dashArray: null` and draws the default, as ISO 32000 says; an
-empty pattern is a solid line and reads `'solid'`. A border from another app can also read
-`'beveled'` or `'inset'`; only form widgets draw those, so a write takes them only sent back
-unchanged.
+solid. A dashed border whose `dashArray` is left out gets the default `[3, 3]`, 3 points on and 3
+off, written into the file, because Acrobat redraws a dashed border whose file names no pattern as
+a solid line. `dashArray: null` is no pattern: the file gets none and the border reads back
+`null`; the engine draws it with the default, as ISO 32000 says, and Acrobat draws it solid. A
+border from another app that names no pattern reads the same way. A pattern needs at least one
+length, so `[]` is refused: an empty pattern is a solid line, which is `borderStyle: 'solid'`, and
+a border from another app with an empty pattern reads `'solid'`. A border from another app can
+also read `'beveled'` or `'inset'`; only form widgets draw those, so a write takes them only sent
+back unchanged.
 
 Colors are `'#rrggbb'`, as in CSS: the engine gives them in lowercase and takes either case. They
 never include transparency: that's what `opacity` is for. The default color depends on the kind

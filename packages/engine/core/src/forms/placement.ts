@@ -15,7 +15,7 @@ export type PlacedWidget = Omit<WidgetPlacement<PdfCoordinates>, 'rect' | 'box'>
  * A placement as the file holds it: `/Rect`, where the widget stands, and
  * its turn. A `box` given is turned into the rect it stands in, as a box
  * kind's create turns it; without one, `rect` is that place. A dashed border
- * with no pattern of its own states the default, `[3, 3]` (`needsDefaultDash`).
+ * with its pattern left out states the default, `[3, 3]` (`needsDefaultDash`).
  *
  * Refused with `InvalidArg`: a placement with neither, and a turn that
  * isn't a quarter turn (a widget's contents turn only so, `/MK /R`).

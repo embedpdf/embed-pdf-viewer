@@ -66,14 +66,14 @@ describe('annotationOfDraft', () => {
     expect(text).toMatchObject({ color: '#0000FF', fontColor: '#000000', intent: 'free-text' });
   });
 
-  test('a dashed border with no pattern of its own states the default, 3 on and 3 off', () => {
+  test('a dashed border with its pattern left out states the default, 3 on and 3 off; null is none', () => {
     const dashed = annotationOfDraft({ subtype: 'square', box, borderStyle: 'dashed' }, { ref });
     expect(dashed).toMatchObject({ borderStyle: 'dashed', dashArray: [3, 3] });
-    const empty = annotationOfDraft(
-      { subtype: 'ink', inkList: [[box, box]], borderStyle: 'dashed', dashArray: [] },
+    const cleared = annotationOfDraft(
+      { subtype: 'ink', inkList: [[box, box]], borderStyle: 'dashed', dashArray: null },
       { ref },
     );
-    expect(empty).toMatchObject({ borderStyle: 'dashed', dashArray: [3, 3] });
+    expect(cleared).toMatchObject({ borderStyle: 'dashed', dashArray: null });
     // Its own pattern stays; a solid border states none.
     expect(
       annotationOfDraft(
@@ -106,6 +106,19 @@ describe('annotationOfDraft', () => {
         state: 'escalated',
       }),
     ).toThrow(expect.objectContaining({ code: 'InvalidArg' }));
+  });
+
+  test('an empty dash pattern is refused: a solid line is borderStyle solid', () => {
+    const page = { left: 0, bottom: 0, right: 600, top: 800 };
+    for (const draft of [
+      { subtype: 'square', box, borderStyle: 'dashed', dashArray: [] },
+      { subtype: 'ink', inkList: [[box, box]], dashArray: [] },
+      { subtype: 'free-text', box, contents: 'Hi', borderStyle: 'dashed', dashArray: [] },
+    ] as unknown as AnnotationDraft[]) {
+      expect(() =>
+        pdfResolveAnnotationDraft(pdfAnnotationDraftOf(draft, page, () => page)),
+      ).toThrow(expect.objectContaining({ code: 'InvalidArg', details: { field: 'dashArray' } }));
+    }
   });
 
   test('predicts a draft whose values the engine refuses, which the engine refuses at its door', () => {

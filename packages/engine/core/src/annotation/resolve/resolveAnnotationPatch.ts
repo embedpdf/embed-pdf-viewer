@@ -95,8 +95,8 @@ export function pdfPrepareAnnotationPatch(
  * file's coordinates:
  *
  * - a note's standard review state brings its state model;
- * - a border made dashed, or cleared of its pattern while dashed, states the
- *   default pattern, `[3, 3]`;
+ * - a border made dashed with its pattern left out, on a border that has
+ *   none, states the default pattern, `[3, 3]`;
  * - a free text's `contents` and rich text follow each other, and its font,
  *   size, text color and alignment move its rich body;
  * - a callout's line stays attached to its box when the box moves or turns;

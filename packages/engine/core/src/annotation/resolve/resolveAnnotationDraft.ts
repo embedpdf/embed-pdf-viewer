@@ -46,7 +46,7 @@ export function pdfPrepareAnnotationDraft(
  * file's coordinates:
  *
  * - a note's standard review state brings its state model;
- * - a dashed border with no pattern of its own states the default, `[3, 3]`;
+ * - a dashed border with its pattern left out states the default, `[3, 3]`;
  * - a free text states its intent, and its text as rich text carrying its
  *   text style, with `contents` its plain projection;
  * - a redaction over text without a `rect` covers its quads;
