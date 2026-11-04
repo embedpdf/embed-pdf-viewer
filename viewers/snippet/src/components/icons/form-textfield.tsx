@@ -18,8 +18,9 @@ export const FormTextfieldIcon = ({
     stroke-linecap="round"
     stroke-linejoin="round"
     class={className}
-    role="img"
+    role={title ? 'img' : undefined}
     aria-label={title}
+    aria-hidden={title ? undefined : true}
   >
     <path stroke="none" d="M0 0h24v24H0z" fill="none" />
     <path d="M12 3a3 3 0 0 0 -3 3v12a3 3 0 0 0 3 3" />

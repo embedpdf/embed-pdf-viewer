@@ -18,8 +18,9 @@ export const HandIcon = ({
     stroke-linecap="round"
     stroke-linejoin="round"
     class={className}
-    role="img"
+    role={title ? 'img' : undefined}
     aria-label={title}
+    aria-hidden={title ? undefined : true}
   >
     <path stroke="none" d="M0 0h24v24H0z" fill="none" />
     <path d="M8 13v-7.5a1.5 1.5 0 0 1 3 0v6.5" />

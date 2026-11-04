@@ -18,8 +18,9 @@ export const PrintIcon = ({
     stroke-linecap="round"
     stroke-linejoin="round"
     class={className}
-    role="img"
+    role={title ? 'img' : undefined}
     aria-label={title}
+    aria-hidden={title ? undefined : true}
   >
     <path stroke="none" d="M0 0h24v24H0z" fill="none" />
     <path d="M17 17h2a2 2 0 0 0 2 -2v-4a2 2 0 0 0 -2 -2h-14a2 2 0 0 0 -2 2v4a2 2 0 0 0 2 2h2" />

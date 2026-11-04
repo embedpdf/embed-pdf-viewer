@@ -18,8 +18,9 @@ export const WidgetEditIcon = ({
     stroke-linecap="round"
     stroke-linejoin="round"
     class={className}
-    role="img"
+    role={title ? 'img' : undefined}
     aria-label={title}
+    aria-hidden={title ? undefined : true}
   >
     <path stroke="none" d="M0 0h24v24H0z" fill="none" />
     <path d="M7 7h-1a2 2 0 0 0 -2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2 -2v-1" />

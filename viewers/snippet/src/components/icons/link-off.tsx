@@ -18,8 +18,9 @@ export const LinkOffIcon = ({
     stroke-linecap="round"
     stroke-linejoin="round"
     class={className}
-    role="img"
+    role={title ? 'img' : undefined}
     aria-label={title}
+    aria-hidden={title ? undefined : true}
   >
     <path stroke="none" d="M0 0h24v24H0z" fill="none" />
     <path d="M9 15l3 -3m2 -2l1 -1" />

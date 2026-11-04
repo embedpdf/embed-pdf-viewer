@@ -17,8 +17,9 @@ export const PencilMarkerIcon = ({
     stroke-linecap="round"
     stroke-width={strokeWidth}
     class={className}
-    role="img"
+    role={title ? 'img' : undefined}
     aria-label={title}
+    aria-hidden={title ? undefined : true}
   >
     <path
       d="m9.109 16.275 8.856-8.097c.812-.743.87-2.014.127-2.826s-2.014-.869-2.826-.127L6.41 13.322l-.127 2.826zM13.79 6.575l2.7 2.952"
