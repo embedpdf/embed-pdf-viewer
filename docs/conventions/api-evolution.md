@@ -124,16 +124,120 @@ The manifest's counters, named by scope:
 
 ### Engine values
 
-`/head` carries `engine`, one opaque string per resource kind. The server
-derives each one from what it computes that kind with: its fonts, its rules
-for reading page text, its search fold, its renderer. Several kinds may share
-a value. A change that should reach cached responses raises the version of
-the rule it changes, and with it that kind's value. A rendering change worth a
-refill of every cached image raises the render value; one that isn't doesn't.
+An engine value answers one question for a kind: besides the document, what
+did the server compute this with? The same page, asked for the same way, gives
+different bytes when the server's fonts change or its rules for reading page
+text do. The URL has to name that, or a CDN keeps serving the old bytes.
+
+`/head` carries `engine`, one opaque string per resource kind. The values are
+the same for every document on a server; `/head` carries them because a client
+reads it before any cached read.
+
+```jsonc
+{
+  "id": "doc_123",
+  "docVersion": 42,
+  // …
+  "engine": {
+    "render": "9f2c41aa",
+    "annotationAppearances": "9f2c41aa",
+    "widgetAppearances": "9f2c41aa",
+    "fonts": "e41b07c2",
+    "text": "c7e01b3d",
+    "search": "4be09a12",
+    "annotations": "51d3fe08",
+    "annotationsAll": "51d3fe08",
+    "layout": "0a6e2c91",
+    // … one entry for every kind in Resource kinds
+  },
+}
+```
+
+The client puts its kind's value in the token as `engine`, beside the
+versions, the shape and the request. A page drawn with its annotations, and
+the same page's text:
+
+```text
+/v1/docs/doc_123/render/annotations/pages/14/data@annotationVersion=3,contentVersion=7,engine=9f2c41aa,format=webp,shape=1,viewport.kind=width,viewport.width=800
+/v1/docs/doc_123/text/pages/14/data@contentVersion=7,engine=c7e01b3d,shape=1
+```
 
 Engine values live in `/head` and not in the manifest because the manifest is
 itself a cached read, keyed by `docVersion`: a server change would not reach a
 manifest that is already cached.
+
+#### How the server derives them
+
+The server keeps one number per rule it computes with, and lists which rules
+each kind reads:
+
+```ts
+// One number per rule. Raise a rule's number in the pull request that changes
+// what the rule gives for the same document and the same request.
+const RULES = {
+  drawing: 1, // how pages, annotations and fields are drawn
+  pageText: 2, // 2: lines end in \n, no U+FFFE
+  searchFold: 2, // 2: invisible characters ignored
+  contents: 2, // 2: contents and rich text read with \n
+};
+
+// What each kind is computed with, besides the document. `fonts` is the
+// fingerprint of the server's fonts, which changes with `CLOUDPDF_FONTS`.
+const INPUTS = {
+  render: ['drawing', 'fonts'],
+  annotationAppearances: ['drawing', 'fonts'],
+  widgetAppearances: ['drawing', 'fonts'],
+  fonts: ['fonts'],
+  text: ['pageText'],
+  search: ['pageText', 'searchFold'],
+  annotations: ['contents'],
+  annotationsAll: ['contents'],
+  // every other kind: none, so its value never changes
+};
+
+const current = { ...RULES, fonts: fontsFingerprint };
+engine[kind] = digest(
+  (INPUTS[kind] ?? []).map((input) => `${input}=${current[input]}`),
+);
+```
+
+Kinds with the same inputs share a value. A rule's number sits beside the code
+it versions, the way `SEARCH_FOLD_VERSION` sits beside the search fold, so the
+change and its number are in the same diff. The server's release version is
+never an input: a deploy or a restart that raises no rule keeps every cached
+response.
+
+#### When a value changes
+
+| What happened                                                  | Values that change                                    | What stays cached                     |
+| :------------------------------------------------------------- | :---------------------------------------------------- | :------------------------------------ |
+| An operator adds a font to `CLOUDPDF_FONTS`                    | `fonts`: render, both appearance kinds, the font list | text, search, annotations, the rest   |
+| Page text is read differently (lines end in `\n`, no `U+FFFE`) | `pageText`: text, search                              | pictures, annotations, the rest       |
+| `contents` and rich text are read with `\n`                    | `contents`: annotations, annotationsAll               | everything else                       |
+| Search ignores more characters                                 | `searchFold`: search                                  | everything else                       |
+| A runtime upgrade fixes a glyph people notice                  | `drawing`: render, both appearance kinds              | text, search, the font list, the rest |
+| A runtime upgrade with no visible difference                   | none                                                  | everything                            |
+| A deploy or a restart that raises no rule                      | none                                                  | everything                            |
+
+During a rolling deploy, each replica answers only its own values. A client
+that reaches the other replica gets "no longer current", reads `/head` again
+and builds a new URL, as after any change. A self-hosted server's values are
+its own: they are opaque, and nothing compares them with another server's.
+
+#### What engine values are not for
+
+- **Document edits** move the versions.
+- **A change to a response's structure** moves that kind's shape.
+- **Which release the client is** goes in `EmbedPDF-Version`, never in a
+  cached URL.
+
+#### Who raises one
+
+The engineer who changes what the server gives, in the pull request that
+changes it, the way a database migration is added. Review asks one question:
+for the same document and the same request, does this change what the server
+returns? If it does, raise the rule's number. A change that only makes the
+server faster, or that no cached response shows, raises nothing.
 
 ### Shapes
 
@@ -197,10 +301,10 @@ Everything here is fixed into the 3.0 client, so it lands before 3.0.0:
 2. **`/head` and the manifest**: `/head` gains the `engine` map; the manifest
    gains `contentsVersion` and loses `serverFonts`.
 3. **Server**: computes `contentsVersion` from the page counters it already
-   keeps, and each engine value from its rules (render and fonts from its
-   fonts' fingerprint, text from its text-reading version, search from that and
-   `SEARCH_FOLD_VERSION`, the rest constant); checks `engine` the way it checks
-   versions; answers the asked shape; sends `EmbedPDF-Server-Version`.
+   keeps, and each engine value from its rules and inputs (see
+   [How the server derives them](#how-the-server-derives-them), with
+   `SEARCH_FOLD_VERSION` as the search fold's number); checks `engine` the way
+   it checks versions; answers the asked shape; sends `EmbedPDF-Server-Version`.
 4. **Client** (`@cloudpdf/engine`): copies versions and engine values, sends
    its shapes and `EmbedPDF-Version`, and stops with a clear error on a server
    older than it needs.
