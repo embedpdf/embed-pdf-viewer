@@ -146,7 +146,7 @@ export function createTextFonts(
   const resolveBox = async (id: Id): Promise<void> => {
     const api = fonts();
     const record = store.model().byId[id];
-    const question = record && questionOf(record);
+    const question = api && record && questionOf(record);
     if (!api || !record || !question) return;
     const { body, runs, faces, text, key } = question;
     // A box not written yet has no font of its own to count.
