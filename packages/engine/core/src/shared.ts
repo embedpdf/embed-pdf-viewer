@@ -615,6 +615,7 @@ export {
   fontNameForFace,
   isStandardFontName,
   standardFamilyOf,
+  standardFontForFace,
   STANDARD_FACES,
   type DescribeFont,
   type FaceRequest,

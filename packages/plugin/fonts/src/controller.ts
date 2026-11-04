@@ -3,7 +3,6 @@ import {
   fontProgramFamily,
   LAST_RESORT_HASH,
   lastResortFontProgram,
-  standardFontForFace,
   standardFontOf,
   standardFontOfProgramFamily,
   standardFontProgram,
@@ -13,6 +12,7 @@ import {
 import {
   isStandardFontName,
   standardFamilyOf,
+  standardFontForFace,
   STANDARD_FACES,
   type Font,
   type FontList,
@@ -220,12 +220,8 @@ export function createFontsController(ctx: PluginContext<void>) {
       .catch(() => {});
   };
 
-  /**
-   * The fallbacks text in `style` draws with, in the order the engine tries them for it (a bold
-   * run tries the bold ones first). The engine says, once per style, after the asker's turn; the
-   * list's order until it has.
-   */
-  const fallbacksFor = (style: { weight: number; italic: boolean }): readonly string[] => {
+  /** The engine's fallback fonts for a style, in its order. */
+  const styleFallbacksFor = (style: { weight: number; italic: boolean }): readonly string[] => {
     const current = list.get();
     const key = `${style.weight}|${style.italic}`;
     const known = styleFallbacks.get(key);
@@ -252,6 +248,21 @@ export function createFontsController(ctx: PluginContext<void>) {
     }
     return fallbackHashes(current);
   };
+
+  /**
+   * The fallbacks text in `face` draws with, in the order the engine tries them for its style (a
+   * bold run tries the bold ones first), then the standard font that stands in for the face, which
+   * the engine draws Latin the face lacks in. The engine says the order once per style, after the
+   * asker's turn; the list's order until it has.
+   */
+  const fallbacksFor = (face: {
+    family: string;
+    weight: number;
+    italic: boolean;
+  }): readonly string[] => [
+    ...styleFallbacksFor(face),
+    standardFontProgram(standardFontForFace(face)).hash,
+  ];
 
   const cached = (key: string, build: () => FontCss): FontCss => {
     let known = css.get(key);
@@ -301,7 +312,12 @@ export function createFontsController(ctx: PluginContext<void>) {
         standardFontForFace({ family: font.familyName, weight: font.weight, italic: font.italic }),
       );
     }
-    return cssOf(mountable, font, fallbacksFor(font), tailOf(font, null));
+    return cssOf(
+      mountable,
+      font,
+      fallbacksFor({ family: font.familyName, weight: font.weight, italic: font.italic }),
+      tailOf(font, null),
+    );
   };
 
   const api: FontsCapability = {

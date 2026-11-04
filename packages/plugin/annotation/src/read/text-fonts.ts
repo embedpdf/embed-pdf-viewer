@@ -3,8 +3,10 @@
  * program the engine writes with. A box someone types in is resolved the way
  * its write will be (the fonts plugin's `resolve`, with the box, so its own
  * font counts): when the edit starts, and again after a pause in typing once
- * the text has a character it wasn't resolved with. Any other box is drawn in
- * the fonts its names say. Without the fonts plugin, a box is drawn in the
+ * the text has a character it wasn't resolved with. An answer holds for the
+ * faces it was asked about: a box restyled since (another font, a bold word)
+ * is asked again, and drawn in the fonts its names say until it is answered.
+ * Any other box is drawn in the fonts its names say. Without the fonts plugin, a box is drawn in the
  * standard font the engine falls back to for its font or face, in that
  * font's built-in program (`@embedpdf/core-fonts`).
  */
@@ -14,22 +16,19 @@ import {
   textOf,
   type FontLookup,
   type Id,
+  type ModelAnnotation,
   type TextStyle,
 } from '@embedpdf/core-annotation';
+import { standardFontCss, standardFontOf, standardFontOfProgramFamily } from '@embedpdf/core-fonts';
 import {
   STANDARD_FACES,
   faceForFontName,
   familyKey,
+  standardFontForFace,
   type FontResolveRun,
   type ResolvedFontRun,
   type RichTextBody,
 } from '@embedpdf/engine-core/runtime';
-import {
-  standardFontCss,
-  standardFontForFace,
-  standardFontOf,
-  standardFontOfProgramFamily,
-} from '@embedpdf/core-fonts';
 import { FontsToken, type FontCss, type FontsCapability } from '@embedpdf/plugin-fonts/contract';
 
 import type { AnnotationContext } from '../services/context';
@@ -75,13 +74,23 @@ export function createTextFonts(
   const fonts = (): FontsCapability | null => ctx.tryGet(FontsToken);
 
   /**
-   * What the engine answered per box: the run each face its text was resolved with drew in, its
-   * CSS asked for on each read (it changes as the programs reach the browser).
+   * What the engine answered per box: the faces it was asked about, the record it was asked for
+   * (a newer one with the same faces keeps the answer), and the run each face drew in, its CSS
+   * asked for on each read (it changes as the programs reach the browser).
    */
-  const answers = new Map<Id, ReadonlyMap<string, ResolvedFontRun>>();
+  const answers = new Map<
+    Id,
+    {
+      readonly faces: string;
+      readonly record: ModelAnnotation;
+      readonly byFace: ReadonlyMap<string, ResolvedFontRun>;
+    }
+  >();
   /** The box being typed in, and the characters its last resolve asked about. */
+  let editing: Id | null = null;
   let asked: { readonly id: Id; readonly codePoints: Set<number> } | null = null;
-  let resolving: AbortController | null = null;
+  /** Each box's resolve in flight: a newer one for the same box replaces it. */
+  const resolving = new Map<Id, AbortController>();
   let cancelPause = () => {};
   let answered = 0;
   let token: { list: unknown; answered: number; epoch: number } = {
@@ -98,17 +107,15 @@ export function createTextFonts(
     return (face.weight ?? 400) === body.weight && (face.italic ?? false) === body.italic;
   };
 
-  /** Ask the engine what the box's text will be drawn in, and keep the answer. */
-  const resolveBox = async (id: Id): Promise<void> => {
-    const api = fonts();
-    const record = store.model().byId[id];
-    const style = record && textOf(record.annotation);
-    if (!api || !record || !style || record.annotation.subtype !== 'free-text') return;
-    // A box not written yet has no font of its own to count.
-    const ref = refOf(record) ?? undefined;
+  /**
+   * What the engine is asked about a box's text: the body first, then every run, unstyled ones by
+   * the box's font, the rest by face; `faces` names the faces asked, whatever the text.
+   */
+  const questionOf = (record: ModelAnnotation) => {
+    const style = textOf(record.annotation);
+    if (!style || record.annotation.subtype !== 'free-text') return null;
     const doc = richDocOf(record.annotation, lookup);
     const body = doc.body;
-    // The body first, then every run: unstyled ones by the box's font, the rest by face.
     const faces: string[] = [BODY];
     const runs: FontResolveRun[] = [bodyRun(style, body, bodyIsItsFont(style, body))];
     let text = '';
@@ -130,10 +137,24 @@ export function createTextFonts(
         runs.push({ text: run.text, ...face });
       }
     }
-    asked = { id, codePoints: new Set(codePointsOf(text)) };
-    resolving?.abort();
+    // The body run has no text of its own: it and the faces are the question, whatever is typed.
+    const key = JSON.stringify({ body: runs[0], faces: [...new Set(faces)].sort() });
+    return { body, runs, faces, text, key };
+  };
+
+  /** Ask the engine what the box's text will be drawn in, and keep the answer. */
+  const resolveBox = async (id: Id): Promise<void> => {
+    const api = fonts();
+    const record = store.model().byId[id];
+    const question = api && record && questionOf(record);
+    if (!api || !record || !question) return;
+    const { body, runs, faces, text, key } = question;
+    // A box not written yet has no font of its own to count.
+    const ref = refOf(record) ?? undefined;
+    if (id === editing) asked = { id, codePoints: new Set(codePointsOf(text)) };
+    resolving.get(id)?.abort();
     const request = new AbortController();
-    resolving = request;
+    resolving.set(id, request);
     try {
       // The list names the programs' styles and the system families after them.
       await api.ensureLoaded();
@@ -141,7 +162,8 @@ export function createTextFonts(
         { ...(ref ? { annotation: ref } : {}), runs },
         { signal: request.signal },
       );
-      if (resolving !== request) return;
+      if (resolving.get(id) !== request) return;
+      resolving.delete(id);
       const byFace = new Map<string, ResolvedFontRun>();
       answer.runs.forEach((run, index) => {
         const face = faces[index]!;
@@ -149,7 +171,7 @@ export function createTextFonts(
       });
       // A run that names the body's own face is drawn as the body is.
       if (!byFace.has(faceKey(body))) byFace.set(faceKey(body), byFace.get(BODY)!);
-      answers.set(id, byFace);
+      answers.set(id, { faces: key, record, byFace });
       answered++;
       ctx.notify();
     } catch {
@@ -157,9 +179,37 @@ export function createTextFonts(
     }
   };
 
+  /**
+   * Drop the answers the model moved on from: a box deleted, or restyled so its faces aren't the
+   * ones asked about, which is asked again (typing keeps the faces, and the answer).
+   */
+  let checked: unknown = null;
+  const dropStaleAnswers = () => {
+    const model = store.model();
+    if (model === checked) return;
+    checked = model;
+    let dropped = false;
+    for (const [id, answer] of answers) {
+      const record = model.byId[id];
+      if (record === answer.record) continue;
+      const question = record && questionOf(record);
+      if (question && question.key === answer.faces) {
+        answers.set(id, { ...answer, record });
+        continue;
+      }
+      answers.delete(id);
+      dropped = true;
+      if (question) void resolveBox(id);
+    }
+    if (dropped) {
+      answered++;
+      ctx.notify();
+    }
+  };
+
   // Resolve the box someone starts typing in.
-  let editing: Id | null = null;
   ctx.state.onChange(() => {
+    dropStaleAnswers();
     const next = store.model().editing;
     if (next === editing) return;
     editing = next;
@@ -177,14 +227,14 @@ export function createTextFonts(
           byFont ? standardFontOf(style.fontFamily) : standardFontForFace(body),
         );
       }
-      const run = answers.get(id)?.get(BODY);
+      const run = answers.get(id)?.byFace.get(BODY);
       if (run) return api.getRunCss(run);
       return byFont ? api.getFontCss(style.fontFamily) : api.getFaceCss(body);
     },
     faceCss: (id, face) => {
       const api = fonts();
       if (!api) return standardFontCss(standardFontForFace(face));
-      const run = id !== null ? answers.get(id)?.get(faceKey(face)) : undefined;
+      const run = id !== null ? answers.get(id)?.byFace.get(faceKey(face)) : undefined;
       return run ? api.getRunCss(run) : api.getFaceCss(face);
     },
     familyOfCss: (cssFamily) => {

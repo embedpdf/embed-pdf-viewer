@@ -124,3 +124,18 @@ export function fontNameForFace(
   }
   return face.family;
 }
+
+/**
+ * The standard font that stands in for a face: its own standard family's
+ * (Arial is Helvetica), else Helvetica, in the face's weight and italic. The
+ * engine draws a face in it when no other font is that face, and draws in it
+ * what the face lacks and no fallback has, so Latin always has a font.
+ */
+export function standardFontForFace(face: FaceRequest): StandardFont {
+  const name = fontNameForFace({
+    family: standardFamilyOf(face.family) ?? 'Helvetica',
+    weight: face.weight ?? 400,
+    italic: face.italic ?? false,
+  });
+  return isStandardFontName(name) ? name : 'helvetica';
+}

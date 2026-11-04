@@ -7,7 +7,11 @@
  * once it's mounted (`ctx.measurer`).
  */
 import type { HostTextMeasurer } from '@embedpdf/core';
-import type { MountableFontProgram } from '@embedpdf/core-fonts';
+import {
+  fontProgramFamily,
+  standardFontOfProgramFamily,
+  type MountableFontProgram,
+} from '@embedpdf/core-fonts';
 import {
   coversGrapheme,
   defaultPaintFonts,
@@ -89,12 +93,18 @@ export function createPaintFonts(sources: PaintFontSources) {
     return programPaintFont(info, program, (text, rtl) => measure.width(program, text, rtl));
   };
 
+  /** A fallback: the standard font the list ends with is drawn as the engine writes it, through its encoding. */
+  const fallbackFont = async (measure: HostTextMeasurer, hash: string): Promise<PaintFont> => {
+    const standard = standardFontOfProgramFamily(fontProgramFamily(hash));
+    return standard ? standardPaintFont(standard) : programFont(measure, hash);
+  };
+
   /** The fonts a box in `font` draws with: its style's fallbacks, whatever its text. */
   const find = async (measure: HostTextMeasurer, font: FontName): Promise<PaintFonts> => {
     await sources.loadList();
     const resolution = await sources.resolve({ runs: [{ text: ' ', fontFamily: font }] });
     const run = resolution.runs[0]!;
-    const fallbacks = Promise.all(run.fallbacks.map((hash) => programFont(measure, hash)));
+    const fallbacks = Promise.all(run.fallbacks.map((hash) => fallbackFont(measure, hash)));
     const face = isStandardFontName(run.font)
       ? standardPaintFont(run.font)
       : run.program

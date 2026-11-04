@@ -7,10 +7,7 @@
 import {
   STANDARD_FACES,
   STANDARD_FONTS,
-  fontNameForFace,
   isStandardFontName,
-  standardFamilyOf,
-  type FaceRequest,
   type FontName,
   type StandardFont,
 } from '@embedpdf/engine-core/runtime';
@@ -60,20 +57,6 @@ export function standardFontCss(font: StandardFont): StandardFontCss {
 /** The standard font a box's font is drawn in without its program: itself, else Helvetica. */
 export function standardFontOf(font: FontName): StandardFont {
   return isStandardFontName(font) ? font : 'helvetica';
-}
-
-/**
- * The standard font the engine draws a face in when no other font is that
- * face: its own standard family's (Arial is Helvetica), else Helvetica, in the
- * face's weight and italic.
- */
-export function standardFontForFace(face: FaceRequest): StandardFont {
-  const name = fontNameForFace({
-    family: standardFamilyOf(face.family) ?? 'Helvetica',
-    weight: face.weight ?? 400,
-    italic: face.italic ?? false,
-  });
-  return isStandardFontName(name) ? name : 'helvetica';
 }
 
 let byProgramFamily: Map<string, StandardFont> | null = null;

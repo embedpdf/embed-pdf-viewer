@@ -1,12 +1,13 @@
 /**
  * The fonts a text box is drawn in while someone types: resolved the way the
  * write will be when the edit starts, again after a pause once the text has a
- * character it wasn't resolved with, and drawn from the answer.
+ * character it wasn't resolved with, and drawn from the answer while the box
+ * keeps the faces it was asked about.
  */
 import { standardFontCss, standardFontProgram } from '@embedpdf/core-fonts';
-import type { FontCss, FontsCapability } from '@embedpdf/plugin-fonts/contract';
 import type { AnnotationRef, ResolvedFontRun } from '@embedpdf/engine-core/runtime';
 import { toPageRef } from '@embedpdf/engine-core/runtime';
+import type { FontCss, FontsCapability } from '@embedpdf/plugin-fonts/contract';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { annotationHarness, type FileAnnotation } from '../harness';
@@ -83,16 +84,21 @@ const cssOf = (hash: string): FontCss => ({
   programs: [program(hash)],
 });
 
-/** A fonts plugin whose engine moves the box to Helvetica: its subset doesn't cover the text. */
+/** What the engine answers a run: drawn in `program`. */
+const answer = (program: string): ResolvedFontRun => ({
+  font: 'helvetica',
+  weight: 400,
+  italic: false,
+  substituted: true,
+  program,
+  fallbacks: [],
+});
+
+/**
+ * A fonts plugin whose engine moves the box to Helvetica (its subset doesn't cover the text), and
+ * that draws a font by its name in a program of that name.
+ */
 function fakeFonts() {
-  const answer = (program: string): ResolvedFontRun => ({
-    font: 'helvetica',
-    weight: 400,
-    italic: false,
-    substituted: true,
-    program,
-    fallbacks: [],
-  });
   const fonts = {
     getFontList: () => null,
     getStatus: () => 'ready' as const,
@@ -103,7 +109,7 @@ function fakeFonts() {
       missingCharacters: [],
     })),
     getProgram: vi.fn(),
-    getFontCss: vi.fn(() => cssOf('minion')),
+    getFontCss: vi.fn((font: string) => cssOf(font === 'Minion-Regular' ? 'minion' : font)),
     getFaceCss: vi.fn(() => cssOf('face')),
     getRunCss: vi.fn((run: ResolvedFontRun) => cssOf(run.program!)),
     getFaceOfCssFamily: (css: string) =>
@@ -168,6 +174,8 @@ describe('a text box being typed in', () => {
     vi.advanceTimersByTime(300);
     await flush();
     expect(harness.fonts.resolve).toHaveBeenCalledTimes(1);
+    // The text changed, not its faces: the answer still holds.
+    expect(harness.item().css.fontFamily).toBe('"epdf-helvetica", sans-serif');
 
     harness.capability.draftRichText(REF, { paragraphs: [{ runs: [{ text: 'hello Ω' }] }] });
     expect(harness.fonts.resolve).toHaveBeenCalledTimes(1);
@@ -189,6 +197,46 @@ describe('a text box being typed in', () => {
     expect(harness.capability.getFamilyOfCss('epdf-minion')).toBe('Minion');
     // A family no font is reads back as it is.
     expect(harness.capability.getFamilyOfCss('epdf-brand-sans')).toBe('epdf-brand-sans');
+  });
+});
+
+describe('a text box restyled after it was typed in', () => {
+  it('is drawn in its new font, never the answer for its old one, and the engine is asked again', async () => {
+    const harness = await editing();
+    // The engine draws Noto Sans Hebrew in its own program, anything else in Helvetica.
+    harness.fonts.resolve.mockImplementation(async (request: { runs: unknown[] }) => ({
+      runs: request.runs.map((run) =>
+        answer(
+          (run as { fontFamily?: string }).fontFamily === 'NotoSansHebrew' ? 'hebrew' : 'helvetica',
+        ),
+      ),
+      missingCharacters: [],
+    }));
+    harness.update.mockImplementation(async (_ref: AnnotationRef, patch: object) => ({
+      annotation: { ...freeText('hello'), ...patch },
+      appearance: { changed: false },
+    }));
+    harness.capability.text.begin(REF);
+    await flush();
+    expect(harness.item().css.fontFamily).toBe('"epdf-helvetica", sans-serif');
+    void harness.capability.text.end();
+    await flush();
+
+    harness.capability.selection.update({ fontFamily: 'NotoSansHebrew' } as never);
+    // Until the engine answers for the new font, its name draws it.
+    expect(harness.item().css.fontFamily).toBe('"epdf-NotoSansHebrew", sans-serif');
+    await flush();
+    expect(harness.fonts.resolve).toHaveBeenLastCalledWith(
+      {
+        annotation: REF,
+        runs: [
+          { text: '', fontFamily: 'NotoSansHebrew' },
+          { text: 'hello', fontFamily: 'NotoSansHebrew' },
+        ],
+      },
+      expect.anything(),
+    );
+    expect(harness.item().css.fontFamily).toBe('"epdf-hebrew", sans-serif');
   });
 });
 
