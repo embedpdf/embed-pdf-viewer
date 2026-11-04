@@ -4169,6 +4169,10 @@ export class PdfiumNative implements IPdfiumExecutor {
       return false;
     }
 
+    if (!this.setAnnotationOpacity(annotationPtr, annotation.opacity ?? 1)) {
+      return false;
+    }
+
     if (context && 'data' in context && context.data) {
       const meta = getImageMetadata(context.data);
       if (!meta) return false;
@@ -8243,6 +8247,7 @@ export class PdfiumNative implements IPdfiumExecutor {
     const pageRect = this.readPageAnnoRect(annotationPtr);
     const rect = this.convertPageRectToDeviceRect(doc, page, pageRect);
     const name = this.getAnnotationName(annotationPtr);
+    const opacity = this.getAnnotationOpacity(annotationPtr);
 
     return {
       pageIndex: page.index,
@@ -8251,6 +8256,7 @@ export class PdfiumNative implements IPdfiumExecutor {
       rect,
       name,
       icon: name,
+      opacity,
       ...this.readBaseAnnotationProperties(doc, page, annotationPtr),
     };
   }

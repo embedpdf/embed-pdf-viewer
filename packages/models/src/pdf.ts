@@ -2099,6 +2099,11 @@ export interface PdfStampAnnoObject extends PdfAnnotationObjectBase {
 
   /** @deprecated Use name instead */
   icon?: PdfAnnotationIcon;
+
+  /**
+   * opacity of stamp annotation
+   */
+  opacity: number;
 }
 
 /**
