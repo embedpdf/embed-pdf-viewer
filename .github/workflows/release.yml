@@ -54,7 +54,10 @@ jobs:
       - name: Build packages
         run: pnpm run build:viewers
 
-      # Changesets will either open a version PR or publish if already versioned
+      # Changesets will either open a version PR or publish if already versioned.
+      # 3.0 releases from main own the npm `latest` tag (and GitHub's Latest
+      # release below), so ci:publish puts 2.x versions on `v2-latest`. Not `v2`:
+      # npm refuses a tag that reads as a semver range.
       - name: Version / Publish via Changesets
         id: changesets
         uses: changesets/action@v1
@@ -140,4 +143,4 @@ jobs:
           files: release-assets/*
           draft: false
           prerelease: false
-          make_latest: true
+          make_latest: false
