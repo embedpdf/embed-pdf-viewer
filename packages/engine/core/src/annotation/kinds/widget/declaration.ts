@@ -78,4 +78,12 @@ export const WidgetDeclaration = defineKind('widget', {
       'unknown',
     ]),
   ),
+  /**
+   * Whether a mark is in the widget: its field is a signature field that is
+   * signed, or that a mark was drawn into without signing
+   * (`forms.setSignatureAppearance`). The widget then shows that mark, not
+   * its box: its style no longer applies, and a change to it is refused.
+   * `false` for every other widget.
+   */
+  hasMark: field.engine(z.boolean()),
 });

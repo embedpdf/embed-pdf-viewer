@@ -16,7 +16,7 @@ import {
   type PdfRect,
 } from '@embedpdf/engine-core/runtime';
 
-import { borderStyleInfo, rgbOf } from './border';
+import { borderStyleInfo, fieldBoxOps, rgbOf } from './border';
 import { comboBoxOps, listBoxOps, pushButtonOps, textFieldOps, type TextLook } from './text';
 import { checkboxOps, radioOps } from './toggle';
 import type { DrawOp, WidgetDrawing } from './types';
@@ -66,7 +66,7 @@ export function textLookOf<C extends Coordinates = PageCoordinates>(
   };
 }
 
-/** Whether the painter draws this field's widgets: not a signature, nor a family the engine doesn't know. */
+/** Whether the painter draws this field's widgets: not a family the engine doesn't know. */
 export const paints = (field: Pick<FormFieldDTO, 'family'>): boolean =>
   PAINTED_FAMILIES.has(field.family);
 
@@ -77,6 +77,7 @@ const PAINTED_FAMILIES: ReadonlySet<string> = new Set([
   'combobox',
   'listbox',
   'pushbutton',
+  'signature',
 ]);
 
 /**
@@ -106,8 +107,8 @@ export function widgetText<C extends Coordinates = PageCoordinates>(
 }
 
 /**
- * The drawing, or `null` for a widget the painter doesn't draw (a signature,
- * a family the engine doesn't know).
+ * The drawing, or `null` for a widget the painter doesn't draw: a family the
+ * engine doesn't know. A signature field's is its box, with no mark in it.
  */
 export function widgetDrawing<C extends Coordinates = PageCoordinates>(
   widget: WidgetAnnotation<C>,
@@ -128,6 +129,10 @@ export function widgetDrawing<C extends Coordinates = PageCoordinates>(
     ops,
     approximate,
   });
+
+  if (field.family === 'signature') {
+    return drawing(fieldBoxOps(bbox, border, background, borderColor));
+  }
 
   if (field.family === 'checkbox' || field.family === 'radio') {
     const look = {

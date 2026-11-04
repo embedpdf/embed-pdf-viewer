@@ -3,6 +3,7 @@ import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 import { NULL_PTR, type PdfRuntimeModule, type Ptr } from '@embedpdf/engine-runtime';
 
 import { CloseStack } from '../../../document-session/lifecycle/PdfDocumentOpener';
+import { writeAppearanceFit } from '../../annotations/internal/appearanceFit';
 
 /** `EPDF_STAMP_FIT_CONTAIN`: uniform scale, letterboxed and centred in the rect. */
 const FIT_CONTAIN = 0;
@@ -18,12 +19,19 @@ const FIT_CONTAIN = 0;
  * `UpdateAppearanceToRect` writes that placement — the page fitted uniformly
  * into the widget's rect. Without the second call the page sits in its own
  * box and the viewer's BBox→/Rect mapping stretches it to the rect's aspect.
+ *
+ * `recordFit`, for a mark drawn in without signing, records the fit as a
+ * stamp records its own: the widget then reads as having a mark in it
+ * (`hasMark`), which its style never draws over. A signature's mark needs
+ * no record (the field's value says it's signed), and a signing changes no
+ * other key of its widget.
  */
 export function bakeWidgetAppearance(
   runtime: PdfRuntimeModule,
   docPtr: Ptr,
   widget: FormWidget,
   pdf: Uint8Array,
+  { recordFit }: { recordFit: boolean },
 ): void {
   const { mem, fn } = runtime;
   const stack = new CloseStack();
@@ -67,6 +75,7 @@ export function bakeWidgetAppearance(
         'the appearance page could not be fitted into the widget',
       );
     }
+    if (recordFit) writeAppearanceFit(fn, mem, annotPtr, 'contain');
   } finally {
     stack.close();
   }

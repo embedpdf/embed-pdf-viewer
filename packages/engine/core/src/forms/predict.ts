@@ -596,9 +596,11 @@ function widgetRowOfPlacement(
     field: { kind: 'objectNumber', objectNumber: at.field },
     fieldFamily: draft.family,
     // Attaching the widget prints it and draws its appearance (a signature
-    // field's waits for its signature); a checkbox or radio button starts off.
+    // field's: its box, with no mark in it yet); a checkbox or radio button
+    // starts off.
     print: true,
-    hasAppearance: draft.family !== 'signature',
+    hasAppearance: true,
+    hasMark: false,
     appearanceState: toggle ? 'Off' : null,
     caption: draft.family === 'pushbutton' ? (placement.caption ?? null) : null,
   } as WidgetAnnotation;

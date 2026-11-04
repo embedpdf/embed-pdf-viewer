@@ -30,6 +30,7 @@ import {
   widgetBox,
   widgetButton,
   widgetChoice,
+  widgetMark,
   widgetRadio,
   widgetText,
   widgetToggle,
@@ -73,6 +74,7 @@ export const KINDS: Readonly<Record<string, AnnotationKind>> = {
   [widgetToggle.name]: widgetToggle,
   [widgetRadio.name]: widgetRadio,
   [widgetBox.name]: widgetBox,
+  [widgetMark.name]: widgetMark,
 };
 
 /**

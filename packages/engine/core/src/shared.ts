@@ -661,6 +661,7 @@ export type {
   WidgetStylePatchFields,
   WidgetAppearance,
 } from './annotation/kinds/widget.shared';
+export { WIDGET_STYLE_NAMES } from './annotation/kinds/widget/styleNames';
 export type { FormKind, FormSnapshot } from './forms/snapshot';
 export type {
   WidgetPlacement,

@@ -17766,7 +17766,8 @@
                 "nullable": true
               },
               "field": {},
-              "fieldFamily": {}
+              "fieldFamily": {},
+              "hasMark": {}
             },
             "required": ["subtype"],
             "additionalProperties": false
@@ -23195,6 +23196,9 @@
               "signature",
               "unknown"
             ]
+          },
+          "hasMark": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -23244,7 +23248,8 @@
           "caption",
           "checkStyle",
           "field",
-          "fieldFamily"
+          "fieldFamily",
+          "hasMark"
         ],
         "additionalProperties": false
       },
@@ -23478,7 +23483,8 @@
             "nullable": true
           },
           "field": {},
-          "fieldFamily": {}
+          "fieldFamily": {},
+          "hasMark": {}
         },
         "additionalProperties": false
       },

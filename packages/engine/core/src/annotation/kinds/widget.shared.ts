@@ -2,22 +2,7 @@ import { z } from 'zod';
 
 import type { WidgetAnnotation, WidgetPatch } from './widget';
 import { WidgetDeclaration } from './widget/declaration';
-
-const WIDGET_STYLE_NAMES = [
-  'color',
-  'interiorColor',
-  'strokeWidth',
-  'borderStyle',
-  'dashArray',
-  'fontFamily',
-  'fontSize',
-  'fontColor',
-  'textAlign',
-  'caption',
-  'checkStyle',
-] as const;
-
-type WidgetStyleName = (typeof WIDGET_STYLE_NAMES)[number];
+import { WIDGET_STYLE_NAMES, type WidgetStyleName } from './widget/styleNames';
 
 /** A widget's appearance characteristics (`/MK`, a push button's caption among them) and default appearance (`/DA`). */
 export type WidgetStyleFields = Pick<WidgetAnnotation, WidgetStyleName>;

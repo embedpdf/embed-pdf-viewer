@@ -11,13 +11,13 @@ import type { Id, ModelAnnotation } from '../types';
 
 /**
  * An annotation's kind (`kinds/`): the one its subtype names; for a widget,
- * the one its field family picks (`widget-text`…); for a free text with the
- * callout intent, the callout.
+ * the one its field family picks (`widget-text`…), or `widget-mark` when a
+ * mark is in it; for a free text with the callout intent, the callout.
  */
 export function kindOf(annotation: Annotation): AnnotationKind {
   switch (annotation.subtype) {
     case 'widget':
-      return kindNamed(widgetKindOf(annotation.fieldFamily));
+      return kindNamed(widgetKindOf(annotation));
     case 'free-text':
       return kindNamed(
         annotation.intent === 'free-text-callout' ? 'free-text-callout' : 'free-text',

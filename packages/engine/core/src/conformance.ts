@@ -113,6 +113,7 @@ export { runNamedPagesConformance } from './conformance/runNamedPagesConformance
 export { runAnnotationFlattenConformance } from './conformance/runAnnotationFlattenConformance';
 export { runAnnotationAppearanceExportConformance } from './conformance/runAnnotationAppearanceExportConformance';
 export { runPageFlattenConformance } from './conformance/runPageFlattenConformance';
+export { BANDS_PDF } from './conformance/stampFixtures';
 export {
   BARE_PAGE_FIXTURE_PDF,
   runRedactionApplyConformance,

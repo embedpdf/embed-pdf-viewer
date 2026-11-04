@@ -11,6 +11,7 @@ import { type PdfFunctions, type PdfRuntimeMemory, type Ptr } from '@embedpdf/en
 import { withScratchN } from '../../../../runtime/memory/scratch';
 import { readUtf16String } from '../../../../runtime/memory/strings';
 import { readI32 } from '../../../../runtime/memory/structs';
+import { readAppearanceFit } from '../appearanceFit';
 import { widgetBorderStyleFromCode } from '../shapeBorderStyle';
 import { textAlignmentFromCode } from '../textAlignment';
 import type { AnnotationReadContext } from './annotationReadContext';
@@ -104,5 +105,8 @@ export function readWidget(
     // a field dictionary, which annotation-plane primitives cannot follow.
     field: null,
     fieldFamily: 'unknown',
+    // A mark drawn in records how it fits; the join adds a signature, and
+    // keeps it only for a signature field's widget.
+    hasMark: readAppearanceFit(fn, mem, annotPtr) !== null,
   };
 }

@@ -131,6 +131,18 @@ export const widgetBox = defineKind({
   properties: BOX_FIELDS,
 });
 
+/**
+ * A signature field's widget with a mark in it (`hasMark`: it's signed, or a
+ * mark was drawn in): it shows the mark, not its box, so it has no style.
+ */
+export const widgetMark = defineKind({
+  name: 'widget-mark',
+  family: boxFamily,
+  style: widgetStyle,
+  caps: WIDGET_CAPS,
+  properties: [],
+});
+
 /** The widget kind for a field family. */
 const KIND_BY_FAMILY: Readonly<Record<string, string>> = {
   text: widgetText.name,
@@ -141,8 +153,9 @@ const KIND_BY_FAMILY: Readonly<Record<string, string>> = {
   radio: widgetRadio.name,
 };
 
-/** The name of the widget kind for a widget's field family. */
-export const widgetKindOf = (family: string): string => KIND_BY_FAMILY[family] ?? widgetBox.name;
+/** The name of a widget's kind: the one with a mark in it, else its field family's. */
+export const widgetKindOf = (widget: { fieldFamily: string; hasMark: boolean }): string =>
+  widget.hasMark ? widgetMark.name : (KIND_BY_FAMILY[widget.fieldFamily] ?? widgetBox.name);
 
 /**
  * The field family a widget kind stands for, the other way round: what a form
