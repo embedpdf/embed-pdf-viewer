@@ -29,6 +29,7 @@ const COLUMNS: { head: string; links: { label: string; href: string }[] }[] = [
     links: [
       { label: 'Documentation', href: '/docs' },
       { label: 'Quick Start', href: '/docs' },
+      { label: 'Docs for EmbedPDF 2.x', href: 'https://v2.embedpdf.com/docs' },
       { label: 'GitHub', href: 'https://github.com/embedpdf/embed-pdf-viewer' },
       { label: 'Releases', href: 'https://github.com/embedpdf/embed-pdf-viewer/releases' },
     ],
