@@ -115,6 +115,13 @@ export const it: Locale = {
         copy: 'Copia',
         strip: 'Azioni selezione testo',
       },
+      snapshot: {
+        tool: 'Scatta istantanea',
+        copy: 'Copia',
+        save: 'Salva immagine',
+        clear: 'Elimina istantanea',
+        strip: 'Azioni istantanea',
+      },
       shapes: {
         rectangle: 'Rettangolo',
         circle: 'Ovale',
@@ -162,6 +169,7 @@ export const it: Locale = {
         'doc-annotate-modify': 'La modifica delle annotazioni non è consentita',
         'doc-annotate-read': 'La visualizzazione delle annotazioni non è consentita',
         'doc-attachments-modify': 'L’aggiunta di file non è consentita',
+        'doc-content-copy': 'Le istantanee non sono consentite',
         'doc-download': 'Il download non è consentito',
         'doc-forms-modify': 'La modifica dei campi modulo non è consentita',
         'doc-outline-modify': 'La modifica dei segnalibri non è consentita',

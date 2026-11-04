@@ -71,6 +71,19 @@ export const EPDF_VARIABLES = {
   },
   'zoom-box-stroke': { setting: 'stage.zoomBox.stroke', follows: 'accent', default: '#3858e9' },
 
+  // ── rendering: renderPlugin({ snapshot: { box } }) ──
+  'snapshot-box-fill': {
+    setting: 'render.snapshot.box.fill',
+    follows: 'accent',
+    accentPercent: 8,
+    default: 'color-mix(in srgb, #3858e9 8%, transparent)',
+  },
+  'snapshot-box-stroke': {
+    setting: 'render.snapshot.box.stroke',
+    follows: 'accent',
+    default: '#3858e9',
+  },
+
   // ── annotations: annotationPlugin({ chrome }) and each tool ──
   'annotation-accent': {
     setting: 'annotation.chrome.accent',

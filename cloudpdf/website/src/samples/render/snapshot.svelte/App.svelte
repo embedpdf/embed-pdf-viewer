@@ -1,0 +1,28 @@
+<script lang="ts" module>
+  import { DocumentGate, Viewer, type OpenInput } from '@embedpdf/svelte/runtime';
+  import { RenderLayer, SnapshotLayer, renderPlugin } from '@embedpdf/svelte/render';
+  import { Stage, stagePlugin } from '@embedpdf/svelte/stage';
+  import { interactionPlugin } from '@embedpdf/svelte/interaction';
+  import { cloudEngine } from '@cloudpdf/engine';
+  import SnapshotToolbar from './SnapshotToolbar.svelte';
+
+  import '../snapshot.css';
+
+  const engine = cloudEngine();
+  const plugins = [stagePlugin(), renderPlugin(), interactionPlugin({ defaultTool: 'pan' })];
+
+  const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
+</script>
+
+<Viewer {engine} {plugins} initialDocuments={[{ source: welcome }]}>
+  <DocumentGate>
+    {#snippet fallback()}
+      <p class="loading">Loading…</p>
+    {/snippet}
+    <SnapshotToolbar />
+    <Stage class="stage">
+      <RenderLayer />
+      <SnapshotLayer />
+    </Stage>
+  </DocumentGate>
+</Viewer>

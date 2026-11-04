@@ -15,10 +15,12 @@ export const en = {
     selection: { copy: 'Copy' },
     annotation: { delete: 'Delete' },
     document: { download: 'Download', print: 'Print' },
+    snapshot: { copy: 'Copy', save: 'Save image', clear: 'Clear snapshot' },
     tool: {
       pointer: 'Select',
       pan: 'Pan',
       zoom: 'Marquee zoom',
+      snapshot: 'Snapshot',
       highlight: 'Highlight',
       underline: 'Underline',
       strikeout: 'Strikethrough',

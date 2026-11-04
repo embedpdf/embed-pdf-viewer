@@ -63,7 +63,7 @@ RemoveItemOptions [InterfaceDeclaration] (from packages/core/ui/src/layout.ts): 
 ResolveMenuTarget [TypeAliasDeclaration] (from packages/core/ui/src/projection.ts): export type ResolveMenuTarget = (commandId: string) =>{ menu?: string} | null;
 SectionName [TypeAliasDeclaration] (from packages/core/ui/src/layout.ts): export type SectionName = 'start' | 'center' | 'end';
 SectionSpacing [TypeAliasDeclaration] (from packages/core/ui/src/toolbar-layout.ts): export type SectionSpacing = 'balance' | 'gap' | 'none';
-SelectionTarget [TypeAliasDeclaration] (from packages/core/ui/src/layout.ts): export type SelectionTarget = 'selection' | 'annotation';
+SelectionTarget [TypeAliasDeclaration] (from packages/core/ui/src/layout.ts): export type SelectionTarget = 'selection' | 'annotation' | 'snapshot';
 StripGroup [InterfaceDeclaration] (from packages/core/ui/src/projection.ts): export interface StripGroup{ readonly id: string; readonly labelKey?: string; readonly commands: readonly string[]; }
 StripView [InterfaceDeclaration] (from packages/core/ui/src/toolbar-layout.ts): export interface StripView<Command extends ToolbarCommand = ToolbarCommand>{ readonly groups: readonly StripViewGroup<Command>[]; execute(id: string): void; }
 StripViewGroup [InterfaceDeclaration] (from packages/core/ui/src/toolbar-layout.ts): export interface StripViewGroup<Command extends ToolbarCommand = ToolbarCommand>{ readonly id: string; readonly labelKey?: string; readonly commands: readonly Command[]; }

@@ -116,6 +116,13 @@ export const fr: Locale = {
         copy: 'Copier',
         strip: 'Actions de sélection de texte',
       },
+      snapshot: {
+        tool: 'Prendre un instantané',
+        copy: 'Copier',
+        save: 'Enregistrer l’image',
+        clear: 'Effacer l’instantané',
+        strip: 'Actions de l’instantané',
+      },
       shapes: {
         rectangle: 'Rectangle',
         circle: 'Ellipse',
@@ -163,6 +170,7 @@ export const fr: Locale = {
         'doc-annotate-modify': 'La modification des annotations n’est pas autorisée',
         'doc-annotate-read': 'L’affichage des annotations n’est pas autorisé',
         'doc-attachments-modify': 'L’ajout de fichiers n’est pas autorisé',
+        'doc-content-copy': 'Les instantanés ne sont pas autorisés',
         'doc-download': 'Le téléchargement n’est pas autorisé',
         'doc-forms-modify': 'La modification des champs de formulaire n’est pas autorisée',
         'doc-outline-modify': 'La modification des signets n’est pas autorisée',

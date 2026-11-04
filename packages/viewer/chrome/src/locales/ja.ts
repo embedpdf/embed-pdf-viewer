@@ -115,6 +115,13 @@ export const ja: Locale = {
         copy: 'コピー',
         strip: 'テキスト選択の操作',
       },
+      snapshot: {
+        tool: 'スナップショットを作成',
+        copy: 'コピー',
+        save: '画像を保存',
+        clear: 'スナップショットを解除',
+        strip: 'スナップショットの操作',
+      },
       shapes: {
         rectangle: '長方形',
         circle: '楕円',
@@ -162,6 +169,7 @@ export const ja: Locale = {
         'doc-annotate-modify': '注釈の変更は許可されていません',
         'doc-annotate-read': '注釈の表示は許可されていません',
         'doc-attachments-modify': 'ファイルの追加は許可されていません',
+        'doc-content-copy': 'スナップショットは許可されていません',
         'doc-download': 'ダウンロードは許可されていません',
         'doc-forms-modify': 'フォームフィールドの編集は許可されていません',
         'doc-outline-modify': 'しおりの変更は許可されていません',

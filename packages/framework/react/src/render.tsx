@@ -36,6 +36,7 @@ import type {
   PicturePainter,
   PictureState,
   RenderCapability,
+  Snapshot,
 } from '@embedpdf/plugin-render';
 import type { EventHook } from '@embedpdf/core';
 import {
@@ -43,9 +44,13 @@ import {
   pageLayersOf,
   partsDrawnTwice,
   pictureLayerOptionsOf,
+  rectInPixels,
+  SNAPSHOT_BOX_DASH,
+  snapshotBoxPaint,
   whenPresented,
   type PicturePartProps,
 } from '@embedpdf/web';
+import { Anchored, type AnchoredPlacement } from './anchored';
 import { devWarn } from './dev';
 import { usePaintedParts } from './page-layers';
 import {
@@ -54,6 +59,7 @@ import {
   useOptionalSelector,
   usePage,
   useSelector,
+  useViewerSettings,
 } from './runtime';
 import { settingsHook } from './state';
 
@@ -408,5 +414,75 @@ function TileImg({
         zIndex: source.z,
       }}
     />
+  );
+}
+
+/**
+ * The snapshot the `snapshot` tool holds, or `null`: `{ page, rect, image }`, the same object while
+ * it's held. Copy it with `copyImage(snapshot.image)`, in the click itself.
+ */
+export function useSnapshot(): Snapshot | null {
+  return useOptionalSelector(RenderPublicToken, (render) => render.getSnapshot(), null);
+}
+
+export interface SnapshotMenuProps {
+  children: React.ReactNode;
+  /** Gap in screen px between the snapshot's box and the menu (default 8). */
+  gap?: number;
+  /** Where to place the menu around the box. Default 'bottom'. */
+  placement?: AnchoredPlacement;
+}
+
+/**
+ * Floats by the snapshot the `snapshot` tool holds, once it's taken: hidden
+ * while the box is still dragged, it appears when the pointer lifts. Works
+ * under `<Stage>` (mount in the overlay slot) and `<PageView>` alike, the
+ * surface providing the projection. Compose the contents from
+ * `useSnapshot()`, `copyImage` and `saveFile`.
+ */
+export function SnapshotMenu({ children, gap = 8, placement = 'bottom' }: SnapshotMenuProps) {
+  const snapshot = useSnapshot();
+  const anchor = useMemo(
+    () => snapshot && { page: snapshot.page, bounds: snapshot.rect },
+    [snapshot],
+  );
+  if (!anchor) return null;
+  return (
+    <Anchored anchor={anchor} placement={placement} gap={gap}>
+      {children}
+    </Anchored>
+  );
+}
+
+/**
+ * The `snapshot` tool's box on this page, while it's dragged and while it's
+ * held: the plugin's box in page space, in the page layer's pixels. It only
+ * draws; the tool's handler takes the pointer. Put it in each page, after the
+ * other layers.
+ */
+export function SnapshotLayer() {
+  const page = usePage();
+  const box = useOptionalSelector(RenderToken, (render) => render.getSnapshotBox(page.ref), null);
+  const colors = useRenderSettings((settings) => settings.snapshot.box);
+  // Unset colors follow the viewer's accent, behind the `--epdf-accent` variable.
+  const accent = useViewerSettings((settings) => settings.accent);
+  if (!box) return null;
+  const { left, top, width, height } = rectInPixels(box, page.transform);
+  return (
+    <svg
+      aria-hidden
+      width={width}
+      height={height}
+      style={{ position: 'absolute', left, top, overflow: 'visible', pointerEvents: 'none' }}
+    >
+      <rect
+        width={width}
+        height={height}
+        strokeWidth={1}
+        strokeDasharray={SNAPSHOT_BOX_DASH}
+        // In `style`: an SVG attribute doesn't read var().
+        style={snapshotBoxPaint(colors, accent)}
+      />
+    </svg>
   );
 }

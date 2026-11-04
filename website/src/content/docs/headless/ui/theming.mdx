@@ -133,6 +133,13 @@ it on, so two viewers on one page can each have their own colors from one styles
 | `zoomBox.fill`   | Inside the box you drag with the [zoom tool](../viewing/stage#zoom-to-a-box) | the viewer's `accent` at 8% | `--epdf-zoom-box-fill`   |
 | `zoomBox.stroke` | Its dashed edge                                    | the viewer's `accent`       | `--epdf-zoom-box-stroke` |
 
+**Rendering**: `renderPlugin({ snapshot: { box } })`
+
+| Setting               | What it colors                                     | Default                     | From CSS                     |
+| :-------------------- | :------------------------------------------------- | :-------------------------- | :--------------------------- |
+| `snapshot.box.fill`   | Inside the box you drag with the [snapshot tool](../viewing/render#take-a-snapshot) | the viewer's `accent` at 8% | `--epdf-snapshot-box-fill`   |
+| `snapshot.box.stroke` | Its dashed edge                                    | the viewer's `accent`       | `--epdf-snapshot-box-stroke` |
+
 **Annotations**: `annotationPlugin({ chrome })`
 
 | Setting                         | What it colors                                                    | Default                   | From CSS                                   |

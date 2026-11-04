@@ -112,6 +112,13 @@ export const en: Locale = {
         copy: 'Copy',
         strip: 'Text selection actions',
       },
+      snapshot: {
+        tool: 'Take a Snapshot',
+        copy: 'Copy',
+        save: 'Save Image',
+        clear: 'Clear Snapshot',
+        strip: 'Snapshot actions',
+      },
       shapes: {
         rectangle: 'Rectangle',
         circle: 'Circle',
@@ -161,6 +168,7 @@ export const en: Locale = {
         'doc-annotate-modify': "Changing annotations isn't allowed",
         'doc-annotate-read': "Viewing annotations isn't allowed",
         'doc-attachments-modify': 'Adding files isn’t allowed',
+        'doc-content-copy': "Taking snapshots isn't allowed",
         'doc-download': "Downloading isn't allowed",
         'doc-forms-modify': "Editing form fields isn't allowed",
         'doc-outline-modify': 'Changing the outline isn’t allowed',

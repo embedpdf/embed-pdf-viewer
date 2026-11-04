@@ -116,6 +116,13 @@ export const he: Locale = {
         copy: 'העתק',
         strip: 'פעולות בחירת טקסט',
       },
+      snapshot: {
+        tool: 'צילום תמונת מצב',
+        copy: 'העתק',
+        save: 'שמור תמונה',
+        clear: 'נקה תמונת מצב',
+        strip: 'פעולות תמונת מצב',
+      },
       shapes: {
         rectangle: 'מלבן',
         circle: 'עיגול',
@@ -163,6 +170,7 @@ export const he: Locale = {
         'doc-annotate-modify': 'שינוי ביאורים אינו מותר',
         'doc-annotate-read': 'צפייה בביאורים אינה מותרת',
         'doc-attachments-modify': 'אסור להוסיף קבצים',
+        'doc-content-copy': 'צילום תמונות מצב אינו מותר',
         'doc-download': 'הורדה אינה מותרת',
         'doc-forms-modify': 'עריכת שדות טופס אינה מותרת',
         'doc-outline-modify': 'אין הרשאה לשנות סימניות',

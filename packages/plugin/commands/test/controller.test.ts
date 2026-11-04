@@ -605,6 +605,11 @@ describe('permissions', () => {
           { id: 'acme:save', label: 'Save', shortcut: 'Mod+S', categories: ['acme.saving'] },
           { id: 'acme:send', label: 'Send', shortcut: 'Mod+E', categories: ['acme'] },
           { id: 'acme:mail', label: 'Mail', shortcut: 'Mod+E' },
+          { id: 'acme:cancel', label: 'Cancel', shortcut: 'Mod+K', enabled: () => false },
+          { id: 'acme:close', label: 'Close', shortcut: 'Mod+K', visible: () => false },
+          { id: 'acme:dismiss', label: 'Dismiss', shortcut: 'Mod+K' },
+          { id: 'acme:undo', label: 'Undo', shortcut: 'Mod+J', enabled: () => false },
+          { id: 'acme:redo', label: 'Redo', shortcut: 'Mod+J', enabled: () => false },
         ],
         disabledCategories: ['acme'],
       },
@@ -629,7 +634,17 @@ describe('permissions', () => {
       commandId: 'acme:mail',
       refusal: null,
     });
-    expect(commands.matchStroke(stroke('k'), options)).toBeNull();
+    // Of commands that share keys, the one that can run now wins, wherever it is in the list.
+    expect(commands.matchStroke(stroke('k'), options)).toEqual({
+      commandId: 'acme:dismiss',
+      refusal: null,
+    });
+    // When none can run now, the first one still takes the key, which keeps its default.
+    expect(commands.matchStroke(stroke('j'), options)).toEqual({
+      commandId: 'acme:undo',
+      refusal: null,
+    });
+    expect(commands.matchStroke(stroke('l'), options)).toBeNull();
   });
 
   it('matches a key typed in a text field only for a command that runs from text fields', () => {

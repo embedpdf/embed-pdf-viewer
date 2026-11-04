@@ -57,7 +57,7 @@ const FLOAT_POSITIONS: readonly string[] = [
   'bottom',
   'bottom-end',
 ];
-const SELECTION_TARGETS: readonly string[] = ['selection', 'annotation'];
+const SELECTION_TARGETS: readonly string[] = ['selection', 'annotation', 'snapshot'];
 const PRESENTATIONS: readonly string[] = ['dock', 'overlay', 'sheet'];
 const SIZES: readonly string[] = ['compact', 'medium', 'expanded'];
 const WIDTH_FIELDS: readonly string[] = ['initial', 'min', 'max'];
@@ -167,7 +167,7 @@ function placeProblems(
   if ('at' in place)
     return SELECTION_TARGETS.includes(place.at)
       ? []
-      : [`${where}: "${place.at}" is not selection or annotation`];
+      : [`${where}: "${place.at}" is not selection, annotation or snapshot`];
   if ('panel' in place) {
     const panels = Object.keys(data.panels ?? {});
     return panels.includes(place.panel)

@@ -242,6 +242,33 @@ viewer.commands.execute('document:print');
 await viewer.documents.print();
 ```
 
+## Take a snapshot
+
+**Take a Snapshot**, in the document menu, takes part of a page as a picture, like Acrobat's
+snapshot tool. Drag a box over a page, or click a page for all of it. The box stays, with a bar
+under it:
+
+- **Copy** puts the picture on the clipboard, to paste into a message, a document or a slide.
+  `Ctrl`/`Cmd`+`C` does the same. Once it's copied, the box goes, as selected text does.
+- **Save image** downloads it as a PNG, named after the document and the page.
+
+`Escape` lets the box go, and so does switching to another tool. The picture is the box at twice
+its size in points, 144 DPI, with the annotations and form fields the user sees. For bigger
+pictures, raise the [render plugin's](/docs/headless/viewing/render#take-a-snapshot)
+`snapshot.scale`:
+
+```js
+{
+  plugins: {
+    render: { snapshot: { scale: 3 } },
+  },
+}
+```
+
+A PDF that doesn't allow copying doesn't allow snapshots either, as in Acrobat: **Take a Snapshot**
+isn't in the menu. To leave snapshots out everywhere, `disable: ['snapshots']`. From your own
+button, run `tool:snapshot`.
+
 ## Save to your server
 
 `viewer.documents.download()` gives you the PDF with every change, as bytes, without a download

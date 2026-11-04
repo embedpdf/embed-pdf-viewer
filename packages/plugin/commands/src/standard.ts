@@ -1,15 +1,17 @@
 /**
  * @embedpdf/plugin-commands/standard — the commands every viewer has: zoom,
- * pages, view rotation, a command for every tool, copy, delete, download and
- * print, with shortcuts, and labels in EmbedPDF's eight languages (the i18n
- * plugin has the strings). Two of them reach the browser (the clipboard, a
- * file download), which plugins never touch, so each framework's `/commands`
- * builds them with its platform: that is the `standardCommands` an app
- * imports. Print goes through the kernel, which has the host's printer.
+ * pages, view rotation, a command for every tool, copy, the snapshot, delete,
+ * download and print, with shortcuts, and labels in EmbedPDF's eight
+ * languages (the i18n plugin has the strings). Some of them reach the browser
+ * (the clipboard, a file download), which plugins never touch, so each
+ * framework's `/commands` builds them with its platform: that is the
+ * `standardCommands` an app imports. Print goes through the kernel, which has
+ * the host's printer.
  */
 import { DocumentsToken } from '@embedpdf/core';
 import { AnnotationToken } from '@embedpdf/plugin-annotation/contract';
 import { InteractionToken, type Tool } from '@embedpdf/plugin-interaction/contract';
+import { RenderToken, SNAPSHOT_TOOL, type PageImage } from '@embedpdf/plugin-render/contract';
 import { SelectionToken, type SelectionCapability } from '@embedpdf/plugin-selection/contract';
 import { StageToken } from '@embedpdf/plugin-stage/contract';
 
@@ -19,11 +21,17 @@ import type { CommandContext, CommandDef, CommandFamily } from './contract';
 export interface StandardCommandsPlatform {
   /** Copy the selected text to the clipboard. */
   copySelection(selection: SelectionCapability): Promise<unknown>;
-  /** Give the user the bytes as a file download. */
-  saveFile(bytes: Uint8Array, fileName: string): void;
+  /**
+   * Copy an image to the clipboard. Called in the press or key itself, before
+   * the image is there: a browser may take the clipboard only then.
+   */
+  copyImage(image: Promise<PageImage>): Promise<unknown>;
+  /** Give the user the bytes as a file download, of the given content type. */
+  saveFile(bytes: Uint8Array | Blob, fileName: string, contentType: string): void;
 }
 
 const stageOf = (context: CommandContext) => context.tryGet(StageToken);
+const snapshotOf = (context: CommandContext) => context.tryGet(RenderToken)?.getSnapshot() ?? null;
 const interactionOf = (context: CommandContext) => context.tryGet(InteractionToken);
 
 /** Enabled while the document has a Stage. */
@@ -184,6 +192,12 @@ export function createStandardCommands(
     { ...toolCommand('pointer'), id: 'tool:pointer', shortcut: 'V' },
     { ...toolCommand('pan'), id: 'tool:pan', shortcut: 'H' },
     { ...toolCommand('zoom'), id: 'tool:zoom', shortcut: 'Z' },
+    {
+      ...toolCommand(SNAPSHOT_TOOL),
+      id: 'tool:snapshot',
+      allowed: (context) => context.tryGet(RenderToken)?.canSnapshot() ?? true,
+      notAllowedKey: 'commands.notAllowed.doc-content-copy',
+    },
     toolCommands,
 
     // ── selections ──
@@ -223,6 +237,51 @@ export function createStandardCommands(
       },
     },
 
+    // ── the snapshot the snapshot tool holds ──
+    {
+      id: 'snapshot:copy',
+      labelKey: 'commands.snapshot.copy',
+      label: 'Copy',
+      icon: 'copy',
+      shortcut: 'Mod+C',
+      categories: ['snapshot'],
+      // Straight to the clipboard, in the press itself: the picture follows when it's there.
+      run: (context) => {
+        const snapshot = snapshotOf(context);
+        return snapshot ? platform.copyImage(snapshot.image) : undefined;
+      },
+      enabled: (context) => snapshotOf(context) !== null,
+    },
+    {
+      id: 'snapshot:save',
+      labelKey: 'commands.snapshot.save',
+      label: 'Save image',
+      icon: 'download',
+      categories: ['snapshot'],
+      run: async (context) => {
+        const snapshot = snapshotOf(context);
+        if (!snapshot) return;
+        const documents = context.get(DocumentsToken);
+        const id = context.documentId ?? undefined;
+        const blob = await (await snapshot.image).blob();
+        const number =
+          documents
+            .listPages(id)
+            .findIndex((page) => page.ref.objectNumber === snapshot.page.objectNumber) + 1;
+        platform.saveFile(blob, snapshotFileNameOf(documents.get(id)?.name, number), 'image/png');
+      },
+      enabled: (context) => snapshotOf(context) !== null,
+    },
+    {
+      id: 'snapshot:clear',
+      labelKey: 'commands.snapshot.clear',
+      label: 'Clear snapshot',
+      shortcut: 'Escape',
+      categories: ['snapshot'],
+      run: (context) => context.get(RenderToken).clearSnapshot(),
+      enabled: (context) => snapshotOf(context) !== null,
+    },
+
     // ── the document ──
     {
       id: 'document:download',
@@ -237,7 +296,7 @@ export function createStandardCommands(
         const documents = context.get(DocumentsToken);
         const id = context.documentId ?? undefined;
         const bytes = await documents.download(id, { signal: context.signal });
-        platform.saveFile(bytes, fileNameOf(documents.get(id)?.name));
+        platform.saveFile(bytes, fileNameOf(documents.get(id)?.name), 'application/pdf');
       },
       enabled: (context) => context.documentId !== null,
     },
@@ -265,4 +324,10 @@ export function createStandardCommands(
 function fileNameOf(name: string | undefined): string {
   if (!name) return 'document.pdf';
   return /\.pdf$/i.test(name) ? name : `${name}.pdf`;
+}
+
+/** A snapshot's file name: the document's name and the page's number, as a PNG (`Report p3.png`). */
+function snapshotFileNameOf(name: string | undefined, pageNumber: number): string {
+  const base = (name ?? 'document').replace(/\.pdf$/i, '');
+  return `${base} p${pageNumber}.png`;
 }

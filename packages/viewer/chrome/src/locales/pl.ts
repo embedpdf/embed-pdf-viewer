@@ -115,6 +115,13 @@ export const pl: Locale = {
         copy: 'Kopiuj',
         strip: 'Akcje zaznaczonego tekstu',
       },
+      snapshot: {
+        tool: 'Wykonaj migawkę',
+        copy: 'Kopiuj',
+        save: 'Zapisz obraz',
+        clear: 'Usuń migawkę',
+        strip: 'Akcje migawki',
+      },
       shapes: {
         rectangle: 'Prostokąt',
         circle: 'Okrąg',
@@ -162,6 +169,7 @@ export const pl: Locale = {
         'doc-annotate-modify': 'Zmienianie adnotacji jest niedozwolone',
         'doc-annotate-read': 'Wyświetlanie adnotacji jest niedozwolone',
         'doc-attachments-modify': 'Dodawanie plików jest niedozwolone',
+        'doc-content-copy': 'Migawki są niedozwolone',
         'doc-download': 'Pobieranie jest niedozwolone',
         'doc-forms-modify': 'Edytowanie pól formularza jest niedozwolone',
         'doc-outline-modify': 'Zmienianie zakładek jest niedozwolone',

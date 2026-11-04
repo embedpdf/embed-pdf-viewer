@@ -38,6 +38,7 @@ and nothing else changes. Every change returns a new layout, so changes chain:
 | `pager` | Floating at the bottom | The page number between the previous and next page buttons; nothing for a document of one page |
 | `selection` | Over selected text | Copy, highlight, underline, strike out |
 | `annotation` | Over selected annotations | Comment, style, delete |
+| `snapshot` | Under the box the snapshot tool holds | Copy, save image |
 | `thumbnails` | In the thumbnails panel | Insert, rotate and delete pages, and undo and redo |
 | `outline` | In the outline panel | The filter; add, expand all and collapse all |
 | `attachments` | In the attachments panel | How many files there are, and attach a file |
@@ -54,7 +55,7 @@ The ids of every bar, group, menu and button are at the [end of this page](#ever
 | `'start'`, `'end'` | Along the left or right edge, vertical. In a right-to-left language they swap sides. |
 | `{ float: 'bottom' }` | Floating over the pages: `'top-start'`, `'top'`, `'top-end'`, `'start'`, `'end'`, `'bottom-start'`, `'bottom'` or `'bottom-end'`. Add `hideWhenIdle` to [rest it out of sight while nothing moves](#out-of-the-way-while-reading). |
 | `{ with: 'main' }` | Along another bar, on the side of the pages. The mode bars ride along `main` this way, so they follow it wherever it goes. |
-| `{ at: 'selection' }`, `{ at: 'annotation' }` | Over selected text, or over selected annotations |
+| `{ at: 'selection' }`, `{ at: 'annotation' }`, `{ at: 'snapshot' }` | Over selected text, over selected annotations, or by the snapshot tool's box |
 | `{ panel: 'thumbnails' }` | At the top of a panel, under its title: any panel's id, your own too. See [A bar in a panel](panels#a-bar-in-a-panel). |
 
 You never say which way a menu opens or where a tooltip goes. A menu opens away from its bar's
@@ -340,6 +341,7 @@ own title, icon and words, so `search` needs no more than its side. Which one to
 | `pager` | `pages` |
 | `selection` | `selection` |
 | `annotation` | `actions`, `danger` |
+| `snapshot` | `snapshot` |
 | `thumbnails` | `edit`, `more`, `history` |
 | `outline` | `filter`, `items` |
 | `attachments` | `count`, `files` |

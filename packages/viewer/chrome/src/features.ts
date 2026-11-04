@@ -24,6 +24,7 @@ export const FEATURE_PARTS = {
   pages: [],
   attachments: ['adding'],
   text: ['selection', 'copy'],
+  snapshots: [],
   search: [],
   thumbnails: [],
   outline: ['editing'],

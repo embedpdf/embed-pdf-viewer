@@ -33,7 +33,7 @@ import { FormLayer } from '@embedpdf/react/form';
 import { useT } from '@embedpdf/react/i18n';
 import { LinkLayer } from '@embedpdf/react/link';
 import { useMeasurementState } from '@embedpdf/react/measurement';
-import { RenderLayer } from '@embedpdf/react/render';
+import { RenderLayer, SnapshotLayer } from '@embedpdf/react/render';
 import { DocumentGate, useDocument, useDocumentId } from '@embedpdf/react/runtime';
 import { SearchLayer } from '@embedpdf/react/search';
 import { SelectionClipboard, SelectionHandles, SelectionLayer } from '@embedpdf/react/selection';
@@ -57,6 +57,7 @@ import { PlacedComponentsHost, type PlacedComponents } from './ui/placed-compone
 import { useRefusalNotice } from './ui/refusal-notice';
 import { RotationBadge } from './ui/rotation-badge';
 import { SelectionStrip } from './ui/selection-strip';
+import { SnapshotStrip } from './ui/snapshot-strip';
 import { ShortcutsSheet } from './ui/shortcuts-sheet';
 import { SidebarReads } from './ui/sidebar-reads';
 import { SignatureBridge } from './ui/signature-bridge';
@@ -258,6 +259,8 @@ export function Shell({ components }: { components?: PlacedComponents }) {
                       {/* the angle a selection is being turned to, by the pointer */}
                       <RotationBadge />
                       <SelectionStrip />
+                      {/* copy or save the box the snapshot tool holds */}
+                      <SnapshotStrip />
                       {/* a signed field's facts, anchored at its widget */}
                       <SignatureInspector />
                       {/* touch: draggable start/end selection handles (long-press
@@ -298,6 +301,8 @@ export function Shell({ components }: { components?: PlacedComponents }) {
                       leaves the fields to it, as it leaves the annotations
                       to the annotation layer. */}
                       <FormLayer />
+                      {/* The snapshot tool's box, over everything on the page. */}
+                      <SnapshotLayer />
                     </>
                   )}
                 </Stage>

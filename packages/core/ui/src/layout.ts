@@ -28,8 +28,8 @@ export type FloatPosition =
   | 'bottom'
   | 'bottom-end';
 
-/** What a bar over a selection follows: selected text, or selected annotations. */
-export type SelectionTarget = 'selection' | 'annotation';
+/** What a bar over a selection follows: selected text, selected annotations, or the snapshot tool's box. */
+export type SelectionTarget = 'selection' | 'annotation' | 'snapshot';
 
 /** A bar floating over the pages: where, and whether it rests out of sight while nothing moves. */
 export interface FloatPlace {

@@ -115,6 +115,13 @@ export const zhCN: Locale = {
         copy: '复制',
         strip: '文本选择操作',
       },
+      snapshot: {
+        tool: '拍快照',
+        copy: '复制',
+        save: '保存图像',
+        clear: '清除快照',
+        strip: '快照操作',
+      },
       shapes: {
         rectangle: '矩形',
         circle: '椭圆',
@@ -162,6 +169,7 @@ export const zhCN: Locale = {
         'doc-annotate-modify': '不允许更改注释',
         'doc-annotate-read': '不允许查看注释',
         'doc-attachments-modify': '不允许添加文件',
+        'doc-content-copy': '不允许拍快照',
         'doc-download': '不允许下载',
         'doc-forms-modify': '不允许编辑表单字段',
         'doc-outline-modify': '不允许更改书签',

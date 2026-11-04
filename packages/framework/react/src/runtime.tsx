@@ -11,8 +11,8 @@
 // One-line-per-feature: registration travels with the UI.
 export * from '@embedpdf/core';
 // What a page with a viewer needs from the browser: handing bytes to the user as a download,
-// and a font the engine draws with, for text you draw yourself.
-export { saveFile } from '@embedpdf/web';
+// an image to the clipboard, and a font the engine draws with, for text you draw yourself.
+export { copyImage, saveFile } from '@embedpdf/web';
 // The page context every layer draws through; its conversions are shared with every framework.
 export { makePageContext } from '@embedpdf/web';
 // A theme written with setting names, as the style for the element around a viewer.

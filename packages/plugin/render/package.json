@@ -44,7 +44,8 @@
   },
   "dependencies": {
     "@embedpdf/core": "workspace:*",
-    "@embedpdf/core-geometry": "workspace:*"
+    "@embedpdf/core-geometry": "workspace:*",
+    "@embedpdf/plugin-interaction": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.0.0",

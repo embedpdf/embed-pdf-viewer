@@ -106,6 +106,7 @@ the headless docs lists them, with plain strings where 2.x had enums. The ones 2
 | `annotations: { selectAfterCreate: false }` | `annotation: { afterCreate: { select: false } }` |
 | `annotations: { deactivateToolAfterCreate: true }` | `annotation: { afterCreate: { tool: 'default' } }` |
 | `stamp: { manifests: [] }` | `stamp: { standard: false }` |
+| `capture: { scale: 2 }` | `render: { snapshot: { scale: 2 } }`. A snapshot is always PNG, with what the user may see drawn in. |
 
 All of them in one 3.0 config:
 
@@ -153,6 +154,7 @@ The plugins have new names:
 | :-- | :-- |
 | `zoom`, `scroll`, `spread`, `rotate`, `viewport` | `stage` |
 | `render`, `tiling` | `render` |
+| `capture` | `render`, whose `snapshot` tool takes part of a page as an image |
 | `thumbnail` | `thumbnails` |
 | `bookmark` | `outline`, which also adds, renames, moves and deletes items |
 | `attachment` | `attachment`, which also lists the files pinned to pages, and attaches and removes files |
@@ -175,6 +177,8 @@ makes most:
 | `download()` | `viewer.commands.execute('document:download')` |
 | `scrollToPage({ pageNumber: 5 })` | `viewer.get('stage').goToPage(4)`: pages count from 0 |
 | `setLocale('de')` | The `locale` prop |
+| `toggleMarqueeCapture()` | `viewer.commands.execute('tool:snapshot')` |
+| `onCaptureArea(callback)` | `viewer.get('render').onSnapshotChanged(({ snapshot }) => …)` |
 
 ## Theme
 
@@ -255,6 +259,7 @@ The ids changed:
 | `document:export`, `document:fullscreen` | `document:download`, `view:fullscreen` |
 | `annotation:add-highlight`, `panel:toggle-search`, `scroll:next-page` | `tool:highlight`, `panel:search`, `page:next` |
 | `zoom:marquee` | `tool:zoom`, which switches to the `zoom` tool |
+| `capture:screenshot` | `tool:snapshot`, which switches to the `snapshot` tool |
 
 Every 3.0 id is on [Layout](customize/layout#every-built-in-id) and
 [Buttons & commands](customize/commands#every-built-in-command).
@@ -277,6 +282,7 @@ after a dot, and single commands by their id:
 | `panel-search` | `search` |
 | `panel-comment` | `comments` |
 | `selection-copy` | `text.copy` |
+| `capture`, `capture-screenshot` | `snapshots` |
 | `document-open`, `document-export`, `document-print` | `documents.open`, `documents.download`, `documents.print` |
 | `zoom`, `rotate`, `spread`, `scroll`, `pan` | No feature: [remove](customize/layout#remove-buttons) their buttons, or disable each command, such as `'zoom:in'` |
 
@@ -295,7 +301,7 @@ New in 3.0, `readOnly: true` turns off everything that changes the document.
 | `overrides: { print: false }` | A scope that leaves out both `'doc.print'` and `'pdf.permissions'`, or, for the button only, `disable: ['documents.print']` |
 
 2.x's `print` is `doc.print` in a scope, `printHighQuality` is `doc.print.high`, `copyContents` is
-`doc.text.copy`, `modifyAnnotations` is `doc.annotate.modify`, `fillForms` is `doc.forms.fill` and
+`doc.text.copy` and `doc.content.copy`, `modifyAnnotations` is `doc.annotate.modify`, `fillForms` is `doc.forms.fill` and
 `assembleDocument` is `doc.pages.assemble`. See [Permissions](/docs/headless/concepts/permissions).
 
 ## Security and self-hosting
@@ -345,7 +351,6 @@ What 2.x had that 3.0 doesn't:
   always runs in a worker.
 - **Zoom steps:** `zoomStep` and `zoomRanges`. Zooming in and out steps through round levels: 100%,
   125%, 150%, 200% and so on.
-- **The screenshot tool** (the `capture` plugin).
 - **Protect.** 2.x's Protect dialog, `setDocumentEncryption()` and `removeEncryption()`: 3.0 can't
   add or remove a document's password.
 - **Theme events:** `themechange`, `activeColorScheme` and `themePreference`.

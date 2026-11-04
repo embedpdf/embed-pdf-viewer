@@ -26,8 +26,12 @@ export { browserTextMeasurer } from './text-measurer';
 export type { WebTextMeasurer } from './text-measurer';
 export { cssText } from './css-text';
 export type { StyleRecord } from './css-text';
-export { copySelection, wireSelectionClipboard } from './clipboard';
-export type { ClipboardSelectionSource, SelectionClipboardOptions } from './clipboard';
+export { copyImage, copySelection, wireSelectionClipboard } from './clipboard';
+export type {
+  ClipboardImageSource,
+  ClipboardSelectionSource,
+  SelectionClipboardOptions,
+} from './clipboard';
 export { bindCommandShortcuts, isMacPlatform } from './command-shortcuts';
 export { isFromTextField } from './text-field-event';
 export type {
@@ -151,6 +155,8 @@ export type {
 } from './theme';
 export { ZOOM_BOX_DASH, zoomBoxPaint } from './zoom-box';
 export type { ZoomBoxColors } from './zoom-box';
+export { SNAPSHOT_BOX_DASH, snapshotBoxPaint } from './snapshot-box';
+export type { SnapshotBoxColors } from './snapshot-box';
 export { isUprightQuad, quadInPixels, rectInPixels, svgPoints } from './page-pixels';
 export type { PagePoint, PageQuad, PageToPixels, PixelRect } from './page-pixels';
 export { isolatePointerDown, isolateWheel } from './event-isolation';

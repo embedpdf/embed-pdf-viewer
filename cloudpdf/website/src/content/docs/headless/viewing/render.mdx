@@ -126,10 +126,27 @@ side. It needs only `doc.render.thumbnail`, so it works for users who may not re
 const thumbnail = await render.renderThumbnail(page.ref);
 ```
 
+To render part of a page, give its `rect` in [page space](/docs/engine/concepts/coordinates): from
+the page's top-left, y down, in points. `width` and `scale` then size that part. `rotation` turns the
+picture clockwise:
+
+```ts
+const part = await render.renderPage(page.ref, {
+  rect: { x: 72, y: 72, width: 200, height: 100 },
+  scale: 2, // 400 × 200 pixels
+});
+```
+
+A part of a page, or a turned picture, is rendered for you alone: it doesn't go through the layers'
+cache. A `rect` that runs past the page's edge is cut at it, and one that misses the page fails with
+`invalid-input`.
+
 | Option               | What it is                                       | Default                                                           |
 | :------------------- | :----------------------------------------------- | :---------------------------------------------------------------- |
 | `width`              | The width of the image, in pixels                | —                                                                 |
 | `scale`              | Or a scale: `1` is the page's size in points     | `1`                                                               |
+| `rect`               | The part of the page to render, in page space    | the whole page                                                    |
+| `rotation`           | Turn the picture clockwise: `0`, `90`, `180` or `270` | `0`: the page as stored                                      |
 | `includeAnnotations` | Draw the annotations into the image              | when the user may read them                                       |
 | `includeFormFields`  | Draw the form fields into the image              | `false` without annotations; else when the user may read the form |
 | `format`             | `'png'`, `'webp'` or `'bmp'`                     | per engine                                                        |
@@ -139,6 +156,45 @@ const thumbnail = await render.renderThumbnail(page.ref);
 Asking for annotations or form fields the user may not read fails with `permission-denied`.
 
 <Example name="render/render-page" />
+
+## Take a snapshot
+
+The `snapshot` tool takes part of a page as an image, to paste into a message or save as a file,
+like Acrobat's Snapshot. Put `<SnapshotLayer>` in each page, after your other layers, to draw the
+box, and switch to the tool:
+
+```ts
+interaction.activateTool('snapshot');
+```
+
+<Example name="render/snapshot" />
+
+> **Try it:** switch to Snapshot and drag a box over the page, then copy it and paste it into a
+> message, or save it. A click takes the whole page.
+
+- **Drag a box on a page.** It stays on the page where it started. A click takes the whole page.
+- **The box stays** when you let go: it is the snapshot until you take another or switch tools.
+  `Escape` and `render.clearSnapshot()` let it go.
+- **Its picture** is the box at 2 pixels per point (144 DPI) as PNG, turned as the page is shown,
+  with the annotations and form fields the user may read. `snapshot.scale` changes the size. A
+  picture over 16 million pixels, or over what your server allows, comes out smaller, to fit.
+- **A change on its way is in it.** The picture waits until the engine has every change made
+  before the snapshot, so a stamp you placed a moment ago is there.
+
+<Fw only={['react', 'vue', 'svelte']}>`useSnapshot()`</Fw><Fw only="angular">`getSnapshot()` on `inject(EpdfRender)`</Fw>
+reads it: `{ page, rect, image }`, where `rect` is the box in page space and `image` resolves to the
+picture, or `null` while there's none. Outside a component, `render.getSnapshot()` reads the same,
+and `onSnapshotChanged` fires when one is taken or let go. To copy it or save it, `copyImage` and
+`saveFile` from `/runtime` do the browser's part:
+
+<Snippet name="viewing/snapshot-actions" />
+
+Call `copyImage` in the click itself, not after an `await`: Safari lets a page write to the
+clipboard only while it handles a press or a key.
+
+The render plugin adds the tool when the [interaction plugin](../ui/tools) is registered. It needs
+[`doc.content.copy`](#permissions) as well as `doc.render`; `render.canSnapshot()` says whether the
+user may take one. Without it, the tool draws no box.
 
 ## When a page changes
 
@@ -213,6 +269,9 @@ Everything `useRender()` gives you.
 | `getPictureState(page, view)`              | Whether a picture of the page is on screen in a view: `{ status, slow }`. [Show that a page is loading](#show-that-a-page-is-loading) |
 | `canRender()`                              | Whether page images are allowed. [Permissions](#permissions)                                                                                     |
 | `canRenderThumbnail()`                     | Whether thumbnails are allowed. [Permissions](#permissions)                                                                                      |
+| `canSnapshot()`                            | Whether the user may take a snapshot. [Permissions](#permissions)                                                                                |
+| `getSnapshot()`                            | The snapshot held now, `{ page, rect, image }`, or `null`. [Take a snapshot](#take-a-snapshot)                                                   |
+| `clearSnapshot()`                          | Lets the snapshot go. [Take a snapshot](#take-a-snapshot)                                                                                        |
 | `handOverPictures(painter)`, `getPicturePainter()` | Lets another plugin paint the pages' pictures until the function it returns is called, and which one does, or `null`. [Paint the pictures another way](#paint-the-pictures-another-way) |
 | `getSettings()`, `updateSettings(changes)`, `resetSettings()` | Reads the settings, changes them while the app runs, or goes back to what you registered. In a component, use `useRenderSettings()`. [Settings](#settings) |
 
@@ -238,12 +297,17 @@ Set them when you register the plugin, and change them while the app runs with
 | `format`                      | `'png'`, `'webp'`, or `'bmp'` (fastest, local engine only)            | per engine       |
 | `quality`                     | WebP quality, from `0` to `1`                                         | per engine       |
 | `debug`                       | Log what the plugin renders, and why, to the console                  | `false`          |
+| `snapshot.scale`              | A [snapshot](#take-a-snapshot)'s pixels per point                     | `2`              |
+| `snapshot.box.fill`           | Inside the box you drag with the snapshot tool                        | the viewer's `accent` at 8% |
+| `snapshot.box.stroke`         | Its dashed edge                                                       | the viewer's `accent` |
 
 `<RenderLayer>` takes four <Word of="props" />: `annotations` and `formFields`, unset by default
 (see [What the picture draws](#what-the-picture-draws)), `tiles` (default `true`), and `thumbnail`:
 in a strip of thumbnails, `<RenderLayer thumbnail />` draws each page's
 [thumbnail](/docs/engine/documents/rendering#thumbnails) instead, one small picture without tiles,
-which needs only `doc.render.thumbnail`.
+which needs only `doc.render.thumbnail`. `<SnapshotLayer>` takes none. The box's colors also come
+from CSS: `--epdf-snapshot-box-fill` and `--epdf-snapshot-box-stroke` win over the settings, as on
+[Theming](../ui/theming).
 
 ## Events
 
@@ -253,6 +317,7 @@ which needs only `doc.render.thumbnail`.
 | :-------------- | :------------------------------------------ | :--------------------------- |
 | `onInvalidated` | Pages' pixels changed and they will redraw  | `pages`, `scope`, `origin`   |
 | `onPictureStateChanged` | A page's picture came on screen, failed, went slow, or left its view | `page`, `view`, `status`, `slow` |
+| `onSnapshotChanged` | A snapshot was taken, or let go | `snapshot`: `{ page, rect, image }`, or `null` |
 | `onSettingsChanged` | The settings changed | `settings`, `changed` |
 
 ## Permissions
@@ -261,11 +326,23 @@ which needs only `doc.render.thumbnail`.
 | :----------- | :---------------------------------------- | :------------------- |
 | `doc.render` | Page images and page sections, and thumbnails | `render.canRender()` |
 | `doc.render.thumbnail` | Thumbnails only (`<RenderLayer thumbnail />`, `renderThumbnail`) | `render.canRenderThumbnail()` |
+| `doc.content.copy` | [Snapshots](#take-a-snapshot), with `doc.render` | `render.canSnapshot()` |
 
 Without `doc.render`, pages keep their size and place, so the Stage still scrolls and the other
 plugins still work, but nothing is painted: each page's [state](#show-that-a-page-is-loading) is
 `'forbidden'`. A strip of thumbnails still draws with
 `doc.render.thumbnail`.
+
+`doc.content.copy` comes with copying text: a PDF that forbids copying forbids snapshots too, as in
+Acrobat. It's a rule the viewer keeps, not one that hides pixels: someone who may see the pages
+could still capture the screen.
+
+<Engine cloud>
+
+To keep pages from being captured at all, see
+[Screenshot protection](/docs/viewer/features/screenshot-protection).
+
+</Engine>
 
 ## Good to know
 

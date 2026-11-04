@@ -211,6 +211,7 @@ export function LayoutRoot({
     const strips = {
       selection: stable('strip:selection', stripOf(data, 'selection', bar)),
       annotation: stable('strip:annotation', stripOf(data, 'annotation', bar)),
+      snapshot: stable('strip:snapshot', stripOf(data, 'snapshot', bar)),
     };
     const menus = new Map<string, readonly MenuSection[]>();
     for (const id of Object.keys(data.menus ?? {}))

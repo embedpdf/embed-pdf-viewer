@@ -1,6 +1,7 @@
 import { DocumentsToken, type CapabilityToken } from '@embedpdf/core';
 import { AnnotationToken } from '@embedpdf/plugin-annotation/contract';
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
+import { RenderToken } from '@embedpdf/plugin-render/contract';
 import { SelectionToken } from '@embedpdf/plugin-selection/contract';
 import { StageToken } from '@embedpdf/plugin-stage/contract';
 import { describe, expect, it, vi } from 'vitest';
@@ -26,6 +27,7 @@ function contextWith(capabilities: Map<CapabilityToken<unknown>, unknown>): Comm
 
 const platform = () => ({
   copySelection: vi.fn(async () => 'text'),
+  copyImage: vi.fn(async () => {}),
   saveFile: vi.fn(),
 });
 
@@ -55,8 +57,12 @@ describe('standard commands', () => {
       'tool:pointer': 'V',
       'tool:pan': 'H',
       'tool:zoom': 'Z',
+      'tool:snapshot': null,
       'selection:copy': 'Mod+C',
       'annotation:delete': ['Delete', 'Backspace'],
+      'snapshot:copy': 'Mod+C',
+      'snapshot:save': null,
+      'snapshot:clear': 'Escape',
       'document:download': 'Mod+S',
       'document:print': 'Mod+P',
     });
@@ -168,7 +174,53 @@ describe('standard commands', () => {
     expect(command('document:print').enabled?.({ ...context, documentId: null })).toBe(false);
     await command('document:download').run?.(context);
     expect(documents.download).toHaveBeenCalledWith('doc', { signal: undefined });
-    expect(platform.saveFile).toHaveBeenCalledWith(bytes, 'contract.pdf');
+    expect(platform.saveFile).toHaveBeenCalledWith(bytes, 'contract.pdf', 'application/pdf');
+  });
+
+  it('switches to the snapshot tool only when the user may take snapshots', () => {
+    const { command } = standard();
+    const render = { canSnapshot: () => false, getSnapshot: () => null };
+    const context = contextWith(new Map([[RenderToken, render]]));
+    expect(command('tool:snapshot').allowed?.(context)).toBe(false);
+    expect(command('tool:snapshot').notAllowedKey).toBe('commands.notAllowed.doc-content-copy');
+    render.canSnapshot = () => true;
+    expect(command('tool:snapshot').allowed?.(context)).toBe(true);
+    expect(command('tool:snapshot').labelKey).toBe('commands.tool.snapshot');
+  });
+
+  it('copies, saves and clears the snapshot, while there is one', async () => {
+    const { command, platform } = standard();
+    const blob = new Blob(['png'], { type: 'image/png' });
+    const image = Promise.resolve({ blob: async () => blob });
+    const snapshot = { page: { objectNumber: 22 }, rect: {}, image };
+    const render = {
+      getSnapshot: vi.fn((): typeof snapshot | null => null),
+      clearSnapshot: vi.fn(),
+    };
+    const documents = {
+      get: () => ({ name: 'Report.pdf' }),
+      listPages: () => [{ ref: { objectNumber: 11 } }, { ref: { objectNumber: 22 } }],
+    };
+    const context = contextWith(
+      new Map<CapabilityToken<unknown>, unknown>([
+        [RenderToken, render],
+        [DocumentsToken, documents],
+      ]),
+    );
+    for (const id of ['snapshot:copy', 'snapshot:save', 'snapshot:clear']) {
+      expect(command(id).enabled?.(context)).toBe(false);
+    }
+    render.getSnapshot.mockReturnValue(snapshot);
+    for (const id of ['snapshot:copy', 'snapshot:save', 'snapshot:clear']) {
+      expect(command(id).enabled?.(context)).toBe(true);
+    }
+    // The copy starts in the press: the picture goes to the clipboard as it comes.
+    void command('snapshot:copy').run?.(context);
+    expect(platform.copyImage).toHaveBeenCalledWith(image);
+    await command('snapshot:save').run?.(context);
+    expect(platform.saveFile).toHaveBeenCalledWith(blob, 'Report p2.png', 'image/png');
+    await command('snapshot:clear').run?.(context);
+    expect(render.clearSnapshot).toHaveBeenCalled();
   });
 
   it('prints the document in scope through the kernel', async () => {

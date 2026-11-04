@@ -106,6 +106,7 @@ describe('document:open', () => {
       'document:open',
       'document:download',
       'document:print',
+      'tool:snapshot',
     ]);
   });
 });

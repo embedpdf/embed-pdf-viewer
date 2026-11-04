@@ -17,6 +17,7 @@ import {
   type PageRenderViewport,
   type PluginErrorInfo,
 } from '@embedpdf/core';
+import type { Rect } from '@embedpdf/core-geometry';
 import {
   RenderToken as PublicRenderToken,
   type PageImage,
@@ -176,6 +177,13 @@ export interface RenderHostCapability extends RenderCapability {
   /** A base raster resolved / failed (the conforming and exact doors alike). */
   readonly onRenderCompleted: EventHook<RenderCompletedEvent>;
   readonly onRenderFailed: EventHook<RenderFailedEvent>;
+  /**
+   * The snapshot tool's box on `page`, in page space, for a page layer to
+   * draw: while it is dragged and while it is held. Null on every other page,
+   * and for a drag still too small to be a box. The same object while it
+   * doesn't change.
+   */
+  getSnapshotBox(page: PageRef): Rect | null;
 }
 
 export const RenderToken = createHostToken<RenderHostCapability>(PublicRenderToken);

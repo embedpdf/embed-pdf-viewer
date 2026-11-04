@@ -115,6 +115,13 @@ export const ko: Locale = {
         copy: '복사',
         strip: '텍스트 선택 작업',
       },
+      snapshot: {
+        tool: '스냅숏 찍기',
+        copy: '복사',
+        save: '이미지 저장',
+        clear: '스냅숏 지우기',
+        strip: '스냅숏 작업',
+      },
       shapes: {
         rectangle: '사각형',
         circle: '타원',
@@ -162,6 +169,7 @@ export const ko: Locale = {
         'doc-annotate-modify': '주석 변경은 허용되지 않습니다',
         'doc-annotate-read': '주석 보기는 허용되지 않습니다',
         'doc-attachments-modify': '파일을 추가할 수 없습니다',
+        'doc-content-copy': '스냅숏은 허용되지 않습니다',
         'doc-download': '다운로드는 허용되지 않습니다',
         'doc-forms-modify': '양식 필드 편집은 허용되지 않습니다',
         'doc-outline-modify': '책갈피 변경은 허용되지 않습니다',
