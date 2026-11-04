@@ -43,6 +43,7 @@ import {
   AnnotationUpdateResultSchema,
   annotationAppearancesImageOptionsToWire,
   wirePaths,
+  tokenPinOf,
 } from '@embedpdf/engine-core/wire';
 
 import { parseAppearanceForm } from './appearanceForm';
@@ -95,13 +96,20 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
         // base's own annotations are simply visible through an inheriting
         // layer, so every visitor reads one doc-level URL served from the
         // base session.
+        const pin = tokenPinOf('annotations', manifest.engine);
         return planesInherited(manifest, ['annotations'])
-          ? wirePaths.docPageAnnotations(this.docId, this.pageRef, page.cache.annotationVersion)
+          ? wirePaths.docPageAnnotations(
+              this.docId,
+              this.pageRef,
+              page.cache.annotationVersion,
+              pin,
+            )
           : wirePaths.layerPageAnnotations(
               this.docId,
               this.layerName,
               this.pageRef,
               page.cache.annotationVersion,
+              pin,
             );
       };
       return this.http.getJsonWithRefresh(
@@ -141,7 +149,10 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
         }
         const wireToken = annotationAppearancesImageOptionsToWire(
           { ...options, format },
-          { annotationVersion: page.cache.annotationVersion, serverFonts: manifest.serverFonts },
+          {
+            annotationVersion: page.cache.annotationVersion,
+            pin: tokenPinOf('annotationAppearances', manifest.engine),
+          },
         );
         // Same `annotations` plane switch as list(): the appearance
         // batch shares too.
@@ -207,12 +218,14 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
         // A FileAttachment annotation's bytes depend on both planes —
         // the annotation must exist in this view (`annotations`) and the
         // byte pin is `attachmentsVersion` (`attachments`).
+        const pin = tokenPinOf('attachments', manifest.engine);
         return planesInherited(manifest, ['annotations', 'attachments'])
           ? wirePaths.docAnnotationFile(
               this.docId,
               this.pageRef,
               annotKey,
               manifest.attachmentsVersion,
+              pin,
             )
           : wirePaths.layerAnnotationFile(
               this.docId,
@@ -220,6 +233,7 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
               this.pageRef,
               annotKey,
               manifest.attachmentsVersion,
+              pin,
             );
       };
       const file = await this.http.getFileWithRefresh(

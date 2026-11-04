@@ -13,6 +13,7 @@ import {
   DocumentHeadSchema,
   DocumentManifestSchema,
   PageTextSnapshotSchema,
+  CACHED_READ_KINDS,
 } from '@embedpdf/engine-core/wire';
 
 /**
@@ -22,15 +23,15 @@ import {
  * The fixture wires four endpoints:
  *
  *   GET /v1/docs/:docId/head             → current head (`docVersion`)
- *   GET /v1/docs/:docId/manifest@docVersion=N     → current manifest, 404 if `D` ≠ current
- *   GET /v1/docs/:docId/text/pages/:pageKey/data@contentVersion=N → page text, 404 if `P` ≠ current page contentVersion
+ *   GET /v1/docs/:docId/manifest@docVersion=N,engine=e1,shape=1     → current manifest, 404 if `D` ≠ current
+ *   GET /v1/docs/:docId/text/pages/:pageKey/data@contentVersion=N,engine=e1,shape=1 → page text, 404 if `P` ≠ current page contentVersion
  *   (any other path)                     → 404 (so we'd notice spurious calls)
  *
  * The test rewrites the "current" version mid-flight to model a
  * mutation flipping the manifest under the SDK. The retry must:
  *   1. Issue GET with the *stale* `P` (from cached manifest)
  *   2. Receive 404
- *   3. Re-fetch `/head` and the new `/manifest@docVersion=N`
+ *   3. Re-fetch `/head` and the new `/manifest@docVersion=N,engine=e1,shape=1`
  *   4. Re-issue GET with the *fresh* `P`
  *   5. Return the parsed snapshot
  *
@@ -48,6 +49,8 @@ interface ServerState {
   annotationCount: number;
   text: string;
   title: string | null;
+  /** The server's engine value for page text; every other kind's is `e1`. */
+  textEngine?: string;
 }
 
 interface CallLog {
@@ -174,7 +177,7 @@ function metadataSnapshot(title: string | null) {
   };
 }
 
-function headPayload(id: string, docVersion: number, baseSha = 'stub-sha') {
+function headPayload(id: string, docVersion: number, baseSha = 'stub-sha', textEngine = 'e1') {
   return {
     id,
     baseSha,
@@ -191,6 +194,10 @@ function headPayload(id: string, docVersion: number, baseSha = 'stub-sha') {
       canUpgradeToOwner: false,
     },
     access: { required: false, reasons: [] },
+    engine: {
+      ...Object.fromEntries(CACHED_READ_KINDS.map((kind) => [kind, 'e1'])),
+      text: textEngine,
+    },
   };
 }
 
@@ -207,14 +214,17 @@ function buildStub(initial: ServerState): StubbedFixture {
 
     const headMatch = path.match(/^\/v1\/docs\/([^/]+)\/layers\/([^/]+)\/head$/);
     if (headMatch && method === 'GET') {
-      return new Response(JSON.stringify(headPayload(headMatch[1]!, state.docVersion)), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      });
+      return new Response(
+        JSON.stringify(headPayload(headMatch[1]!, state.docVersion, 'stub-sha', state.textEngine)),
+        {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        },
+      );
     }
 
     const manifestMatch = path.match(
-      /^\/v1\/docs\/([^/]+)\/layers\/([^/]+)\/manifest@docVersion=(\d+)$/,
+      /^\/v1\/docs\/([^/]+)\/layers\/([^/]+)\/manifest@docVersion=(\d+),engine=e1,shape=1$/,
     );
     if (manifestMatch && method === 'GET') {
       const requested = Number(manifestMatch[3]);
@@ -231,7 +241,6 @@ function buildStub(initial: ServerState): StubbedFixture {
           metadataVersion: state.metadataVersion,
           auditHead: 0,
           baseSha: 'stub-sha',
-          serverFonts: 'f0',
           protection: null,
           pages: [
             {
@@ -249,7 +258,7 @@ function buildStub(initial: ServerState): StubbedFixture {
     }
 
     const layoutMatch = path.match(
-      /^\/v1\/docs\/([^/]+)\/layers\/([^/]+)\/layout@format=2,layoutVersion=(\d+)$/,
+      /^\/v1\/docs\/([^/]+)\/layers\/([^/]+)\/layout@engine=e1,layoutVersion=(\d+),shape=1$/,
     );
     if (layoutMatch && method === 'GET') {
       const requested = Number(layoutMatch[3]);
@@ -266,7 +275,7 @@ function buildStub(initial: ServerState): StubbedFixture {
     }
 
     const metadataLeafMatch = path.match(
-      /^\/v1\/docs\/([^/]+)\/layers\/([^/]+)\/metadata@metadataVersion=(\d+)$/,
+      /^\/v1\/docs\/([^/]+)\/layers\/([^/]+)\/metadata@engine=e1,metadataVersion=(\d+),shape=1$/,
     );
     if (metadataLeafMatch && method === 'GET') {
       const requested = Number(metadataLeafMatch[3]);
@@ -311,11 +320,12 @@ function buildStub(initial: ServerState): StubbedFixture {
     }
 
     const textMatch = path.match(
-      /^\/v1\/docs\/([^/]+)\/layers\/([^/]+)\/text\/pages\/obj%3A(\d+)\/data@contentVersion=(\d+)$/,
+      /^\/v1\/docs\/([^/]+)\/layers\/([^/]+)\/text\/pages\/obj%3A(\d+)\/data@contentVersion=(\d+),engine=([A-Za-z0-9.-]+),shape=1$/,
     );
     if (textMatch && method === 'GET') {
       const requestedPageObjectNumber = Number(textMatch[3]);
       const requestedVersion = Number(textMatch[4]);
+      const ownEngine = state.textEngine ?? 'e1';
       if (requestedPageObjectNumber !== PAGE_OBJECT_NUMBER) {
         return new Response(
           JSON.stringify({ error: { code: 'NotFound', message: 'unknown page' } }),
@@ -328,17 +338,20 @@ function buildStub(initial: ServerState): StubbedFixture {
           { status: 404, headers: { 'content-type': 'application/json' } },
         );
       }
+      // Another engine value than this server's: its own answer, naming its value.
+      const engineHeader: Record<string, string> =
+        textMatch[5] === ownEngine ? {} : { 'embedpdf-engine': ownEngine };
       return new Response(
         JSON.stringify({
           text: state.text,
           charCount: state.text.length,
         }),
-        { status: 200, headers: { 'content-type': 'application/json' } },
+        { status: 200, headers: { 'content-type': 'application/json', ...engineHeader } },
       );
     }
 
     const annotationsMatch = path.match(
-      /^\/v1\/docs\/([^/]+)\/layers\/([^/]+)\/annotations\/pages\/obj%3A(\d+)\/items@annotationVersion=(\d+)$/,
+      /^\/v1\/docs\/([^/]+)\/layers\/([^/]+)\/annotations\/pages\/obj%3A(\d+)\/items@annotationVersion=(\d+),engine=e1,shape=1$/,
     );
     if (annotationsMatch && method === 'GET') {
       const requestedPageObjectNumber = Number(annotationsMatch[3]);
@@ -532,8 +545,8 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
       const paths = fx.calls.map((c) => c.path);
       expect(paths).toEqual([
         `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/head`,
-        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/manifest@docVersion=1`,
-        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/text/pages/${PAGE_KEY}/data@contentVersion=1`,
+        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/manifest@docVersion=1,engine=e1,shape=1`,
+        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/text/pages/${PAGE_KEY}/data@contentVersion=1,engine=e1,shape=1`,
       ]);
     } finally {
       await doc.close();
@@ -554,8 +567,8 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
       // the content-addressed /layout leaf — no extra /head.
       expect(paths).toEqual([
         `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/head`,
-        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/manifest@docVersion=1`,
-        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/layout@format=2,layoutVersion=1`,
+        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/manifest@docVersion=1,engine=e1,shape=1`,
+        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/layout@engine=e1,layoutVersion=1,shape=1`,
       ]);
       expect(paths.filter((path) => path.endsWith('/head'))).toHaveLength(1);
     } finally {
@@ -589,10 +602,10 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
       // leaf is fetched at the refreshed layoutVersion.
       expect(paths).toEqual([
         `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/head`,
-        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/manifest@docVersion=1`,
+        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/manifest@docVersion=1,engine=e1,shape=1`,
         `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/head`,
-        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/manifest@docVersion=2`,
-        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/layout@format=2,layoutVersion=1`,
+        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/manifest@docVersion=2,engine=e1,shape=1`,
+        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/layout@engine=e1,layoutVersion=1,shape=1`,
       ]);
     } finally {
       await doc.close();
@@ -615,10 +628,10 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
       expect(snap.text).toBe('initial');
       const paths = fx.calls.slice(callsBeforeRefresh).map((call) => call.path);
       expect(paths).toEqual([
-        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/text/pages/${PAGE_KEY}/data@contentVersion=1`,
+        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/text/pages/${PAGE_KEY}/data@contentVersion=1,engine=e1,shape=1`,
         `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/head`,
-        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/manifest@docVersion=2`,
-        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/text/pages/${PAGE_KEY}/data@contentVersion=2`,
+        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/manifest@docVersion=2,engine=e1,shape=1`,
+        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/text/pages/${PAGE_KEY}/data@contentVersion=2,engine=e1,shape=1`,
       ]);
     } finally {
       await doc.close();
@@ -635,7 +648,28 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
       await page.text.get();
       const newPaths = fx.calls.slice(callsAfterFirst).map((c) => c.path);
       expect(newPaths).toEqual([
-        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/text/pages/${PAGE_KEY}/data@contentVersion=1`,
+        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/text/pages/${PAGE_KEY}/data@contentVersion=1,engine=e1,shape=1`,
+      ]);
+    } finally {
+      await doc.close();
+    }
+  });
+
+  test('an answer naming another engine value makes the next read learn /head again', async () => {
+    const doc = new CloudDocumentHandle(fx.http, DOC_ID);
+    try {
+      const page = doc.page(toPageRef(PAGE_OBJECT_NUMBER));
+      await page.text.get();
+      // The server's text engine value moves (a deploy, its fonts).
+      fx.bump({ textEngine: 'e2' });
+      const before = fx.calls.length;
+      expect((await page.text.get()).text).toBe('initial');
+      expect((await page.text.get()).text).toBe('initial');
+      expect(fx.calls.slice(before).map((c) => c.path)).toEqual([
+        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/text/pages/${PAGE_KEY}/data@contentVersion=1,engine=e1,shape=1`,
+        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/head`,
+        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/manifest@docVersion=1,engine=e1,shape=1`,
+        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/text/pages/${PAGE_KEY}/data@contentVersion=1,engine=e2,shape=1`,
       ]);
     } finally {
       await doc.close();
@@ -661,14 +695,14 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
       // The retry ladder must be exactly:
       //   [stale leaf, contentVersion=1]  → 404
       //   [/head]                         → 200 (docVersion=2)
-      //   [/manifest@docVersion=2]        → 200 (pageContentVersion=2)
+      //   [/manifest@docVersion=2,engine=e1,shape=1]        → 200 (pageContentVersion=2)
       //   [fresh leaf, contentVersion=2]  → 200
       const retryPaths = fx.calls.slice(callsBeforeRetry).map((c) => c.path);
       expect(retryPaths).toEqual([
-        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/text/pages/${PAGE_KEY}/data@contentVersion=1`,
+        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/text/pages/${PAGE_KEY}/data@contentVersion=1,engine=e1,shape=1`,
         `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/head`,
-        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/manifest@docVersion=2`,
-        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/text/pages/${PAGE_KEY}/data@contentVersion=2`,
+        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/manifest@docVersion=2,engine=e1,shape=1`,
+        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/text/pages/${PAGE_KEY}/data@contentVersion=2,engine=e1,shape=1`,
       ]);
 
       // Cache is now warm with docVersion=2; a third read uses it
@@ -678,7 +712,7 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
       expect(third.text).toBe('after-mutation');
       const thirdPaths = fx.calls.slice(callsBeforeThird).map((c) => c.path);
       expect(thirdPaths).toEqual([
-        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/text/pages/${PAGE_KEY}/data@contentVersion=2`,
+        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/text/pages/${PAGE_KEY}/data@contentVersion=2,engine=e1,shape=1`,
       ]);
     } finally {
       await doc.close();
@@ -701,10 +735,10 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
 
       const retryPaths = fx.calls.slice(callsBeforeRetry).map((c) => c.path);
       expect(retryPaths).toEqual([
-        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/annotations/pages/${PAGE_KEY}/items@annotationVersion=1`,
+        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/annotations/pages/${PAGE_KEY}/items@annotationVersion=1,engine=e1,shape=1`,
         `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/head`,
-        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/manifest@docVersion=2`,
-        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/annotations/pages/${PAGE_KEY}/items@annotationVersion=2`,
+        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/manifest@docVersion=2,engine=e1,shape=1`,
+        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/annotations/pages/${PAGE_KEY}/items@annotationVersion=2,engine=e1,shape=1`,
       ]);
     } finally {
       await doc.close();
@@ -726,10 +760,10 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
 
       const retryPaths = fx.calls.slice(callsBeforeRetry).map((c) => c.path);
       expect(retryPaths).toEqual([
-        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/metadata@metadataVersion=1`,
+        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/metadata@engine=e1,metadataVersion=1,shape=1`,
         `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/head`,
-        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/manifest@docVersion=2`,
-        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/metadata@metadataVersion=2`,
+        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/manifest@docVersion=2,engine=e1,shape=1`,
+        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/metadata@engine=e1,metadataVersion=2,shape=1`,
       ]);
     } finally {
       await doc.close();
@@ -757,7 +791,9 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
       const after = await doc.metadata.get();
       expect(after.title).toBe('patched-title');
       const paths = fx.calls.slice(callsBeforeRead).map((c) => c.path);
-      expect(paths).toEqual([`/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/metadata@metadataVersion=2`]);
+      expect(paths).toEqual([
+        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/metadata@engine=e1,metadataVersion=2,shape=1`,
+      ]);
     } finally {
       await doc.close();
     }
@@ -790,7 +826,7 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
       expect(second.annotations).toHaveLength(1);
       const paths = fx.calls.slice(callsBeforeList).map((call) => call.path);
       expect(paths).toEqual([
-        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/annotations/pages/${PAGE_KEY}/items@annotationVersion=2`,
+        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/annotations/pages/${PAGE_KEY}/items@annotationVersion=2,engine=e1,shape=1`,
       ]);
     } finally {
       await doc.close();
@@ -829,8 +865,8 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
       const paths = fx.calls.slice(callsBeforeList).map((call) => call.path);
       expect(paths).toEqual([
         `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/head`,
-        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/manifest@docVersion=3`,
-        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/annotations/pages/${PAGE_KEY}/items@annotationVersion=3`,
+        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/manifest@docVersion=3,engine=e1,shape=1`,
+        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/annotations/pages/${PAGE_KEY}/items@annotationVersion=3,engine=e1,shape=1`,
       ]);
     } finally {
       await doc.close();
@@ -900,7 +936,6 @@ describe('CloudEngine schema parity — DocumentHeadSchema / DocumentManifestSch
       metadataVersion: 1,
       auditHead: 0,
       baseSha: 'sha',
-      serverFonts: 'f0',
       protection: null,
       pages: [
         {

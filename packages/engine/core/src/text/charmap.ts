@@ -167,6 +167,14 @@ export function isNoncharacter(codePoint: number): boolean {
 const LINE_BREAK_OR_NONCHARACTER = /[\r\p{Noncharacter_Code_Point}]/u;
 
 /**
+ * The version of the rules {@link toPageText} reads page text by. Raise it
+ * when they return different text for the same page: a server's engine
+ * values for page text and search change with it, so cached answers are
+ * read again.
+ */
+export const PAGE_TEXT_VERSION = 1;
+
+/**
  * The page text the engine returns, from the text as PDFium extracted it:
  *
  *   - a line break is `\n`: PDFium writes `\r\n`, and its `\r` gives no text

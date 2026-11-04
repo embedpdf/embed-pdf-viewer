@@ -19,16 +19,11 @@ import {
   unflatten,
   WidgetAppearancesQuerySchema,
   type ManifestPage,
+  type TokenPin,
 } from '@embedpdf/engine-core/wire';
 import type { FastifyReply } from 'fastify';
 
-import {
-  assertServerFonts,
-  parseOrInvalidArg,
-  readAtPins,
-  setImmutableCache,
-  setNoStore,
-} from './_helpers';
+import { parseOrInvalidArg, readAtPins, setImmutableCache, setNoStore } from './_helpers';
 import { buildMultipart, type MultipartPart } from './_multipart';
 import type { SharpImageEncoder } from '../render/SharpImageEncoder';
 import type { DerivedRenderService } from '../services/DerivedRenderService';
@@ -78,17 +73,17 @@ export async function renderAppearanceBatch(input: {
   // The family's pin: the token's, against the page's in the manifest.
   let imageOptions: AnnotationAppearanceImageOptions;
   let requestedPin: number | undefined;
-  let requestedServerFonts: string | undefined;
+  let requestedTokenPin: TokenPin | undefined;
   if (widgets) {
     const parsed = parseOrInvalidArg(WidgetAppearancesQuerySchema, unflatten(flatInput), label);
     imageOptions = parsed.options;
     requestedPin = parsed.widgetVersion;
-    requestedServerFonts = parsed.serverFonts;
+    requestedTokenPin = parsed.pin;
   } else {
     const parsed = parseOrInvalidArg(AnnotationAppearancesQuerySchema, unflatten(flatInput), label);
     imageOptions = parsed.options;
     requestedPin = parsed.annotationVersion;
-    requestedServerFonts = parsed.serverFonts;
+    requestedTokenPin = parsed.pin;
   }
   const pinName = widgets ? 'widgetVersion' : 'annotationVersion';
   const pinOf = (current: ManifestPage) =>
@@ -114,8 +109,6 @@ export async function renderAppearanceBatch(input: {
     setNoStore(input.reply);
     throw err;
   }
-  // An appearance drawn here may fill in characters with fallback fonts.
-  await assertServerFonts(input.documentService, requestedServerFonts, input.reply);
 
   // Appearance-scale enforcement: the appearance lattice
   // bounds scale — appearances are sized by `rect × scale`, so a page-sized
@@ -285,7 +278,10 @@ export async function renderAppearanceBatch(input: {
     layerName: input.scope.kind === 'layer' ? input.scope.layerName : undefined,
     assertCurrent: async () => assertPinCurrent(await resolvePageForRead(input)),
     read: collect,
-    pinned: requestedPin !== undefined,
+    token: requestedTokenPin && {
+      kind: widgets ? 'widgetAppearances' : 'annotationAppearances',
+      pin: requestedTokenPin,
+    },
   });
 
   const manifest: AnnotationAppearanceBatch = {

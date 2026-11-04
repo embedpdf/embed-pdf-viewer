@@ -9,7 +9,11 @@ import {
   type PageNetworkRenderFormat,
   type PageRef,
 } from '@embedpdf/engine-core/runtime';
-import { wirePaths, widgetAppearancesImageOptionsToWire } from '@embedpdf/engine-core/wire';
+import {
+  wirePaths,
+  widgetAppearancesImageOptionsToWire,
+  tokenPinOf,
+} from '@embedpdf/engine-core/wire';
 
 import { parseAppearanceForm } from './appearanceForm';
 import type { ManifestAccessor } from './CloudDocumentHandle';
@@ -55,7 +59,10 @@ export class CloudPageFormsService implements PageFormsService {
         }
         const token = widgetAppearancesImageOptionsToWire(
           { ...options, format },
-          { widgetVersion: page.cache.widgetVersion, serverFonts: manifest.serverFonts },
+          {
+            widgetVersion: page.cache.widgetVersion,
+            pin: tokenPinOf('widgetAppearances', manifest.engine),
+          },
         );
         return planesInherited(manifest, ['forms'])
           ? wirePaths.docPageFormAppearances(this.docId, this.pageRef, token)

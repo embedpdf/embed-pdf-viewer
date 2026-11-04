@@ -691,6 +691,8 @@ async function buildAppUnchecked(opts: LicensedAppOptions): Promise<AppBundle> {
         'x-embedpdf-appearance-count',
         // The object numbers a write handed the editing session.
         'embedpdf-object-numbers',
+        // This server's engine value, on an answer to a URL that named another.
+        'embedpdf-engine',
       ],
       credentials: false,
       maxAge: 86_400,

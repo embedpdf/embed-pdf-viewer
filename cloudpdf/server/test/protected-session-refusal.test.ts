@@ -18,6 +18,7 @@ import {
 import { encodeSearchToken } from '@embedpdf/engine-core/wire';
 import { buildAppForTesting } from '../src/app/buildApp';
 import { createValidTestLicenseGate } from '../src/licensing/testing';
+import { pinOf } from './_helpers/pins';
 
 /**
  * The guarantee screenshot protection rests on: a session without
@@ -220,7 +221,12 @@ function categoryOf(route: DocRoute): Category | null {
  */
 const REQUESTS: Readonly<Record<string, { token?: string; query?: string; body?: unknown }>> = {
   'GET /layers/:layerName/search/full/data@:token': {
-    token: encodeSearchToken({ epoch: '1', query: { text: 'confidential' }, skip: 0 }),
+    token: encodeSearchToken({
+      epoch: '1',
+      query: { text: 'confidential' },
+      skip: 0,
+      pin: pinOf('search'),
+    }),
   },
   'GET /layers/:layerName/search/full/data': { query: '?q=confidential' },
   'POST /layers/:layerName/pages/extract': {

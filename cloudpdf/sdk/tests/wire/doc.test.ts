@@ -25,6 +25,7 @@ describe("DocClient", () => {
                 canUpgradeToOwner: true,
             },
             access: { required: true, reasons: ["password"], endpoint: "endpoint" },
+            engine: { key: "value" },
         };
 
         server
@@ -322,7 +323,6 @@ describe("DocClient", () => {
             formsVersion: 1,
             outlineVersion: 1,
             fontsVersion: 1,
-            serverFonts: "serverFonts",
             auditHead: 1,
             baseSha: "baseSha",
             layerVersion: 1,

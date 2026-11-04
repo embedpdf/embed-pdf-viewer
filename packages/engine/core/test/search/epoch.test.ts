@@ -16,7 +16,6 @@ function manifest(
     formsVersion: 0,
     outlineVersion: 0,
     fontsVersion: 1,
-    serverFonts: 'f0',
     auditHead: 42,
     baseSha: 'abc',
     layerVersion: 0,

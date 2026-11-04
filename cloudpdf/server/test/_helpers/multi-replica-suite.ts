@@ -16,6 +16,7 @@ import {
   type ReplicaCluster,
   type ReplicaDbFactory,
 } from './two-replica-harness';
+import { ENGINE } from './pins';
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -418,7 +419,7 @@ export function runMultiReplicaSuite(factory: ReplicaDbFactory): void {
 
       // Pinned read at the current (pre-commit) version, issued mid-window.
       const readPromise = fetch(
-        `${b!.baseUrl}/v1/docs/${DOC}/layers/${LAYER}/annotations/pages/obj:1/items@annotationVersion=${pin}`,
+        `${b!.baseUrl}/v1/docs/${DOC}/layers/${LAYER}/annotations/pages/obj:1/items@annotationVersion=${pin},engine=${ENGINE.annotations},shape=1`,
         { headers: { Authorization: `Bearer ${docToken(TENANT, DOC, LAYER)}` } },
       );
       // Give the read time to either answer (unfixed: serves the dirty

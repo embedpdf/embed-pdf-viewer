@@ -16,7 +16,6 @@ import {
   type AnnotationList,
   type AnnotationListOptions,
   type DocumentAnnotationsService,
-  type DocumentManifest,
   type ManifestPage,
   type PageObjectNumber,
   type PageRef,
@@ -26,7 +25,9 @@ import {
   AnnotationImportResultSchema,
   AnnotationListSchema,
   wirePaths,
+  tokenPinOf,
 } from '@embedpdf/engine-core/wire';
+import type { CloudManifest } from './CloudDocumentHandle';
 
 import type { ManifestAccessor } from './CloudDocumentHandle';
 import type { CloudWrites } from './CloudWrites';
@@ -97,13 +98,11 @@ export class CloudDocumentAnnotationsService implements DocumentAnnotationsServi
    *  cursor older than the current manifest's, which is still safe — the
    *  pin proves no items-affecting mutation landed in between, so replaying
    *  that window over the body is all no-ops. */
-  private async readBulkAt(
-    manifest: DocumentManifest,
-    signal: AbortSignal,
-  ): Promise<AnnotationList> {
+  private async readBulkAt(manifest: CloudManifest, signal: AbortSignal): Promise<AnnotationList> {
+    const pin = tokenPinOf('annotationsAll', manifest.engine);
     const path = planesInherited(manifest, ['annotations'])
-      ? wirePaths.docAnnotationsAll(this.docId, manifest.annotationsVersion)
-      : wirePaths.layerAnnotationsAll(this.docId, this.layerName, manifest.annotationsVersion);
+      ? wirePaths.docAnnotationsAll(this.docId, manifest.annotationsVersion, pin)
+      : wirePaths.layerAnnotationsAll(this.docId, this.layerName, manifest.annotationsVersion, pin);
     return this.http.getJson(path, (raw) => AnnotationListSchema.parse(raw), signal);
   }
 
@@ -223,13 +222,14 @@ export class CloudDocumentAnnotationsService implements DocumentAnnotationsServi
    * refs.
    */
   private exportPathAt(
-    manifest: DocumentManifest,
+    manifest: CloudManifest,
     selection: AnnotationExportSelection,
   ): string | null {
     const token = {
       annotationsVersion: manifest.annotationsVersion,
       layoutVersion: manifest.layoutVersion,
       selection,
+      pin: tokenPinOf('annotationsExport', manifest.engine),
     };
     try {
       return planesInherited(manifest, ['annotations', 'layout'])
@@ -243,22 +243,21 @@ export class CloudDocumentAnnotationsService implements DocumentAnnotationsServi
   /** Versioned leaf URL for one manifest page entry, with the same
    *  plane routing as `CloudPageAnnotationsService.list()`: an inherited
    *  `annotations` plane reads the doc-level base leaf. */
-  private pagePathAt(manifest: DocumentManifest, page: ManifestPage): string {
+  private pagePathAt(manifest: CloudManifest, page: ManifestPage): string {
     const ref = page.page;
+    const pin = tokenPinOf('annotations', manifest.engine);
     return planesInherited(manifest, ['annotations'])
-      ? wirePaths.docPageAnnotations(this.docId, ref, page.cache.annotationVersion)
+      ? wirePaths.docPageAnnotations(this.docId, ref, page.cache.annotationVersion, pin)
       : wirePaths.layerPageAnnotations(
           this.docId,
           this.layerName,
           ref,
           page.cache.annotationVersion,
+          pin,
         );
   }
 
-  private versionedPagePath(
-    manifest: DocumentManifest,
-    pageObjectNumber: PageObjectNumber,
-  ): string {
+  private versionedPagePath(manifest: CloudManifest, pageObjectNumber: PageObjectNumber): string {
     const page = manifest.pages.find((p) => p.page.objectNumber === pageObjectNumber);
     if (!page) {
       throw new EngineError(

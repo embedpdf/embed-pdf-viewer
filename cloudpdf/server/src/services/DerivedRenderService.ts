@@ -16,6 +16,7 @@ import {
   PAGE_RENDER_FAMILIES,
   pageRenderOptionsFromImageOptions,
   type PageRenderFamily,
+  SHAPES,
   type RenderPolicy,
   type RenderVersions,
 } from '@embedpdf/engine-core/wire';
@@ -27,6 +28,7 @@ import { EngineBusyError } from '../runtime/SchedulingEnginePool';
 import type { BaseFileCache } from '../storage/BaseFileCache';
 import { StorageKeys } from '../storage/keys';
 import type { ObjectStore } from '../storage/ObjectStore';
+import { EngineValues } from './EngineValues';
 import type { ServerFonts } from './ServerFonts';
 
 export interface DerivedRenderServiceOptions {
@@ -134,7 +136,7 @@ export class DerivedRenderService {
   private readonly encoder?: SharpImageEncoder;
   private readonly encodeInEngine: boolean;
   private readonly documents?: DocumentsRepo;
-  private readonly serverFonts?: ServerFonts;
+  private readonly engineValues?: EngineValues;
   private readonly onWarmError?: (err: unknown, ctx: { docId: string; tenantId: string }) => void;
   private readonly inFlight = new Map<string, Flight>();
 
@@ -149,7 +151,7 @@ export class DerivedRenderService {
     this.encoder = opts.encoder;
     this.encodeInEngine = opts.encodeInEngine ?? true;
     this.documents = opts.documents;
-    this.serverFonts = opts.serverFonts;
+    this.engineValues = opts.serverFonts && new EngineValues(opts.serverFonts);
     this.onWarmError = opts.onWarmError;
   }
 
@@ -212,11 +214,17 @@ export class DerivedRenderService {
       return { onLattice, fullPage };
     }
 
-    const pins: Partial<RenderVersions> = {};
-    for (const pin of PAGE_RENDER_FAMILIES[input.family].pins) pins[pin] = input.pins[pin];
-    // The server's fonts it was drawn with key it too: fallback fonts draw
-    // page text, so a change of them stores the picture again.
-    if (input.pins.serverFonts !== undefined) pins.serverFonts = input.pins.serverFonts;
+    const pins: Record<string, number | string> = {};
+    for (const pin of PAGE_RENDER_FAMILIES[input.family].pins) {
+      const value = input.pins[pin];
+      if (value !== undefined) pins[pin] = value;
+    }
+    // The engine value it was drawn with keys it too: a change of the
+    // server's fonts or of how it draws stores the picture again.
+    if (input.pins.pin !== undefined) {
+      pins.engine = input.pins.pin.engine;
+      pins.shape = input.pins.pin.shape;
+    }
     const canonicalToken = encodeRenderToken(
       flatten({
         ...pins,
@@ -399,8 +407,8 @@ export class DerivedRenderService {
     /** Object key of the base PDF (the lifecycle's upload key). */
     baseKey: string;
   }): Promise<void> {
-    const { cache, pool, encoder, documents, serverFonts } = this;
-    if (!cache || !pool || !encoder || !documents || !serverFonts) return;
+    const { cache, pool, encoder, documents, engineValues } = this;
+    if (!cache || !pool || !encoder || !documents || !engineValues) return;
 
     try {
       const imageOptions: PageImageOptions = {
@@ -414,7 +422,10 @@ export class DerivedRenderService {
         imageOptions,
         format: 'webp',
         family: 'pages',
-        pins: { contentVersion: 1, serverFonts: await serverFonts.fingerprint() },
+        pins: {
+          contentVersion: 1,
+          pin: { engine: await engineValues.of('render'), shape: SHAPES.render },
+        },
       });
       if (!classification.canonicalToken) return;
       const token = classification.canonicalToken;

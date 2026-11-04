@@ -1,7 +1,12 @@
 import { createReadStream } from 'node:fs';
 
 import { EngineError, EngineErrorCode, type AttachmentRef } from '@embedpdf/engine-core/runtime';
-import { decodeAttachmentsToken, decodeTokenText, wireTemplates } from '@embedpdf/engine-core/wire';
+import {
+  decodeAttachmentsToken,
+  decodeTokenText,
+  wireTemplates,
+  type TokenPin,
+} from '@embedpdf/engine-core/wire';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 
 import {
@@ -335,7 +340,7 @@ function atAttachmentsVersion<T>(
   ctx: OpenContext,
   docId: string,
   layerName: string | undefined,
-  requested: number,
+  requested: { attachmentsVersion: number; pin: TokenPin },
   read: () => Promise<T>,
 ): Promise<T> {
   return readAtPins({
@@ -348,13 +353,14 @@ function atAttachmentsVersion<T>(
         layerName === undefined
           ? await documentService.getManifest(ctx, docId)
           : await documentService.getLayerManifest(ctx, docId, layerName);
-      if (requested === manifest.attachmentsVersion) return;
+      if (requested.attachmentsVersion === manifest.attachmentsVersion) return;
       throw new EngineError(
         EngineErrorCode.NotFound,
-        `attachments version ${requested} no longer current (current=${manifest.attachmentsVersion})`,
+        `attachments version ${requested.attachmentsVersion} no longer current (current=${manifest.attachmentsVersion})`,
       );
     },
     read,
+    token: { kind: 'attachments', pin: requested.pin },
   });
 }
 
@@ -365,7 +371,7 @@ async function fileAtAttachmentsVersion(
   ctx: OpenContext,
   docId: string,
   layerName: string | undefined,
-  requested: number,
+  requested: { attachmentsVersion: number; pin: TokenPin },
   read: () => Promise<SavedAttachmentFile>,
 ): Promise<SavedAttachmentFile> {
   let file: SavedAttachmentFile | undefined;

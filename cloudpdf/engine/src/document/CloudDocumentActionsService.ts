@@ -5,7 +5,7 @@ import {
   type DocumentActionsService,
   type DocumentActionsSnapshot,
 } from '@embedpdf/engine-core/runtime';
-import { DocumentActionsSnapshotSchema, wirePaths } from '@embedpdf/engine-core/wire';
+import { DocumentActionsSnapshotSchema, wirePaths, tokenPinOf } from '@embedpdf/engine-core/wire';
 
 import type { ManifestAccessor } from './CloudDocumentHandle';
 import { planesInherited } from './planes';
@@ -33,9 +33,10 @@ export class CloudDocumentActionsService implements DocumentActionsService {
           // Plane-scope rule: catalog actions depend on the `actions` plane
           // (constant-inherited until action writing exists) — one
           // doc-level URL, base session, no layer warm-up on open.
+          const pin = tokenPinOf('actions', manifest.engine);
           return planesInherited(manifest, ['actions'])
-            ? wirePaths.docActions(this.docId, manifest.actionsVersion)
-            : wirePaths.layerActions(this.docId, this.layerName, manifest.actionsVersion);
+            ? wirePaths.docActions(this.docId, manifest.actionsVersion, pin)
+            : wirePaths.layerActions(this.docId, this.layerName, manifest.actionsVersion, pin);
         },
         (raw) => DocumentActionsSnapshotSchema.parse(raw),
         async (currentSignal) => {

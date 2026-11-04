@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { toPageRef, type DocumentEvent } from '@embedpdf/engine-core/runtime';
+import { CACHED_READ_KINDS } from '@embedpdf/engine-core/wire';
 import { HttpClient } from '../src/transport/HttpClient';
 import { CloudDocumentHandle } from '../src/document/CloudDocumentHandle';
 
@@ -101,6 +102,7 @@ function headPayload(docVersion: number) {
       canUpgradeToOwner: false,
     },
     access: { required: false, reasons: [] },
+    engine: Object.fromEntries(CACHED_READ_KINDS.map((kind) => [kind, 'e1'])),
   };
 }
 
@@ -144,7 +146,7 @@ function buildStub(overrides: Partial<StubState> = {}): Stub {
       return json(headPayload(state.docVersion));
     }
 
-    const manifestMatch = path.match(/\/manifest@docVersion=(\d+)$/);
+    const manifestMatch = path.match(/\/manifest@docVersion=(\d+),engine=e1,shape=1$/);
     if (manifestMatch) {
       if (Number(manifestMatch[1]) !== state.docVersion) return notFound('stale docVersion');
       return json({
@@ -154,7 +156,6 @@ function buildStub(overrides: Partial<StubState> = {}): Stub {
         annotationsVersion: state.annotationsVersion,
         auditHead: state.auditHead,
         baseSha: 'stub-sha',
-        serverFonts: 'f0',
         protection: null,
         pages: PAGE_OBJECT_NUMBERS.map((pageObjectNumber) => ({
           page: toPageRef(pageObjectNumber),
@@ -167,7 +168,9 @@ function buildStub(overrides: Partial<StubState> = {}): Stub {
       });
     }
 
-    const bulkMatch = path.match(/\/annotations\/items@annotationsVersion=(\d+)$/);
+    const bulkMatch = path.match(
+      /\/annotations\/items@annotationsVersion=(\d+),engine=e1,shape=1$/,
+    );
     if (bulkMatch) {
       if (Number(bulkMatch[1]) !== state.annotationsVersion) {
         return notFound('stale annotationsVersion');
@@ -180,7 +183,7 @@ function buildStub(overrides: Partial<StubState> = {}): Stub {
     }
 
     const leafMatch = path.match(
-      /\/annotations\/pages\/obj%3A(\d+)\/items@annotationVersion=(\d+)$/,
+      /\/annotations\/pages\/obj%3A(\d+)\/items@annotationVersion=(\d+),engine=e1,shape=1$/,
     );
     if (leafMatch) {
       const pageObjectNumber = Number(leafMatch[1]);
@@ -240,7 +243,7 @@ describe('annotations.list() — one bulk read at the manifest pin', () => {
       // leaves are never touched.
       const itemCalls = fx.calls.filter((p) => p.includes('/items'));
       expect(itemCalls).toEqual([
-        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/annotations/items@annotationsVersion=1`,
+        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/annotations/items@annotationsVersion=1,engine=e1,shape=1`,
       ]);
     } finally {
       await doc.close();
@@ -263,8 +266,8 @@ describe('annotations.list() — one bulk read at the manifest pin', () => {
       expect(snap.auditHead).toBe(50);
       const tail = fx.calls.slice(before).filter((p) => p.includes('/items'));
       expect(tail).toEqual([
-        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/annotations/items@annotationsVersion=1`,
-        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/annotations/items@annotationsVersion=2`,
+        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/annotations/items@annotationsVersion=1,engine=e1,shape=1`,
+        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/annotations/items@annotationsVersion=2,engine=e1,shape=1`,
       ]);
     } finally {
       await doc.close();
@@ -294,7 +297,7 @@ describe('annotations.list() — one bulk read at the manifest pin', () => {
       expect(snap.auditHead).toBe(50);
       const tail = fx.calls.slice(before);
       expect(tail).toEqual([
-        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/annotations/items@annotationsVersion=2`,
+        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/annotations/items@annotationsVersion=2,engine=e1,shape=1`,
       ]);
     } finally {
       await doc.close();
@@ -310,7 +313,7 @@ describe('listRaw — versioned single-page reads', () => {
       const first = await doc.annotations.list({ pages: [toPageRef(11)] });
       expect(first.annotations).toHaveLength(1);
       expect(fx.calls.filter((p) => p.includes('/items'))).toEqual([
-        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/annotations/pages/obj%3A11/items@annotationVersion=1`,
+        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/annotations/pages/obj%3A11/items@annotationVersion=1,engine=e1,shape=1`,
       ]);
 
       // Server moves on; the cached manifest pin goes stale → one 404,
@@ -322,8 +325,8 @@ describe('listRaw — versioned single-page reads', () => {
       expect(second.annotations).toHaveLength(1);
       const tail = fx.calls.slice(before).filter((p) => p.includes('/items'));
       expect(tail).toEqual([
-        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/annotations/pages/obj%3A11/items@annotationVersion=1`,
-        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/annotations/pages/obj%3A11/items@annotationVersion=2`,
+        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/annotations/pages/obj%3A11/items@annotationVersion=1,engine=e1,shape=1`,
+        `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/annotations/pages/obj%3A11/items@annotationVersion=2,engine=e1,shape=1`,
       ]);
     } finally {
       await doc.close();

@@ -27,6 +27,7 @@ import {
   renderImageOptionsToWire,
   wirePaths,
   type RenderVersions,
+  tokenPinOf,
 } from '@embedpdf/engine-core/wire';
 
 import type { ManifestAccessor } from './CloudDocumentHandle';
@@ -108,10 +109,10 @@ export class CloudPageRenderService implements PageRenderService {
         // Normalized above so the URL always carries an explicit,
         // network-supported format (PNG or WebP; default WebP). What the
         // picture draws is its family's path; the token carries the family's
-        // pins, and the server's fonts it is drawn with.
+        // pins, and the render engine value and shape.
         const pins: RenderVersions = {
           contentVersion: page.cache.contentVersion,
-          serverFonts: manifest.serverFonts,
+          pin: tokenPinOf('render', manifest.engine),
         };
         for (const pin of picture.pins) pins[pin] = page.cache[pin];
         const wireToken = renderImageOptionsToWire({ ...options, format }, pins);

@@ -308,7 +308,6 @@ export {
   decodeSearchToken,
   encodeTokenText,
   decodeTokenText,
-  SEARCH_RESULT_FORMAT,
   encodeAppearanceModes,
 } from './wire/tokens';
 export type { DownloadToken, SearchToken } from './wire/tokens';
@@ -462,6 +461,15 @@ export type {
   LayerVersions,
 } from './wire/schemas';
 export { encodeAnalysisToken, decodeAnalysisToken, type AnalysisToken } from './wire/tokens';
+export {
+  CACHED_READ_KINDS,
+  EngineValuesSchema,
+  SHAPES,
+  tokenPinOf,
+  type CachedReadKind,
+  type EngineValues,
+  type TokenPin,
+} from './wire/cachedReads';
 export type {
   AnnotationsExportToken,
   FontsToken,

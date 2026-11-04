@@ -229,16 +229,17 @@ manifest that is already cached.
 #### How the server derives them
 
 The server keeps one number per rule it computes with, one number per kind for
-the fields that kind returns, and lists which rules each kind reads:
+the fields that kind returns, and lists which rules each kind reads
+(`cloudpdf/server/src/services/EngineValues.ts`):
 
 ```ts
 // One number per rule. Raise a rule's number in the pull request that changes
 // what the rule gives for the same document and the same request.
 const RULES = {
-  drawing: 1, // how pages, annotations and fields are drawn
-  pageText: 2, // 2: lines end in \n, no U+FFFE
-  searchFold: 2, // 2: invisible characters ignored
-  contents: 2, // 2: contents and rich text read with \n
+  drawing: DRAWING_VERSION, // how pages, annotations and fields are drawn
+  pageText: PAGE_TEXT_VERSION, // engine-core text/charmap.ts (toPageText)
+  searchFold: SEARCH_FOLD_VERSION, // engine-core search/fold.ts
+  lineBreaks: LINE_BREAKS_VERSION, // engine-core text/lineBreaks.ts (contents, rich text)
 };
 
 // One number per kind. Raise it in the pull request that adds a field to the
@@ -259,8 +260,8 @@ const INPUTS = {
   fonts: ['fonts'],
   text: ['pageText'],
   search: ['pageText', 'searchFold'],
-  annotations: ['contents'],
-  annotationsAll: ['contents'],
+  annotations: ['lineBreaks'],
+  annotationsAll: ['lineBreaks'],
   // every other kind: none
 };
 
@@ -282,7 +283,7 @@ a deploy or a restart that raises nothing keeps every cached response.
 | :--------------------------------------------------------------- | :---------------------------------------------------- | :------------------------------------ |
 | An operator adds a font to `CLOUDPDF_FONTS`                      | `fonts`: render, both appearance kinds, the font list | text, search, annotations, the rest   |
 | Page text is read differently (lines end in `\n`, no `U+FFFE`)   | `pageText`: text, search                              | pictures, annotations, the rest       |
-| `contents` and rich text are read with `\n`                      | `contents`: annotations, annotationsAll               | everything else                       |
+| `contents` and rich text are read with `\n`                      | `lineBreaks`: annotations, annotationsAll             | everything else                       |
 | Search ignores more characters                                   | `searchFold`: search                                  | everything else                       |
 | Annotations gain a response field                                | `FIELDS.annotations`: annotations                     | everything else                       |
 | A runtime upgrade changes any pixel of the test PDFs             | `drawing`: render, both appearance kinds              | text, search, the font list, the rest |
@@ -354,6 +355,7 @@ parameter, not a shape.
 | `actions`               | `/actions@`                                                            | `actionsVersion`                                                    |                                             |
 | `fonts`                 | `/fonts@`                                                              | `fontsVersion`                                                      |                                             |
 | `search`                | `/layers/:layer/search/:tier/data@`                                    | `contentsVersion`, `layoutVersion`                                  | query, options, `from`, `skip`, limits      |
+| `signatures`            | `/layers/:layer/signatures@`                                           | `docVersion`                                                        |                                             |
 | `analysis`              | `/layers/:layer/signatures/analysis@`                                  | `docVersion`                                                        | since, level, policy, detail                |
 | `download`              | `/layers/:layer/download@`                                             | `docVersion`                                                        | mode                                        |
 
@@ -367,63 +369,39 @@ that kind). A new cached read adds a row here.
 This section lists where the code doesn't follow the rules above yet. Delete
 each entry when its work lands, and the section with the last one.
 
-| Gap                                                                                                                                                                                                                                                                                                                                                 | Where                                                                                         |
-| :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------------------- |
-| Most cached routes check their pins only before the worker read: render, text, geometry, both appearance batches, outline, metadata, fonts, attachments and search. Only annotations and forms check again after it, although `awaitLayerWriteSettled` relies on that second check. A write that lands during the read is cached under the old pin. | `cloudpdf/server` `routes/`, `services/DocumentService.ts`                                    |
-| The check after the read that annotations and forms do compares committed counters, so a write the session has applied but not yet committed can still pass it (found by reading the code, not reproduced)                                                                                                                                          | `cloudpdf/server` `routes/annotations.ts`, `routes/forms.ts`                                  |
-| No version headers, and the CORS configuration allows neither                                                                                                                                                                                                                                                                                       | `cloudpdf/engine` `HttpClient`, `cloudpdf/server` routes and `app/buildApp.ts`                |
-| The client retries a stale pin once, then fails, so a replica with other engine values fails requests until a deploy ends                                                                                                                                                                                                                           | `cloudpdf/engine` `HttpClient.getJsonWithRefresh`                                             |
-| Schemas that responses are parsed with are `.strict()`, nested ones too: `point` and `offset` in `Measure.schema.ts`, `WidgetAppearanceSchema`, `FormFieldValueSchema`, `LineLeaderSchema`, `LineDimensionCaptionSchema`, `ShapeDimensionCaptionSchema`, likely more (the unknown-field test finds the rest)                                        | `engine-core` `dto/Measure.schema.ts`, `annotation/kinds/widget.shared.ts`, `forms/schema.ts` |
-| An unknown annotation subtype fails the whole list: `AnnotationSchema` is a `z.discriminatedUnion` with no fallback to `unsupported`                                                                                                                                                                                                                | `engine-core` `annotation/kinds/index.ts`                                                     |
-| The Python SDK fails a whole annotation list on an unknown subtype (pydantic's discriminator); the TypeScript, Go, Java and C# SDKs keep going                                                                                                                                                                                                      | `fern/generators.yml` (`fern-python-sdk`)                                                     |
-| The cached manifest carries `serverFonts`, so a font change can leave a cached manifest handing out a value the server no longer accepts                                                                                                                                                                                                            | `DocumentManifest.serverFonts`, `/manifest@`                                                  |
-| Search pins a client-computed `epoch` instead of `contentsVersion` and `layoutVersion`; `SEARCH_FOLD_VERSION` reaches no URL                                                                                                                                                                                                                        | `engine-core` `search/epoch.ts`, `wire/tokens.ts`                                             |
-| `format` means three things: a shape number (`LAYOUT_FORMAT = 2`), a shape string the server rejects on mismatch (`ranges1`), and an image encoding (renders)                                                                                                                                                                                       | `engine-core` `wire/tokens.ts`, `wire/tokenSchemas.ts`                                        |
-| Engine values exist for four kinds (`serverFonts`), shapes for two                                                                                                                                                                                                                                                                                  | `engine-core` `wire/tokenSchemas.ts`                                                          |
+| Gap                                                                                                                                                                                                                                                                                                          | Where                                                                                         |
+| :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------------------- |
+| No version headers, and the CORS configuration allows neither                                                                                                                                                                                                                                                | `cloudpdf/engine` `HttpClient`, `cloudpdf/server` routes and `app/buildApp.ts`                |
+| Schemas that responses are parsed with are `.strict()`, nested ones too: `point` and `offset` in `Measure.schema.ts`, `WidgetAppearanceSchema`, `FormFieldValueSchema`, `LineLeaderSchema`, `LineDimensionCaptionSchema`, `ShapeDimensionCaptionSchema`, likely more (the unknown-field test finds the rest) | `engine-core` `dto/Measure.schema.ts`, `annotation/kinds/widget.shared.ts`, `forms/schema.ts` |
+| An unknown annotation subtype fails the whole list: `AnnotationSchema` is a `z.discriminatedUnion` with no fallback to `unsupported`                                                                                                                                                                         | `engine-core` `annotation/kinds/index.ts`                                                     |
+| The Python SDK fails a whole annotation list on an unknown subtype (pydantic's discriminator); the TypeScript, Go, Java and C# SDKs keep going                                                                                                                                                               | `fern/generators.yml` (`fern-python-sdk`)                                                     |
+| Search pins a client-computed `epoch` instead of `contentsVersion` and `layoutVersion`; `SEARCH_FOLD_VERSION` reaches no URL                                                                                                                                                                                 | `engine-core` `search/epoch.ts`, `wire/tokens.ts`                                             |
 
 ### Work, before 3.0.0
 
 Everything here is fixed into the 3.0 client or the 3.0.0 server, so it lands
-before 3.0.0. The first item is a bug today, so it goes first, on its own:
+before 3.0.0. Every cached read is computed at its pins (one helper,
+`readAtPins`), and every token carries its engine value and shape; what is
+left:
 
-1. **Computing at the pins** (`cloudpdf/server`): one helper for every cached
-   route that checks the pins before and after the read, sees writes applied
-   but not yet committed, and runs before the body is sent or stored. A test
-   per kind: a write that lands during a pinned read never yields a body under
-   the old pin.
-2. **Tokens** (`engine-core` `wire/tokenSchemas.ts`, `wire/tokens.ts`): every
-   token gets `engine` and `shape`. Layout's `format` and search's `format`
-   become `shape`. Search's `epoch` becomes `contentsVersion` and
-   `layoutVersion`. `serverFonts` becomes each kind's `engine`.
-3. **`/head` and the manifest**: `/head` gains the `engine` map; the manifest
-   gains `contentsVersion`, a stored counter raised in the write's transaction
-   (a migration, like `annotations_version`), and loses `serverFonts`.
-4. **Server**: computes each engine value from `RULES`, `FIELDS` and `INPUTS`
-   (see [How the server derives them](#how-the-server-derives-them), with
-   `SEARCH_FOLD_VERSION` as the search fold's number); answers a stale version
-   with "no longer current" and another engine value with its own output,
-   `no-store` and `EmbedPDF-Engine`; answers the asked shape; sends
-   `EmbedPDF-Server-Version`; lists the three headers in its CORS
-   configuration.
-5. **Client** (`@cloudpdf/engine`): copies versions and engine values; sends
-   its shapes and `EmbedPDF-Version`; reads `/head` again after an answer whose
-   `EmbedPDF-Engine` differs from the value it sent; checks each feature's
-   minimum server version against `/head`.
-6. **Tolerant reading**: no schema that parses responses uses `.strict()`,
+1. **`contentsVersion`**: a stored counter raised in the write's transaction
+   (a migration, like `annotations_version`), published in the manifest.
+   Search pins it and `layoutVersion` instead of its `epoch`.
+2. **Version headers**: the client sends `EmbedPDF-Version` and checks each
+   feature's minimum server version against `/head`; the server sends
+   `EmbedPDF-Server-Version` and lists both in its CORS configuration; the
+   headers go into the OpenAPI contract, and `pnpm api:sync` regenerates the
+   SDKs to send them.
+3. **Tolerant reading**: no schema that parses responses uses `.strict()`,
    nested ones included; an unknown annotation subtype parses as
    `unsupported` and a malformed known one still fails; the enums in responses
    are each given a fallback or marked closed; the Python SDK reads an unknown
-   subtype (a generator setting or a change to the contract's union, to be
-   found).
-7. **Contract and SDKs**: the headers go into the OpenAPI contract,
-   `pnpm api:sync` regenerates the SDKs to send them, and each SDK's generation
-   check parses the fixture with unknown values.
-8. **Conformance** (both engines): the unknown-field test over real responses;
-   a stale version answers "no longer current"; another engine value is
-   answered uncached with the server's own output; two servers with different
-   `CLOUDPDF_FONTS` behind one round-robin address answer every request, and
-   nothing is cached under a value that doesn't describe it; a request without
-   `EmbedPDF-Version` is answered as the server's version.
+   subtype; each SDK's generation check parses a fixture with unknown values.
+4. **Conformance** (both engines): the unknown-field test over real responses;
+   two servers with different `CLOUDPDF_FONTS` behind one round-robin address
+   answer every request, and nothing is cached under a value that doesn't
+   describe it; a request without `EmbedPDF-Version` is answered as the
+   server's version.
 
 ### After 3.0.0
 

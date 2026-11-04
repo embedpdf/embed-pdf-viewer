@@ -21,6 +21,8 @@ import {
   DocumentMetadataSchema,
   MetadataUpdateResultSchema,
   wirePaths,
+  tokenPinOf,
+  type TokenPin,
 } from '@embedpdf/engine-core/wire';
 
 import type { ManifestAccessor } from './CloudDocumentHandle';
@@ -40,8 +42,8 @@ interface MetadataDeps {
 
 /** One half of the Info dict: the leaf it reads and the route it writes. */
 interface MetadataLeaf<T, R> {
-  docPath: (docId: string, metadataVersion: number) => string;
-  layerPath: (docId: string, layerName: string, metadataVersion: number) => string;
+  docPath: (docId: string, metadataVersion: number, pin: TokenPin) => string;
+  layerPath: (docId: string, layerName: string, metadataVersion: number, pin: TokenPin) => string;
   updatePath: (docId: string, layerName: string) => string;
   parse: (raw: unknown) => T;
   parseResult: (raw: unknown) => R;
@@ -83,9 +85,10 @@ function readLeaf<T>(deps: MetadataDeps, leaf: MetadataLeaf<T, unknown>): Aborta
       const manifest = await deps.manifest.get(s);
       // Plane-scope rule: the leaf depends on the `metadata` plane — while
       // inherited, one doc-level URL serves every visitor.
+      const pin = tokenPinOf('metadata', manifest.engine);
       return planesInherited(manifest, ['metadata'])
-        ? leaf.docPath(deps.docId, manifest.metadataVersion)
-        : leaf.layerPath(deps.docId, deps.layerName, manifest.metadataVersion);
+        ? leaf.docPath(deps.docId, manifest.metadataVersion, pin)
+        : leaf.layerPath(deps.docId, deps.layerName, manifest.metadataVersion, pin);
     };
     return deps.http.getJsonWithRefresh(
       buildPath,

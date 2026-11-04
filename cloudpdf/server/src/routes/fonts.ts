@@ -43,8 +43,9 @@ const PRIVATE_IMMUTABLE_CACHE = 'private, max-age=31536000, immutable';
 
 /**
  * The fonts that can be named in a document (`doc.fonts`): the list, pinned
- * by the document's `fontsVersion` and the server's fonts' fingerprint
- * (`/fonts@{fontsVersion, serverFonts}`); a resolve, a read with a body; a
+ * by the document's `fontsVersion` and the fonts engine value, which the
+ * server's fonts are an input of (`/fonts@{engine, fontsVersion, shape}`); a
+ * resolve, a read with a body; a
  * program's facts and its bytes, content-addressed by its display hash; and a
  * served server font's bytes at one URL for every document. The list, the
  * resolve and a program's facts need `doc.open`; a program's bytes need a
@@ -70,6 +71,7 @@ export async function registerFontRoutes(app: FastifyInstance, deps: FontRouteDe
       layerName: undefined,
       assertCurrent: async () => assertCurrent(requested, await service.getManifest(ctx, docId)),
       read: () => fontListIn(service, ctx, docId, undefined, abortSignalOf(reply)),
+      token: { kind: 'fonts', pin: requested.pin },
     });
     setImmutableCache(reply);
     return list;
@@ -91,6 +93,7 @@ export async function registerFontRoutes(app: FastifyInstance, deps: FontRouteDe
       assertCurrent: async () =>
         assertCurrent(requested, await service.getLayerManifest(ctx, docId, layerName)),
       read: () => fontListIn(service, ctx, docId, layerName, abortSignalOf(reply)),
+      token: { kind: 'fonts', pin: requested.pin },
     });
     setImmutableCache(reply);
     return list;
@@ -289,17 +292,11 @@ function sendProgram(reply: FastifyReply, bytes: Uint8Array): FastifyReply {
   return reply.send(Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength));
 }
 
-/** A pinned list answers only at the manifest's pins and this server's fonts; any other is a 404. */
+/** A pinned list answers only at the manifest's `fontsVersion`; any other is a 404. */
 function assertCurrent(requested: FontsToken, manifest: DocumentManifest): void {
-  if (
-    requested.fontsVersion === manifest.fontsVersion &&
-    requested.serverFonts === manifest.serverFonts
-  ) {
-    return;
-  }
+  if (requested.fontsVersion === manifest.fontsVersion) return;
   throw new EngineError(
     EngineErrorCode.NotFound,
-    `fonts ${requested.fontsVersion}/${requested.serverFonts} no longer current ` +
-      `(current=${manifest.fontsVersion}/${manifest.serverFonts})`,
+    `fonts ${requested.fontsVersion} no longer current (current=${manifest.fontsVersion})`,
   );
 }
