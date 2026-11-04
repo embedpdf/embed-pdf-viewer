@@ -1,4 +1,5 @@
 import type { TextAlignment } from '../annotation/primitives';
+import { toLineBreaks } from '../text/lineBreaks';
 
 /**
  * Rich text of a FreeText annotation (`/RC` + `/DS`), the model the engine
@@ -54,7 +55,7 @@ export interface RichTextParagraphProps {
 }
 
 export interface RichTextRun {
-  /** May contain `\r`: a hard line break inside the paragraph. */
+  /** May contain `\n`: a hard line break inside the paragraph. */
   text: string;
   /** The properties this run overrides. Absent = the body style. */
   style?: Partial<RichTextRunStyle>;
@@ -102,10 +103,11 @@ export interface RichTextDocumentInput {
   paragraphs: RichTextParagraph[];
 }
 
-/** The plain-text projection of a rich document: paragraphs joined by `\r`,
- *  runs concatenated — what the engine writes to `/Contents`. */
+/** The plain-text projection of a rich document: paragraphs joined by `\n`,
+ *  runs concatenated — its annotation's `contents`. */
 export function richTextPlainText(doc: { paragraphs: readonly RichTextParagraph[] }): string {
-  return doc.paragraphs.map((p) => p.runs.map((r) => r.text).join('')).join('\r');
+  const paragraphs = doc.paragraphs.map((p) => p.runs.map((r) => r.text).join(''));
+  return toLineBreaks(paragraphs.join('\n'), '\n');
 }
 
 /** Plain text as rich paragraphs: one per line break, one run each, no

@@ -52,7 +52,7 @@ describe('a comment as rich text', () => {
     const patch = patchOf(note(null, 'old'), {
       richText: { paragraphs: [{ runs: [{ text: 'a' }] }, { runs: [{ text: 'b' }] }] },
     });
-    expect(patch.contents).toBe('a\rb');
+    expect(patch.contents).toBe('a\nb');
   });
 
   test('new contents on a rich comment rewrite its paragraphs and keep its body', () => {
@@ -62,7 +62,7 @@ describe('a comment as rich text', () => {
       paragraphs: [{ runs: [{ text: 'one' }] }, { runs: [{ text: 'two' }] }],
     });
     // As the engine writes `/Contents`: the rich text's projection.
-    expect(patch.contents).toBe('one\rtwo');
+    expect(patch.contents).toBe('one\ntwo');
   });
 
   test('new contents on a plain comment keep it plain', () => {
@@ -80,7 +80,7 @@ describe('a comment as rich text', () => {
   test('contents and rich text given together must agree, line breaks however spelled', () => {
     const richText = { paragraphs: [{ runs: [{ text: 'a\rb' }] }, { runs: [{ text: 'c' }] }] };
     // Acrobat spells a note's breaks `\n` in /Contents and `\r` in its rich text.
-    expect(patchOf(note(null, null), { contents: 'a\nb\r\nc', richText }).contents).toBe('a\rb\rc');
+    expect(patchOf(note(null, null), { contents: 'a\nb\r\nc', richText }).contents).toBe('a\nb\nc');
     expect(() => patchOf(note(null, null), { contents: 'abc', richText })).toThrow(
       /`contents` must equal the plain projection of `richText`/,
     );

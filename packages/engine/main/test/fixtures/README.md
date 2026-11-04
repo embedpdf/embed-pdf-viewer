@@ -1,6 +1,6 @@
 # Vendored engine-runtime corpus fixtures
 
-Most files in this directory are authored in-repo for specific suites. Twelve
+Most files in this directory are authored in-repo for specific suites. Thirteen
 are copies from the engine-runtime fork's test corpus, vendored so the
 conformance suites (`forms`, `actions`, `page-flatten`, `redaction-apply`,
 `text-divergence` —
@@ -22,13 +22,15 @@ it per package:
 - `bug_1139.pdf`
 - `bug_384770169.pdf`
 - `embedpdf_astral_tounicode.pdf`
+- `bug_781804.pdf`
 
 Source of truth: `testing/resources/` in <https://github.com/embedpdf/runtime>
 (the PDFium fork; upstream PDFium fixtures are BSD-3-Clause, see the fork's
 LICENSE). Copied from submodule commit
 `608d50ef5719bb179e8c0a8377b3759bcb39f169`; the three text-divergence
 fixtures were synced from runtime artifact commit
-`fce2b000cc7a9e2cabc92db41cd57ca03233f07d`.
+`fce2b000cc7a9e2cabc92db41cd57ca03233f07d`, and `bug_781804.pdf` from submodule commit
+`2c1490a9e821826c79a69d475292a9b280639335`.
 
 When bumping the submodule, re-sync if the fork changed these files:
 
@@ -37,12 +39,19 @@ cd packages/engine/runtime/runtime-src/testing/resources && cp \
   toggle_fields.pdf orphan_widgets.pdf listbox_form.pdf \
   document_aactions.pdf get_page_aaction.pdf annots_action_handling.pdf \
   annot_javascript.pdf flatten_selective.pdf hello_world.pdf \
-  bug_1139.pdf bug_384770169.pdf embedpdf_astral_tounicode.pdf \
+  bug_1139.pdf bug_384770169.pdf embedpdf_astral_tounicode.pdf bug_781804.pdf \
   ../../../../main/test/fixtures/
 ```
 
 If the vendored list keeps growing, replace the manual copy with a sync
 script instead of adding more entries here.
+
+## A word split by a line-end hyphen
+
+`search_cross_run_bug.pdf` was contributed by Gianluca Guarini with GitHub issue #848 and
+pull request #849: a one-page PDF whose word "containers" is set as "con-" and "tainers" on
+two lines, which PDFium joins into one word with U+FFFE for the hyphen.
+`search-joined-hyphen.test.ts` searches it.
 
 ## Form fixtures for page insert and extract
 

@@ -116,7 +116,7 @@ describe('buildTextItems — the editor document', () => {
     (record as { annotation?: unknown }).annotation = {
       ...record.annotation,
       textAlign: 'center',
-      contents: 'one\rtwo',
+      contents: 'one\ntwo',
       richText: {
         body: {
           family: 'Helvetica',

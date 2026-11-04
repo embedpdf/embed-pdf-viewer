@@ -1148,8 +1148,8 @@ export function runAnnotationMutationConformance(
         expect(created.annotation.subtype).toBe('free-text');
         if (created.annotation.subtype === 'free-text') {
           const dto = created.annotation;
-          // `contents` is the projection: paragraphs joined by \r, runs concatenated.
-          expect(dto.contents).toBe('Hello bold red\rH2');
+          // `contents` is the projection: paragraphs joined by \n, runs concatenated.
+          expect(dto.contents).toBe('Hello bold red\nH2');
           // The body became the /DA font and size; the /DA colour, the border's,
           // stayed the draft's, and the text is the body's color.
           expect(dto.fontFamily).toBe('helvetica');
@@ -1226,11 +1226,11 @@ export function runAnnotationMutationConformance(
         // break — run formatting is gone by design.
         const rewritten = await page.annotations.update(ref, {
           subtype: 'free-text',
-          contents: 'one\rtwo',
+          contents: 'one\ntwo',
         });
         expect(rewritten.annotation.subtype).toBe('free-text');
         if (rewritten.annotation.subtype === 'free-text') {
-          expect(rewritten.annotation.contents).toBe('one\rtwo');
+          expect(rewritten.annotation.contents).toBe('one\ntwo');
           expect(rewritten.annotation.richText.paragraphs).toEqual([
             { runs: [{ text: 'one' }] },
             { runs: [{ text: 'two' }] },
@@ -1349,7 +1349,7 @@ export function runAnnotationMutationConformance(
         } satisfies TextDraft);
         const note = rich.annotation;
         if (note.subtype !== 'text') throw new Error('expected a note');
-        expect(note.contents).toBe('Hello bold\rtwo');
+        expect(note.contents).toBe('Hello bold\ntwo');
         expect(note.richText?.paragraphs).toEqual([
           { runs: [{ text: 'Hello ' }, { text: 'bold', style: { weight: 700 } }] },
           { runs: [{ text: 'two', style: { decoration: ['underline'] } }] },
@@ -1390,7 +1390,7 @@ export function runAnnotationMutationConformance(
           contents: 'now\nplain',
         });
         if (rewritten.annotation.subtype !== 'square') throw new Error('expected a square');
-        expect(rewritten.annotation.contents).toBe('now\rplain');
+        expect(rewritten.annotation.contents).toBe('now\nplain');
         expect(rewritten.annotation.richText?.paragraphs).toEqual([
           { runs: [{ text: 'now' }] },
           { runs: [{ text: 'plain' }] },
@@ -1400,7 +1400,7 @@ export function runAnnotationMutationConformance(
         const unstyled = await page.annotations.update(ref, { subtype: 'square', richText: null });
         if (unstyled.annotation.subtype !== 'square') throw new Error('expected a square');
         expect(unstyled.annotation.richText).toBeNull();
-        expect(unstyled.annotation.contents).toBe('now\rplain');
+        expect(unstyled.annotation.contents).toBe('now\nplain');
       } finally {
         await doc.close();
       }
@@ -2640,6 +2640,32 @@ export function runAnnotationMutationConformance(
           caught = err;
         }
         expect(EngineError.is(caught, EngineErrorCode.InvalidArg)).toBe(true);
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test("a comment's line breaks are `\\n` in `contents` and `\\r` in the saved /Contents", async () => {
+      const doc = await openFixture(engine, opts);
+      try {
+        const page = doc.page(toPageRef(fix.pageObjectNumber));
+        const note = await page.annotations.create({
+          subtype: 'text',
+          rect: iconRect(shapeRect.x, shapeRect.y),
+          contents: 'first\nsecond\r\nthird',
+        } satisfies TextDraft);
+        expect(note.annotation.contents).toBe('first\nsecond\nthird');
+
+        // As Acrobat writes it: every line break a carriage return.
+        const ref = note.annotation.ref;
+        if (ref.kind !== 'objectNumber') throw new Error('expected an object-number ref');
+        const pdf = new TextDecoder('latin1').decode(await doc.download());
+        const objects = [
+          ...pdf.matchAll(new RegExp(`(?:^|[\\r\\n])${ref.objectNumber} 0 obj`, 'g')),
+        ];
+        const at = objects[objects.length - 1]!.index;
+        const body = pdf.slice(at, pdf.indexOf('endobj', at));
+        expect(/\/Contents\s*\(first(?:\\r|\r)second(?:\\r|\r)third\)/.test(body)).toBe(true);
       } finally {
         await doc.close();
       }

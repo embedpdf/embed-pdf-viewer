@@ -19,8 +19,8 @@
  * per the layering law. The return shape is a Svelte action; the other
  * frameworks call the same two functions from their effects.
  *
- * Offsets: positions in the plain projection — paragraphs joined by `\r`,
- * runs concatenated, a hard break inside a run is a `\r` too. The same
+ * Offsets: positions in the plain projection — paragraphs joined by `\n`,
+ * runs concatenated, a hard break inside a run is a `\n` too. The same
  * arithmetic the core's run algebra uses.
  *
  * Known limits, by design: the browser's native undo stack does not span a
@@ -493,13 +493,13 @@ function pushText(walk: Walk, text: string, style: RichTextEditorStyle): void {
 
 function walkNode(node: EditorNode, inherited: RichTextEditorStyle, walk: Walk): void {
   if (node.nodeType === TEXT_NODE) {
-    const text = (node.nodeValue ?? '').replace(/\r\n|\n/g, '\r');
+    const text = (node.nodeValue ?? '').replace(/\r\n|\r/g, '\n');
     if (text) pushText(walk, text, inherited);
     return;
   }
   if (node.nodeType !== ELEMENT_NODE) return;
   if (isBreak(node)) {
-    if (!isTrailingBreak(node, walk.root)) pushText(walk, '\r', inherited);
+    if (!isTrailingBreak(node, walk.root)) pushText(walk, '\n', inherited);
     return;
   }
   const name = node.nodeName.toUpperCase();

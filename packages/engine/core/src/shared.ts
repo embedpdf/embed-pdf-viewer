@@ -853,9 +853,12 @@ export {
   charBoundaryAtTextOffset,
   charMapViolation,
   charRangeForTextOffsets,
+  isNoncharacter,
   sliceText,
+  toPageText,
 } from './text/charmap';
 export type { CharBoundaryBias, CharMapAnchor } from './text/charmap';
+export { toLineBreaks } from './text/lineBreaks';
 export { searchContentEpoch, canonicalSearchQuery } from './search/epoch';
 
 export type { PageReorderInput } from './mutation/PageReorderInput';

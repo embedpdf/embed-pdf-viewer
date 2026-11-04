@@ -4,7 +4,9 @@ import {
   charBoundaryAtTextOffset,
   charMapViolation,
   charRangeForTextOffsets,
+  isNoncharacter,
   sliceText,
+  toPageText,
 } from '../../src/shared';
 import type { PageTextSnapshot } from '../../src/shared';
 import { PageTextSnapshotSchema } from '../../src/wire/schemas';
@@ -201,5 +203,81 @@ describe('PageTextSnapshotSchema', () => {
     expect(() =>
       PageTextSnapshotSchema.parse({ text: 'AB', charCount: 3, charMap: [[1, 1]] }),
     ).toThrow();
+  });
+});
+
+describe('toPageText', () => {
+  /** The snapshot passes every charMap invariant, and slicing it whole gives its text. */
+  function expectValid(snapshot: PageTextSnapshot): void {
+    expect(charMapViolation(snapshot.charCount, snapshot.text.length, snapshot.charMap)).toBeNull();
+    expect(PageTextSnapshotSchema.safeParse(snapshot).success).toBe(true);
+    expect(sliceText(snapshot, { start: 0, count: snapshot.charCount })).toBe(snapshot.text);
+  }
+
+  test('a line break is `\n`: its `\r` keeps its slot and gives no text', () => {
+    // [A, \r, \n, B]
+    const page = toPageText({ text: 'A\r\nB', charCount: 4 });
+    expect(page).toEqual({ text: 'A\nB', charCount: 4, charMap: [[2, 1]] });
+    expectValid(page);
+    expect(sliceText(page, { start: 1, count: 2 })).toBe('\n');
+    // The line break as text maps back to its `\n` alone.
+    expect(charRangeForTextOffsets(page, { start: 1, count: 1 })).toEqual({ start: 2, count: 1 });
+  });
+
+  test('a lone `\r` becomes `\n`, one unit for one', () => {
+    expect(toPageText({ text: 'A\rB', charCount: 3 })).toEqual({ text: 'A\nB', charCount: 3 });
+  });
+
+  test('a noncharacter keeps its slot and gives no text', () => {
+    // PDFium's joined line-end hyphen: [V, e, r, i, t, a, `U+FFFE`, s, e, r, u, m]
+    const page = toPageText({ text: 'Verita\uFFFEserum', charCount: 12 });
+    expect(page).toEqual({ text: 'Veritaserum', charCount: 12, charMap: [[7, 6]] });
+    expectValid(page);
+    expect(charRangeForTextOffsets(page, { start: 0, count: 11 })).toEqual({ start: 0, count: 12 });
+  });
+
+  test('a supplementary noncharacter drops both of its units', () => {
+    // [A, U+1FFFE, B]: the noncharacter arrives as one character of two units.
+    const page = toPageText({ text: 'A\u{1FFFE}B', charCount: 3, charMap: [[2, 3]] });
+    expect(page).toEqual({ text: 'AB', charCount: 3, charMap: [[2, 1]] });
+    expectValid(page);
+  });
+
+  test('anchors the extraction already has are kept, merged with the new ones', () => {
+    // [×, 😀, \r, \n, A]: a dropped character, a surrogate pair, a line break.
+    const page = toPageText({
+      text: '😀\r\nA',
+      charCount: 5,
+      charMap: [
+        [1, 0],
+        [2, 2],
+      ],
+    });
+    expect(page).toEqual({
+      text: '😀\nA',
+      charCount: 5,
+      charMap: [
+        [1, 0],
+        [2, 2],
+        [3, 2],
+      ],
+    });
+    expectValid(page);
+  });
+
+  test('gives back the same snapshot when there is nothing to change', () => {
+    expect(toPageText(identity)).toBe(identity);
+    expect(toPageText(astral)).toBe(astral);
+  });
+});
+
+describe('isNoncharacter', () => {
+  test('is true for U+FDD0–U+FDEF and the last two code points of every plane', () => {
+    for (const codePoint of [0xfdd0, 0xfdef, 0xfffe, 0xffff, 0x1fffe, 0x10ffff]) {
+      expect(isNoncharacter(codePoint)).toBe(true);
+    }
+    for (const codePoint of [0x41, 0xfdcf, 0xfdf0, 0xfffd, 0xfeff, 0x1fffd]) {
+      expect(isNoncharacter(codePoint)).toBe(false);
+    }
   });
 });

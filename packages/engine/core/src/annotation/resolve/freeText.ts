@@ -123,7 +123,7 @@ export function freeTextFollows(
     ...text,
     ...styleOfBody(body, current, text),
     richText,
-    // The engine writes `/Contents` from the rich text: a line break reads back as `\r`.
+    // The engine writes `/Contents` from the rich text; `contents` is its plain projection.
     ...(textChanged ? { contents: richTextPlainText(richText) } : {}),
   };
 }
@@ -173,6 +173,6 @@ export function freeTextDraftFollows(
     body: bodyWithStyle(draft.richText?.body ?? {}, draft, describe),
     paragraphs: draft.richText?.paragraphs ?? richTextParagraphsFromPlainText(draft.contents ?? ''),
   };
-  // The engine writes `/Contents` from the rich text: a line break reads back as `\r`.
+  // The engine writes `/Contents` from the rich text; `contents` is its plain projection.
   return { ...draft, intent, richText, contents: richTextPlainText(richText) };
 }
