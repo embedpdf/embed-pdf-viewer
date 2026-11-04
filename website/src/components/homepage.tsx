@@ -186,7 +186,7 @@ const paths = [
       'Fully responsive & accessible',
     ],
     checkColor: 'text-green-500',
-    npmCommand: 'npm install @embedpdf/snippet',
+    npmCommand: 'npm install @embedpdf/snippet@2',
     ctaTitle: 'Get Started',
     links: [
       {
@@ -230,7 +230,7 @@ const paths = [
       'React, Vue, Svelte hooks',
     ],
     checkColor: 'text-blue-500',
-    npmCommand: 'npm install @embedpdf/core',
+    npmCommand: 'npm install @embedpdf/core@2',
     ctaTitle: 'Read Documentation',
     links: [
       {

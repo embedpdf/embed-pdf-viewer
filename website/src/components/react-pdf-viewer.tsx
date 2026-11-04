@@ -212,7 +212,7 @@ const IntegrationPaths = () => {
               </li>
             </ul>
             <div className="mb-6 overflow-x-auto rounded-lg border border-gray-200 bg-gray-100 p-3 font-mono text-xs dark:border-gray-700 dark:bg-gray-800">
-              npm install @embedpdf/react-pdf-viewer
+              npm install @embedpdf/react-pdf-viewer@2
             </div>
 
             <div className="mt-auto">
@@ -255,7 +255,7 @@ const IntegrationPaths = () => {
               </li>
             </ul>
             <div className="mb-6 overflow-x-auto rounded-lg border border-gray-200 bg-gray-100 p-3 font-mono text-xs dark:border-gray-700 dark:bg-gray-800">
-              npm install @embedpdf/core
+              npm install @embedpdf/core@2
             </div>
 
             <div className="mt-auto">
