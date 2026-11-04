@@ -1,3 +1,4 @@
+import { ArchiveBanner } from '@/components/archive-banner'
 import { ThemeProvider } from '@/components/theme-provider'
 import '@/styles/tailwind.css'
 import { getPageMap } from 'nextra/page-map'
@@ -34,6 +35,7 @@ export default async function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
+          <ArchiveBanner />
           {children}
         </ThemeProvider>
       </body>
