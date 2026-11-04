@@ -36,6 +36,7 @@ export class PdfiumEngineRunner extends PdfiumNativeRunner {
     this.native = new PdfiumNative(wasmModule, {
       logger: this.logger,
       fontFallback: this.fontFallback,
+      rangeLoading: true,
     });
 
     this.ready();

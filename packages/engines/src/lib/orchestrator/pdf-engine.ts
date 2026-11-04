@@ -44,6 +44,7 @@ import {
   PdfSignatureObject,
   AnnotationCreateContext,
   Task,
+  PdfTaskHelper,
   PdfErrorCode,
   SearchResult,
   CompoundTask,
@@ -60,6 +61,14 @@ export type { ImageDataLike, IPdfiumExecutor, BatchProgress } from '@embedpdf/mo
 
 const LOG_SOURCE = 'PdfEngine';
 const LOG_CATEGORY = 'Orchestrator';
+
+type RangeCapableExecutor = IPdfiumExecutor & {
+  readonly supportsRangeLoading?: boolean;
+  openDocumentUrl?: (
+    file: PdfFileUrl,
+    options?: PdfOpenDocumentUrlOptions,
+  ) => PdfTask<PdfDocumentObject>;
+};
 
 export interface PdfEngineOptions<T> {
   /**
@@ -87,13 +96,15 @@ export interface PdfEngineOptions<T> {
  * - Manages visibility-based task ranking
  */
 export class PdfEngine<T = Blob> implements IPdfEngine<T> {
-  private executor: IPdfiumExecutor;
+  private executor: RangeCapableExecutor;
   private workerQueue: WorkerTaskQueue;
   private logger: Logger;
   private options: PdfEngineOptions<T>;
+  private custom_fetcher: boolean;
 
   constructor(executor: IPdfiumExecutor, options: PdfEngineOptions<T>) {
     this.executor = executor;
+    this.custom_fetcher = Boolean(options.fetcher);
     this.logger = options.logger ?? new NoopLogger();
     this.options = {
       imageConverter: options.imageConverter,
@@ -155,33 +166,55 @@ export class PdfEngine<T = Blob> implements IPdfEngine<T> {
     file: PdfFileUrl,
     options?: PdfOpenDocumentUrlOptions,
   ): PdfTask<PdfDocumentObject> {
-    const task = new Task<PdfDocumentObject, PdfErrorReason>();
+    if (
+      !this.custom_fetcher &&
+      options?.mode !== 'full-fetch' &&
+      options?.requestOptions?.credentials !== 'omit' &&
+      this.executor.supportsRangeLoading &&
+      this.executor.openDocumentUrl
+    ) {
+      return this.workerQueue.enqueue(
+        {
+          execute: () => {
+            try {
+              const url =
+                typeof globalThis.location === 'undefined'
+                  ? file.url
+                  : new URL(file.url, globalThis.location.href).href;
+              return this.executor.openDocumentUrl!({ ...file, url }, options);
+            } catch (error) {
+              return PdfTaskHelper.reject({
+                code: PdfErrorCode.Unknown,
+                message: error instanceof Error ? error.message : String(error),
+              });
+            }
+          },
+          meta: { docId: file.id, operation: 'openDocumentUrl' },
+        },
+        { priority: Priority.CRITICAL },
+      );
+    }
 
-    // Handle fetch in main thread (not worker!)
+    const task = new Task<PdfDocumentObject, PdfErrorReason>();
     (async () => {
       try {
-        if (!this.options.fetcher) {
-          throw new Error('Fetcher is not set');
-        }
+        if (!this.options.fetcher) throw new Error('Fetcher is not set');
 
         const response = await this.options.fetcher(file.url, options?.requestOptions);
-        const arrayBuf = await response.arrayBuffer();
+        if (!response.ok) throw new Error(`Could not fetch PDF: ${response.statusText}`);
+        const array_buf = await response.arrayBuffer();
 
-        const pdfFile: PdfFile = {
-          id: file.id,
-          content: arrayBuf,
-        };
-
-        // Then open in worker - use wait() to properly propagate task errors
-        this.openDocumentBuffer(pdfFile, {
-          password: options?.password,
-          normalizeRotation: options?.normalizeRotation,
-        }).wait(
+        this.openDocumentBuffer(
+          { id: file.id, content: array_buf },
+          {
+            password: options?.password,
+            normalizeRotation: options?.normalizeRotation,
+          },
+        ).wait(
           (doc) => task.resolve(doc),
           (error) => task.fail(error),
         );
       } catch (error) {
-        // This only catches fetch errors (network issues, etc.)
         task.reject({ code: PdfErrorCode.Unknown, message: String(error) });
       }
     })();
