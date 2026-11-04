@@ -2636,6 +2636,196 @@ export function runAnnotationMutationConformance(
         await doc.close();
       }
     });
+
+    // Kind changes: an update with a sibling subtype (`siblingKindsOf`) turns
+    // the annotation into that kind and it stays itself; ISO 32000-2
+    // describes each group of siblings with one table of entries.
+    const readBack = async (doc: DocumentHandle, ref: AnnotationRef) =>
+      (await doc.page(toPageRef(fix.pageObjectNumber)).annotations.list()).annotations.find(
+        (annotation) => annotationKey(annotation.ref) === annotationKey(ref),
+      );
+
+    test('a highlight becomes a squiggly line and stays the same annotation', async () => {
+      const doc = await openFixture(engine, opts);
+      try {
+        const page = doc.page(toPageRef(fix.pageObjectNumber));
+        const mark = (
+          await page.annotations.create({
+            subtype: 'highlight',
+            contents: 'mutation conformance: kind change',
+            color: '#1d4ed8',
+            quadPoints: quad,
+          } satisfies HighlightDraft)
+        ).annotation;
+        const reply = (
+          await page.annotations.create({
+            subtype: 'text',
+            rect: iconRect(shapeRect.x, shapeRect.y),
+            contents: 'a reply to the mark',
+            reply: { to: mark.ref, type: 'reply' },
+          } satisfies TextDraft)
+        ).annotation;
+        const order = (await page.annotations.list()).annotations.map((a) => annotationKey(a.ref));
+
+        const result = await page.annotations.update(mark.ref, { subtype: 'squiggly' });
+        expect(AnnotationUpdateResultSchema.safeParse(result).success).toBe(true);
+        expect(result.appearance.changed).toBe(true);
+        const changed = result.annotation;
+        expect(changed.subtype).toBe('squiggly');
+        expect(annotationKey(changed.ref)).toBe(annotationKey(mark.ref));
+        expect(changed.nm).toBe(mark.nm);
+        expect(changed.contents).toBe(mark.contents);
+        expect(changed.author).toBe(mark.author);
+        expect(changed.createdAt).toBe(mark.createdAt);
+        if (changed.subtype === 'squiggly' && mark.subtype === 'highlight') {
+          expect(changed.color).toBe(mark.color);
+          expect(changed.quadPoints).toEqual(mark.quadPoints);
+        }
+
+        // Same place in the drawing order; its reply still answers it.
+        const after = await page.annotations.list();
+        expect(after.annotations.map((a) => annotationKey(a.ref))).toEqual(order);
+        const answer = await readBack(doc, reply.ref);
+        expect(answer?.reply?.to && annotationKey(answer.reply.to)).toBe(annotationKey(mark.ref));
+        expect((await readBack(doc, mark.ref))?.subtype).toBe('squiggly');
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test('a square becomes a circle with a new color, and back', async () => {
+      const doc = await openFixture(engine, opts);
+      try {
+        const page = doc.page(toPageRef(fix.pageObjectNumber));
+        const square = (
+          await page.annotations.create({
+            subtype: 'square',
+            box: shapeRect,
+            color: '#008000',
+            strokeWidth: 2,
+          } satisfies SquareDraft)
+        ).annotation;
+
+        const circle = (
+          await page.annotations.update(square.ref, { subtype: 'circle', color: '#dc143c' })
+        ).annotation;
+        expect(circle.subtype).toBe('circle');
+        expect(annotationKey(circle.ref)).toBe(annotationKey(square.ref));
+        if (circle.subtype === 'circle') {
+          expect(circle.box).toEqual(shapeRect);
+          expect(circle.color).toBe('#dc143c');
+          expect(circle.strokeWidth).toBe(2);
+        }
+
+        const back = (await page.annotations.update(square.ref, { subtype: 'square' })).annotation;
+        expect(back.subtype).toBe('square');
+        if (back.subtype === 'square') expect(back.color).toBe('#dc143c');
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test('a kind outside the group, or over a value the new kind cannot hold, is refused', async () => {
+      const doc = await openFixture(engine, opts);
+      try {
+        const page = doc.page(toPageRef(fix.pageObjectNumber));
+        const mark = (
+          await page.annotations.create({
+            subtype: 'highlight',
+            quadPoints: quad,
+          } satisfies HighlightDraft)
+        ).annotation;
+        await expect(
+          page.annotations.update(mark.ref, { subtype: 'ink' } as unknown as AnnotationPatch),
+        ).rejects.toMatchObject({
+          code: EngineErrorCode.InvalidArg,
+          details: { field: 'subtype' },
+        });
+        const ink = (
+          await page.annotations.create({ subtype: 'ink', inkList: inkStrokes } satisfies InkDraft)
+        ).annotation;
+        await expect(
+          page.annotations.update(ink.ref, { subtype: 'square' } as unknown as AnnotationPatch),
+        ).rejects.toMatchObject({
+          code: EngineErrorCode.InvalidArg,
+          details: { field: 'subtype' },
+        });
+
+        // A replacement's strikeout holds an intent a highlight has no field for.
+        const caret = (
+          await page.annotations.create({
+            subtype: 'caret',
+            intent: 'replace',
+            box: { x: shapeRect.x, y: shapeRect.y, width: 8, height: 12 },
+            contents: 'invoice',
+          } satisfies CaretDraft)
+        ).annotation;
+        const strikeout = (
+          await page.annotations.create({
+            subtype: 'strikeout',
+            intent: 'strikeout-text-edit',
+            quadPoints: quad,
+            reply: { to: caret.ref, type: 'group' },
+          } satisfies StrikeoutDraft)
+        ).annotation;
+        await expect(
+          page.annotations.update(strikeout.ref, { subtype: 'highlight' }),
+        ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg, details: { field: 'intent' } });
+        const kept = await readBack(doc, strikeout.ref);
+        expect(kept?.subtype).toBe('strikeout');
+        if (kept?.subtype === 'strikeout') expect(kept.intent).toBe('strikeout-text-edit');
+
+        // Cleared first, in the same change, it becomes a highlight, still in its group.
+        await doc.apply({
+          ops: [
+            { type: 'annotations.update', ref: strikeout.ref, patch: { intent: null } },
+            { type: 'annotations.update', ref: strikeout.ref, patch: { subtype: 'highlight' } },
+          ],
+        });
+        const changed = await readBack(doc, strikeout.ref);
+        expect(changed?.subtype).toBe('highlight');
+        expect(changed?.reply).toMatchObject({ type: 'group' });
+        expect(changed?.reply && annotationKey(changed.reply.to)).toBe(annotationKey(caret.ref));
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test('undo puts the old kind back, and so does an undo after a later change', async () => {
+      const doc = await openFixture(engine, opts);
+      try {
+        const page = doc.page(toPageRef(fix.pageObjectNumber));
+        const create = () =>
+          page.annotations.create({
+            subtype: 'highlight',
+            color: '#ffff00',
+            quadPoints: quad,
+          } satisfies HighlightDraft);
+
+        const mark = (await create()).annotation;
+        const changed = await doc.apply({
+          ops: [{ type: 'annotations.update', ref: mark.ref, patch: { subtype: 'underline' } }],
+        });
+        expect((await readBack(doc, mark.ref))?.subtype).toBe('underline');
+        const undo = await doc.apply({ undoOf: changed.meta.opId });
+        expect((await readBack(doc, mark.ref))?.subtype).toBe('highlight');
+        await doc.apply({ undoOf: undo.meta.opId });
+        expect((await readBack(doc, mark.ref))?.subtype).toBe('underline');
+
+        // Restyled since: the undo puts back the kind by value and keeps the new color.
+        const other = (await create()).annotation;
+        const retyped = await doc.apply({
+          ops: [{ type: 'annotations.update', ref: other.ref, patch: { subtype: 'underline' } }],
+        });
+        await page.annotations.update(other.ref, { color: '#16a34a' });
+        await doc.apply({ undoOf: retyped.meta.opId });
+        const restored = await readBack(doc, other.ref);
+        expect(restored?.subtype).toBe('highlight');
+        if (restored?.subtype === 'highlight') expect(restored.color).toBe('#16a34a');
+      } finally {
+        await doc.close();
+      }
+    });
   });
 }
 

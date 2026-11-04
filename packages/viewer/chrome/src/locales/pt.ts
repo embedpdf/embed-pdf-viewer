@@ -347,6 +347,7 @@ export const pt: Locale = {
       // The style panel's labels, as the annotation kinds name them (`labelKey`), by wording:
       // one field is called different things by different kinds.
       style: {
+        kind: 'Tipo',
         opacity: 'Opacidade',
         stroke: 'Traço',
         fill: 'Preenchimento',

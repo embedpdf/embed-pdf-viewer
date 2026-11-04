@@ -761,8 +761,9 @@ export async function registerAnnotationRoutes(
 
   /**
    * Update an annotation. The patch has to fit some kind here; the worker
-   * checks it against its target's kind, and the caller's authority against
-   * the target's owner, inside the write.
+   * checks it against the kind it leaves the target (its own, or a sibling
+   * its `subtype` names), and the caller's authority against the target's
+   * owner, inside the write.
    */
   async function updateAnnotation(
     req: FastifyRequest,

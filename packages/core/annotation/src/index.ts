@@ -133,7 +133,13 @@ export {
   type FlagKey,
   type KindCaps,
 } from './kinds';
-export { initialTextStyle, kindTakesLink, propertiesOf, sharedProperties } from './props';
+export {
+  initialTextStyle,
+  kindTakesLink,
+  propertiesOf,
+  selectionProperties,
+  sharedProperties,
+} from './props';
 export { FLAG_PROPERTIES, LINE_ENDING_NAMES } from './kinds/fields';
 export { engineSubtypeOf, readOfDefaults, widgetAppearanceOf } from './record/defaults';
 export {

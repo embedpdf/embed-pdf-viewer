@@ -294,10 +294,10 @@ const mirrorEveryPage: VisibleBoxOf = () => MIRROR;
  * follows its points and scale. Values `patch` gives come back as given.
  *
  * Throws `InvalidArg` for what the engine refuses without its schemas: a
- * field the kind doesn't declare, a changed subtype or name, a rect with a
- * new shape or that isn't finite, and where nothing can follow. The engine
- * checks the values against the kind's schema when the update reaches it,
- * and refuses there what this lets through.
+ * field the kind doesn't declare, a subtype the annotation can't become, a
+ * changed name, a rect with a new shape or that isn't finite, and where
+ * nothing can follow. The engine checks the values against the kind's schema
+ * when the update reaches it, and refuses there what this lets through.
  */
 export function resolveAnnotationPatch(
   current: Annotation,
