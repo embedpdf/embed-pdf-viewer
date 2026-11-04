@@ -238,6 +238,33 @@ describe('a text box restyled after it was typed in', () => {
     );
     expect(harness.item().css.fontFamily).toBe('"epdf-hebrew", sans-serif');
   });
+
+  it('is asked again when it is restyled while drawn live already', async () => {
+    const harness = await editing();
+    // The engine draws a bold face in Helvetica Bold, anything else in Helvetica.
+    harness.fonts.resolve.mockImplementation(async (request: { runs: unknown[] }) => ({
+      runs: request.runs.map((run) =>
+        answer((run as { weight?: number }).weight === 700 ? 'helvetica-bold' : 'helvetica'),
+      ),
+      missingCharacters: [],
+    }));
+    harness.update.mockImplementation(async (_ref: AnnotationRef, patch: object) => ({
+      annotation: { ...freeText('hello'), ...patch },
+      appearance: { changed: false },
+    }));
+    harness.capability.text.begin(REF);
+    await flush();
+    void harness.capability.text.end();
+    await flush();
+    // The first restyle draws the box live; the second changes only what it shows.
+    harness.capability.selection.set([REF]);
+    await harness.capability.selection.update({ fontColor: '#cc0000' });
+    await flush();
+    expect(harness.item().css.fontFamily).toBe('"epdf-helvetica", sans-serif');
+    void harness.capability.text.toggleFormat('bold');
+    await flush();
+    expect(harness.item().css.fontFamily).toBe('"epdf-helvetica-bold", sans-serif');
+  });
 });
 
 describe('a text box without the fonts plugin', () => {

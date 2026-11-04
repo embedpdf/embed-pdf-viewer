@@ -39,25 +39,35 @@ The same calls work while someone types in a box and when boxes are only selecte
 ```ts
 await annotation.selection.update({ bold: true });
 await annotation.selection.update({ fontSize: 24, fontColor: '#c00000' });
-await annotation.text.toggleFormat('italic'); // italic on, or off if it already is
+await annotation.text.toggleFormat('italic'); // italic on, or off if all of it already is
 ```
 
 Where a change lands depends on what's selected:
 
 - **Words selected while typing**: the change styles those words.
-- **Otherwise**: it styles the whole text of every selected box.
+- **A caret while typing**: the change is for the text typed next, as in a word processor. Nothing
+  changes until someone types, and moving the caret drops it.
+- **Otherwise**: it styles all the text of every selected box. A word with its own style follows
+  the change: turn the box red, and a blue word turns red too.
 
 A property that isn't about text, such as opacity or the border, always applies to the whole box.
 
 To show the state in your toolbar, [`useAnnotationProperties()`](../annotations/selecting#a-style-panel)
-reports it the same way. With words selected, `values.bold` is true when every selected word is
-bold, and `mixed` lists what the words disagree on. With a caret or a selected box, it reports the
-box's own style. Text boxes also give you `textFormat` properties, so a style panel shows the bold,
-italic and underline buttons without extra code.
+reports what the next change would style:
+
+- **Words selected**: `values.bold` is true when every selected word is bold, and `mixed` lists what
+  the words disagree on.
+- **A caret**: the style of the text before it (at the start of a line, the text after it), with the
+  changes made at the caret since.
+- **A selected box**: all of its text, the way selected words read.
+
+Text boxes also give you `textFormat` properties, so a style panel shows the bold, italic and
+underline buttons without extra code.
 
 <Callout type="info">
-  A word with its own style keeps it when the box changes: turn the whole box red, and the one blue
-  word stays blue. To make a word follow the box again, write the paragraphs without that style.
+  The engine's own update keeps the PDF's rule: `fontColor`, `fontSize` and `fontFamily` change the
+  box's body style, and a word with its own style keeps it. See
+  [Free text](/docs/engine/annotations/free-text#rich-text).
 </Callout>
 
 ## When it's saved

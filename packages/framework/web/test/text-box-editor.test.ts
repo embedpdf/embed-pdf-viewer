@@ -29,7 +29,9 @@ function textBoxElement() {
 function textEditing(editingId: () => string | null = () => null) {
   const annotation: TextBoxEditorAnnotation<Ref> & { drafts: unknown[] } = {
     drafts: [],
-    draftRichText: (ref, document) => annotation.drafts.push({ ref, document }),
+    draftRichText: (ref, document) => {
+      annotation.drafts.push({ ref, document });
+    },
     setTextSelection: vi.fn(),
     text: { toggleFormat: vi.fn() },
     getCssFontFamily: (face) => face.family,

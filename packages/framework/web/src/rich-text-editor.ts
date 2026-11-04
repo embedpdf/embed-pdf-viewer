@@ -86,8 +86,13 @@ export interface RichTextEditorFace {
 
 /** What the binding needs from the plugin — structural, no plugin import. */
 export interface RichTextEditorHost {
-  /** The element's content changed by typing: here is the serialised document. */
-  onInput(doc: RichTextEditorDocument): void;
+  /**
+   * The element's content changed by typing: here is the serialised
+   * document. Returns the document the host keeps when it isn't this one (it
+   * gave the text typed at the caret a style chosen there): the element shows
+   * it before the next keystroke reads the element again.
+   */
+  onInput(doc: RichTextEditorDocument): RichTextEditorDocument | void;
   /** The selection inside the editor moved (null: the editor has none). */
   onSelectionChange(range: RichTextEditorRange | null): void;
   /** A keyboard command the host applies to the current selection. */
@@ -732,6 +737,12 @@ export function attachRichTextEditor(
   let props = initial;
   let rendered: RichTextEditorDocument | null = null;
   let composing = false;
+  // What the element reported (or showed, as the host kept it) that the host
+  // hasn't drawn back yet, oldest first. Keystrokes can come faster than the
+  // host draws: an update carrying one of these is late, and the element
+  // already shows something newer.
+  let unanswered: RichTextEditorDocument[] = [];
+  const UNANSWERED_KEPT = 64;
 
   const currentSelection = (): RichTextEditorRange | null => {
     const range = liveRange();
@@ -834,7 +845,10 @@ export function attachRichTextEditor(
       host.familyOfCss && ((cssFamily) => host.familyOfCss!(cssFamily) ?? cssFamily),
     );
     rendered = document;
-    host.onInput(document);
+    const kept = host.onInput(document);
+    if (kept && !documentsEqual(kept, document)) render(kept, true);
+    unanswered.push(rendered);
+    if (unanswered.length > UNANSWERED_KEPT) unanswered.shift();
   };
 
   const onInput = () => {
@@ -846,6 +860,7 @@ export function attachRichTextEditor(
   const onCompositionEnd = () => {
     composing = false;
     serialiseAndReport();
+    onSelectionChange();
   };
   const onKeyDown = (event: KeyboardEvent) => {
     if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
@@ -854,6 +869,9 @@ export function attachRichTextEditor(
       key === 'b' ? 'bold' : key === 'i' ? 'italic' : key === 'u' ? 'underline' : null;
     if (!command) return;
     event.preventDefault();
+    // The command is for the selection as it is now: the browser may not have
+    // reported the last caret move yet (its `selectionchange` is a later task).
+    onSelectionChange();
     host.onCommand(command);
   };
   const onPaste = (event: ClipboardEvent) => {
@@ -863,8 +881,11 @@ export function attachRichTextEditor(
     // the insertion; the resulting `input` event serialises as usual.
     doc.execCommand('insertText', false, text);
   };
+  // A composition reports its text and the caret after it once, when it ends:
+  // the caret moving through it is no move of the host's (a style chosen at
+  // the caret waits for the composed text).
   const onSelectionChange = () => {
-    if (activeElement() !== element) return;
+    if (composing || activeElement() !== element) return;
     host.onSelectionChange(currentSelection());
   };
 
@@ -882,12 +903,17 @@ export function attachRichTextEditor(
     update(next: RichTextEditorProps) {
       const scaleChanged = next.scale !== props.scale;
       props = next;
-      // Our own input echoes back through the host unchanged: no re-render,
-      // the caret stays where the browser put it. Anything else (a restyle,
-      // a remote edit, a scale change) re-renders and restores the caret.
+      // Our own input echoes back through the host unchanged, maybe late: no
+      // re-render, the caret stays where the browser put it. Anything else (a
+      // restyle, a remote edit) re-renders and restores the caret, and so
+      // does a scale change, with the newest text.
       if (composing) return;
-      if (!rendered || scaleChanged || !documentsEqual(next.document, rendered)) {
-        render(next.document, activeElement() === element);
+      const echo = unanswered.findIndex((document) => documentsEqual(next.document, document));
+      if (echo >= 0) unanswered = unanswered.slice(echo + 1);
+      const changed = echo < 0 && (!rendered || !documentsEqual(next.document, rendered));
+      if (changed || scaleChanged) {
+        if (changed) unanswered = [];
+        render(changed ? next.document : rendered!, activeElement() === element);
         return;
       }
       // The fonts may have changed under an unchanged document (a body

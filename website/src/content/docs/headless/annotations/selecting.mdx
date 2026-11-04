@@ -258,7 +258,7 @@ A double-click on a text box starts typing in it; a click outside ends it. From 
 
 ```ts
 annotation.text.begin(ref);
-await annotation.text.toggleFormat('bold'); // the selected words, or the whole box
+await annotation.text.toggleFormat('bold'); // the selected words, what's typed next at a caret, or the whole box
 await annotation.text.end();
 ```
 
@@ -331,7 +331,7 @@ What `useAnnotation()` gives you for selecting, drawing and editing text: its `s
 | `draft.get()`                                              | The polygon or polyline being drawn (`{ page, bounds, pointCount, canFinish }`), or `null`. `<AnnotationDraftMenu>` uses it. [Shapes with many points](#shapes-with-many-points) |
 | `draft.finish()`, `draft.cancel()`                         | Ends the shape and creates it, as a double-click does, or drops it                                                               |
 | `text.begin(ref)`, `text.end()`                            | Starts typing in a text box, as a double-click does, or stops and saves what was typed. [Edit text](#edit-text)                  |
-| `text.toggleFormat(format)`                                | Turns `'bold'`, `'italic'` or `'underline'` on or off, for the selected words or the whole box                                   |
+| `text.toggleFormat(format)`                                | Turns `'bold'`, `'italic'` or `'underline'` on or off, for the selected words, what's typed next at a caret, or the whole box. [Rich text](../concepts/rich-text#format-from-your-toolbar) |
 | `isEditable(ref)`                                          | Whether people may change this annotation by hand, as the `editable` setting says. [What people may change](#what-people-may-change) |
 | `cancel()`                                                 | Stops a drag, or a polygon in progress. [Keyboard](#keyboard)                                                                    |
 

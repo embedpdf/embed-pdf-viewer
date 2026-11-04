@@ -224,6 +224,80 @@ export function styleAt(
   return previous?.style ?? {};
 }
 
+/**
+ * The text an edit inserted at `at`, when inserting it there is all the edit
+ * did, as typing at a caret does; `null` for any other edit.
+ */
+function insertedAt(
+  before: { paragraphs: readonly RichTextParagraph[] },
+  after: { paragraphs: readonly RichTextParagraph[] },
+  at: number,
+): string | null {
+  const was = plainTextOf(before);
+  const is = plainTextOf(after);
+  const added = is.length - was.length;
+  if (added <= 0 || at > was.length) return null;
+  if (is.slice(0, at) !== was.slice(0, at) || is.slice(at + added) !== was.slice(at)) return null;
+  return is.slice(at, at + added);
+}
+
+/**
+ * Typing at a caret where the text typed next has a style of its own
+ * (`style`, chosen at the caret before anything was typed there): the text
+ * the edit inserted at `at` takes it, and `caret` is where the caret is after
+ * it. A line break carries the style on to that caret (`style` comes back);
+ * text takes it. `null` when the edit was no typing at `at` (a deletion, a
+ * replacement): the style is dropped.
+ */
+export function typeWithStyle<T extends { paragraphs: RichTextParagraph[] }>(
+  before: { paragraphs: readonly RichTextParagraph[] },
+  after: T,
+  at: number,
+  style: RichTextStyleDelta,
+): { doc: T; caret: number; style?: RichTextStyleDelta } | null {
+  const inserted = insertedAt(before, after, at);
+  if (inserted === null) return null;
+  const caret = at + inserted.length;
+  if (/^\r+$/.test(inserted)) return { doc: after, caret, style };
+  return { doc: applyStyleToRange(after, { start: at, end: caret }, style), caret };
+}
+
+const NO_STYLE: RichTextStyleDelta = Object.freeze({});
+
+/**
+ * The document with every run's own style passed through `change`,
+ * normalised; the same document when `change` gives back every style it was
+ * given.
+ */
+export function restyleRuns<T extends { paragraphs: RichTextParagraph[] }>(
+  doc: T,
+  change: (style: RichTextStyleDelta) => RichTextStyleDelta,
+): T {
+  let changed = false;
+  const paragraphs = doc.paragraphs.map((paragraph) => ({
+    ...paragraph,
+    runs: paragraph.runs.map((run) => {
+      const own = run.style ?? NO_STYLE;
+      const style = change(own);
+      if (style === own) return run;
+      changed = true;
+      return { ...run, style };
+    }),
+  }));
+  return changed ? normalizeRuns({ ...doc, paragraphs }) : doc;
+}
+
+/** `style` without `keys`, so a run follows the body for them; the same style when it has none of them. */
+export function withoutStyle(
+  style: RichTextStyleDelta,
+  keys: readonly (keyof RichTextRunStyle)[],
+): RichTextStyleDelta {
+  if (!keys.some((key) => style[key] !== undefined)) return style;
+  const out = { ...style };
+  for (const key of keys) delete out[key];
+  return out;
+}
+
 /** Every run overlapping the range satisfies `predicate` (an empty range
  *  tests the caret's style). */
 export function rangeHasStyle(
