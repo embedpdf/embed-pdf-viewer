@@ -36,7 +36,7 @@ const freeTextDTO = (
   contents: string,
   extra: Record<string, unknown> = {},
   paragraphs: RichTextParagraph[] = contents
-    .split('\r')
+    .split('\n')
     .map((line) => ({ runs: [{ text: line }] })),
 ): FileAnnotation =>
   ({

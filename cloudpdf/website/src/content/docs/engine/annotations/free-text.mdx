@@ -24,8 +24,8 @@ const { annotation } = await page.annotations.create({
 
 ## Text boxes
 
-The text wraps inside `box`. Start a new line with `\n` in `contents`; it reads back as `\r`,
-the line break PDF uses.
+The text wraps inside `box`. Start a new line with `\n` in `contents`. The file stores it as `\r`,
+as Acrobat does, and it reads back as `\n`.
 
 | Field           | What it is                                                       | Default       |
 | :-------------- | :--------------------------------------------------------------- | :------------ |
@@ -179,7 +179,7 @@ await page.annotations.create({
 The `body` is the same style as `fontFamily`, `fontSize`, `fontColor` and `textAlign`, so you
 rarely write one. When you send both, the field wins: `fontColor: '#CC0000'` with a `body` of
 `{ color: '#0000CC' }` makes red text. `contents` always reads back as the plain text:
-`'Total is wrong, see page 4.'`, with paragraphs joined by `\r`.
+`'Total is wrong, see page 4.'`, with paragraphs joined by `\n`.
 
 A style can hold:
 

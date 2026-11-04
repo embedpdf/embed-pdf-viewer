@@ -142,7 +142,7 @@ export function runAnnotationRotationConformance(
           ),
           0.01,
         );
-        const upright = await textBoxOf(page, 'test\rtest 123');
+        const upright = await textBoxOf(page, 'test\ntest 123');
         expect(upright.rotation).toBeNull();
         expectRect(upright.box, upright.rect, 0);
       });

@@ -16,8 +16,7 @@ const page = doc.page(pageRef);
 const { text } = await page.text.get();
 ```
 
-`text` is the page's text in reading order, as a normal JavaScript string. Lines are separated
-by `\r\n`.
+`text` is the page's text in reading order, as a normal JavaScript string. Lines end in `\n`.
 
 ## Part of a page
 
@@ -81,12 +80,16 @@ images and highlight positions, never the text as characters they can copy.
 ### Characters and string positions
 
 The engine numbers characters the way the PDF stores them. Most of the time that matches the
-string: character 5 is `text[5]`. Two things make them differ:
+string: character 5 is `text[5]`. A few things make them differ:
 
 - **Characters outside the Basic Multilingual Plane** (most emoji, some CJK characters) are one
   character in the PDF but two positions in a JavaScript string.
 - **Characters with no text of their own** (a glyph the PDF maps to no Unicode character) have a
   number but add nothing to the string.
+- **Line breaks** are two characters, `\r` and `\n`, and only `\n` is in the string.
+- **A hyphen that splits a word over two lines** is a character, but the string reads the word
+  whole: `Verita-` and `serum` read `Veritaserum`. A selection or match over the word covers the
+  hyphen too.
 
 That's why you pass ranges to `slice()` instead of cutting `text` yourself: `slice()` converts for
 you. `get()` also returns `charCount` (how many characters the page has) and, when the two

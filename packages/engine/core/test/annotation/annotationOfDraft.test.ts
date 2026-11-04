@@ -52,7 +52,7 @@ describe('annotationOfDraft', () => {
       },
       { ref },
     );
-    expect(text.subtype === 'free-text' && text.contents).toBe('One\rTwo');
+    expect(text.subtype === 'free-text' && text.contents).toBe('One\nTwo');
     expect(text.subtype === 'free-text' && text.richText).toEqual({
       body: expect.objectContaining({
         family: 'Times',

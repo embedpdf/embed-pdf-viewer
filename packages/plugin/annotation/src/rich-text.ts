@@ -35,7 +35,7 @@ import {
 export type TextFormat = 'bold' | 'italic' | 'underline';
 
 /** The editor's selection inside one free-text annotation: flat offsets over
- *  the plain projection (paragraphs joined by `\r`). */
+ *  the plain projection (paragraphs joined by `\n`). */
 export interface TextSelection extends RichTextRange {
   id: string;
 }

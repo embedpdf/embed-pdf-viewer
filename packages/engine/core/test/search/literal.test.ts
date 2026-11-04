@@ -34,6 +34,15 @@ describe('matchLiteral', () => {
     ]);
   });
 
+  test('matches across an invisible character, and the range covers it', () => {
+    // A soft hyphen inside the word.
+    expect(find('Veri\u00ADtaserum', { text: 'veritaserum' })).toEqual([{ start: 0, count: 12 }]);
+  });
+
+  test('a needle with an invisible character still matches', () => {
+    expect(find('foo bar', { text: 'fo\u200Bo' })).toEqual([{ start: 0, count: 3 }]);
+  });
+
   test('matches across line wraps (whitespace collapse)', () => {
     // Text reflowed across a newline + indent.
     expect(find('hello\n   world', { text: 'hello world' })).toEqual([{ start: 0, count: 14 }]);

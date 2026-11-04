@@ -109,7 +109,7 @@ describe('rich text FreeText (local engine)', () => {
       },
     });
     const dto = created.annotation as FreeTextAnnotation;
-    expect(dto.contents).toBe('Hello bold red\rH2');
+    expect(dto.contents).toBe('Hello bold red\nH2');
     // The body became the /DA font and size; the /DA colour, the border's,
     // stayed the draft's, and the text is the body's color.
     expect(dto.fontFamily).toBe('helvetica');
@@ -191,10 +191,10 @@ describe('rich text FreeText (local engine)', () => {
     const ref = created.annotation.ref;
     const updated = await doc.page(toPageRef(PAGE)).annotations.update(ref, {
       subtype: 'free-text',
-      contents: 'one\rtwo',
+      contents: 'one\ntwo',
     });
     const dto = updated.annotation as FreeTextAnnotation;
-    expect(dto.contents).toBe('one\rtwo');
+    expect(dto.contents).toBe('one\ntwo');
     // A paragraph names alignment/direction only where it differs from the body.
     expect(dto.richText.paragraphs).toEqual([
       { runs: [{ text: 'one' }] },

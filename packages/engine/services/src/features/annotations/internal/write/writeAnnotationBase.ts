@@ -5,6 +5,7 @@ import {
   type AnnotationSubtype,
   type DateInput,
   type PdfCoordinates,
+  toLineBreaks,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
@@ -15,6 +16,11 @@ import {
 } from './annotationWritePrimitives';
 import { formatPdfDate } from '../../../../shared/pdf-date';
 import { flagFieldsOf } from '../annotationFlagBits';
+
+/** `contents` as `/Contents` spells it: line breaks `\r`, as Acrobat writes them. */
+function pdfContentsOf(contents: string | null): string | null {
+  return contents === null ? null : toLineBreaks(contents, '\r');
+}
 
 /**
  * Write the annotation-wide base fields shared by every Draft
@@ -34,7 +40,7 @@ export function applyAnnotationBaseDraft(
   draft: AnnotationDraftBase<PdfCoordinates>,
 ): void {
   if (draft.contents !== undefined) {
-    writeAnnotStringOrClear(fn, mem, annotPtr, 'Contents', draft.contents);
+    writeAnnotStringOrClear(fn, mem, annotPtr, 'Contents', pdfContentsOf(draft.contents));
   }
   if (draft.subject !== undefined) {
     writeAnnotStringOrClear(fn, mem, annotPtr, 'Subj', draft.subject);
@@ -66,7 +72,7 @@ export function applyAnnotationBasePatch(
   patch: AnnotationPatchBase<PdfCoordinates>,
 ): void {
   if (patch.contents !== undefined) {
-    writeAnnotStringOrClear(fn, mem, annotPtr, 'Contents', patch.contents);
+    writeAnnotStringOrClear(fn, mem, annotPtr, 'Contents', pdfContentsOf(patch.contents));
   }
   if (patch.subject !== undefined) {
     writeAnnotStringOrClear(fn, mem, annotPtr, 'Subj', patch.subject);

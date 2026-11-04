@@ -72,7 +72,8 @@ await doc.search.query({ text: 'Total', matchCase: true, wholeWord: true });
 | `from`             | Start at this page and wrap around, so the matches the user sees come first. | first page |
 
 By default the search ignores case and accents, and treats any run of spaces and line breaks as
-one space, so `total amount` finds a phrase broken over two lines.
+one space, so `total amount` finds a phrase broken over two lines. It also looks past characters
+you can't see, such as a soft hyphen or a zero-width space, so a word split by one is still found.
 
 ### Regular expressions
 
