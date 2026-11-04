@@ -4885,9 +4885,9 @@ export class PdfiumNative implements IPdfiumExecutor {
         right,
         bottom,
         textBuffer,
-        utf16Length,
+        utf16Length + 1,
       );
-      const content = this.pdfiumModule.pdfium.UTF16ToString(textBuffer);
+      const content = this.pdfiumModule.pdfium.UTF16ToString(textBuffer, utf16Length * 2);
       this.memoryManager.free(textBuffer);
 
       const charIndex = this.pdfiumModule.FPDFText_GetCharIndexAtPos(textPagePtr, left, top, 2, 2);
