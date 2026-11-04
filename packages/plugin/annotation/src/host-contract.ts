@@ -251,7 +251,11 @@ export interface AnnotationHostCapability extends AnnotationCapability {
     zoom?: number,
   ): boolean;
   draftContents(ref: AnnotationRef, text: string): void;
-  draftRichText(ref: AnnotationRef, doc: { paragraphs: RichTextParagraph[] }): void;
+  /** Returns the paragraphs it keeps: the text typed at the caret takes a style chosen there. */
+  draftRichText(
+    ref: AnnotationRef,
+    doc: { paragraphs: RichTextParagraph[] },
+  ): { paragraphs: RichTextParagraph[] };
   setTextSelection(ref: AnnotationRef, range: { start: number; end: number } | null): void;
   /**
    * The CSS family list a face is drawn with in a text box (`id`; `null` for

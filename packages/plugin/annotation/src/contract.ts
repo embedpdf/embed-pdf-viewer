@@ -577,10 +577,11 @@ export interface AnnotationSelectionApi {
   list(): readonly Annotation[];
   /**
    * Change the selected annotations: each takes the fields its kind has, and
-   * skips the rest. A function changes each relative to itself. While words
-   * are selected in a text box being typed in, its font, size, colour and
-   * formats change those words. Resolves once the engine wrote every change,
-   * with what it refused in `failed`.
+   * skips the rest. A function changes each relative to itself. A text box's
+   * font, size, colour and formats change all of its text; while words are
+   * selected in a text box being typed in, those words, and at its caret, the
+   * text typed there next. Resolves once the engine wrote every change, with
+   * what it refused in `failed`.
    */
   update(
     changes: AnnotationPatch | ((annotation: Annotation) => AnnotationPatch),
@@ -634,7 +635,11 @@ export interface AnnotationTextApi {
   end(options?: OperationOptions): Promise<void>;
   /** The text box being typed in, or `null`. */
   getEditing(): Annotation | null;
-  /** Bold, italic or underline on or off: for the selected words, or the whole of each selected box. */
+  /**
+   * Bold, italic or underline on or off: for the selected words, the text
+   * typed next at the caret, or all the text of each selected box. On, unless
+   * all of it already has it.
+   */
   toggleFormat(format: TextFormat, options?: OperationOptions): Promise<void>;
 }
 

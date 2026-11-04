@@ -44,7 +44,8 @@ export interface TextBoxEditorItem<Ref> {
 
 /** The annotation plugin's text-editing calls (its host capability satisfies it). */
 export interface TextBoxEditorAnnotation<Ref> {
-  draftRichText(ref: Ref, document: RichTextEditorDocument): void;
+  /** Returns the document it keeps (the text typed at the caret in a style chosen there). */
+  draftRichText(ref: Ref, document: RichTextEditorDocument): RichTextEditorDocument | void;
   setTextSelection(ref: Ref, range: RichTextEditorRange | null): void;
   readonly text: { toggleFormat(format: RichTextEditorCommand): unknown };
   /** The CSS family list a face is drawn with in the box `id` (`null`: no box yet). */
@@ -82,9 +83,7 @@ export function attachTextBoxEditor<Ref>(
   let shownEditing: boolean | null = null;
 
   const host: RichTextEditorHost = {
-    onInput: (document) => {
-      if (item?.ref) annotation.draftRichText(item.ref, document);
-    },
+    onInput: (document) => (item?.ref ? annotation.draftRichText(item.ref, document) : undefined),
     onSelectionChange: (range) => {
       if (item?.ref) annotation.setTextSelection(item.ref, range);
     },

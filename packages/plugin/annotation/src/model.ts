@@ -16,7 +16,7 @@ import type { EditableKinds, Id, Point, Session, SnapSettings } from '@embedpdf/
 import type { PageRotation } from '@embedpdf/core-geometry';
 import type { PageRef } from '@embedpdf/engine-core/runtime';
 
-import type { TextSelection } from './rich-text';
+import type { EditorSelection } from './rich-text';
 
 /** Where the active tool's ghost is: the pointer on a page, and how that page shows there. */
 export interface GhostPointer {
@@ -62,9 +62,10 @@ export interface AnnotationModel {
    * The text editor's selection inside the annotation being edited (flat
    * offsets over its plain text), or null. It is state because the property
    * surface reads it: while a range is held, the text style keys report and
-   * change the runs, not the whole body.
+   * change the runs it covers; at a caret, the text typed there next, with the
+   * style chosen at the caret.
    */
-  readonly textSelection: TextSelection | null;
+  readonly textSelection: EditorSelection | null;
 }
 
 /** The initial state. The session's snapping and editable rule come from the settings (`withSnap`, `withEditable`). */
@@ -161,5 +162,5 @@ export const setPlacing = (
 
 export const setTextSelection = (
   state: AnnotationModel,
-  textSelection: TextSelection | null,
+  textSelection: EditorSelection | null,
 ): AnnotationModel => (state.textSelection === textSelection ? state : { ...state, textSelection });

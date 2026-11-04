@@ -4,9 +4,18 @@
  * hold): the view shows the text at once, and the change keeps its place in
  * line holding the latest text. It is sent after a pause in typing, when
  * editing ends, when anything else is staged, and before a download; what is
- * typed after that goes into a new one.
+ * typed after that goes into a new one. A style chosen at the caret waits in
+ * the editor's selection for the text typed there next.
  */
-import { refOf, type Id, type Message, type Point, richDocOf } from '@embedpdf/core-annotation';
+import {
+  refOf,
+  type Id,
+  type Message,
+  type Point,
+  richDocOf,
+  type RichTextStyleDelta,
+  typeWithStyle,
+} from '@embedpdf/core-annotation';
 import {
   annotationKey,
   type AnnotationRef,
@@ -16,7 +25,7 @@ import {
 
 import { setTextSelection } from '../model';
 import type { ChromeReads } from '../read/chrome';
-import { textCommitPatch, type TextSelection } from '../rich-text';
+import { textCommitPatch, type EditorSelection } from '../rich-text';
 import type { AnnotationContext, AnnotationServices } from '../services';
 import type { Commit, StoreHold, Written } from '../services/store';
 
@@ -69,6 +78,34 @@ export function createTextEditing(
     return commit;
   };
 
+  /**
+   * The style the text typed next at the caret in box `id` takes, over what
+   * was chosen there already. Nothing is written until it is typed.
+   */
+  const styleTyping = (id: Id, style: RichTextStyleDelta): void => {
+    const selection = ctx.state.get().textSelection;
+    if (selection?.id !== id || selection.start !== selection.end) return;
+    ctx.state.update(setTextSelection, { ...selection, typing: { ...selection.typing, ...style } });
+  };
+
+  /**
+   * The paragraphs typed into box `id`, the text typed at the caret in the
+   * style chosen there (`typeWithStyle`), and the caret where the typing
+   * leaves it. Any other edit drops the style.
+   */
+  const typedInStyle = (id: Id, paragraphs: RichTextParagraph[]): RichTextParagraph[] => {
+    const selection = ctx.state.get().textSelection;
+    const record = store.model().byId[id];
+    if (!selection?.typing || selection.id !== id || !record) return paragraphs;
+    const before = richDocOf(record.annotation, fonts);
+    const typed = typeWithStyle(before, { paragraphs }, selection.start, selection.typing);
+    const caret: EditorSelection = typed
+      ? { id, start: typed.caret, end: typed.caret, ...(typed.style && { typing: typed.style }) }
+      : { id, start: selection.start, end: selection.end };
+    ctx.state.update(setTextSelection, caret);
+    return typed?.doc.paragraphs ?? paragraphs;
+  };
+
   // A record's text, as the engine writes it: its plain and rich text.
   store.onEffect('text', (effect, model) => {
     const record = model.byId[effect.id];
@@ -119,12 +156,17 @@ export function createTextEditing(
     },
     draftRichText: (ref: AnnotationRef, doc: { paragraphs: RichTextParagraph[] }) => {
       const id = annotationKey(ref);
-      type(id, { type: 'setRichText', id, doc: { paragraphs: doc.paragraphs } });
+      const kept = { paragraphs: typedInStyle(id, doc.paragraphs) };
+      type(id, { type: 'setRichText', id, doc: kept });
+      return kept;
     },
+    // A selection that moves is a new one: the style chosen at the caret stays only while it doesn't.
     setTextSelection: (ref: AnnotationRef, range: { start: number; end: number } | null) => {
       const id = annotationKey(ref);
       const previous = ctx.state.get().textSelection;
-      const next: TextSelection | null = range ? { id, start: range.start, end: range.end } : null;
+      const next: EditorSelection | null = range
+        ? { id, start: range.start, end: range.end }
+        : null;
       if (
         (previous === null) === (next === null) &&
         (!previous ||
@@ -140,7 +182,7 @@ export function createTextEditing(
     getFamilyOfCss: (cssFamily: string) => textFonts.familyOfCss(cssFamily) ?? cssFamily,
   };
 
-  return { type, sendTyping, text, api };
+  return { type, styleTyping, sendTyping, text, api };
 }
 
 export type TextEditing = ReturnType<typeof createTextEditing>;

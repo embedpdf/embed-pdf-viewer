@@ -338,6 +338,93 @@ describe('which fields a write may change', () => {
   });
 });
 
+describe('a whole text box restyled by hand', () => {
+  /** A box reading "Paid in full", "in full" bold and blue, in a box with a regular body. */
+  const paid = (id: string): ModelAnnotation => {
+    const box = textBox(id);
+    if (box.annotation.subtype !== 'free-text') throw new Error('a free text');
+    const runs = [{ text: 'Paid ' }, { text: 'in full', style: { weight: 700, color: '#0000FF' } }];
+    return withAnnotation(box, {
+      richText: { ...box.annotation.richText, paragraphs: [{ runs }] },
+    } as Partial<ModelAnnotation['annotation']>);
+  };
+  const richTextOf = (record: ModelAnnotation | undefined) =>
+    record?.annotation.subtype === 'free-text' ? record.annotation.richText : undefined;
+
+  it("a format is every word's: a word with its own weight follows the body", () => {
+    const model = modelWith([paid('obj:3')], { selected: ['obj:3'] });
+    const result = update(model, { type: 'setTextFormat', format: 'bold', on: false });
+    expect(richTextOf(result.change.put[0])?.body.weight).toBe(400);
+    expect(richTextOf(result.change.put[0])?.paragraphs).toEqual([
+      { runs: [{ text: 'Paid ' }, { text: 'in full', style: { color: '#0000ff' } }] },
+    ]);
+  });
+
+  it('a format the body has is still a change while a word says otherwise', () => {
+    const box = paid('obj:3');
+    const plain = richTextOf(box)!;
+    const bold = withAnnotation(box, {
+      richText: {
+        body: { ...plain.body, weight: 700 },
+        paragraphs: [{ runs: [{ text: 'Paid ' }, { text: 'in full', style: { weight: 400 } }] }],
+      },
+    } as Partial<ModelAnnotation['annotation']>);
+    const model = modelWith([bold], { selected: ['obj:3'] });
+    // The body is bold, but "in full" names its own regular weight: bold on makes it bold.
+    const bolded = update(model, { type: 'setTextFormat', format: 'bold', on: true });
+    expect(richTextOf(bolded.change.put[0])?.paragraphs).toEqual([
+      { runs: [{ text: 'Paid in full' }] },
+    ]);
+    // Once every word follows the bold body, bold on again is no change.
+    const all = { ...model, byId: { 'obj:3': bolded.change.put[0]! } };
+    expect(update(all, { type: 'setTextFormat', format: 'bold', on: true }).change).toBe(
+      EMPTY_CHANGE,
+    );
+  });
+
+  it('an underline joins the lines a word draws itself', () => {
+    const box = paid('obj:3');
+    const struck = withAnnotation(box, {
+      richText: {
+        ...richTextOf(box)!,
+        paragraphs: [
+          {
+            runs: [{ text: 'Paid ' }, { text: 'in full', style: { decoration: ['line-through'] } }],
+          },
+        ],
+      },
+    } as Partial<ModelAnnotation['annotation']>);
+    const model = modelWith([struck], { selected: ['obj:3'] });
+    const result = update(model, { type: 'setTextFormat', format: 'underline', on: true });
+    expect(richTextOf(result.change.put[0])?.paragraphs).toEqual([
+      {
+        runs: [
+          { text: 'Paid ' },
+          { text: 'in full', style: { decoration: ['line-through', 'underline'] } },
+        ],
+      },
+    ]);
+  });
+
+  it("a font, size or text color is every word's: a word with its own follows the box", () => {
+    const model = modelWith([paid('obj:3')], { selected: ['obj:3'] });
+    const result = update(model, {
+      type: 'setFields',
+      patches: { 'obj:3': { fontColor: '#cc0000' } },
+    });
+    const richText = richTextOf(result.change.put[0])!;
+    expect(richText.body.color.toLowerCase()).toBe('#cc0000');
+    expect(richText.paragraphs).toEqual([
+      { runs: [{ text: 'Paid ' }, { text: 'in full', style: { weight: 700 } }] },
+    ]);
+    // A field that isn't about the text leaves the words alone.
+    const faded = update(model, { type: 'setFields', patches: { 'obj:3': { opacity: 0.5 } } });
+    expect(richTextOf(faded.change.put[0])?.paragraphs).toEqual(
+      richTextOf(paid('obj:3'))?.paragraphs,
+    );
+  });
+});
+
 describe('every record holds its annotation', () => {
   const created = (objectNumbers: readonly number[]) =>
     drawSquare(

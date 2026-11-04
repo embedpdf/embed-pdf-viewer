@@ -6,7 +6,8 @@
  *
  *   • a flat props patch → the run delta it means for a text range (font,
  *     size, colour, bold/italic/underline) and the keys left for the body
- *   • what a range reads back for those keys (agree → the value, else mixed)
+ *   • what a range reads back for those keys (agree → the value, else mixed),
+ *     and a caret: the text typed there next
  *   • faces: the DTO font a face names
  *   • the commit rule: a document nothing overrides on a plain annotation
  *     commits as `contents`; anything else as `richText`
@@ -20,6 +21,7 @@ import {
   richDocOf,
   type RichTextRange,
   type RichTextStyleDelta,
+  styleAt,
 } from '@embedpdf/core-annotation';
 import {
   familyKey,
@@ -36,6 +38,15 @@ export type TextFormat = 'bold' | 'italic' | 'underline';
  *  the plain projection (paragraphs joined by `\r`). */
 export interface TextSelection extends RichTextRange {
   id: string;
+}
+
+/**
+ * The editor's selection as the plugin keeps it: at a caret, with the style
+ * chosen there for the text typed next. A selection that moves is a new one,
+ * without it.
+ */
+export interface EditorSelection extends TextSelection {
+  readonly typing?: RichTextStyleDelta;
 }
 
 /** The face a run or a body names. */
@@ -197,15 +208,42 @@ export function runsInRange(
   return out;
 }
 
-/** The values a range reads back for the range keys — resolved against the
- *  body, one value where every run agrees, `mixed` where they don't. */
+/** What text reads back for the range keys: a value each, and the keys its runs disagree on. */
+export interface TextProps {
+  values: Record<string, unknown>;
+  mixed: string[];
+}
+
+/** The values a range reads back for the range keys: the runs it covers (`runProps`). */
 export function rangeProps(
   doc: RichTextDocument,
   range: RichTextRange,
   fonts?: FontLookup,
-): { values: Record<string, unknown>; mixed: string[] } {
-  const runs = runsInRange(doc, range);
-  const body = doc.body;
+): TextProps {
+  return runProps(doc.body, runsInRange(doc, range), fonts);
+}
+
+/**
+ * The values a caret reads back for the range keys: the text typed there
+ * next, in the style of the text before it (`styleAt`) with the style chosen
+ * at the caret over it.
+ */
+export function caretProps(
+  doc: RichTextDocument,
+  at: number,
+  typing: RichTextStyleDelta | undefined,
+  fonts?: FontLookup,
+): TextProps {
+  return runProps(doc.body, [{ ...styleAt(doc, at), ...typing }], fonts);
+}
+
+/** The values runs read back for the range keys: resolved against the
+ *  body, one value where every run agrees, `mixed` where they don't. */
+function runProps(
+  body: RichTextBody,
+  runs: readonly RichTextStyleDelta[],
+  fonts?: FontLookup,
+): TextProps {
   const resolve = (delta: RichTextStyleDelta): Partial<RichTextRunStyle> => ({
     family: delta.family ?? body.family,
     weight: delta.weight ?? body.weight,

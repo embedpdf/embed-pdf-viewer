@@ -16,6 +16,7 @@ import {
   textOf,
   type FontLookup,
   type Id,
+  type Model,
   type ModelAnnotation,
   type TextStyle,
 } from '@embedpdf/core-annotation';
@@ -67,7 +68,7 @@ export interface TextFonts {
 }
 
 export function createTextFonts(
-  ctx: Pick<AnnotationContext, 'tryGet' | 'clock' | 'notify' | 'state'>,
+  ctx: Pick<AnnotationContext, 'tryGet' | 'clock' | 'notify' | 'state' | 'watch'>,
   store: Pick<AnnotationStore, 'model'>,
   lookup: FontLookup,
 ): TextFonts {
@@ -181,13 +182,11 @@ export function createTextFonts(
 
   /**
    * Drop the answers the model moved on from: a box deleted, or restyled so its faces aren't the
-   * ones asked about, which is asked again (typing keeps the faces, and the answer).
+   * ones asked about, which is asked again (typing keeps the faces, and the answer). The model is
+   * watched, not this plugin's state: a change that shows before the engine answers it, as a
+   * format on a whole box does, changes the view alone.
    */
-  let checked: unknown = null;
-  const dropStaleAnswers = () => {
-    const model = store.model();
-    if (model === checked) return;
-    checked = model;
+  const dropStaleAnswers = (model: Model) => {
     let dropped = false;
     for (const [id, answer] of answers) {
       const record = model.byId[id];
@@ -207,9 +206,10 @@ export function createTextFonts(
     }
   };
 
+  ctx.watch(store.model, dropStaleAnswers);
+
   // Resolve the box someone starts typing in.
   ctx.state.onChange(() => {
-    dropStaleAnswers();
     const next = store.model().editing;
     if (next === editing) return;
     editing = next;
