@@ -10494,8 +10494,8 @@ export class PdfiumNative implements IPdfiumExecutor {
 
   /**
    * The effective page origin in PDF user space: the lower-left corner of the
-   * crop box (which PDFium also uses for the page size). Used to offset
-   * coordinates for PDFs whose MediaBox/CropBox origin is not `(0, 0)`.
+   * intersection of the MediaBox and CropBox. Used to offset coordinates for
+   * PDFs whose MediaBox/CropBox origin is not `(0, 0)`.
    * Returns `(0, 0)` when the page has no box information.
    * @param page - pdf page info
    * @returns the page origin
@@ -10503,11 +10503,14 @@ export class PdfiumNative implements IPdfiumExecutor {
    * @private
    */
   private getPageOrigin(page: PdfPageObject): Position {
-    const crop = page.boxes?.crop;
-    if (!crop) {
+    const boxes = page.boxes;
+    if (!boxes) {
       return { x: 0, y: 0 };
     }
-    return { x: crop.left, y: crop.bottom };
+    return {
+      x: Math.max(boxes.media.left, boxes.crop.left),
+      y: Math.max(boxes.media.bottom, boxes.crop.bottom),
+    };
   }
 
   /**
