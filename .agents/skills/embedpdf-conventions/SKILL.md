@@ -29,6 +29,7 @@ do not load unrelated ones.
 | changes supervised engine processes, credential exposure, crash recovery or threat boundaries                   | [engine-host-isolation.md](../../../docs/conventions/engine-host-isolation.md)                                 |
 | adds or changes a CloudPDF server adapter family                                                                | [server-adapters.md](../../../docs/conventions/server-adapters.md)                                             |
 | adds a database migration or touches rollback                                                                   | [server-migrations.md](../../../docs/conventions/server-migrations.md)                                         |
+| changes a wire response, a cached `@token` URL, `/head`, the manifest or a version header                       | [api-evolution.md](../../../docs/conventions/api-evolution.md)                                                 |
 | changes documentation structure or per-framework rendering                                                      | [docs-architecture.md](../../../docs/conventions/docs-architecture.md)                                         |
 
 Package build and export rules remain in

@@ -77,6 +77,7 @@ verbs that do work, and events. A plugin talks to the engine only through
 | [`engine-host-isolation.md`](./engine-host-isolation.md) | Running engines in supervised child processes, and the threat model                                                                      |
 | [`server-adapters.md`](./server-adapters.md)             | The CloudPDF server's adapter families: secrets, KMS, storage, CDN, import                                                               |
 | [`server-migrations.md`](./server-migrations.md)         | Forward and rollback database migrations for the CloudPDF server                                                                         |
+| [`api-evolution.md`](./api-evolution.md)                 | Changing the HTTP API within a major: additive changes, tolerant clients, version headers, and what every cached URL names               |
 | [`docs-architecture.md`](./docs-architecture.md)         | How the documentation site renders one source per framework                                                                              |
 
 Package build and export rules are in
