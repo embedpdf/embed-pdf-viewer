@@ -16,6 +16,7 @@ import { DOCS_SITE } from './src/docs-site';
 import { docsRedirects } from '../docs/content/redirects.mjs';
 import { rehypeCodeExample } from './src/lib/rehype-code-example';
 import { remarkCodeExample } from './src/lib/remark-code-example';
+import { v2Redirects } from './src/lib/v2-redirects';
 
 // Nextra 4 emits the Tabs import from `nextra/components` for npm2yarn blocks
 // regardless of the plugin's `packageName` option, so rewrite the import
@@ -96,9 +97,10 @@ const withNextra = nextra({
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-  // The docs pages that moved (docs/content/redirects.mjs).
+  // The docs pages that moved (docs/content/redirects.mjs), and the 2.x site's URLs
+  // (src/lib/v2-redirects.ts).
   async redirects() {
-    return docsRedirects(DOCS_SITE.engine);
+    return [...docsRedirects(DOCS_SITE.engine), ...v2Redirects()];
   },
   // The docs kit ships raw TypeScript source (workspace package).
   transpilePackages: ['@embedpdf/docs-kit'],
