@@ -15,17 +15,20 @@ export const OPACITY: AnnotationProperty = {
   max: 1,
   step: 0.05,
 };
+/** A shape's or a line's stroke: none keeps the fill and the stroke width. */
 export const STROKE: AnnotationProperty = {
   key: 'color',
   control: 'color',
   label: 'Stroke',
   labelKey: 'annotation.style.stroke',
+  allowsNone: true,
 };
 export const FILL: AnnotationProperty = {
   key: 'interiorColor',
   control: 'color',
   label: 'Fill',
   labelKey: 'annotation.style.fill',
+  allowsNone: true,
 };
 export const COLOR: AnnotationProperty = {
   key: 'color',

@@ -17,6 +17,7 @@ import type { DescribeFont } from '../fontFaces';
 import type { Annotation, AnnotationPatch } from '../kinds';
 import { fieldTheKindCannotHold, siblingKindsOf } from '../siblings';
 import type { AnnotationSubtype } from '../subtype';
+import { dashPatchFollows } from './dash';
 import { calloutEndFollows, freeTextFollows } from './freeText';
 import { measurementFollows } from './measurement';
 import { pdfResolveRectCommand } from './rectCommand';
@@ -133,6 +134,8 @@ export function pdfPrepareAnnotationPatch(
  * file's coordinates:
  *
  * - a note's standard review state brings its state model;
+ * - a border made dashed with its pattern left out, on a border that has
+ *   none, states the default pattern, `[3, 3]`;
  * - a free text's `contents` and rich text follow each other, and its font,
  *   size, text color and alignment move its rich body;
  * - a callout's line stays attached to its box when the box moves or turns;
@@ -147,7 +150,7 @@ export function pdfDeriveAnnotationPatch(
   prepared: AnnotationPatch<PdfCoordinates>,
   options: ResolveOptions = {},
 ): AnnotationPatch<PdfCoordinates> {
-  const resolved = noteStateFollows(current, prepared);
+  const resolved = dashPatchFollows(current, noteStateFollows(current, prepared));
   assertRichTextAgreement(resolved);
   const text = calloutEndFollows(current, freeTextFollows(current, resolved, options.describeFont));
   return measurementFollows(current, text);

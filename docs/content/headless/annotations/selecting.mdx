@@ -90,7 +90,7 @@ shows both:
 
 | `property.control` | What to show                                                                                                | Also on the property |
 | :-------------- | :------------------------------------------------------------------------------------------------------------- | :------------------- |
-| `'color'`       | A color picker. `null` means no color.                                                                         |                      |
+| `'color'`       | A color picker, and a "none" choice that writes `null` when `allowsNone` is `true`: no line around a shape, no fill. | `allowsNone`         |
 | `'number'`      | A slider or a number input.                                                                                    | `min`, `max`, `step` |
 | `'choice'`      | A list, such as fonts or line endings. Each option is `{ value, label, labelKey }`: write `value`, show `label`. | `options`            |
 | `'flag'`        | An on/off switch, such as `locked` or `print`.                                                                 |                      |

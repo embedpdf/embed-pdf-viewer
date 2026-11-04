@@ -301,4 +301,54 @@ describe('a callout line follows its box', () => {
     const untouched = applyAnnotationPatch(callout, { opacity: 0.5 });
     expect(lineOf(untouched)).toBe(lineOf(callout));
   });
+
+  test('a border made dashed with its pattern left out states the default; null is none', () => {
+    expect(applyAnnotationPatch(square, { borderStyle: 'dashed' })).toMatchObject({
+      borderStyle: 'dashed',
+      dashArray: [3, 3],
+    });
+    const patterned = {
+      ...square,
+      borderStyle: 'dashed',
+      dashArray: [6, 2],
+    } as unknown as Annotation;
+    expect(applyAnnotationPatch(patterned, { dashArray: null })).toMatchObject({
+      dashArray: null,
+    });
+    // On a border with no pattern, null changes nothing: the patch makes it
+    // dashed, as one that leaves the pattern out does.
+    expect(applyAnnotationPatch(square, { borderStyle: 'dashed', dashArray: null })).toMatchObject({
+      borderStyle: 'dashed',
+      dashArray: [3, 3],
+    });
+    // A pattern stored on a solid border is kept and draws once it is dashed.
+    const kept = { ...square, dashArray: [6, 2] } as unknown as Annotation;
+    expect(applyAnnotationPatch(kept, { borderStyle: 'dashed' })).toMatchObject({
+      dashArray: [6, 2],
+    });
+    // Back to solid, or another app's dashed border without /D left alone: nothing stated.
+    expect(resolveAnnotationPatch(patterned, { borderStyle: 'solid' })).toEqual({
+      subtype: 'square',
+      borderStyle: 'solid',
+    });
+    const foreign = { ...square, borderStyle: 'dashed' } as unknown as Annotation;
+    expect(resolveAnnotationPatch(foreign, { color: '#00ff00' })).toEqual({
+      subtype: 'square',
+      color: '#00ff00',
+    });
+  });
+
+  test('an empty dash pattern is refused: a solid line is borderStyle solid', () => {
+    const page = { left: 0, bottom: 0, right: 600, top: 800 };
+    expect(() =>
+      pdfResolveAnnotationPatch(
+        pdfAnnotationOf(square, page, () => page),
+        pdfAnnotationPatchOf(
+          { subtype: 'square', borderStyle: 'dashed', dashArray: [] } as AnnotationPatch,
+          page,
+          () => page,
+        ),
+      ),
+    ).toThrow(expect.objectContaining({ code: 'InvalidArg', details: { field: 'dashArray' } }));
+  });
 });

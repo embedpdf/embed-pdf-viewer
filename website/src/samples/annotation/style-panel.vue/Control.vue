@@ -53,12 +53,7 @@ function setLink(event: Event) {
       :value="typeof value === 'string' ? value : '#ffffff'"
       @input="update(valueOf($event))"
     />
-    <button
-      v-if="property.key === 'interiorColor'"
-      type="button"
-      class="link"
-      @click="update(null)"
-    >
+    <button v-if="property.allowsNone" type="button" class="link" @click="update(null)">
       {{ value === null ? 'none' : 'remove' }}
     </button>
   </span>

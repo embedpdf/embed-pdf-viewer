@@ -60,6 +60,8 @@ export type AnnotationProperty =
       readonly control: 'color';
       readonly label: string;
       readonly labelKey: string;
+      /** A panel offers none, which writes `null`: no stroke, no fill, no border. */
+      readonly allowsNone?: boolean;
     }
   | {
       readonly key: 'opacity' | 'strokeWidth' | 'fontSize';

@@ -31,6 +31,8 @@ export interface ScenePaint {
   lineCap?: 'round';
   join?: 'round';
   fillRule?: 'evenodd';
+  /** One pixel wide at any zoom, whatever `width` says. */
+  hairline?: true;
 }
 
 interface SceneBox {
@@ -152,13 +154,17 @@ function paintAttributes(
   const attributes: Record<string, string | number> = {
     fill: nodePaint.fill ?? 'none',
     stroke: nodePaint.stroke ?? 'none',
-    // Unset joins are sharp miters; round joins and caps are only for ink.
+    // Unset joins are sharp miters; round joins are for clouds and icons.
     'stroke-linejoin': nodePaint.join ?? 'miter',
     'stroke-miterlimit': miterLimit,
   };
   // Even-odd punches the holes of an icon; unset is SVG's nonzero.
   if (nodePaint.fillRule !== undefined) attributes['fill-rule'] = nodePaint.fillRule;
   if (nodePaint.width !== undefined) attributes['stroke-width'] = nodePaint.width;
+  if (nodePaint.hairline) {
+    attributes['stroke-width'] = 1;
+    attributes['vector-effect'] = 'non-scaling-stroke';
+  }
   if (nodePaint.opacity !== undefined) attributes.opacity = nodePaint.opacity;
   if (nodePaint.lineCap !== undefined) attributes['stroke-linecap'] = nodePaint.lineCap;
   if (nodePaint.dash) attributes['stroke-dasharray'] = nodePaint.dash.join(' ');

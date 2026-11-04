@@ -515,7 +515,7 @@ export namespace AnnotationDraft {
         modifiedBy?: unknown | undefined;
         importedBy?: unknown | undefined;
         actions?: unknown | undefined;
-        color?: string | undefined;
+        color?: (string | null) | undefined;
         opacity?: number | undefined;
         strokeWidth?: number | undefined;
         borderStyle?: AnnotationDraftCircle.BorderStyle | undefined;
@@ -614,7 +614,7 @@ export namespace AnnotationDraft {
         modifiedBy?: unknown | undefined;
         importedBy?: unknown | undefined;
         actions?: unknown | undefined;
-        color?: string | undefined;
+        color?: (string | null) | undefined;
         opacity?: number | undefined;
         strokeWidth?: number | undefined;
         borderStyle?: AnnotationDraftSquare.BorderStyle | undefined;
@@ -713,7 +713,7 @@ export namespace AnnotationDraft {
         modifiedBy?: unknown | undefined;
         importedBy?: unknown | undefined;
         actions?: unknown | undefined;
-        color?: string | undefined;
+        color?: (string | null) | undefined;
         opacity?: number | undefined;
         strokeWidth?: number | undefined;
         borderStyle?: AnnotationDraftPolygon.BorderStyle | undefined;
@@ -828,7 +828,7 @@ export namespace AnnotationDraft {
         modifiedBy?: unknown | undefined;
         importedBy?: unknown | undefined;
         actions?: unknown | undefined;
-        color?: string | undefined;
+        color?: (string | null) | undefined;
         opacity?: number | undefined;
         strokeWidth?: number | undefined;
         borderStyle?: AnnotationDraftPolyline.BorderStyle | undefined;
@@ -976,7 +976,7 @@ export namespace AnnotationDraft {
         modifiedBy?: unknown | undefined;
         importedBy?: unknown | undefined;
         actions?: unknown | undefined;
-        color?: string | undefined;
+        color?: (string | null) | undefined;
         opacity?: number | undefined;
         strokeWidth?: number | undefined;
         borderStyle?: AnnotationDraftLine.BorderStyle | undefined;
@@ -1225,7 +1225,7 @@ export namespace AnnotationDraft {
         modifiedBy?: unknown | undefined;
         importedBy?: unknown | undefined;
         actions?: unknown | undefined;
-        color?: string | undefined;
+        color?: (string | null) | undefined;
         opacity?: number | undefined;
         strokeWidth?: number | undefined;
         borderStyle?: AnnotationDraftInk.BorderStyle | undefined;

@@ -58,6 +58,13 @@ export const WidgetCheckStyleSchema: z.ZodType<WidgetCheckStyle> = z.enum([
 /** What a write takes for a border that isn't a widget's. */
 export const DrawnBorderStyleSchema: z.ZodType<DrawnBorderStyle> = z.enum(['solid', 'dashed']);
 
+/**
+ * A dash pattern a write sets: lengths of line, then gap, at least one. An
+ * empty pattern draws a solid line (ISO 32000 8.4.3.6), which is
+ * `borderStyle: 'solid'`, so a write refuses it; a read never returns one.
+ */
+export const DashArrayWriteSchema: z.ZodType<number[]> = z.array(z.number().nonnegative()).min(1);
+
 export const LineEndingSchema: z.ZodType<LineEnding> = z.enum([
   'none',
   'square',
