@@ -262,9 +262,9 @@ describe('update', () => {
   it('typing puts the edited record and asks for a text write', () => {
     const box = textBox('obj:3');
     const result = update(modelWith([box]), { type: 'setText', id: 'obj:3', text: 'Hi\nthere' });
-    // As the engine reads it back: one paragraph per line, joined by `\r`.
+    // As the engine reads it back: one paragraph per line, joined by `\n`.
     expect(result.change.put[0]!.annotation).toMatchObject({
-      contents: 'Hi\rthere',
+      contents: 'Hi\nthere',
       richText: { paragraphs: [{ runs: [{ text: 'Hi' }] }, { runs: [{ text: 'there' }] }] },
     });
     expect(result.change.put[0]!.source).toBe('vector');

@@ -133,8 +133,10 @@ export interface SearchOptions extends OperationOptions {
 
 export interface SearchFindAllOptions extends OperationOptions {
   /**
-   * Pin whether hits carry snippets. By default they do, falling back to none
-   * when snippets are denied; pass `false` when only geometry is needed.
+   * Pin whether hits carry snippets. By default they do when the session may
+   * copy text (`doc.text.copy`) and don't otherwise. `true` requires them:
+   * without `doc.text.copy`, `findAll` refuses. Pass `false` when only
+   * geometry is needed.
    */
   readonly snippets?: boolean;
 }
@@ -251,7 +253,8 @@ export interface SearchCapability extends SettingsApi<SearchSettings> {
    * Run a query to completion and return every hit, touching no session
    * state. Scans in natural page order; concurrent calls are independent.
    * Rejects `operation-cancelled` when `options.signal` aborts, and
-   * `permission-denied` without `doc.text.search`.
+   * `permission-denied` without `doc.text.search`, or without `doc.text.copy`
+   * when `options.snippets` is `true`.
    */
   findAll(query: SearchQuery, options?: SearchFindAllOptions): Promise<readonly SearchHit[]>;
 

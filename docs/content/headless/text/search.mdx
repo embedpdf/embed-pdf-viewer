@@ -207,7 +207,8 @@ Set them when you register the plugin, and change them while the app runs with
 | `doc.text.copy`   | The words around each match (`snippet`)               | `search.canSearch({ snippets: true })` |
 
 Without `doc.text.copy`, search still finds and highlights every match, but a match has no
-snippet.
+snippet. `findAll(query, { snippets: true })` asks for snippets outright, so without it that call
+is refused.
 
 ## Good to know
 

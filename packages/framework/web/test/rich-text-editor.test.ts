@@ -23,7 +23,7 @@ function projection(node: EditorNode): string {
   const doc = serializeRichText(node, 1);
   return doc.paragraphs
     .map((paragraph) => paragraph.runs.map((run) => run.text).join(''))
-    .join('\r');
+    .join('\n');
 }
 
 // ---- Render + serialise -------------------------------------------------------
@@ -42,7 +42,7 @@ describe('renderRichText', () => {
               { text: 'bold', style: { weight: 700, color: '#FF0000', size: 14 } },
             ],
           },
-          { runs: [{ text: 'a\rb' }] },
+          { runs: [{ text: 'a\nb' }] },
           { runs: [{ text: '' }] },
         ],
       },
@@ -104,7 +104,7 @@ describe('serializeRichText', () => {
             { text: ' sub', style: { script: 'sub' } },
           ],
         },
-        { dir: 'rtl', runs: [{ text: 'line\rbreak', style: { family: 'Helvetica' } }] },
+        { dir: 'rtl', runs: [{ text: 'line\nbreak', style: { family: 'Helvetica' } }] },
         { runs: [{ text: '' }] },
       ],
     };
@@ -180,6 +180,11 @@ describe('serializeRichText', () => {
     });
   });
 
+  it('reads a line break in a text node, however spelled, as a hard break', () => {
+    const el = root(elementTree('div', {}, 'a\r\nb\rc\nd'));
+    expect(serializeRichText(el, 1)).toEqual({ paragraphs: [{ runs: [{ text: 'a\nb\nc\nd' }] }] });
+  });
+
   it('understands what a browser produces while editing', () => {
     // Chrome: Enter makes a new <div> (with a placeholder <br> when empty),
     // Shift+Enter inserts <br>, a styled new line wraps the placeholder in a
@@ -201,7 +206,7 @@ describe('serializeRichText', () => {
       paragraphs: [
         { runs: [{ text: 'first' }] },
         { runs: [{ text: '' }] },
-        { runs: [{ text: 'a\rb\r' }] },
+        { runs: [{ text: 'a\nb\n' }] },
         {
           runs: [
             { text: 'strong', style: { weight: 700 } },
@@ -270,7 +275,7 @@ describe('offsets', () => {
   const doc: RichTextEditorDocument = {
     paragraphs: [
       { runs: [{ text: 'ab' }, { text: 'cd', style: { weight: 700 } }] },
-      { runs: [{ text: 'e\rf' }] },
+      { runs: [{ text: 'e\nf' }] },
       { runs: [{ text: '' }] },
     ],
   };
@@ -284,7 +289,7 @@ describe('offsets', () => {
   const fText = p2!.childNodes[2]!;
 
   it('counts like the plain projection', () => {
-    expect(projection(element)).toBe('abcd\re\rf\r');
+    expect(projection(element)).toBe('abcd\ne\nf\n');
     expect(offsetOfPosition(element, { node: ab, offset: 0 })).toBe(0);
     expect(offsetOfPosition(element, { node: ab, offset: 2 })).toBe(2);
     expect(offsetOfPosition(element, { node: cd, offset: 0 })).toBe(2);
@@ -316,7 +321,7 @@ describe('offsets', () => {
 
   it('places the caret after a trailing hard break', () => {
     const el2 = root();
-    renderRichText(el2, { paragraphs: [{ runs: [{ text: 'a\r' }] }] }, { scale: 1, cssFontFamily });
+    renderRichText(el2, { paragraphs: [{ runs: [{ text: 'a\n' }] }] }, { scale: 1, cssFontFamily });
     const block = el2.childNodes[0]!;
     expect(block.childNodes.map((node) => node.nodeName)).toEqual(['#text', 'BR', 'BR']);
     expect(positionOfOffset(el2, 2)).toEqual({ node: block, offset: 2 });
@@ -325,7 +330,7 @@ describe('offsets', () => {
     const el3 = root();
     renderRichText(
       el3,
-      { paragraphs: [{ runs: [{ text: 'a\rb\r', style: { weight: 700 } }] }] },
+      { paragraphs: [{ runs: [{ text: 'a\nb\n', style: { weight: 700 } }] }] },
       { scale: 1, cssFontFamily },
     );
     const b3 = el3.childNodes[0]!;
@@ -337,7 +342,7 @@ describe('offsets', () => {
       'BR',
     ]);
     expect(serializeRichText(el3, 1)).toEqual({
-      paragraphs: [{ runs: [{ text: 'a\rb\r', style: { weight: 700 } }] }],
+      paragraphs: [{ runs: [{ text: 'a\nb\n', style: { weight: 700 } }] }],
     });
     expect(positionOfOffset(el3, 4)).toEqual({ node: b3.childNodes[0], offset: 4 });
   });

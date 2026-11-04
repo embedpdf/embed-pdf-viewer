@@ -86,7 +86,7 @@ await page.annotations.create({
 });
 ```
 
-The annotation reads back with `contents: 'Is this total right?\rIt looks low.'`, the same text
+The annotation reads back with `contents: 'Is this total right?\nIt looks low.'`, the same text
 without the formatting, so code that only reads `contents` still gets the comment. A plain comment
 reads `richText: null`.
 

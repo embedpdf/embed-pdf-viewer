@@ -7,6 +7,7 @@ import {
   type RichTextDocumentInput,
   type RichTextParagraph,
   type RichTextRunStyle,
+  toLineBreaks,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
@@ -18,7 +19,9 @@ import { readUtf8String } from '../../../runtime/memory/strings';
  * `diagnostics`, so reading is a parse and writing is a stringify — except
  * for faces. The DTO names a face the way the host does (a registered
  * font's `key`, a standard font's kebab name); the engine names it the way
- * a PDF does (family, weight, italic). Both directions map here.
+ * a PDF does (family, weight, italic). Both directions map here, and so do
+ * hard line breaks: `\n` in the DTO, `\r` in the engine's JSON, as a PDF
+ * spells them.
  */
 
 /** How a write's font names become what the engine draws with. */
@@ -62,7 +65,11 @@ export function engineRichTextJson(
   if (body && fonts.bodyProgram !== undefined) body.program = fonts.bodyProgram;
   const paragraphs = input.paragraphs.map((p) => ({
     ...p,
-    runs: p.runs.map((r) => (r.style ? { ...r, style: withEngineFace(r.style, fonts) } : r)),
+    runs: p.runs.map((r) => ({
+      ...r,
+      text: toLineBreaks(r.text, '\r'),
+      ...(r.style ? { style: withEngineFace(r.style, fonts) } : {}),
+    })),
   }));
   return JSON.stringify(body ? { body, paragraphs } : { paragraphs });
 }
@@ -102,10 +109,11 @@ function parsedEngineRichText(
     return {
       ...(props as Partial<RichTextParagraph>),
       runs: (runs ?? []).map((r) => {
-        const run = r as { style?: Record<string, unknown> };
+        const run = r as { text?: unknown; style?: Record<string, unknown> };
+        const text = typeof run.text === 'string' ? toLineBreaks(run.text, '\n') : run.text;
         return (run.style
-          ? { ...run, style: withLowercaseColor(run.style) }
-          : run) as unknown as RichTextParagraph['runs'][number];
+          ? { ...run, text, style: withLowercaseColor(run.style) }
+          : { ...run, text }) as unknown as RichTextParagraph['runs'][number];
       }),
     } as RichTextParagraph;
   });

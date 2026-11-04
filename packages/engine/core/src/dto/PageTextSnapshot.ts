@@ -4,8 +4,9 @@ import type { CharMapAnchor } from '../text/charmap';
  * Per-page text snapshot returned by `PageHandle.text.get()` and over
  * the wire as the `GET …/text/pages/:pon/data@<contentVersion>` body.
  *
- * `text` is the full extracted page text in display order, UTF-16 faithful
- * (supplementary-plane characters are surrogate pairs, never dropped).
+ * `text` is the full page text in display order, UTF-16 faithful
+ * (supplementary-plane characters are surrogate pairs, never dropped), with
+ * lines ending in `\n` (see `toPageText` in `text/charmap.ts`).
  *
  * `charCount` is the size of the page's character space — PDFium's internal
  * character list, the same space geometry runs tile

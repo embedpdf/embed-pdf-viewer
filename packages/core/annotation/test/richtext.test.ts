@@ -31,7 +31,7 @@ const doc = () => ({
 describe('rich text algebra', () => {
   it('measures the plain projection with the paragraph separator', () => {
     expect(richTextLength(doc())).toBe('Hello bold world'.length + 1 + 'second'.length);
-    expect(plainTextOf(doc())).toBe('Hello bold world\rsecond');
+    expect(plainTextOf(doc())).toBe('Hello bold world\nsecond');
   });
 
   it('locates offsets, giving the separator to the earlier paragraph', () => {
@@ -241,7 +241,7 @@ describe('a free text’s document', () => {
     });
     const annotation = {
       subtype: 'free-text',
-      contents: 'a\rb',
+      contents: 'a\nb',
       ...text,
     } as unknown as Annotation;
     const doc = richDocOf(annotation);

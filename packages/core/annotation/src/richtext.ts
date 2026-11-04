@@ -6,9 +6,9 @@
  * maps DOM selections to these offsets and renders the result; the plugin
  * applies these functions and commits.
  *
- * Offsets are positions in the plain projection: paragraphs joined by `\r`,
- * runs concatenated. Every character counts one, including the `\r` a run
- * carries as a hard break and the `\r` that separates two paragraphs.
+ * Offsets are positions in the plain projection: paragraphs joined by `\n`,
+ * runs concatenated. Every character counts one, including the `\n` a run
+ * carries as a hard break and the `\n` that separates two paragraphs.
  */
 import {
   faceForFontName,
@@ -258,7 +258,7 @@ export function typeWithStyle<T extends { paragraphs: RichTextParagraph[] }>(
   const inserted = insertedAt(before, after, at);
   if (inserted === null) return null;
   const caret = at + inserted.length;
-  if (/^\r+$/.test(inserted)) return { doc: after, caret, style };
+  if (/^\n+$/.test(inserted)) return { doc: after, caret, style };
   return { doc: applyStyleToRange(after, { start: at, end: caret }, style), caret };
 }
 
@@ -336,11 +336,11 @@ export function paragraphsFromPlainText(text: string): RichTextParagraph[] {
   return text.split(/\r\n|\r|\n/).map((line) => ({ runs: [{ text: line }] }));
 }
 
-/** The plain projection: paragraphs joined by `\r`, runs concatenated. */
+/** The plain projection: paragraphs joined by `\n`, runs concatenated. */
 export function plainTextOf(doc: { paragraphs: readonly RichTextParagraph[] }): string {
   return doc.paragraphs
     .map((paragraph) => paragraph.runs.map((run) => run.text).join(''))
-    .join('\r');
+    .join('\n');
 }
 
 /** True when nothing in the document overrides the body: no run delta, no

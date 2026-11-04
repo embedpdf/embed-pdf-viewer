@@ -6,11 +6,9 @@ import {
 import { EngineError } from '../../errors/EngineError';
 import { EngineErrorCode } from '../../errors/EngineErrorCode';
 import type { PdfCoordinates } from '../../pageSpace/coordinates';
+import { toLineBreaks } from '../../text/lineBreaks';
 import { ANNOTATION_FIELD_NAMES } from '../field-names';
 import type { Annotation, AnnotationDraft, AnnotationPatch } from '../kinds';
-
-/** Text with every line break spelled `\r`: `/Contents` spells them as its writer did. */
-const withBreaks = (text: string): string => text.replace(/\r\n|\r|\n/g, '\r');
 
 /**
  * A draft or patch that carries both `contents` and `richText` must agree:
@@ -25,7 +23,7 @@ export function assertRichTextAgreement(input: {
 }): void {
   if (input.richText === undefined || input.richText === null) return;
   if (input.contents === undefined || input.contents === null) return;
-  if (withBreaks(input.contents) !== withBreaks(richTextPlainText(input.richText))) {
+  if (toLineBreaks(input.contents, '\n') !== richTextPlainText(input.richText)) {
     throw new EngineError(
       EngineErrorCode.InvalidArg,
       `${input.subtype ?? 'annotation'}: \`contents\` must equal the plain projection of \`richText\` when both are given`,
