@@ -22,7 +22,7 @@
     "format": "prettier --write \"**/*.{ts,tsx,js,mjs,jsx,json,css,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,jsx,json,css,md}\"",
     "changeset": "changeset",
-    "ci:publish": "pnpm publish -r --access public --publish-branch v2 --report-summary"
+    "ci:publish": "pnpm publish -r --access public --tag v2-latest --publish-branch v2 --report-summary"
   },
   "devDependencies": {
     "@changesets/cli": "^2.29.6",
