@@ -86,6 +86,57 @@ export async function assertServerFonts(
   );
 }
 
+/**
+ * Reads the answer to a pinned request (`…@token`). It goes out `immutable`,
+ * and every cache that keeps it serves it for a year, so it must be exactly
+ * the state its pins name. Every pinned read goes through here:
+ *
+ * - `assertCurrent` runs before the read and again after it, so a write that
+ *   committed meanwhile refuses the pins;
+ * - a read that a layer write began during is refused too, since the layer's
+ *   session may have shown that write before it committed. A write already
+ *   in flight when the read starts is no reason: the read waits for it
+ *   before it runs (`DocumentService.ensureLayerOnPool`).
+ *
+ * A refusal is "no longer current" with `no-store`; the client reads its
+ * manifest again.
+ */
+export async function readAtPins<T>(input: {
+  documentService: { layerWriteMark(docId: string, layerName: string): number };
+  reply: { header(name: 'Cache-Control', value: string): unknown };
+  docId: string;
+  /** The layer whose session answers; `undefined` for the base, which no write changes in place. */
+  layerName: string | undefined;
+  /** Throws `NotFound` when a pin is no longer current. */
+  assertCurrent: () => unknown;
+  read: () => Promise<T>;
+  /**
+   * Whether the answer goes out under the pins. An unpinned read (`no-store`)
+   * runs `assertCurrent` once and is never refused for a write. Defaults to
+   * `true`.
+   */
+  pinned?: boolean;
+}): Promise<T> {
+  const { documentService, docId, layerName } = input;
+  try {
+    await input.assertCurrent();
+    if (input.pinned === false) return await input.read();
+    const mark = layerName === undefined ? 0 : documentService.layerWriteMark(docId, layerName);
+    const body = await input.read();
+    if (layerName !== undefined && documentService.layerWriteMark(docId, layerName) !== mark) {
+      throw new EngineError(
+        EngineErrorCode.NotFound,
+        `layer ${layerName} of document ${docId} was written during this read; its pins are no longer current`,
+      );
+    }
+    await input.assertCurrent();
+    return body;
+  } catch (err) {
+    if (EngineError.is(err, EngineErrorCode.NotFound)) setNoStore(input.reply);
+    throw err;
+  }
+}
+
 /** `429` with `Retry-After`: the caller is over a request budget for `retryAfterMs` more. */
 export function tooManyRequests(reply: FastifyReply, retryAfterMs: number): FastifyReply {
   return reply

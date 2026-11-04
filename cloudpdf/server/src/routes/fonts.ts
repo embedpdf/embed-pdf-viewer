@@ -25,6 +25,7 @@ import {
   abortSignalOf,
   parseOrInvalidArg,
   parseTokenOrInvalidArg,
+  readAtPins,
   setImmutableCache,
   setNoStore,
 } from './_helpers';
@@ -62,8 +63,14 @@ export async function registerFontRoutes(app: FastifyInstance, deps: FontRouteDe
       'forms',
     ]);
     const requested = parseTokenOrInvalidArg(decodeFontsToken, token, 'fonts token');
-    assertCurrent(requested, await service.getManifest(ctx, docId), reply);
-    const list = await fontListIn(service, ctx, docId, undefined, abortSignalOf(reply));
+    const list = await readAtPins({
+      documentService: service,
+      reply,
+      docId,
+      layerName: undefined,
+      assertCurrent: async () => assertCurrent(requested, await service.getManifest(ctx, docId)),
+      read: () => fontListIn(service, ctx, docId, undefined, abortSignalOf(reply)),
+    });
     setImmutableCache(reply);
     return list;
   });
@@ -76,8 +83,15 @@ export async function registerFontRoutes(app: FastifyInstance, deps: FontRouteDe
     };
     const ctx = await layerRead(req, service, docId, layerName, 'layer-fonts');
     const requested = parseTokenOrInvalidArg(decodeFontsToken, token, 'fonts token');
-    assertCurrent(requested, await service.getLayerManifest(ctx, docId, layerName), reply);
-    const list = await fontListIn(service, ctx, docId, layerName, abortSignalOf(reply));
+    const list = await readAtPins({
+      documentService: service,
+      reply,
+      docId,
+      layerName,
+      assertCurrent: async () =>
+        assertCurrent(requested, await service.getLayerManifest(ctx, docId, layerName)),
+      read: () => fontListIn(service, ctx, docId, layerName, abortSignalOf(reply)),
+    });
     setImmutableCache(reply);
     return list;
   });
@@ -276,18 +290,13 @@ function sendProgram(reply: FastifyReply, bytes: Uint8Array): FastifyReply {
 }
 
 /** A pinned list answers only at the manifest's pins and this server's fonts; any other is a 404. */
-function assertCurrent(
-  requested: FontsToken,
-  manifest: DocumentManifest,
-  reply: Parameters<typeof setNoStore>[0],
-): void {
+function assertCurrent(requested: FontsToken, manifest: DocumentManifest): void {
   if (
     requested.fontsVersion === manifest.fontsVersion &&
     requested.serverFonts === manifest.serverFonts
   ) {
     return;
   }
-  setNoStore(reply);
   throw new EngineError(
     EngineErrorCode.NotFound,
     `fonts ${requested.fontsVersion}/${requested.serverFonts} no longer current ` +

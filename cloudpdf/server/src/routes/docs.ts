@@ -7,6 +7,7 @@ import {
   DEFAULT_PDF_SAVE_MODE,
   EngineError,
   EngineErrorCode,
+  type DocumentManifest,
   type PdfSaveMode,
 } from '@embedpdf/engine-core/runtime';
 import {
@@ -25,7 +26,13 @@ import {
 } from '../app/jwt-plugin';
 import type { SignDevTokenInput } from '../auth/JwtVerifier';
 import type { DocumentService, OpenContext, PdfDownload } from '../services/DocumentService';
-import { abortSignalOf, parseTokenOrInvalidArg, setImmutableCache, setNoStore } from './_helpers';
+import {
+  abortSignalOf,
+  parseTokenOrInvalidArg,
+  readAtPins,
+  setImmutableCache,
+  setNoStore,
+} from './_helpers';
 import { requireSharedDocRead } from './_planeGuard';
 
 export interface DocsRouteDeps {
@@ -59,6 +66,36 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
     docId: string,
     layerName: string,
   ) => service.getEffectivePdfBits(accessCtx, docId, layerName);
+  /** Reads at one of the manifest's counters (see `readAtPins`). */
+  const atVersion = <T>(input: {
+    reply: FastifyReply;
+    ctx: OpenContext;
+    docId: string;
+    layerName: string | undefined;
+    label: string;
+    requested: number;
+    current: (manifest: DocumentManifest) => number;
+    read: () => Promise<T>;
+  }): Promise<T> =>
+    readAtPins({
+      documentService: service,
+      reply: input.reply,
+      docId: input.docId,
+      layerName: input.layerName,
+      assertCurrent: async () => {
+        const manifest =
+          input.layerName === undefined
+            ? await service.getManifest(input.ctx, input.docId)
+            : await service.getLayerManifest(input.ctx, input.docId, input.layerName);
+        const current = input.current(manifest);
+        if (input.requested === current) return;
+        throw new EngineError(
+          EngineErrorCode.NotFound,
+          `${input.label} version ${input.requested} no longer current (current=${current})`,
+        );
+      },
+      read: input.read,
+    });
 
   app.get('/v1/docs/:docId/head', async (req, reply) => {
     const { docId } = req.params as { docId: string };
@@ -107,15 +144,16 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
     const { docId, token } = req.params as { docId: string; token: string };
     const ctx = await requireSharedDocRead(req, service, docId, 'layout', ['layout']);
     const requested = parseTokenOrInvalidArg(decodeLayoutToken, token, 'layoutVersion token');
-    const manifest = await service.getManifest(ctx, docId);
-    if (requested !== manifest.layoutVersion) {
-      setNoStore(reply);
-      throw new EngineError(
-        EngineErrorCode.NotFound,
-        `layout version ${requested} no longer current (current=${manifest.layoutVersion})`,
-      );
-    }
-    const snapshot = await service.getLayerLayout(ctx, docId, undefined, abortSignalOf(reply));
+    const snapshot = await atVersion({
+      reply,
+      ctx,
+      docId,
+      layerName: undefined,
+      label: 'layout',
+      requested,
+      current: (manifest) => manifest.layoutVersion,
+      read: () => service.getLayerLayout(ctx, docId, undefined, abortSignalOf(reply)),
+    });
     setImmutableCache(reply);
     return snapshot;
   });
@@ -124,15 +162,16 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
     const { docId, token } = req.params as { docId: string; token: string };
     const ctx = await requireSharedDocRead(req, service, docId, 'actions', ['actions']);
     const requested = parseTokenOrInvalidArg(decodeActionsToken, token, 'actionsVersion token');
-    const manifest = await service.getManifest(ctx, docId);
-    if (requested !== manifest.actionsVersion) {
-      setNoStore(reply);
-      throw new EngineError(
-        EngineErrorCode.NotFound,
-        `actions version ${requested} no longer current (current=${manifest.actionsVersion})`,
-      );
-    }
-    const snapshot = await service.getLayerActions(ctx, docId, undefined, abortSignalOf(reply));
+    const snapshot = await atVersion({
+      reply,
+      ctx,
+      docId,
+      layerName: undefined,
+      label: 'actions',
+      requested,
+      current: (manifest) => manifest.actionsVersion,
+      read: () => service.getLayerActions(ctx, docId, undefined, abortSignalOf(reply)),
+    });
     setImmutableCache(reply);
     return snapshot;
   });
@@ -189,15 +228,16 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
     const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
     const ctx = requireLayerResource(req, docId, layerName, 'layer-layout', pdfBits);
     const requested = parseTokenOrInvalidArg(decodeLayoutToken, token, 'layoutVersion token');
-    const manifest = await service.getLayerManifest(ctx, docId, layerName);
-    if (requested !== manifest.layoutVersion) {
-      setNoStore(reply);
-      throw new EngineError(
-        EngineErrorCode.NotFound,
-        `layout version ${requested} no longer current (current=${manifest.layoutVersion})`,
-      );
-    }
-    const snapshot = await service.getLayerLayout(ctx, docId, layerName, abortSignalOf(reply));
+    const snapshot = await atVersion({
+      reply,
+      ctx,
+      docId,
+      layerName: layerName,
+      label: 'layout',
+      requested,
+      current: (manifest) => manifest.layoutVersion,
+      read: () => service.getLayerLayout(ctx, docId, layerName, abortSignalOf(reply)),
+    });
     setImmutableCache(reply);
     return snapshot;
   });
@@ -222,15 +262,16 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
     const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
     const ctx = requireLayerResource(req, docId, layerName, 'layer-actions', pdfBits);
     const requested = parseTokenOrInvalidArg(decodeActionsToken, token, 'actionsVersion token');
-    const manifest = await service.getLayerManifest(ctx, docId, layerName);
-    if (requested !== manifest.actionsVersion) {
-      setNoStore(reply);
-      throw new EngineError(
-        EngineErrorCode.NotFound,
-        `actions version ${requested} no longer current (current=${manifest.actionsVersion})`,
-      );
-    }
-    const snapshot = await service.getLayerActions(ctx, docId, layerName, abortSignalOf(reply));
+    const snapshot = await atVersion({
+      reply,
+      ctx,
+      docId,
+      layerName: layerName,
+      label: 'actions',
+      requested,
+      current: (manifest) => manifest.actionsVersion,
+      read: () => service.getLayerActions(ctx, docId, layerName, abortSignalOf(reply)),
+    });
     setImmutableCache(reply);
     return snapshot;
   });
@@ -274,18 +315,35 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
         `this link downloads version ${link.docVersion} (${link.mode}) only`,
       );
     }
-    const current = await service.layerDocVersion(ctx, docId, layerName);
-    if (requested.docVersion !== current) {
-      setNoStore(reply);
-      throw new EngineError(
-        EngineErrorCode.NotFound,
-        `download version ${requested.docVersion} no longer current (current=${current})`,
-      );
-    }
     // The link's maker passed the password check; the link carries no password.
-    const file = await layerDownload(ctx, docId, layerName, requested.mode, {
-      passwordChecked: link !== undefined,
-    });
+    // A file prepared at a version that is refused afterwards is removed.
+    let prepared: PdfDownload | undefined;
+    let file: PdfDownload;
+    try {
+      file = await readAtPins({
+        documentService: service,
+        reply,
+        docId,
+        layerName,
+        assertCurrent: async () => {
+          const current = await service.layerDocVersion(ctx, docId, layerName);
+          if (requested.docVersion === current) return;
+          throw new EngineError(
+            EngineErrorCode.NotFound,
+            `download version ${requested.docVersion} no longer current (current=${current})`,
+          );
+        },
+        read: async () => {
+          prepared = await layerDownload(ctx, docId, layerName, requested.mode, {
+            passwordChecked: link !== undefined,
+          });
+          return prepared;
+        },
+      });
+    } catch (err) {
+      await prepared?.cleanup();
+      throw err;
+    }
     return sendDownload(
       reply,
       file,

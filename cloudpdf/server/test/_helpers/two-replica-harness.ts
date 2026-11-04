@@ -216,6 +216,38 @@ export function holdNextUpload(replica: Replica): { held: Promise<void>; release
 }
 
 /**
+ * Trap the replica's next worker read of one of `kinds` (a job kind such as
+ * `pages.renderEncoded`): `held` resolves once the read has passed its
+ * version checks and the wait for in-flight writes, just before its job
+ * reaches the worker. `release()` sends the job. A write started while the
+ * read is held reaches the worker first.
+ */
+export function holdNextRead(
+  replica: Replica,
+  kinds: readonly string[],
+): { held: Promise<void>; release: () => void } {
+  const pool = (replica.bundle.documentService as unknown as { pool: PoolRunPatchable }).pool;
+  const original = pool.run.bind(pool);
+  let heldResolve!: () => void;
+  let gateResolve!: () => void;
+  const held = new Promise<void>((resolve) => (heldResolve = resolve));
+  const gate = new Promise<void>((resolve) => (gateResolve = resolve));
+  pool.run = async (docId, build, signal) => {
+    const kind = (build(0) as { payload?: { kind?: string } }).payload?.kind;
+    if (kind === undefined || !kinds.includes(kind)) return original(docId, build, signal);
+    pool.run = original; // one-shot: restore before proceeding
+    heldResolve();
+    await gate;
+    return original(docId, build, signal);
+  };
+  return { held, release: gateResolve };
+}
+
+interface PoolRunPatchable {
+  run(docId: string, build: (jobId: number) => unknown, signal?: AbortSignal): Promise<unknown>;
+}
+
+/**
  * Trap the replica's next write alignment (`ensureLayerFreshOnPool` for a
  * write): `held` resolves once the write checked for an earlier answer and
  * is about to open the layer, before its object numbers are checked.

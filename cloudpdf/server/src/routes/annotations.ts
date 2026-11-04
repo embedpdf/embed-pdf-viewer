@@ -17,6 +17,7 @@ import {
   type AnnotationPosition,
   type AnnotationRef,
   type CollabTarget,
+  type DocumentManifest,
   type DocumentProtection,
   type PdfBits,
   type WorkerJobId,
@@ -47,6 +48,7 @@ import {
   abortSignalOf,
   parseOrInvalidArg,
   parseTokenOrInvalidArg,
+  readAtPins,
   resolvePageKeyParam,
   setImmutableCache,
   setNoStore,
@@ -925,99 +927,73 @@ async function readAnnotations(input: {
   pageObjectNumber: number;
   requestedVersion?: number;
 }) {
-  const page = await resolvePageForRead(input);
-  if (
-    input.requestedVersion !== undefined &&
-    input.requestedVersion !== page.cache.annotationVersion
-  ) {
-    setNoStore(input.reply);
-    throw new EngineError(
-      EngineErrorCode.NotFound,
-      `${input.scope.kind === 'layer' ? 'layer ' : ''}annotation version ${
-        input.requestedVersion
-      } no longer current (current=${page.cache.annotationVersion}) for page ${
-        input.pageObjectNumber
-      }`,
-    );
-  }
-
-  if (input.scope.kind === 'layer') {
-    await input.documentService.ensureLayerOnPool(
-      input.scope.ctx,
-      input.scope.docId,
-      input.scope.layerName,
-    );
-  }
-  // Raw read (docPtr dictionary walk, no FPDF_LoadPage): wire-identical to
-  // the full path today — no dispatched subtype reader uses the pagePtr —
-  // and ~1000x cheaper per cold leaf materialization. If a pagePtr-dependent
-  // reader ever lands, the local-vs-cloud conformance parity diff fails and
-  // forces this choice back onto the table (safe-by-conformance).
-  const build = (jobId: WorkerJobId) =>
-    wirePack({
-      kind: 'annotations.list' as const,
-      effect: 'read' as const,
-      jobId,
-      docId: input.scope.docId,
-      ...(input.scope.kind === 'layer' ? { layerName: input.scope.layerName } : {}),
-      pages: [toPageRef(input.pageObjectNumber)],
-    });
   const scope = input.scope;
-  const result = await input.documentService.readOnPool(
-    scope.ctx,
-    scope.docId,
-    scope.kind === 'layer' ? scope.layerName : undefined,
-    build,
-    input.signal,
-  );
-  if (result.tag !== 'annotations.list') {
-    throw new EngineError(
-      EngineErrorCode.WireFormat,
-      `unexpected ${
-        input.scope.kind === 'layer' ? 'layer ' : ''
-      }annotations.list payload: ${result.tag}`,
-    );
-  }
-
-  if (input.requestedVersion !== undefined) {
-    // Re-validate the pin after the worker read. The pre-check ran before
-    // parking behind any in-flight write; if that write (or any remote
-    // commit) landed while we read, the snapshot in hand belongs to a
-    // newer version and must not go out under this pin — the response
-    // carries `immutable`, so one slip poisons the CDN for every future
-    // reader. Refusing costs the client one manifest refetch.
-    const fresh = await resolvePageForRead(input);
-    if (input.requestedVersion !== fresh.cache.annotationVersion) {
-      setNoStore(input.reply);
+  const assertCurrent = async () => {
+    const page = await resolvePageForRead(input);
+    if (
+      input.requestedVersion !== undefined &&
+      input.requestedVersion !== page.cache.annotationVersion
+    ) {
       throw new EngineError(
         EngineErrorCode.NotFound,
-        `${input.scope.kind === 'layer' ? 'layer ' : ''}annotation version ${
+        `${scope.kind === 'layer' ? 'layer ' : ''}annotation version ${
           input.requestedVersion
-        } no longer current (current=${fresh.cache.annotationVersion}) for page ${
+        } no longer current (current=${page.cache.annotationVersion}) for page ${
           input.pageObjectNumber
         }`,
       );
     }
-  }
+  };
+  const read = async () => {
+    if (scope.kind === 'layer') {
+      await input.documentService.ensureLayerOnPool(scope.ctx, scope.docId, scope.layerName);
+    }
+    // Raw read (docPtr dictionary walk, no FPDF_LoadPage): wire-identical to
+    // the full path today — no dispatched subtype reader uses the pagePtr —
+    // and ~1000x cheaper per cold leaf materialization. If a pagePtr-dependent
+    // reader ever lands, the local-vs-cloud conformance parity diff fails and
+    // forces this choice back onto the table (safe-by-conformance).
+    const build = (jobId: WorkerJobId) =>
+      wirePack({
+        kind: 'annotations.list' as const,
+        effect: 'read' as const,
+        jobId,
+        docId: scope.docId,
+        ...(scope.kind === 'layer' ? { layerName: scope.layerName } : {}),
+        pages: [toPageRef(input.pageObjectNumber)],
+      });
+    const result = await input.documentService.readOnPool(
+      scope.ctx,
+      scope.docId,
+      scope.kind === 'layer' ? scope.layerName : undefined,
+      build,
+      input.signal,
+    );
+    if (result.tag !== 'annotations.list') {
+      throw new EngineError(
+        EngineErrorCode.WireFormat,
+        `unexpected ${scope.kind === 'layer' ? 'layer ' : ''}annotations.list payload: ${result.tag}`,
+      );
+    }
+    return result.list;
+  };
+  const list = await readAtPins({
+    documentService: input.documentService,
+    reply: input.reply,
+    docId: scope.docId,
+    layerName: scope.kind === 'layer' ? scope.layerName : undefined,
+    assertCurrent,
+    read,
+    pinned: input.requestedVersion !== undefined,
+  });
 
   input.requestedVersion === undefined ? setNoStore(input.reply) : setImmutableCache(input.reply);
-  return result.list;
+  return list;
 }
 
 /**
- * Whole-document bulk read: One `annotations.list` worker job per
- * attempt (the raw docPtr sweep — no per-page loads). Version-addressed
- * reads double-check the manifest pin before serving a CDN-immutable body.
- * The public current-version read retries once if a mutation races the
- * sweep, then returns a retryable conflict rather than mixing a snapshot
- * with the wrong audit cursor. The response stamps the pre-check
- * manifest's `auditHead`, so replaying events with `serverId > auditHead`
- * over this body is exact.
- */
-/**
- * One export job at the token's pins, checked before and after the job so an
- * immutable body never belongs to another version: a stale pin is a 404 the
- * client answers by refreshing its manifest. The response is the bundle
+ * One export job, read at the token's pins (see `readAtPins`): a stale pin
+ * is a 404 the client answers by refreshing its manifest. The response is the bundle
  * without its bytes as the `body` part, then one `resource:<id>` part per
  * resource.
  */
@@ -1041,7 +1017,6 @@ async function exportAnnotations(input: {
     const annotationsVersion = manifest.annotationsVersion ?? 1;
     const layoutVersion = manifest.layoutVersion ?? 1;
     if (token.annotationsVersion !== annotationsVersion || token.layoutVersion !== layoutVersion) {
-      setNoStore(input.reply);
       throw new EngineError(
         EngineErrorCode.NotFound,
         `annotation export at annotationsVersion ${token.annotationsVersion}, layoutVersion ${token.layoutVersion} no longer current (current: ${annotationsVersion}, ${layoutVersion})`,
@@ -1049,34 +1024,52 @@ async function exportAnnotations(input: {
     }
   };
 
-  await assertCurrent();
-  const build = (jobId: WorkerJobId) =>
-    wirePack({
-      kind: 'annotations.export' as const,
-      effect: 'snapshot' as const,
-      jobId,
-      docId: scope.docId,
-      ...(layerName !== undefined ? { layerName } : {}),
-      selection: token.selection,
-      limits: input.limits,
-    });
-  const result = await input.documentService.readOnPool(
-    scope.ctx,
-    scope.docId,
-    layerName,
-    build,
-    input.signal,
-  );
-  if (result.tag !== 'annotations.export') {
-    throw new EngineError(
-      EngineErrorCode.WireFormat,
-      `unexpected annotations.export payload: ${result.tag}`,
+  const read = async () => {
+    const build = (jobId: WorkerJobId) =>
+      wirePack({
+        kind: 'annotations.export' as const,
+        effect: 'snapshot' as const,
+        jobId,
+        docId: scope.docId,
+        ...(layerName !== undefined ? { layerName } : {}),
+        selection: token.selection,
+        limits: input.limits,
+      });
+    const result = await input.documentService.readOnPool(
+      scope.ctx,
+      scope.docId,
+      layerName,
+      build,
+      input.signal,
     );
-  }
-  await assertCurrent();
-  return sendBundle(input.reply, result.bundle, input.cache ?? 'immutable');
+    if (result.tag !== 'annotations.export') {
+      throw new EngineError(
+        EngineErrorCode.WireFormat,
+        `unexpected annotations.export payload: ${result.tag}`,
+      );
+    }
+    return result.bundle;
+  };
+  const bundle = await readAtPins({
+    documentService: input.documentService,
+    reply: input.reply,
+    docId: scope.docId,
+    layerName,
+    assertCurrent,
+    read,
+  });
+  return sendBundle(input.reply, bundle, input.cache ?? 'immutable');
 }
 
+/**
+ * Whole-document bulk read: one `annotations.list` worker job (the raw
+ * docPtr sweep, no per-page loads). A version-addressed read is read at its
+ * pin (see `readAtPins`). The current-version read retries once if a
+ * mutation races the sweep, then returns a retryable conflict rather than
+ * mixing a snapshot with the wrong audit cursor. The response stamps the
+ * pre-check manifest's `auditHead`, so replaying events with
+ * `serverId > auditHead` over this body is exact.
+ */
 async function readAnnotationsAll(input: {
   documentService: DocumentService;
   reply: FastifyReply;
@@ -1089,22 +1082,7 @@ async function readAnnotationsAll(input: {
     scope.kind === 'layer'
       ? input.documentService.getLayerManifest(scope.ctx, scope.docId, scope.layerName)
       : input.documentService.getManifest(scope.ctx, scope.docId);
-
-  const maxAttempts = input.requestedVersion === undefined ? 2 : 1;
-  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-    const manifest = await getManifest();
-    const current = manifest.annotationsVersion ?? 1;
-    if (input.requestedVersion !== undefined && input.requestedVersion !== current) {
-      setNoStore(input.reply);
-      throw new EngineError(
-        EngineErrorCode.NotFound,
-        `${scope.kind === 'layer' ? 'layer ' : ''}annotations version ${
-          input.requestedVersion
-        } no longer current (current=${current})`,
-      );
-    }
-    const pinnedVersion = input.requestedVersion ?? current;
-
+  const read = async () => {
     if (scope.kind === 'layer') {
       await input.documentService.ensureLayerOnPool(scope.ctx, scope.docId, scope.layerName);
     }
@@ -1131,31 +1109,46 @@ async function readAnnotationsAll(input: {
         }`,
       );
     }
+    return result.list;
+  };
 
-    // Re-validate the pin after the worker read (see readAnnotations).
-    const fresh = await getManifest();
-    const freshCurrent = fresh.annotationsVersion ?? 1;
-    if (pinnedVersion !== freshCurrent) {
-      setNoStore(input.reply);
-      if (input.requestedVersion !== undefined) {
-        throw new EngineError(
-          EngineErrorCode.NotFound,
-          `${scope.kind === 'layer' ? 'layer ' : ''}annotations version ${
-            input.requestedVersion
-          } no longer current (current=${freshCurrent})`,
-        );
-      }
-      if (attempt + 1 < maxAttempts) continue;
-      throw new EngineError(
-        EngineErrorCode.LayerVersionConflict,
-        `${scope.kind === 'layer' ? 'layer ' : ''}annotations changed while reading; retry the request`,
-      );
-    }
-
-    input.requestedVersion === undefined ? setNoStore(input.reply) : setImmutableCache(input.reply);
-    return { ...result.list, auditHead: manifest.auditHead };
+  const requested = input.requestedVersion;
+  if (requested !== undefined) {
+    let auditHead: DocumentManifest['auditHead'] | undefined;
+    let checked = false;
+    const list = await readAtPins({
+      documentService: input.documentService,
+      reply: input.reply,
+      docId: scope.docId,
+      layerName: scope.kind === 'layer' ? scope.layerName : undefined,
+      assertCurrent: async () => {
+        const manifest = await getManifest();
+        const current = manifest.annotationsVersion ?? 1;
+        if (requested !== current) {
+          throw new EngineError(
+            EngineErrorCode.NotFound,
+            `${scope.kind === 'layer' ? 'layer ' : ''}annotations version ${requested} no longer current (current=${current})`,
+          );
+        }
+        if (!checked) auditHead = manifest.auditHead;
+        checked = true;
+      },
+      read,
+    });
+    setImmutableCache(input.reply);
+    return { ...list, auditHead };
   }
 
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const manifest = await getManifest();
+    const current = manifest.annotationsVersion ?? 1;
+    const list = await read();
+    const fresh = await getManifest();
+    if ((fresh.annotationsVersion ?? 1) !== current) continue;
+    setNoStore(input.reply);
+    return { ...list, auditHead: manifest.auditHead };
+  }
+  setNoStore(input.reply);
   throw new EngineError(
     EngineErrorCode.LayerVersionConflict,
     `${scope.kind === 'layer' ? 'layer ' : ''}annotations changed while reading; retry the request`,

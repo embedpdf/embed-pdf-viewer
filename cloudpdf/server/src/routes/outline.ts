@@ -3,7 +3,13 @@ import { EngineError, EngineErrorCode, type DocumentManifest } from '@embedpdf/e
 import { decodeOutlineToken, type OutlineToken } from '@embedpdf/engine-core/wire';
 import { requireLayerDocAccessOnly, requireLayerResource } from '../app/jwt-plugin';
 import type { DocumentService } from '../services/DocumentService';
-import { abortSignalOf, parseTokenOrInvalidArg, setImmutableCache, setNoStore } from './_helpers';
+import {
+  abortSignalOf,
+  parseTokenOrInvalidArg,
+  readAtPins,
+  setImmutableCache,
+  setNoStore,
+} from './_helpers';
 import { requireSharedDocRead } from './_planeGuard';
 
 interface OutlineRouteDeps {
@@ -30,8 +36,14 @@ export async function registerOutlineRoutes(
     const { docId, token } = req.params as { docId: string; token: string };
     const ctx = await requireSharedDocRead(req, service, docId, 'outline', ['outline', 'layout']);
     const requested = parseTokenOrInvalidArg(decodeOutlineToken, token, 'outline token');
-    assertCurrent(requested, await service.getManifest(ctx, docId), reply);
-    const body = await service.readLayerOutline(ctx, docId, undefined, abortSignalOf(reply));
+    const body = await readAtPins({
+      documentService: service,
+      reply,
+      docId,
+      layerName: undefined,
+      assertCurrent: async () => assertCurrent(requested, await service.getManifest(ctx, docId)),
+      read: () => service.readLayerOutline(ctx, docId, undefined, abortSignalOf(reply)),
+    });
     setImmutableCache(reply);
     return body;
   });
@@ -46,8 +58,15 @@ export async function registerOutlineRoutes(
     const pdfBits = await service.getEffectivePdfBits(accessCtx, docId, layerName);
     const ctx = requireLayerResource(req, docId, layerName, 'layer-outline', pdfBits);
     const requested = parseTokenOrInvalidArg(decodeOutlineToken, token, 'outline token');
-    assertCurrent(requested, await service.getLayerManifest(ctx, docId, layerName), reply);
-    const body = await service.readLayerOutline(ctx, docId, layerName, abortSignalOf(reply));
+    const body = await readAtPins({
+      documentService: service,
+      reply,
+      docId,
+      layerName,
+      assertCurrent: async () =>
+        assertCurrent(requested, await service.getLayerManifest(ctx, docId, layerName)),
+      read: () => service.readLayerOutline(ctx, docId, layerName, abortSignalOf(reply)),
+    });
     setImmutableCache(reply);
     return body;
   });
@@ -64,18 +83,13 @@ export async function registerOutlineRoutes(
 }
 
 /** A pinned read answers only at the manifest's current pins; a stale one is a 404. */
-function assertCurrent(
-  requested: OutlineToken,
-  manifest: DocumentManifest,
-  reply: Parameters<typeof setNoStore>[0],
-): void {
+function assertCurrent(requested: OutlineToken, manifest: DocumentManifest): void {
   if (
     requested.outlineVersion === manifest.outlineVersion &&
     requested.layoutVersion === manifest.layoutVersion
   ) {
     return;
   }
-  setNoStore(reply);
   throw new EngineError(
     EngineErrorCode.NotFound,
     `outline ${requested.outlineVersion}/${requested.layoutVersion} no longer current ` +

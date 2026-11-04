@@ -54,6 +54,7 @@ import {
   abortSignalOf,
   parseOrInvalidArg,
   parseTokenOrInvalidArg,
+  readAtPins,
   setImmutableCache,
   setNoStore,
   type SchemaLike,
@@ -119,16 +120,23 @@ export async function registerSignatureRoutes(
     const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
     const ctx = requireLayerResource(req, docId, layerName, 'layer-signatures', pdfBits);
     const requested = parseTokenOrInvalidArg(decodeDocToken, token, 'docVersion token');
-    const manifest = await service.getLayerManifest(ctx, docId, layerName);
-    if (requested !== manifest.docVersion) {
-      setNoStore(reply);
-      throw new EngineError(
-        EngineErrorCode.NotFound,
-        `signatures version ${requested} no longer current (current=${manifest.docVersion})`,
-      );
-    }
+    const snapshot = await readAtPins({
+      documentService: service,
+      reply,
+      docId,
+      layerName,
+      assertCurrent: async () => {
+        const manifest = await service.getLayerManifest(ctx, docId, layerName);
+        if (requested === manifest.docVersion) return;
+        throw new EngineError(
+          EngineErrorCode.NotFound,
+          `signatures version ${requested} no longer current (current=${manifest.docVersion})`,
+        );
+      },
+      read: () => readSignatures(ctx, docId, layerName, abortSignalOf(reply)),
+    });
     setImmutableCache(reply);
-    return readSignatures(ctx, docId, layerName, abortSignalOf(reply));
+    return snapshot;
   });
 
   app.get('/v1/docs/:docId/layers/:layerName/signatures', async (req, reply) => {
@@ -152,14 +160,6 @@ export async function registerSignatureRoutes(
     const ctx = requireLayerResource(req, docId, layerName, 'layer-signatures-analysis', pdfBits);
     const requested = parseTokenOrInvalidArg(decodeAnalysisToken, token, 'analysis token');
     requireServedPolicy(reply, requested.policyVersion);
-    const manifest = await service.getLayerManifest(ctx, docId, layerName);
-    if (requested.docVersion !== manifest.docVersion) {
-      setNoStore(reply);
-      throw new EngineError(
-        EngineErrorCode.NotFound,
-        `analysis version ${requested.docVersion} no longer current (current=${manifest.docVersion})`,
-      );
-    }
     const input: AnalyzeInput = {
       since: requested.since,
       until: 'working-copy',
@@ -170,7 +170,21 @@ export async function registerSignatureRoutes(
     };
     // No cache header until the worker has answered: an error response must
     // never carry the immutable header the success path earns.
-    const analysis = await analyzeLayer(ctx, docId, layerName, input, abortSignalOf(reply));
+    const analysis = await readAtPins({
+      documentService: service,
+      reply,
+      docId,
+      layerName,
+      assertCurrent: async () => {
+        const manifest = await service.getLayerManifest(ctx, docId, layerName);
+        if (requested.docVersion === manifest.docVersion) return;
+        throw new EngineError(
+          EngineErrorCode.NotFound,
+          `analysis version ${requested.docVersion} no longer current (current=${manifest.docVersion})`,
+        );
+      },
+      read: () => analyzeLayer(ctx, docId, layerName, input, abortSignalOf(reply)),
+    });
     return finishAnalysisReply(reply, analysis);
   });
 
