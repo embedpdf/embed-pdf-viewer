@@ -16,6 +16,7 @@ import type {
   PdfRotation,
   PdfSize,
 } from './primitives';
+import { closed } from '../wire/reading';
 
 export const PdfPointSchema: z.ZodType<PdfPoint> = z.object({
   x: z.number(),
@@ -56,12 +57,9 @@ export const PdfQuadSchema: z.ZodType<PdfQuad> = z.object({
   lowerRight: PdfPointSchema,
 });
 
-export const PdfRotationSchema: z.ZodType<PdfRotation> = z.union([
-  z.literal(0),
-  z.literal(90),
-  z.literal(180),
-  z.literal(270),
-]);
+export const PdfRotationSchema: z.ZodType<PdfRotation> = closed(
+  z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]),
+);
 
 // ── page space ──
 

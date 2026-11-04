@@ -1,3 +1,4 @@
+import { EVERY_PERMISSION } from './fixtureScope';
 import type {
   ConformanceTestRunner,
   ConformanceFixture,
@@ -13,7 +14,6 @@ import { annotationKey } from '../identity/annotationKey';
 import { toPageRef } from '../identity/PageRef';
 import { AbortError } from '../promise/AbortError';
 import { AnnotationListSchema } from '../wire/schemas';
-import { EVERY_PERMISSION } from './fixtureScope';
 
 /**
  * Expected per-fixture annotation knowledge. The harness asserts against
@@ -234,25 +234,24 @@ export function runAnnotationReadConformance(
       }
     });
 
-    test('AnnotationSchema rejects an annotation with a foreign subtype', () => {
-      const bogus: unknown = {
-        subtype: 'pretend-not-real',
-        ref: {
-          kind: 'objectNumber',
-          page: { kind: 'objectNumber', objectNumber: 1 },
-          objectNumber: 1,
-        },
-        pageObjectNumber: 1,
-        nm: null,
-        flags: emptyFlags(),
-        rect: { left: 0, top: 0, right: 0, bottom: 0 },
-        contents: null,
-        author: null,
-        createdAt: null,
-        modifiedAt: null,
-      };
-      const result = AnnotationSchema.safeParse(bogus);
-      expect(result.success).toBe(false);
+    test('AnnotationSchema reads a subtype it does not know as unsupported, and a malformed one it knows fails', async () => {
+      const doc = await openFixture(engine, opts);
+      try {
+        const snap = await doc.annotations.list({
+          pages: [toPageRef(opts.fixture.pageObjectNumber)],
+        });
+        for (const annotation of snap.annotations) {
+          const newer = { ...annotation, subtype: 'from-a-newer-server' };
+          expect(AnnotationSchema.parse(newer)).toMatchObject({
+            subtype: 'unsupported',
+            ref: annotation.ref,
+            rect: annotation.rect,
+          });
+          expect(AnnotationSchema.safeParse({ ...annotation, rect: 'wide' }).success).toBe(false);
+        }
+      } finally {
+        await doc.close();
+      }
     });
 
     if (opts.fixture.expectsInlineAnnotation) {
@@ -333,21 +332,6 @@ async function openFixture(engine: Engine, opts: AnnotationConformanceOptions) {
     return engine.open({ kind: 'bytes', id: opts.fixture.id, bytes }, EVERY_PERMISSION);
   }
   return engine.open({ kind: 'id', id: opts.fixture.cloudId ?? opts.fixture.id });
-}
-
-function emptyFlags() {
-  return {
-    invisible: false,
-    hidden: false,
-    print: false,
-    noZoom: false,
-    noRotate: false,
-    noView: false,
-    readOnly: false,
-    locked: false,
-    toggleNoView: false,
-    lockedContents: false,
-  };
 }
 
 // Re-export for convenience: tests can hand a literal snapshot.

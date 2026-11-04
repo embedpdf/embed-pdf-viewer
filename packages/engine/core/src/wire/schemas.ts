@@ -189,20 +189,24 @@ import type {
   FormValuesImportOptions,
   FormValuesImportResult,
 } from '../transfer/formImport';
+import { closed, readsUnknownAs } from './reading';
 export type { CacheDelta, MutationMeta } from '../mutation/MutationMeta';
 
+const identityObject = z.object({
+  userId: z.string().min(1).max(256).optional(),
+  displayName: z.string().min(1).max(256).optional(),
+  email: z.string().min(1).max(256).optional(),
+  title: z.string().min(1).max(256).optional(),
+  organization: z.string().min(1).max(256).optional(),
+  organizationalUnit: z.string().min(1).max(256).optional(),
+  groupId: z.string().min(1).max(256).optional(),
+});
+
 /** Who a session acts for; see `Identity` in `auth/scope/types.ts`. */
-export const IdentitySchema: z.ZodType<Identity> = z
-  .object({
-    userId: z.string().min(1).max(256).optional(),
-    displayName: z.string().min(1).max(256).optional(),
-    email: z.string().min(1).max(256).optional(),
-    title: z.string().min(1).max(256).optional(),
-    organization: z.string().min(1).max(256).optional(),
-    organizationalUnit: z.string().min(1).max(256).optional(),
-    groupId: z.string().min(1).max(256).optional(),
-  })
-  .strict();
+export const IdentitySchema: z.ZodType<Identity> = identityObject;
+
+/** An identity a request names, which refuses a field it doesn't know. */
+export const IdentityInputSchema: z.ZodType<Identity> = identityObject.strict();
 
 export const DocumentMetadataSchema: z.ZodType<DocumentMetadata> = z.object({
   title: z.string().nullable(),
@@ -213,7 +217,7 @@ export const DocumentMetadataSchema: z.ZodType<DocumentMetadata> = z.object({
   creator: z.string().nullable(),
   createdAt: IsoDateTimeSchema.nullable(),
   modifiedAt: IsoDateTimeSchema.nullable(),
-  trapped: z.enum(['true', 'false', 'unknown']),
+  trapped: closed(z.enum(['true', 'false', 'unknown'])),
 });
 
 /**
@@ -269,22 +273,22 @@ export const DocumentHeadSchema = z.object({
   baseSha: z.string(),
   storageSizeBytes: z.number().int().nonnegative(),
   docVersion: z.number().int().positive(),
-  state: z.enum(['pending', 'ready', 'failed', 'deleting']),
+  state: closed(z.enum(['pending', 'ready', 'failed', 'deleting'])),
   encryption: z.object({
-    state: z.enum(['unknown', 'none', 'encrypted', 'unsupported']),
+    state: closed(z.enum(['unknown', 'none', 'encrypted', 'unsupported'])),
     requiresPassword: z.boolean().nullable(),
   }),
   permissions: z.object({
     known: z.boolean(),
     bits: z.number().int().nonnegative().nullable(),
     allAllowed: z.boolean().nullable(),
-    openedAs: z.enum(['none', 'user', 'owner']).nullable(),
+    openedAs: closed(z.enum(['none', 'user', 'owner'])).nullable(),
     securityHandlerRevision: z.number().int().nullable(),
     canUpgradeToOwner: z.boolean(),
   }),
   access: z.object({
     required: z.boolean(),
-    reasons: z.array(z.enum(['password', 'cdn', 'permissions-unknown'])),
+    reasons: z.array(closed(z.enum(['password', 'cdn', 'permissions-unknown']))),
     endpoint: z.string().optional(),
   }),
 });
@@ -316,7 +320,7 @@ export const ObjectNumberRangeSchema = z.object({
 
 /** See `EditSessionAccess`. */
 export const EditSessionAccessSchema = z.object({
-  session: z.enum(['new', 'revived', 'live']),
+  session: closed(z.enum(['new', 'revived', 'live'])),
   expiresIn: z.number().int().nonnegative(),
   objectNumbers: z.array(ObjectNumberRangeSchema),
 });
@@ -373,7 +377,7 @@ const PdfPermissionInfoObjectSchema: z.ZodType<PdfPermissionInfo> = z.object({
   known: z.boolean(),
   allAllowed: z.boolean().nullable(),
   bits: z.number().int().nonnegative().nullable(),
-  openedAs: z.enum(['none', 'user', 'owner']).nullable(),
+  openedAs: closed(z.enum(['none', 'user', 'owner'])).nullable(),
   securityHandlerRevision: z.number().int().nullable(),
   // Enriched fields from /access (commit 14). Optional so /head, which
   // doesn't always populate them, stays valid against this schema too.
@@ -385,20 +389,20 @@ const PdfPermissionInfoSchema = PdfPermissionInfoObjectSchema.nullable();
 
 export const DocumentSecurityStateSchema: z.ZodType<DocumentSecurityState> = z.object({
   encryption: z.object({
-    state: z.enum(['unknown', 'none', 'encrypted', 'unsupported']),
+    state: closed(z.enum(['unknown', 'none', 'encrypted', 'unsupported'])),
     requiresPassword: z.boolean().nullable(),
   }),
   permissions: z.object({
     known: z.boolean(),
     bits: z.number().int().nonnegative().nullable(),
     allAllowed: z.boolean().nullable(),
-    openedAs: z.enum(['none', 'user', 'owner']).nullable(),
+    openedAs: closed(z.enum(['none', 'user', 'owner'])).nullable(),
     securityHandlerRevision: z.number().int().nullable(),
     canUpgradeToOwner: z.boolean(),
   }),
   access: z.object({
     required: z.boolean(),
-    reasons: z.array(z.enum(['password', 'cdn', 'permissions-unknown'])),
+    reasons: z.array(closed(z.enum(['password', 'cdn', 'permissions-unknown']))),
     endpoint: z.string().optional(),
   }),
 });
@@ -406,25 +410,25 @@ export const DocumentSecurityStateSchema: z.ZodType<DocumentSecurityState> = z.o
 const positiveCount = z.number().int().positive();
 
 /** See `BundleLimits`. */
-export const BundleLimitsSchema = z
-  .object({
-    bundleBytes: positiveCount,
-    manifestBytes: positiveCount,
-    items: positiveCount,
-    pages: positiveCount,
-    resources: positiveCount,
-    resourceBytes: positiveCount,
-    imagePixels: positiveCount,
-  })
-  .strict();
+export const BundleLimitsSchema = z.object({
+  bundleBytes: positiveCount,
+  manifestBytes: positiveCount,
+  items: positiveCount,
+  pages: positiveCount,
+  resources: positiveCount,
+  resourceBytes: positiveCount,
+  imagePixels: positiveCount,
+});
 
 export const AccessResponseSchema = z.object({
   security: DocumentSecurityStateSchema,
   cdn: z.object({
-    adapter: z.enum(['none', 'cloudfront', 'cloud-cdn', 'bunny', 'azure-fd', 'custom-hmac']),
+    adapter: closed(
+      z.enum(['none', 'cloudfront', 'cloud-cdn', 'bunny', 'azure-fd', 'custom-hmac']),
+    ),
     expiresAt: z.number().int().positive(),
     cache: z.object({
-      scope: z.enum(['browser-private', 'edge-shared']),
+      scope: closed(z.enum(['browser-private', 'edge-shared'])),
       immutableVersionedReads: z.boolean(),
     }),
     baseUrlOverrides: z.record(z.string(), z.string()).nullable(),
@@ -467,7 +471,7 @@ export const AccessResponseSchema = z.object({
   protection: z.lazy(() => DocumentProtectionSchema).nullable(),
   identity: IdentitySchema,
   originPasswordPolicy: z.object({
-    mode: z.enum(['not-needed', 'client-retry', 'server-session']),
+    mode: closed(z.enum(['not-needed', 'client-retry', 'server-session'])),
   }),
   expiresAt: z.number().int().positive(),
   /**
@@ -515,8 +519,8 @@ export const AccessResponseSchema = z.object({
         .optional(),
       /** Worker-side output budget for degenerate page geometry. */
       maxRenderPixels: z.number().int().positive().optional(),
-      formats: z.array(z.enum(['webp', 'png'])),
-      background: z.enum(['white']),
+      formats: z.array(closed(z.enum(['webp', 'png']))),
+      background: closed(z.enum(['white'])),
       enforced: z.boolean(),
     })
     .optional(),
@@ -536,8 +540,8 @@ const engineErrorCodeValues = Object.values(EngineErrorCode) as [
 ];
 
 export const EngineErrorPayloadSchema: z.ZodType<SerializedEngineError> = z.object({
-  name: z.literal('EngineError'),
-  code: z.enum(engineErrorCodeValues),
+  name: closed(z.literal('EngineError')),
+  code: readsUnknownAs(z.enum(engineErrorCodeValues), EngineErrorCode.Unknown),
   message: z.string(),
   details: z.record(z.string(), z.unknown()).optional(),
 });
@@ -553,7 +557,7 @@ export const CachePinsSchema: z.ZodType<CachePins> = z.object({
  * is built, never stored. Absent on base manifests: consumers treat absence
  * as all-'layer' (never wrong, only unshared).
  */
-const LayerScopeValueSchema = z.enum(['base', 'layer']);
+const LayerScopeValueSchema = closed(z.enum(['base', 'layer']));
 export const LayerScopesSchema: z.ZodType<LayerScopes> = z.object({
   content: LayerScopeValueSchema,
   annotations: LayerScopeValueSchema,
@@ -645,15 +649,15 @@ export const PageTextSnapshotSchema: z.ZodType<PageTextSnapshot> = z
 export const PageGeometryGlyphSchema = z.object({
   loose: PageBoxSchema,
   tight: PageBoxSchema.optional(),
-  space: z.literal(true).optional(),
-  empty: z.literal(true).optional(),
+  space: closed(z.literal(true)).optional(),
+  empty: closed(z.literal(true)).optional(),
 });
 
 export const RotatedGeometryGlyphSchema = z.object({
   loose: PageQuadSchema,
   tight: PageQuadSchema.optional(),
-  space: z.literal(true).optional(),
-  empty: z.literal(true).optional(),
+  space: closed(z.literal(true)).optional(),
+  empty: closed(z.literal(true)).optional(),
 });
 
 export const UprightGeometryRunSchema = z.object({
@@ -675,10 +679,9 @@ export const RotatedGeometryRunSchema = z.object({
 // Rotated first: in zod's default strip mode the upright shape would accept a
 // zero-glyph rotated run and silently drop its angle; the rotated shape can
 // never swallow an upright run (it requires `rotation`/`ascentFlip`).
-export const PageGeometryRunSchema: z.ZodType<PageGeometryRun> = z.union([
-  RotatedGeometryRunSchema,
-  UprightGeometryRunSchema,
-]);
+export const PageGeometryRunSchema: z.ZodType<PageGeometryRun> = closed(
+  z.union([RotatedGeometryRunSchema, UprightGeometryRunSchema]),
+);
 
 export const PageGeometrySnapshotSchema: z.ZodType<PageGeometrySnapshot> = z.object({
   runs: z.array(PageGeometryRunSchema),
@@ -721,7 +724,7 @@ export const SearchSnippetSchema: z.ZodType<SearchSnippet> = z.object({
 export const PdfTextSegmentSchema: z.ZodType<PdfTextSegment> = z.object({
   quad: PageQuadSchema,
   rect: PageBoxSchema,
-  advance: z.union([z.literal(1), z.literal(-1)]),
+  advance: closed(z.union([z.literal(1), z.literal(-1)])),
 });
 
 export const SearchMatchSchema: z.ZodType<SearchMatch> = z.object({
@@ -739,10 +742,9 @@ export const SearchSliceSchema: z.ZodType<SearchSlice> = z.object({
   pageCount: z.number().int().nonnegative(),
 });
 
-export const PageNetworkRenderFormatSchema: z.ZodType<PageNetworkRenderFormat> = z.enum([
-  'png',
-  'webp',
-]);
+export const PageNetworkRenderFormatSchema: z.ZodType<PageNetworkRenderFormat> = closed(
+  z.enum(['png', 'webp']),
+);
 
 /**
  * Wire schema for the cloud render endpoints, applied to the **nested**
@@ -804,7 +806,7 @@ const RenderBackgroundSchema = z.enum(['white', 'transparent']);
 /** WebP quality, 0 (smallest) to 1 (best) — the `canvas.toBlob` scale. */
 const RenderQualitySchema = z.coerce.number().min(0).max(1);
 
-const AppearanceModeSchema = z.enum(['normal', 'rollover', 'down']);
+const AppearanceModeSchema = closed(z.enum(['normal', 'rollover', 'down']));
 
 /** `DocumentManifest.serverFonts` in a picture's token: the fingerprint, in hex. */
 const ServerFontsSchema = z.string().regex(/^[0-9a-f]{1,64}$/);
@@ -1170,18 +1172,20 @@ export const AnnotationImportResultSchema: z.ZodType<AnnotationImportResult> = z
     z.object({
       ref: AnnotationRefSchema,
       field: z.string().optional(),
-      reason: z.enum([
-        'unsupported-kind',
-        'widget',
-        'geospatial',
-        'unknown-measure',
-        'unsupported-action',
-        'unsupported-value',
-        'name-conflict',
-        'parent-dropped',
-        'parent-missing',
-        'popup-taken',
-      ]),
+      reason: closed(
+        z.enum([
+          'unsupported-kind',
+          'widget',
+          'geospatial',
+          'unknown-measure',
+          'unsupported-action',
+          'unsupported-value',
+          'name-conflict',
+          'parent-dropped',
+          'parent-missing',
+          'popup-taken',
+        ]),
+      ),
     }),
   ),
   meta: AnnotationListMutationMetaSchema,
@@ -1190,7 +1194,7 @@ export const AnnotationImportResultSchema: z.ZodType<AnnotationImportResult> = z
 /** The engine's `/AP` verdict riding every update result (see engine-core
  *  `annotation/appearance.ts`). `changed` drives client raster invalidation. */
 export const AppearanceOutcomeSchema: z.ZodType<AppearanceOutcome> = z.object({
-  action: z.enum(['preserved', 'regenerated', 'generation-unavailable', 'restored']),
+  action: closed(z.enum(['preserved', 'regenerated', 'generation-unavailable', 'restored'])),
   changed: z.boolean(),
 });
 
@@ -1294,13 +1298,15 @@ export const FormImportResultSchema: z.ZodType<FormImportResult> = z.object({
       ref: FormFieldRefSchema.nullable(),
       widget: AnnotationRefSchema.optional(),
       field: z.string().optional(),
-      reason: z.enum([
-        'name-conflict',
-        'no-field',
-        'unsupported-family',
-        'script-not-allowed',
-        'unsupported-action',
-      ]),
+      reason: closed(
+        z.enum([
+          'name-conflict',
+          'no-field',
+          'unsupported-family',
+          'script-not-allowed',
+          'unsupported-action',
+        ]),
+      ),
     }),
   ),
   calculationOrder: z.array(FormFieldRefSchema).optional(),
@@ -1313,13 +1319,9 @@ export const FormValuesImportResultSchema: z.ZodType<FormValuesImportResult> = z
   dropped: z.array(
     z.object({
       ref: FormFieldRefSchema,
-      reason: z.enum([
-        'no-field',
-        'wrong-family',
-        'value-not-allowed',
-        'locked',
-        'fill-not-allowed',
-      ]),
+      reason: closed(
+        z.enum(['no-field', 'wrong-family', 'value-not-allowed', 'locked', 'fill-not-allowed']),
+      ),
     }),
   ),
   meta: FormMutationMetaSchema,
@@ -1430,7 +1432,7 @@ export const PageLayoutSchema: z.ZodType<PageLayout> = z.object({
   size: PdfSizeSchema,
   rotation: PdfRotationSchema,
   userUnit: z.number().positive(),
-  tabOrder: z.enum(['rows', 'columns', 'structure', 'annotations', 'widgets']).nullable(),
+  tabOrder: closed(z.enum(['rows', 'columns', 'structure', 'annotations', 'widgets'])).nullable(),
   boxes: PageBoxesSchema,
   pdfCropBox: PdfRectSchema,
   actions: PdfPageActionsSchema.optional(),
@@ -1438,11 +1440,11 @@ export const PageLayoutSchema: z.ZodType<PageLayout> = z.object({
 
 export const PageFlattenResultSchema: z.ZodType<PageFlattenResult> = z.object({
   pages: z.array(PageRefSchema),
-  usage: z.enum(['display', 'print']),
+  usage: closed(z.enum(['display', 'print'])),
   results: z.array(
     z.object({
       page: PageRefSchema,
-      status: z.enum(['applied', 'unchanged']),
+      status: closed(z.enum(['applied', 'unchanged'])),
     }),
   ),
   meta: MutationMetaSchema,
@@ -1451,11 +1453,11 @@ export const PageFlattenResultSchema: z.ZodType<PageFlattenResult> = z.object({
 /** See `AnnotationFlattenResult`. */
 export const AnnotationFlattenResultSchema: z.ZodType<AnnotationFlattenResult> = z.object({
   page: PageRefSchema,
-  usage: z.enum(['display', 'print']),
+  usage: closed(z.enum(['display', 'print'])),
   results: z.array(
     z.object({
       ref: AnnotationRefSchema,
-      status: z.enum(['applied', 'unchanged']),
+      status: closed(z.enum(['applied', 'unchanged'])),
     }),
   ),
   meta: MutationMetaSchema,
@@ -1589,18 +1591,27 @@ export const PageFlattenInputSchema: z.ZodType<PageFlattenInput> = z.object({
   usage: z.enum(['display', 'print']),
 });
 
+const redactionApplyScopeObject = z.object({
+  pages: z.array(PageRefSchema).optional(),
+  annotations: z.array(AnnotationRefSchema).optional(),
+});
+
+const namesOneScope = (scope: z.infer<typeof redactionApplyScopeObject>): boolean =>
+  (scope.pages === undefined) !== (scope.annotations === undefined);
+
 /**
  * `{ pages }` or `{ annotations }`: one object with exactly one of the two,
  * so the wire has no untagged union (the API reference labels variants by a
  * discriminating literal, and a scope has none to add).
  */
-export const RedactionApplyScopeSchema: z.ZodType<RedactionApplyScope> = z
-  .object({
-    pages: z.array(PageRefSchema).optional(),
-    annotations: z.array(AnnotationRefSchema).optional(),
-  })
-  .strict()
-  .refine((scope) => (scope.pages === undefined) !== (scope.annotations === undefined), {
+export const RedactionApplyScopeSchema: z.ZodType<RedactionApplyScope> =
+  redactionApplyScopeObject.refine(namesOneScope, {
+    message: 'exactly one of pages or annotations',
+  }) as unknown as z.ZodType<RedactionApplyScope>;
+
+/** The scope a request names, which refuses a field it doesn't know. */
+export const RedactionApplyScopeInputSchema: z.ZodType<RedactionApplyScope> =
+  redactionApplyScopeObject.strict().refine(namesOneScope, {
     message: 'exactly one of pages or annotations',
   }) as unknown as z.ZodType<RedactionApplyScope>;
 
@@ -1609,7 +1620,7 @@ export const RedactionApplyResultSchema: z.ZodType<RedactionApplyResult> = z.obj
   results: z.array(
     z.object({
       page: PageRefSchema,
-      status: z.enum(['applied', 'unchanged']),
+      status: closed(z.enum(['applied', 'unchanged'])),
       removedAnnotationCount: z.number().int().nonnegative(),
     }),
   ),
@@ -1625,17 +1636,21 @@ export const RedactionApplyResultSchema: z.ZodType<RedactionApplyResult> = z.obj
 /** See `NamedPageEntry`: decoded key + what it resolves to. */
 export const NamedPageEntrySchema: z.ZodType<NamedPageEntry> = z.object({
   name: z.string(),
-  target: z.discriminatedUnion('kind', [
-    z.object({ kind: z.literal('page'), page: PageRefSchema }),
-    z.object({ kind: z.literal('template'), objectNumber: z.number().int().positive() }),
-    z.object({ kind: z.literal('dangling') }),
-  ]),
+  target: closed(
+    z.discriminatedUnion('kind', [
+      z.object({ kind: z.literal('page'), page: PageRefSchema }),
+      z.object({ kind: z.literal('template'), objectNumber: z.number().int().positive() }),
+      z.object({ kind: z.literal('dangling') }),
+    ]),
+  ),
 });
 
 /** See `PageLabelSection`: pages numbered together. */
 export const PageLabelSectionSchema: z.ZodType<PageLabelSection> = z.object({
   firstPage: z.number().int().nonnegative(),
-  style: z.enum(['decimal', 'upperRoman', 'lowerRoman', 'upperLetters', 'lowerLetters']).nullable(),
+  style: closed(
+    z.enum(['decimal', 'upperRoman', 'lowerRoman', 'upperLetters', 'lowerLetters']),
+  ).nullable(),
   firstNumber: z.number().int(),
   prefix: z.string(),
 });
@@ -1857,9 +1872,9 @@ export const OutlineWireComponents = {
 const fontProgramShape = {
   displayHash: z.string().nullable(),
   sourceHash: z.string().nullable(),
-  embedded: z.enum(['whole', 'subset', 'none']),
-  format: z.enum(['truetype', 'opentype', 'cff', 'type1', 'type3']).nullable(),
-  embeddingPermission: z.enum(['installable', 'editable', 'preview-and-print']).nullable(),
+  embedded: closed(z.enum(['whole', 'subset', 'none'])),
+  format: closed(z.enum(['truetype', 'opentype', 'cff', 'type1', 'type3'])).nullable(),
+  embeddingPermission: closed(z.enum(['installable', 'editable', 'preview-and-print'])).nullable(),
   canDownload: z.boolean(),
 };
 
@@ -1869,21 +1884,23 @@ const FontProgramSchema: z.ZodType<FontProgram> = z.object(fontProgramShape);
 /** A font that can be named in a document. */
 const FontSchema: z.ZodType<Font> = z.object({
   name: z.string(),
-  source: z.enum(['standard', 'engine', 'document']),
+  source: closed(z.enum(['standard', 'engine', 'document'])),
   familyName: z.string(),
   weight: z.number().int(),
   italic: z.boolean(),
   postScriptName: z.string().nullable(),
   canChoose: z.boolean(),
   restrictions: z.array(
-    z.enum([
-      'subset',
-      'not-embedded',
-      'preview-and-print',
-      'unsupported-format',
-      'no-unicode-map',
-      'not-served',
-    ]),
+    closed(
+      z.enum([
+        'subset',
+        'not-embedded',
+        'preview-and-print',
+        'unsupported-format',
+        'no-unicode-map',
+        'not-served',
+      ]),
+    ),
   ),
   programs: z.array(FontProgramSchema),
 });
@@ -1995,7 +2012,7 @@ export const ByteRangeSchema = z.tuple([
 export const SignaturePreparedWireSchema = z.object({
   signingId: z.string().min(1),
   digest: Base64Schema,
-  algorithm: z.enum(['sha256', 'sha384', 'sha512']),
+  algorithm: closed(z.enum(['sha256', 'sha384', 'sha512'])),
   byteRange: ByteRangeSchema,
   contentsSize: z.number().int().positive(),
   subFilter: z.string(),
@@ -2028,12 +2045,12 @@ export type SignatureCompleteBody = z.infer<typeof SignatureCompleteBodySchema>;
 // query, and the version catalog.
 // ---------------------------------------------------------------------------
 
-const DocMdpPermissionSchema = z.union([z.literal(1), z.literal(2), z.literal(3)]);
-const ModificationLevelSchema = z.enum(['none', 'lta', 'fill', 'annotate']);
-const DigestAlgorithmSchema = z.enum(['sha1', 'sha256', 'sha384', 'sha512']);
+const DocMdpPermissionSchema = closed(z.union([z.literal(1), z.literal(2), z.literal(3)]));
+const ModificationLevelSchema = closed(z.enum(['none', 'lta', 'fill', 'annotate']));
+const DigestAlgorithmSchema = closed(z.enum(['sha1', 'sha256', 'sha384', 'sha512']));
 
 export const FieldLockSpecSchema: z.ZodType<FieldLockSpec> = z.object({
-  action: z.enum(['all', 'include', 'exclude']),
+  action: closed(z.enum(['all', 'include', 'exclude'])),
   fields: z.array(z.string()),
   permission: DocMdpPermissionSchema.optional(),
 });
@@ -2042,7 +2059,7 @@ export const SignatureSeedValueSchema: z.ZodType<SignatureSeedValue> = z.object(
   requiredFlags: z.number().int(),
   presentFlags: z.number().int(),
   version: z.number().int().nullable(),
-  mdp: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]).nullable(),
+  mdp: closed(z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)])).nullable(),
   filter: z.string().nullable(),
   subFilters: z.array(z.string()),
   digestMethods: z.array(z.string()),
@@ -2056,12 +2073,12 @@ export const SignatureDTOSchema: z.ZodType<SignatureDTO> = z.object({
   fieldName: z.string(),
   widget: FormFieldWidgetSchema.nullable(),
   signed: z.boolean(),
-  kind: z.enum(['signature', 'timestamp']),
+  kind: closed(z.enum(['signature', 'timestamp'])),
   filter: z.string().nullable(),
   subFilter: z.string().nullable(),
   byteRange: ByteRangeSchema.nullable(),
   contentsSize: z.number().int().nonnegative(),
-  coverage: z.enum(['whole-revision', 'partial', 'malformed']).nullable(),
+  coverage: closed(z.enum(['whole-revision', 'partial', 'malformed'])).nullable(),
   revisionIndex: z.number().int().nonnegative().nullable(),
   signer: z.object({
     name: z.string().nullable(),
@@ -2086,7 +2103,7 @@ export const DocumentProtectionSchema: z.ZodType<DocumentProtection> = z.object(
   fieldLocks: z.array(
     z.object({
       signatureIndex: z.number().int().nonnegative(),
-      source: z.enum(['fieldmdp', 'lock']),
+      source: closed(z.enum(['fieldmdp', 'lock'])),
       spec: FieldLockSpecSchema,
     }),
   ),
@@ -2113,7 +2130,7 @@ export const BaseVersionInfoSchema: z.ZodType<BaseVersionInfo> = z.object({
 });
 
 export const SignatureCompleteResultSchema: z.ZodType<SignatureCompleteResult> = z.object({
-  status: z.enum(['completed', 'already-completed']),
+  status: closed(z.enum(['completed', 'already-completed'])),
   signature: SignatureDTOSchema,
   version: BaseVersionInfoSchema,
   previous: DocumentVersionRefSchema,
@@ -2122,12 +2139,12 @@ export const SignatureCompleteResultSchema: z.ZodType<SignatureCompleteResult> =
 });
 
 export const SignatureCancelResultSchema: z.ZodType<SignatureCancelResult> = z.object({
-  status: z.enum(['cancelled', 'already-completed', 'unknown']),
+  status: closed(z.enum(['cancelled', 'already-completed', 'unknown'])),
 });
 
 const ChangeFindingSchema = z.object({
   rule: z.string(),
-  verdict: z.enum(['permitted', 'forbidden', 'incomplete']),
+  verdict: closed(z.enum(['permitted', 'forbidden', 'incomplete'])),
   objectNumber: z.number().int().nonnegative(),
   edge: z.string().optional(),
   detail: z.string().optional(),
@@ -2137,12 +2154,12 @@ const AnalysisDetailSchema = z.enum(['summary', 'full']);
 
 /** The analysis: one verdict (`current`) with its findings, the restrictions it was judged under, and facts about the revisions in between. */
 export const ChangeAnalysisSchema = z.object({
-  mode: z.enum(['authoritative', 'exploratory']),
+  mode: closed(z.enum(['authoritative', 'exploratory'])),
   policyVersion: z.number().int(),
   basis: z.object({
     version: BaseVersionInfoSchema,
     editsVersion: z.number().int().nonnegative(),
-    source: z.enum(['persisted', 'working-copy']),
+    source: closed(z.enum(['persisted', 'working-copy'])),
   }),
   since: z.object({
     revisionIndex: z.number().int().nonnegative(),
@@ -2153,25 +2170,25 @@ export const ChangeAnalysisSchema = z.object({
     z.object({
       signatureIndex: z.number().int().nonnegative(),
       revisionIndex: z.number().int().nonnegative(),
-      source: z.enum(['docmdp', 'fieldmdp', 'lock']),
+      source: closed(z.enum(['docmdp', 'fieldmdp', 'lock'])),
       own: z.boolean(),
-      permission: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional(),
+      permission: closed(z.union([z.literal(1), z.literal(2), z.literal(3)])).optional(),
       fields: z.unknown().optional(),
     }),
   ),
   current: z.object({
-    verdict: z.enum(['unchanged', 'permitted', 'forbidden', 'indeterminate']),
+    verdict: closed(z.enum(['unchanged', 'permitted', 'forbidden', 'indeterminate'])),
     complete: z.boolean(),
     primary: ChangeFindingSchema.optional(),
     findings: z.array(ChangeFindingSchema),
-    method: z.enum(['net-state', 'net-state+replay']),
+    method: closed(z.enum(['net-state', 'net-state+replay'])),
   }),
   later: z.object({
     revisionCount: z.number().int().nonnegative(),
     undoneObjectNumbers: z.array(z.number().int().nonnegative()),
   }),
   /** Equals `current.verdict`. */
-  verdict: z.enum(['unchanged', 'permitted', 'forbidden', 'indeterminate']),
+  verdict: closed(z.enum(['unchanged', 'permitted', 'forbidden', 'indeterminate'])),
   /** The step DTOs are large and evolving; carried verbatim. */
   steps: z.array(z.unknown()),
 }) as unknown as z.ZodType<ChangeAnalysis>;
@@ -2260,7 +2277,7 @@ export const LayerVersionSchema = z.object({
   byteLength: z.number().int().nonnegative(),
   number: z.number().int().positive(),
   parentSha256: z.string().nullable(),
-  producer: z.enum(['upload', 'signature']),
+  producer: closed(z.enum(['upload', 'signature'])),
   signingId: z.string().nullable(),
   createdAt: z.number().int(),
 });

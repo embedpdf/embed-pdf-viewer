@@ -14,5 +14,7 @@ export default defineConfig({
     minWorkers: 1,
     maxWorkers: 4,
     include: ['test/**/*.test.ts'],
+    // Every response the client reads is read again with unknown fields added.
+    setupFiles: ['test/_helpers/readsTolerantly.ts'],
   },
 });

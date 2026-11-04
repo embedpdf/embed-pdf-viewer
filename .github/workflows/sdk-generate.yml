@@ -207,6 +207,19 @@ jobs:
               ;;
           esac
 
+      # Clients read tolerantly (docs/conventions/api-evolution.md): the SDK
+      # reads an annotation list with an unknown field, an annotation of an
+      # unknown subtype and an unknown enum value, as a newer server sends it.
+      - name: Read a response from a newer server
+        if: steps.select.outputs.enabled == 'true'
+        env:
+          LANGUAGE: ${{ matrix.language }}
+        run: |
+          if [[ "$LANGUAGE" == "python" ]]; then
+            python -m pip install --disable-pip-version-check /tmp/cloudpdf-python-dist/*.whl
+          fi
+          node fern/scripts/check-tolerant-reading.mjs "$LANGUAGE"
+
       - name: Resolve SDK repository
         if: steps.select.outputs.enabled == 'true' && inputs.sync_repositories == true && matrix.language != 'typescript'
         id: repository

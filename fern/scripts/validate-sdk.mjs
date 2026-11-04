@@ -130,6 +130,7 @@ switch (language) {
     includes('src/cloudpdf/core/client_wrapper.py', expectedVersion);
     includes('src/cloudpdf/client.py', 'class CloudPDFClient:');
     includes('src/cloudpdf/client.py', 'class AsyncCloudPDFClient:');
+    includes('src/cloudpdf/types/annotation.py', 'def _read_unknown_subtype_as_unsupported(');
     break;
   }
   case 'php': {

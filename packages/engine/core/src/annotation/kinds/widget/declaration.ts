@@ -14,6 +14,7 @@ import {
 import { FormFieldRefSchema } from '../../../identity/FormFieldRef.schema';
 import { defineKind, field } from '../../declaration';
 import { annotationBaseFields, FontNameSchema, widgetBoxFields } from '../shared-fields';
+import { readsUnknownAs } from '../../../wire/reading';
 
 export const WidgetDeclaration = defineKind('widget', {
   ...annotationBaseFields,
@@ -67,16 +68,19 @@ export const WidgetDeclaration = defineKind('widget', {
   field: field.engine(FormFieldRefSchema).nullable(),
   /** Its field's family, so a widget reads as what it is without the form. */
   fieldFamily: field.engine(
-    z.enum([
-      'text',
-      'checkbox',
-      'radio',
-      'combobox',
-      'listbox',
-      'pushbutton',
-      'signature',
+    readsUnknownAs(
+      z.enum([
+        'text',
+        'checkbox',
+        'radio',
+        'combobox',
+        'listbox',
+        'pushbutton',
+        'signature',
+        'unknown',
+      ]),
       'unknown',
-    ]),
+    ),
   ),
   /**
    * Whether a mark is in the widget: its field is a signature field that is

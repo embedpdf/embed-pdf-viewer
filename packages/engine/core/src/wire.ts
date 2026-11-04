@@ -146,6 +146,7 @@ export {
   PageFlattenInputSchema,
   PageFlattenResultSchema,
   RedactionApplyScopeSchema,
+  RedactionApplyScopeInputSchema,
   RedactionApplyResultSchema,
   SearchQuerySchema,
   SearchRequestSchema,
@@ -153,6 +154,7 @@ export {
   SearchMatchSchema,
   SearchSliceSchema,
   IdentitySchema,
+  IdentityInputSchema,
 } from './wire/schemas';
 export {
   PdfActionTypeSchema,
@@ -492,3 +494,4 @@ export {
   ChangeResultSchema,
   ChangeWireComponents,
 } from './wire/changeSchemas';
+export { closed, readingOf, readsUnknownAs, withCatchAll, type SetReading } from './wire/reading';

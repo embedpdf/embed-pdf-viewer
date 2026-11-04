@@ -86,6 +86,29 @@ const SHARED_COMPONENT_SCHEMAS = sharedComponents([
 const SHARED_COMPONENT_BY_DEFINITION = new Map<z.ZodTypeDef, string>(
   Object.entries(SHARED_COMPONENT_SCHEMAS).map(([name, schema]) => [schema._def, name]),
 );
+/**
+ * A response ignores fields it doesn't know and a request refuses them, so
+ * the model a request names can be the response model's `.strict()` twin:
+ * the same object, so the same component.
+ */
+const SHARED_OBJECT_COMPONENT_BY_SHAPE = new Map<unknown, string>(
+  Object.entries(SHARED_COMPONENT_SCHEMAS).flatMap(([name, schema]) => {
+    const definition = schema._def as Partial<z.ZodObjectDef>;
+    return definition.typeName === z.ZodFirstPartyTypeKind.ZodObject
+      ? [[definition.shape, name] as const]
+      : [];
+  }),
+);
+
+function sharedComponentOf(definition: z.ZodTypeDef): string | undefined {
+  const shared = SHARED_COMPONENT_BY_DEFINITION.get(definition);
+  if (shared) return shared;
+  const object = definition as Partial<z.ZodObjectDef>;
+  return object.typeName === z.ZodFirstPartyTypeKind.ZodObject && object.unknownKeys === 'strict'
+    ? SHARED_OBJECT_COMPONENT_BY_SHAPE.get(object.shape)
+    : undefined;
+}
+
 const SHARED_COMPONENT_REFS = new Set(
   Object.keys(SHARED_COMPONENT_SCHEMAS).map((name) => `#/components/schemas/${name}`),
 );
@@ -431,7 +454,7 @@ function registerSchema(
     $refStrategy: 'root',
     basePath: ['#', ...componentPath],
     override: (definition) => {
-      const sharedName = SHARED_COMPONENT_BY_DEFINITION.get(definition);
+      const sharedName = sharedComponentOf(definition);
       if (!sharedName || sharedName === name) return ignoreOverride;
       return { $ref: `#/components/schemas/${sharedName}` };
     },

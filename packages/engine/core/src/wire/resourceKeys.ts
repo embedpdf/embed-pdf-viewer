@@ -23,5 +23,5 @@ export const FileResourceKeysSchema = z.object({ file: ResourceKeySchema }).stri
 /** The PDF whose pages an insert copies in. */
 export const SourceResourceKeysSchema = z.object({ source: ResourceKeySchema }).strict();
 
-/** An answer's picture. */
-export const ImageResourceKeysSchema = z.object({ image: ResourceKeySchema }).strict();
+/** An answer's picture: read like every answer, ignoring a role it doesn't know. */
+export const ImageResourceKeysSchema = z.object({ image: ResourceKeySchema });

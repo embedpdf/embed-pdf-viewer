@@ -19,6 +19,7 @@ import {
   PdfFieldActionsSchema,
   WidgetActionsPatchSchema,
 } from '../dto/PdfAction.schema';
+import { closed, withCatchAll } from '../wire/reading';
 
 export { FormFieldRefSchema };
 
@@ -47,17 +48,21 @@ export const FormFieldOptionSchema: z.ZodType<FormFieldOption> = z.object({
   selected: z.boolean(),
 });
 
-export const FormValueEntrySchema: z.ZodType<FormValueEntry> = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('none') }),
-  z.object({ kind: z.literal('scalar'), value: z.string() }),
-  z.object({ kind: z.literal('array'), values: z.array(z.string()) }),
-  z.object({ kind: z.literal('unsupported') }),
-]);
+/** A `/V` of a kind this client doesn't know reads as `unsupported`. */
+export const FormValueEntrySchema: z.ZodType<FormValueEntry> = withCatchAll(
+  z.discriminatedUnion('kind', [
+    z.object({ kind: z.literal('none') }),
+    z.object({ kind: z.literal('scalar'), value: z.string() }),
+    z.object({ kind: z.literal('array'), values: z.array(z.string()) }),
+    z.object({ kind: z.literal('unsupported') }),
+  ]),
+  'unsupported',
+);
 
 const FormFieldBaseShape = {
   ref: FormFieldRefSchema,
   name: z.string(),
-  origin: z.enum(['acroform', 'recovered']),
+  origin: closed(z.enum(['acroform', 'recovered'])),
   readOnly: z.boolean(),
   required: z.boolean(),
   noExport: z.boolean(),
@@ -76,65 +81,73 @@ const FormFieldBaseShape = {
   widgets: z.array(FormFieldWidgetSchema),
 };
 
-export const FormFieldDTOSchema: z.ZodType<FormFieldDTO> = z.discriminatedUnion('family', [
-  z.object({
-    ...FormFieldBaseShape,
-    family: z.literal('text'),
-    value: z.string(),
-    defaultValue: z.string(),
-    maxLength: z.number().int().positive().nullable(),
-    multiline: z.boolean(),
-    password: z.boolean(),
-    comb: z.boolean(),
-  }),
-  z.object({
-    ...FormFieldBaseShape,
-    family: z.literal('checkbox'),
-    checked: z.boolean(),
-    exportValue: z.string(),
-    widgets: z.array(ToggleFieldWidgetSchema),
-  }),
-  z.object({
-    ...FormFieldBaseShape,
-    family: z.literal('radio'),
-    value: z.string(),
-    radiosInUnison: z.boolean(),
-    noToggleToOff: z.boolean(),
-    widgets: z.array(ToggleFieldWidgetSchema),
-  }),
-  z.object({
-    ...FormFieldBaseShape,
-    family: z.literal('combobox'),
-    value: z.string(),
-    defaultValue: z.string(),
-    edit: z.boolean(),
-    options: z.array(FormFieldOptionSchema),
-  }),
-  z.object({
-    ...FormFieldBaseShape,
-    family: z.literal('listbox'),
-    selectedValues: z.array(z.string()),
-    defaultValue: z.array(z.string()),
-    multiSelect: z.boolean(),
-    options: z.array(FormFieldOptionSchema),
-    topIndex: z.number().int().nonnegative(),
-  }),
-  z.object({
-    ...FormFieldBaseShape,
-    family: z.literal('pushbutton'),
-  }),
-  z.object({
-    ...FormFieldBaseShape,
-    family: z.literal('signature'),
-  }),
-  z.object({
-    ...FormFieldBaseShape,
-    family: z.literal('unknown'),
-    rawValue: z.string(),
-  }),
-]) as unknown as z.ZodType<FormFieldDTO>;
+/**
+ * A field of a family this client doesn't know reads as `unknown`, with the
+ * body's `rawValue` when it carries one and `''` when it doesn't.
+ */
+export const FormFieldDTOSchema: z.ZodType<FormFieldDTO> = withCatchAll(
+  z.discriminatedUnion('family', [
+    z.object({
+      ...FormFieldBaseShape,
+      family: z.literal('text'),
+      value: z.string(),
+      defaultValue: z.string(),
+      maxLength: z.number().int().positive().nullable(),
+      multiline: z.boolean(),
+      password: z.boolean(),
+      comb: z.boolean(),
+    }),
+    z.object({
+      ...FormFieldBaseShape,
+      family: z.literal('checkbox'),
+      checked: z.boolean(),
+      exportValue: z.string(),
+      widgets: z.array(ToggleFieldWidgetSchema),
+    }),
+    z.object({
+      ...FormFieldBaseShape,
+      family: z.literal('radio'),
+      value: z.string(),
+      radiosInUnison: z.boolean(),
+      noToggleToOff: z.boolean(),
+      widgets: z.array(ToggleFieldWidgetSchema),
+    }),
+    z.object({
+      ...FormFieldBaseShape,
+      family: z.literal('combobox'),
+      value: z.string(),
+      defaultValue: z.string(),
+      edit: z.boolean(),
+      options: z.array(FormFieldOptionSchema),
+    }),
+    z.object({
+      ...FormFieldBaseShape,
+      family: z.literal('listbox'),
+      selectedValues: z.array(z.string()),
+      defaultValue: z.array(z.string()),
+      multiSelect: z.boolean(),
+      options: z.array(FormFieldOptionSchema),
+      topIndex: z.number().int().nonnegative(),
+    }),
+    z.object({
+      ...FormFieldBaseShape,
+      family: z.literal('pushbutton'),
+    }),
+    z.object({
+      ...FormFieldBaseShape,
+      family: z.literal('signature'),
+    }),
+    z.object({
+      ...FormFieldBaseShape,
+      family: z.literal('unknown'),
+      rawValue: z.string(),
+    }),
+  ]) as unknown as z.ZodType<FormFieldDTO>,
+  'unknown',
+  (field) => ({ ...field, rawValue: typeof field.rawValue === 'string' ? field.rawValue : '' }),
+);
 
-export const FormKindSchema: z.ZodType<FormKind> = z.enum(['none', 'acroform', 'xfa']);
+export const FormKindSchema: z.ZodType<FormKind> = closed(z.enum(['none', 'acroform', 'xfa']));
 
 export const FormSnapshotSchema: z.ZodType<FormSnapshot> = z.object({
   formKind: FormKindSchema,

@@ -12,21 +12,21 @@ import type {
   WidgetActionsPatch,
 } from './PdfAction';
 import { PageDestinationSchema, PdfDestinationSchema } from './PdfDestination.schema';
+import { closed, withCatchAll } from '../wire/reading';
 
-export const PdfActionTargetRefSchema: z.ZodType<PdfActionTargetRef> = z.discriminatedUnion(
-  'kind',
-  [
+export const PdfActionTargetRefSchema: z.ZodType<PdfActionTargetRef> = closed(
+  z.discriminatedUnion('kind', [
     z.object({ kind: z.literal('name'), name: z.string() }),
     z.object({ kind: z.literal('objectNumber'), objectNumber: z.number().int().positive() }),
-  ],
+  ]),
 ) as unknown as z.ZodType<PdfActionTargetRef>;
 
 const SubmitFormFlagsSchema = z.object({
   raw: z.number().int().nonnegative(),
   exclude: z.boolean(),
   includeNoValueFields: z.boolean(),
-  format: z.enum(['fdf', 'html', 'xfdf', 'pdf']),
-  method: z.enum(['post', 'get']),
+  format: closed(z.enum(['fdf', 'html', 'xfdf', 'pdf'])),
+  method: closed(z.enum(['post', 'get'])),
   submitCoordinates: z.boolean(),
   includeAppendSaves: z.boolean(),
   includeAnnotations: z.boolean(),
@@ -85,15 +85,20 @@ function actionSchemasFor<Destination>(destination: z.ZodType<Destination>) {
     arm('goto-3d-view'),
     arm('unknown'),
   ] as const;
-  const node: z.ZodType<PdfActionNode<Destination>> = z.lazy(
-    () =>
+  /** An action of a type this client doesn't know reads as `unknown`, with its `subtype` and `next`. */
+  const node: z.ZodType<PdfActionNode<Destination>> = z.lazy(() =>
+    withCatchAll(
       z.discriminatedUnion('type', [...arms]) as unknown as z.ZodType<PdfActionNode<Destination>>,
+      'unknown',
+    ),
   );
   const tree: z.ZodType<PdfActionTree<Destination>> = z.object({
     root: node.nullable(),
     incomplete: z.boolean(),
     warningFlags: z.number().int().nonnegative(),
-    warnings: z.array(z.enum(['cycle-dropped', 'malformed-next', 'incomplete', 'payload-dropped'])),
+    warnings: z.array(
+      closed(z.enum(['cycle-dropped', 'malformed-next', 'incomplete', 'payload-dropped'])),
+    ),
   });
   const fieldActions = z.object({
     keystroke: tree.optional(),

@@ -180,8 +180,64 @@ if (language === 'python') {
     const documentPath = `${outputDirectory}/${document}`;
     writeFileSync(
       documentPath,
-      readFileSync(documentPath, 'utf8').replaceAll('CloudPDFClientEnvironment', 'CloudPDFEnvironment'),
+      readFileSync(documentPath, 'utf8').replaceAll(
+        'CloudPDFClientEnvironment',
+        'CloudPDFEnvironment',
+      ),
     );
+  }
+
+  // Clients read an annotation of a subtype they don't know, one a newer
+  // server sends, as `unsupported` (docs/conventions/api-evolution.md,
+  // "Reading tolerantly"). fern-python-sdk 5.26.0 has no setting for it: the
+  // union dispatches with pydantic's `discriminator`, which refuses an unknown
+  // tag and with it the whole list. Put a validator in front of that dispatch
+  // that turns an unknown subtype into `unsupported`; a known one goes on to
+  // its model as before. Fail if Fern changes the union's shape.
+  const annotationPath = `${outputDirectory}/src/cloudpdf/types/annotation.py`;
+  const annotationSource = readFileSync(annotationPath, 'utf8');
+  const generatedDispatch =
+    '        Annotation_Unsupported,\n    ],\n    pydantic.Field(discriminator="subtype"),\n]\n';
+  const unknownSubtypeAsUnsupported = `
+
+# An annotation of a subtype this SDK doesn't know, one a newer server sends,
+# reads as \`unsupported\`: the fields every annotation has, with
+# \`rawSubtypeCode\` and \`rawSubtypeName\` from the body when it carries them and
+# 0 and None when it doesn't. A subtype it knows is read as that subtype.
+# Added after generation by fern/scripts/record-sdk-metadata.mjs.
+if IS_PYDANTIC_V2:
+    _ANNOTATION_SUBTYPES = frozenset(
+        member.model_fields["subtype"].default
+        for member in typing.get_args(typing.get_args(Annotation)[0])
+    )
+
+    def _read_unknown_subtype_as_unsupported(value: typing.Any) -> typing.Any:
+        if not isinstance(value, dict):
+            return value
+        subtype = value.get("subtype")
+        if not isinstance(subtype, str) or subtype in _ANNOTATION_SUBTYPES:
+            return value
+        raw_code = value.get("rawSubtypeCode")
+        raw_name = value.get("rawSubtypeName")
+        return {
+            **value,
+            "subtype": "unsupported",
+            "rawSubtypeCode": raw_code if isinstance(raw_code, int) and not isinstance(raw_code, bool) else 0,
+            "rawSubtypeName": raw_name if isinstance(raw_name, str) else None,
+        }
+
+    Annotation = typing_extensions.Annotated[  # type: ignore[misc]
+        Annotation, pydantic.BeforeValidator(_read_unknown_subtype_as_unsupported)
+    ]
+`;
+  if (!annotationSource.endsWith(unknownSubtypeAsUnsupported)) {
+    if (
+      !annotationSource.endsWith(generatedDispatch) ||
+      !annotationSource.includes('\nAnnotation = typing_extensions.Annotated[\n    typing.Union[\n')
+    ) {
+      throw new Error('Python Annotation union changed; revisit the unknown-subtype patch');
+    }
+    writeFileSync(annotationPath, annotationSource + unknownSubtypeAsUnsupported);
   }
 }
 
