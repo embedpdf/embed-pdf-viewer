@@ -31,7 +31,10 @@ export function ZoomGestureWrapper({
       {...props}
       style={{
         ...style,
-        display: 'inline-block',
+        display: 'block',
+        width: 'fit-content',
+        marginLeft: 'auto',
+        marginRight: 'auto',
         overflow: 'visible',
         boxSizing: 'border-box',
       }}
