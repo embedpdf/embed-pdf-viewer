@@ -190,7 +190,8 @@ export interface ChromeSettings {
  * fields most tools have are typed, the rest read as `unknown`.
  */
 export interface ToolDefaults {
-  readonly color?: string;
+  /** `null` on a shape or line tool: no stroke. */
+  readonly color?: string | null;
   readonly interiorColor?: string | null;
   readonly opacity?: number;
   readonly strokeWidth?: number;

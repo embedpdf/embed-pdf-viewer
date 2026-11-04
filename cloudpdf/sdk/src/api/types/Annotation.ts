@@ -516,7 +516,7 @@ export namespace Annotation {
         modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
-        color: string;
+        color: string | null;
         opacity: number;
         strokeWidth: number;
         borderStyle: AnnotationCircle.BorderStyle;
@@ -617,7 +617,7 @@ export namespace Annotation {
         modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
-        color: string;
+        color: string | null;
         opacity: number;
         strokeWidth: number;
         borderStyle: AnnotationSquare.BorderStyle;
@@ -718,7 +718,7 @@ export namespace Annotation {
         modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
-        color: string;
+        color: string | null;
         opacity: number;
         strokeWidth: number;
         borderStyle: AnnotationPolygon.BorderStyle;
@@ -835,7 +835,7 @@ export namespace Annotation {
         modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
-        color: string;
+        color: string | null;
         opacity: number;
         strokeWidth: number;
         borderStyle: AnnotationPolyline.BorderStyle;
@@ -985,7 +985,7 @@ export namespace Annotation {
         modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
-        color: string;
+        color: string | null;
         opacity: number;
         strokeWidth: number;
         borderStyle: AnnotationLine.BorderStyle;
@@ -1236,7 +1236,7 @@ export namespace Annotation {
         modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
-        color: string;
+        color: string | null;
         opacity: number;
         strokeWidth: number;
         borderStyle: AnnotationInk.BorderStyle;

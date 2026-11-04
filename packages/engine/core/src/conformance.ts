@@ -88,6 +88,11 @@ export {
   type ColorConformanceOptions,
 } from './conformance/runColorConformance';
 export {
+  NO_STROKE_FIXTURE_PDF,
+  runNoStrokeConformance,
+  type NoStrokeConformanceOptions,
+} from './conformance/runNoStrokeConformance';
+export {
   APPEARANCE_STATES_FIXTURE_PDF,
   runAppearanceStatesConformance,
   type AppearanceStatesConformanceOptions,

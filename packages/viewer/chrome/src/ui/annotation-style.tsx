@@ -758,23 +758,13 @@ function FieldControl({
   switch (spec.key) {
     case 'color':
     case 'fontColor':
-      return (
-        <Field label={label(spec)} mixed={mixed}>
-          <SwatchGrid
-            value={value as string}
-            onSelect={(color) => onChange({ [spec.key]: color })}
-          />
-        </Field>
-      );
     case 'interiorColor':
       return (
         <Field label={label(spec)} mixed={mixed}>
           <SwatchGrid
             value={value as string | null}
-            allowTransparent
-            onSelect={(color) =>
-              onChange({ interiorColor: color === 'transparent' ? null : color })
-            }
+            allowTransparent={spec.allowsNone}
+            onSelect={(color) => onChange({ [spec.key]: color === 'transparent' ? null : color })}
           />
         </Field>
       );

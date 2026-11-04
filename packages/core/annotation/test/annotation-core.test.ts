@@ -1436,6 +1436,73 @@ describe('annotation-core', () => {
     expect(scene(item)[0].paint.join).toBeUndefined(); // solid border → default miter joins
   });
 
+  it('scene() paints a shape with no stroke color as its fill alone, inset where the stroke would be', () => {
+    const item: RenderItem = placed({
+      id: 's',
+      ref: null,
+      subtype: 'square',
+      geometry: {
+        kind: 'box',
+        box: { x: 0, y: 0, width: 50, height: 40 },
+        rotation: 0,
+        ellipse: false,
+      },
+      box: { x: 0, y: 0, width: 50, height: 40 },
+      style: {
+        color: null,
+        interiorColor: '#eeeeee',
+        strokeWidth: 4,
+        opacity: 1,
+        blendMode: 'normal',
+        borderStyle: 'solid',
+        dashArray: null,
+        cloudyIntensity: null,
+      },
+      source: 'vector',
+      selected: false,
+    });
+    const [rect] = scene(item);
+    expect(rect).toMatchObject({ kind: 'rect', rect: { x: 2, y: 2, width: 46, height: 36 } });
+    expect(rect!.paint.fill).toBe('#eeeeee');
+    expect(rect!.paint.stroke).toBeUndefined();
+  });
+
+  it('scene() draws a line at width 0 as a hairline, with the endings of a 1 pt line', () => {
+    const lineAt = (strokeWidth: number): RenderItem =>
+      placed({
+        id: 'l',
+        ref: null,
+        subtype: 'line',
+        geometry: {
+          kind: 'line',
+          linePoints: { start: { x: 0, y: 0 }, end: { x: 100, y: 0 } },
+          lineEndings: { start: 'none', end: 'open-arrow' },
+          rotation: 0,
+        },
+        box: { x: 0, y: -10, width: 100, height: 20 },
+        style: {
+          color: '#ff0000',
+          interiorColor: null,
+          strokeWidth,
+          opacity: 1,
+          blendMode: 'normal',
+          borderStyle: 'solid',
+          dashArray: null,
+          cloudyIntensity: null,
+        },
+        source: 'vector',
+        selected: false,
+      });
+    const hairline = scene(lineAt(0));
+    const onePoint = scene(lineAt(1));
+    expect(hairline.every((node) => node.paint.hairline === true)).toBe(true);
+    expect(onePoint.some((node) => node.paint.hairline)).toBe(false);
+    // The arrowhead is where a 1 pt line's is.
+    expect(hairline.slice(1).map((node) => ({ ...node, paint: undefined }))).toEqual(
+      onePoint.slice(1).map((node) => ({ ...node, paint: undefined })),
+    );
+  });
+
   it('scene() strokes a cloudy border with ROUND joins (PDFium `1 j` parity) — polygon and box alike', () => {
     // The curl tails reverse direction by design; a miter join spikes at every
     // seam. PDFium bakes cloudy APs with `1 j`, so the live paint must match.
@@ -1514,12 +1581,15 @@ describe('annotation-core', () => {
     // a short tap (no travel) is discarded, not committed
     const tap = run(initialModel, [ink('down', 5, 5), ink('up', 5, 5)]);
     expect(tap.order).toHaveLength(0);
-    // scene: each stroke is a stroke-only open polyline, with round caps (pen ends)
+    // scene: each stroke is the stroke-only curves Acrobat draws it with,
+    // with round caps (pen ends) and no join
     const node = scene(pageItems(model, PAGE)[0])[0];
-    expect(node.kind).toBe('poly');
+    expect(node.kind).toBe('path');
+    expect(node.kind === 'path' && node.d).toMatch(/^M 10 10 C /);
     expect(node.paint.fill).toBeUndefined();
     expect(node.paint.stroke).toBe(styleOf(record.annotation).color);
     expect(node.paint.lineCap).toBe('round');
+    expect(node.paint.join).toBeUndefined();
   });
 
   it('groups deferred ink strokes, straightens each stroke, and commits one intent-bearing annotation', () => {
@@ -3056,7 +3126,7 @@ describe('annotation-core — join-aware stroke bounds', () => {
     expect(sb.height).toBeGreaterThan(tight.height);
   });
 
-  it('ink bounds are unchanged — a plain half-width grow of the freehand hull (round, never spikes)', () => {
+  it("ink bounds are what its curves paint: half the width round Acrobat's curve, which swings past the points", () => {
     const geometry: Shape = {
       kind: 'ink',
       inkList: [
@@ -3072,12 +3142,13 @@ describe('annotation-core — join-aware stroke bounds', () => {
     const halfWidth = sw / 2;
     const rect = geomVisualBounds(geometry, { strokeWidth: sw });
     const hull = geomBounds(geometry);
-    expect(rect).toEqual({
-      x: hull.x - halfWidth,
-      y: hull.y - halfWidth,
-      width: hull.width + sw,
-      height: hull.height + sw,
-    });
+    // The round caps at the two ends.
+    expect(rect.x).toBeCloseTo(hull.x - halfWidth, 9);
+    expect(rect.y + rect.height).toBeCloseTo(hull.y + hull.height + halfWidth, 9);
+    // The curve rises to 6.9448 between the first two points and swings out
+    // to 62.1363 past the second.
+    expect(rect.y).toBeCloseTo(6.9448 - halfWidth, 3);
+    expect(rect.x + rect.width).toBeCloseTo(62.1363 + halfWidth, 3);
   });
 
   it('a mitred arrowhead tip is fully enclosed — the box reaches ~sw past the tip vertex', () => {
@@ -3095,7 +3166,7 @@ describe('annotation-core — join-aware stroke bounds', () => {
     expect(rect.x + rect.width).toBeGreaterThanOrEqual(100 + sw - 1e-6);
   });
 
-  it('scene paint: only ink rounds its joins; shapes and polys stay sharp (miter)', () => {
+  it('scene paint: shapes, polys and ink keep the miter join; only ink rounds its caps', () => {
     const mk = (subtype: KindName, geometry: Shape): RenderItem =>
       placed({
         id: 'x',
@@ -3159,7 +3230,9 @@ describe('annotation-core — join-aware stroke bounds', () => {
     expect(scene(square)[0].paint.join).toBeUndefined();
     expect(scene(polyline)[0].paint.join).toBeUndefined();
     expect(scene(polygon)[0].paint.join).toBeUndefined();
-    expect(scene(ink)[0].paint.join).toBe('round');
+    // Ink's curves meet smoothly: Acrobat sets no join, only round caps.
+    expect(scene(ink)[0].paint.join).toBeUndefined();
+    expect(scene(ink)[0].paint.lineCap).toBe('round');
   });
 });
 

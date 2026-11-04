@@ -11509,7 +11509,12 @@
                 "nullable": true
               },
               "color": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/color"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/color"
+                  }
+                ],
+                "nullable": true
               },
               "opacity": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/opacity"
@@ -11742,7 +11747,12 @@
                 "nullable": true
               },
               "color": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/color"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/color"
+                  }
+                ],
+                "nullable": true
               },
               "opacity": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/opacity"
@@ -11975,7 +11985,12 @@
                 "nullable": true
               },
               "color": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/color"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/color"
+                  }
+                ],
+                "nullable": true
               },
               "opacity": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/opacity"
@@ -12359,7 +12374,12 @@
                 "nullable": true
               },
               "color": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/color"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/color"
+                  }
+                ],
+                "nullable": true
               },
               "opacity": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/opacity"
@@ -12641,7 +12661,12 @@
                 "nullable": true
               },
               "color": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/color"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/color"
+                  }
+                ],
+                "nullable": true
               },
               "opacity": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/opacity"
@@ -13127,7 +13152,12 @@
                 "nullable": true
               },
               "color": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/color"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/color"
+                  }
+                ],
+                "nullable": true
               },
               "opacity": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/opacity"
@@ -15741,7 +15771,12 @@
               "importedBy": {},
               "actions": {},
               "color": {
-                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/color"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/color"
+                  }
+                ],
+                "nullable": true
               },
               "opacity": {
                 "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/opacity"
@@ -15873,7 +15908,12 @@
               "importedBy": {},
               "actions": {},
               "color": {
-                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/color"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/color"
+                  }
+                ],
+                "nullable": true
               },
               "opacity": {
                 "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/opacity"
@@ -16005,7 +16045,12 @@
               "importedBy": {},
               "actions": {},
               "color": {
-                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/color"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/color"
+                  }
+                ],
+                "nullable": true
               },
               "opacity": {
                 "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/opacity"
@@ -16291,7 +16336,12 @@
               "importedBy": {},
               "actions": {},
               "color": {
-                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/color"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/color"
+                  }
+                ],
+                "nullable": true
               },
               "opacity": {
                 "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/opacity"
@@ -16469,7 +16519,12 @@
               "importedBy": {},
               "actions": {},
               "color": {
-                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/color"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/color"
+                  }
+                ],
+                "nullable": true
               },
               "opacity": {
                 "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/opacity"
@@ -16755,7 +16810,12 @@
               "importedBy": {},
               "actions": {},
               "color": {
-                "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/color"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/color"
+                  }
+                ],
+                "nullable": true
               },
               "opacity": {
                 "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/opacity"
@@ -18580,7 +18640,12 @@
               "importedBy": {},
               "actions": {},
               "color": {
-                "$ref": "#/components/schemas/AnnotationPatch/anyOf/0/properties/color"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/AnnotationPatch/anyOf/0/properties/color"
+                  }
+                ],
+                "nullable": true
               },
               "opacity": {
                 "$ref": "#/components/schemas/AnnotationPatch/anyOf/0/properties/opacity"
@@ -18719,7 +18784,12 @@
               "importedBy": {},
               "actions": {},
               "color": {
-                "$ref": "#/components/schemas/AnnotationPatch/anyOf/0/properties/color"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/AnnotationPatch/anyOf/0/properties/color"
+                  }
+                ],
+                "nullable": true
               },
               "opacity": {
                 "$ref": "#/components/schemas/AnnotationPatch/anyOf/0/properties/opacity"
@@ -18857,7 +18927,12 @@
               "importedBy": {},
               "actions": {},
               "color": {
-                "$ref": "#/components/schemas/AnnotationPatch/anyOf/0/properties/color"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/AnnotationPatch/anyOf/0/properties/color"
+                  }
+                ],
+                "nullable": true
               },
               "opacity": {
                 "$ref": "#/components/schemas/AnnotationPatch/anyOf/0/properties/opacity"
@@ -19159,7 +19234,12 @@
               "importedBy": {},
               "actions": {},
               "color": {
-                "$ref": "#/components/schemas/AnnotationPatch/anyOf/0/properties/color"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/AnnotationPatch/anyOf/0/properties/color"
+                  }
+                ],
+                "nullable": true
               },
               "opacity": {
                 "$ref": "#/components/schemas/AnnotationPatch/anyOf/0/properties/opacity"
@@ -19353,7 +19433,12 @@
               "importedBy": {},
               "actions": {},
               "color": {
-                "$ref": "#/components/schemas/AnnotationPatch/anyOf/0/properties/color"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/AnnotationPatch/anyOf/0/properties/color"
+                  }
+                ],
+                "nullable": true
               },
               "opacity": {
                 "$ref": "#/components/schemas/AnnotationPatch/anyOf/0/properties/opacity"
@@ -19656,7 +19741,12 @@
               "importedBy": {},
               "actions": {},
               "color": {
-                "$ref": "#/components/schemas/AnnotationPatch/anyOf/0/properties/color"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/AnnotationPatch/anyOf/0/properties/color"
+                  }
+                ],
+                "nullable": true
               },
               "opacity": {
                 "$ref": "#/components/schemas/AnnotationPatch/anyOf/0/properties/opacity"

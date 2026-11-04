@@ -117,8 +117,11 @@ export type Shape =
  * hit-testing: nothing is written back through it.
  */
 export interface Style {
-  /** The stroke for a drawn kind, a markup's colour, a free text's border. */
-  color: Color;
+  /**
+   * The stroke for a drawn kind, a markup's colour, a free text's border.
+   * `null` strokes nothing: a shape with no stroke keeps its fill and its width.
+   */
+  color: Color | null;
   /** The fill; `null` when the annotation has none. */
   interiorColor: Color | null;
   strokeWidth: number;
@@ -932,9 +935,11 @@ export interface Paint {
   opacity?: number;
   dash?: number[]; // stroke dash (content units)
   blend?: Exclude<BlendMode, 'normal'>;
-  lineCap?: 'round'; // stroke-linecap; omitted = the default butt. Round for freehand ink.
-  join?: 'round'; // stroke-linejoin; omitted = the default miter. Round for freehand ink.
+  lineCap?: 'round'; // stroke-linecap; omitted = the default butt. Round for ink and icons.
+  join?: 'round'; // stroke-linejoin; omitted = the default miter. Round for clouds and icons.
   fillRule?: 'evenodd'; // fill-rule; omitted = the default nonzero. Even-odd punches icon holes.
+  /** The thinnest line the screen draws, one pixel at any zoom: a stroke of width 0 (ISO 32000-2 §8.4.3.2). */
+  hairline?: true;
 }
 
 /**

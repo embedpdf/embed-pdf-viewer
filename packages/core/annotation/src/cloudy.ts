@@ -16,6 +16,7 @@
  * The internal math runs in PDFBox's y-up frame; a `CurveSink` flips back to
  * y-down and translates into the box's page-space origin on the way out.
  */
+import { bezierAt, bezierTurns, pathNumber } from './bezier';
 import { expandRect } from './rect';
 import type { Rect, Point } from './types';
 
@@ -29,8 +30,6 @@ interface P {
   x: number;
   y: number;
 }
-
-const formatNumber = (value: number): string => Number(value.toFixed(4)).toString();
 
 /**
  * Where the cloud's curves go: an SVG path (`PathBuilder`), their bounds
@@ -54,12 +53,12 @@ class PathBuilder implements CurveSink {
     private oy: number,
   ) {}
   moveTo(x: number, y: number): void {
-    this.parts.push(`M ${formatNumber(x + this.ox)} ${formatNumber(-y + this.oy)}`);
+    this.parts.push(`M ${pathNumber(x + this.ox)} ${pathNumber(-y + this.oy)}`);
     this.started = true;
   }
   curveTo(x1: number, y1: number, x2: number, y2: number, x3: number, y3: number): void {
     this.parts.push(
-      `C ${formatNumber(x1 + this.ox)} ${formatNumber(-y1 + this.oy)}, ${formatNumber(x2 + this.ox)} ${formatNumber(-y2 + this.oy)}, ${formatNumber(x3 + this.ox)} ${formatNumber(-y3 + this.oy)}`,
+      `C ${pathNumber(x1 + this.ox)} ${pathNumber(-y1 + this.oy)}, ${pathNumber(x2 + this.ox)} ${pathNumber(-y2 + this.oy)}, ${pathNumber(x3 + this.ox)} ${pathNumber(-y3 + this.oy)}`,
     );
   }
   close(): void {
@@ -68,35 +67,6 @@ class PathBuilder implements CurveSink {
   build(): string {
     return this.parts.join(' ');
   }
-}
-
-/** The point at `t` on the cubic Bézier `p0..p3`. */
-function bezierAt(p0: P, p1: P, p2: P, p3: P, t: number): P {
-  const rest = 1 - t;
-  const weights = [rest * rest * rest, 3 * rest * rest * t, 3 * rest * t * t, t * t * t];
-  return {
-    x: weights[0]! * p0.x + weights[1]! * p1.x + weights[2]! * p2.x + weights[3]! * p3.x,
-    y: weights[0]! * p0.y + weights[1]! * p1.y + weights[2]! * p2.y + weights[3]! * p3.y,
-  };
-}
-
-/** Where a cubic Bézier coordinate `p0..p3` turns: the parameters in (0, 1) where its slope is zero. */
-function turnsOf(p0: number, p1: number, p2: number, p3: number): number[] {
-  const a = -p0 + 3 * p1 - 3 * p2 + p3;
-  const b = 2 * (p0 - 2 * p1 + p2);
-  const c = p1 - p0;
-  const roots =
-    Math.abs(a) < 1e-12
-      ? Math.abs(b) < 1e-12
-        ? []
-        : [-c / b]
-      : b * b - 4 * a * c < 0
-        ? []
-        : [
-            (-b + Math.sqrt(b * b - 4 * a * c)) / (2 * a),
-            (-b - Math.sqrt(b * b - 4 * a * c)) / (2 * a),
-          ];
-  return roots.filter((t) => t > 0 && t < 1);
 }
 
 /**
@@ -131,7 +101,10 @@ class CurveBounds implements CurveSink {
     const p1 = this.place(x1, y1);
     const p2 = this.place(x2, y2);
     const p3 = this.place(x3, y3);
-    for (const t of [...turnsOf(p0.x, p1.x, p2.x, p3.x), ...turnsOf(p0.y, p1.y, p2.y, p3.y)]) {
+    for (const t of [
+      ...bezierTurns(p0.x, p1.x, p2.x, p3.x),
+      ...bezierTurns(p0.y, p1.y, p2.y, p3.y),
+    ]) {
       this.add(bezierAt(p0, p1, p2, p3, t));
     }
     this.add(p3);

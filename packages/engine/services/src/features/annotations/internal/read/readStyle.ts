@@ -1,6 +1,5 @@
 import type {
   AnnotationBorderStyle,
-  Color,
   FilledStyleFields,
   GeometryStyleFields,
 } from '@embedpdf/engine-core/runtime';
@@ -14,12 +13,6 @@ import {
   readBorderDashPattern,
   readBorderStyle,
 } from './annotationReadPrimitives';
-
-/**
- * Default `/C` colour when an annotation has none: circle, square,
- * polygon, polyline, line and ink all default to red.
- */
-const DEFAULT_COLOR: Color = '#ff0000';
 
 /** Effective `/BS` or legacy `/Border` fields shared by bordered kinds. */
 export interface BorderFields {
@@ -60,7 +53,8 @@ export function readGeometryStyleExtras(
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
 ): GeometryStyleFields {
-  const color = readAnnotColor(fn, mem, annotPtr, FPDFANNOT_COLORTYPE.Color) ?? DEFAULT_COLOR;
+  // A `/C` left out or empty is no stroke, as Acrobat draws it.
+  const color = readAnnotColor(fn, mem, annotPtr, FPDFANNOT_COLORTYPE.Color);
   const ca = readAnnotOpacity(fn, mem, annotPtr);
   const opacity = ca == null ? 1 : Math.max(0, Math.min(1, ca));
 

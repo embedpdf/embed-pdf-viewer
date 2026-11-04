@@ -38,10 +38,10 @@ const penIcon = (color: string) =>
 
 // The pen cursor follows the pen's color.
 function InkCursor() {
-  const { color = '#000000' } = useAnnotationDefaults('ink');
+  const { color } = useAnnotationDefaults('ink');
   useToolCursor({
     toolId: 'ink',
-    cursors: { crosshair: { svg: penIcon(color), hotspot: { x: 2, y: 22 } } },
+    cursors: { crosshair: { svg: penIcon(color ?? '#000000'), hotspot: { x: 2, y: 22 } } },
   });
   return null;
 }

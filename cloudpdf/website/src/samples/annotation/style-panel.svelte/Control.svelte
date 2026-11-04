@@ -41,7 +41,7 @@
       value={typeof value === 'string' ? value : '#ffffff'}
       oninput={(event) => update(event.currentTarget.value)}
     />
-    {#if property.key === 'interiorColor'}
+    {#if property.allowsNone}
       <button type="button" class="link" onclick={() => update(null)}>
         {value === null ? 'none' : 'remove'}
       </button>
