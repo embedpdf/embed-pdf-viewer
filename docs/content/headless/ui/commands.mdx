@@ -54,12 +54,16 @@ and says `null` for an id it doesn't have.
 | `view:rotate-clockwise`, `view:rotate-counterclockwise` | Turn the view                             |                  |
 | `tool:pointer`, `tool:pan`, `tool:zoom`              | Switch tools                                 | `V`, `H`, `Z`    |
 | `tool:<id>`                                          | Any registered tool, such as `tool:highlight` |                 |
+| `tool:snapshot`                                      | Switch to the [snapshot](../viewing/render#take-a-snapshot) tool |  |
 | `selection:copy`                                     | Copy the selected text                       | `Mod+C`          |
+| `snapshot:copy`, `snapshot:save`                     | Copy the snapshot, or save it as a PNG file  | `Mod+C`          |
+| `snapshot:clear`                                     | Let the snapshot go                          | `Escape`         |
 | `annotation:delete`                                  | Delete the selected annotations              | `Delete`         |
 | `document:download`, `document:print`                | Download or print the document               | `Mod+S`, `Mod+P` |
 
 Each one is enabled only when it can run: `selection:copy` needs a selection and permission to copy,
-`annotation:delete` a selection the user may delete.
+`annotation:delete` a selection the user may delete, the `snapshot:` commands a snapshot. Without
+[`doc.content.copy`](../viewing/render#permissions), `tool:snapshot` is not allowed.
 
 ## Keyboard shortcuts
 
