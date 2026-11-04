@@ -1,5 +1,15 @@
 # @embedpdf/web
 
+## 3.0.0-next.22
+
+### Minor Changes
+
+- [#975](https://github.com/embedpdf/embed-pdf-viewer/pull/975) by [@bobsingor](https://github.com/bobsingor) – The rich text editor keeps up with fast typing: an update that brings back text the editor already reported is late, not a change, so it no longer undoes the keystrokes typed after it. `RichTextEditorHost.onInput` may return the document the host keeps (text typed at the caret in a style chosen there), which the editor shows at once, and `TextBoxEditorAnnotation.draftRichText` returns it. A format shortcut reports the selection as it is before the command runs, and the caret is reported once an input method composition ends instead of while it moves through it.
+
+- [#971](https://github.com/embedpdf/embed-pdf-viewer/pull/971) by [@bobsingor](https://github.com/bobsingor) – A scene paint's `hairline` draws a stroke one pixel wide at any zoom: a line, polyline or ink at width 0, as the engine and Acrobat draw it.
+
+- [#980](https://github.com/embedpdf/embed-pdf-viewer/pull/980) by [@bobsingor](https://github.com/bobsingor) – New `copyImage(image)`: copies a picture to the clipboard as PNG, starting the write at once, so it works in a click before the picture is there (Safari copies only then). New `snapshotBoxPaint` and `SNAPSHOT_BOX_DASH`, the look of the snapshot tool's box, with the `--epdf-snapshot-box-fill` and `--epdf-snapshot-box-stroke` variables. `standardCommandsBrowser` has `copyImage`, and its `saveFile` takes the content type.
+
 ## 3.0.0-next.21
 
 ### Patch Changes

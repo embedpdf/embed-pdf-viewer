@@ -1,5 +1,19 @@
 # @embedpdf/viewer-chrome
 
+## 3.0.0-next.22
+
+### Minor Changes
+
+- [#973](https://github.com/embedpdf/embed-pdf-viewer/pull/973) by [@bobsingor](https://github.com/bobsingor) – The style panel has a **Type** row for a selected highlight, underline, squiggly line or strikethrough, and for a square or circle: one button per kind it can become, each with its tool's icon. Picking one changes the annotation's kind in place, with its comment and replies. The `annotation.style.kind` label is translated into every viewer language.
+
+- [#971](https://github.com/embedpdf/embed-pdf-viewer/pull/971) by [@bobsingor](https://github.com/bobsingor) – The style panel offers no color for a shape's or line's stroke and for a form field's border, as it does for fills.
+
+- [#980](https://github.com/embedpdf/embed-pdf-viewer/pull/980) by [@bobsingor](https://github.com/bobsingor) – Take a Snapshot, in the document menu: drag a box over a page, or click a page for all of it, and a bar under the box copies the picture (`Ctrl`/`Cmd`+`C`) or saves it as a PNG; `Escape` lets it go. New commands `tool:snapshot`, `snapshot:copy`, `snapshot:save` and `snapshot:clear`, the `snapshot` bar, and the `snapshots` feature for `disable`. A PDF that forbids copying has no Take a Snapshot. In all fifteen languages.
+
+### Patch Changes
+
+- [#970](https://github.com/embedpdf/embed-pdf-viewer/pull/970) by [@bobsingor](https://github.com/bobsingor) – The style panel's font picker offers only the fonts new text can be written in. A document font that can't be chosen (one the PDF holds only the characters of, a Type 3 font, one licensed for viewing only) is no longer listed greyed; the box that has it still shows it as its font, with why it can't be chosen for another box.
+
 ## 3.0.0-next.21
 
 ### Minor Changes

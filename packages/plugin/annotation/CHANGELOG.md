@@ -1,5 +1,19 @@
 # @embedpdf/plugin-annotation
 
+## 3.0.0-next.22
+
+### Minor Changes
+
+- [#973](https://github.com/embedpdf/embed-pdf-viewer/pull/973) by [@bobsingor](https://github.com/bobsingor) – `selection.update({ subtype })` changes each selected annotation that can become that kind, as the same annotation, and the rest keep theirs. `selection.getProperties()` leads with a `subtype` choice when the selection's kinds are siblings that can change kind (not a replacement's strikeout), offering the kinds people may change by hand.
+
+- [#975](https://github.com/embedpdf/embed-pdf-viewer/pull/975) by [@bobsingor](https://github.com/bobsingor) – The caret works as in a word processor. With a caret in a text box, `selection.getProperties()` reports the text typed next: the style of the text before the caret (at the start of a line, the text after it). `text.toggleFormat()` and a font, size or color from `selection.update()` at a caret style the text typed next, without writing anything, and moving the caret drops that style. A selected box reads all of its text, so bold shows only when every word is bold, and a change styles all of it, a word with its own style included. `text.toggleFormat()` turns a format on unless all of the text already has it, so words that disagree all take it. A box restyled while it is already drawn live now draws in its new font at once, not in the font answer for its old style.
+
+- [#971](https://github.com/embedpdf/embed-pdf-viewer/pull/971) by [@bobsingor](https://github.com/bobsingor) – A shape or line tool's defaults may set `color: null`, so the tool draws without a stroke.
+
+### Patch Changes
+
+- [#974](https://github.com/embedpdf/embed-pdf-viewer/pull/974) by [@bobsingor](https://github.com/bobsingor) – A free text box restyled after it was typed in is drawn in its new font at once: the fonts the engine answered for its old font no longer draw its body while its other runs follow the new one. An answer holds for the faces it was asked about; a box whose faces change is asked again, and typing keeps the answer.
+
 ## 3.0.0-next.21
 
 ## 3.0.0-next.20

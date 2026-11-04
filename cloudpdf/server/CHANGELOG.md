@@ -1,5 +1,11 @@
 # @cloudpdf/server
 
+## 3.0.0-next.22
+
+### Minor Changes
+
+- [#967](https://github.com/embedpdf/embed-pdf-viewer/pull/967) by [@bobsingor](https://github.com/bobsingor) – Modules describe themselves, and count their usage. A module has a `name` (required) and a `description`, and declares `meters` (each with a `label` and a `unit`) that its routes count with `req.meters.count(meter, { oncePerDay })` for the document's tenant. A permission can say how it relates to the core's: `replaces` (`protected-display.view` replaces `doc.render`) and `bypassedBy` (`doc.download`…), facts for a grant dialog that the server doesn't enforce; a token may hold a permission and the one it replaces, and the core one has its usual effect. `GET /v1/deployment/modules` lists the installed modules as they declare themselves, with the API token. Tenant usage is counted per UTC day: `tenants.usage` takes `from` and `to` in place of `period`, and reports each installed module's meters next to the core's. Migration 051 moves the counters to days (a month counted before keeps its total on its first day) and keeps the once-a-day keys as hashes, swept when the day is over.
+
 ## 3.0.0-next.21
 
 ### Minor Changes

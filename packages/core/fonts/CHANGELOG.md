@@ -1,5 +1,11 @@
 # @embedpdf/core-fonts
 
+## 3.0.0-next.22
+
+### Minor Changes
+
+- [#974](https://github.com/embedpdf/embed-pdf-viewer/pull/974) by [@bobsingor](https://github.com/bobsingor) – `standardFontForFace` moved to `@embedpdf/engine-core/runtime`, so the engine and the browser pick the standard font for a face with one function; it is no longer exported here.
+
 ## 3.0.0-next.21
 
 ## 3.0.0-next.20

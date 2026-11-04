@@ -1,5 +1,7 @@
 # @embedpdf/plugin-link
 
+## 3.0.0-next.22
+
 ## 3.0.0-next.21
 
 ## 3.0.0-next.20

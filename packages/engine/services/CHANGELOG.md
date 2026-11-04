@@ -1,5 +1,15 @@
 # @embedpdf/engine-services
 
+## 3.0.0-next.22
+
+### Minor Changes
+
+- [#973](https://github.com/embedpdf/embed-pdf-viewer/pull/973) by [@bobsingor](https://github.com/bobsingor) – An update with a sibling `subtype` writes the annotation as its new kind: its `/Subtype`, its fields as the new kind's, and an appearance drawn as one. Undo puts the old kind back, also when the annotation changed since.
+
+- [#978](https://github.com/embedpdf/embed-pdf-viewer/pull/978) by [@bobsingor](https://github.com/bobsingor) – A markup annotation's comment reads and writes as rich text: `richText` reads its `/RC` (`null` without one) and a write sets `/RC` and `/Contents` together, as Acrobat writes a note's, without touching its appearance. Writing `contents` alone on a formatted comment rewrites its `/RC` too, so other PDF apps no longer show the old text. A comment body that names no font reads as Helvetica, and is written back naming none. A redaction's overlay font is read from its `/DA` alone, so a comment in another font no longer changes it.
+
+- [#971](https://github.com/embedpdf/embed-pdf-viewer/pull/971) by [@bobsingor](https://github.com/bobsingor) – `color: null` on a square, circle, polygon, polyline, line or ink is written as `/C []`, the empty color ISO 32000 defines as no color. A shape whose `/C` is empty or left out reads `color: null`, where it read red before.
+
 ## 3.0.0-next.21
 
 ### Patch Changes

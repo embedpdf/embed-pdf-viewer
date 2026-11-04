@@ -1,5 +1,21 @@
 # @embedpdf/core-annotation
 
+## 3.0.0-next.22
+
+### Minor Changes
+
+- [#973](https://github.com/embedpdf/embed-pdf-viewer/pull/973) by [@bobsingor](https://github.com/bobsingor) – A record changes its kind to a sibling: `withValues` takes a `subtype` the annotation can become now (`canChangeKind`; not when it's locked), and the patch and the pending view are the new kind's. `setFields` gives it only to annotations people may change by hand as the new kind too, so a mixed selection changes the ones that can and restyles the rest. New `selectionProperties(model, annotations)`: the properties a style panel shows for selected annotations, led by a `subtype` choice (label `annotation.style.kind`, each kind named as the comment list names it) when they are kinds of one group and each can change kind.
+
+- [#975](https://github.com/embedpdf/embed-pdf-viewer/pull/975) by [@bobsingor](https://github.com/bobsingor) – New `typeWithStyle(before, after, at, style)`: the text typed at a caret takes a style chosen there, a line break carries the style on to the next line, and any other edit drops it. New `restyleRuns(doc, change)` and `withoutStyle(style, keys)` change every run's own style. A whole free text restyled by hand now restyles all of its text: `setTextFormat` and a font, size or text color in `setFields` set the body and take that property off every word that set its own, so a box typed bold from its first letter turns regular with one toggle.
+
+- [#971](https://github.com/embedpdf/embed-pdf-viewer/pull/971) by [@bobsingor](https://github.com/bobsingor) – A style's `color` may be `null`: a shape or line drawn without a stroke. A color property's `allowsNone` says a panel may offer none, which writes `null`: on a shape's or line's stroke and fill, a text box's background, a redaction's fill and a form field's border and background.
+
+  A line, polyline or ink at width 0 is drawn as a hairline (`Paint.hairline`), with the line endings a 1 pt line has, as the engine and Acrobat draw it.
+
+### Patch Changes
+
+- [#971](https://github.com/embedpdf/embed-pdf-viewer/pull/971) by [@bobsingor](https://github.com/bobsingor) – Ink is drawn as Acrobat draws it: each stroke as the smooth curves Acrobat fits to its points (cubic Béziers, never more than about 1.4 points from any point), with round caps and no join, and a stroke of one point as a filled dot. Its box and hit testing follow those curves, so a live drawing looks the same as the appearance the engine writes.
+
 ## 3.0.0-next.21
 
 ## 3.0.0-next.20

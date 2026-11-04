@@ -1,5 +1,11 @@
 # @embedpdf/plugin-i18n
 
+## 3.0.0-next.22
+
+### Minor Changes
+
+- [#980](https://github.com/embedpdf/embed-pdf-viewer/pull/980) by [@bobsingor](https://github.com/bobsingor) – Labels for the snapshot tool and its commands (`commands.tool.snapshot`, `commands.snapshot.copy`, `.save`, `.clear`) in every language.
+
 ## 3.0.0-next.21
 
 ## 3.0.0-next.20
