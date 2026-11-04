@@ -24,10 +24,10 @@ export const englishTranslations: Locale = {
       dragTip: 'Drag to select area to zoom',
     },
     pan: {
-      toggle: 'Toggle Pan Mode',
+      toggle: 'Pan Mode',
     },
     pointer: {
-      toggle: 'Toggle Pointer Mode',
+      toggle: 'Pointer Mode',
     },
     capture: {
       screenshot: 'Screenshot',

@@ -57,6 +57,7 @@ export function ModeSelectButton({ documentId, className }: ModeSelectButtonProp
         } flex flex-row items-center justify-between gap-2`}
         onClick={handleClick}
         disabled={commandOverflow.disabled}
+        aria-expanded={isActive}
         style={{
           height: 34,
         }}
