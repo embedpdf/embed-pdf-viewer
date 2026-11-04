@@ -1,9 +1,11 @@
 import {
+  DEFAULT_RICH_TEXT_BODY,
   EngineError,
   EngineErrorCode,
   type AnnotationDraft,
   type AnnotationPatch,
   type PlacedDraft,
+  type RichTextDocumentInput,
 } from '@embedpdf/engine-core/runtime';
 import type {
   CaretDraft,
@@ -36,6 +38,7 @@ import type {
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
+import { engineRichTextJson } from '../richTextWire';
 import type { AnnotationWriteContext } from './annotationWriteContext';
 import { applyCaretDraft, applyCaretPatch, isCaretSubtype } from './writeCaretAnnotation';
 import {
@@ -117,9 +120,10 @@ export function preflightPatch(
 }
 
 /**
- * Per-subtype write dispatch, mirroring the read-side registry. Adding a
- * new subtype is one extra arm here plus its writer module — no other
- * file in this package needs to change.
+ * Per-subtype write dispatch, mirroring the read-side registry, then a
+ * markup annotation's comment (`applyComment`). Adding a new subtype is one
+ * extra arm here plus its writer module — no other file in this package
+ * needs to change.
  *
  * The mutator calls `applyDraft` or `applyPatch` once per mutation; the
  * actual `EPDFPage_CreateAnnot` / identity resolution happens around
@@ -127,6 +131,69 @@ export function preflightPatch(
  * (`pdfResolveAnnotationDraft`), so a box kind's states its box.
  */
 export function applyDraft(
+  fn: PdfFunctions,
+  mem: PdfRuntimeMemory,
+  annotPtr: Ptr,
+  draft: AnnotationDraft<PdfCoordinates>,
+  ctx?: AnnotationWriteContext,
+): void {
+  applyKindDraft(fn, mem, annotPtr, draft, ctx);
+  applyComment(fn, annotPtr, draft, ctx);
+}
+
+export function applyPatch(
+  fn: PdfFunctions,
+  mem: PdfRuntimeMemory,
+  annotPtr: Ptr,
+  patch: AnnotationPatch<PdfCoordinates>,
+  ctx?: AnnotationWriteContext,
+): void {
+  applyKindPatch(fn, mem, annotPtr, patch, ctx);
+  applyComment(fn, annotPtr, { ...patch, subtype: subtypeOf(patch) }, ctx);
+}
+
+/**
+ * A markup annotation's comment as rich text (`/RC`), after the kind's
+ * fields, whose base wrote its `contents`: rich text writes `/RC` and its
+ * plain projection in `/Contents`, `null` removes `/RC` and leaves
+ * `/Contents`. A free text writes its own: its rich text is what it draws.
+ */
+function applyComment(
+  fn: PdfFunctions,
+  annotPtr: Ptr,
+  input: { subtype?: string; richText?: RichTextDocumentInput | null },
+  ctx?: AnnotationWriteContext,
+): void {
+  if (input.subtype === 'free-text' || input.richText === undefined) return;
+  if (input.richText === null) {
+    fn.EPDFAnnot_RemoveKey(annotPtr, 'RC');
+    return;
+  }
+  const json = engineRichTextJson(commentWithoutDefaultFamily(input.richText), {
+    describe: ctx?.describeFont,
+  });
+  if (!fn.EPDFAnnot_SetRichTextJSON(annotPtr, json)) {
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      `${input.subtype}: the comment's rich text could not be written`,
+    );
+  }
+}
+
+/**
+ * A comment's rich text with a body in the default family written as one
+ * naming none: a comment that names none reads back in it
+ * (`readCommentRichText`), so another tool's comment sent back keeps its
+ * reader's face.
+ */
+function commentWithoutDefaultFamily(input: RichTextDocumentInput): RichTextDocumentInput {
+  if (input.body?.family !== DEFAULT_RICH_TEXT_BODY.family) return input;
+  const { family: _family, ...body } = input.body;
+  void _family;
+  return { ...input, body };
+}
+
+function applyKindDraft(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
@@ -204,7 +271,7 @@ export function applyDraft(
   );
 }
 
-export function applyPatch(
+function applyKindPatch(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,

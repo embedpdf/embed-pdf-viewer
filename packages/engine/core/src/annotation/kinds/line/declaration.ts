@@ -5,7 +5,7 @@ import { LinePointsSchema } from '../../../geometry/schemas';
 import { LineEndingsSchema } from '../../base.schema';
 import { defineKind, field } from '../../declaration';
 import {
-  annotationBaseFields,
+  markupBaseFields,
   drawnRectFields,
   filledStyleFields,
   measureField,
@@ -13,7 +13,7 @@ import {
 } from '../shared-fields';
 
 export const LineDeclaration = defineKind('line', {
-  ...annotationBaseFields,
+  ...markupBaseFields,
   ...filledStyleFields,
   ...drawnRectFields,
   linePoints: field.data(LinePointsSchema).space('linePoints'),

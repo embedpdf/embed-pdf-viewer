@@ -1,13 +1,13 @@
 import { z } from 'zod';
 
 import { defineKind, field } from '../../declaration';
-import { annotationBaseFields, boxFields } from '../shared-fields';
+import { markupBaseFields, boxFields } from '../shared-fields';
 import { StampFitSchema } from './values';
 
 export const StampDeclaration = defineKind(
   'stamp',
   {
-    ...annotationBaseFields,
+    ...markupBaseFields,
     ...boxFields,
     /** `/Name`: the stamp's label, such as `Approved`. */
     name: field.data(z.string()).nullable().optional(),

@@ -9,6 +9,7 @@ import type {
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import { polygonIntentFromName, polylineIntentFromName } from '../measurementIntent';
+import { readCommentRichText } from '../richTextWire';
 import { readIntent } from './annotationReadPrimitives';
 import { readBorderEffect, readLineEndings, readVertices } from './annotationReadPrimitives';
 import { readAnnotationMeasure, readShapeCaption } from './readMeasurementFields';
@@ -51,6 +52,7 @@ export function readPolygon(
   const intent = readIntent(fn, mem, annotPtr);
   return {
     ...base,
+    richText: readCommentRichText(fn, mem, annotPtr),
     ...readAnnotationMeasure(fn, mem, annotPtr),
     captionEnabled,
     captionCenter,
@@ -74,6 +76,7 @@ export function readPolyline(
   const intent = readIntent(fn, mem, annotPtr);
   return {
     ...base,
+    richText: readCommentRichText(fn, mem, annotPtr),
     ...readAnnotationMeasure(fn, mem, annotPtr),
     captionEnabled,
     captionCenter,

@@ -4,4 +4,4 @@ export { annotationPatchBetween, mergeAnnotationPatch } from './patchBetween';
 export { resolveMeasurementDraft, touchesCaption } from './measurement';
 export { assertDeclaredFields, type ResolveOptions } from './resolveAnnotationPatch';
 export type { DraftResolveOptions } from './resolveAnnotationDraft';
-export { assertRichTextAgreement } from './text';
+export { assertRichTextAgreement } from './comment';

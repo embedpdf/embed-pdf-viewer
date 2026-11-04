@@ -17,12 +17,13 @@ import type { DescribeFont } from '../fontFaces';
 import type { Annotation, AnnotationPatch } from '../kinds';
 import { fieldTheKindCannotHold, siblingKindsOf } from '../siblings';
 import type { AnnotationSubtype } from '../subtype';
+import { assertRichTextAgreement, commentFollows } from './comment';
 import { dashPatchFollows } from './dash';
 import { calloutEndFollows, freeTextFollows } from './freeText';
 import { measurementFollows } from './measurement';
 import { pdfResolveRectCommand } from './rectCommand';
 import { withoutUnchangedColors, withoutUnchangedFields } from './sentBack';
-import { assertRichTextAgreement, noteStateFollows } from './text';
+import { noteStateFollows } from './text';
 
 /** A write names only fields its kind declares: a misspelled or foreign field is refused, never ignored. */
 export function assertDeclaredFields(subtype: AnnotationSubtype, write: object): void {
@@ -138,6 +139,8 @@ export function pdfPrepareAnnotationPatch(
  *   none, states the default pattern, `[3, 3]`;
  * - a free text's `contents` and rich text follow each other, and its font,
  *   size, text color and alignment move its rich body;
+ * - so do another markup annotation's: new rich text brings its `contents`,
+ *   and new `contents` rewrites a rich comment's paragraphs;
  * - a callout's line stays attached to its box when the box moves or turns;
  * - a measurement's label follows its points and scale, and a polygon's
  *   caption follows its vertices.
@@ -152,7 +155,10 @@ export function pdfDeriveAnnotationPatch(
 ): AnnotationPatch<PdfCoordinates> {
   const resolved = dashPatchFollows(current, noteStateFollows(current, prepared));
   assertRichTextAgreement(resolved);
-  const text = calloutEndFollows(current, freeTextFollows(current, resolved, options.describeFont));
+  const text = calloutEndFollows(
+    current,
+    commentFollows(current, freeTextFollows(current, resolved, options.describeFont)),
+  );
   return measurementFollows(current, text);
 }
 

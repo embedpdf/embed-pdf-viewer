@@ -3,6 +3,7 @@ import type {
   Color,
   HighlightAnnotation,
   PdfQuad,
+  RichTextDocument,
   SquigglyAnnotation,
   StrikeoutAnnotation,
   UnderlineAnnotation,
@@ -16,6 +17,7 @@ import {
   readIntent,
   readQuadPoints,
 } from './annotationReadPrimitives';
+import { readCommentRichText } from '../richTextWire';
 import { strikeoutIntentFromName } from '../textEditIntent';
 
 const DEFAULT_HIGHLIGHT_COLOR: Color = '#ffff00';
@@ -23,7 +25,7 @@ const DEFAULT_TEXT_MARKUP_COLOR: Color = '#000000';
 
 /**
  * Shared reader for the four text-markup subtypes. Wires color, opacity,
- * and quadPoints; the caller fills in the `subtype` literal so the
+ * quadPoints and the comment's rich text; the caller fills in the `subtype` literal so the
  * result matches the requested DTO shape.
  */
 export function readTextMarkupExtras(
@@ -35,12 +37,13 @@ export function readTextMarkupExtras(
   color: Color;
   opacity: number;
   quadPoints: PdfQuad[];
+  richText: RichTextDocument | null;
 } {
   const color = readAnnotColor(fn, mem, annotPtr) ?? fallbackColor;
   const ca = readAnnotOpacity(fn, mem, annotPtr);
   const opacity = ca == null ? 1 : Math.max(0, Math.min(1, ca));
   const quadPoints = readQuadPoints(fn, mem, annotPtr);
-  return { color, opacity, quadPoints };
+  return { color, opacity, quadPoints, richText: readCommentRichText(fn, mem, annotPtr) };
 }
 
 export function readHighlight(

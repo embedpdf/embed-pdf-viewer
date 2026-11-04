@@ -2,12 +2,13 @@ import type { PdfCoordinates } from '../../pageSpace/coordinates';
 import type { DescribeFont } from '../fontFaces';
 import type { AnnotationDraft } from '../kinds';
 import { boxDraftFollows } from './box';
+import { assertRichTextAgreement, commentDraftFollows } from './comment';
 import { dashDraftFollows } from './dash';
 import { freeTextDraftFollows } from './freeText';
 import { resolveMeasurementDraft } from './measurement';
 import { redactDraftFollows } from './redact';
 import { assertDeclaredFields } from './resolveAnnotationPatch';
-import { assertRichTextAgreement, noteDraftStateFollows } from './text';
+import { noteDraftStateFollows } from './text';
 
 export interface DraftResolveOptions {
   /**
@@ -49,6 +50,8 @@ export function pdfPrepareAnnotationDraft(
  * - a dashed border with its pattern left out states the default, `[3, 3]`;
  * - a free text states its intent, and its text as rich text carrying its
  *   text style, with `contents` its plain projection;
+ * - another markup annotation's rich comment brings its `contents`, its
+ *   plain projection;
  * - a redaction over text without a `rect` covers its quads;
  * - a measurement's label follows its points and scale, and its caption is
  *   stated whole.
@@ -65,7 +68,9 @@ export function pdfDeriveAnnotationDraft(
 ): AnnotationDraft<PdfCoordinates> {
   assertRichTextAgreement(prepared);
   const followed = redactDraftFollows(
-    freeTextDraftFollows(dashDraftFollows(noteDraftStateFollows(prepared)), options.describeFont),
+    commentDraftFollows(
+      freeTextDraftFollows(dashDraftFollows(noteDraftStateFollows(prepared)), options.describeFont),
+    ),
   );
   return resolveMeasurementDraft(followed);
 }

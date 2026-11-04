@@ -4,14 +4,14 @@ import { InkListSchema, PdfPointSchema } from '../../../geometry/schemas';
 import { InkIntentSchema } from '../../base.schema';
 import { defineKind, field } from '../../declaration';
 import {
-  annotationBaseFields,
+  markupBaseFields,
   drawnRectFields,
   geometryStyleFields,
   pointsTurnFields,
 } from '../shared-fields';
 
 export const InkDeclaration = defineKind('ink', {
-  ...annotationBaseFields,
+  ...markupBaseFields,
   ...geometryStyleFields,
   /** More than 0 on a write: ink has no fill, so a line of 0 draws nothing. */
   strokeWidth: field

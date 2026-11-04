@@ -1,13 +1,13 @@
 import { z } from 'zod';
 
-import { ColorSchema } from '../../base.schema';
 import type {
   RichTextAlign,
   RichTextDocument,
   RichTextDocumentInput,
   RichTextParagraph,
   RichTextRunStyle,
-} from '../../../dto/RichText';
+} from './RichText';
+import { ColorSchema } from '../annotation/base.schema';
 
 /** How a paragraph's lines line up: a free text's `textAlign` too. */
 export const RichTextAlignSchema: z.ZodType<RichTextAlign> = z.enum([

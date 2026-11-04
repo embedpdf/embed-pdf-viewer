@@ -131,6 +131,12 @@ Besides `subtype`, `rect` and `ref`, every kind has these fields:
 
 Each annotation also has the [flags](#flags) and the fields that say [who wrote it](#who-wrote-it).
 
+Every kind but a link, a popup and a form widget also has `richText`: its comment with bold,
+italic or colored words, or `null` when the comment is plain text. `contents` is then the same
+text without the formatting. See
+[Formatted comments](/docs/engine/annotations/notes-and-replies#formatted-comments). A free text
+draws its rich text in the box; see [Free text](/docs/engine/annotations/free-text#rich-text).
+
 ## Add an annotation
 
 `create()` takes the kind and its fields, and returns the new annotation:
@@ -172,8 +178,9 @@ accepts. That makes "change a copy, then save it" code simple:
 await page.annotations.update(annotation.ref, { ...annotation, opacity: 0.5 });
 ```
 
-Fields the engine writes (`author`, the dates, `userId`, `ref`…) are accepted and ignored. For
-free text, send `contents` or `richText`, not both with different text.
+Fields the engine writes (`author`, the dates, `userId`, `ref`…) are accepted and ignored. Send
+`contents` or `richText`, not both with different text: a read sent back after the text changed
+fails with `InvalidArg` instead of putting the old text back.
 
 ### Move or resize by `rect`
 

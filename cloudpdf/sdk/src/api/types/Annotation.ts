@@ -58,6 +58,7 @@ export namespace Annotation {
         modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
+        richText: CloudPDF.RichTextDocument | null;
         color: string;
         opacity: number;
         quadPoints: AnnotationHighlight.QuadPoints.Item[];
@@ -171,6 +172,7 @@ export namespace Annotation {
         modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
+        richText: CloudPDF.RichTextDocument | null;
         color: string;
         opacity: number;
         quadPoints: AnnotationUnderline.QuadPoints.Item[];
@@ -284,6 +286,7 @@ export namespace Annotation {
         modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
+        richText: CloudPDF.RichTextDocument | null;
         color: string;
         opacity: number;
         quadPoints: AnnotationSquiggly.QuadPoints.Item[];
@@ -397,6 +400,7 @@ export namespace Annotation {
         modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
+        richText: CloudPDF.RichTextDocument | null;
         color: string;
         opacity: number;
         quadPoints: AnnotationStrikeout.QuadPoints.Item[];
@@ -516,6 +520,7 @@ export namespace Annotation {
         modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
+        richText: CloudPDF.RichTextDocument | null;
         color: string | null;
         opacity: number;
         strokeWidth: number;
@@ -617,6 +622,7 @@ export namespace Annotation {
         modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
+        richText: CloudPDF.RichTextDocument | null;
         color: string | null;
         opacity: number;
         strokeWidth: number;
@@ -718,6 +724,7 @@ export namespace Annotation {
         modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
+        richText: CloudPDF.RichTextDocument | null;
         color: string | null;
         opacity: number;
         strokeWidth: number;
@@ -835,6 +842,7 @@ export namespace Annotation {
         modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
+        richText: CloudPDF.RichTextDocument | null;
         color: string | null;
         opacity: number;
         strokeWidth: number;
@@ -985,6 +993,7 @@ export namespace Annotation {
         modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
+        richText: CloudPDF.RichTextDocument | null;
         color: string | null;
         opacity: number;
         strokeWidth: number;
@@ -1236,6 +1245,7 @@ export namespace Annotation {
         modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
+        richText: CloudPDF.RichTextDocument | null;
         color: string | null;
         opacity: number;
         strokeWidth: number;
@@ -1342,6 +1352,7 @@ export namespace Annotation {
         modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
+        richText: CloudPDF.RichTextDocument;
         box: AnnotationFreeText.Box;
         rotation: number | null;
         intent: AnnotationFreeText.Intent;
@@ -1349,7 +1360,6 @@ export namespace Annotation {
         fontSize: number;
         textAlign: AnnotationFreeText.TextAlign;
         verticalAlign: AnnotationFreeText.VerticalAlign;
-        richText: AnnotationFreeText.RichText;
         color: string;
         fontColor: string;
         interiorColor: string | null;
@@ -1429,151 +1439,6 @@ export namespace Annotation {
             Bottom: "bottom",
         } as const;
         export type VerticalAlign = (typeof VerticalAlign)[keyof typeof VerticalAlign];
-
-        export interface RichText {
-            body: RichText.Body;
-            paragraphs: RichText.Paragraphs.Item[];
-        }
-
-        export namespace RichText {
-            export interface Body {
-                family: string;
-                weight: number;
-                italic: boolean;
-                size: number;
-                color: string;
-                decoration: Body.Decoration.Item[];
-                script: Body.Script;
-                letterSpacing: number;
-                horizontalScale: number;
-                unknown?: string | undefined;
-                align: Body.Align;
-                dir: Body.Dir;
-                lineHeight?: number | undefined;
-                margins?: Body.Margins | undefined;
-                textIndent?: number | undefined;
-            }
-
-            export namespace Body {
-                export type Decoration = Decoration.Item[];
-
-                export namespace Decoration {
-                    export const Item = {
-                        Underline: "underline",
-                        LineThrough: "line-through",
-                        Word: "word",
-                    } as const;
-                    export type Item = (typeof Item)[keyof typeof Item];
-                }
-
-                export const Script = {
-                    Normal: "normal",
-                    Sub: "sub",
-                    Super: "super",
-                } as const;
-                export type Script = (typeof Script)[keyof typeof Script];
-                export const Align = {
-                    Left: "left",
-                    Center: "center",
-                    Right: "right",
-                    Justify: "justify",
-                } as const;
-                export type Align = (typeof Align)[keyof typeof Align];
-                export const Dir = {
-                    Ltr: "ltr",
-                    Rtl: "rtl",
-                } as const;
-                export type Dir = (typeof Dir)[keyof typeof Dir];
-
-                export interface Margins {
-                    top: number;
-                    bottom: number;
-                    left: number;
-                    right: number;
-                }
-            }
-
-            export type Paragraphs = Paragraphs.Item[];
-
-            export namespace Paragraphs {
-                export interface Item {
-                    align?: Item.Align | undefined;
-                    dir?: Item.Dir | undefined;
-                    lineHeight?: number | undefined;
-                    margins?: Item.Margins | undefined;
-                    textIndent?: number | undefined;
-                    unknown?: string | undefined;
-                    runs: Item.Runs.Item[];
-                }
-
-                export namespace Item {
-                    export const Align = {
-                        Left: "left",
-                        Center: "center",
-                        Right: "right",
-                        Justify: "justify",
-                    } as const;
-                    export type Align = (typeof Align)[keyof typeof Align];
-                    export const Dir = {
-                        Ltr: "ltr",
-                        Rtl: "rtl",
-                    } as const;
-                    export type Dir = (typeof Dir)[keyof typeof Dir];
-
-                    export interface Margins {
-                        top: number;
-                        bottom: number;
-                        left: number;
-                        right: number;
-                    }
-
-                    export type Runs = Runs.Item[];
-
-                    export namespace Runs {
-                        export interface Item {
-                            text: string;
-                            style?: Item.Style | undefined;
-                        }
-
-                        export namespace Item {
-                            export interface Style {
-                                family?: string | undefined;
-                                weight?: number | undefined;
-                                italic?: boolean | undefined;
-                                size?: number | undefined;
-                                color?: string | undefined;
-                                decoration?: Style.Decoration.Item[] | undefined;
-                                script?: Style.Script | undefined;
-                                letterSpacing?: number | undefined;
-                                horizontalScale?: number | undefined;
-                                unknown?: string | undefined;
-                            }
-
-                            export namespace Style {
-                                export type Decoration = Decoration.Item[];
-
-                                export namespace Decoration {
-                                    export const Item = {
-                                        Underline: "underline",
-                                        LineThrough: "line-through",
-                                        Word: "word",
-                                    } as const;
-                                    export type Item = (typeof Item)[keyof typeof Item];
-                                }
-
-                                export const Script = {
-                                    Normal: "normal",
-                                    Sub: "sub",
-                                    Super: "super",
-                                } as const;
-                                export type Script = (typeof Script)[keyof typeof Script];
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
         export const BorderStyle = {
             Solid: "solid",
             Dashed: "dashed",
@@ -1629,6 +1494,7 @@ export namespace Annotation {
         modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
+        richText: CloudPDF.RichTextDocument | null;
         color: string;
         opacity: number;
         box: AnnotationCaret.Box;
@@ -1723,6 +1589,7 @@ export namespace Annotation {
         modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
+        richText: CloudPDF.RichTextDocument | null;
         color: string;
         opacity: number;
         icon: AnnotationText.Icon;
@@ -1817,6 +1684,7 @@ export namespace Annotation {
         modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
+        richText: CloudPDF.RichTextDocument | null;
         box: AnnotationStamp.Box;
         rotation: number | null;
         name: string | null;
@@ -1913,6 +1781,7 @@ export namespace Annotation {
         modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
+        richText: CloudPDF.RichTextDocument | null;
         color: string;
         opacity: number;
         icon: AnnotationFileAttachment.Icon;
@@ -2006,6 +1875,7 @@ export namespace Annotation {
         modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
+        richText: CloudPDF.RichTextDocument | null;
         color: string;
         opacity: number;
         quadPoints: AnnotationRedact.QuadPoints.Item[];

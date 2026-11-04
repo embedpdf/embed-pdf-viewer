@@ -6,6 +6,7 @@ import type {
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
+import { readCommentRichText } from '../richTextWire';
 import { readAnnotName, readAnnotOpacity } from './annotationReadPrimitives';
 import { readAnnotationBox } from './readAnnotationTurn';
 import { readEmbedMetadataString } from './readEmbedMetadata';
@@ -39,6 +40,7 @@ export function readStamp(
 ): StampAnnotation<PdfCoordinates> {
   return {
     ...base,
+    richText: readCommentRichText(fn, mem, annotPtr),
     subtype: 'stamp',
     name: readAnnotName(fn, mem, annotPtr),
     fit: readStampFit(fn, mem, annotPtr),

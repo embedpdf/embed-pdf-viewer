@@ -1,4 +1,5 @@
 import {
+  DEFAULT_RICH_TEXT_BODY,
   faceForFontName,
   type DescribeFont,
   type RichTextBody,
@@ -75,6 +76,13 @@ interface EngineRichText {
 /** The engine's JSON, parsed into the DTO shape (its `source` and
  *  `diagnostics` dropped). `null` when it is not what the engine writes. */
 export function parseEngineRichText(json: string): RichTextDocument | null {
+  return parsedEngineRichText(json)?.document ?? null;
+}
+
+/** The engine's JSON as the DTO, and where the engine read it from: `/RC`, or `/Contents`. */
+function parsedEngineRichText(
+  json: string,
+): { source: unknown; document: RichTextDocument } | null {
   let raw: EngineRichText;
   try {
     raw = JSON.parse(json) as EngineRichText;
@@ -101,12 +109,30 @@ export function parseEngineRichText(json: string): RichTextDocument | null {
       }),
     } as RichTextParagraph;
   });
-  return { body, paragraphs };
+  return { source: raw.source, document: { body, paragraphs } };
 }
 
 /** A style's color as the engine gives every color: `'#rrggbb'`, lowercase. */
 function withLowercaseColor(style: Record<string, unknown>): Record<string, unknown> {
   return typeof style.color === 'string' ? { ...style, color: style.color.toLowerCase() } : style;
+}
+
+/**
+ * A markup annotation's comment as rich text: its `/RC`, `null` when it has
+ * none (the engine's model then comes from `/Contents`, which is the plain
+ * comment itself). A body that names no family, as Acrobat writes a
+ * comment's, reads as the engine's default body's.
+ */
+export function readCommentRichText(
+  fn: PdfFunctions,
+  mem: PdfRuntimeMemory,
+  annotPtr: Ptr,
+): RichTextDocument | null {
+  const json = readUtf8String(mem, (buf, cap) => fn.EPDFAnnot_GetRichTextJSON(annotPtr, buf, cap));
+  const read = json ? parsedEngineRichText(json) : null;
+  if (read?.source !== 'rc') return null;
+  const { body, paragraphs } = read.document;
+  return { body: { ...body, family: body.family || DEFAULT_RICH_TEXT_BODY.family }, paragraphs };
 }
 
 /** Read an annotation's rich text through `EPDFAnnot_GetRichTextJSON`. */

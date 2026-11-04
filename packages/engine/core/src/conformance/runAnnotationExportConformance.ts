@@ -130,8 +130,8 @@ export function runAnnotationExportConformance(
     // or to the canonical drawing, changes these on purpose: update them here.
     test('exports a document to the same file on every engine', async () => {
       const expected = {
-        'acrobat-stamps': 'c63bf33e943ed200b4ca152a86ef5c1713153b3ad71b3a764fb261254f36662d',
-        'acrobat-rewrapped': '4c7591de693cddbd29d6f7e080f033cadf0863f52ff0aab5173255db4796361e',
+        'acrobat-stamps': '612f68c76bcdbd06f9ff0d4b2f9e975a9cb6042e060ac301acceb9018874fc9c',
+        'acrobat-rewrapped': '370f5e29cd89ae185060bb71fffaae82fa4a94804aa0d5c635d29bdb93e27b44',
       } as const;
       for (const [fixture, hash] of Object.entries(expected)) {
         await onPage(fixture as AnnotationResourceFixture, async (_page, doc) => {
