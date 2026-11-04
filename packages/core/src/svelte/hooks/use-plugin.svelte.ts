@@ -1,5 +1,5 @@
 import type { BasePlugin } from '@embedpdf/core';
-import { pdfContext } from './use-registry.svelte.js';
+import { useRegistry } from './use-registry.svelte.js';
 
 /**
  * Hook to access a plugin.
@@ -10,7 +10,7 @@ import { pdfContext } from './use-registry.svelte.js';
  * const zoom = usePlugin<ZoomPlugin>(ZoomPlugin.id);
  */
 export function usePlugin<T extends BasePlugin>(pluginId: T['id']) {
-  const { registry } = pdfContext;
+  const { registry } = useRegistry();
 
   const state = $state({
     plugin: null as T | null,
