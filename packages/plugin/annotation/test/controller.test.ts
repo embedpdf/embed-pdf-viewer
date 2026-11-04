@@ -1071,6 +1071,16 @@ describe('remote delivery — echo-driven appearance invalidation', () => {
     expect(harness.model().byId['obj:70']!.pictureVersion).toBe(1);
   });
 
+  it('a remote kind change replaces the record in place, as its new kind', async () => {
+    const harness = createHarness();
+    await seed(harness, hydrationSquare(70));
+    const circle = { ...hydrationSquare(70), subtype: 'circle' } as FileAnnotation;
+    harness.emit(updatedEvent(circle, 45, true));
+    expect(harness.model().order).toEqual(['obj:70']);
+    expect(harness.model().byId['obj:70']!.annotation.subtype).toBe('circle');
+    expect(harness.model().byId['obj:70']!.pictureVersion).toBe(1);
+  });
+
   it('a remote z-order move never re-fetches appearances', async () => {
     const harness = createHarness();
     await seed(harness, hydrationSquare(70));

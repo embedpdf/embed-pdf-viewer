@@ -7,7 +7,7 @@ description: The annotation, shape and insert tools, comments, fonts, stamps, re
 
 People mark up a document in three modes: **Annotate** (highlights, notes, ink and text),
 **Shapes** and **Insert** (stamps, images, files and signatures). They select an annotation to
-move, resize or turn it, change its color and width in the style panel, and undo with
+move, resize or turn it, change its color, width or kind in the style panel, and undo with
 `Ctrl`/`Cmd`+`Z`. Everything they make is a standard PDF annotation, so it opens the same in
 Acrobat and every other PDF app.
 
@@ -163,6 +163,14 @@ Every method is on [Annotations with code](/docs/headless/annotations/with-code)
 Annotations, comments and stamps are written into the file when it's downloaded, as standard PDF
 annotations. To keep them in your own database instead, export and import them with the
 annotation plugin: see [Saving annotations](/docs/headless/annotations/saving).
+
+### Change a mark's kind
+
+The style panel's **Type** turns a selected highlight into an underline, a squiggly line or a
+strikethrough, and a square into a circle and back. It stays the same annotation, with its
+comment and its replies. A strikethrough that is part of a replacement keeps its kind, and so
+does a locked annotation. From code it's `annotation.selection.update({ subtype })`; see
+[A style panel](/docs/headless/annotations/selecting#a-style-panel).
 
 ### Undo
 

@@ -125,6 +125,16 @@ const borderFields = (border: Border): FieldValues => ({
 const optionOf = (options: readonly AnnotationOption[], value: string) =>
   options.find((option) => option.value === value);
 
+/** Each kind a selection can become, by its tool's icon. */
+const KIND_ICON: Readonly<Record<string, string>> = {
+  highlight: 'highlight',
+  underline: 'underline',
+  squiggly: 'squiggly',
+  strikeout: 'strikethrough',
+  square: 'square',
+  circle: 'circle',
+};
+
 // ── layout primitives ────────────────────────────────────────────────────────
 function Field({
   label,
@@ -860,6 +870,25 @@ function FieldControl({
             standard={spec.options}
             onChange={(family) => onChange({ fontFamily: family })}
           />
+        </Field>
+      );
+    // The kind the selection becomes: one of its sibling kinds, as the same
+    // annotation (the plugin offers only kinds it can become).
+    case 'subtype':
+      return (
+        <Field label={label(spec)} mixed={mixed}>
+          <div className="flex gap-2">
+            {spec.options.map((option) => (
+              <Toggle
+                key={option.value}
+                title={label(option)}
+                active={!mixed && value === option.value}
+                onClick={() => onChange({ subtype: option.value })}
+              >
+                <Icon name={KIND_ICON[option.value] ?? 'palette'} size={18} />
+              </Toggle>
+            ))}
+          </div>
         </Field>
       );
     case 'textAlign': {

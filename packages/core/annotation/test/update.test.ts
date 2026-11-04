@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 
 import { modelWith, RecordInput, recordOf, restyle, step, STYLE, withAnnotation } from './support';
 import { DRAWN_FLAGS } from '../src/flags';
+import { selectionProperties } from '../src/props';
 import type { Message, Model, ModelAnnotation, Point } from '../src/types';
 import { EMPTY_CHANGE, newRecordsAtMost, update } from '../src/update';
 import { refOf, shapeOf } from '../src/record';
@@ -417,5 +418,93 @@ describe('every record holds its annotation', () => {
       ref: { kind: 'objectNumber', objectNumber: 101 },
       reply: { to: caret!.annotation.ref, type: 'group' },
     });
+  });
+});
+
+describe('changing a kind', () => {
+  /** A confirmed mark over text, keyed `obj:<n>`. */
+  const mark = (id: string, subtype: 'highlight' | 'strikeout', intent?: string) =>
+    recordOf({
+      id,
+      ref: { kind: 'objectNumber', page: PAGE, objectNumber: Number(id.slice(4)) },
+      page: PAGE,
+      subtype,
+      geometry: {
+        kind: 'quads',
+        quadPoints: [quadFromRect({ x: 10, y: 10, width: 80, height: 20 })],
+      },
+      style: STYLE,
+      flags: DRAWN_FLAGS,
+      source: 'baked',
+      ...(intent ? { intent } : {}),
+    });
+  const setFields = (model: Model, values: Record<string, unknown>) =>
+    update(model, {
+      type: 'setFields',
+      patches: Object.fromEntries(model.order.map((id) => [id, values])),
+    });
+
+  it('a sibling kind: the patch names it, and the record is that kind, drawn live', () => {
+    const result = setFields(modelWith([mark('obj:5', 'highlight')]), { subtype: 'underline' });
+    expect(result.change.patches['obj:5']).toEqual({ subtype: 'underline' });
+    expect(result.change.put[0]!.annotation.subtype).toBe('underline');
+    expect(result.change.put[0]!.source).toBe('vector');
+
+    const circle = setFields(modelWith([square('obj:3', 100)]), {
+      subtype: 'circle',
+      color: '#00ff00',
+    });
+    expect(circle.change.patches['obj:3']).toEqual({ subtype: 'circle', color: '#00ff00' });
+  });
+
+  it('a mixed selection: the kinds that can become it do, the rest take the other fields', () => {
+    const result = setFields(modelWith([mark('obj:5', 'highlight'), square('obj:3', 100)]), {
+      subtype: 'underline',
+      opacity: 0.5,
+    });
+    expect(result.change.patches).toEqual({
+      'obj:5': { subtype: 'underline', opacity: 0.5 },
+      'obj:3': { subtype: 'square', opacity: 0.5 },
+    });
+  });
+
+  it('a replacement’s strikeout, a locked mark, or a kind people may not change keep their kind', () => {
+    const replacement = mark('obj:6', 'strikeout', 'strikeout-text-edit');
+    expect(setFields(modelWith([replacement]), { subtype: 'highlight' }).change.patches).toEqual(
+      {},
+    );
+    const locked = withAnnotation(mark('obj:5', 'highlight'), { locked: true });
+    expect(setFields(modelWith([locked]), { subtype: 'underline' }).change.patches).toEqual({});
+    const onlyHighlights = modelWith([mark('obj:5', 'highlight')], { editable: ['highlight'] });
+    expect(setFields(onlyHighlights, { subtype: 'underline' }).change.patches).toEqual({});
+  });
+
+  it('a style panel leads with the kind the selection can become', () => {
+    const kinds = (model: Model) => {
+      const [first] = selectionProperties(
+        model,
+        model.order.map((id) => model.byId[id]!.annotation),
+      );
+      return first?.key === 'subtype' && first.control === 'choice'
+        ? first.options.map((option) => option.value)
+        : null;
+    };
+    const highlight = mark('obj:5', 'highlight');
+    expect(kinds(modelWith([highlight]))).toEqual([
+      'highlight',
+      'underline',
+      'squiggly',
+      'strikeout',
+    ]);
+    expect(kinds(modelWith([square('obj:3', 100)]))).toEqual(['square', 'circle']);
+    // Kinds of two groups, or a strikeout held by its replacement: no kind to choose.
+    expect(kinds(modelWith([highlight, square('obj:3', 100)]))).toBeNull();
+    expect(kinds(modelWith([mark('obj:6', 'strikeout', 'strikeout-text-edit')]))).toBeNull();
+    // Only the kinds people may change by hand, and a choice needs two.
+    expect(kinds(modelWith([highlight], { editable: ['highlight', 'squiggly'] }))).toEqual([
+      'highlight',
+      'squiggly',
+    ]);
+    expect(kinds(modelWith([highlight], { editable: ['highlight'] }))).toBeNull();
   });
 });

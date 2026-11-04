@@ -633,7 +633,7 @@ function writeDelete(ctx: ChangeContext, ref: AnnotationRef, rights?: StepRights
 /**
  * The value fallback of an update: the fields it changed, their old values,
  * and the values it left. Fields the patch named whose value stayed are not
- * changes.
+ * changes; a `subtype` it changed to a sibling kind is one.
  */
 function valuesChanged(
   before: Annotation<PdfCoordinates>,
@@ -642,9 +642,7 @@ function valuesChanged(
 ): RevertFallback {
   const was = before as unknown as Record<string, unknown>;
   const is = after as unknown as Record<string, unknown>;
-  const keys = Object.keys(patch).filter(
-    (key) => key !== 'subtype' && !valuesEqual(was[key], is[key]),
-  );
+  const keys = Object.keys(patch).filter((key) => !valuesEqual(was[key], is[key]));
   return {
     kind: 'annotation',
     restore: Object.fromEntries(

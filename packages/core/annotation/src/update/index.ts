@@ -152,9 +152,10 @@ function changeBetween(before: Model, after: Model): ChangeSet {
       put.push(record);
       continue;
     }
+    // A kind change states its new subtype; every other patch names the kind it has.
     const fields = annotationPatchBetween(previous.annotation, record.annotation);
     if (!Object.keys(fields).length) continue;
-    const patch = { ...fields, subtype: previous.annotation.subtype } as AnnotationPatch;
+    const patch = { subtype: previous.annotation.subtype, ...fields } as AnnotationPatch;
     patches[id] = patch;
     put.push(applyChange(previous, patch));
   }

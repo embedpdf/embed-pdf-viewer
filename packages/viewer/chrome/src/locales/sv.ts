@@ -348,6 +348,7 @@ export const sv: Locale = {
       // The style panel's labels, as the annotation kinds name them (`labelKey`), by wording:
       // one field is called different things by different kinds.
       style: {
+        kind: 'Typ',
         opacity: 'Opacitet',
         stroke: 'Linje',
         fill: 'Fyllning',

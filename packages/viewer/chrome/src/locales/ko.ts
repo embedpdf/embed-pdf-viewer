@@ -346,6 +346,7 @@ export const ko: Locale = {
       // The style panel's labels, as the annotation kinds name them (`labelKey`), by wording:
       // one field is called different things by different kinds.
       style: {
+        kind: '유형',
         opacity: '불투명도',
         stroke: '선',
         fill: '채우기',

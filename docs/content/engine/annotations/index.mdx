@@ -217,6 +217,49 @@ A create works out a drawn annotation's `rect` from its shape, whatever `rect` y
 copy of another app's drawing keeps its shape exactly. A box turned a quarter can be created by
 its `rect` instead of its `box`; see [Turned shapes](/docs/engine/annotations/shapes#turned-shapes).
 
+### Change the kind
+
+Some kinds take the same fields, and an update turns one into another when you send a new
+`subtype`:
+
+| Kinds                                                     | What they draw                         |
+| :-------------------------------------------------------- | :------------------------------------- |
+| `'highlight'`, `'underline'`, `'squiggly'`, `'strikeout'` | Marks over text                        |
+| `'square'`, `'circle'`                                    | A rectangle or an ellipse inside `box` |
+
+```ts
+await page.annotations.update(highlight.ref, { subtype: 'squiggly' });
+```
+
+It stays the same annotation: its `ref`, `nm`, place in the drawing order, replies, popup and
+group, and who wrote it and when. `modifiedAt` and `modifiedBy` change, as on any update. The
+engine draws it as its new kind, and `annotations.updated` carries the annotation as it now reads.
+Undoing the update turns it back.
+
+The update takes the new kind's fields, so other fields can change with it:
+
+```ts
+await page.annotations.update(highlight.ref, { subtype: 'underline', color: '#1d4ed8' });
+```
+
+Other kinds keep their `subtype`: a highlight can't become ink, and a line can't become a polyline,
+because they keep their shapes in different fields. Create a new annotation for those. A `subtype`
+the annotation can't become fails with `InvalidArg`, and the message lists the kinds it can become.
+
+A value the new kind has no field for is never dropped. The update fails with `InvalidArg` naming
+the field, and you clear it first, in the same [change](/docs/engine/documents/changes), so both
+writes are one step to undo. The one such value today is the `intent` of a strikeout that is part
+of a [replacement](/docs/engine/annotations/text-markup#suggest-an-insertion-or-a-replacement):
+
+```ts
+await doc.apply({
+  ops: [
+    { type: 'annotations.update', ref: strikeout.ref, patch: { intent: null } },
+    { type: 'annotations.update', ref: strikeout.ref, patch: { subtype: 'highlight' } },
+  ],
+});
+```
+
 ## Delete and reorder
 
 ```ts

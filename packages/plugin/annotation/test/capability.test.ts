@@ -196,6 +196,27 @@ describe('the selection', () => {
     await harness.capability.selection.update({ locked: true });
     expect(harness.update).toHaveBeenCalledWith(ref(20), expect.objectContaining({ locked: true }));
   });
+
+  it('the kind is a property too: update turns a square into a circle in place', async () => {
+    const harness = annotationHarness();
+    await harness.load([square(20)]);
+    harness.capability.selection.set([ref(20)]);
+    const { properties, values } = harness.capability.selection.getProperties();
+    const [kind] = properties;
+    expect(kind?.key).toBe('subtype');
+    expect(kind?.control === 'choice' && kind.options.map((option) => option.value)).toEqual([
+      'square',
+      'circle',
+    ]);
+    expect(values.subtype).toBe('square');
+    harness.update.mockResolvedValueOnce({ annotation: { ...square(20), subtype: 'circle' } });
+    await harness.capability.selection.update({ subtype: 'circle' });
+    expect(harness.update).toHaveBeenCalledWith(
+      ref(20),
+      expect.objectContaining({ subtype: 'circle' }),
+    );
+    expect(harness.capability.get(ref(20))?.subtype).toBe('circle');
+  });
 });
 
 describe('the drawing order', () => {

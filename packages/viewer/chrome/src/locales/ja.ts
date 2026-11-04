@@ -347,6 +347,7 @@ export const ja: Locale = {
       // The style panel's labels, as the annotation kinds name them (`labelKey`), by wording:
       // one field is called different things by different kinds.
       style: {
+        kind: '種類',
         opacity: '不透明度',
         stroke: '線',
         fill: '塗り',

@@ -28,7 +28,15 @@ for (const match of matches) {
 | `'squiggly'`  | A wavy line under the text     | black         |
 | `'strikeout'` | A line through the text        | black         |
 
-All four take the same fields. To underline instead of highlight, change only the `subtype`.
+All four take the same fields. To underline instead of highlight, change only the `subtype`, when
+you create the mark or later:
+
+```ts
+await page.annotations.update(highlight.ref, { subtype: 'underline' });
+```
+
+The mark stays the same annotation, with its replies and its comment, and the engine draws it as
+its new kind. See [Change the kind](/docs/engine/annotations#change-the-kind).
 
 ## Mark a search match
 
@@ -146,6 +154,11 @@ await page.annotations.create({
 
 The caret holds the suggestion: its `contents`, its author and its replies. The strikeout is a
 part of it. A caret is red by default and takes `color` and `opacity` like a markup.
+
+While the strikeout has its `intent`, it stays a strikeout: an update to another `subtype` fails
+with `InvalidArg`. Turning it into a highlight takes it out of the suggestion, so clear the intent
+first, in the same change; see [Change the kind](/docs/engine/annotations#change-the-kind). The
+caret and the group stay as they are, so change them too if the suggestion should go.
 
 ## Permissions
 
