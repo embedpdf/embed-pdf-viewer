@@ -249,6 +249,9 @@ export const englishTranslations: Locale = {
     print: {
       title: 'Print Settings',
       loading: 'Preparing document...',
+      documentReady: 'Document prepared successfully',
+      ready: 'Ready to print',
+      dialogOpened: 'Print dialog opened',
       pages: 'Pages to print',
       all: 'All pages',
       current: 'Current page ({currentPage})',
@@ -643,6 +646,9 @@ export const germanTranslations: Locale = {
     print: {
       title: 'Druckeinstellungen',
       loading: 'Dokument wird vorbereitet...',
+      documentReady: 'Dokument erfolgreich vorbereitet',
+      ready: 'Bereit zum Drucken',
+      dialogOpened: 'Druckdialog geöffnet',
       pages: 'Zu druckende Seiten',
       all: 'Alle Seiten',
       current: 'Aktuelle Seite ({currentPage})',
@@ -1039,6 +1045,9 @@ export const dutchTranslations: Locale = {
     print: {
       title: 'Afdrukinstellingen',
       loading: 'Document voorbereiden...',
+      documentReady: 'Document succesvol voorbereid',
+      ready: 'Klaar om af te drukken',
+      dialogOpened: 'Afdrukvenster geopend',
       pages: "Af te drukken pagina's",
       all: "Alle pagina's",
       current: 'Huidige pagina ({currentPage})',
@@ -1433,6 +1442,9 @@ export const frenchTranslations: Locale = {
     print: {
       title: "Paramètres d'impression",
       loading: 'Préparation du document...',
+      documentReady: 'Document préparé avec succès',
+      ready: 'Prêt à imprimer',
+      dialogOpened: 'Boîte de dialogue d’impression ouverte',
       pages: 'Pages à imprimer',
       all: 'Toutes les pages',
       current: 'Page actuelle ({currentPage})',
@@ -1829,6 +1841,9 @@ export const spanishTranslations: Locale = {
     print: {
       title: 'Configuración de impresión',
       loading: 'Preparando documento...',
+      documentReady: 'Documento preparado correctamente',
+      ready: 'Listo para imprimir',
+      dialogOpened: 'Cuadro de diálogo de impresión abierto',
       pages: 'Páginas a imprimir',
       all: 'Todas las páginas',
       current: 'Página actual ({currentPage})',
@@ -2223,6 +2238,9 @@ export const simplifiedChineseTranslations: Locale = {
     print: {
       title: '打印设置',
       loading: '正在处理...',
+      documentReady: '文档准备成功',
+      ready: '可以打印',
+      dialogOpened: '打印对话框已打开',
       pages: '要打印的页码',
       all: '所有页',
       current: '当前页（{currentPage}）',
@@ -2609,6 +2627,9 @@ export const swedishTranslations: Locale = {
     print: {
       title: 'Utskriftsinställningar',
       loading: 'Förbereder dokument...',
+      documentReady: 'Dokumentet har förberetts',
+      ready: 'Redo att skriva ut',
+      dialogOpened: 'Utskriftsdialogen har öppnats',
       pages: 'Sidor att skriva ut',
       all: 'Alla sidor',
       current: 'Aktuell sida ({currentPage})',
@@ -2999,6 +3020,9 @@ export const japaneseTranslations: Locale = {
     print: {
       title: '印刷設定',
       loading: 'ドキュメントを準備中...',
+      documentReady: 'ドキュメントの準備が完了しました',
+      ready: '印刷の準備ができました',
+      dialogOpened: '印刷ダイアログが開きました',
       pages: '印刷するページ',
       all: 'すべてのページ',
       current: '現在のページ ({currentPage})',
@@ -3398,6 +3422,9 @@ export const traditionalChineseTranslations: Locale = {
     print: {
       title: '列印設定',
       loading: '處理中...',
+      documentReady: '文件準備成功',
+      ready: '可以列印',
+      dialogOpened: '列印對話框已開啟',
       pages: '要列印的頁碼',
       all: '所有頁面',
       current: '目前頁面（{currentPage}）',
@@ -3788,6 +3815,9 @@ export const brazilianPortugueseTranslations: Locale = {
     print: {
       title: 'Configurações de impressão',
       loading: 'Preparando documento...',
+      documentReady: 'Documento preparado com sucesso',
+      ready: 'Pronto para imprimir',
+      dialogOpened: 'Caixa de diálogo de impressão aberta',
       pages: 'Páginas a imprimir',
       all: 'Todas as páginas',
       current: 'Página atual ({currentPage})',
