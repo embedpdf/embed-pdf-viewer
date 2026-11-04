@@ -1,4 +1,9 @@
-import { PdfFreeTextAnnoObject, Position } from '@embedpdf/models';
+import {
+  PdfFreeTextAnnoObject,
+  Position,
+  calculateRotatedRectAABBAroundPoint,
+  inferRotationCenterFromRects,
+} from '@embedpdf/models';
 
 import { PatchFunction } from '../patch-registry';
 import {
@@ -39,6 +44,21 @@ function rebuildFromVertices(
 }
 
 export const patchCalloutFreeText: PatchFunction<PdfFreeTextAnnoObject> = (orig, ctx) => {
+  if (
+    orig.rotation &&
+    orig.unrotatedRect &&
+    (ctx.type === 'vertex-edit' || ctx.type === 'property-update')
+  ) {
+    const local = { ...orig, rect: orig.unrotatedRect, rotation: 0, unrotatedRect: undefined };
+    const patch = patchCalloutFreeText(local, ctx);
+    if (!patch.rect) return patch;
+    const pivot = inferRotationCenterFromRects(orig.unrotatedRect, orig.rect, orig.rotation);
+    return {
+      ...patch,
+      unrotatedRect: patch.rect,
+      rect: calculateRotatedRectAABBAroundPoint(patch.rect, orig.rotation, pivot),
+    };
+  }
   switch (ctx.type) {
     case 'vertex-edit': {
       if (!ctx.changes.calloutLine) return ctx.changes;
