@@ -119,10 +119,11 @@ export function createSearchController(ctx: PluginContext<SearchModel, SearchSet
   // ── the mechanism ────────────────────────────────────────────────────────
 
   /**
-   * One cursor loop over budgeted slices: permission fallback (snippets → none
-   * when they are denied, unless pinned), restart-once on a stale cursor,
-   * projection per slice. Returns true on exhaustion, false when the signal
-   * aborted; throws on a real error (already a PluginError: ctx.doc is guarded).
+   * One cursor loop over budgeted slices: snippets when the session may copy
+   * text (unless pinned), falling back to none if the engine still denies them,
+   * restart-once on a stale cursor, projection per slice. Returns true on
+   * exhaustion, false when the signal aborted; throws on a real error (already
+   * a PluginError: ctx.doc is guarded).
    */
   async function collect(
     query: SearchQuery,
@@ -132,7 +133,9 @@ export function createSearchController(ctx: PluginContext<SearchModel, SearchSet
     const { signal } = options;
     sink.onStart();
 
-    let snippets = options.snippets ?? true;
+    // A snippet reproduces document text, so ask for one only where copying is allowed:
+    // the engine would refuse it, and the request would cost a round trip for nothing.
+    let snippets = options.snippets ?? ctx.allows('doc.text.copy');
     const snippetsPinned = options.snippets !== undefined;
     let cursor: string | undefined;
     let restarted = false;
@@ -157,7 +160,8 @@ export function createSearchController(ctx: PluginContext<SearchModel, SearchSet
         );
       } catch (error) {
         if (signal?.aborted) return false;
-        // Snippets denied (no doc.text.copy)? Degrade to matches without them.
+        // Snippets denied although the session looked allowed to copy (its permissions
+        // changed on the server)? Degrade to matches without them.
         if (
           !snippetsPinned &&
           snippets &&
@@ -326,6 +330,8 @@ export function createSearchController(ctx: PluginContext<SearchModel, SearchSet
     // ── the service ──────────────────────────────────────────────────────
     findAll: async (query, options = {}) => {
       ctx.assertAllowed('doc.text.search', 'findAll');
+      // Snippets pinned on are a requirement: refuse here rather than ask the engine.
+      if (options.snippets) ctx.assertAllowed('doc.text.copy', 'findAll');
       const all: SearchHit[] = [];
       const complete = await collect(
         query,
