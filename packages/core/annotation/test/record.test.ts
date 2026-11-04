@@ -176,6 +176,7 @@ describe('record — Ink Highlight intent and blend', () => {
     ...NO_FLAGS,
     rect: { left: 10, bottom: 740, right: 120, top: 760 },
     contents: null,
+    richText: null,
     subject: null,
     author: null,
     createdAt: null,

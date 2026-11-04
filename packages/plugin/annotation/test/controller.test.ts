@@ -84,6 +84,7 @@ const strikeoutDTO = (): FileAnnotation => {
     color: '#ef4444',
     opacity: 1,
     quadPoints: [quad],
+    richText: null,
     reply: { to: ref(10), type: 'group' },
     popup: null,
     groupId: null,

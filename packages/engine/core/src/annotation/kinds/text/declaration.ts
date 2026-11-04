@@ -1,12 +1,12 @@
 import { z } from 'zod';
 
 import { defineKind, field } from '../../declaration';
-import { annotationBaseFields, colorStyleFields } from '../shared-fields';
+import { markupBaseFields, colorStyleFields } from '../shared-fields';
 import { NoteIconSchema } from './values';
 
 /** A note: its icon fills `rect`, 20×20 at the usual size. */
 export const TextDeclaration = defineKind('text', {
-  ...annotationBaseFields,
+  ...markupBaseFields,
   ...colorStyleFields,
   icon: field.data(NoteIconSchema).optional(),
   /**

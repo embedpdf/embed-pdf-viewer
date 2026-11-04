@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { AttachmentFileInfoSchema } from '../../../dto/Attachment.schema';
 import { defineKind, field } from '../../declaration';
-import { annotationBaseFields, colorStyleFields } from '../shared-fields';
+import { markupBaseFields, colorStyleFields } from '../shared-fields';
 import { FileAttachmentIconSchema } from './values';
 
 /**
@@ -21,7 +21,7 @@ const AttachmentFileWriteSchema = z.object({
 export const FileAttachmentDeclaration = defineKind(
   'file-attachment',
   {
-    ...annotationBaseFields,
+    ...markupBaseFields,
     ...colorStyleFields,
     icon: field.data(FileAttachmentIconSchema).optional(),
     /**

@@ -3,10 +3,10 @@ import { z } from 'zod';
 import { PdfQuadSchema, PdfRectSchema } from '../../../geometry/schemas';
 import { ColorSchema, TextAlignmentSchema } from '../../base.schema';
 import { defineKind, field } from '../../declaration';
-import { annotationBaseFields, colorStyleFields, FontNameSchema } from '../shared-fields';
+import { markupBaseFields, colorStyleFields, FontNameSchema } from '../shared-fields';
 
 export const RedactDeclaration = defineKind('redact', {
-  ...annotationBaseFields,
+  ...markupBaseFields,
   ...colorStyleFields,
   /** Worked out from the quads when a create gives quads and no `rect`. */
   rect: field.data(PdfRectSchema).optional().space('box'),

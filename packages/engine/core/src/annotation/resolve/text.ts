@@ -1,6 +1,5 @@
 import { EngineError } from '../../errors/EngineError';
 import { EngineErrorCode } from '../../errors/EngineErrorCode';
-import { richTextPlainText, type RichTextDocumentInput } from '../../dto/RichText';
 import type { PdfCoordinates } from '../../pageSpace/coordinates';
 import { standardStateModelOf } from '../comments';
 import type { AnnotationDraft, Annotation, AnnotationPatch } from '../kinds';
@@ -44,24 +43,4 @@ export function noteStateFollows(
   if (model) return { ...patch, stateModel: model };
   if (!current.stateModel) throw stateNeedsModel(patch.state);
   return patch;
-}
-
-/**
- * A draft or patch that carries both `contents` and `richText` must agree:
- * `contents` is the plain projection of the rich text. A stale read sent back
- * fails loud here instead of quietly restoring old text.
- */
-export function assertRichTextAgreement(input: {
-  subtype?: string;
-  contents?: string | null;
-  richText?: RichTextDocumentInput;
-}): void {
-  if (input.subtype !== 'free-text' || input.richText === undefined) return;
-  if (input.contents === undefined || input.contents === null) return;
-  if (input.contents !== richTextPlainText(input.richText)) {
-    throw new EngineError(
-      EngineErrorCode.InvalidArg,
-      'free-text: `contents` must equal the plain projection of `richText` when both are given',
-    );
-  }
 }

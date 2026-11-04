@@ -332,6 +332,8 @@ export * from "./PdfLinkTarget.js";
 export * from "./PdfLinkTargetWritable.js";
 export * from "./PdfPageActions.js";
 export * from "./ResolvedFontRun.js";
+export * from "./RichTextDocument.js";
+export * from "./RichTextDocumentInput.js";
 export * from "./TenantFeature.js";
 export * from "./TenantsCreate200Response.js";
 export * from "./TenantsCreate400Response.js";

@@ -1,6 +1,7 @@
 import type { AnnotationBase, InkAnnotation, PdfCoordinates } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
+import { readCommentRichText } from '../richTextWire';
 import { readInkList, readIntent } from './annotationReadPrimitives';
 import { readPointsTurn, uprightPoint } from './readPointsTurn';
 import { readGeometryStyleExtras } from './readStyle';
@@ -18,6 +19,7 @@ export function readInk(
   const intent = inkIntentFromName(readIntent(fn, mem, annotPtr));
   return {
     ...base,
+    richText: readCommentRichText(fn, mem, annotPtr),
     subtype: 'ink',
     ...readGeometryStyleExtras(fn, mem, annotPtr),
     intent,

@@ -10697,6 +10697,14 @@
                 ],
                 "nullable": true
               },
+              "richText": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RichTextDocument"
+                  }
+                ],
+                "nullable": true
+              },
               "color": {
                 "type": "string",
                 "pattern": "^#[0-9a-fA-F]{6}$"
@@ -10773,6 +10781,7 @@
               "modifiedBy",
               "importedBy",
               "actions",
+              "richText",
               "color",
               "opacity",
               "quadPoints"
@@ -10923,6 +10932,14 @@
                 ],
                 "nullable": true
               },
+              "richText": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RichTextDocument"
+                  }
+                ],
+                "nullable": true
+              },
               "color": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/color"
               },
@@ -10966,6 +10983,7 @@
               "modifiedBy",
               "importedBy",
               "actions",
+              "richText",
               "color",
               "opacity",
               "quadPoints"
@@ -11116,6 +11134,14 @@
                 ],
                 "nullable": true
               },
+              "richText": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RichTextDocument"
+                  }
+                ],
+                "nullable": true
+              },
               "color": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/color"
               },
@@ -11159,6 +11185,7 @@
               "modifiedBy",
               "importedBy",
               "actions",
+              "richText",
               "color",
               "opacity",
               "quadPoints"
@@ -11309,6 +11336,14 @@
                 ],
                 "nullable": true
               },
+              "richText": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RichTextDocument"
+                  }
+                ],
+                "nullable": true
+              },
               "color": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/color"
               },
@@ -11357,6 +11392,7 @@
               "modifiedBy",
               "importedBy",
               "actions",
+              "richText",
               "color",
               "opacity",
               "quadPoints",
@@ -11508,6 +11544,14 @@
                 ],
                 "nullable": true
               },
+              "richText": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RichTextDocument"
+                  }
+                ],
+                "nullable": true
+              },
               "color": {
                 "allOf": [
                   {
@@ -11590,6 +11634,7 @@
               "modifiedBy",
               "importedBy",
               "actions",
+              "richText",
               "color",
               "opacity",
               "strokeWidth",
@@ -11746,6 +11791,14 @@
                 ],
                 "nullable": true
               },
+              "richText": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RichTextDocument"
+                  }
+                ],
+                "nullable": true
+              },
               "color": {
                 "allOf": [
                   {
@@ -11828,6 +11881,7 @@
               "modifiedBy",
               "importedBy",
               "actions",
+              "richText",
               "color",
               "opacity",
               "strokeWidth",
@@ -11980,6 +12034,14 @@
                 "allOf": [
                   {
                     "$ref": "#/components/schemas/PdfAnnotationActions"
+                  }
+                ],
+                "nullable": true
+              },
+              "richText": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RichTextDocument"
                   }
                 ],
                 "nullable": true
@@ -12213,6 +12275,7 @@
               "modifiedBy",
               "importedBy",
               "actions",
+              "richText",
               "color",
               "opacity",
               "strokeWidth",
@@ -12373,6 +12436,14 @@
                 ],
                 "nullable": true
               },
+              "richText": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RichTextDocument"
+                  }
+                ],
+                "nullable": true
+              },
               "color": {
                 "allOf": [
                   {
@@ -12500,6 +12571,7 @@
               "modifiedBy",
               "importedBy",
               "actions",
+              "richText",
               "color",
               "opacity",
               "strokeWidth",
@@ -12660,6 +12732,14 @@
                 ],
                 "nullable": true
               },
+              "richText": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RichTextDocument"
+                  }
+                ],
+                "nullable": true
+              },
               "color": {
                 "allOf": [
                   {
@@ -12799,6 +12879,7 @@
               "modifiedBy",
               "importedBy",
               "actions",
+              "richText",
               "color",
               "opacity",
               "strokeWidth",
@@ -13151,6 +13232,14 @@
                 ],
                 "nullable": true
               },
+              "richText": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RichTextDocument"
+                  }
+                ],
+                "nullable": true
+              },
               "color": {
                 "allOf": [
                   {
@@ -13229,6 +13318,7 @@
               "modifiedBy",
               "importedBy",
               "actions",
+              "richText",
               "color",
               "opacity",
               "strokeWidth",
@@ -13384,6 +13474,9 @@
                 ],
                 "nullable": true
               },
+              "richText": {
+                "$ref": "#/components/schemas/RichTextDocument"
+              },
               "box": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/rect"
               },
@@ -13411,184 +13504,6 @@
               "verticalAlign": {
                 "type": "string",
                 "enum": ["top", "middle", "bottom"]
-              },
-              "richText": {
-                "type": "object",
-                "properties": {
-                  "body": {
-                    "type": "object",
-                    "properties": {
-                      "family": {
-                        "type": "string",
-                        "minLength": 1
-                      },
-                      "weight": {
-                        "type": "integer",
-                        "minimum": 100,
-                        "maximum": 900
-                      },
-                      "italic": {
-                        "type": "boolean"
-                      },
-                      "size": {
-                        "type": "number",
-                        "minimum": 0
-                      },
-                      "color": {
-                        "$ref": "#/components/schemas/Annotation/anyOf/0/properties/color"
-                      },
-                      "decoration": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "enum": ["underline", "line-through", "word"]
-                        }
-                      },
-                      "script": {
-                        "type": "string",
-                        "enum": ["normal", "sub", "super"]
-                      },
-                      "letterSpacing": {
-                        "type": "number"
-                      },
-                      "horizontalScale": {
-                        "type": "number",
-                        "exclusiveMinimum": true,
-                        "minimum": 0
-                      },
-                      "unknown": {
-                        "type": "string"
-                      },
-                      "align": {
-                        "$ref": "#/components/schemas/Annotation/anyOf/11/properties/textAlign"
-                      },
-                      "dir": {
-                        "type": "string",
-                        "enum": ["ltr", "rtl"]
-                      },
-                      "lineHeight": {
-                        "type": "number",
-                        "exclusiveMinimum": true,
-                        "minimum": 0
-                      },
-                      "margins": {
-                        "type": "object",
-                        "properties": {
-                          "top": {
-                            "type": "number"
-                          },
-                          "bottom": {
-                            "type": "number"
-                          },
-                          "left": {
-                            "type": "number"
-                          },
-                          "right": {
-                            "type": "number"
-                          }
-                        },
-                        "required": ["top", "bottom", "left", "right"],
-                        "additionalProperties": false
-                      },
-                      "textIndent": {
-                        "type": "number"
-                      }
-                    },
-                    "required": [
-                      "family",
-                      "weight",
-                      "italic",
-                      "size",
-                      "color",
-                      "decoration",
-                      "script",
-                      "letterSpacing",
-                      "horizontalScale",
-                      "align",
-                      "dir"
-                    ],
-                    "additionalProperties": false
-                  },
-                  "paragraphs": {
-                    "type": "array",
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "align": {
-                          "$ref": "#/components/schemas/Annotation/anyOf/11/properties/textAlign"
-                        },
-                        "dir": {
-                          "$ref": "#/components/schemas/Annotation/anyOf/11/properties/richText/properties/body/properties/dir"
-                        },
-                        "lineHeight": {
-                          "$ref": "#/components/schemas/Annotation/anyOf/11/properties/richText/properties/body/properties/lineHeight"
-                        },
-                        "margins": {
-                          "$ref": "#/components/schemas/Annotation/anyOf/11/properties/richText/properties/body/properties/margins"
-                        },
-                        "textIndent": {
-                          "$ref": "#/components/schemas/Annotation/anyOf/11/properties/richText/properties/body/properties/textIndent"
-                        },
-                        "unknown": {
-                          "$ref": "#/components/schemas/Annotation/anyOf/11/properties/richText/properties/body/properties/unknown"
-                        },
-                        "runs": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "text": {
-                                "type": "string"
-                              },
-                              "style": {
-                                "type": "object",
-                                "properties": {
-                                  "family": {
-                                    "$ref": "#/components/schemas/Annotation/anyOf/11/properties/richText/properties/body/properties/family"
-                                  },
-                                  "weight": {
-                                    "$ref": "#/components/schemas/Annotation/anyOf/11/properties/richText/properties/body/properties/weight"
-                                  },
-                                  "italic": {
-                                    "$ref": "#/components/schemas/Annotation/anyOf/11/properties/richText/properties/body/properties/italic"
-                                  },
-                                  "size": {
-                                    "$ref": "#/components/schemas/Annotation/anyOf/11/properties/richText/properties/body/properties/size"
-                                  },
-                                  "color": {
-                                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/color"
-                                  },
-                                  "decoration": {
-                                    "$ref": "#/components/schemas/Annotation/anyOf/11/properties/richText/properties/body/properties/decoration"
-                                  },
-                                  "script": {
-                                    "$ref": "#/components/schemas/Annotation/anyOf/11/properties/richText/properties/body/properties/script"
-                                  },
-                                  "letterSpacing": {
-                                    "$ref": "#/components/schemas/Annotation/anyOf/11/properties/richText/properties/body/properties/letterSpacing"
-                                  },
-                                  "horizontalScale": {
-                                    "$ref": "#/components/schemas/Annotation/anyOf/11/properties/richText/properties/body/properties/horizontalScale"
-                                  },
-                                  "unknown": {
-                                    "type": "string"
-                                  }
-                                },
-                                "additionalProperties": false
-                              }
-                            },
-                            "required": ["text"],
-                            "additionalProperties": false
-                          }
-                        }
-                      },
-                      "required": ["runs"],
-                      "additionalProperties": false
-                    }
-                  }
-                },
-                "required": ["body", "paragraphs"],
-                "additionalProperties": false
               },
               "color": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/color"
@@ -13706,6 +13621,7 @@
               "modifiedBy",
               "importedBy",
               "actions",
+              "richText",
               "box",
               "rotation",
               "intent",
@@ -13713,7 +13629,6 @@
               "fontSize",
               "textAlign",
               "verticalAlign",
-              "richText",
               "color",
               "fontColor",
               "interiorColor",
@@ -13871,6 +13786,14 @@
                 ],
                 "nullable": true
               },
+              "richText": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RichTextDocument"
+                  }
+                ],
+                "nullable": true
+              },
               "color": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/color"
               },
@@ -13923,6 +13846,7 @@
               "modifiedBy",
               "importedBy",
               "actions",
+              "richText",
               "color",
               "opacity",
               "box",
@@ -14075,6 +13999,14 @@
                 ],
                 "nullable": true
               },
+              "richText": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RichTextDocument"
+                  }
+                ],
+                "nullable": true
+              },
               "color": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/color"
               },
@@ -14132,6 +14064,7 @@
               "modifiedBy",
               "importedBy",
               "actions",
+              "richText",
               "color",
               "opacity",
               "icon",
@@ -14285,6 +14218,14 @@
                 ],
                 "nullable": true
               },
+              "richText": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RichTextDocument"
+                  }
+                ],
+                "nullable": true
+              },
               "box": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/rect"
               },
@@ -14340,6 +14281,7 @@
               "modifiedBy",
               "importedBy",
               "actions",
+              "richText",
               "box",
               "rotation",
               "name",
@@ -14492,6 +14434,14 @@
                 ],
                 "nullable": true
               },
+              "richText": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RichTextDocument"
+                  }
+                ],
+                "nullable": true
+              },
               "color": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/color"
               },
@@ -14544,6 +14494,7 @@
               "modifiedBy",
               "importedBy",
               "actions",
+              "richText",
               "color",
               "opacity",
               "icon",
@@ -14698,6 +14649,14 @@
                 ],
                 "nullable": true
               },
+              "richText": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RichTextDocument"
+                  }
+                ],
+                "nullable": true
+              },
               "color": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/color"
               },
@@ -14773,6 +14732,7 @@
               "modifiedBy",
               "importedBy",
               "actions",
+              "richText",
               "color",
               "opacity",
               "quadPoints",
@@ -15340,6 +15300,14 @@
               "modifiedBy": {},
               "importedBy": {},
               "actions": {},
+              "richText": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RichTextDocumentInput"
+                  }
+                ],
+                "nullable": true
+              },
               "color": {
                 "type": "string",
                 "pattern": "^#[0-9a-fA-F]{6}$"
@@ -15471,6 +15439,14 @@
               "modifiedBy": {},
               "importedBy": {},
               "actions": {},
+              "richText": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RichTextDocumentInput"
+                  }
+                ],
+                "nullable": true
+              },
               "color": {
                 "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/color"
               },
@@ -15569,6 +15545,14 @@
               "modifiedBy": {},
               "importedBy": {},
               "actions": {},
+              "richText": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RichTextDocumentInput"
+                  }
+                ],
+                "nullable": true
+              },
               "color": {
                 "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/color"
               },
@@ -15667,6 +15651,14 @@
               "modifiedBy": {},
               "importedBy": {},
               "actions": {},
+              "richText": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RichTextDocumentInput"
+                  }
+                ],
+                "nullable": true
+              },
               "color": {
                 "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/color"
               },
@@ -15770,6 +15762,14 @@
               "modifiedBy": {},
               "importedBy": {},
               "actions": {},
+              "richText": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RichTextDocumentInput"
+                  }
+                ],
+                "nullable": true
+              },
               "color": {
                 "allOf": [
                   {
@@ -15908,6 +15908,14 @@
               "modifiedBy": {},
               "importedBy": {},
               "actions": {},
+              "richText": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RichTextDocumentInput"
+                  }
+                ],
+                "nullable": true
+              },
               "color": {
                 "allOf": [
                   {
@@ -16045,6 +16053,14 @@
               "modifiedBy": {},
               "importedBy": {},
               "actions": {},
+              "richText": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RichTextDocumentInput"
+                  }
+                ],
+                "nullable": true
+              },
               "color": {
                 "allOf": [
                   {
@@ -16336,6 +16352,14 @@
               "modifiedBy": {},
               "importedBy": {},
               "actions": {},
+              "richText": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RichTextDocumentInput"
+                  }
+                ],
+                "nullable": true
+              },
               "color": {
                 "allOf": [
                   {
@@ -16519,6 +16543,14 @@
               "modifiedBy": {},
               "importedBy": {},
               "actions": {},
+              "richText": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RichTextDocumentInput"
+                  }
+                ],
+                "nullable": true
+              },
               "color": {
                 "allOf": [
                   {
@@ -16810,6 +16842,14 @@
               "modifiedBy": {},
               "importedBy": {},
               "actions": {},
+              "richText": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RichTextDocumentInput"
+                  }
+                ],
+                "nullable": true
+              },
               "color": {
                 "allOf": [
                   {
@@ -16946,6 +16986,9 @@
               "modifiedBy": {},
               "importedBy": {},
               "actions": {},
+              "richText": {
+                "$ref": "#/components/schemas/RichTextDocumentInput"
+              },
               "box": {
                 "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/rect"
               },
@@ -16973,171 +17016,6 @@
               "verticalAlign": {
                 "type": "string",
                 "enum": ["top", "middle", "bottom"]
-              },
-              "richText": {
-                "type": "object",
-                "properties": {
-                  "body": {
-                    "type": "object",
-                    "properties": {
-                      "family": {
-                        "type": "string",
-                        "minLength": 1
-                      },
-                      "weight": {
-                        "type": "integer",
-                        "minimum": 100,
-                        "maximum": 900
-                      },
-                      "italic": {
-                        "type": "boolean"
-                      },
-                      "size": {
-                        "type": "number",
-                        "minimum": 0
-                      },
-                      "color": {
-                        "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/color"
-                      },
-                      "decoration": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "enum": ["underline", "line-through", "word"]
-                        }
-                      },
-                      "script": {
-                        "type": "string",
-                        "enum": ["normal", "sub", "super"]
-                      },
-                      "letterSpacing": {
-                        "type": "number"
-                      },
-                      "horizontalScale": {
-                        "type": "number",
-                        "exclusiveMinimum": true,
-                        "minimum": 0
-                      },
-                      "unknown": {
-                        "type": "string"
-                      },
-                      "align": {
-                        "$ref": "#/components/schemas/AnnotationDraft/anyOf/11/properties/textAlign"
-                      },
-                      "dir": {
-                        "type": "string",
-                        "enum": ["ltr", "rtl"]
-                      },
-                      "lineHeight": {
-                        "type": "number",
-                        "exclusiveMinimum": true,
-                        "minimum": 0
-                      },
-                      "margins": {
-                        "type": "object",
-                        "properties": {
-                          "top": {
-                            "type": "number"
-                          },
-                          "bottom": {
-                            "type": "number"
-                          },
-                          "left": {
-                            "type": "number"
-                          },
-                          "right": {
-                            "type": "number"
-                          }
-                        },
-                        "required": ["top", "bottom", "left", "right"],
-                        "additionalProperties": false
-                      },
-                      "textIndent": {
-                        "type": "number"
-                      }
-                    },
-                    "additionalProperties": false
-                  },
-                  "paragraphs": {
-                    "type": "array",
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "align": {
-                          "$ref": "#/components/schemas/AnnotationDraft/anyOf/11/properties/textAlign"
-                        },
-                        "dir": {
-                          "$ref": "#/components/schemas/AnnotationDraft/anyOf/11/properties/richText/properties/body/properties/dir"
-                        },
-                        "lineHeight": {
-                          "$ref": "#/components/schemas/AnnotationDraft/anyOf/11/properties/richText/properties/body/properties/lineHeight"
-                        },
-                        "margins": {
-                          "$ref": "#/components/schemas/AnnotationDraft/anyOf/11/properties/richText/properties/body/properties/margins"
-                        },
-                        "textIndent": {
-                          "$ref": "#/components/schemas/AnnotationDraft/anyOf/11/properties/richText/properties/body/properties/textIndent"
-                        },
-                        "unknown": {
-                          "$ref": "#/components/schemas/AnnotationDraft/anyOf/11/properties/richText/properties/body/properties/unknown"
-                        },
-                        "runs": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "text": {
-                                "type": "string"
-                              },
-                              "style": {
-                                "type": "object",
-                                "properties": {
-                                  "family": {
-                                    "$ref": "#/components/schemas/AnnotationDraft/anyOf/11/properties/richText/properties/body/properties/family"
-                                  },
-                                  "weight": {
-                                    "$ref": "#/components/schemas/AnnotationDraft/anyOf/11/properties/richText/properties/body/properties/weight"
-                                  },
-                                  "italic": {
-                                    "$ref": "#/components/schemas/AnnotationDraft/anyOf/11/properties/richText/properties/body/properties/italic"
-                                  },
-                                  "size": {
-                                    "$ref": "#/components/schemas/AnnotationDraft/anyOf/11/properties/richText/properties/body/properties/size"
-                                  },
-                                  "color": {
-                                    "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/color"
-                                  },
-                                  "decoration": {
-                                    "$ref": "#/components/schemas/AnnotationDraft/anyOf/11/properties/richText/properties/body/properties/decoration"
-                                  },
-                                  "script": {
-                                    "$ref": "#/components/schemas/AnnotationDraft/anyOf/11/properties/richText/properties/body/properties/script"
-                                  },
-                                  "letterSpacing": {
-                                    "$ref": "#/components/schemas/AnnotationDraft/anyOf/11/properties/richText/properties/body/properties/letterSpacing"
-                                  },
-                                  "horizontalScale": {
-                                    "$ref": "#/components/schemas/AnnotationDraft/anyOf/11/properties/richText/properties/body/properties/horizontalScale"
-                                  },
-                                  "unknown": {
-                                    "type": "string"
-                                  }
-                                },
-                                "additionalProperties": false
-                              }
-                            },
-                            "required": ["text"],
-                            "additionalProperties": false
-                          }
-                        }
-                      },
-                      "required": ["runs"],
-                      "additionalProperties": false
-                    }
-                  }
-                },
-                "required": ["paragraphs"],
-                "additionalProperties": false
               },
               "color": {
                 "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/color"
@@ -17310,6 +17188,14 @@
               "modifiedBy": {},
               "importedBy": {},
               "actions": {},
+              "richText": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RichTextDocumentInput"
+                  }
+                ],
+                "nullable": true
+              },
               "color": {
                 "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/color"
               },
@@ -17417,6 +17303,14 @@
               "modifiedBy": {},
               "importedBy": {},
               "actions": {},
+              "richText": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RichTextDocumentInput"
+                  }
+                ],
+                "nullable": true
+              },
               "color": {
                 "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/color"
               },
@@ -17529,6 +17423,14 @@
               "modifiedBy": {},
               "importedBy": {},
               "actions": {},
+              "richText": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RichTextDocumentInput"
+                  }
+                ],
+                "nullable": true
+              },
               "box": {
                 "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/rect"
               },
@@ -17639,6 +17541,14 @@
               "modifiedBy": {},
               "importedBy": {},
               "actions": {},
+              "richText": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RichTextDocumentInput"
+                  }
+                ],
+                "nullable": true
+              },
               "color": {
                 "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/color"
               },
@@ -17946,6 +17856,14 @@
               "modifiedBy": {},
               "importedBy": {},
               "actions": {},
+              "richText": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RichTextDocumentInput"
+                  }
+                ],
+                "nullable": true
+              },
               "color": {
                 "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/color"
               },
@@ -18214,6 +18132,14 @@
               "modifiedBy": {},
               "importedBy": {},
               "actions": {},
+              "richText": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RichTextDocumentInput"
+                  }
+                ],
+                "nullable": true
+              },
               "color": {
                 "type": "string",
                 "pattern": "^#[0-9a-fA-F]{6}$"
@@ -18344,6 +18270,14 @@
               "modifiedBy": {},
               "importedBy": {},
               "actions": {},
+              "richText": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RichTextDocumentInput"
+                  }
+                ],
+                "nullable": true
+              },
               "color": {
                 "$ref": "#/components/schemas/AnnotationPatch/anyOf/0/properties/color"
               },
@@ -18441,6 +18375,14 @@
               "modifiedBy": {},
               "importedBy": {},
               "actions": {},
+              "richText": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RichTextDocumentInput"
+                  }
+                ],
+                "nullable": true
+              },
               "color": {
                 "$ref": "#/components/schemas/AnnotationPatch/anyOf/0/properties/color"
               },
@@ -18538,6 +18480,14 @@
               "modifiedBy": {},
               "importedBy": {},
               "actions": {},
+              "richText": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RichTextDocumentInput"
+                  }
+                ],
+                "nullable": true
+              },
               "color": {
                 "$ref": "#/components/schemas/AnnotationPatch/anyOf/0/properties/color"
               },
@@ -18640,6 +18590,14 @@
               "modifiedBy": {},
               "importedBy": {},
               "actions": {},
+              "richText": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RichTextDocumentInput"
+                  }
+                ],
+                "nullable": true
+              },
               "color": {
                 "allOf": [
                   {
@@ -18785,6 +18743,14 @@
               "modifiedBy": {},
               "importedBy": {},
               "actions": {},
+              "richText": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RichTextDocumentInput"
+                  }
+                ],
+                "nullable": true
+              },
               "color": {
                 "allOf": [
                   {
@@ -18928,6 +18894,14 @@
               "modifiedBy": {},
               "importedBy": {},
               "actions": {},
+              "richText": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RichTextDocumentInput"
+                  }
+                ],
+                "nullable": true
+              },
               "color": {
                 "allOf": [
                   {
@@ -19235,6 +19209,14 @@
               "modifiedBy": {},
               "importedBy": {},
               "actions": {},
+              "richText": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RichTextDocumentInput"
+                  }
+                ],
+                "nullable": true
+              },
               "color": {
                 "allOf": [
                   {
@@ -19434,6 +19416,14 @@
               "modifiedBy": {},
               "importedBy": {},
               "actions": {},
+              "richText": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RichTextDocumentInput"
+                  }
+                ],
+                "nullable": true
+              },
               "color": {
                 "allOf": [
                   {
@@ -19742,6 +19732,14 @@
               "modifiedBy": {},
               "importedBy": {},
               "actions": {},
+              "richText": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RichTextDocumentInput"
+                  }
+                ],
+                "nullable": true
+              },
               "color": {
                 "allOf": [
                   {
@@ -19905,6 +19903,9 @@
               "modifiedBy": {},
               "importedBy": {},
               "actions": {},
+              "richText": {
+                "$ref": "#/components/schemas/RichTextDocumentInput"
+              },
               "box": {
                 "$ref": "#/components/schemas/AnnotationPatch/anyOf/0/properties/rect"
               },
@@ -19940,171 +19941,6 @@
               "verticalAlign": {
                 "type": "string",
                 "enum": ["top", "middle", "bottom"]
-              },
-              "richText": {
-                "type": "object",
-                "properties": {
-                  "body": {
-                    "type": "object",
-                    "properties": {
-                      "family": {
-                        "type": "string",
-                        "minLength": 1
-                      },
-                      "weight": {
-                        "type": "integer",
-                        "minimum": 100,
-                        "maximum": 900
-                      },
-                      "italic": {
-                        "type": "boolean"
-                      },
-                      "size": {
-                        "type": "number",
-                        "minimum": 0
-                      },
-                      "color": {
-                        "$ref": "#/components/schemas/AnnotationPatch/anyOf/0/properties/color"
-                      },
-                      "decoration": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "enum": ["underline", "line-through", "word"]
-                        }
-                      },
-                      "script": {
-                        "type": "string",
-                        "enum": ["normal", "sub", "super"]
-                      },
-                      "letterSpacing": {
-                        "type": "number"
-                      },
-                      "horizontalScale": {
-                        "type": "number",
-                        "exclusiveMinimum": true,
-                        "minimum": 0
-                      },
-                      "unknown": {
-                        "type": "string"
-                      },
-                      "align": {
-                        "$ref": "#/components/schemas/AnnotationPatch/anyOf/11/properties/textAlign"
-                      },
-                      "dir": {
-                        "type": "string",
-                        "enum": ["ltr", "rtl"]
-                      },
-                      "lineHeight": {
-                        "type": "number",
-                        "exclusiveMinimum": true,
-                        "minimum": 0
-                      },
-                      "margins": {
-                        "type": "object",
-                        "properties": {
-                          "top": {
-                            "type": "number"
-                          },
-                          "bottom": {
-                            "type": "number"
-                          },
-                          "left": {
-                            "type": "number"
-                          },
-                          "right": {
-                            "type": "number"
-                          }
-                        },
-                        "required": ["top", "bottom", "left", "right"],
-                        "additionalProperties": false
-                      },
-                      "textIndent": {
-                        "type": "number"
-                      }
-                    },
-                    "additionalProperties": false
-                  },
-                  "paragraphs": {
-                    "type": "array",
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "align": {
-                          "$ref": "#/components/schemas/AnnotationPatch/anyOf/11/properties/textAlign"
-                        },
-                        "dir": {
-                          "$ref": "#/components/schemas/AnnotationPatch/anyOf/11/properties/richText/properties/body/properties/dir"
-                        },
-                        "lineHeight": {
-                          "$ref": "#/components/schemas/AnnotationPatch/anyOf/11/properties/richText/properties/body/properties/lineHeight"
-                        },
-                        "margins": {
-                          "$ref": "#/components/schemas/AnnotationPatch/anyOf/11/properties/richText/properties/body/properties/margins"
-                        },
-                        "textIndent": {
-                          "$ref": "#/components/schemas/AnnotationPatch/anyOf/11/properties/richText/properties/body/properties/textIndent"
-                        },
-                        "unknown": {
-                          "$ref": "#/components/schemas/AnnotationPatch/anyOf/11/properties/richText/properties/body/properties/unknown"
-                        },
-                        "runs": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "text": {
-                                "type": "string"
-                              },
-                              "style": {
-                                "type": "object",
-                                "properties": {
-                                  "family": {
-                                    "$ref": "#/components/schemas/AnnotationPatch/anyOf/11/properties/richText/properties/body/properties/family"
-                                  },
-                                  "weight": {
-                                    "$ref": "#/components/schemas/AnnotationPatch/anyOf/11/properties/richText/properties/body/properties/weight"
-                                  },
-                                  "italic": {
-                                    "$ref": "#/components/schemas/AnnotationPatch/anyOf/11/properties/richText/properties/body/properties/italic"
-                                  },
-                                  "size": {
-                                    "$ref": "#/components/schemas/AnnotationPatch/anyOf/11/properties/richText/properties/body/properties/size"
-                                  },
-                                  "color": {
-                                    "$ref": "#/components/schemas/AnnotationPatch/anyOf/0/properties/color"
-                                  },
-                                  "decoration": {
-                                    "$ref": "#/components/schemas/AnnotationPatch/anyOf/11/properties/richText/properties/body/properties/decoration"
-                                  },
-                                  "script": {
-                                    "$ref": "#/components/schemas/AnnotationPatch/anyOf/11/properties/richText/properties/body/properties/script"
-                                  },
-                                  "letterSpacing": {
-                                    "$ref": "#/components/schemas/AnnotationPatch/anyOf/11/properties/richText/properties/body/properties/letterSpacing"
-                                  },
-                                  "horizontalScale": {
-                                    "$ref": "#/components/schemas/AnnotationPatch/anyOf/11/properties/richText/properties/body/properties/horizontalScale"
-                                  },
-                                  "unknown": {
-                                    "type": "string"
-                                  }
-                                },
-                                "additionalProperties": false
-                              }
-                            },
-                            "required": ["text"],
-                            "additionalProperties": false
-                          }
-                        }
-                      },
-                      "required": ["runs"],
-                      "additionalProperties": false
-                    }
-                  }
-                },
-                "required": ["paragraphs"],
-                "additionalProperties": false
               },
               "color": {
                 "$ref": "#/components/schemas/AnnotationPatch/anyOf/0/properties/color"
@@ -20283,6 +20119,14 @@
               "modifiedBy": {},
               "importedBy": {},
               "actions": {},
+              "richText": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RichTextDocumentInput"
+                  }
+                ],
+                "nullable": true
+              },
               "color": {
                 "$ref": "#/components/schemas/AnnotationPatch/anyOf/0/properties/color"
               },
@@ -20389,6 +20233,14 @@
               "modifiedBy": {},
               "importedBy": {},
               "actions": {},
+              "richText": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RichTextDocumentInput"
+                  }
+                ],
+                "nullable": true
+              },
               "color": {
                 "$ref": "#/components/schemas/AnnotationPatch/anyOf/0/properties/color"
               },
@@ -20500,6 +20352,14 @@
               "modifiedBy": {},
               "importedBy": {},
               "actions": {},
+              "richText": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RichTextDocumentInput"
+                  }
+                ],
+                "nullable": true
+              },
               "box": {
                 "$ref": "#/components/schemas/AnnotationPatch/anyOf/0/properties/rect"
               },
@@ -20609,6 +20469,14 @@
               "modifiedBy": {},
               "importedBy": {},
               "actions": {},
+              "richText": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RichTextDocumentInput"
+                  }
+                ],
+                "nullable": true
+              },
               "color": {
                 "$ref": "#/components/schemas/AnnotationPatch/anyOf/0/properties/color"
               },
@@ -20730,6 +20598,14 @@
               "modifiedBy": {},
               "importedBy": {},
               "actions": {},
+              "richText": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RichTextDocumentInput"
+                  }
+                ],
+                "nullable": true
+              },
               "color": {
                 "$ref": "#/components/schemas/AnnotationPatch/anyOf/0/properties/color"
               },
@@ -21099,6 +20975,353 @@
             "additionalProperties": false
           }
         ]
+      },
+      "RichTextDocument": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "object",
+            "properties": {
+              "family": {
+                "type": "string",
+                "minLength": 1
+              },
+              "weight": {
+                "type": "integer",
+                "minimum": 100,
+                "maximum": 900
+              },
+              "italic": {
+                "type": "boolean"
+              },
+              "size": {
+                "type": "number",
+                "minimum": 0
+              },
+              "color": {
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
+              },
+              "decoration": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": ["underline", "line-through", "word"]
+                }
+              },
+              "script": {
+                "type": "string",
+                "enum": ["normal", "sub", "super"]
+              },
+              "letterSpacing": {
+                "type": "number"
+              },
+              "horizontalScale": {
+                "type": "number",
+                "exclusiveMinimum": true,
+                "minimum": 0
+              },
+              "unknown": {
+                "type": "string"
+              },
+              "align": {
+                "type": "string",
+                "enum": ["left", "center", "right", "justify"]
+              },
+              "dir": {
+                "type": "string",
+                "enum": ["ltr", "rtl"]
+              },
+              "lineHeight": {
+                "type": "number",
+                "exclusiveMinimum": true,
+                "minimum": 0
+              },
+              "margins": {
+                "type": "object",
+                "properties": {
+                  "top": {
+                    "type": "number"
+                  },
+                  "bottom": {
+                    "type": "number"
+                  },
+                  "left": {
+                    "type": "number"
+                  },
+                  "right": {
+                    "type": "number"
+                  }
+                },
+                "required": ["top", "bottom", "left", "right"],
+                "additionalProperties": false
+              },
+              "textIndent": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "family",
+              "weight",
+              "italic",
+              "size",
+              "color",
+              "decoration",
+              "script",
+              "letterSpacing",
+              "horizontalScale",
+              "align",
+              "dir"
+            ],
+            "additionalProperties": false
+          },
+          "paragraphs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "align": {
+                  "$ref": "#/components/schemas/RichTextDocument/properties/body/properties/align"
+                },
+                "dir": {
+                  "$ref": "#/components/schemas/RichTextDocument/properties/body/properties/dir"
+                },
+                "lineHeight": {
+                  "$ref": "#/components/schemas/RichTextDocument/properties/body/properties/lineHeight"
+                },
+                "margins": {
+                  "$ref": "#/components/schemas/RichTextDocument/properties/body/properties/margins"
+                },
+                "textIndent": {
+                  "$ref": "#/components/schemas/RichTextDocument/properties/body/properties/textIndent"
+                },
+                "unknown": {
+                  "$ref": "#/components/schemas/RichTextDocument/properties/body/properties/unknown"
+                },
+                "runs": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "text": {
+                        "type": "string"
+                      },
+                      "style": {
+                        "type": "object",
+                        "properties": {
+                          "family": {
+                            "$ref": "#/components/schemas/RichTextDocument/properties/body/properties/family"
+                          },
+                          "weight": {
+                            "$ref": "#/components/schemas/RichTextDocument/properties/body/properties/weight"
+                          },
+                          "italic": {
+                            "$ref": "#/components/schemas/RichTextDocument/properties/body/properties/italic"
+                          },
+                          "size": {
+                            "$ref": "#/components/schemas/RichTextDocument/properties/body/properties/size"
+                          },
+                          "color": {
+                            "$ref": "#/components/schemas/RichTextDocument/properties/body/properties/color"
+                          },
+                          "decoration": {
+                            "$ref": "#/components/schemas/RichTextDocument/properties/body/properties/decoration"
+                          },
+                          "script": {
+                            "$ref": "#/components/schemas/RichTextDocument/properties/body/properties/script"
+                          },
+                          "letterSpacing": {
+                            "$ref": "#/components/schemas/RichTextDocument/properties/body/properties/letterSpacing"
+                          },
+                          "horizontalScale": {
+                            "$ref": "#/components/schemas/RichTextDocument/properties/body/properties/horizontalScale"
+                          },
+                          "unknown": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": ["text"],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": ["runs"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["body", "paragraphs"],
+        "additionalProperties": false
+      },
+      "RichTextDocumentInput": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "object",
+            "properties": {
+              "family": {
+                "type": "string",
+                "minLength": 1
+              },
+              "weight": {
+                "type": "integer",
+                "minimum": 100,
+                "maximum": 900
+              },
+              "italic": {
+                "type": "boolean"
+              },
+              "size": {
+                "type": "number",
+                "minimum": 0
+              },
+              "color": {
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
+              },
+              "decoration": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": ["underline", "line-through", "word"]
+                }
+              },
+              "script": {
+                "type": "string",
+                "enum": ["normal", "sub", "super"]
+              },
+              "letterSpacing": {
+                "type": "number"
+              },
+              "horizontalScale": {
+                "type": "number",
+                "exclusiveMinimum": true,
+                "minimum": 0
+              },
+              "unknown": {
+                "type": "string"
+              },
+              "align": {
+                "type": "string",
+                "enum": ["left", "center", "right", "justify"]
+              },
+              "dir": {
+                "type": "string",
+                "enum": ["ltr", "rtl"]
+              },
+              "lineHeight": {
+                "type": "number",
+                "exclusiveMinimum": true,
+                "minimum": 0
+              },
+              "margins": {
+                "type": "object",
+                "properties": {
+                  "top": {
+                    "type": "number"
+                  },
+                  "bottom": {
+                    "type": "number"
+                  },
+                  "left": {
+                    "type": "number"
+                  },
+                  "right": {
+                    "type": "number"
+                  }
+                },
+                "required": ["top", "bottom", "left", "right"],
+                "additionalProperties": false
+              },
+              "textIndent": {
+                "type": "number"
+              }
+            },
+            "additionalProperties": false
+          },
+          "paragraphs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "align": {
+                  "$ref": "#/components/schemas/RichTextDocumentInput/properties/body/properties/align"
+                },
+                "dir": {
+                  "$ref": "#/components/schemas/RichTextDocumentInput/properties/body/properties/dir"
+                },
+                "lineHeight": {
+                  "$ref": "#/components/schemas/RichTextDocumentInput/properties/body/properties/lineHeight"
+                },
+                "margins": {
+                  "$ref": "#/components/schemas/RichTextDocumentInput/properties/body/properties/margins"
+                },
+                "textIndent": {
+                  "$ref": "#/components/schemas/RichTextDocumentInput/properties/body/properties/textIndent"
+                },
+                "unknown": {
+                  "$ref": "#/components/schemas/RichTextDocumentInput/properties/body/properties/unknown"
+                },
+                "runs": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "text": {
+                        "type": "string"
+                      },
+                      "style": {
+                        "type": "object",
+                        "properties": {
+                          "family": {
+                            "$ref": "#/components/schemas/RichTextDocumentInput/properties/body/properties/family"
+                          },
+                          "weight": {
+                            "$ref": "#/components/schemas/RichTextDocumentInput/properties/body/properties/weight"
+                          },
+                          "italic": {
+                            "$ref": "#/components/schemas/RichTextDocumentInput/properties/body/properties/italic"
+                          },
+                          "size": {
+                            "$ref": "#/components/schemas/RichTextDocumentInput/properties/body/properties/size"
+                          },
+                          "color": {
+                            "$ref": "#/components/schemas/RichTextDocumentInput/properties/body/properties/color"
+                          },
+                          "decoration": {
+                            "$ref": "#/components/schemas/RichTextDocumentInput/properties/body/properties/decoration"
+                          },
+                          "script": {
+                            "$ref": "#/components/schemas/RichTextDocumentInput/properties/body/properties/script"
+                          },
+                          "letterSpacing": {
+                            "$ref": "#/components/schemas/RichTextDocumentInput/properties/body/properties/letterSpacing"
+                          },
+                          "horizontalScale": {
+                            "$ref": "#/components/schemas/RichTextDocumentInput/properties/body/properties/horizontalScale"
+                          },
+                          "unknown": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": ["text"],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": ["runs"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["paragraphs"],
+        "additionalProperties": false
       },
       "FormFieldRef": {
         "anyOf": [

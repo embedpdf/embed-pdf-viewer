@@ -1,11 +1,11 @@
 import { appearanceRaster } from './appearanceRasters';
 import { iconRect } from './creatables';
+import { EVERY_PERMISSION } from './fixtureScope';
 import type {
   ConformanceTestRunner,
   ConformanceFixture,
   ConformanceOptions,
 } from './runMetadataConformance';
-import { drawnPointsOf } from '../pageSpace/helpers';
 import type {
   AnnotationDraft,
   AnnotationPatch,
@@ -29,17 +29,17 @@ import type { Engine } from '../engine/Engine';
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import type { PageBox, PagePoint } from '../geometry/pageSpace';
-import { pagePointsBounds, pagePointTurned, pageTurnOfUpright } from '../pageSpace/helpers';
 import { annotationKey } from '../identity/annotationKey';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import { toPageRef } from '../identity/PageRef';
+import { pagePointsBounds, pagePointTurned, pageTurnOfUpright } from '../pageSpace/helpers';
+import { drawnPointsOf } from '../pageSpace/helpers';
 import { AbortError } from '../promise/AbortError';
 import {
   AnnotationCreateResultSchema,
   AnnotationReorderResultSchema,
   AnnotationUpdateResultSchema,
 } from '../wire/schemas';
-import { EVERY_PERMISSION } from './fixtureScope';
 
 /**
  * Per-fixture knowledge the mutation harness needs. The shared fixture
@@ -1328,6 +1328,107 @@ export function runAnnotationMutationConformance(
             style: { weight: 700 },
           });
         }
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test("a comment as rich text: a note's reads back with its plain projection; a plain one reads null", async () => {
+      const doc = await openFixture(engine, opts);
+      try {
+        const page = doc.page(toPageRef(fix.pageObjectNumber));
+        const rich = await page.annotations.create({
+          subtype: 'text',
+          rect: iconRect(shapeRect.x, shapeRect.y),
+          richText: {
+            paragraphs: [
+              { runs: [{ text: 'Hello ' }, { text: 'bold', style: { weight: 700 } }] },
+              { runs: [{ text: 'two', style: { decoration: ['underline'] } }] },
+            ],
+          },
+        } satisfies TextDraft);
+        const note = rich.annotation;
+        if (note.subtype !== 'text') throw new Error('expected a note');
+        expect(note.contents).toBe('Hello bold\rtwo');
+        expect(note.richText?.paragraphs).toEqual([
+          { runs: [{ text: 'Hello ' }, { text: 'bold', style: { weight: 700 } }] },
+          { runs: [{ text: 'two', style: { decoration: ['underline'] } }] },
+        ]);
+        // A body nobody stated: the engine's default.
+        expect(note.richText?.body.family).toBe('Helvetica');
+        expect(note.richText?.body.size).toBe(12);
+
+        const plain = await page.annotations.create({
+          subtype: 'text',
+          rect: iconRect(shapeRect.x + 40, shapeRect.y),
+          contents: 'plain',
+        } satisfies TextDraft);
+        if (plain.annotation.subtype !== 'text') throw new Error('expected a note');
+        expect(plain.annotation.richText).toBeNull();
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test('a comment as rich text: new contents rewrite a rich comment, and null makes it plain', async () => {
+      const doc = await openFixture(engine, opts);
+      try {
+        const page = doc.page(toPageRef(fix.pageObjectNumber));
+        const created = await page.annotations.create({
+          subtype: 'square',
+          box: shapeRect,
+          richText: {
+            body: { color: '#102030' },
+            paragraphs: [{ runs: [{ text: 'was ' }, { text: 'bold', style: { weight: 700 } }] }],
+          },
+        } satisfies SquareDraft);
+        const ref = created.annotation.ref;
+        // A plain-text client's edit: the comment's /RC follows, not just
+        // /Contents (an Acrobat or pdf.js reader shows /RC when it's there).
+        const rewritten = await page.annotations.update(ref, {
+          subtype: 'square',
+          contents: 'now\nplain',
+        });
+        if (rewritten.annotation.subtype !== 'square') throw new Error('expected a square');
+        expect(rewritten.annotation.contents).toBe('now\rplain');
+        expect(rewritten.annotation.richText?.paragraphs).toEqual([
+          { runs: [{ text: 'now' }] },
+          { runs: [{ text: 'plain' }] },
+        ]);
+        expect(rewritten.annotation.richText?.body.color).toBe('#102030');
+
+        const unstyled = await page.annotations.update(ref, { subtype: 'square', richText: null });
+        if (unstyled.annotation.subtype !== 'square') throw new Error('expected a square');
+        expect(unstyled.annotation.richText).toBeNull();
+        expect(unstyled.annotation.contents).toBe('now\rplain');
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test("a comment as rich text: a redact's comment in another font leaves its overlay's", async () => {
+      const doc = await openFixture(engine, opts);
+      try {
+        const page = doc.page(toPageRef(fix.pageObjectNumber));
+        const created = await page.annotations.create({
+          subtype: 'redact',
+          rect: shapeRect,
+          overlayText: 'CONFIDENTIAL',
+          fontFamily: 'courier',
+          fontSize: 10,
+          fontColor: '#ff0000',
+          richText: {
+            body: { family: 'Times', size: 14 },
+            paragraphs: [{ runs: [{ text: 'why' }] }],
+          },
+        } satisfies RedactDraft);
+        const redact = created.annotation;
+        if (redact.subtype !== 'redact') throw new Error('expected a redact');
+        expect(redact.richText?.body.family).toBe('Times');
+        expect(redact.richText?.body.size).toBe(14);
+        expect(redact.fontFamily).toBe('courier');
+        expect(redact.fontSize).toBe(10);
+        expect(redact.fontColor).toBe('#ff0000');
       } finally {
         await doc.close();
       }

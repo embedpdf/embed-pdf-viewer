@@ -1,34 +1,5 @@
-import type { Identity } from '../auth/scope/types';
-import { PageRefSchema } from '../identity/PageRef.schema';
 import { z } from 'zod';
 
-import { DateInputSchema, IsoDateTimeSchema } from '../dto/IsoDateTime.schema';
-
-import type { AnnotationList } from '../annotation/AnnotationList';
-import { AnnotationRefSchema } from '../annotation/base.schema';
-import {
-  AnnotationDraftSchema,
-  AnnotationPatchSchema,
-  AnnotationSchema,
-  PdfLinkTargetSchema,
-  PdfLinkTargetWritableSchema,
-} from '../annotation/kinds';
-import { WidgetDTOSchema, WidgetPatchSchema } from '../annotation/kinds/widget';
-import {
-  ANNOTATION_APPEARANCE_MODES,
-  type AnnotationAppearanceImageOptions,
-  type AnnotationAppearanceBatch,
-  type AnnotationAppearanceMode,
-  type AnnotationAppearancesQuery,
-  type WidgetAppearancesQuery,
-} from '../dto/AnnotationRender';
-import {
-  AttachmentFileBaseSchema,
-  AttachmentFileInfoSchema,
-  AttachmentRefSchema,
-  AttachmentSchema,
-} from '../dto/Attachment.schema';
-import { AppearanceResourceKeysSchema, ImageResourceKeysSchema } from './resourceKeys';
 import {
   PAGE_PRINT_FAMILIES,
   PAGE_RENDER_FAMILIES,
@@ -38,8 +9,8 @@ import {
   type PageRenderFamilySpec,
   type PageRenderPin,
 } from './renderFamilies';
-import type { CachePins } from '../dto/CachePins';
-import type { DocumentManifest, ManifestPage } from '../dto/DocumentManifest';
+import { AppearanceResourceKeysSchema, ImageResourceKeysSchema } from './resourceKeys';
+import type { AnnotationList } from '../annotation/AnnotationList';
 import type {
   Font,
   FontList,
@@ -78,6 +49,7 @@ import type { NamedPageEntry } from '../dto/NamedPage';
 import type { PageImageOptions, PageNetworkRenderFormat, PageRenderQuery } from '../dto/PageRender';
 import type { PageTextSnapshot } from '../dto/PageTextSnapshot';
 import { PdfPageActionsSchema } from '../dto/PdfAction.schema';
+import { RichTextDocumentInputSchema, RichTextDocumentSchema } from '../dto/RichText.schema';
 import type { PdfSaveMode } from '../dto/PdfSaveMode';
 import type { DocumentSecurityState, PdfPermissionInfo } from '../engine/DocumentSecurityService';
 import type { SerializedEngineError } from '../errors/EngineError';
@@ -100,6 +72,53 @@ import {
   PdfSizeSchema,
 } from '../geometry/schemas';
 import type { AppearanceOutcome } from '../annotation/appearance';
+import { AnnotationRefSchema } from '../annotation/base.schema';
+import {
+  AnnotationDraftSchema,
+  AnnotationPatchSchema,
+  AnnotationSchema,
+  PdfLinkTargetSchema,
+  PdfLinkTargetWritableSchema,
+} from '../annotation/kinds';
+import { WidgetDTOSchema, WidgetPatchSchema } from '../annotation/kinds/widget';
+import type { Identity } from '../auth/scope/types';
+import {
+  ANNOTATION_APPEARANCE_MODES,
+  type AnnotationAppearanceImageOptions,
+  type AnnotationAppearanceBatch,
+  type AnnotationAppearanceMode,
+  type AnnotationAppearancesQuery,
+  type WidgetAppearancesQuery,
+} from '../dto/AnnotationRender';
+import type { AttachmentList } from '../dto/Attachment';
+import {
+  AttachmentFileBaseSchema,
+  AttachmentFileInfoSchema,
+  AttachmentRefSchema,
+  AttachmentSchema,
+} from '../dto/Attachment.schema';
+import type { CachePins } from '../dto/CachePins';
+import type { DocumentManifest, ManifestPage } from '../dto/DocumentManifest';
+import { PAGE_INSERT_BLANK_MAX_COUNT } from '../mutation/PageInsertBlankInput';
+import type { PageInsertResult } from '../mutation/PageInsertResult';
+import type { PageRestoreResult } from '../mutation/PageRestoreResult';
+import type { PageFlattenInput, PageFlattenResult } from '../mutation/PageFlattenResult';
+import type { PageExtractInput } from '../dto/PageExtract';
+import {
+  DocumentOutlineSchema,
+  OutlineItemDraftSchema,
+  OutlineItemPatchSchema,
+  OutlineItemSchema,
+} from '../dto/DocumentOutline.schema';
+import { DateInputSchema, IsoDateTimeSchema } from '../dto/IsoDateTime.schema';
+import { OutlineItemRefSchema } from '../identity/OutlineItemRef.schema';
+import { PageRefSchema } from '../identity/PageRef.schema';
+import type { PageReorderResult } from '../mutation/PageReorderResult';
+import type {
+  AnnotationAppearanceExportInput,
+  AnnotationFlattenInput,
+  AnnotationFlattenResult,
+} from '../mutation/AnnotationFlattenResult';
 import type { AnnotationListMutationMeta } from '../mutation/AnnotationListMutationMeta';
 import type {
   AnnotationCreateResult,
@@ -113,7 +132,7 @@ import type {
   AttachmentRestoreResult,
   AttachmentMutationMeta,
 } from '../mutation/AttachmentMutationResults';
-import type { AttachmentList } from '../dto/Attachment';
+import type { CustomMetadataUpdateResult } from '../mutation/CustomMetadataUpdateResult';
 import type {
   FormFieldCreateResult,
   FormCalculationsReorderResult,
@@ -129,30 +148,9 @@ import type {
   FormWidgetsReorderResult,
   FormWidgetUpdateResult,
 } from '../mutation/FormMutationResults';
-import type { CustomMetadataUpdateResult } from '../mutation/CustomMetadataUpdateResult';
+import type { ListPosition } from '../mutation/ListPosition';
 import type { MetadataUpdateResult } from '../mutation/MetadataUpdateResult';
 import type { CacheDelta, MutationMeta } from '../mutation/MutationMeta';
-import type { PageDeleteResult } from '../mutation/PageDeleteResult';
-import { PAGE_INSERT_BLANK_MAX_COUNT } from '../mutation/PageInsertBlankInput';
-import type { PageInsertResult } from '../mutation/PageInsertResult';
-import type { PageRestoreResult } from '../mutation/PageRestoreResult';
-import type { PageFlattenInput, PageFlattenResult } from '../mutation/PageFlattenResult';
-import type { PageExtractInput } from '../dto/PageExtract';
-import {
-  DocumentOutlineSchema,
-  OutlineItemDraftSchema,
-  OutlineItemPatchSchema,
-  OutlineItemSchema,
-} from '../dto/DocumentOutline.schema';
-import { OutlineItemRefSchema } from '../identity/OutlineItemRef.schema';
-import type { RedactionApplyResult, RedactionApplyScope } from '../mutation/RedactionApplyResult';
-import type { ListPosition } from '../mutation/ListPosition';
-import type { PageReorderResult } from '../mutation/PageReorderResult';
-import type {
-  AnnotationAppearanceExportInput,
-  AnnotationFlattenInput,
-  AnnotationFlattenResult,
-} from '../mutation/AnnotationFlattenResult';
 import type {
   OutlineCreateResult,
   OutlineDeleteResult,
@@ -162,24 +160,11 @@ import type {
   OutlineRestoreResult,
   OutlineUpdateResult,
 } from '../mutation/OutlineMutationResults';
+import type { PageDeleteResult } from '../mutation/PageDeleteResult';
 import type { PageNameInput, PageRemoveNameInput } from '../mutation/PageNameInput';
 import type { PageNameResult } from '../mutation/PageNameResult';
 import type { PageRotateResult } from '../mutation/PageRotateResult';
-import type {
-  AnnotationImportBody,
-  AnnotationImportOptions,
-  AnnotationImportResult,
-} from '../transfer/annotationImport';
-import type { FormExportSelection } from '../transfer/formExport';
-import type {
-  FormImportBody,
-  FormImportOptions,
-  FormImportResult,
-  FormValuesImportBody,
-  FormValuesImportOptions,
-  FormValuesImportResult,
-} from '../transfer/formImport';
-import type { AnnotationExportSelection } from '../transfer/exportSelection';
+import type { RedactionApplyResult, RedactionApplyScope } from '../mutation/RedactionApplyResult';
 import { fromBase64, toBase64 } from '../resource/base64';
 import type {
   SearchMatch,
@@ -189,6 +174,21 @@ import type {
   SearchSnippet,
 } from '../search/types';
 import type { PdfTextSegment } from '../text/layout';
+import type {
+  AnnotationImportBody,
+  AnnotationImportOptions,
+  AnnotationImportResult,
+} from '../transfer/annotationImport';
+import type { AnnotationExportSelection } from '../transfer/exportSelection';
+import type { FormExportSelection } from '../transfer/formExport';
+import type {
+  FormImportBody,
+  FormImportOptions,
+  FormImportResult,
+  FormValuesImportBody,
+  FormValuesImportOptions,
+  FormValuesImportResult,
+} from '../transfer/formImport';
 export type { CacheDelta, MutationMeta } from '../mutation/MutationMeta';
 
 /** Who a session acts for; see `Identity` in `auth/scope/types.ts`. */
@@ -1219,6 +1219,8 @@ export const AnnotationWireComponents = {
   AnnotationList: AnnotationListSchema,
   AnnotationMutationMeta: AnnotationListMutationMetaSchema,
   AnnotationPosition: AnnotationPositionSchema,
+  RichTextDocument: RichTextDocumentSchema,
+  RichTextDocumentInput: RichTextDocumentInputSchema,
 } as const satisfies Record<string, z.ZodTypeAny>;
 
 /** What `page.annotations.reorder` takes on the wire. */

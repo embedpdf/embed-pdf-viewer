@@ -10,6 +10,7 @@ import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runti
 
 import { readAttachmentFileInfo } from '../../../attachments/internal/attachmentPrimitives';
 import { FILE_NAME_TO_ICON } from '../annotationIcon';
+import { readCommentRichText } from '../richTextWire';
 import { readAnnotColor, readAnnotOpacity, readAnnotName } from './annotationReadPrimitives';
 
 /** Default `/C` — matches the generator's default icon fill and the writer default. */
@@ -44,6 +45,7 @@ export function readFileAttachment(
 
   return {
     ...base,
+    richText: readCommentRichText(fn, mem, annotPtr),
     subtype: 'file-attachment',
     icon,
     file,

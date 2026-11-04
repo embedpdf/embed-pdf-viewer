@@ -8,6 +8,7 @@ import {
   PdfMeasureWriteSchema,
 } from '../../dto/Measure.schema';
 import { FileAnnotationActionsSchema } from '../../dto/PdfAction.schema';
+import { RichTextDocumentInputSchema, RichTextDocumentSchema } from '../../dto/RichText.schema';
 import {
   PdfPointSchema,
   PdfQuadSchema,
@@ -104,6 +105,22 @@ export const annotationBaseFields = {
   actions: field.preserved(FileAnnotationActionsSchema).nullable().space('actions'),
 };
 
+/** Fields every markup kind has (ISO 32000-2 Table 171): the base, and its comment's rich text. */
+export const markupBaseFields = {
+  ...annotationBaseFields,
+  /**
+   * `/RC`: the comment as rich text, what its popup shows (ISO 32000-2 §12.5.6.2), with
+   * `contents` its plain projection; `null` when the comment is plain text. A comment draws
+   * nothing: only a free text's rich text is its appearance, and free text declares its own.
+   */
+  richText: field
+    .data(RichTextDocumentSchema)
+    .writes(RichTextDocumentInputSchema)
+    .nullable()
+    .optional()
+    .space('length'),
+};
+
 // ── style ──
 
 export const colorStyleFields = {
@@ -195,7 +212,7 @@ export const widgetBoxFields = {
 // ── families ──
 
 export const textMarkupFields = {
-  ...annotationBaseFields,
+  ...markupBaseFields,
   ...colorStyleFields,
   /** The box around the quads. */
   ...drawnRectFields,
@@ -203,14 +220,14 @@ export const textMarkupFields = {
 };
 
 export const shapeFields = {
-  ...annotationBaseFields,
+  ...markupBaseFields,
   ...filledStyleFields,
   ...boxFields,
   cloudyIntensity: field.data(z.number().positive()).nullable().optional(),
 };
 
 export const vertexFields = {
-  ...annotationBaseFields,
+  ...markupBaseFields,
   ...filledStyleFields,
   ...drawnRectFields,
   vertices: field.data(z.array(PdfPointSchema)).space('points'),

@@ -6,6 +6,7 @@ import type {
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
+import { readCommentRichText } from '../richTextWire';
 import { readAnnotColor, readAnnotOpacity, readIntent } from './annotationReadPrimitives';
 import { readAnnotationBox } from './readAnnotationTurn';
 import { caretIntentFromName } from '../textEditIntent';
@@ -26,6 +27,7 @@ export function readCaret(
 
   return {
     ...base,
+    richText: readCommentRichText(fn, mem, annotPtr),
     subtype: 'caret',
     intent,
     color,

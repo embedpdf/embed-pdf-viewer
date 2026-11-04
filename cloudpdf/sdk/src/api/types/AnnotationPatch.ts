@@ -57,6 +57,7 @@ export namespace AnnotationPatch {
         modifiedBy?: unknown | undefined;
         importedBy?: unknown | undefined;
         actions?: unknown | undefined;
+        richText?: (CloudPDF.RichTextDocumentInput | null) | undefined;
         color?: string | undefined;
         opacity?: number | undefined;
         quadPoints?: AnnotationPatchHighlight.QuadPoints.Item[] | undefined;
@@ -170,6 +171,7 @@ export namespace AnnotationPatch {
         modifiedBy?: unknown | undefined;
         importedBy?: unknown | undefined;
         actions?: unknown | undefined;
+        richText?: (CloudPDF.RichTextDocumentInput | null) | undefined;
         color?: string | undefined;
         opacity?: number | undefined;
         quadPoints?: AnnotationPatchUnderline.QuadPoints.Item[] | undefined;
@@ -283,6 +285,7 @@ export namespace AnnotationPatch {
         modifiedBy?: unknown | undefined;
         importedBy?: unknown | undefined;
         actions?: unknown | undefined;
+        richText?: (CloudPDF.RichTextDocumentInput | null) | undefined;
         color?: string | undefined;
         opacity?: number | undefined;
         quadPoints?: AnnotationPatchSquiggly.QuadPoints.Item[] | undefined;
@@ -396,6 +399,7 @@ export namespace AnnotationPatch {
         modifiedBy?: unknown | undefined;
         importedBy?: unknown | undefined;
         actions?: unknown | undefined;
+        richText?: (CloudPDF.RichTextDocumentInput | null) | undefined;
         color?: string | undefined;
         opacity?: number | undefined;
         quadPoints?: AnnotationPatchStrikeout.QuadPoints.Item[] | undefined;
@@ -515,6 +519,7 @@ export namespace AnnotationPatch {
         modifiedBy?: unknown | undefined;
         importedBy?: unknown | undefined;
         actions?: unknown | undefined;
+        richText?: (CloudPDF.RichTextDocumentInput | null) | undefined;
         color?: (string | null) | undefined;
         opacity?: number | undefined;
         strokeWidth?: number | undefined;
@@ -610,6 +615,7 @@ export namespace AnnotationPatch {
         modifiedBy?: unknown | undefined;
         importedBy?: unknown | undefined;
         actions?: unknown | undefined;
+        richText?: (CloudPDF.RichTextDocumentInput | null) | undefined;
         color?: (string | null) | undefined;
         opacity?: number | undefined;
         strokeWidth?: number | undefined;
@@ -705,6 +711,7 @@ export namespace AnnotationPatch {
         modifiedBy?: unknown | undefined;
         importedBy?: unknown | undefined;
         actions?: unknown | undefined;
+        richText?: (CloudPDF.RichTextDocumentInput | null) | undefined;
         color?: (string | null) | undefined;
         opacity?: number | undefined;
         strokeWidth?: number | undefined;
@@ -817,6 +824,7 @@ export namespace AnnotationPatch {
         modifiedBy?: unknown | undefined;
         importedBy?: unknown | undefined;
         actions?: unknown | undefined;
+        richText?: (CloudPDF.RichTextDocumentInput | null) | undefined;
         color?: (string | null) | undefined;
         opacity?: number | undefined;
         strokeWidth?: number | undefined;
@@ -962,6 +970,7 @@ export namespace AnnotationPatch {
         modifiedBy?: unknown | undefined;
         importedBy?: unknown | undefined;
         actions?: unknown | undefined;
+        richText?: (CloudPDF.RichTextDocumentInput | null) | undefined;
         color?: (string | null) | undefined;
         opacity?: number | undefined;
         strokeWidth?: number | undefined;
@@ -1209,6 +1218,7 @@ export namespace AnnotationPatch {
         modifiedBy?: unknown | undefined;
         importedBy?: unknown | undefined;
         actions?: unknown | undefined;
+        richText?: (CloudPDF.RichTextDocumentInput | null) | undefined;
         color?: (string | null) | undefined;
         opacity?: number | undefined;
         strokeWidth?: number | undefined;
@@ -1309,6 +1319,7 @@ export namespace AnnotationPatch {
         modifiedBy?: unknown | undefined;
         importedBy?: unknown | undefined;
         actions?: unknown | undefined;
+        richText?: CloudPDF.RichTextDocumentInput | undefined;
         box?: AnnotationPatchFreeText.Box | undefined;
         rotation?: (number | null) | undefined;
         intent?: AnnotationPatchFreeText.Intent | undefined;
@@ -1316,7 +1327,6 @@ export namespace AnnotationPatch {
         fontSize?: number | undefined;
         textAlign?: AnnotationPatchFreeText.TextAlign | undefined;
         verticalAlign?: AnnotationPatchFreeText.VerticalAlign | undefined;
-        richText?: AnnotationPatchFreeText.RichText | undefined;
         color?: string | undefined;
         fontColor?: string | undefined;
         interiorColor?: (string | null) | undefined;
@@ -1393,151 +1403,6 @@ export namespace AnnotationPatch {
             Bottom: "bottom",
         } as const;
         export type VerticalAlign = (typeof VerticalAlign)[keyof typeof VerticalAlign];
-
-        export interface RichText {
-            body?: RichText.Body | undefined;
-            paragraphs: RichText.Paragraphs.Item[];
-        }
-
-        export namespace RichText {
-            export interface Body {
-                family?: string | undefined;
-                weight?: number | undefined;
-                italic?: boolean | undefined;
-                size?: number | undefined;
-                color?: string | undefined;
-                decoration?: Body.Decoration.Item[] | undefined;
-                script?: Body.Script | undefined;
-                letterSpacing?: number | undefined;
-                horizontalScale?: number | undefined;
-                unknown?: string | undefined;
-                align?: Body.Align | undefined;
-                dir?: Body.Dir | undefined;
-                lineHeight?: number | undefined;
-                margins?: Body.Margins | undefined;
-                textIndent?: number | undefined;
-            }
-
-            export namespace Body {
-                export type Decoration = Decoration.Item[];
-
-                export namespace Decoration {
-                    export const Item = {
-                        Underline: "underline",
-                        LineThrough: "line-through",
-                        Word: "word",
-                    } as const;
-                    export type Item = (typeof Item)[keyof typeof Item];
-                }
-
-                export const Script = {
-                    Normal: "normal",
-                    Sub: "sub",
-                    Super: "super",
-                } as const;
-                export type Script = (typeof Script)[keyof typeof Script];
-                export const Align = {
-                    Left: "left",
-                    Center: "center",
-                    Right: "right",
-                    Justify: "justify",
-                } as const;
-                export type Align = (typeof Align)[keyof typeof Align];
-                export const Dir = {
-                    Ltr: "ltr",
-                    Rtl: "rtl",
-                } as const;
-                export type Dir = (typeof Dir)[keyof typeof Dir];
-
-                export interface Margins {
-                    top: number;
-                    bottom: number;
-                    left: number;
-                    right: number;
-                }
-            }
-
-            export type Paragraphs = Paragraphs.Item[];
-
-            export namespace Paragraphs {
-                export interface Item {
-                    align?: Item.Align | undefined;
-                    dir?: Item.Dir | undefined;
-                    lineHeight?: number | undefined;
-                    margins?: Item.Margins | undefined;
-                    textIndent?: number | undefined;
-                    unknown?: string | undefined;
-                    runs: Item.Runs.Item[];
-                }
-
-                export namespace Item {
-                    export const Align = {
-                        Left: "left",
-                        Center: "center",
-                        Right: "right",
-                        Justify: "justify",
-                    } as const;
-                    export type Align = (typeof Align)[keyof typeof Align];
-                    export const Dir = {
-                        Ltr: "ltr",
-                        Rtl: "rtl",
-                    } as const;
-                    export type Dir = (typeof Dir)[keyof typeof Dir];
-
-                    export interface Margins {
-                        top: number;
-                        bottom: number;
-                        left: number;
-                        right: number;
-                    }
-
-                    export type Runs = Runs.Item[];
-
-                    export namespace Runs {
-                        export interface Item {
-                            text: string;
-                            style?: Item.Style | undefined;
-                        }
-
-                        export namespace Item {
-                            export interface Style {
-                                family?: string | undefined;
-                                weight?: number | undefined;
-                                italic?: boolean | undefined;
-                                size?: number | undefined;
-                                color?: string | undefined;
-                                decoration?: Style.Decoration.Item[] | undefined;
-                                script?: Style.Script | undefined;
-                                letterSpacing?: number | undefined;
-                                horizontalScale?: number | undefined;
-                                unknown?: string | undefined;
-                            }
-
-                            export namespace Style {
-                                export type Decoration = Decoration.Item[];
-
-                                export namespace Decoration {
-                                    export const Item = {
-                                        Underline: "underline",
-                                        LineThrough: "line-through",
-                                        Word: "word",
-                                    } as const;
-                                    export type Item = (typeof Item)[keyof typeof Item];
-                                }
-
-                                export const Script = {
-                                    Normal: "normal",
-                                    Sub: "sub",
-                                    Super: "super",
-                                } as const;
-                                export type Script = (typeof Script)[keyof typeof Script];
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
         export type BorderStyle = ("solid" | "dashed") | ("solid" | "dashed" | "beveled" | "inset");
         export const LineEnding = {
             None: "none",
@@ -1587,6 +1452,7 @@ export namespace AnnotationPatch {
         modifiedBy?: unknown | undefined;
         importedBy?: unknown | undefined;
         actions?: unknown | undefined;
+        richText?: (CloudPDF.RichTextDocumentInput | null) | undefined;
         color?: string | undefined;
         opacity?: number | undefined;
         box?: AnnotationPatchCaret.Box | undefined;
@@ -1681,6 +1547,7 @@ export namespace AnnotationPatch {
         modifiedBy?: unknown | undefined;
         importedBy?: unknown | undefined;
         actions?: unknown | undefined;
+        richText?: (CloudPDF.RichTextDocumentInput | null) | undefined;
         color?: string | undefined;
         opacity?: number | undefined;
         icon?: AnnotationPatchText.Icon | undefined;
@@ -1775,6 +1642,7 @@ export namespace AnnotationPatch {
         modifiedBy?: unknown | undefined;
         importedBy?: unknown | undefined;
         actions?: unknown | undefined;
+        richText?: (CloudPDF.RichTextDocumentInput | null) | undefined;
         box?: AnnotationPatchStamp.Box | undefined;
         rotation?: (number | null) | undefined;
         name?: (string | null) | undefined;
@@ -1871,6 +1739,7 @@ export namespace AnnotationPatch {
         modifiedBy?: unknown | undefined;
         importedBy?: unknown | undefined;
         actions?: unknown | undefined;
+        richText?: (CloudPDF.RichTextDocumentInput | null) | undefined;
         color?: string | undefined;
         opacity?: number | undefined;
         icon?: AnnotationPatchFileAttachment.Icon | undefined;
@@ -1970,6 +1839,7 @@ export namespace AnnotationPatch {
         modifiedBy?: unknown | undefined;
         importedBy?: unknown | undefined;
         actions?: unknown | undefined;
+        richText?: (CloudPDF.RichTextDocumentInput | null) | undefined;
         color?: string | undefined;
         opacity?: number | undefined;
         quadPoints?: AnnotationPatchRedact.QuadPoints.Item[] | undefined;

@@ -1,5 +1,10 @@
 import { z } from 'zod';
 
+import {
+  RichTextAlignSchema,
+  RichTextDocumentInputSchema,
+  RichTextDocumentSchema,
+} from '../../../dto/RichText.schema';
 import { CalloutLineSchema } from '../../../geometry/schemas';
 import {
   AnnotationBorderStyleSchema,
@@ -12,11 +17,10 @@ import {
   VerticalAlignmentSchema,
 } from '../../base.schema';
 import { defineKind, field } from '../../declaration';
-import { annotationBaseFields, boxFields, FontNameSchema } from '../shared-fields';
-import { RichTextAlignSchema, RichTextDocumentInputSchema, RichTextDocumentSchema } from './values';
+import { boxFields, FontNameSchema, markupBaseFields } from '../shared-fields';
 
 export const FreeTextDeclaration = defineKind('free-text', {
-  ...annotationBaseFields,
+  ...markupBaseFields,
   ...boxFields,
   /**
    * A create without it is a callout when it has a `calloutLine`, else a
