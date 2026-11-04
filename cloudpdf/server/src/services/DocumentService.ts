@@ -289,6 +289,13 @@ export class DocumentService {
    */
   private readonly layerWritesInFlight = new Map<string, Promise<void>>();
   /**
+   * Per layer session, the number {@link layerWriteMark} answers: drawn from
+   * `layerWriteCount` when a write begins, so it never repeats, even after
+   * the entry is forgotten and written again.
+   */
+  private readonly layerWriteMarks = new Map<string, number>();
+  private layerWriteCount = 0;
+  /**
    * Engine generation captured at write-alignment time (the
    * `forWrite` door of {@link ensureLayerFreshOnPool}), consumed by
    * {@link advanceLayerSession}. Correct without per-write threading
@@ -901,6 +908,7 @@ export class DocumentService {
     await this.awaitLayerWriteSettled(key);
     await this.layerOpens.get(key)?.catch(() => undefined);
     this.layerTouches.delete(key);
+    this.layerWriteMarks.delete(key);
     await this.closeLayerOnPool(docId, layerName);
   }
 
@@ -920,6 +928,7 @@ export class DocumentService {
     let settle!: () => void;
     const marker = new Promise<void>((resolve) => (settle = resolve));
     this.layerWritesInFlight.set(key, marker);
+    this.layerWriteMarks.set(key, ++this.layerWriteCount);
     this.touchLayer(docId, layerName);
     return () => {
       if (this.layerWritesInFlight.get(key) === marker) {
@@ -932,12 +941,22 @@ export class DocumentService {
   }
 
   /**
+   * Which write began last on the layer's session on this replica, as a
+   * number that changes whenever a write begins. A pinned read takes it
+   * before it reads and compares after (`readAtPins` in
+   * `routes/_helpers.ts`): the same number means no write began meanwhile.
+   */
+  layerWriteMark(docId: string, layerName: string): number {
+    return this.layerWriteMarks.get(layerSessionKey(docId, layerName)) ?? 0;
+  }
+
+  /**
    * Park until no layer write is in flight — bounded to two rounds so a
-   * continuous write stream cannot starve reads: after the bound, the
-   * request-time freshness check plus the routes' pinned-read
-   * re-validation still guarantee no uncommitted content is served under
-   * a version pin; the barrier exists to make that the rare path, not the
-   * only defense.
+   * continuous write stream cannot starve reads. The layer's writes run one
+   * at a time, so a read that started while one write was in flight runs
+   * after it settles. Past the bound, a read can run on uncommitted state:
+   * a pinned read then sees that another write began and refuses its pins
+   * (`readAtPins` in `routes/_helpers.ts`).
    */
   private async awaitLayerWriteSettled(key: string): Promise<void> {
     for (let round = 0; round < 2; round++) {
@@ -2435,6 +2454,9 @@ export class DocumentService {
     }
     for (const key of Array.from(this.layerOpens.keys())) {
       if (key.startsWith(`${docId}::`)) this.layerOpens.delete(key);
+    }
+    for (const key of Array.from(this.layerWriteMarks.keys())) {
+      if (key.startsWith(`${docId}::`)) this.layerWriteMarks.delete(key);
     }
   }
 

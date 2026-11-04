@@ -12,7 +12,13 @@ import {
 import { decodeSearchToken, encodeSearchToken } from '@embedpdf/engine-core/wire';
 import { requireLayerDocAccessOnly, requireLayerResource } from '../app/jwt-plugin';
 import type { DocumentService, OpenContext } from '../services/DocumentService';
-import { abortSignalOf, parseTokenOrInvalidArg, setImmutableCache, setNoStore } from './_helpers';
+import {
+  abortSignalOf,
+  parseTokenOrInvalidArg,
+  readAtPins,
+  setImmutableCache,
+  setNoStore,
+} from './_helpers';
 
 interface SearchRouteDeps {
   documentService: DocumentService;
@@ -101,13 +107,16 @@ async function runSearchSlice(
 
   const manifest = await documentService.getLayerManifest(ctx, docId, layerName);
   const epoch = searchContentEpoch(manifest);
-  if (state.epoch !== undefined && state.epoch !== epoch) {
-    setNoStore(reply);
+  const assertCurrent = async () => {
+    const current = searchContentEpoch(
+      await documentService.getLayerManifest(ctx, docId, layerName),
+    );
+    if (state.epoch === undefined || state.epoch === current) return;
     throw new EngineError(
       EngineErrorCode.NotFound,
-      `search epoch ${state.epoch} no longer current (current=${epoch}) for layer ${layerName} of document ${docId}`,
+      `search epoch ${state.epoch} no longer current (current=${current}) for layer ${layerName} of document ${docId}`,
     );
-  }
+  };
 
   // A layer whose text and page order are still the base's searches the
   // base: the same answer, without opening a session for the layer.
@@ -130,16 +139,32 @@ async function runSearchSlice(
         ...(state.limit !== undefined ? { limit: state.limit } : {}),
       },
     });
-  const result = await documentService.readOnPool(ctx, docId, view, build, abortSignalOf(reply));
-  if (result.tag !== 'search.query') {
-    throw new EngineError(
-      EngineErrorCode.WireFormat,
-      `unexpected search.query payload: ${result.tag}`,
-    );
-  }
+  const slice = await readAtPins({
+    documentService,
+    reply,
+    docId,
+    layerName: view,
+    assertCurrent,
+    read: async () => {
+      const result = await documentService.readOnPool(
+        ctx,
+        docId,
+        view,
+        build,
+        abortSignalOf(reply),
+      );
+      if (result.tag !== 'search.query') {
+        throw new EngineError(
+          EngineErrorCode.WireFormat,
+          `unexpected search.query payload: ${result.tag}`,
+        );
+      }
+      return result.slice;
+    },
+    pinned: versioned,
+  });
 
   versioned ? setImmutableCache(reply) : setNoStore(reply);
-  const slice = result.slice;
   return {
     ...slice,
     // The worker's session cursor never crosses the wire — continuation

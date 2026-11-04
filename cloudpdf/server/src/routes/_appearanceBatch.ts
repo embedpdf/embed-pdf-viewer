@@ -22,7 +22,13 @@ import {
 } from '@embedpdf/engine-core/wire';
 import type { FastifyReply } from 'fastify';
 
-import { assertServerFonts, parseOrInvalidArg, setImmutableCache, setNoStore } from './_helpers';
+import {
+  assertServerFonts,
+  parseOrInvalidArg,
+  readAtPins,
+  setImmutableCache,
+  setNoStore,
+} from './_helpers';
 import { buildMultipart, type MultipartPart } from './_multipart';
 import type { SharpImageEncoder } from '../render/SharpImageEncoder';
 import type { DerivedRenderService } from '../services/DerivedRenderService';
@@ -85,7 +91,15 @@ export async function renderAppearanceBatch(input: {
     requestedServerFonts = parsed.serverFonts;
   }
   const pinName = widgets ? 'widgetVersion' : 'annotationVersion';
-  const currentPin = widgets ? page.cache.widgetVersion : page.cache.annotationVersion;
+  const pinOf = (current: ManifestPage) =>
+    widgets ? current.cache.widgetVersion : current.cache.annotationVersion;
+  const assertPinCurrent = (current: ManifestPage) => {
+    if (requestedPin === undefined || requestedPin === pinOf(current)) return;
+    throw new EngineError(
+      EngineErrorCode.NotFound,
+      `appearance ${pinName} ${requestedPin} no longer current (current=${pinOf(current)}) for page ${input.pageObjectNumber}`,
+    );
+  };
   // Format lives in the token (versioned) or query (unversioned). The schema
   // requires it on versioned requests; the unversioned alias defaults to webp.
   const format: PageNetworkRenderFormat = parseOrInvalidArg(
@@ -94,12 +108,11 @@ export async function renderAppearanceBatch(input: {
     'render format',
   );
 
-  if (requestedPin !== undefined && requestedPin !== currentPin) {
+  try {
+    assertPinCurrent(page);
+  } catch (err) {
     setNoStore(input.reply);
-    throw new EngineError(
-      EngineErrorCode.NotFound,
-      `appearance ${pinName} ${requestedPin} no longer current (current=${currentPin}) for page ${input.pageObjectNumber}`,
-    );
+    throw err;
   }
   // An appearance drawn here may fill in characters with fallback fonts.
   await assertServerFonts(input.documentService, requestedServerFonts, input.reply);
@@ -123,14 +136,6 @@ export async function renderAppearanceBatch(input: {
     );
   }
 
-  if (input.scope.kind === 'layer') {
-    await input.documentService.ensureLayerOnPool(
-      input.scope.ctx,
-      input.scope.docId,
-      input.scope.layerName,
-    );
-  }
-
   // Every server render carries the deployment's output-pixel budget —
   // the worker rejects before allocating (degenerate-geometry guard).
   const renderOptions = {
@@ -147,6 +152,13 @@ export async function renderAppearanceBatch(input: {
     entries: AnnotationAppearanceBatchEntry[];
     parts: MultipartPart[];
   }> => {
+    if (input.scope.kind === 'layer') {
+      await input.documentService.ensureLayerOnPool(
+        input.scope.ctx,
+        input.scope.docId,
+        input.scope.layerName,
+      );
+    }
     const entries: AnnotationAppearanceBatchEntry[] = [];
     const parts: MultipartPart[] = [];
     const ext = format === 'webp' ? 'webp' : 'png';
@@ -266,7 +278,15 @@ export async function renderAppearanceBatch(input: {
     }
     return { page: result.page, entries, parts };
   };
-  const collected = await collect();
+  const collected = await readAtPins({
+    documentService: input.documentService,
+    reply: input.reply,
+    docId: input.scope.docId,
+    layerName: input.scope.kind === 'layer' ? input.scope.layerName : undefined,
+    assertCurrent: async () => assertPinCurrent(await resolvePageForRead(input)),
+    read: collect,
+    pinned: requestedPin !== undefined,
+  });
 
   const manifest: AnnotationAppearanceBatch = {
     page: collected.page,

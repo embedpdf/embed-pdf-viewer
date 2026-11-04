@@ -64,6 +64,7 @@ import {
   objectNumbersQuery,
   parseOrInvalidArg,
   parseTokenOrInvalidArg,
+  readAtPins,
   resolvePageKeyParam,
   setImmutableCache,
   setNoStore,
@@ -834,9 +835,9 @@ function fieldRefFromParams(req: FastifyRequest): FormFieldRef {
 
 /**
  * The form at a pinned `formsVersion` (immutable, CDN-cacheable), read on
- * the base session or the layer's. The pin is checked before and after the
- * worker read, so a write that landed in between is a 404 into the client's
- * manifest refresh, never a body filed under the wrong pin.
+ * the base session or the layer's at its pin (see `readAtPins`): a write
+ * that landed meanwhile is a 404 into the client's manifest refresh, never a
+ * body filed under the wrong pin.
  */
 async function readForm(input: {
   documentService: DocumentService;
@@ -850,49 +851,56 @@ async function readForm(input: {
     scope.kind === 'layer'
       ? input.documentService.getLayerManifest(scope.ctx, scope.docId, scope.layerName)
       : input.documentService.getManifest(scope.ctx, scope.docId);
-  const assertCurrent = (current: number) => {
+  const assertCurrent = async () => {
+    const current = (await getManifest()).formsVersion;
     if (input.requestedVersion === current) return;
-    setNoStore(input.reply);
     throw new EngineError(
       EngineErrorCode.NotFound,
       `${scope.kind === 'layer' ? 'layer ' : ''}forms version ${input.requestedVersion} no longer current (current=${current})`,
     );
   };
-
-  assertCurrent((await getManifest()).formsVersion);
-  if (scope.kind === 'layer') {
-    await input.documentService.ensureLayerOnPool(scope.ctx, scope.docId, scope.layerName);
-  }
-  const build = (jobId: WorkerJobId) =>
-    wirePack({
-      kind: 'forms.list' as const,
-      effect: 'read' as const,
-      jobId,
-      docId: scope.docId,
-      ...(scope.kind === 'layer' ? { layerName: scope.layerName } : {}),
-    });
-  const result = await input.documentService.readOnPool(
-    scope.ctx,
-    scope.docId,
-    scope.kind === 'layer' ? scope.layerName : undefined,
-    build,
-    input.signal,
-  );
-  if (result.tag !== 'forms.list') {
-    throw new EngineError(
-      EngineErrorCode.WireFormat,
-      `unexpected forms.list payload: ${result.tag}`,
+  const read = async () => {
+    if (scope.kind === 'layer') {
+      await input.documentService.ensureLayerOnPool(scope.ctx, scope.docId, scope.layerName);
+    }
+    const build = (jobId: WorkerJobId) =>
+      wirePack({
+        kind: 'forms.list' as const,
+        effect: 'read' as const,
+        jobId,
+        docId: scope.docId,
+        ...(scope.kind === 'layer' ? { layerName: scope.layerName } : {}),
+      });
+    const result = await input.documentService.readOnPool(
+      scope.ctx,
+      scope.docId,
+      scope.kind === 'layer' ? scope.layerName : undefined,
+      build,
+      input.signal,
     );
-  }
-  assertCurrent((await getManifest()).formsVersion);
+    if (result.tag !== 'forms.list') {
+      throw new EngineError(
+        EngineErrorCode.WireFormat,
+        `unexpected forms.list payload: ${result.tag}`,
+      );
+    }
+    return result.snapshot;
+  };
+  const snapshot = await readAtPins({
+    documentService: input.documentService,
+    reply: input.reply,
+    docId: scope.docId,
+    layerName: scope.kind === 'layer' ? scope.layerName : undefined,
+    assertCurrent,
+    read,
+  });
   setImmutableCache(input.reply);
-  return result.snapshot;
+  return snapshot;
 }
 
 /**
- * One export job at the token's pins, checked before and after the job so an
- * immutable body never belongs to another version: a stale pin is a 404 the
- * client answers by refreshing its manifest. The response is the bundle as
+ * One export job, read at the token's pins (see `readAtPins`): a stale pin
+ * is a 404 the client answers by refreshing its manifest. The response is the bundle as
  * `sendBundle` writes it.
  */
 async function exportForm(input: {
@@ -914,7 +922,6 @@ async function exportForm(input: {
         : await input.documentService.getManifest(scope.ctx, scope.docId);
     const layoutVersion = manifest.layoutVersion ?? 1;
     if (token.formsVersion !== manifest.formsVersion || token.layoutVersion !== layoutVersion) {
-      setNoStore(input.reply);
       throw new EngineError(
         EngineErrorCode.NotFound,
         `form export at formsVersion ${token.formsVersion}, layoutVersion ${token.layoutVersion} no longer current (current: ${manifest.formsVersion}, ${layoutVersion})`,
@@ -922,33 +929,42 @@ async function exportForm(input: {
     }
   };
 
-  await assertCurrent();
-  if (layerName !== undefined) {
-    await input.documentService.ensureLayerOnPool(scope.ctx, scope.docId, layerName);
-  }
-  const build = (jobId: WorkerJobId) =>
-    wirePack({
-      kind: 'forms.export' as const,
-      effect: 'snapshot' as const,
-      jobId,
-      docId: scope.docId,
-      ...(layerName !== undefined ? { layerName } : {}),
-      selection: token.selection,
-      limits: input.limits,
-    });
-  const result = await input.documentService.readOnPool(
-    scope.ctx,
-    scope.docId,
-    layerName,
-    build,
-    input.signal,
-  );
-  if (result.tag !== 'forms.export') {
-    throw new EngineError(
-      EngineErrorCode.WireFormat,
-      `unexpected forms.export payload: ${result.tag}`,
+  const read = async () => {
+    if (layerName !== undefined) {
+      await input.documentService.ensureLayerOnPool(scope.ctx, scope.docId, layerName);
+    }
+    const build = (jobId: WorkerJobId) =>
+      wirePack({
+        kind: 'forms.export' as const,
+        effect: 'snapshot' as const,
+        jobId,
+        docId: scope.docId,
+        ...(layerName !== undefined ? { layerName } : {}),
+        selection: token.selection,
+        limits: input.limits,
+      });
+    const result = await input.documentService.readOnPool(
+      scope.ctx,
+      scope.docId,
+      layerName,
+      build,
+      input.signal,
     );
-  }
-  await assertCurrent();
-  return sendBundle(input.reply, result.bundle, input.cache ?? 'immutable');
+    if (result.tag !== 'forms.export') {
+      throw new EngineError(
+        EngineErrorCode.WireFormat,
+        `unexpected forms.export payload: ${result.tag}`,
+      );
+    }
+    return result.bundle;
+  };
+  const bundle = await readAtPins({
+    documentService: input.documentService,
+    reply: input.reply,
+    docId: scope.docId,
+    layerName,
+    assertCurrent,
+    read,
+  });
+  return sendBundle(input.reply, bundle, input.cache ?? 'immutable');
 }

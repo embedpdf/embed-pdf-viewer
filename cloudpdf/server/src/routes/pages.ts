@@ -49,6 +49,7 @@ import {
   abortSignalOf,
   parseOrInvalidArg,
   parseTokenOrInvalidArg,
+  readAtPins,
   resolvePageKeyParam,
   resolvePageRefToNumber,
   setImmutableCache,
@@ -536,19 +537,44 @@ async function renderPageImage(input: {
     'render format',
   );
 
-  // A versioned request carries every pin of its family; each must be current.
-  for (const pin of input.picture.pins) {
-    const requested = parsedQuery[pin];
-    if (requested === undefined || requested === page.cache[pin]) continue;
+  // A versioned request carries every pin of its family; each must be current,
+  // and so must the base the store files the picture under.
+  const assertPinsCurrent = (current: { page: ManifestPage; baseSha: string }) => {
+    for (const pin of input.picture.pins) {
+      const requested = parsedQuery[pin];
+      if (requested === undefined || requested === current.page.cache[pin]) continue;
+      throw new EngineError(
+        EngineErrorCode.NotFound,
+        `render ${pin} ${requested} no longer current (current=${current.page.cache[pin]}) for page ${input.pageObjectNumber}`,
+      );
+    }
+    if (current.baseSha !== baseSha) {
+      throw new EngineError(
+        EngineErrorCode.NotFound,
+        `render of base ${baseSha} no longer current (current=${current.baseSha}) for page ${input.pageObjectNumber}`,
+      );
+    }
+  };
+  const pinned = input.picture.pins.some((pin) => parsedQuery[pin] !== undefined);
+  try {
+    assertPinsCurrent({ page, baseSha });
+  } catch (err) {
     setNoStore(input.reply);
-    throw new EngineError(
-      EngineErrorCode.NotFound,
-      `render ${pin} ${requested} no longer current (current=${page.cache[pin]}) for page ${input.pageObjectNumber}`,
-    );
+    throw err;
   }
   // ...and the server's fonts it was drawn with: fallback fonts draw page
   // text, so another server's fonts are another picture.
   await assertServerFonts(input.documentService, parsedQuery.serverFonts, input.reply);
+  const atPins = <T>(read: () => Promise<T>): Promise<T> =>
+    readAtPins({
+      documentService: input.documentService,
+      reply: input.reply,
+      docId: input.scope.docId,
+      layerName: input.scope.kind === 'layer' ? input.scope.layerName : undefined,
+      assertCurrent: async () => assertPinsCurrent(await resolvePageAndManifestForRead(input)),
+      read,
+      pinned,
+    });
 
   // ── The derived-artifact plane ───────────────────────────────────────
   // Lattice renders are durable: URL space == artifact space at canonical
@@ -685,20 +711,28 @@ async function renderPageImage(input: {
             classification.canonicalToken,
             input.picture.family,
           );
-    const artifact = await derived.getOrRender(
-      key,
-      async (signal) => {
-        if (input.encodeInEngine) {
-          const image = await renderEncoded(signal);
-          return { bytes: image.bytes, contentType: image.contentType };
-        }
-        return input.imageEncoder.encodeToBuffer(await renderRaster(signal), {
-          format,
-          quality: imageOptions.quality,
-        });
-      },
-      input.signal,
-    );
+    // The pins are checked inside the render, before the store keeps it.
+    // Callers that joined the render share its refusal.
+    const artifact = await derived
+      .getOrRender(
+        key,
+        (signal) =>
+          atPins(async () => {
+            if (input.encodeInEngine) {
+              const image = await renderEncoded(signal);
+              return { bytes: image.bytes, contentType: image.contentType };
+            }
+            return input.imageEncoder.encodeToBuffer(await renderRaster(signal), {
+              format,
+              quality: imageOptions.quality,
+            });
+          }),
+        input.signal,
+      )
+      .catch((err: unknown) => {
+        if (EngineError.is(err, EngineErrorCode.NotFound)) setNoStore(input.reply);
+        throw err;
+      });
     setImmutableCache(input.reply);
     input.reply.type(artifact.contentType);
     return input.reply.send(Buffer.from(artifact.bytes));
@@ -707,23 +741,19 @@ async function renderPageImage(input: {
   // Compute-only path (off-lattice or unpinned): unchanged contract —
   // body plus the advisory dimension headers.
   if (input.encodeInEngine) {
-    const image = await renderEncoded(input.signal);
-    parsedQuery.contentVersion === undefined
-      ? setNoStore(input.reply)
-      : setImmutableCache(input.reply);
+    const image = await atPins(() => renderEncoded(input.signal));
+    pinned ? setImmutableCache(input.reply) : setNoStore(input.reply);
     input.reply.type(image.contentType);
     input.reply.header('X-EmbedPDF-Image-Width', String(image.width));
     input.reply.header('X-EmbedPDF-Image-Height', String(image.height));
     return input.reply.send(Buffer.from(image.bytes));
   }
-  const raster = await renderRaster(input.signal);
+  const raster = await atPins(() => renderRaster(input.signal));
   const encoded = input.imageEncoder.encode(raster, {
     format,
     quality: imageOptions.quality,
   });
-  parsedQuery.contentVersion === undefined
-    ? setNoStore(input.reply)
-    : setImmutableCache(input.reply);
+  pinned ? setImmutableCache(input.reply) : setNoStore(input.reply);
   input.reply.type(encoded.contentType);
   input.reply.header('X-EmbedPDF-Image-Width', String(raster.width));
   input.reply.header('X-EmbedPDF-Image-Height', String(raster.height));
@@ -738,58 +768,70 @@ async function readPageText(input: {
   pageObjectNumber: number;
   requestedVersion?: number;
 }) {
-  const page = await resolvePageForRead(input);
-  if (
-    input.requestedVersion !== undefined &&
-    input.requestedVersion !== page.cache.contentVersion
-  ) {
-    setNoStore(input.reply);
-    throw new EngineError(
-      EngineErrorCode.NotFound,
-      `${input.scope.kind === 'layer' ? 'layer ' : ''}text version ${
-        input.requestedVersion
-      } no longer current (current=${page.cache.contentVersion}) for page ${
-        input.pageObjectNumber
-      }`,
+  const assertCurrent = async () => {
+    const page = await resolvePageForRead(input);
+    if (
+      input.requestedVersion !== undefined &&
+      input.requestedVersion !== page.cache.contentVersion
+    ) {
+      throw new EngineError(
+        EngineErrorCode.NotFound,
+        `${input.scope.kind === 'layer' ? 'layer ' : ''}text version ${
+          input.requestedVersion
+        } no longer current (current=${page.cache.contentVersion}) for page ${
+          input.pageObjectNumber
+        }`,
+      );
+    }
+  };
+  const read = async () => {
+    if (input.scope.kind === 'layer') {
+      await input.documentService.ensureLayerOnPool(
+        input.scope.ctx,
+        input.scope.docId,
+        input.scope.layerName,
+      );
+    }
+    const build = (jobId: WorkerJobId) =>
+      wirePack({
+        kind: 'pages.text' as const,
+        effect: 'read' as const,
+        jobId,
+        docId: input.scope.docId,
+        ...(input.scope.kind === 'layer' ? { layerName: input.scope.layerName } : {}),
+        page: toPageRef(input.pageObjectNumber),
+      });
+    const scope = input.scope;
+    const result = await input.documentService.readOnPool(
+      scope.ctx,
+      scope.docId,
+      scope.kind === 'layer' ? scope.layerName : undefined,
+      build,
+      input.signal,
     );
-  }
-
-  if (input.scope.kind === 'layer') {
-    await input.documentService.ensureLayerOnPool(
-      input.scope.ctx,
-      input.scope.docId,
-      input.scope.layerName,
-    );
-  }
-  const build = (jobId: WorkerJobId) =>
-    wirePack({
-      kind: 'pages.text' as const,
-      effect: 'read' as const,
-      jobId,
-      docId: input.scope.docId,
-      ...(input.scope.kind === 'layer' ? { layerName: input.scope.layerName } : {}),
-      page: toPageRef(input.pageObjectNumber),
-    });
-  const scope = input.scope;
-  const result = await input.documentService.readOnPool(
-    scope.ctx,
-    scope.docId,
-    scope.kind === 'layer' ? scope.layerName : undefined,
-    build,
-    input.signal,
-  );
-  if (result.tag !== 'pages.text') {
-    throw new EngineError(
-      EngineErrorCode.WireFormat,
-      `unexpected ${input.scope.kind === 'layer' ? 'layer ' : ''}pages.text payload: ${result.tag}`,
-    );
-  }
+    if (result.tag !== 'pages.text') {
+      throw new EngineError(
+        EngineErrorCode.WireFormat,
+        `unexpected ${input.scope.kind === 'layer' ? 'layer ' : ''}pages.text payload: ${result.tag}`,
+      );
+    }
+    return result.snapshot;
+  };
+  const snapshot = await readAtPins({
+    documentService: input.documentService,
+    reply: input.reply,
+    docId: input.scope.docId,
+    layerName: input.scope.kind === 'layer' ? input.scope.layerName : undefined,
+    assertCurrent,
+    read,
+    pinned: input.requestedVersion !== undefined,
+  });
 
   input.requestedVersion === undefined ? setNoStore(input.reply) : setImmutableCache(input.reply);
   // The text body is immutable and keyed by contentVersion. Annotation
   // liveness (revision / weak-state) changes on a different cadence, so it
   // is intentionally not baked in here; it lives on annotation reads.
-  return result.snapshot;
+  return snapshot;
 }
 
 async function readPageGeometry(input: {
@@ -800,58 +842,70 @@ async function readPageGeometry(input: {
   pageObjectNumber: number;
   requestedVersion?: number;
 }) {
-  const page = await resolvePageForRead(input);
-  if (
-    input.requestedVersion !== undefined &&
-    input.requestedVersion !== page.cache.contentVersion
-  ) {
-    setNoStore(input.reply);
-    throw new EngineError(
-      EngineErrorCode.NotFound,
-      `${input.scope.kind === 'layer' ? 'layer ' : ''}geometry version ${
-        input.requestedVersion
-      } no longer current (current=${page.cache.contentVersion}) for page ${
-        input.pageObjectNumber
-      }`,
+  const assertCurrent = async () => {
+    const page = await resolvePageForRead(input);
+    if (
+      input.requestedVersion !== undefined &&
+      input.requestedVersion !== page.cache.contentVersion
+    ) {
+      throw new EngineError(
+        EngineErrorCode.NotFound,
+        `${input.scope.kind === 'layer' ? 'layer ' : ''}geometry version ${
+          input.requestedVersion
+        } no longer current (current=${page.cache.contentVersion}) for page ${
+          input.pageObjectNumber
+        }`,
+      );
+    }
+  };
+  const read = async () => {
+    if (input.scope.kind === 'layer') {
+      await input.documentService.ensureLayerOnPool(
+        input.scope.ctx,
+        input.scope.docId,
+        input.scope.layerName,
+      );
+    }
+    const build = (jobId: WorkerJobId) =>
+      wirePack({
+        kind: 'pages.geometry' as const,
+        effect: 'read' as const,
+        jobId,
+        docId: input.scope.docId,
+        ...(input.scope.kind === 'layer' ? { layerName: input.scope.layerName } : {}),
+        page: toPageRef(input.pageObjectNumber),
+      });
+    const scope = input.scope;
+    const result = await input.documentService.readOnPool(
+      scope.ctx,
+      scope.docId,
+      scope.kind === 'layer' ? scope.layerName : undefined,
+      build,
+      input.signal,
     );
-  }
-
-  if (input.scope.kind === 'layer') {
-    await input.documentService.ensureLayerOnPool(
-      input.scope.ctx,
-      input.scope.docId,
-      input.scope.layerName,
-    );
-  }
-  const build = (jobId: WorkerJobId) =>
-    wirePack({
-      kind: 'pages.geometry' as const,
-      effect: 'read' as const,
-      jobId,
-      docId: input.scope.docId,
-      ...(input.scope.kind === 'layer' ? { layerName: input.scope.layerName } : {}),
-      page: toPageRef(input.pageObjectNumber),
-    });
-  const scope = input.scope;
-  const result = await input.documentService.readOnPool(
-    scope.ctx,
-    scope.docId,
-    scope.kind === 'layer' ? scope.layerName : undefined,
-    build,
-    input.signal,
-  );
-  if (result.tag !== 'pages.geometry') {
-    throw new EngineError(
-      EngineErrorCode.WireFormat,
-      `unexpected ${
-        input.scope.kind === 'layer' ? 'layer ' : ''
-      }pages.geometry payload: ${result.tag}`,
-    );
-  }
+    if (result.tag !== 'pages.geometry') {
+      throw new EngineError(
+        EngineErrorCode.WireFormat,
+        `unexpected ${
+          input.scope.kind === 'layer' ? 'layer ' : ''
+        }pages.geometry payload: ${result.tag}`,
+      );
+    }
+    return result.snapshot;
+  };
+  const snapshot = await readAtPins({
+    documentService: input.documentService,
+    reply: input.reply,
+    docId: input.scope.docId,
+    layerName: input.scope.kind === 'layer' ? input.scope.layerName : undefined,
+    assertCurrent,
+    read,
+    pinned: input.requestedVersion !== undefined,
+  });
 
   input.requestedVersion === undefined ? setNoStore(input.reply) : setImmutableCache(input.reply);
   // See readPageText: geometry is content-cached; liveness is not baked in.
-  return result.snapshot;
+  return snapshot;
 }
 
 async function resolvePageForRead(input: {
