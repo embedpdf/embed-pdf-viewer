@@ -323,6 +323,7 @@ describe("DocClient", () => {
             formsVersion: 1,
             outlineVersion: 1,
             fontsVersion: 1,
+            contentsVersion: 1,
             auditHead: 1,
             baseSha: "baseSha",
             layerVersion: 1,

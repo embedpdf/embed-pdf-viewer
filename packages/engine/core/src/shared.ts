@@ -861,7 +861,7 @@ export {
 } from './text/charmap';
 export type { CharBoundaryBias, CharMapAnchor } from './text/charmap';
 export { LINE_BREAKS_VERSION, toLineBreaks } from './text/lineBreaks';
-export { searchContentEpoch, canonicalSearchQuery } from './search/epoch';
+export { canonicalSearchQuery } from './search/canonicalQuery';
 
 export type { PageReorderInput } from './mutation/PageReorderInput';
 export type { PageReorderResult } from './mutation/PageReorderResult';

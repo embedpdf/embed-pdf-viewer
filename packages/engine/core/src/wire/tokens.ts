@@ -432,15 +432,17 @@ export const decodeWidgetAppearancesRenderToken = (raw: string): TokenQuery =>
   decodeToken(WidgetAppearancesRenderTokenSchema, raw);
 
 /**
- * The decoded state of a versioned search URL — the whole cache key.
- * `epoch` is `searchContentEpoch(manifest)`; `from` the scan origin by page
+ * The decoded state of a versioned search URL — the whole cache key. A
+ * search reads every page's text in page order, so it pins the manifest's
+ * `contentsVersion` and `layoutVersion`; `from` is the scan origin by page
  * object number; `skip` the number of scan-order pages already searched
- * (0 = first batch). The server mints continuation tokens (same epoch,
+ * (0 = first batch). The server mints continuation tokens (same pins,
  * advanced skip); the client decodes them only to verify a resumed cursor
  * still belongs to its query.
  */
 export interface SearchToken {
-  epoch: string;
+  contentsVersion: number;
+  layoutVersion: number;
   query: SearchQuery;
   from?: number;
   skip: number;
@@ -452,7 +454,8 @@ export const encodeSearchToken = (input: SearchToken): string => {
   const q = input.query;
   return encodeToken(SearchTokenSchema, {
     ...pinFields(input.pin),
-    epoch: input.epoch,
+    contentsVersion: input.contentsVersion,
+    layoutVersion: input.layoutVersion,
     q: encodeTokenText(q.text),
     // Canonical keys: every default is omitted, never encoded as false/0.
     regex: q.regex ? true : undefined,
@@ -469,7 +472,6 @@ export const encodeSearchToken = (input: SearchToken): string => {
 
 export const decodeSearchToken = (raw: string): SearchToken => {
   const t = decodeToken(SearchTokenSchema, raw);
-  if (t.epoch === undefined) throw new Error('search token is missing "epoch"');
   if (t.q === undefined) throw new Error('search token is missing "q"');
   const query: SearchQuery = {
     text: decodeTokenText(t.q),
@@ -486,7 +488,8 @@ export const decodeSearchToken = (raw: string): SearchToken => {
       ? undefined
       : decodePositiveInteger(t.limitMatches, 'limitMatches');
   return {
-    epoch: t.epoch,
+    contentsVersion: decodePositiveInteger(t.contentsVersion, 'contentsVersion'),
+    layoutVersion: decodePositiveInteger(t.layoutVersion, 'layoutVersion'),
     pin: decodePin(t),
     query,
     ...(t.from === undefined ? {} : { from: decodePositiveInteger(t.from, 'from') }),

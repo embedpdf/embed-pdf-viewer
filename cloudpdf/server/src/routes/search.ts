@@ -2,7 +2,6 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import {
   EngineError,
   EngineErrorCode,
-  searchContentEpoch,
   toPageRef,
   wirePack,
   type SearchQuery,
@@ -31,8 +30,12 @@ interface SearchRouteDeps {
 
 /** Decoded state of one search GET — the whole cache key minus the tier. */
 interface SearchGetState {
-  /** Content epoch the caller pinned; absent on the unversioned form. */
-  epoch?: string;
+  /**
+   * The document's contents and layout pins the caller read at; the
+   * unversioned form may leave them out.
+   */
+  contentsVersion?: number;
+  layoutVersion?: number;
   /** The token's engine value and shape; absent on the unversioned form. */
   pin?: TokenPin;
   query: SearchQuery;
@@ -55,10 +58,10 @@ const RESOURCE_BY_TIER = {
  * routes' two forms.
  *
  *   - `/search/{mode}/data@:token` — versioned. The token
- *     (`encodeSearchToken`) carries the content epoch + query + position
- *     and is the cache key; the response is immutable and CDN-cacheable.
- *     A stale epoch answers `NotFound` (the standard versioned-read
- *     refresh signal), never stale results.
+ *     (`encodeSearchToken`) carries the contents and layout pins + query +
+ *     position and is the cache key; the response is immutable and
+ *     CDN-cacheable. A stale pin answers `NotFound` (the standard
+ *     versioned-read refresh signal), never stale results.
  *   - `/search/{mode}/data?…` — unversioned, flat query params (`q` as
  *     plain text), served from the current content, always `no-store`.
  *
@@ -70,7 +73,7 @@ const RESOURCE_BY_TIER = {
  * snippet is extracted text.
  *
  * Continuation: responses carry `nextCursor` = the ready-made token for
- * the next slice (same epoch, advanced `skip`) — deterministic, so the
+ * the next slice (same pins, advanced `skip`) — deterministic, so the
  * whole cursor chain of a popular query is cacheable end to end. There
  * is no server-side job; cancelling is not asking for the next slice.
  */
@@ -113,15 +116,21 @@ async function runSearchSlice(
   );
 
   const manifest = await documentService.getLayerManifest(ctx, docId, layerName);
-  const epoch = searchContentEpoch(manifest);
   const assertCurrent = async () => {
-    const current = searchContentEpoch(
-      await documentService.getLayerManifest(ctx, docId, layerName),
-    );
-    if (state.epoch === undefined || state.epoch === current) return;
+    const current = await documentService.getLayerManifest(ctx, docId, layerName);
+    const stale = (requested: number | undefined, now: number) =>
+      requested !== undefined && requested !== now;
+    if (
+      !stale(state.contentsVersion, current.contentsVersion) &&
+      !stale(state.layoutVersion, current.layoutVersion)
+    ) {
+      return;
+    }
     throw new EngineError(
       EngineErrorCode.NotFound,
-      `search epoch ${state.epoch} no longer current (current=${current}) for layer ${layerName} of document ${docId}`,
+      `search at contentsVersion ${state.contentsVersion}, layoutVersion ${state.layoutVersion} ` +
+        `no longer current (current: ${current.contentsVersion}, ${current.layoutVersion}) ` +
+        `for layer ${layerName} of document ${docId}`,
     );
   };
 
@@ -181,13 +190,14 @@ async function runSearchSlice(
   return {
     ...slice,
     // The worker's session cursor never crosses the wire — continuation
-    // is a deterministic next token (same epoch, advanced position).
+    // is a deterministic next token (same pins, advanced position).
     nextCursor:
       slice.nextCursor === null
         ? null
         : encodeSearchToken({
             pin: cursorPin,
-            epoch,
+            contentsVersion: manifest.contentsVersion,
+            layoutVersion: manifest.layoutVersion,
             query: state.query,
             ...(state.from !== undefined ? { from: state.from } : {}),
             skip: slice.pagesSearched,
@@ -208,8 +218,9 @@ function rejectQueryParamsOnTokenUrl(query: unknown): void {
 /**
  * Parse the unversioned form's flat query params. Same field vocabulary
  * as the token, except `q` is plain text (the query string already
- * carries arbitrary text safely) and `epoch` is optional — provide it to
- * get the same stale-version rejection the token form has.
+ * carries arbitrary text safely) and the pins (`contentsVersion`,
+ * `layoutVersion`) are optional — provide them to get the same stale-version
+ * rejection the token form has.
  */
 function searchStateFromParams(params: unknown): SearchGetState {
   const p = (params ?? {}) as Record<string, unknown>;
@@ -258,7 +269,10 @@ function searchStateFromParams(params: unknown): SearchGetState {
   const pages = int('limitPages', 1);
   const matches = int('limitMatches', 1);
   return {
-    ...(str('epoch') !== undefined ? { epoch: str('epoch') } : {}),
+    ...(int('contentsVersion', 1) !== undefined
+      ? { contentsVersion: int('contentsVersion', 1) }
+      : {}),
+    ...(int('layoutVersion', 1) !== undefined ? { layoutVersion: int('layoutVersion', 1) } : {}),
     query,
     ...(int('from', 1) !== undefined ? { from: int('from', 1) } : {}),
     skip: int('skip', 0) ?? 0,

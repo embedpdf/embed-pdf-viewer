@@ -75,6 +75,12 @@ export interface DocumentManifest {
    */
   fontsVersion: number;
   /**
+   * Doc-level pin for a read across every page's content (search). Moves with
+   * any write that moves a page's `contentVersion`, inserts a page or deletes
+   * one, and never on an annotation or form write.
+   */
+  contentsVersion: number;
+  /**
    * Audit-log head at this manifest's state — written in the same
    * transaction as the version bumps, so an event subscriber that starts
    * from `auditHead` can never miss a mutation between manifest fetch and

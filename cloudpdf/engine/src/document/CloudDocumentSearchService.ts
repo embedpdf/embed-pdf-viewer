@@ -3,7 +3,6 @@ import {
   EngineError,
   EngineErrorCode,
   canonicalSearchQuery,
-  searchContentEpoch,
   type DocumentSearchService,
   type SearchQuery,
   type SearchRequest,
@@ -26,7 +25,7 @@ import type { HttpClient } from '../transport/HttpClient';
  * Cloud search transport: versioned GETs, one per budgeted slice.
  *
  * Every slice URL is a canonical cache key — the search token pins the
- * layer's content epoch (computed from the cached manifest), the
+ * manifest's `contentsVersion` and `layoutVersion` (copied, never computed), the
  * canonical query (default-fold literals collapse case/diacritic
  * variants into one entry), and the resume position. Identical searches
  * from any reader of the document hit the same CDN entry; matches are
@@ -104,7 +103,8 @@ export class CloudDocumentSearchService implements DocumentSearchService {
       const mint = (current: CloudManifest) =>
         encodeSearchToken({
           pin: tokenPinOf('search', current.engine),
-          epoch: searchContentEpoch(current),
+          contentsVersion: current.contentsVersion,
+          layoutVersion: current.layoutVersion,
           query,
           ...(from !== undefined ? { from } : {}),
           skip: 0,

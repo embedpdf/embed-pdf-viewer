@@ -100,6 +100,8 @@ import down050 from './050_tenant_features.down.sql';
 import sql050 from './050_tenant_features.sql';
 import down051 from './051_tenant_usage_days.down.sql';
 import sql051 from './051_tenant_usage_days.sql';
+import down052 from './052_contents_version.down.sql';
+import sql052 from './052_contents_version.sql';
 import type { MigrationSource } from '../../migrator/runner';
 
 /**
@@ -269,5 +271,11 @@ export const sqliteMigrations: ReadonlyArray<MigrationSource> = [
     name: '051_tenant_usage_days.sql',
     sql: sql051,
     down: down051,
+  },
+  {
+    version: '052',
+    name: '052_contents_version.sql',
+    sql: sql052,
+    down: down052,
   },
 ];

@@ -12,6 +12,7 @@ export interface DocManifest200Response {
     formsVersion?: number | undefined;
     outlineVersion?: number | undefined;
     fontsVersion?: number | undefined;
+    contentsVersion?: number | undefined;
     auditHead: number;
     baseSha: string;
     layerVersion?: number | undefined;

@@ -222,7 +222,8 @@ function categoryOf(route: DocRoute): Category | null {
 const REQUESTS: Readonly<Record<string, { token?: string; query?: string; body?: unknown }>> = {
   'GET /layers/:layerName/search/full/data@:token': {
     token: encodeSearchToken({
-      epoch: '1',
+      contentsVersion: 1,
+      layoutVersion: 1,
       query: { text: 'confidential' },
       skip: 0,
       pin: pinOf('search'),

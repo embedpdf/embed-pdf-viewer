@@ -604,6 +604,7 @@ export const DocumentManifestSchema = z.object({
   formsVersion: z.number().int().positive().default(1),
   outlineVersion: z.number().int().positive().default(1),
   fontsVersion: z.number().int().positive().default(1),
+  contentsVersion: z.number().int().positive().default(1),
   auditHead: z.number().int().nonnegative(),
   baseSha: z.string(),
   // Signing fences (absent on pre-signature servers: unwritten, unknown length).
@@ -1103,6 +1104,7 @@ export const CacheDeltaSchema: z.ZodType<CacheDelta> = z.object({
   attachmentsVersion: z.number().int().positive().optional(),
   outlineVersion: z.number().int().positive().optional(),
   fontsVersion: z.number().int().positive().optional(),
+  contentsVersion: z.number().int().positive().optional(),
   layerVersion: z.number().int().nonnegative().optional(),
   working: z.boolean().optional(),
   pages: z.array(

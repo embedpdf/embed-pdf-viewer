@@ -680,6 +680,7 @@ export class DocumentService {
           formsVersion: headVersion.formsVersion,
           outlineVersion: headVersion.outlineVersion,
           fontsVersion: headVersion.fontsVersion,
+          contentsVersion: headVersion.contentsVersion,
           lastAuditId: 0,
           currentVersion: 0,
           currentArtifactKey: null,
@@ -2759,6 +2760,7 @@ function legacyVersionRow(row: DocumentRow, sha: string): BaseVersionRow {
     formsVersion: 1,
     outlineVersion: 1,
     fontsVersion: 1,
+    contentsVersion: 1,
     createdAt: row.createdAt,
   };
 }

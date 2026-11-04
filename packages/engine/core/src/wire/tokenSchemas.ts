@@ -133,7 +133,8 @@ export const RenderTokenSchema = {
 
 /**
  * Token for the versioned search endpoints (`/search/{rects,full}/data@…`).
- * One token carries the whole cache key: the content epoch, the query
+ * One token carries the whole cache key: the document's contents and layout
+ * pins, the query
  * (text/pattern rides base64-variant-encoded in `q` — the token value
  * charset excludes free text), and the resume position. Canonical by
  * construction: the codec sorts fields and the encoder omits every
@@ -143,10 +144,11 @@ export const RenderTokenSchema = {
  */
 export const SearchTokenSchema = {
   fields: [
+    'contentsVersion',
     'engine',
-    'epoch',
     'from',
     'ignoreWhitespace',
+    'layoutVersion',
     'limitMatches',
     'limitPages',
     'matchCase',

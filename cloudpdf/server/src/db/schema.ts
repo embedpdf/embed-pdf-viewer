@@ -185,6 +185,12 @@ export interface LayersTable {
    * (migration 049): bumps on a write that changes the fonts the list shows.
    */
   fonts_version: number;
+  /**
+   * Document contents pointer epoch, for a read across every page's content
+   * (search) (migration 052): bumps with every write that moves a page's
+   * `content_version`, inserts a page or deletes one.
+   */
+  contents_version: number;
   /** Audit-log head at this layer's current state — advanced in the same
    *  transaction as every audit append. Published as the manifest's
    *  `auditHead` (the gapless subscribe cursor). */
@@ -634,6 +640,7 @@ export interface BaseVersionsTable {
   forms_version: number;
   outline_version: number;
   fonts_version: number;
+  contents_version: number;
   created_at: number;
 }
 
