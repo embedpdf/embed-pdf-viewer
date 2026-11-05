@@ -5,6 +5,7 @@ export interface TenantsUsageResponse {
     periodStart: string;
     periodEnd: string;
     metrics: TenantsUsageResponse.Metrics;
+    moduleMeters: Record<string, number>;
 }
 
 export namespace TenantsUsageResponse {

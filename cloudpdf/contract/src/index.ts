@@ -1351,18 +1351,18 @@ export const TenantUsageResponseSchema = z.object({
   periodStart: z.string(),
   /** The day after the last one reported, `YYYY-MM-DD`. */
   periodEnd: z.string(),
+  /** The core's meters. */
+  metrics: z.object({
+    pdfViews: z.number().int(),
+    pdfUploads: z.number().int(),
+    storageBytes: z.number().int(),
+  }),
   /**
-   * The core's meters, then each installed module's by its meter id
-   * (`protected-display.views`), 0 when nothing counted it, and any other module
-   * meter counted in the window.
+   * The modules' meters by their names (`protected-display.views`): each
+   * installed module's, 0 when nothing counted it, and any other module meter
+   * counted in the window.
    */
-  metrics: z
-    .object({
-      pdfViews: z.number().int(),
-      pdfUploads: z.number().int(),
-      storageBytes: z.number().int(),
-    })
-    .catchall(z.number().int()),
+  moduleMeters: z.record(z.string(), z.number().int()),
 });
 export type TenantUsageResponse = z.infer<typeof TenantUsageResponseSchema>;
 

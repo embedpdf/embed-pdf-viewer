@@ -27806,12 +27806,16 @@
               }
             },
             "required": ["pdfViews", "pdfUploads", "storageBytes"],
+            "additionalProperties": false
+          },
+          "moduleMeters": {
+            "type": "object",
             "additionalProperties": {
               "type": "integer"
             }
           }
         },
-        "required": ["tenantId", "periodStart", "periodEnd", "metrics"],
+        "required": ["tenantId", "periodStart", "periodEnd", "metrics", "moduleMeters"],
         "additionalProperties": false
       },
       "TenantsSuspendRequest": {

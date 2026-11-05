@@ -371,23 +371,21 @@ export function runDbConformance(fx: DialectFixture): void {
         expect(await usage.count('tenant-1', meter, {}, nov4)).toBe(true);
 
         const month = await usage.snapshot('tenant-1', { from: '2026-11-01', to: '2026-12-01' });
-        expect(month.metrics).toMatchObject({ pdfViews: 2, pdfUploads: 0, [meter]: 3 });
+        expect(month.metrics).toMatchObject({ pdfViews: 2, pdfUploads: 0 });
+        expect(month.moduleMeters).toEqual({ [meter]: 3 });
         const day = await usage.snapshot('tenant-1', { from: '2026-11-04', to: '2026-11-05' }, [
           meter,
           'other-module.pages',
         ]);
-        expect(day.metrics).toMatchObject({
-          pdfViews: 1,
-          [meter]: 2,
-          'other-module.pages': 0,
-        });
+        expect(day.metrics).toMatchObject({ pdfViews: 1 });
+        expect(day.moduleMeters).toEqual({ [meter]: 2, 'other-module.pages': 0 });
 
         // A day's keys go once the day is over; its count stays.
         await usage.sweepOnceKeys(nov4);
         const left = await db.selectFrom('tenant_usage_once').select('day').execute();
         expect(left.map((row) => row.day)).toEqual(['2026-11-04']);
         expect(
-          (await usage.snapshot('tenant-1', { from: '2026-11-03', to: '2026-11-04' })).metrics[
+          (await usage.snapshot('tenant-1', { from: '2026-11-03', to: '2026-11-04' })).moduleMeters[
             meter
           ],
         ).toBe(1);

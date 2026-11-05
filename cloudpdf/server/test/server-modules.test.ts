@@ -595,10 +595,11 @@ describe('a mounted module', () => {
         periodStart: string;
         periodEnd: string;
         metrics: Record<string, number>;
+        moduleMeters: Record<string, number>;
       };
     };
     // Installed, so reported before anything counted it.
-    expect((await usage()).metrics['snapshot.saved']).toBe(0);
+    expect((await usage()).moduleMeters['snapshot.saved']).toBe(0);
 
     const count = (query: string) => call(`snapshot/count${query}`, SNAPSHOT, { method: 'POST' });
     expect((await count('')).status).toBe(204);
@@ -611,15 +612,15 @@ describe('a mounted module', () => {
     expect((await count('?meter=pages')).status).toBe(500);
 
     const month = await usage();
-    expect(month.metrics['snapshot.saved']).toBe(4);
+    expect(month.moduleMeters['snapshot.saved']).toBe(4);
     expect(month.metrics.pdfViews).toBeTypeOf('number');
 
     const day = (offset: number) =>
       new Date(Date.now() + offset * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
     const today = await usage(`?from=${day(0)}&to=${day(1)}`);
     expect(today).toMatchObject({ periodStart: day(0), periodEnd: day(1) });
-    expect(today.metrics['snapshot.saved']).toBe(4);
-    expect((await usage(`?from=${day(1)}&to=${day(2)}`)).metrics['snapshot.saved']).toBe(0);
+    expect(today.moduleMeters['snapshot.saved']).toBe(4);
+    expect((await usage(`?from=${day(1)}&to=${day(2)}`)).moduleMeters['snapshot.saved']).toBe(0);
 
     const refused = async (query: string) =>
       (

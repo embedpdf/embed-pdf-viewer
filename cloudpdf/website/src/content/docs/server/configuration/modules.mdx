@@ -247,8 +247,8 @@ export default defineServerModule({
 `oncePerDay`, only the first count with that key each UTC day adds one; the server keeps the key as
 its hash, for that day only. A meter the module didn't declare is an error in the module.
 
-The tenant's usage reports each installed module's meter by its whole name, next to the core's,
-and `0` when nothing counted it:
+The tenant's usage reports each installed module's meter in `moduleMeters`, by its whole name, and
+`0` when nothing counted it. The core's meters are in `metrics`:
 
 ```sh
 curl "localhost:3000/v1/tenants/fernquill/usage?from=2026-11-03&to=2026-12-03" \
@@ -263,7 +263,9 @@ curl "localhost:3000/v1/tenants/fernquill/usage?from=2026-11-03&to=2026-12-03" \
   "metrics": {
     "pdfViews": 1840,
     "pdfUploads": 52,
-    "storageBytes": 73400320,
+    "storageBytes": 73400320
+  },
+  "moduleMeters": {
     "snapshot.saved": 311
   }
 }

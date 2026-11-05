@@ -139,8 +139,11 @@ its rules hold in every language:
   engine reads and writes the PDF's bits and the API names them.
 - **Names are camelCase, without dots.** A path parameter is spelled out
   and follows the same rules (`docId`, `annotationKey`, `sha256`,
-  `displaySha256`), as the SDKs name their arguments after it. A map keyed by name (custom metadata, a module's meters) keeps
-  its keys as they are.
+  `displaySha256`), as the SDKs name their arguments after it. A map keyed
+  by name (custom metadata, a module's meters) keeps its keys as they are.
+- **An object is named fields or a map, never both.** A map's entries get a
+  field of their own (`metrics` and `moduleMeters`), so every SDK types
+  them, instead of an "anything else" bag next to the fields.
 - **Points in time are ISO 8601 strings** (`IsoDateTimeSchema`), named `…At`:
   a response says them in UTC (`…Z`), and a request gives them with an
   offset. Durations are whole seconds, named `…Seconds`. A calendar day

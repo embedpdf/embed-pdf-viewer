@@ -167,6 +167,21 @@ describe('naming rules in openapi.json', () => {
     expect(unique(odd)).toEqual([]);
   });
 
+  test('an object is named fields or a map, never both', () => {
+    // An "anything else" bag next to fields is untyped in most SDKs.
+    const both: string[] = [];
+    const visit = (node: unknown, at: string): void => {
+      if (typeof node !== 'object' || node === null) return;
+      const schema = node as Schema;
+      const isMap =
+        schema.additionalProperties !== undefined && schema.additionalProperties !== false;
+      if (schema.properties && isMap) both.push(at);
+      for (const [key, value] of Object.entries(node)) visit(value, `${at}/${key}`);
+    };
+    visit(spec, '#');
+    expect(both).toEqual([]);
+  });
+
   test('a size in bytes ends in Bytes, and a hash names its algorithm', () => {
     const unnamed = everyProperty
       .filter(({ name }) =>
