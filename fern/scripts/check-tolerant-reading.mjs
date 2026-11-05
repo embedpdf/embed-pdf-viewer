@@ -144,9 +144,7 @@ function main() {
     }
     const { status, output } = run(plan.run, plan.cwd, plan.env);
     if (status !== 0 || (plan.prints && !expected.every((line) => output.includes(line)))) {
-      throw new Error(
-        `${language}: the SDK doesn't read responses from a newer server\n${output}`,
-      );
+      throw new Error(`${language}: the SDK doesn't read responses from a newer server\n${output}`);
     }
     console.log(`${language}: reads responses from a newer server (${expected.join(', ')})`);
   } finally {
