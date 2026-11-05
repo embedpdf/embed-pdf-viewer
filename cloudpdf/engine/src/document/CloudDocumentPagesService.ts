@@ -24,6 +24,7 @@ import {
   PageListSnapshotSchema,
   PageNameResultSchema,
   wirePaths,
+  tokenPinOf,
 } from '@embedpdf/engine-core/wire';
 
 import type { ManifestAccessor } from './CloudDocumentHandle';
@@ -117,9 +118,10 @@ export class CloudDocumentPagesService implements Omit<DocumentPagesService, Pag
    */
   private async layoutPath(signal: AbortSignal): Promise<string> {
     const manifest = await this.manifest.get(signal);
+    const pin = tokenPinOf('layout', manifest.engine);
     return planesInherited(manifest, ['layout'])
-      ? wirePaths.docLayout(this.docId, manifest.layoutVersion)
-      : wirePaths.layerLayout(this.docId, this.layerName, manifest.layoutVersion);
+      ? wirePaths.docLayout(this.docId, manifest.layoutVersion, pin)
+      : wirePaths.layerLayout(this.docId, this.layerName, manifest.layoutVersion, pin);
   }
 
   private fetchLayout(signal: AbortSignal): Promise<PageListSnapshot> {

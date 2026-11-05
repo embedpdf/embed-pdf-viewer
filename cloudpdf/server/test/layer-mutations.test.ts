@@ -22,6 +22,7 @@ import {
 import { buildAppForTesting } from '../src/app/buildApp';
 import { createValidTestLicenseGate } from '../src/licensing/testing';
 import { appliedResult, postChange, type ChangeTarget } from './_helpers/changes';
+import { ENGINE } from './_helpers/pins';
 
 const STUB_ENTRY = new URL('./_helpers/stub-worker-entry.cjs', import.meta.url);
 const SECRET = 'layer-mutations-secret';
@@ -195,7 +196,7 @@ describe('Phase 5 layer mutation pipeline', () => {
     expect(pages[1]).toMatchObject({ page_object_number: 2, annotation_version: 1 });
 
     const stale = await fetch(
-      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/manifest@docVersion=1`,
+      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/manifest@docVersion=1,engine=${ENGINE.manifest},shape=1`,
       {
         headers: { Authorization: `Bearer ${docToken(tenantId, docId, layerName)}` },
       },
@@ -203,7 +204,7 @@ describe('Phase 5 layer mutation pipeline', () => {
     expect(stale.status).toBe(404);
 
     const fresh = await fetch(
-      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/manifest@docVersion=2`,
+      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/manifest@docVersion=2,engine=${ENGINE.manifest},shape=1`,
       {
         headers: { Authorization: `Bearer ${docToken(tenantId, docId, layerName)}` },
       },
@@ -490,13 +491,15 @@ describe('Phase 5 layer mutation pipeline', () => {
     expect(item.layout.pageCount).toBe(2);
     expect(item.layout.pages.map((page) => page.ref.objectNumber)).toEqual([1, 3]);
     expect(item.layout.pages.map((page) => page.index)).toEqual([0, 1]);
-    // The page set changed: the annotation list and the form move with the layout.
+    // The page set changed: the annotation list, the form and the contents
+    // move with the layout.
     expect(item.meta.cacheDelta).toEqual({
       previousDocVersion: 1,
       docVersion: 2,
       layoutVersion: 2,
       annotationsVersion: 2,
       formsVersion: 2,
+      contentsVersion: 2,
       working: true,
       pages: [],
     });

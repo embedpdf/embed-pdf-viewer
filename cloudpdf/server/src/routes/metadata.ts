@@ -111,6 +111,7 @@ export async function registerMetadataRoutes(
         assertCurrent: async () =>
           assertMetadataCurrent(requested, await service.getManifest(ctx, docId)),
         read: () => half.read(ctx, docId, undefined, abortSignalOf(reply)),
+        token: { kind: 'metadata', pin: requested.pin },
       });
       setImmutableCache(reply);
       return body;
@@ -134,6 +135,7 @@ export async function registerMetadataRoutes(
         assertCurrent: async () =>
           assertMetadataCurrent(requested, await service.getLayerManifest(ctx, docId, layerName)),
         read: () => half.read(ctx, docId, layerName, abortSignalOf(reply)),
+        token: { kind: 'metadata', pin: requested.pin },
       });
       setImmutableCache(reply);
       return body;
@@ -167,10 +169,13 @@ export async function registerMetadataRoutes(
 }
 
 /** A pinned read answers only at the manifest's current `metadataVersion`; a stale one is a 404. */
-function assertMetadataCurrent(requested: number, manifest: DocumentManifest): void {
-  if (requested === manifest.metadataVersion) return;
+function assertMetadataCurrent(
+  requested: { metadataVersion: number },
+  manifest: DocumentManifest,
+): void {
+  if (requested.metadataVersion === manifest.metadataVersion) return;
   throw new EngineError(
     EngineErrorCode.NotFound,
-    `metadata version ${requested} no longer current (current=${manifest.metadataVersion})`,
+    `metadata version ${requested.metadataVersion} no longer current (current=${manifest.metadataVersion})`,
   );
 }

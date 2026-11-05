@@ -16,6 +16,12 @@
       "x-fern-server-name": "Saas"
     }
   ],
+  "x-fern-global-headers": [
+    {
+      "header": "EmbedPDF-Version",
+      "type": "literal<\"3.0\">"
+    }
+  ],
   "paths": {
     "/v1/deployment/license/status": {
       "get": {
@@ -9177,6 +9183,11 @@
             "minimum": 0
           },
           "fontsVersion": {
+            "type": "integer",
+            "exclusiveMinimum": true,
+            "minimum": 0
+          },
+          "contentsVersion": {
             "type": "integer",
             "exclusiveMinimum": true,
             "minimum": 0
@@ -29457,6 +29468,13 @@
             },
             "required": ["required", "reasons"],
             "additionalProperties": false
+          },
+          "engine": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9.-]+$"
+            }
           }
         },
         "required": [
@@ -29467,7 +29485,8 @@
           "state",
           "encryption",
           "permissions",
-          "access"
+          "access",
+          "engine"
         ],
         "additionalProperties": false
       },
@@ -29528,8 +29547,11 @@
             "minimum": 0,
             "default": 1
           },
-          "serverFonts": {
-            "type": "string"
+          "contentsVersion": {
+            "type": "integer",
+            "exclusiveMinimum": true,
+            "minimum": 0,
+            "default": 1
           },
           "auditHead": {
             "type": "integer",
@@ -29723,7 +29745,6 @@
           "docVersion",
           "layoutVersion",
           "metadataVersion",
-          "serverFonts",
           "auditHead",
           "baseSha",
           "protection",

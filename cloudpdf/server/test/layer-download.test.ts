@@ -27,6 +27,7 @@ import {
 import { buildAppForTesting } from '../src/app/buildApp';
 import { createValidTestLicenseGate } from '../src/licensing/testing';
 import { readLayerArtifactHeader } from '../src/storage/layerArtifact';
+import { pinOf } from './_helpers/pins';
 
 const SECRET = 'layer-download-secret';
 const TENANT = 'tenant-layer-download';
@@ -261,7 +262,11 @@ describe('an incremental download', () => {
     const { docVersion } = await json(await call('GET', DOC, layer, '/manifest'));
     const path = (version: number) =>
       wirePaths
-        .layerDownloadVersioned(DOC, layer, { docVersion: version, mode: 'incremental' })
+        .layerDownloadVersioned(DOC, layer, {
+          docVersion: version,
+          mode: 'incremental',
+          pin: pinOf('download'),
+        })
         .replace(`/v1/docs/${DOC}/layers/${layer}`, '');
     const { result: bytes, dispatched } = await jobsDuring(async () =>
       bytesOf(await call('GET', DOC, layer, path(docVersion))),
@@ -305,7 +310,11 @@ describe('a download link', () => {
       extras: { download: { docVersion, mode: 'incremental' } },
     });
   const versionedUrl = (layer: string, docVersion: number) =>
-    `${baseUrl}${wirePaths.layerDownloadVersioned(DOC, layer, { docVersion, mode: 'incremental' })}`;
+    `${baseUrl}${wirePaths.layerDownloadVersioned(DOC, layer, {
+      docVersion,
+      mode: 'incremental',
+      pin: pinOf('download'),
+    })}`;
 
   test('downloads the layer with a plain GET, without the engine, and is not cached', async () => {
     const layer = 'linked';

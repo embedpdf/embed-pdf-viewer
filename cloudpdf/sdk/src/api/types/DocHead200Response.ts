@@ -9,6 +9,7 @@ export interface DocHead200Response {
     encryption: DocHead200Response.Encryption;
     permissions: DocHead200Response.Permissions;
     access: DocHead200Response.Access;
+    engine: Record<string, string>;
 }
 
 export namespace DocHead200Response {

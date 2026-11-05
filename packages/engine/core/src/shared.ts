@@ -850,6 +850,7 @@ export { createPdfTextLayout } from './text/layout';
 export type { PdfTextSegment, TextLayout } from './text/layout';
 export type { PageTextRange, TextRange } from './text/TextRange';
 export {
+  PAGE_TEXT_VERSION,
   boundaryTextOffset,
   charBoundaryAtTextOffset,
   charMapViolation,
@@ -859,8 +860,8 @@ export {
   toPageText,
 } from './text/charmap';
 export type { CharBoundaryBias, CharMapAnchor } from './text/charmap';
-export { toLineBreaks } from './text/lineBreaks';
-export { searchContentEpoch, canonicalSearchQuery } from './search/epoch';
+export { LINE_BREAKS_VERSION, toLineBreaks } from './text/lineBreaks';
+export { canonicalSearchQuery } from './search/canonicalQuery';
 
 export type { PageReorderInput } from './mutation/PageReorderInput';
 export type { PageReorderResult } from './mutation/PageReorderResult';

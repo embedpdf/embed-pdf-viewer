@@ -16,7 +16,10 @@ import {
   decodeLayoutToken,
   decodeActionsToken,
   PdfSaveModeSchema,
+  SHAPES,
   wirePaths,
+  type CachedReadKind,
+  type TokenPin,
 } from '@embedpdf/engine-core/wire';
 import {
   requireDocAccessOnly,
@@ -72,8 +75,10 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
     ctx: OpenContext;
     docId: string;
     layerName: string | undefined;
+    kind: CachedReadKind;
     label: string;
     requested: number;
+    pin: TokenPin;
     current: (manifest: DocumentManifest) => number;
     read: () => Promise<T>;
   }): Promise<T> =>
@@ -95,6 +100,7 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
         );
       },
       read: input.read,
+      token: { kind: input.kind, pin: input.pin },
     });
 
   app.get('/v1/docs/:docId/head', async (req, reply) => {
@@ -113,14 +119,25 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
     const pdfBits = await bitsForDoc(accessCtx, docId);
     const ctx = requireResource(req, docId, 'manifest', pdfBits);
     const requested = parseTokenOrInvalidArg(decodeDocToken, token, 'docVersion token');
-    const manifest = await service.getManifest(ctx, docId);
-    if (requested !== manifest.docVersion) {
-      setNoStore(reply);
-      throw new EngineError(
-        EngineErrorCode.NotFound,
-        `manifest version ${requested} no longer current (current=${manifest.docVersion})`,
-      );
-    }
+    // The check and the answer are one read of the manifest.
+    const manifest = await readAtPins({
+      documentService: service,
+      reply,
+      docId,
+      layerName: undefined,
+      assertCurrent: () => undefined,
+      read: async () => {
+        const current = await service.getManifest(ctx, docId);
+        if (requested.docVersion !== current.docVersion) {
+          throw new EngineError(
+            EngineErrorCode.NotFound,
+            `manifest version ${requested.docVersion} no longer current (current=${current.docVersion})`,
+          );
+        }
+        return current;
+      },
+      token: { kind: 'manifest', pin: requested.pin },
+    });
     setImmutableCache(reply);
     return manifest;
   });
@@ -149,8 +166,10 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
       ctx,
       docId,
       layerName: undefined,
+      kind: 'layout',
       label: 'layout',
-      requested,
+      requested: requested.layoutVersion,
+      pin: requested.pin,
       current: (manifest) => manifest.layoutVersion,
       read: () => service.getLayerLayout(ctx, docId, undefined, abortSignalOf(reply)),
     });
@@ -167,8 +186,10 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
       ctx,
       docId,
       layerName: undefined,
+      kind: 'actions',
       label: 'actions',
-      requested,
+      requested: requested.actionsVersion,
+      pin: requested.pin,
       current: (manifest) => manifest.actionsVersion,
       read: () => service.getLayerActions(ctx, docId, undefined, abortSignalOf(reply)),
     });
@@ -196,14 +217,25 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
     const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
     const ctx = requireLayerResource(req, docId, layerName, 'layer-manifest', pdfBits);
     const requested = parseTokenOrInvalidArg(decodeDocToken, token, 'layerDocVersion token');
-    const manifest = await service.getLayerManifest(ctx, docId, layerName);
-    if (requested !== manifest.docVersion) {
-      setNoStore(reply);
-      throw new EngineError(
-        EngineErrorCode.NotFound,
-        `layer manifest version ${requested} no longer current (current=${manifest.docVersion})`,
-      );
-    }
+    // The check and the answer are one read of the manifest.
+    const manifest = await readAtPins({
+      documentService: service,
+      reply,
+      docId,
+      layerName: undefined,
+      assertCurrent: () => undefined,
+      read: async () => {
+        const current = await service.getLayerManifest(ctx, docId, layerName);
+        if (requested.docVersion !== current.docVersion) {
+          throw new EngineError(
+            EngineErrorCode.NotFound,
+            `layer manifest version ${requested.docVersion} no longer current (current=${current.docVersion})`,
+          );
+        }
+        return current;
+      },
+      token: { kind: 'manifest', pin: requested.pin },
+    });
     setImmutableCache(reply);
     return manifest;
   });
@@ -233,8 +265,10 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
       ctx,
       docId,
       layerName: layerName,
+      kind: 'layout',
       label: 'layout',
-      requested,
+      requested: requested.layoutVersion,
+      pin: requested.pin,
       current: (manifest) => manifest.layoutVersion,
       read: () => service.getLayerLayout(ctx, docId, layerName, abortSignalOf(reply)),
     });
@@ -267,8 +301,10 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
       ctx,
       docId,
       layerName: layerName,
+      kind: 'actions',
       label: 'actions',
-      requested,
+      requested: requested.actionsVersion,
+      pin: requested.pin,
       current: (manifest) => manifest.actionsVersion,
       read: () => service.getLayerActions(ctx, docId, layerName, abortSignalOf(reply)),
     });
@@ -333,6 +369,7 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
             `download version ${requested.docVersion} no longer current (current=${current})`,
           );
         },
+        token: { kind: 'download', pin: requested.pin },
         read: async () => {
           prepared = await layerDownload(ctx, docId, layerName, requested.mode, {
             passwordChecked: link !== undefined,
@@ -382,6 +419,7 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
     const download = {
       docVersion: await service.layerDocVersion(ctx, docId, layerName),
       mode: 'incremental' as const,
+      pin: { engine: await service.engineValues.of('download'), shape: SHAPES.download },
     };
     const expiresIn = parsed.data.expiresIn ?? DEFAULT_DOWNLOAD_LINK_SECONDS;
     const linkToken = deps.sign({

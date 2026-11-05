@@ -29,7 +29,10 @@ import type { TextRange } from '../text/TextRange';
  * rebuilt instead of silently mismatching fresh needles.
  */
 
-/** Version stamp for persisted pre-folded corpus artifacts. */
+/**
+ * The fold's version: stamps persisted pre-folded corpora, and a server's
+ * engine value for search changes with it, so cached searches run again.
+ */
 export const SEARCH_FOLD_VERSION = 2;
 
 export interface FoldOptions {

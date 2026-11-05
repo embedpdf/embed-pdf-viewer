@@ -4,7 +4,7 @@ import {
   EngineErrorCode,
   type DocumentOutline,
 } from '@embedpdf/engine-core/runtime';
-import { DocumentOutlineSchema, wirePaths } from '@embedpdf/engine-core/wire';
+import { DocumentOutlineSchema, wirePaths, tokenPinOf } from '@embedpdf/engine-core/wire';
 
 import type { ManifestAccessor } from './CloudDocumentHandle';
 import { planesInherited } from './planes';
@@ -37,6 +37,7 @@ export function readCloudOutline(
       const token = {
         outlineVersion: current.outlineVersion,
         layoutVersion: current.layoutVersion,
+        pin: tokenPinOf('outline', current.engine),
       };
       return planesInherited(current, ['outline', 'layout'])
         ? wirePaths.docOutline(docId, token)

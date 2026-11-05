@@ -29,6 +29,7 @@ import {
   pagePictureQuerySchema,
   unflatten,
   type ManifestPage,
+  type TokenPin,
   type PageRenderFamilySpec,
 } from '@embedpdf/engine-core/wire';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
@@ -45,7 +46,6 @@ import type { DocumentService, OpenContext } from '../services/DocumentService';
 import type { LayerService } from '../services/LayerService';
 import type { SharpImageEncoder } from '../render/SharpImageEncoder';
 import {
-  assertServerFonts,
   abortSignalOf,
   parseOrInvalidArg,
   parseTokenOrInvalidArg,
@@ -95,7 +95,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
       signal: abortSignalOf(reply),
       scope: { kind: 'base', ctx, docId },
       pageObjectNumber: resolvePageKeyParam(pageKey),
-      requestedVersion: parseTokenOrInvalidArg(decodeContentToken, token, 'contentVersion token'),
+      requested: parseTokenOrInvalidArg(decodeContentToken, token, 'contentVersion token'),
     });
   });
 
@@ -126,7 +126,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
       signal: abortSignalOf(reply),
       scope: { kind: 'base', ctx, docId },
       pageObjectNumber: resolvePageKeyParam(pageKey),
-      requestedVersion: parseTokenOrInvalidArg(decodeContentToken, token, 'contentVersion token'),
+      requested: parseTokenOrInvalidArg(decodeContentToken, token, 'contentVersion token'),
     });
   });
 
@@ -202,7 +202,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
         signal: abortSignalOf(reply),
         scope: { kind: 'layer', ctx, docId, layerName },
         pageObjectNumber: resolvePageKeyParam(pageKey),
-        requestedVersion: parseTokenOrInvalidArg(decodeContentToken, token, 'contentVersion token'),
+        requested: parseTokenOrInvalidArg(decodeContentToken, token, 'contentVersion token'),
       });
     },
   );
@@ -243,7 +243,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
         signal: abortSignalOf(reply),
         scope: { kind: 'layer', ctx, docId, layerName },
         pageObjectNumber: resolvePageKeyParam(pageKey),
-        requestedVersion: parseTokenOrInvalidArg(decodeContentToken, token, 'contentVersion token'),
+        requested: parseTokenOrInvalidArg(decodeContentToken, token, 'contentVersion token'),
       });
     },
   );
@@ -555,16 +555,14 @@ async function renderPageImage(input: {
       );
     }
   };
-  const pinned = input.picture.pins.some((pin) => parsedQuery[pin] !== undefined);
+  const token = parsedQuery.pin && { kind: 'render' as const, pin: parsedQuery.pin };
+  const pinned = token !== undefined;
   try {
     assertPinsCurrent({ page, baseSha });
   } catch (err) {
     setNoStore(input.reply);
     throw err;
   }
-  // ...and the server's fonts it was drawn with: fallback fonts draw page
-  // text, so another server's fonts are another picture.
-  await assertServerFonts(input.documentService, parsedQuery.serverFonts, input.reply);
   const atPins = <T>(read: () => Promise<T>): Promise<T> =>
     readAtPins({
       documentService: input.documentService,
@@ -573,7 +571,7 @@ async function renderPageImage(input: {
       layerName: input.scope.kind === 'layer' ? input.scope.layerName : undefined,
       assertCurrent: async () => assertPinsCurrent(await resolvePageAndManifestForRead(input)),
       read,
-      pinned,
+      token,
     });
 
   // ── The derived-artifact plane ───────────────────────────────────────
@@ -583,10 +581,15 @@ async function renderPageImage(input: {
   // through to the legacy compute-only path below. A print picture has one
   // size per page and tier, and a thumbnail one per page, both off the
   // lattice: they are never classified, so never stored or refused here, and
-  // their versioned URLs are still cached.
+  // their versioned URLs are still cached. A request that names another
+  // engine value than this server's is answered uncached (see readAtPins),
+  // so it never reaches the store either.
   const derived = input.derivedRenders;
+  const ownEngine =
+    token !== undefined &&
+    token.pin.engine === (await input.documentService.engineValues.of('render'));
   const classification =
-    input.picture.print === null && !input.picture.thumbnail
+    ownEngine && input.picture.print === null && !input.picture.thumbnail
       ? derived?.classify({
           imageOptions,
           format,
@@ -766,18 +769,18 @@ async function readPageText(input: {
   signal: AbortSignal;
   scope: ReadScope;
   pageObjectNumber: number;
-  requestedVersion?: number;
+  requested?: { contentVersion: number; pin: TokenPin };
 }) {
   const assertCurrent = async () => {
     const page = await resolvePageForRead(input);
     if (
-      input.requestedVersion !== undefined &&
-      input.requestedVersion !== page.cache.contentVersion
+      input.requested !== undefined &&
+      input.requested.contentVersion !== page.cache.contentVersion
     ) {
       throw new EngineError(
         EngineErrorCode.NotFound,
         `${input.scope.kind === 'layer' ? 'layer ' : ''}text version ${
-          input.requestedVersion
+          input.requested.contentVersion
         } no longer current (current=${page.cache.contentVersion}) for page ${
           input.pageObjectNumber
         }`,
@@ -824,10 +827,10 @@ async function readPageText(input: {
     layerName: input.scope.kind === 'layer' ? input.scope.layerName : undefined,
     assertCurrent,
     read,
-    pinned: input.requestedVersion !== undefined,
+    token: input.requested && { kind: 'text', pin: input.requested.pin },
   });
 
-  input.requestedVersion === undefined ? setNoStore(input.reply) : setImmutableCache(input.reply);
+  input.requested === undefined ? setNoStore(input.reply) : setImmutableCache(input.reply);
   // The text body is immutable and keyed by contentVersion. Annotation
   // liveness (revision / weak-state) changes on a different cadence, so it
   // is intentionally not baked in here; it lives on annotation reads.
@@ -840,18 +843,18 @@ async function readPageGeometry(input: {
   signal: AbortSignal;
   scope: ReadScope;
   pageObjectNumber: number;
-  requestedVersion?: number;
+  requested?: { contentVersion: number; pin: TokenPin };
 }) {
   const assertCurrent = async () => {
     const page = await resolvePageForRead(input);
     if (
-      input.requestedVersion !== undefined &&
-      input.requestedVersion !== page.cache.contentVersion
+      input.requested !== undefined &&
+      input.requested.contentVersion !== page.cache.contentVersion
     ) {
       throw new EngineError(
         EngineErrorCode.NotFound,
         `${input.scope.kind === 'layer' ? 'layer ' : ''}geometry version ${
-          input.requestedVersion
+          input.requested.contentVersion
         } no longer current (current=${page.cache.contentVersion}) for page ${
           input.pageObjectNumber
         }`,
@@ -900,10 +903,10 @@ async function readPageGeometry(input: {
     layerName: input.scope.kind === 'layer' ? input.scope.layerName : undefined,
     assertCurrent,
     read,
-    pinned: input.requestedVersion !== undefined,
+    token: input.requested && { kind: 'geometry', pin: input.requested.pin },
   });
 
-  input.requestedVersion === undefined ? setNoStore(input.reply) : setImmutableCache(input.reply);
+  input.requested === undefined ? setNoStore(input.reply) : setImmutableCache(input.reply);
   // See readPageText: geometry is content-cached; liveness is not baked in.
   return snapshot;
 }

@@ -26,6 +26,7 @@ import {
   decodePrepared,
   toBase64,
   wirePaths,
+  tokenPinOf,
 } from '@embedpdf/engine-core/wire';
 
 import { buildRoleMutationForm } from './buildMutationForm';
@@ -67,7 +68,12 @@ export class CloudDocumentSignaturesService implements DocumentSignaturesService
       this.http.getJsonWithRefresh(
         async (s) => {
           const manifest = await this.manifest.get(s);
-          return wirePaths.layerSignatures(this.docId, this.layerName, manifest.docVersion);
+          return wirePaths.layerSignatures(
+            this.docId,
+            this.layerName,
+            manifest.docVersion,
+            tokenPinOf('signatures', manifest.engine),
+          );
         },
         (raw) => SignatureSnapshotSchema.parse(raw),
         async (s) => {
@@ -139,6 +145,7 @@ export class CloudDocumentSignaturesService implements DocumentSignaturesService
             const current = await this.manifest.get(s);
             return wirePaths.layerSignaturesAnalysis(this.docId, this.layerName, {
               docVersion: current.docVersion,
+              pin: tokenPinOf('analysis', current.engine),
               since: input.since,
               ...(input.exploratoryLevel !== undefined
                 ? { exploratoryLevel: input.exploratoryLevel }
@@ -270,7 +277,12 @@ export class CloudDocumentSignaturesService implements DocumentSignaturesService
     const snapshot = await this.http.getJsonWithRefresh(
       async (s) => {
         const manifest = await this.manifest.get(s);
-        return wirePaths.layerSignatures(this.docId, this.layerName, manifest.docVersion);
+        return wirePaths.layerSignatures(
+          this.docId,
+          this.layerName,
+          manifest.docVersion,
+          tokenPinOf('signatures', manifest.engine),
+        );
       },
       (raw) => SignatureSnapshotSchema.parse(raw),
       async (s) => {

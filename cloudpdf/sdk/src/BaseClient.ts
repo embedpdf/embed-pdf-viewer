@@ -15,6 +15,8 @@ export type BaseClientOptions = {
     environment?: core.Supplier<environments.CloudPDFEnvironment | string>;
     /** Specify a custom URL to connect the client to. */
     baseUrl?: core.Supplier<string>;
+    /** Override the EmbedPDF-Version header */
+    embedPdfVersion?: "3.0";
     /** Additional headers to include in requests. */
     headers?: Record<string, string | core.Supplier<string | null | undefined> | null | undefined>;
     /** The default maximum time to wait for a response in seconds. */
@@ -38,6 +40,8 @@ export interface BaseRequestOptions {
     maxRetries?: number;
     /** A hook to abort the request. */
     abortSignal?: AbortSignal;
+    /** Override the EmbedPDF-Version header */
+    embedPdfVersion?: "3.0";
     /** Additional query string parameters to include in the request. */
     queryParams?: Record<string, unknown>;
     /** A dictionary containing additional parameters to spread into the request's body. */
@@ -69,6 +73,7 @@ export function normalizeClientOptions<T extends BaseClientOptions = BaseClientO
             "User-Agent": "@cloudpdf/sdk/3.0.0-next.22",
             "X-Fern-Runtime": core.RUNTIME.type,
             "X-Fern-Runtime-Version": core.RUNTIME.version,
+            "EmbedPDF-Version": options?.embedPdfVersion ?? "3.0",
         },
         options?.headers,
     );

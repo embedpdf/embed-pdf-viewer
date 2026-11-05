@@ -11,6 +11,7 @@ import {
   type TokenSource,
 } from '@embedpdf/engine-core/runtime';
 import {
+  API_VERSION,
   applyCdnAccess,
   EngineErrorPayloadSchema,
   type CdnAccessInfoForApply,
@@ -151,6 +152,7 @@ export class HttpClient {
   /** The open document's session id; `null` on the engine's own client. */
   readonly sessionId: string | null;
   private cdnBinding: CdnBinding | null = null;
+  private readonly engineChangedListeners = new Set<() => void>();
 
   constructor(private readonly options: HttpClientOptions) {
     this.base = (options.baseUrl ?? CLOUDPDF_SAAS_URL).replace(/\/$/, '');
@@ -160,6 +162,16 @@ export class HttpClient {
     this.fetchFn = options.fetch ?? globalThis.fetch.bind(globalThis);
     this.docAffinityHeader = options.docAffinityHeader ?? true;
     this.onRetry = options.onRetry;
+  }
+
+  /**
+   * Call `listener` when the server answers a cached read with another
+   * engine value than its URL named (`EmbedPDF-Engine`). Returns the
+   * unsubscribe.
+   */
+  onEngineChanged(listener: () => void): () => void {
+    this.engineChangedListeners.add(listener);
+    return () => this.engineChangedListeners.delete(listener);
   }
 
   /** Normalized server base URL (no trailing slash). */
@@ -569,6 +581,10 @@ export class HttpClient {
       }
     }
     if (extraHeader) headers.set(extraHeader.name, extraHeader.value);
+    // The version this client speaks, on every request to the server itself.
+    // A CDN serves cached reads, whose answers never depend on it, and there
+    // the header would cost every URL a CORS preflight.
+    if (!routedToCdn) headers.set('EmbedPDF-Version', API_VERSION);
     // Document affinity key: origin-bound doc requests only (a CDN GET is a
     // "simple" request today — a custom header would create preflights
     // for zero routing value). Same extraction as the chart's uri-mode
@@ -602,6 +618,11 @@ export class HttpClient {
         this.onRetry?.({ path, code: EngineErrorCode.Network, attempt, waitMs });
         await sleepRacingAbort(waitMs, init.signal ?? null);
         continue;
+      }
+      // The server answered with another engine value than the URL named:
+      // its values moved, and `/head` has the new ones.
+      if (res.ok && res.headers.has('EmbedPDF-Engine')) {
+        for (const listener of this.engineChangedListeners) listener();
       }
       if (res.ok && write?.onObjectNumbers) {
         const ranges = parseObjectNumberRanges(res.headers.get('EmbedPDF-Object-Numbers'));

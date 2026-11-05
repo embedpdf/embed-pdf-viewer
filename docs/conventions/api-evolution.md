@@ -17,8 +17,8 @@ may depend on both sides being the same version.
 2. Clients read tolerantly: an unknown field is ignored, and an unknown kind or
    value falls back to its catch-all instead of failing the response. A known
    kind with a malformed body still fails.
-3. Every request says which version the client speaks, and every response says
-   which version the server is.
+3. Every request to the server says which version the client speaks, and every
+   response says which version the server is.
 4. A cached response's URL alone decides its content. The URL names everything
    the content depends on, the server computes it from exactly the document
    state the URL names, and nothing else changes it, not even the client's
@@ -68,13 +68,17 @@ The client parses every response with the wire schemas in
 
 ## Versions on the wire
 
-- **The client sends `EmbedPDF-Version: <major>.<minor>`** on every request:
-  the contract version it was built against. The engine and viewer packages
-  release together under one version (the Changesets `fixed` group), so this
-  is that release's major and minor. The generated SDKs send the contract
-  version they were generated from. A request without the header (a plain
-  `curl`) is answered as the server's own version. The header chooses how the
-  server answers live reads and writes; cached responses never depend on it.
+- **The client sends `EmbedPDF-Version: <major>.<minor>`** on every request
+  to the server itself: the contract version it was built against. The engine,
+  viewer, server and SDK packages release together under one version (the
+  Changesets `fixed` group), so this is that release's major and minor
+  (`API_VERSION` in `@embedpdf/engine-core/wire`). The generated SDKs send the
+  version they were generated from (a literal header in the contract's
+  `x-fern-global-headers`). A request without the header (a plain `curl`) is
+  answered as the server's own version. The header chooses how the server
+  answers live reads and writes; cached responses never depend on it. So a
+  request through a CDN leaves it out: a CDN serves cached reads, and there
+  the header would cost every URL a CORS preflight.
 - **The server sends `EmbedPDF-Server-Version: <major>.<minor>`** on every
   response. A cached response carries the version of the server that produced
   it, which can be older or newer than the server answering now, so a client
@@ -82,10 +86,14 @@ The client parses every response with the wire schemas in
 - **A client feature that needs a newer server names the minimum version it
   needs.** The client checks it against `/head` before using the feature.
   Against an older server, that feature fails with an error that names both
-  versions, and everything else keeps working. A server of another major is
-  refused outright.
-- **A server supports every earlier version of its major.** Additive changes
-  need nothing for that. A breaking change needs a version change.
+  versions, and everything else keeps working.
+- **A server answers every version of its major and refuses another.** An
+  older minor is answered through the version changes: additive changes need
+  none, a breaking change needs one. A newer minor is answered as the server's
+  own version. A client of another major gets a 400 that names both versions,
+  and so does a header that isn't `<major>.<minor>`. The server decides, not
+  the client, so a server of a later major that can still answer older clients
+  may do so.
 - **The headers are in the server's CORS configuration**:
   `embedpdf-version` among the allowed request headers,
   `embedpdf-server-version` among the exposed response headers, and
@@ -235,16 +243,17 @@ manifest that is already cached.
 #### How the server derives them
 
 The server keeps one number per rule it computes with, one number per kind for
-the fields that kind returns, and lists which rules each kind reads:
+the fields that kind returns, and lists which rules each kind reads
+(`cloudpdf/server/src/services/EngineValues.ts`):
 
 ```ts
 // One number per rule. Raise a rule's number in the pull request that changes
 // what the rule gives for the same document and the same request.
 const RULES = {
-  drawing: 1, // how pages, annotations and fields are drawn
-  pageText: 2, // 2: lines end in \n, no U+FFFE
-  searchFold: 2, // 2: invisible characters ignored
-  contents: 2, // 2: contents and rich text read with \n
+  drawing: DRAWING_VERSION, // how pages, annotations and fields are drawn
+  pageText: PAGE_TEXT_VERSION, // engine-core text/charmap.ts (toPageText)
+  searchFold: SEARCH_FOLD_VERSION, // engine-core search/fold.ts
+  lineBreaks: LINE_BREAKS_VERSION, // engine-core text/lineBreaks.ts (contents, rich text)
 };
 
 // One number per kind. Raise it in the pull request that adds a field to the
@@ -265,8 +274,8 @@ const INPUTS = {
   fonts: ['fonts'],
   text: ['pageText'],
   search: ['pageText', 'searchFold'],
-  annotations: ['contents'],
-  annotationsAll: ['contents'],
+  annotations: ['lineBreaks'],
+  annotationsAll: ['lineBreaks'],
   // every other kind: none
 };
 
@@ -288,7 +297,7 @@ a deploy or a restart that raises nothing keeps every cached response.
 | :--------------------------------------------------------------- | :---------------------------------------------------- | :------------------------------------ |
 | An operator adds a font to `CLOUDPDF_FONTS`                      | `fonts`: render, both appearance kinds, the font list | text, search, annotations, the rest   |
 | Page text is read differently (lines end in `\n`, no `U+FFFE`)   | `pageText`: text, search                              | pictures, annotations, the rest       |
-| `contents` and rich text are read with `\n`                      | `contents`: annotations, annotationsAll               | everything else                       |
+| `contents` and rich text are read with `\n`                      | `lineBreaks`: annotations, annotationsAll             | everything else                       |
 | Search ignores more characters                                   | `searchFold`: search                                  | everything else                       |
 | Annotations gain a response field                                | `FIELDS.annotations`: annotations                     | everything else                       |
 | A runtime upgrade changes any pixel of the test PDFs             | `drawing`: render, both appearance kinds              | text, search, the font list, the rest |
@@ -360,6 +369,7 @@ parameter, not a shape.
 | `actions`               | `/actions@`                                                            | `actionsVersion`                                                    |                                             |
 | `fonts`                 | `/fonts@`                                                              | `fontsVersion`                                                      |                                             |
 | `search`                | `/layers/:layer/search/:tier/data@`                                    | `contentsVersion`, `layoutVersion`                                  | query, options, `from`, `skip`, limits      |
+| `signatures`            | `/layers/:layer/signatures@`                                           | `docVersion`                                                        |                                             |
 | `analysis`              | `/layers/:layer/signatures/analysis@`                                  | `docVersion`                                                        | since, level, policy, detail                |
 | `download`              | `/layers/:layer/download@`                                             | `docVersion`                                                        | mode                                        |
 
@@ -373,57 +383,19 @@ that kind). A new cached read adds a row here.
 This section lists where the code doesn't follow the rules above yet. Delete
 each entry when its work lands, and the section with the last one.
 
-| Gap                                                                                                                                                                                                                                                                                                                                                 | Where                                                                          |
-| :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :----------------------------------------------------------------------------- |
-| Most cached routes check their pins only before the worker read: render, text, geometry, both appearance batches, outline, metadata, fonts, attachments and search. Only annotations and forms check again after it, although `awaitLayerWriteSettled` relies on that second check. A write that lands during the read is cached under the old pin. | `cloudpdf/server` `routes/`, `services/DocumentService.ts`                     |
-| The check after the read that annotations and forms do compares committed counters, so a write the session has applied but not yet committed can still pass it (found by reading the code, not reproduced)                                                                                                                                          | `cloudpdf/server` `routes/annotations.ts`, `routes/forms.ts`                   |
-| No version headers, and the CORS configuration allows neither                                                                                                                                                                                                                                                                                       | `cloudpdf/engine` `HttpClient`, `cloudpdf/server` routes and `app/buildApp.ts` |
-| The client retries a stale pin once, then fails, so a replica with other engine values fails requests until a deploy ends                                                                                                                                                                                                                           | `cloudpdf/engine` `HttpClient.getJsonWithRefresh`                              |
-| The cached manifest carries `serverFonts`, so a font change can leave a cached manifest handing out a value the server no longer accepts                                                                                                                                                                                                            | `DocumentManifest.serverFonts`, `/manifest@`                                   |
-| Search pins a client-computed `epoch` instead of `contentsVersion` and `layoutVersion`; `SEARCH_FOLD_VERSION` reaches no URL                                                                                                                                                                                                                        | `engine-core` `search/epoch.ts`, `wire/tokens.ts`                              |
-| `format` means three things: a shape number (`LAYOUT_FORMAT = 2`), a shape string the server rejects on mismatch (`ranges1`), and an image encoding (renders)                                                                                                                                                                                       | `engine-core` `wire/tokens.ts`, `wire/tokenSchemas.ts`                         |
-| Engine values exist for four kinds (`serverFonts`), shapes for two                                                                                                                                                                                                                                                                                  | `engine-core` `wire/tokenSchemas.ts`                                           |
+| Gap                                                                                                                                                                                                                                                                         | Where                                                                             |
+| :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------- |
+| The Python SDK reads an unknown annotation subtype, but its other open unions still refuse an unknown kind: form fields, value entries, measures, link and outline targets, actions. Fern inlines each into separate Python types, which the annotation patch doesn't reach | `fern/scripts/record-sdk-metadata.mjs`, `fern/generators.yml` (`fern-python-sdk`) |
 
 ### Work, before 3.0.0
 
 Everything here is fixed into the 3.0 client or the 3.0.0 server, so it lands
-before 3.0.0. The first item is a bug today, so it goes first, on its own:
+before 3.0.0. Every cached read is computed at its pins (one helper,
+`readAtPins`), every token carries its engine value and shape, search pins
+`contentsVersion` and `layoutVersion`, every request and response carries its
+version header, and every response is read tolerantly; what is left:
 
-1. **Computing at the pins** (`cloudpdf/server`): one helper for every cached
-   route that checks the pins before and after the read, sees writes applied
-   but not yet committed, and runs before the body is sent or stored. A test
-   per kind: a write that lands during a pinned read never yields a body under
-   the old pin.
-2. **Tokens** (`engine-core` `wire/tokenSchemas.ts`, `wire/tokens.ts`): every
-   token gets `engine` and `shape`. Layout's `format` and search's `format`
-   become `shape`. Search's `epoch` becomes `contentsVersion` and
-   `layoutVersion`. `serverFonts` becomes each kind's `engine`.
-3. **`/head` and the manifest**: `/head` gains the `engine` map; the manifest
-   gains `contentsVersion`, a stored counter raised in the write's transaction
-   (a migration, like `annotations_version`), and loses `serverFonts`.
-4. **Server**: computes each engine value from `RULES`, `FIELDS` and `INPUTS`
-   (see [How the server derives them](#how-the-server-derives-them), with
-   `SEARCH_FOLD_VERSION` as the search fold's number); answers a stale version
-   with "no longer current" and another engine value with its own output,
-   `no-store` and `EmbedPDF-Engine`; answers the asked shape; sends
-   `EmbedPDF-Server-Version`; lists the three headers in its CORS
-   configuration.
-5. **Client** (`@cloudpdf/engine`): copies versions and engine values; sends
-   its shapes and `EmbedPDF-Version`; reads `/head` again after an answer whose
-   `EmbedPDF-Engine` differs from the value it sent; checks each feature's
-   minimum server version against `/head`.
-6. **Tolerant reading**: no schema that parses responses uses `.strict()`,
-   nested ones included; an unknown annotation subtype parses as
-   `unsupported` and a malformed known one still fails; the enums in responses
-   are each given a fallback or marked closed; the Python SDK reads an unknown
-   subtype (a generator setting or a change to the contract's union, to be
-   found).
-7. **Contract and SDKs**: the headers go into the OpenAPI contract,
-   `pnpm api:sync` regenerates the SDKs to send them, and each SDK's generation
-   check parses the fixture with unknown values.
-8. **Conformance** (both engines): the unknown-field test over real responses;
-   a stale version answers "no longer current"; another engine value is
-   answered uncached with the server's own output; two servers with different
+1. **Conformance** (both engines): two servers with different
    `CLOUDPDF_FONTS` behind one round-robin address answer every request, and
    nothing is cached under a value that doesn't describe it; a request without
    `EmbedPDF-Version` is answered as the server's version.
@@ -432,6 +404,9 @@ before 3.0.0. The first item is a bug today, so it goes first, on its own:
 
 - The version-change machinery, built with the first breaking change that
   needs it.
+- The client's minimum-version check, built with the first feature that needs
+  a newer server. Every 3.x server sends its version, so a later client can
+  check any of them.
 - The runtime's release check renders the test PDFs with the old and the new
   runtime and lists the pages that differ, which decides `drawing`.
 - CI keeps the 3.0.0 server image as an older server for the client's suite,

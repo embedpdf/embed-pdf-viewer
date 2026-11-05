@@ -18,7 +18,7 @@ const appearanceQueryOf = (token: string) =>
 
 describe('the appearance render token', () => {
   test('carries modes only when it asks for fewer than every mode, in one spelling', () => {
-    const versions = { annotationVersion: 4, serverFonts: 'f0' };
+    const versions = { annotationVersion: 4, pin: { engine: 'f0', shape: 1 } };
     const every = annotationAppearancesImageOptionsToToken({ format: 'webp' }, versions);
     expect(every).not.toContain('modes');
     expect(
@@ -39,24 +39,24 @@ describe('the appearance render token', () => {
     expect(() =>
       annotationAppearancesImageOptionsToToken(
         { format: 'webp', modes: [] },
-        { annotationVersion: 4, serverFonts: 'f0' },
+        { annotationVersion: 4, pin: { engine: 'f0', shape: 1 } },
       ),
     ).toThrow(expect.objectContaining({ code: EngineErrorCode.InvalidArg }));
     expect(() =>
-      appearanceQueryOf('annotationVersion=4,format=webp,modes=down-normal,serverFonts=f0'),
+      appearanceQueryOf('annotationVersion=4,engine=f0,format=webp,modes=down-normal,shape=1'),
     ).toThrow();
     expect(() =>
       appearanceQueryOf(
-        'annotationVersion=4,format=webp,modes=normal-rollover-down,serverFonts=f0',
+        'annotationVersion=4,engine=f0,format=webp,modes=normal-rollover-down,shape=1',
       ),
     ).toThrow();
   });
 
-  test('a versioned one carries the server fonts it was drawn with', () => {
+  test('a versioned one carries its engine value and shape', () => {
     expect(() => appearanceQueryOf('annotationVersion=4,format=webp')).toThrow();
-    expect(appearanceQueryOf('annotationVersion=4,format=webp,serverFonts=f0')).toMatchObject({
+    expect(appearanceQueryOf('annotationVersion=4,engine=f0,format=webp,shape=1')).toMatchObject({
       annotationVersion: 4,
-      serverFonts: 'f0',
+      pin: { engine: 'f0', shape: 1 },
     });
   });
 });
@@ -73,21 +73,24 @@ describe('the page render token', () => {
           includeAnnotations: true,
           ...(includeFormFields === undefined ? {} : { includeFormFields }),
         },
-        { contentVersion: 2, serverFonts: 'f0' },
+        { contentVersion: 2, pin: { engine: 'f0', shape: 1 } },
       );
-      expect(token).toBe('contentVersion=2,format=webp,serverFonts=f0');
+      expect(token).toBe('contentVersion=2,engine=f0,format=webp,shape=1');
     }
     expect(() =>
-      queryOf('all', 'contentVersion=2,format=webp,formFields=false,serverFonts=f0'),
+      queryOf('all', 'contentVersion=2,engine=f0,format=webp,formFields=false,shape=1'),
     ).toThrow();
-    // A versioned picture carries the server fonts it was drawn with.
+    // A versioned picture carries its engine value and shape.
     expect(() => queryOf('pages', 'contentVersion=2,format=webp')).toThrow();
   });
 
   test("each family's token carries exactly its own pins", () => {
     const pins = { contentVersion: 2, annotationVersion: 5, widgetVersion: 7 };
     for (const spec of Object.values(PAGE_RENDER_FAMILIES)) {
-      const own: RenderVersions = { contentVersion: pins.contentVersion, serverFonts: 'f0' };
+      const own: RenderVersions = {
+        contentVersion: pins.contentVersion,
+        pin: { engine: 'f0', shape: 1 },
+      };
       for (const pin of spec.pins) own[pin] = pins[pin];
       const query = queryOf(spec.family, renderImageOptionsToToken({ format: 'webp' }, own));
       expect(query).toMatchObject(own);

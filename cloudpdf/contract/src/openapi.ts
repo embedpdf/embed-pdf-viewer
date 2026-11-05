@@ -11,6 +11,7 @@
 
 import {
   AnnotationWireComponents,
+  apiVersionOf,
   AttachmentWireComponents,
   ChangeWireComponents,
   DocumentWireComponents,
@@ -147,6 +148,7 @@ export function buildAdminOpenApiDocument(opts: BuildAdminOpenApiOptions): Recor
     entry[method] = operationObject(op, schemas);
   }
 
+  const apiVersion = apiVersionOf(opts.version);
   return {
     openapi: '3.1.0',
     info: {
@@ -170,6 +172,11 @@ export function buildAdminOpenApiDocument(opts: BuildAdminOpenApiOptions): Recor
         'x-fern-server-name': 'Saas',
       },
     ],
+    // The SDKs send `EmbedPDF-Version` on every request: the version of the
+    // release they were generated from (docs/conventions/api-evolution.md).
+    // A literal header, which every generator sends; not every generator
+    // reads `x-fern-version`.
+    'x-fern-global-headers': [{ header: 'EmbedPDF-Version', type: `literal<"${apiVersion}">` }],
     paths: sortKeys(paths),
     // Docs navigation manifest: section titles and URL slugs for the API
     // reference, in sidebar order (see `docsGroups` in the registry).

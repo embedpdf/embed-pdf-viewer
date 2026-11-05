@@ -53,6 +53,7 @@ import { RichTextDocumentInputSchema, RichTextDocumentSchema } from '../dto/Rich
 import type { PdfSaveMode } from '../dto/PdfSaveMode';
 import type { DocumentSecurityState, PdfPermissionInfo } from '../engine/DocumentSecurityService';
 import type { SerializedEngineError } from '../errors/EngineError';
+import { EngineValuesSchema } from './cachedReads';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import {
   FormFieldDraftSchema,
@@ -291,6 +292,12 @@ export const DocumentHeadSchema = z.object({
     reasons: z.array(closed(z.enum(['password', 'cdn', 'permissions-unknown']))),
     endpoint: z.string().optional(),
   }),
+  /**
+   * The server's engine value for each kind of cached read: what it computes
+   * that kind with, besides the document. Same for every document on a
+   * server; a client copies its kind's value into every cached URL.
+   */
+  engine: EngineValuesSchema,
 });
 export type DocumentHead = z.infer<typeof DocumentHeadSchema>;
 
@@ -601,7 +608,7 @@ export const DocumentManifestSchema = z.object({
   formsVersion: z.number().int().positive().default(1),
   outlineVersion: z.number().int().positive().default(1),
   fontsVersion: z.number().int().positive().default(1),
-  serverFonts: z.string(),
+  contentsVersion: z.number().int().positive().default(1),
   auditHead: z.number().int().nonnegative(),
   baseSha: z.string(),
   // Signing fences (absent on pre-signature servers: unwritten, unknown length).
@@ -808,8 +815,10 @@ const RenderQualitySchema = z.coerce.number().min(0).max(1);
 
 const AppearanceModeSchema = closed(z.enum(['normal', 'rollover', 'down']));
 
-/** `DocumentManifest.serverFonts` in a picture's token: the fingerprint, in hex. */
-const ServerFontsSchema = z.string().regex(/^[0-9a-f]{1,64}$/);
+/** A token's engine value: opaque, in the token's value charset. */
+const EngineValueSchema = z.string().regex(/^[A-Za-z0-9.-]+$/);
+/** A token's shape: a positive integer. */
+const ShapeSchema = z.coerce.number().int().positive();
 
 /**
  * A token's `modes`: the modes it asks for, in the engine's mode order,
@@ -877,7 +886,8 @@ function buildPageRenderQuerySchema(picture: PageRenderFamilySpec): z.ZodType<Pa
   return z
     .object({
       ...pinFields,
-      serverFonts: ServerFontsSchema.optional(),
+      engine: EngineValueSchema.optional(),
+      shape: ShapeSchema.optional(),
       format: PageNetworkRenderFormatSchema.optional(),
       quality: RenderQualitySchema.optional(),
       ...screenFields,
@@ -903,11 +913,12 @@ function buildPageRenderQuerySchema(picture: PageRenderFamilySpec): z.ZodType<Pa
           message: 'versioned render requires format',
         });
       }
-      if (v.serverFonts === undefined) {
+      for (const field of ['engine', 'shape'] as const) {
+        if (v[field] !== undefined) continue;
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          path: ['serverFonts'],
-          message: 'versioned render requires serverFonts',
+          path: [field],
+          message: `versioned render requires ${field}`,
         });
       }
       for (const pin of pins) {
@@ -937,7 +948,9 @@ function buildPageRenderQuerySchema(picture: PageRenderFamilySpec): z.ZodType<Pa
       };
       const query: PageRenderQuery = {
         options,
-        ...(v.serverFonts !== undefined ? { serverFonts: v.serverFonts } : {}),
+        ...(v.engine !== undefined && v.shape !== undefined
+          ? { pin: { engine: v.engine, shape: v.shape } }
+          : {}),
       };
       for (const pin of pins) {
         if (pinned[pin] !== undefined) query[pin] = pinned[pin];
@@ -1005,7 +1018,8 @@ function buildAppearancesQuerySchema<Pin extends 'annotationVersion' | 'widgetVe
   return z
     .object({
       [pin]: z.coerce.number().int().positive().optional(),
-      serverFonts: ServerFontsSchema.optional(),
+      engine: EngineValueSchema.optional(),
+      shape: ShapeSchema.optional(),
       format: PageNetworkRenderFormatSchema.optional(),
       modes: AppearanceModesSchema.optional(),
       rotation: RenderRotationSchema.optional(),
@@ -1023,11 +1037,12 @@ function buildAppearancesQuerySchema<Pin extends 'annotationVersion' | 'widgetVe
           message: 'versioned appearance render requires format',
         });
       }
-      if (v[pin] !== undefined && v.serverFonts === undefined) {
+      for (const field of ['engine', 'shape'] as const) {
+        if (v[pin] === undefined || v[field] !== undefined) continue;
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          path: ['serverFonts'],
-          message: 'versioned appearance render requires serverFonts',
+          path: [field],
+          message: `versioned appearance render requires ${field}`,
         });
       }
     })
@@ -1042,7 +1057,9 @@ function buildAppearancesQuerySchema<Pin extends 'annotationVersion' | 'widgetVe
       return {
         options,
         ...(v[pin] !== undefined ? { [pin]: v[pin] } : {}),
-        ...(v.serverFonts !== undefined ? { serverFonts: v.serverFonts } : {}),
+        ...(v.engine !== undefined && v.shape !== undefined
+          ? { pin: { engine: v.engine as string, shape: v.shape as number } }
+          : {}),
       };
     });
 }
@@ -1089,6 +1106,7 @@ export const CacheDeltaSchema: z.ZodType<CacheDelta> = z.object({
   attachmentsVersion: z.number().int().positive().optional(),
   outlineVersion: z.number().int().positive().optional(),
   fontsVersion: z.number().int().positive().optional(),
+  contentsVersion: z.number().int().positive().optional(),
   layerVersion: z.number().int().nonnegative().optional(),
   working: z.boolean().optional(),
   pages: z.array(

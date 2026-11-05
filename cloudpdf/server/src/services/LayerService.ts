@@ -407,6 +407,7 @@ export class LayerService {
             formsVersion: base.formsVersion,
             outlineVersion: base.outlineVersion,
             fontsVersion: base.fontsVersion,
+            contentsVersion: base.contentsVersion,
           }
         : {}),
     });
@@ -1891,6 +1892,9 @@ export class LayerService {
             ...(bumped.versions.forms_version !== undefined
               ? { formsVersion: bumped.versions.forms_version }
               : {}),
+            ...(bumped.versions.contents_version !== undefined
+              ? { contentsVersion: bumped.versions.contents_version }
+              : {}),
             ...(bumped.versions.fonts_version !== undefined
               ? { fontsVersion: bumped.versions.fonts_version }
               : {}),
@@ -2052,6 +2056,7 @@ export class LayerService {
       attachments_version?: number;
       layout_version?: number;
       fonts_version?: number;
+      contents_version?: number;
     };
     pages: DurablePageRow[];
   }> {
@@ -2066,6 +2071,7 @@ export class LayerService {
         'attachments_version',
         'layout_version',
         'fonts_version',
+        'contents_version',
       ])
       .where('id', '=', layer.id)
       .executeTakeFirst();
@@ -2114,6 +2120,10 @@ export class LayerService {
           : {}),
         ...(facts.layout ? { layout_version: Number(current.layout_version) + 1 } : {}),
         ...(written.fonts ? { fonts_version: Number(current.fonts_version ?? 1) + 1 } : {}),
+        // A page that came or went changes the document's contents.
+        ...(facts.pageSet.some((step) => step.pages.length > 0)
+          ? { contents_version: Number(current.contents_version ?? 1) + 1 }
+          : {}),
       },
       pages,
     };
@@ -2750,6 +2760,8 @@ export class LayerService {
         // lists change.
         const annotationsVersion = Number(currentLayer.annotations_version ?? 1) + 1;
         const formsVersion = Number(currentLayer.forms_version ?? 1) + 1;
+        // Their pages' content moves too.
+        const contentsVersion = Number(currentLayer.contents_version ?? 1) + 1;
         const fontsVersion = this.fontsVersionAfter(input.docId, input.layerName, currentLayer);
         const durable: CommittedPageFlatten = {
           pages: nextPages,
@@ -2767,6 +2779,7 @@ export class LayerService {
               docVersion: durable.layerDocVersion,
               annotationsVersion,
               formsVersion,
+              contentsVersion,
               ...(fontsVersion !== undefined ? { fontsVersion } : {}),
               pages: nextPages,
             }),
@@ -2799,6 +2812,7 @@ export class LayerService {
             doc_version: durable.layerDocVersion,
             annotations_version: annotationsVersion,
             forms_version: formsVersion,
+            contents_version: contentsVersion,
             ...(fontsVersion !== undefined ? { fonts_version: fontsVersion } : {}),
           },
           auditId,
@@ -2877,6 +2891,8 @@ export class LayerService {
         // fields included — both lists change.
         const annotationsVersion = Number(currentLayer.annotations_version ?? 1) + 1;
         const formsVersion = Number(currentLayer.forms_version ?? 1) + 1;
+        // Their pages' content moves too.
+        const contentsVersion = Number(currentLayer.contents_version ?? 1) + 1;
         const fontsVersion = this.fontsVersionAfter(input.docId, input.layerName, currentLayer);
         const result: RedactionApplyResult = {
           ...input.raw,
@@ -2889,6 +2905,7 @@ export class LayerService {
               docVersion: layerDocVersion,
               annotationsVersion,
               formsVersion,
+              contentsVersion,
               ...(fontsVersion !== undefined ? { fontsVersion } : {}),
               pages: nextPages,
             }),
@@ -2921,6 +2938,7 @@ export class LayerService {
             doc_version: layerDocVersion,
             annotations_version: annotationsVersion,
             forms_version: formsVersion,
+            contents_version: contentsVersion,
             ...(fontsVersion !== undefined ? { fonts_version: fontsVersion } : {}),
           },
           auditId,
@@ -2956,6 +2974,7 @@ export class LayerService {
     annotations_version: number | bigint;
     forms_version: number | bigint;
     fonts_version: number | bigint;
+    contents_version: number | bigint;
   }> {
     // Plain read — values feed the next-version computation. The fence is
     // the guarded UPDATE (see guardedVersionBump), never a SELECT check.
@@ -2968,6 +2987,7 @@ export class LayerService {
         'annotations_version',
         'forms_version',
         'fonts_version',
+        'contents_version',
       ])
       .where('id', '=', layer.id)
       .executeTakeFirst();
@@ -3794,6 +3814,7 @@ export class LayerService {
           outlineVersion: layer.outlineVersion,
           // A signature's appearance may draw with a font of its own.
           fontsVersion: layer.fontsVersion + 1,
+          contentsVersion: layer.contentsVersion,
           createdAt: now,
         });
 
@@ -3918,6 +3939,7 @@ export class LayerService {
       forms_version?: number;
       outline_version?: number;
       fonts_version?: number;
+      contents_version?: number;
     },
     lastAuditId: number,
     now: number,

@@ -43,6 +43,7 @@ export async function registerOutlineRoutes(
       layerName: undefined,
       assertCurrent: async () => assertCurrent(requested, await service.getManifest(ctx, docId)),
       read: () => service.readLayerOutline(ctx, docId, undefined, abortSignalOf(reply)),
+      token: { kind: 'outline', pin: requested.pin },
     });
     setImmutableCache(reply);
     return body;
@@ -66,6 +67,7 @@ export async function registerOutlineRoutes(
       assertCurrent: async () =>
         assertCurrent(requested, await service.getLayerManifest(ctx, docId, layerName)),
       read: () => service.readLayerOutline(ctx, docId, layerName, abortSignalOf(reply)),
+      token: { kind: 'outline', pin: requested.pin },
     });
     setImmutableCache(reply);
     return body;

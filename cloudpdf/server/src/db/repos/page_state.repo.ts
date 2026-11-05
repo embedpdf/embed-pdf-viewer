@@ -111,6 +111,8 @@ export interface LayerRow {
   outlineVersion: number;
   /** Font list pointer — see `LayersTable.fonts_version`. */
   fontsVersion: number;
+  /** Document contents pointer — see `LayersTable.contents_version`. */
+  contentsVersion: number;
   /** Audit-log head at this layer's state — the manifest's `auditHead`. */
   lastAuditId: number;
   currentVersion: number;
@@ -166,6 +168,7 @@ export interface CreateLayerInput {
   formsVersion?: number;
   outlineVersion?: number;
   fontsVersion?: number;
+  contentsVersion?: number;
   /** A visitor's layer: the grant that made it and the visitor. */
   visitor?: { grantId: string; visitorId: string };
 }
@@ -279,6 +282,7 @@ export class LayersRepo {
         forms_version: input.formsVersion ?? 1,
         outline_version: input.outlineVersion ?? 1,
         fonts_version: input.fontsVersion ?? 1,
+        contents_version: input.contentsVersion ?? 1,
         layout_version: input.layoutVersion ?? 1,
         metadata_version: input.metadataVersion ?? 1,
         last_audit_id: 0,
@@ -424,6 +428,7 @@ function mapLayerRow(row: {
   forms_version?: number | bigint;
   outline_version?: number | bigint;
   fonts_version?: number | bigint;
+  contents_version?: number | bigint;
   current_version: number;
   current_artifact_key: string | null;
   current_artifact_sha: string | null;
@@ -446,6 +451,7 @@ function mapLayerRow(row: {
     formsVersion: Number(row.forms_version ?? 1),
     outlineVersion: Number(row.outline_version ?? 1),
     fontsVersion: Number(row.fonts_version ?? 1),
+    contentsVersion: Number(row.contents_version ?? 1),
     lastAuditId: Number(row.last_audit_id ?? 0),
     currentVersion: Number(row.current_version),
     currentArtifactKey: row.current_artifact_key,

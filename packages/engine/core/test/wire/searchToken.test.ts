@@ -4,7 +4,6 @@ import {
   decodeTokenText,
   encodeSearchToken,
   encodeTokenText,
-  SEARCH_RESULT_FORMAT,
 } from '../../src/wire';
 import type { SearchToken } from '../../src/wire';
 
@@ -30,10 +29,14 @@ describe('token text codec', () => {
   });
 });
 
+const pin = { engine: '4be09a12', shape: 1 };
+
 describe('search token codec', () => {
   test('round-trips the full state', () => {
     const token: SearchToken = {
-      epoch: 'a1b2c3d4e5f60718',
+      pin,
+      contentsVersion: 3,
+      layoutVersion: 2,
       query: { text: 'net income', wholeWord: true },
       from: 3056,
       skip: 128,
@@ -44,7 +47,9 @@ describe('search token codec', () => {
 
   test('round-trips regex queries', () => {
     const token: SearchToken = {
-      epoch: '00000000000000ff',
+      pin,
+      contentsVersion: 3,
+      layoutVersion: 2,
       query: { text: 'I-\\d{3}', regex: true, matchCase: true },
       skip: 0,
     };
@@ -53,7 +58,9 @@ describe('search token codec', () => {
 
   test('round-trips whitespace-insensitive queries', () => {
     const token: SearchToken = {
-      epoch: '00000000000000ff',
+      pin,
+      contentsVersion: 3,
+      layoutVersion: 2,
       query: { text: 'invoice', ignoreWhitespace: true, wholeWord: true },
       skip: 0,
     };
@@ -62,11 +69,19 @@ describe('search token codec', () => {
 
   test('canonical: defaults are omitted, equal searches are byte-equal', () => {
     const a = encodeSearchToken({
-      epoch: 'e',
+      contentsVersion: 3,
+      layoutVersion: 2,
       query: { text: 'x', matchCase: undefined, wholeWord: undefined },
       skip: 0,
+      pin,
     });
-    const b = encodeSearchToken({ epoch: 'e', query: { text: 'x' }, skip: 0 });
+    const b = encodeSearchToken({
+      contentsVersion: 3,
+      layoutVersion: 2,
+      query: { text: 'x' },
+      skip: 0,
+      pin,
+    });
     expect(a).toBe(b);
     expect(a).not.toContain('matchCase');
     expect(a).not.toContain('skip');
@@ -74,31 +89,40 @@ describe('search token codec', () => {
 
   test('the token is URL-path safe', () => {
     const token = encodeSearchToken({
-      epoch: 'a1b2c3d4e5f60718',
+      contentsVersion: 3,
+      layoutVersion: 2,
       query: { text: 'was kostet das? 50%/Tag' },
       skip: 64,
+      pin,
     });
     expect(encodeURIComponent(token)).toBe(token.replace(/,/g, '%2C').replace(/=/g, '%3D'));
     expect(token).toMatch(/^[A-Za-z0-9.=,-]+$/);
   });
 
   test('rejects tokens missing required fields', () => {
-    expect(() => decodeSearchToken('epoch=ff')).toThrow(/missing "q"/);
-    expect(() => decodeSearchToken('q=aGk')).toThrow(/missing "epoch"/);
+    expect(() => decodeSearchToken('contentsVersion=3,layoutVersion=2')).toThrow(/missing "q"/);
+    expect(() => decodeSearchToken('engine=4be09a12,layoutVersion=2,q=aGk,shape=1')).toThrow(
+      /contentsVersion/,
+    );
+    expect(() => decodeSearchToken('contentsVersion=3,engine=4be09a12,q=aGk,shape=1')).toThrow(
+      /layoutVersion/,
+    );
     expect(() => decodeSearchToken('not a token')).toThrow();
   });
 
-  test('carries the result-format marker and rejects other formats', () => {
-    // Always encoded (the deliberate exception to omit-defaults): the marker
-    // exists to change the token bytes — and therefore the CDN cache key —
-    // whenever the result representation changes.
-    const token = encodeSearchToken({ epoch: 'e', query: { text: 'x' }, skip: 0 });
-    expect(token).toContain(`format=${SEARCH_RESULT_FORMAT}`);
-    // A pre-segments token (no format field) must fail decode, not silently
-    // pair a new client with an old cached response shape.
-    expect(() => decodeSearchToken('epoch=ff,q=aGk')).toThrow(/unsupported result format/);
-    expect(() => decodeSearchToken(`epoch=ff,format=rects0,q=aGk`)).toThrow(
-      /unsupported result format/,
-    );
+  test('carries its engine value and shape, and refuses a token without them', () => {
+    const token = encodeSearchToken({
+      contentsVersion: 3,
+      layoutVersion: 2,
+      query: { text: 'x' },
+      skip: 0,
+      pin,
+    });
+    expect(token).toContain('engine=4be09a12');
+    expect(token).toContain('shape=1');
+    expect(() => decodeSearchToken('contentsVersion=3,layoutVersion=2,q=aGk')).toThrow(/engine/);
+    expect(() =>
+      decodeSearchToken('contentsVersion=3,engine=4be09a12,layoutVersion=2,q=aGk'),
+    ).toThrow(/shape/);
   });
 });

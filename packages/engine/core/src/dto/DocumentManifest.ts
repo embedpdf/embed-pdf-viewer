@@ -70,18 +70,16 @@ export interface DocumentManifest {
   outlineVersion: number;
   /**
    * Doc-level pin for the fonts that can be named in the document
-   * (`/fonts@{fontsVersion,serverFonts}`). Bumps on a write that changes
-   * the fonts the list shows: one that embeds a font, or removes the last
-   * use of one.
+   * (`/fonts@{fontsVersion}`). Bumps on a write that changes the fonts the
+   * list shows: one that embeds a font, or removes the last use of one.
    */
   fontsVersion: number;
   /**
-   * The server's fonts, as a fingerprint of their setup (keys, programs,
-   * `serve`, fallbacks and their order). The font list's URL and every
-   * picture's carry it, since fallback fonts draw page text: a change of the
-   * server's fonts re-keys them, and a server answers only its own.
+   * Doc-level pin for a read across every page's content (search). Moves with
+   * any write that moves a page's `contentVersion`, inserts a page or deletes
+   * one, and never on an annotation or form write.
    */
-  serverFonts: string;
+  contentsVersion: number;
   /**
    * Audit-log head at this manifest's state — written in the same
    * transaction as the version bumps, so an event subscriber that starts

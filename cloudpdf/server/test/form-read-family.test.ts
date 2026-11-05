@@ -31,6 +31,7 @@ import {
 } from '../src/index';
 import { buildAppForTesting } from '../src/app/buildApp';
 import { createValidTestLicenseGate } from '../src/licensing/testing';
+import { pinOf } from './_helpers/pins';
 
 const SECRET = 'form-read-family-secret';
 const TENANT = 'tenant-form-family';
@@ -142,9 +143,13 @@ const pageOf = (manifest: { pages: { page: { objectNumber: number }; cache: unkn
 describe('the form read family', () => {
   test('the form holds the fields and the widget rows; the annotations hold no widget', async () => {
     const manifest = await manifestOf('reader');
-    const form = await call('GET', `/form@${encodeFormToken(manifest.formsVersion)}`, {
-      layer: 'reader',
-    });
+    const form = await call(
+      'GET',
+      `/form@${encodeFormToken(manifest.formsVersion, pinOf('form'))}`,
+      {
+        layer: 'reader',
+      },
+    );
     expect(form.status).toBe(200);
     expect(form.body.fields.map((field: { name: string }) => field.name)).toEqual(['name']);
     expect(
@@ -153,7 +158,7 @@ describe('the form read family', () => {
 
     const annotations = await call(
       'GET',
-      `/annotations/items@${encodeAnnotationsAllToken(manifest.annotationsVersion)}`,
+      `/annotations/items@${encodeAnnotationsAllToken(manifest.annotationsVersion, pinOf('annotationsAll'))}`,
       { layer: 'reader' },
     );
     expect(annotations.status).toBe(200);
@@ -170,7 +175,7 @@ describe('the form read family', () => {
       'GET',
       `/form/pages/obj:${PAGE}/appearances@${widgetAppearancesImageOptionsToToken(options, {
         widgetVersion: cache.widgetVersion,
-        serverFonts: manifest.serverFonts,
+        pin: pinOf('widgetAppearances'),
       })}`,
       { layer: 'reader' },
     );
@@ -180,7 +185,7 @@ describe('the form read family', () => {
       'GET',
       `/annotations/pages/obj:${PAGE}/appearances@${annotationAppearancesImageOptionsToToken(
         options,
-        { annotationVersion: cache.annotationVersion, serverFonts: manifest.serverFonts },
+        { annotationVersion: cache.annotationVersion, pin: pinOf('annotationAppearances') },
       )}`,
       { layer: 'reader' },
     );
@@ -209,17 +214,21 @@ describe('the form read family', () => {
     // The shared annotation list still serves the filler; the shared form doesn't.
     const annotations = await call(
       'GET',
-      `/annotations/items@${encodeAnnotationsAllToken(after.annotationsVersion)}`,
+      `/annotations/items@${encodeAnnotationsAllToken(after.annotationsVersion, pinOf('annotationsAll'))}`,
       { layer: 'filler' },
     );
     expect(annotations.status).toBe(200);
-    const sharedForm = await call('GET', `/form@${encodeFormToken(after.formsVersion)}`, {
-      layer: 'filler',
-    });
+    const sharedForm = await call(
+      'GET',
+      `/form@${encodeFormToken(after.formsVersion, pinOf('form'))}`,
+      {
+        layer: 'filler',
+      },
+    );
     expect(sharedForm.status).toBe(404);
     const ownForm = await call(
       'GET',
-      `/layers/filler/form@${encodeFormToken(after.formsVersion)}`,
+      `/layers/filler/form@${encodeFormToken(after.formsVersion, pinOf('form'))}`,
       {
         layer: 'filler',
       },
@@ -251,14 +260,18 @@ describe('the form read family', () => {
   test('a filler reads the form, never the annotations', async () => {
     const scope = ['doc.open', 'doc.render', 'doc.forms.fill'];
     const manifest = await manifestOf('reader');
-    const form = await call('GET', `/form@${encodeFormToken(manifest.formsVersion)}`, {
-      layer: 'reader',
-      scope,
-    });
+    const form = await call(
+      'GET',
+      `/form@${encodeFormToken(manifest.formsVersion, pinOf('form'))}`,
+      {
+        layer: 'reader',
+        scope,
+      },
+    );
     expect(form.status).toBe(200);
     const annotations = await call(
       'GET',
-      `/annotations/items@${encodeAnnotationsAllToken(manifest.annotationsVersion)}`,
+      `/annotations/items@${encodeAnnotationsAllToken(manifest.annotationsVersion, pinOf('annotationsAll'))}`,
       { layer: 'reader', scope },
     );
     expect(annotations.status).toBe(403);

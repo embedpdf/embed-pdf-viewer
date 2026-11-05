@@ -42,6 +42,7 @@ import {
   decodeFormToken,
   decodeWidgetAppearancesRenderToken,
   type FormExportToken,
+  type TokenPin,
 } from '@embedpdf/engine-core/wire';
 import {
   changeAuthorityOf,
@@ -120,7 +121,7 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
       reply,
       signal: abortSignalOf(reply),
       scope: { kind: 'base', ctx, docId },
-      requestedVersion: parseTokenOrInvalidArg(decodeFormToken, token, 'formsVersion token'),
+      requested: parseTokenOrInvalidArg(decodeFormToken, token, 'formsVersion token'),
     });
   });
 
@@ -135,7 +136,7 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
       reply,
       signal: abortSignalOf(reply),
       scope: { kind: 'layer', ctx, docId, layerName },
-      requestedVersion: parseTokenOrInvalidArg(decodeFormToken, token, 'formsVersion token'),
+      requested: parseTokenOrInvalidArg(decodeFormToken, token, 'formsVersion token'),
     });
   });
 
@@ -452,8 +453,8 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
       const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
       const ctx = requireLayerResource(req, docId, layerName, 'layer-form-export', pdfBits);
-      const request = parseOrInvalidArg<FormExportToken>(
-        FormExportRequestSchema as unknown as SchemaLike<FormExportToken>,
+      const request = parseOrInvalidArg<Omit<FormExportToken, 'pin'>>(
+        FormExportRequestSchema as unknown as SchemaLike<Omit<FormExportToken, 'pin'>>,
         req.body,
         'request body',
       );
@@ -844,7 +845,7 @@ async function readForm(input: {
   reply: FastifyReply;
   signal: AbortSignal;
   scope: ReadScope;
-  requestedVersion: number;
+  requested: { formsVersion: number; pin: TokenPin };
 }): Promise<FormSnapshot> {
   const { scope } = input;
   const getManifest = () =>
@@ -853,10 +854,10 @@ async function readForm(input: {
       : input.documentService.getManifest(scope.ctx, scope.docId);
   const assertCurrent = async () => {
     const current = (await getManifest()).formsVersion;
-    if (input.requestedVersion === current) return;
+    if (input.requested.formsVersion === current) return;
     throw new EngineError(
       EngineErrorCode.NotFound,
-      `${scope.kind === 'layer' ? 'layer ' : ''}forms version ${input.requestedVersion} no longer current (current=${current})`,
+      `${scope.kind === 'layer' ? 'layer ' : ''}forms version ${input.requested.formsVersion} no longer current (current=${current})`,
     );
   };
   const read = async () => {
@@ -893,6 +894,7 @@ async function readForm(input: {
     layerName: scope.kind === 'layer' ? scope.layerName : undefined,
     assertCurrent,
     read,
+    token: { kind: 'form', pin: input.requested.pin },
   });
   setImmutableCache(input.reply);
   return snapshot;
@@ -909,7 +911,8 @@ async function exportForm(input: {
   reply: FastifyReply;
   signal: AbortSignal;
   scope: ReadScope;
-  token: FormExportToken;
+  /** A POST carries its pins in its body, without an engine value or shape. */
+  token: Omit<FormExportToken, 'pin'> & { pin?: TokenPin };
   /** A GET at its token is immutable; a POST is answered uncached. */
   cache?: 'immutable' | 'no-store';
 }) {
@@ -965,6 +968,7 @@ async function exportForm(input: {
     layerName,
     assertCurrent,
     read,
+    token: { kind: 'formExport', pin: token.pin },
   });
   return sendBundle(input.reply, bundle, input.cache ?? 'immutable');
 }

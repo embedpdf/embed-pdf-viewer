@@ -4,6 +4,7 @@ import {
   decodePageKey,
   type PageRef,
 } from '@embedpdf/engine-core/runtime';
+import { SHAPES, type CachedReadKind, type TokenPin } from '@embedpdf/engine-core/wire';
 import type { FastifyReply } from 'fastify';
 
 /**
@@ -57,33 +58,24 @@ declare module 'fastify' {
   }
 }
 
+/**
+ * The response header that names this server's engine value when a request
+ * named another one (see {@link readAtPins}): that answer is never cached.
+ */
+export const ENGINE_HEADER = 'EmbedPDF-Engine';
+
 export function setImmutableCache(reply: FastifyReply): void {
+  // An answer computed with another engine value than its URL names is not
+  // the answer that URL stands for.
+  if (reply.hasHeader(ENGINE_HEADER)) {
+    setNoStore(reply);
+    return;
+  }
   reply.header('Cache-Control', reply.server.immutableCache);
 }
 
 export function setNoStore(reply: { header(name: 'Cache-Control', value: string): unknown }): void {
   reply.header('Cache-Control', NO_STORE);
-}
-
-/**
- * A picture pinned to other server fonts than this server's (`serverFonts`)
- * is a 404: this server would draw it differently, since fallback fonts draw
- * page text. The client reads the manifest again. A request that pins
- * nothing carries none.
- */
-export async function assertServerFonts(
-  service: { readonly serverFonts: { fingerprint(): Promise<string> } },
-  requested: string | undefined,
-  reply: { header(name: 'Cache-Control', value: string): unknown },
-): Promise<void> {
-  if (requested === undefined) return;
-  const own = await service.serverFonts.fingerprint();
-  if (requested === own) return;
-  setNoStore(reply);
-  throw new EngineError(
-    EngineErrorCode.NotFound,
-    `drawn with server fonts ${requested}; this server's are ${own}`,
-  );
 }
 
 /**
@@ -96,14 +88,22 @@ export async function assertServerFonts(
  * - a read that a layer write began during is refused too, since the layer's
  *   session may have shown that write before it committed. A write already
  *   in flight when the read starts is no reason: the read waits for it
- *   before it runs (`DocumentService.ensureLayerOnPool`).
+ *   before it runs (`DocumentService.ensureLayerOnPool`);
+ * - the token's shape must be one this server answers;
+ * - a token that names another engine value than this server's is answered
+ *   with this server's own answer, uncached, and its engine value in
+ *   {@link ENGINE_HEADER}: nothing is cached under a value that doesn't
+ *   describe it, and the request doesn't fail.
  *
  * A refusal is "no longer current" with `no-store`; the client reads its
  * manifest again.
  */
 export async function readAtPins<T>(input: {
-  documentService: { layerWriteMark(docId: string, layerName: string): number };
-  reply: { header(name: 'Cache-Control', value: string): unknown };
+  documentService: {
+    layerWriteMark(docId: string, layerName: string): number;
+    readonly engineValues: { of(kind: CachedReadKind): Promise<string> };
+  };
+  reply: FastifyReply;
   docId: string;
   /** The layer whose session answers; `undefined` for the base, which no write changes in place. */
   layerName: string | undefined;
@@ -111,16 +111,24 @@ export async function readAtPins<T>(input: {
   assertCurrent: () => unknown;
   read: () => Promise<T>;
   /**
-   * Whether the answer goes out under the pins. An unpinned read (`no-store`)
-   * runs `assertCurrent` once and is never refused for a write. Defaults to
-   * `true`.
+   * The kind of cached read and its token's pin. Without a token the read is
+   * unpinned (`no-store`): it runs `assertCurrent` once and is never
+   * refused for a write. A request that carries its pins in its body has no
+   * pin: it is read at its pins, and answered uncached.
    */
-  pinned?: boolean;
+  token: { kind: CachedReadKind; pin: TokenPin | undefined } | undefined;
 }): Promise<T> {
-  const { documentService, docId, layerName } = input;
+  const { documentService, docId, layerName, token } = input;
   try {
     await input.assertCurrent();
-    if (input.pinned === false) return await input.read();
+    if (token === undefined) return await input.read();
+    const { kind, pin } = token;
+    if (pin && pin.shape > SHAPES[kind]) {
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        `${kind} shape ${pin.shape} is newer than this server answers (${SHAPES[kind]})`,
+      );
+    }
     const mark = layerName === undefined ? 0 : documentService.layerWriteMark(docId, layerName);
     const body = await input.read();
     if (layerName !== undefined && documentService.layerWriteMark(docId, layerName) !== mark) {
@@ -130,6 +138,11 @@ export async function readAtPins<T>(input: {
       );
     }
     await input.assertCurrent();
+    const engine = await documentService.engineValues.of(kind);
+    if (pin && pin.engine !== engine) {
+      input.reply.header(ENGINE_HEADER, engine);
+      setNoStore(input.reply);
+    }
     return body;
   } catch (err) {
     if (EngineError.is(err, EngineErrorCode.NotFound)) setNoStore(input.reply);
