@@ -38,10 +38,10 @@ export namespace DocSignaturesListResponse {
             coverage: Item.Coverage | null;
             revisionIndex: number | null;
             signer: Item.Signer;
-            docMdp: number | null;
+            docMdp: CloudPDF.DocMdpPermissionTwo | null;
             catalogCertification: boolean;
-            fieldMdp: Item.FieldMdp | null;
-            lock: Item.Lock | null;
+            fieldMdp: CloudPDF.FieldLockSpec | null;
+            lock: CloudPDF.FieldLockSpec | null;
             seedValue: Item.SeedValue | null;
         }
 
@@ -64,36 +64,6 @@ export namespace DocSignaturesListResponse {
                 location: string | null;
                 contactInfo: string | null;
                 signedAt: string | null;
-            }
-
-            export interface FieldMdp {
-                action: FieldMdp.Action;
-                fields: string[];
-                permission?: (number | null) | undefined;
-            }
-
-            export namespace FieldMdp {
-                export const Action = {
-                    All: "all",
-                    Include: "include",
-                    Exclude: "exclude",
-                } as const;
-                export type Action = (typeof Action)[keyof typeof Action];
-            }
-
-            export interface Lock {
-                action: Lock.Action;
-                fields: string[];
-                permission?: (number | null) | undefined;
-            }
-
-            export namespace Lock {
-                export const Action = {
-                    All: "all",
-                    Include: "include",
-                    Exclude: "exclude",
-                } as const;
-                export type Action = (typeof Action)[keyof typeof Action];
             }
 
             export interface SeedValue {
@@ -136,7 +106,7 @@ export namespace DocSignaturesListResponse {
 
         export interface Certification {
             signatureIndex: number;
-            permission: number | null;
+            permission: CloudPDF.DocMdpPermissionTwo;
         }
 
         export type FieldLocks = FieldLocks.Item[];
@@ -145,7 +115,7 @@ export namespace DocSignaturesListResponse {
             export interface Item {
                 signatureIndex: number;
                 source: Item.Source;
-                spec: Item.Spec | null;
+                spec: CloudPDF.FieldLockSpec;
             }
 
             export namespace Item {
@@ -154,21 +124,6 @@ export namespace DocSignaturesListResponse {
                     Lock: "lock",
                 } as const;
                 export type Source = (typeof Source)[keyof typeof Source];
-
-                export interface Spec {
-                    action: Spec.Action;
-                    fields: string[];
-                    permission?: (number | null) | undefined;
-                }
-
-                export namespace Spec {
-                    export const Action = {
-                        All: "all",
-                        Include: "include",
-                        Exclude: "exclude",
-                    } as const;
-                    export type Action = (typeof Action)[keyof typeof Action];
-                }
             }
         }
     }

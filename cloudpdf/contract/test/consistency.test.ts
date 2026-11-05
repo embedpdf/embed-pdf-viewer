@@ -95,10 +95,14 @@ const responseProperties = operations.flatMap(({ name, operation }) =>
     ),
 );
 
-const isNullable = (schema: Schema): boolean =>
-  schema.nullable === true ||
-  schema.type === 'null' ||
-  [...(schema.anyOf ?? []), ...(schema.oneOf ?? [])].some(isNullable);
+const isNullable = (schema: Schema): boolean => {
+  const target = resolved(schema);
+  return (
+    target.nullable === true ||
+    target.type === 'null' ||
+    [...(target.anyOf ?? []), ...(target.oneOf ?? [])].some(isNullable)
+  );
+};
 
 const typeOf = (schema: Schema): string | undefined => {
   const target = resolved(schema);
@@ -140,6 +144,10 @@ describe('naming rules in openapi.json', () => {
       .map(({ at }) => at);
     // A destination's axes: left out and `null` both keep the viewer's
     // value, as in the file. Undecided (docs/plans, API consistency).
-    expect(unique(both)).toEqual(['PageDestination.x']);
+    expect(unique(both)).toEqual([
+      'PageDestination.x',
+      'PageDestination.y',
+      'PageDestination.zoom',
+    ]);
   });
 });

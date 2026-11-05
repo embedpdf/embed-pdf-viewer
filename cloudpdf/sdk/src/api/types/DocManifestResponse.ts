@@ -104,7 +104,7 @@ export namespace DocManifestResponse {
 
         export interface Certification {
             signatureIndex: number;
-            permission: number;
+            permission: CloudPDF.DocMdpPermissionTwo;
         }
 
         export type FieldLocks = FieldLocks.Item[];
@@ -113,7 +113,7 @@ export namespace DocManifestResponse {
             export interface Item {
                 signatureIndex: number;
                 source: Item.Source;
-                spec: Item.Spec;
+                spec: CloudPDF.FieldLockSpec;
             }
 
             export namespace Item {
@@ -122,21 +122,6 @@ export namespace DocManifestResponse {
                     Lock: "lock",
                 } as const;
                 export type Source = (typeof Source)[keyof typeof Source];
-
-                export interface Spec {
-                    action: Spec.Action;
-                    fields: string[];
-                    permission?: number | undefined;
-                }
-
-                export namespace Spec {
-                    export const Action = {
-                        All: "all",
-                        Include: "include",
-                        Exclude: "exclude",
-                    } as const;
-                    export type Action = (typeof Action)[keyof typeof Action];
-                }
             }
         }
     }

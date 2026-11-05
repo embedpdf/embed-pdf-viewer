@@ -48,7 +48,7 @@ describe("SignaturesClient", () => {
                 enforced: "none",
                 judged: "none",
                 certification: { signatureIndex: 1, permission: 1.1 },
-                fieldLocks: [{ signatureIndex: 1, source: "fieldmdp", spec: null }],
+                fieldLocks: [{ signatureIndex: 1, source: "fieldmdp", spec: { action: "all", fields: ["fields"] } }],
                 policyVersion: 1,
             },
         };
@@ -187,7 +187,7 @@ describe("SignaturesClient", () => {
                 enforced: "none",
                 judged: "none",
                 certification: { signatureIndex: 1, permission: 1.1 },
-                fieldLocks: [{ signatureIndex: 1, source: "fieldmdp", spec: null }],
+                fieldLocks: [{ signatureIndex: 1, source: "fieldmdp", spec: { action: "all", fields: ["fields"] } }],
                 policyVersion: 1,
             },
             meta: {

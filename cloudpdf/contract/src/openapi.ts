@@ -21,6 +21,7 @@ import {
   FormWireComponents,
   OutlineWireComponents,
   PdfActionWireComponents,
+  SignatureWireComponents,
 } from '@embedpdf/engine-core/wire';
 import { z } from 'zod';
 import { ignoreOverride, zodToJsonSchema } from 'zod-to-json-schema';
@@ -85,6 +86,7 @@ export const SHARED_COMPONENT_SCHEMAS = sharedComponents([
   AttachmentWireComponents,
   ChangeWireComponents,
   FontWireComponents,
+  SignatureWireComponents,
 ]);
 
 const SHARED_COMPONENT_BY_DEFINITION = new Map<z.ZodTypeDef, string>(

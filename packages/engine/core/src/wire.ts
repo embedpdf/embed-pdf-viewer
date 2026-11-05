@@ -94,6 +94,7 @@ export {
   AnnotationReorderBodySchema,
   AnnotationReorderResultSchema,
   DocumentWireComponents,
+  SignatureWireComponents,
   FormMutationMetaSchema,
   FormWireComponents,
   FormSetValueResultSchema,

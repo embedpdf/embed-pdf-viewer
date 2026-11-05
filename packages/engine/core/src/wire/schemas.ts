@@ -2126,6 +2126,16 @@ export const SignatureDTOSchema: z.ZodType<SignatureDTO> = z.object({
   seedValue: SignatureSeedValueSchema.nullable(),
 });
 
+/**
+ * Signature models with a stable public name (see `DocumentWireComponents`).
+ * Named, a signature's `fieldMdp.permission` points to its own schema, not to
+ * the nullable `docMdp` beside it.
+ */
+export const SignatureWireComponents = {
+  DocMdpPermission: DocMdpPermissionSchema,
+  FieldLockSpec: FieldLockSpecSchema,
+} as const satisfies Record<string, z.ZodTypeAny>;
+
 export const DocumentProtectionSchema: z.ZodType<DocumentProtection> = z.object({
   enforced: ModificationLevelSchema.nullable(),
   judged: ModificationLevelSchema.nullable(),

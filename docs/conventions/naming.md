@@ -103,8 +103,9 @@ its rules hold in every language:
   `details` holds what a code carries, as the code's comment says.
 - **Whole numbers are integers.** A count, an index, a size in bytes and a
   duration in seconds are `.int()`, so the SDKs type them as integers.
-- **A response field is always there.** It is `null` when there is nothing,
-  never left out: one spelling for "nothing".
+- **One spelling for "nothing".** A response field is either always there,
+  `null` when there is nothing, or left out when there is nothing; never
+  both.
 
 `cloudpdf/contract/test/consistency.test.ts` checks these on `openapi.json`.
 

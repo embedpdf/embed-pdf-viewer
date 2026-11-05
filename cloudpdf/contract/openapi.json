@@ -26210,6 +26210,42 @@
         "required": ["runs", "missingCharacters"],
         "additionalProperties": false
       },
+      "DocMdpPermission": {
+        "anyOf": [
+          {
+            "type": "number",
+            "enum": [1]
+          },
+          {
+            "type": "number",
+            "enum": [2]
+          },
+          {
+            "type": "number",
+            "enum": [3]
+          }
+        ]
+      },
+      "FieldLockSpec": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": ["all", "include", "exclude"]
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "permission": {
+            "$ref": "#/components/schemas/DocMdpPermission"
+          }
+        },
+        "required": ["action", "fields"],
+        "additionalProperties": false
+      },
       "TenantsCreateRequest": {
         "type": "object",
         "properties": {
@@ -29418,20 +29454,7 @@
                     "minimum": 0
                   },
                   "permission": {
-                    "anyOf": [
-                      {
-                        "type": "number",
-                        "enum": [1]
-                      },
-                      {
-                        "type": "number",
-                        "enum": [2]
-                      },
-                      {
-                        "type": "number",
-                        "enum": [3]
-                      }
-                    ]
+                    "$ref": "#/components/schemas/DocMdpPermission"
                   }
                 },
                 "required": ["signatureIndex", "permission"],
@@ -29452,24 +29475,7 @@
                       "enum": ["fieldmdp", "lock"]
                     },
                     "spec": {
-                      "type": "object",
-                      "properties": {
-                        "action": {
-                          "type": "string",
-                          "enum": ["all", "include", "exclude"]
-                        },
-                        "fields": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
-                        },
-                        "permission": {
-                          "$ref": "#/components/schemas/DocManifestResponse/properties/protection/properties/certification/properties/permission"
-                        }
-                      },
-                      "required": ["action", "fields"],
-                      "additionalProperties": false
+                      "$ref": "#/components/schemas/FieldLockSpec"
                     }
                   },
                   "required": ["signatureIndex", "source", "spec"],
@@ -29696,18 +29702,9 @@
                   "additionalProperties": false
                 },
                 "docMdp": {
-                  "anyOf": [
+                  "allOf": [
                     {
-                      "type": "number",
-                      "enum": [1]
-                    },
-                    {
-                      "type": "number",
-                      "enum": [2]
-                    },
-                    {
-                      "type": "number",
-                      "enum": [3]
+                      "$ref": "#/components/schemas/DocMdpPermission"
                     }
                   ],
                   "nullable": true
@@ -29716,30 +29713,17 @@
                   "type": "boolean"
                 },
                 "fieldMdp": {
-                  "type": "object",
-                  "properties": {
-                    "action": {
-                      "type": "string",
-                      "enum": ["all", "include", "exclude"]
-                    },
-                    "fields": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    },
-                    "permission": {
-                      "$ref": "#/components/schemas/DocSignaturesListResponse/properties/signatures/items/properties/docMdp"
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/FieldLockSpec"
                     }
-                  },
-                  "required": ["action", "fields"],
-                  "additionalProperties": false,
+                  ],
                   "nullable": true
                 },
                 "lock": {
                   "allOf": [
                     {
-                      "$ref": "#/components/schemas/DocSignaturesListResponse/properties/signatures/items/properties/fieldMdp"
+                      "$ref": "#/components/schemas/FieldLockSpec"
                     }
                   ],
                   "nullable": true
@@ -29866,7 +29850,7 @@
                     "minimum": 0
                   },
                   "permission": {
-                    "$ref": "#/components/schemas/DocSignaturesListResponse/properties/signatures/items/properties/docMdp"
+                    "$ref": "#/components/schemas/DocMdpPermission"
                   }
                 },
                 "required": ["signatureIndex", "permission"],
@@ -29887,7 +29871,7 @@
                       "enum": ["fieldmdp", "lock"]
                     },
                     "spec": {
-                      "$ref": "#/components/schemas/DocSignaturesListResponse/properties/signatures/items/properties/fieldMdp"
+                      "$ref": "#/components/schemas/FieldLockSpec"
                     }
                   },
                   "required": ["signatureIndex", "source", "spec"],
@@ -30317,18 +30301,9 @@
                 "additionalProperties": false
               },
               "docMdp": {
-                "anyOf": [
+                "allOf": [
                   {
-                    "type": "number",
-                    "enum": [1]
-                  },
-                  {
-                    "type": "number",
-                    "enum": [2]
-                  },
-                  {
-                    "type": "number",
-                    "enum": [3]
+                    "$ref": "#/components/schemas/DocMdpPermission"
                   }
                 ],
                 "nullable": true
@@ -30337,30 +30312,17 @@
                 "type": "boolean"
               },
               "fieldMdp": {
-                "type": "object",
-                "properties": {
-                  "action": {
-                    "type": "string",
-                    "enum": ["all", "include", "exclude"]
-                  },
-                  "fields": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  },
-                  "permission": {
-                    "$ref": "#/components/schemas/DocSignaturesCompleteResponse/properties/signature/properties/docMdp"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/FieldLockSpec"
                   }
-                },
-                "required": ["action", "fields"],
-                "additionalProperties": false,
+                ],
                 "nullable": true
               },
               "lock": {
                 "allOf": [
                   {
-                    "$ref": "#/components/schemas/DocSignaturesCompleteResponse/properties/signature/properties/fieldMdp"
+                    "$ref": "#/components/schemas/FieldLockSpec"
                   }
                 ],
                 "nullable": true
@@ -30516,7 +30478,7 @@
                     "minimum": 0
                   },
                   "permission": {
-                    "$ref": "#/components/schemas/DocSignaturesCompleteResponse/properties/signature/properties/docMdp"
+                    "$ref": "#/components/schemas/DocMdpPermission"
                   }
                 },
                 "required": ["signatureIndex", "permission"],
@@ -30537,7 +30499,7 @@
                       "enum": ["fieldmdp", "lock"]
                     },
                     "spec": {
-                      "$ref": "#/components/schemas/DocSignaturesCompleteResponse/properties/signature/properties/fieldMdp"
+                      "$ref": "#/components/schemas/FieldLockSpec"
                     }
                   },
                   "required": ["signatureIndex", "source", "spec"],
@@ -30764,18 +30726,9 @@
                   "additionalProperties": false
                 },
                 "docMdp": {
-                  "anyOf": [
+                  "allOf": [
                     {
-                      "type": "number",
-                      "enum": [1]
-                    },
-                    {
-                      "type": "number",
-                      "enum": [2]
-                    },
-                    {
-                      "type": "number",
-                      "enum": [3]
+                      "$ref": "#/components/schemas/DocMdpPermission"
                     }
                   ],
                   "nullable": true
@@ -30784,30 +30737,17 @@
                   "type": "boolean"
                 },
                 "fieldMdp": {
-                  "type": "object",
-                  "properties": {
-                    "action": {
-                      "type": "string",
-                      "enum": ["all", "include", "exclude"]
-                    },
-                    "fields": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    },
-                    "permission": {
-                      "$ref": "#/components/schemas/DocVersionsSignaturesResponse/properties/signatures/items/properties/docMdp"
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/FieldLockSpec"
                     }
-                  },
-                  "required": ["action", "fields"],
-                  "additionalProperties": false,
+                  ],
                   "nullable": true
                 },
                 "lock": {
                   "allOf": [
                     {
-                      "$ref": "#/components/schemas/DocVersionsSignaturesResponse/properties/signatures/items/properties/fieldMdp"
+                      "$ref": "#/components/schemas/FieldLockSpec"
                     }
                   ],
                   "nullable": true
@@ -30934,7 +30874,7 @@
                     "minimum": 0
                   },
                   "permission": {
-                    "$ref": "#/components/schemas/DocVersionsSignaturesResponse/properties/signatures/items/properties/docMdp"
+                    "$ref": "#/components/schemas/DocMdpPermission"
                   }
                 },
                 "required": ["signatureIndex", "permission"],
@@ -30955,7 +30895,7 @@
                       "enum": ["fieldmdp", "lock"]
                     },
                     "spec": {
-                      "$ref": "#/components/schemas/DocVersionsSignaturesResponse/properties/signatures/items/properties/fieldMdp"
+                      "$ref": "#/components/schemas/FieldLockSpec"
                     }
                   },
                   "required": ["signatureIndex", "source", "spec"],
