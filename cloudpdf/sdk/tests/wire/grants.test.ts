@@ -25,7 +25,7 @@ describe("GrantsClient", () => {
                     privacyUrl: "privacyUrl",
                 },
             },
-            expiresAt: 1.1,
+            expiresAt: 1,
         };
 
         server
@@ -47,7 +47,7 @@ describe("GrantsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { grant: "grant" };
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -69,7 +69,7 @@ describe("GrantsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { grant: "grant" };
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -91,7 +91,7 @@ describe("GrantsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { grant: "grant" };
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -113,7 +113,7 @@ describe("GrantsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { grant: "grant" };
-        const rawResponseBody = { error: { code: "code", message: "message" } };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -135,7 +135,7 @@ describe("GrantsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { grant: "grant" };
-        const rawResponseBody = { error: { code: "code", message: "message" } };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -167,21 +167,21 @@ describe("GrantsClient", () => {
                     layerMode: "shared",
                     layerName: "layerName",
                     keepVisitorLayers: true,
-                    visitorIdleSeconds: 1.1,
+                    visitorIdleSeconds: 1,
                     visitorIdentity: { fields: {}, ask: "on-open" },
                     identity: {},
                     scope: ["scope"],
                     origins: ["origins"],
                     passphraseProtected: true,
-                    sessionTtlSeconds: 1.1,
+                    sessionTtlSeconds: 1,
                     disabled: true,
-                    archivedAt: 1.1,
-                    expiresAt: 1.1,
-                    exchangeCount: 1.1,
-                    lastExchangedAt: 1.1,
+                    archivedAt: 1,
+                    expiresAt: 1,
+                    exchangeCount: 1,
+                    lastExchangedAt: 1,
                     createdBy: "createdBy",
-                    createdAt: 1.1,
-                    updatedAt: 1.1,
+                    createdAt: 1,
+                    updatedAt: 1,
                 },
             ],
             nextCursor: "nextCursor",
@@ -205,7 +205,7 @@ describe("GrantsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -235,7 +235,7 @@ describe("GrantsClient", () => {
                 layerMode: "shared",
                 layerName: "layerName",
                 keepVisitorLayers: true,
-                visitorIdleSeconds: 1.1,
+                visitorIdleSeconds: 1,
                 visitorIdentity: { fields: {}, ask: "on-open", purpose: "purpose", privacyUrl: "privacyUrl" },
                 identity: {
                     userId: "userId",
@@ -249,15 +249,15 @@ describe("GrantsClient", () => {
                 scope: ["scope"],
                 origins: ["origins"],
                 passphraseProtected: true,
-                sessionTtlSeconds: 1.1,
+                sessionTtlSeconds: 1,
                 disabled: true,
-                archivedAt: 1.1,
-                expiresAt: 1.1,
-                exchangeCount: 1.1,
-                lastExchangedAt: 1.1,
+                archivedAt: 1,
+                expiresAt: 1,
+                exchangeCount: 1,
+                lastExchangedAt: 1,
                 createdBy: "createdBy",
-                createdAt: 1.1,
-                updatedAt: 1.1,
+                createdAt: 1,
+                updatedAt: 1,
             },
         };
 
@@ -282,7 +282,7 @@ describe("GrantsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { docId: "docId", scope: ["scope", "scope"] };
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -306,7 +306,7 @@ describe("GrantsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { docId: "docId", scope: ["scope", "scope"] };
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -330,7 +330,7 @@ describe("GrantsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { docId: "docId", scope: ["scope", "scope"] };
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -363,7 +363,7 @@ describe("GrantsClient", () => {
                 layerMode: "shared",
                 layerName: "layerName",
                 keepVisitorLayers: true,
-                visitorIdleSeconds: 1.1,
+                visitorIdleSeconds: 1,
                 visitorIdentity: { fields: {}, ask: "on-open", purpose: "purpose", privacyUrl: "privacyUrl" },
                 identity: {
                     userId: "userId",
@@ -377,15 +377,15 @@ describe("GrantsClient", () => {
                 scope: ["scope"],
                 origins: ["origins"],
                 passphraseProtected: true,
-                sessionTtlSeconds: 1.1,
+                sessionTtlSeconds: 1,
                 disabled: true,
-                archivedAt: 1.1,
-                expiresAt: 1.1,
-                exchangeCount: 1.1,
-                lastExchangedAt: 1.1,
+                archivedAt: 1,
+                expiresAt: 1,
+                exchangeCount: 1,
+                lastExchangedAt: 1,
                 createdBy: "createdBy",
-                createdAt: 1.1,
-                updatedAt: 1.1,
+                createdAt: 1,
+                updatedAt: 1,
             },
         };
 
@@ -408,7 +408,7 @@ describe("GrantsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -443,7 +443,7 @@ describe("GrantsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -465,7 +465,7 @@ describe("GrantsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -496,7 +496,7 @@ describe("GrantsClient", () => {
                 layerMode: "shared",
                 layerName: "layerName",
                 keepVisitorLayers: true,
-                visitorIdleSeconds: 1.1,
+                visitorIdleSeconds: 1,
                 visitorIdentity: { fields: {}, ask: "on-open", purpose: "purpose", privacyUrl: "privacyUrl" },
                 identity: {
                     userId: "userId",
@@ -510,15 +510,15 @@ describe("GrantsClient", () => {
                 scope: ["scope"],
                 origins: ["origins"],
                 passphraseProtected: true,
-                sessionTtlSeconds: 1.1,
+                sessionTtlSeconds: 1,
                 disabled: true,
-                archivedAt: 1.1,
-                expiresAt: 1.1,
-                exchangeCount: 1.1,
-                lastExchangedAt: 1.1,
+                archivedAt: 1,
+                expiresAt: 1,
+                exchangeCount: 1,
+                lastExchangedAt: 1,
                 createdBy: "createdBy",
-                createdAt: 1.1,
-                updatedAt: 1.1,
+                createdAt: 1,
+                updatedAt: 1,
             },
         };
 
@@ -542,7 +542,7 @@ describe("GrantsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = {};
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -565,7 +565,7 @@ describe("GrantsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = {};
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -588,7 +588,7 @@ describe("GrantsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = {};
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -611,7 +611,7 @@ describe("GrantsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = {};
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -643,7 +643,7 @@ describe("GrantsClient", () => {
                 layerMode: "shared",
                 layerName: "layerName",
                 keepVisitorLayers: true,
-                visitorIdleSeconds: 1.1,
+                visitorIdleSeconds: 1,
                 visitorIdentity: { fields: {}, ask: "on-open", purpose: "purpose", privacyUrl: "privacyUrl" },
                 identity: {
                     userId: "userId",
@@ -657,15 +657,15 @@ describe("GrantsClient", () => {
                 scope: ["scope"],
                 origins: ["origins"],
                 passphraseProtected: true,
-                sessionTtlSeconds: 1.1,
+                sessionTtlSeconds: 1,
                 disabled: true,
-                archivedAt: 1.1,
-                expiresAt: 1.1,
-                exchangeCount: 1.1,
-                lastExchangedAt: 1.1,
+                archivedAt: 1,
+                expiresAt: 1,
+                exchangeCount: 1,
+                lastExchangedAt: 1,
                 createdBy: "createdBy",
-                createdAt: 1.1,
-                updatedAt: 1.1,
+                createdAt: 1,
+                updatedAt: 1,
             },
         };
 
@@ -688,7 +688,7 @@ describe("GrantsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()

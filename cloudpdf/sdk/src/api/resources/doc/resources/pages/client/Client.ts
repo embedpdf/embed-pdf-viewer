@@ -42,14 +42,14 @@ export class PagesClient {
     public setScale(
         request: CloudPDF.doc.DocPagesSetScaleRequest,
         requestOptions?: PagesClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocPagesSetScale200Response> {
+    ): core.HttpResponsePromise<CloudPDF.DocPagesSetScaleResponse> {
         return core.HttpResponsePromise.fromPromise(this.__setScale(request, requestOptions));
     }
 
     private async __setScale(
         request: CloudPDF.doc.DocPagesSetScaleRequest,
         requestOptions?: PagesClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocPagesSetScale200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.DocPagesSetScaleResponse>> {
         const {
             docId,
             layerName,
@@ -89,15 +89,21 @@ export class PagesClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return { data: _response.body as CloudPDF.DocPagesSetScale200Response, rawResponse: _response.rawResponse };
+            return { data: _response.body as CloudPDF.DocPagesSetScaleResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 400:
-                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.BadRequestError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -133,14 +139,14 @@ export class PagesClient {
     public viewports(
         request: CloudPDF.doc.ViewportsPagesRequest,
         requestOptions?: PagesClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocPagesViewports200Response> {
+    ): core.HttpResponsePromise<CloudPDF.DocPagesViewportsResponse> {
         return core.HttpResponsePromise.fromPromise(this.__viewports(request, requestOptions));
     }
 
     private async __viewports(
         request: CloudPDF.doc.ViewportsPagesRequest,
         requestOptions?: PagesClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocPagesViewports200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.DocPagesViewportsResponse>> {
         const { docId, layerName, pageKey, "X-Document-Password": documentPassword } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
@@ -169,16 +175,16 @@ export class PagesClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return {
-                data: _response.body as CloudPDF.DocPagesViewports200Response,
-                rawResponse: _response.rawResponse,
-            };
+            return { data: _response.body as CloudPDF.DocPagesViewportsResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -253,9 +259,15 @@ export class PagesClient {
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 400:
-                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.BadRequestError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -294,14 +306,14 @@ export class PagesClient {
     public flatten(
         request: CloudPDF.doc.FlattenPagesRequest,
         requestOptions?: PagesClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocPagesFlatten200Response> {
+    ): core.HttpResponsePromise<CloudPDF.DocPagesFlattenResponse> {
         return core.HttpResponsePromise.fromPromise(this.__flatten(request, requestOptions));
     }
 
     private async __flatten(
         request: CloudPDF.doc.FlattenPagesRequest,
         requestOptions?: PagesClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocPagesFlatten200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.DocPagesFlattenResponse>> {
         const {
             docId,
             layerName,
@@ -340,15 +352,21 @@ export class PagesClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return { data: _response.body as CloudPDF.DocPagesFlatten200Response, rawResponse: _response.rawResponse };
+            return { data: _response.body as CloudPDF.DocPagesFlattenResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 400:
-                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.BadRequestError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -387,14 +405,14 @@ export class PagesClient {
     public setName(
         request: CloudPDF.doc.SetNamePagesRequest,
         requestOptions?: PagesClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocPagesSetName200Response> {
+    ): core.HttpResponsePromise<CloudPDF.DocPagesSetNameResponse> {
         return core.HttpResponsePromise.fromPromise(this.__setName(request, requestOptions));
     }
 
     private async __setName(
         request: CloudPDF.doc.SetNamePagesRequest,
         requestOptions?: PagesClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocPagesSetName200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.DocPagesSetNameResponse>> {
         const {
             docId,
             layerName,
@@ -433,15 +451,21 @@ export class PagesClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return { data: _response.body as CloudPDF.DocPagesSetName200Response, rawResponse: _response.rawResponse };
+            return { data: _response.body as CloudPDF.DocPagesSetNameResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 400:
-                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.BadRequestError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -480,14 +504,14 @@ export class PagesClient {
     public removeName(
         request: CloudPDF.doc.RemoveNamePagesRequest,
         requestOptions?: PagesClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocPagesRemoveName200Response> {
+    ): core.HttpResponsePromise<CloudPDF.DocPagesRemoveNameResponse> {
         return core.HttpResponsePromise.fromPromise(this.__removeName(request, requestOptions));
     }
 
     private async __removeName(
         request: CloudPDF.doc.RemoveNamePagesRequest,
         requestOptions?: PagesClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocPagesRemoveName200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.DocPagesRemoveNameResponse>> {
         const {
             docId,
             layerName,
@@ -526,18 +550,21 @@ export class PagesClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return {
-                data: _response.body as CloudPDF.DocPagesRemoveName200Response,
-                rawResponse: _response.rawResponse,
-            };
+            return { data: _response.body as CloudPDF.DocPagesRemoveNameResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 400:
-                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.BadRequestError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,

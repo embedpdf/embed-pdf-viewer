@@ -42,14 +42,14 @@ export class VisitorsClient {
     public list(
         request: CloudPDF.grants.ListVisitorsRequest,
         requestOptions?: VisitorsClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.GrantsVisitorsList200Response> {
+    ): core.HttpResponsePromise<CloudPDF.GrantsVisitorsListResponse> {
         return core.HttpResponsePromise.fromPromise(this.__list(request, requestOptions));
     }
 
     private async __list(
         request: CloudPDF.grants.ListVisitorsRequest,
         requestOptions?: VisitorsClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.GrantsVisitorsList200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.GrantsVisitorsListResponse>> {
         const { tenantId, grantId, limit, cursor } = request;
         const _queryParams: Record<string, unknown> = {
             limit,
@@ -83,18 +83,21 @@ export class VisitorsClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return {
-                data: _response.body as CloudPDF.GrantsVisitorsList200Response,
-                rawResponse: _response.rawResponse,
-            };
+            return { data: _response.body as CloudPDF.GrantsVisitorsListResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 400:
-                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.BadRequestError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -171,7 +174,10 @@ export class VisitorsClient {
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,

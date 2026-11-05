@@ -127,9 +127,12 @@ describe('bodyless requests with a JSON content type', () => {
     });
     expect(res.statusCode).toBe(400);
     // Rejected at the content-type-parser layer (secure-json-parse fires,
-    // Fastify wraps it as an FST_ERR_CTP_* invalid-JSON error). Had the
-    // payload been accepted, it would have reached zod and come back as
-    // InvalidArg instead.
-    expect(res.json().error.code).toMatch(/^FST_ERR_CTP_/);
+    // Fastify wraps it as an invalid-JSON error, answered with the 400's
+    // code). Had the payload been accepted, it would have reached zod, whose
+    // message names the body's fields instead.
+    expect(res.json().error).toMatchObject({
+      code: 'InvalidArg',
+      message: expect.stringMatching(/not valid JSON/),
+    });
   });
 });

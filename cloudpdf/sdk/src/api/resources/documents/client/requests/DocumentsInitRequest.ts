@@ -4,7 +4,7 @@
  * @example
  *     {
  *         tenantId: "tenantId",
- *         contentLength: 1.1,
+ *         contentLength: 1,
  *         contentSha256: "contentSha256"
  *     }
  */

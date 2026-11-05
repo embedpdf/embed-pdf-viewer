@@ -714,7 +714,6 @@ describe('a mounted module', () => {
     expect(response.status).toBe(400);
     expect(await response.json()).toMatchObject({
       error: {
-        name: 'EngineError',
         code: EngineErrorCode.InvalidArg,
         message: 'scale must be > 0',
       },

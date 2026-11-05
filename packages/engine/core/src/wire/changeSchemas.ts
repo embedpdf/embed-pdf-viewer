@@ -12,7 +12,7 @@ import {
   AttachmentRestoreResultSchema,
   CustomMetadataPatchSchema,
   CustomMetadataUpdateResultSchema,
-  EngineErrorPayloadSchema,
+  EngineErrorSchema,
   FieldPositionSchema,
   FormCalculationsReorderResultSchema,
   FormFieldCreateResultSchema,
@@ -402,7 +402,7 @@ export const ChangeResultSchema = z.object({
 export const ChangeAnswerSchema = closed(
   z.discriminatedUnion('status', [
     z.object({ opId: z.string(), status: z.literal('applied'), result: ChangeResultSchema }),
-    z.object({ opId: z.string(), status: z.literal('refused'), error: EngineErrorPayloadSchema }),
+    z.object({ opId: z.string(), status: z.literal('refused'), error: EngineErrorSchema }),
   ]),
 );
 

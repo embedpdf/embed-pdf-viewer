@@ -16,7 +16,7 @@ import {
   AnnotationSchema,
   closed,
   EditSessionStatusSchema,
-  EngineErrorPayloadSchema,
+  EngineErrorSchema,
   FormFieldDTOSchema,
   FormSnapshotSchema,
   PdfLinkTargetSchema,
@@ -138,9 +138,9 @@ describe('an annotation of a kind the client knows', () => {
 
 describe('the other sets with a catch-all', () => {
   test('an error code the client does not know reads as Unknown', () => {
-    const error = { name: 'EngineError', code: 'QuotaExceeded', message: 'too many' };
-    expect(EngineErrorPayloadSchema.parse(error).code).toBe('Unknown');
-    expect(EngineErrorPayloadSchema.safeParse({ ...error, code: 42 }).success).toBe(false);
+    const error = { code: 'QuotaExceeded', message: 'too many' };
+    expect(EngineErrorSchema.parse(error).code).toBe('Unknown');
+    expect(EngineErrorSchema.safeParse({ ...error, code: 42 }).success).toBe(false);
   });
 
   test('a measure, a link target and a form field read as their catch-all', () => {

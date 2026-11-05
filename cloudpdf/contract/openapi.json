@@ -52,7 +52,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -90,7 +90,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -144,7 +144,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocHead200Response"
+                  "$ref": "#/components/schemas/DocHeadResponse"
                 }
               }
             }
@@ -154,7 +154,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocHead404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -164,7 +164,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -228,7 +228,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocAnnotationsListAll200Response"
+                  "$ref": "#/components/schemas/DocAnnotationsListAllResponse"
                 }
               }
             }
@@ -238,7 +238,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocAnnotationsListAll404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -248,7 +248,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocAnnotationsListAll409Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -258,7 +258,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -332,7 +332,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocAnnotationsList200Response"
+                  "$ref": "#/components/schemas/DocAnnotationsListResponse"
                 }
               }
             }
@@ -342,7 +342,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocAnnotationsList404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -352,7 +352,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -444,7 +444,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocAnnotationsCreate200Response"
+                  "$ref": "#/components/schemas/DocAnnotationsCreateResponse"
                 }
               }
             }
@@ -454,7 +454,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocAnnotationsCreate400Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -464,7 +464,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocAnnotationsCreate404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -474,7 +474,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -578,7 +578,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocAnnotationsUpdate200Response"
+                  "$ref": "#/components/schemas/DocAnnotationsUpdateResponse"
                 }
               }
             }
@@ -588,7 +588,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocAnnotationsUpdate400Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -598,7 +598,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocAnnotationsUpdate404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -608,7 +608,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -700,7 +700,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocAnnotationsDelete200Response"
+                  "$ref": "#/components/schemas/DocAnnotationsDeleteResponse"
                 }
               }
             }
@@ -710,7 +710,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocAnnotationsDelete404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -720,7 +720,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -816,7 +816,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocAnnotationsReadAppearance400Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -826,7 +826,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocAnnotationsReadAppearance404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -836,7 +836,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -933,7 +933,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocAnnotationsReadFile400Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -943,17 +943,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocAnnotationsReadFile404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
           },
           "413": {
-            "description": "Response",
+            "description": "Payload too large",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocAnnotationsReadFile413Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -963,7 +963,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1058,7 +1058,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocAnnotationsExportAppearance400Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1068,7 +1068,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocAnnotationsExportAppearance404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1078,7 +1078,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1171,7 +1171,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocAnnotationsFlatten200Response"
+                  "$ref": "#/components/schemas/DocAnnotationsFlattenResponse"
                 }
               }
             }
@@ -1181,7 +1181,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocAnnotationsFlatten400Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1191,7 +1191,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocAnnotationsFlatten404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1201,7 +1201,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1294,7 +1294,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocAnnotationsReorder200Response"
+                  "$ref": "#/components/schemas/DocAnnotationsReorderResponse"
                 }
               }
             }
@@ -1304,7 +1304,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocAnnotationsReorder400Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1314,7 +1314,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocAnnotationsReorder404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1324,7 +1324,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1409,7 +1409,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocAttachmentsDownload400Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1419,17 +1419,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocAttachmentsDownload404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
           },
           "413": {
-            "description": "Response",
+            "description": "Payload too large",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocAttachmentsDownload413Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1439,7 +1439,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1503,7 +1503,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocAttachmentsList200Response"
+                  "$ref": "#/components/schemas/DocAttachmentsListResponse"
                 }
               }
             }
@@ -1513,7 +1513,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocAttachmentsList404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1523,7 +1523,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1610,7 +1610,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocChanges200Response"
+                  "$ref": "#/components/schemas/DocChangesResponse"
                 }
               }
             }
@@ -1620,7 +1620,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocChanges400Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1630,7 +1630,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocChanges404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1640,17 +1640,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocChanges409Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
           },
           "413": {
-            "description": "Response",
+            "description": "Payload too large",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocChanges413Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1660,7 +1660,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1734,7 +1734,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocDownloadResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1744,7 +1744,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1818,7 +1818,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocDownloadLink200Response"
+                  "$ref": "#/components/schemas/DocDownloadLinkResponse"
                 }
               }
             }
@@ -1828,17 +1828,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocDownloadLink404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
           },
           "501": {
-            "description": "Response",
+            "description": "Not implemented",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocDownloadLink501Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1848,7 +1848,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1937,7 +1937,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocFontsProgramsDownload403Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1947,7 +1947,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocFontsProgramsDownload404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1957,7 +1957,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2029,7 +2029,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocFontsProgramsGet200Response"
+                  "$ref": "#/components/schemas/DocFontsProgramsGetResponse"
                 }
               }
             }
@@ -2039,7 +2039,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocFontsProgramsGet404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2049,7 +2049,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2112,7 +2112,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocFontsList200Response"
+                  "$ref": "#/components/schemas/DocFontsListResponse"
                 }
               }
             }
@@ -2122,7 +2122,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocFontsList404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2132,7 +2132,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2205,7 +2205,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocFontsResolve200Response"
+                  "$ref": "#/components/schemas/DocFontsResolveResponse"
                 }
               }
             }
@@ -2215,7 +2215,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocFontsResolve400Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2225,7 +2225,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocFontsResolve404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2235,7 +2235,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2298,7 +2298,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocFormsList200Response"
+                  "$ref": "#/components/schemas/DocFormsListResponse"
                 }
               }
             }
@@ -2308,7 +2308,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocFormsList404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2318,7 +2318,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2400,7 +2400,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocFormsReorderCalculations200Response"
+                  "$ref": "#/components/schemas/DocFormsReorderCalculationsResponse"
                 }
               }
             }
@@ -2410,7 +2410,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocFormsReorderCalculations400Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2420,7 +2420,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocFormsReorderCalculations404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2430,7 +2430,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2521,7 +2521,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocFormsSetValue200Response"
+                  "$ref": "#/components/schemas/DocFormsSetValueResponse"
                 }
               }
             }
@@ -2531,7 +2531,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocFormsSetValue400Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2541,7 +2541,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocFormsSetValue404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2551,7 +2551,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2633,7 +2633,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocFormsReset200Response"
+                  "$ref": "#/components/schemas/DocFormsResetResponse"
                 }
               }
             }
@@ -2643,7 +2643,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocFormsReset400Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2653,7 +2653,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocFormsReset404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2663,7 +2663,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2767,7 +2767,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocFormsUpdateWidget200Response"
+                  "$ref": "#/components/schemas/DocFormsUpdateWidgetResponse"
                 }
               }
             }
@@ -2777,7 +2777,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocFormsUpdateWidget400Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2787,7 +2787,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocFormsUpdateWidget404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2797,7 +2797,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2889,7 +2889,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocFormsDeleteWidget200Response"
+                  "$ref": "#/components/schemas/DocFormsDeleteWidgetResponse"
                 }
               }
             }
@@ -2899,7 +2899,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocFormsDeleteWidget400Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2909,7 +2909,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocFormsDeleteWidget404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2919,7 +2919,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3012,7 +3012,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocFormsReorderWidgets200Response"
+                  "$ref": "#/components/schemas/DocFormsReorderWidgetsResponse"
                 }
               }
             }
@@ -3022,7 +3022,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocFormsReorderWidgets400Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3032,7 +3032,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocFormsReorderWidgets404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3042,7 +3042,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3105,7 +3105,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocManifest200Response"
+                  "$ref": "#/components/schemas/DocManifestResponse"
                 }
               }
             }
@@ -3115,7 +3115,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocManifest404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3125,7 +3125,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3188,7 +3188,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocMetadataGet200Response"
+                  "$ref": "#/components/schemas/DocMetadataGetResponse"
                 }
               }
             }
@@ -3198,7 +3198,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocMetadataGet404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3208,7 +3208,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3271,7 +3271,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocMetadataCustomGet200Response"
+                  "$ref": "#/components/schemas/DocMetadataCustomGetResponse"
                 }
               }
             }
@@ -3281,7 +3281,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocMetadataCustomGet404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3291,7 +3291,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3354,7 +3354,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocOutlineGet200Response"
+                  "$ref": "#/components/schemas/DocOutlineGetResponse"
                 }
               }
             }
@@ -3364,7 +3364,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocOutlineGet404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3374,7 +3374,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3467,7 +3467,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocPagesSetScale200Response"
+                  "$ref": "#/components/schemas/DocPagesSetScaleResponse"
                 }
               }
             }
@@ -3477,7 +3477,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocPagesSetScale400Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3487,7 +3487,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocPagesSetScale404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3497,7 +3497,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3571,7 +3571,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocPagesViewports200Response"
+                  "$ref": "#/components/schemas/DocPagesViewportsResponse"
                 }
               }
             }
@@ -3581,7 +3581,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocPagesViewports404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3591,7 +3591,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3676,7 +3676,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocPagesExtract400Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3686,7 +3686,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocPagesExtract404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3696,7 +3696,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3778,7 +3778,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocPagesFlatten200Response"
+                  "$ref": "#/components/schemas/DocPagesFlattenResponse"
                 }
               }
             }
@@ -3788,7 +3788,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocPagesFlatten400Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3798,7 +3798,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocPagesFlatten404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3808,7 +3808,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3890,7 +3890,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocPagesSetName200Response"
+                  "$ref": "#/components/schemas/DocPagesSetNameResponse"
                 }
               }
             }
@@ -3900,7 +3900,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocPagesSetName400Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3910,7 +3910,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocPagesSetName404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3920,7 +3920,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4002,7 +4002,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocPagesRemoveName200Response"
+                  "$ref": "#/components/schemas/DocPagesRemoveNameResponse"
                 }
               }
             }
@@ -4012,7 +4012,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocPagesRemoveName400Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4022,7 +4022,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocPagesRemoveName404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4032,7 +4032,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4114,7 +4114,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocRedactionsApply200Response"
+                  "$ref": "#/components/schemas/DocRedactionsApplyResponse"
                 }
               }
             }
@@ -4124,7 +4124,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocRedactionsApply400Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4134,7 +4134,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocRedactionsApply404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4144,7 +4144,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4230,7 +4230,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocRenderResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4240,7 +4240,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4304,7 +4304,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocSignaturesList200Response"
+                  "$ref": "#/components/schemas/DocSignaturesListResponse"
                 }
               }
             }
@@ -4314,7 +4314,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocSignaturesList404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4324,7 +4324,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4396,7 +4396,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocSignaturesCancel200Response"
+                  "$ref": "#/components/schemas/DocSignaturesCancelResponse"
                 }
               }
             }
@@ -4406,7 +4406,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocSignaturesCancel404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4416,7 +4416,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4499,7 +4499,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocSignaturesComplete200Response"
+                  "$ref": "#/components/schemas/DocSignaturesCompleteResponse"
                 }
               }
             }
@@ -4509,7 +4509,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocSignaturesComplete400Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4519,7 +4519,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocSignaturesComplete404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4529,7 +4529,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocSignaturesComplete409Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4539,7 +4539,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4630,7 +4630,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocSignaturesAnalysis200Response"
+                  "$ref": "#/components/schemas/DocSignaturesAnalysisResponse"
                 }
               }
             }
@@ -4640,7 +4640,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocSignaturesAnalysis400Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4650,7 +4650,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocSignaturesAnalysis404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4660,7 +4660,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4741,7 +4741,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocSignaturesPrepare200Response"
+                  "$ref": "#/components/schemas/DocSignaturesPrepareResponse"
                 }
               }
             }
@@ -4751,7 +4751,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocSignaturesPrepare400Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4761,7 +4761,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocSignaturesPrepare404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4771,7 +4771,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocSignaturesPrepare409Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4781,7 +4781,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4855,7 +4855,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocText200Response"
+                  "$ref": "#/components/schemas/DocTextResponse"
                 }
               }
             }
@@ -4865,7 +4865,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocText404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4875,7 +4875,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4939,7 +4939,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocVersionsList200Response"
+                  "$ref": "#/components/schemas/DocVersionsListResponse"
                 }
               }
             }
@@ -4949,7 +4949,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocVersionsList404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4959,7 +4959,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -5077,7 +5077,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocVersionsAnalysis200Response"
+                  "$ref": "#/components/schemas/DocVersionsAnalysisResponse"
                 }
               }
             }
@@ -5087,7 +5087,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocVersionsAnalysis400Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -5097,7 +5097,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocVersionsAnalysis404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -5107,7 +5107,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -5190,7 +5190,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocVersionsDownloadResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -5200,7 +5200,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -5292,7 +5292,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocVersionsRevisionResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -5302,7 +5302,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -5374,7 +5374,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocVersionsSignatures200Response"
+                  "$ref": "#/components/schemas/DocVersionsSignaturesResponse"
                 }
               }
             }
@@ -5384,7 +5384,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocVersionsSignatures404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -5394,7 +5394,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -5487,7 +5487,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocVersionsSignatureContentsResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -5497,7 +5497,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -5599,7 +5599,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocVersionsSignatureDigestResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -5609,7 +5609,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -5643,7 +5643,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GrantsExchange200Response"
+                  "$ref": "#/components/schemas/GrantsExchangeResponse"
                 }
               }
             }
@@ -5653,7 +5653,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GrantsExchange400Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -5663,7 +5663,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GrantsExchange403Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -5673,7 +5673,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GrantsExchange404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -5683,7 +5683,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GrantsExchange410Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -5693,7 +5693,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GrantsExchange422Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -5703,7 +5703,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -5740,7 +5740,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TenantsCreate200Response"
+                  "$ref": "#/components/schemas/TenantsCreateResponse"
                 }
               }
             }
@@ -5750,7 +5750,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TenantsCreate400Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -5760,7 +5760,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -5807,7 +5807,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TenantsList200Response"
+                  "$ref": "#/components/schemas/TenantsListResponse"
                 }
               }
             }
@@ -5817,7 +5817,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TenantsList400Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -5827,7 +5827,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -5865,7 +5865,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TenantsGet200Response"
+                  "$ref": "#/components/schemas/TenantsGetResponse"
                 }
               }
             }
@@ -5875,7 +5875,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TenantsGet404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -5885,7 +5885,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -5932,7 +5932,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TenantsUpdate200Response"
+                  "$ref": "#/components/schemas/TenantsUpdateResponse"
                 }
               }
             }
@@ -5942,7 +5942,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TenantsUpdate400Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -5952,7 +5952,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TenantsUpdate404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -5962,7 +5962,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -6002,7 +6002,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TenantsDeleteResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -6012,7 +6012,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -6125,7 +6125,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocumentsList200Response"
+                  "$ref": "#/components/schemas/DocumentsListResponse"
                 }
               }
             }
@@ -6135,7 +6135,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocumentsList400Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -6145,7 +6145,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -6195,7 +6195,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocumentsGet200Response"
+                  "$ref": "#/components/schemas/DocumentsGetResponse"
                 }
               }
             }
@@ -6205,7 +6205,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocumentsGet403Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -6215,7 +6215,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocumentsGet404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -6225,7 +6225,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -6284,7 +6284,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocumentsUpdate200Response"
+                  "$ref": "#/components/schemas/DocumentsUpdateResponse"
                 }
               }
             }
@@ -6294,7 +6294,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocumentsUpdate400Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -6304,7 +6304,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocumentsUpdate403Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -6314,7 +6314,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocumentsUpdate404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -6324,7 +6324,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -6375,7 +6375,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocumentsDelete403Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -6385,7 +6385,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocumentsDelete404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -6395,7 +6395,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -6459,7 +6459,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocumentsCommit200Response"
+                  "$ref": "#/components/schemas/DocumentsCommitResponse"
                 }
               }
             }
@@ -6469,7 +6469,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocumentsCommit400Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -6479,7 +6479,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocumentsCommit404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -6489,7 +6489,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -6551,7 +6551,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocumentsDownload403Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -6561,7 +6561,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocumentsDownload404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -6571,7 +6571,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -6650,7 +6650,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocumentsLayersList200Response"
+                  "$ref": "#/components/schemas/DocumentsLayersListResponse"
                 }
               }
             }
@@ -6660,7 +6660,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocumentsLayersList400Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -6670,7 +6670,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocumentsLayersList403Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -6680,7 +6680,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocumentsLayersList404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -6690,7 +6690,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -6753,7 +6753,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocumentsLayersDelete403Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -6763,7 +6763,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocumentsLayersDelete404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -6773,7 +6773,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocumentsLayersDelete409Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -6783,7 +6783,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -6851,7 +6851,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocumentsThumbnailResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -6861,7 +6861,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -6932,7 +6932,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocumentsUploadProxy200Response"
+                  "$ref": "#/components/schemas/DocumentsUploadProxyResponse"
                 }
               }
             }
@@ -6942,7 +6942,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocumentsUploadProxy400Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -6952,7 +6952,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocumentsUploadProxy404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -6962,7 +6962,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocumentsUploadProxy409Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -6972,7 +6972,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -7030,7 +7030,7 @@
             }
           },
           "202": {
-            "description": "Response",
+            "description": "Accepted",
             "content": {
               "application/json": {
                 "schema": {
@@ -7044,7 +7044,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocumentsImportFrom400Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -7054,17 +7054,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocumentsImportFrom403Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
           },
           "502": {
-            "description": "Response",
+            "description": "Bad gateway",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocumentsImportFrom502Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -7074,7 +7074,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -7129,7 +7129,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocumentsInit200Response"
+                  "$ref": "#/components/schemas/DocumentsInitResponse"
                 }
               }
             }
@@ -7139,7 +7139,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocumentsInit400Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -7149,7 +7149,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocumentsInit403Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -7159,7 +7159,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -7211,7 +7211,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FoldersCreate200Response"
+                  "$ref": "#/components/schemas/FoldersCreateResponse"
                 }
               }
             }
@@ -7221,7 +7221,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FoldersCreate400Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -7231,7 +7231,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FoldersCreate403Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -7241,7 +7241,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FoldersCreate404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -7251,7 +7251,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FoldersCreate409Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -7261,7 +7261,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -7330,7 +7330,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FoldersList200Response"
+                  "$ref": "#/components/schemas/FoldersListResponse"
                 }
               }
             }
@@ -7340,7 +7340,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FoldersList400Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -7350,7 +7350,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FoldersList403Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -7360,7 +7360,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FoldersList404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -7370,7 +7370,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -7420,7 +7420,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FoldersGet200Response"
+                  "$ref": "#/components/schemas/FoldersGetResponse"
                 }
               }
             }
@@ -7430,7 +7430,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FoldersGet403Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -7440,7 +7440,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FoldersGet404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -7450,7 +7450,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -7509,7 +7509,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FoldersUpdate200Response"
+                  "$ref": "#/components/schemas/FoldersUpdateResponse"
                 }
               }
             }
@@ -7519,7 +7519,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FoldersUpdate400Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -7529,7 +7529,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FoldersUpdate403Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -7539,7 +7539,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FoldersUpdate404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -7549,7 +7549,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FoldersUpdate409Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -7559,7 +7559,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -7620,7 +7620,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FoldersDelete403Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -7630,7 +7630,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FoldersDelete404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -7640,7 +7640,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FoldersDelete409Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -7650,7 +7650,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -7715,7 +7715,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FoldersMoveInto400Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -7725,7 +7725,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FoldersMoveInto403Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -7735,7 +7735,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FoldersMoveInto404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -7745,7 +7745,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FoldersMoveInto409Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -7755,7 +7755,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -7807,7 +7807,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GrantsCreate200Response"
+                  "$ref": "#/components/schemas/GrantsCreateResponse"
                 }
               }
             }
@@ -7817,7 +7817,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GrantsCreate400Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -7827,7 +7827,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GrantsCreate403Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -7837,7 +7837,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GrantsCreate404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -7847,7 +7847,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -7923,7 +7923,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GrantsList200Response"
+                  "$ref": "#/components/schemas/GrantsListResponse"
                 }
               }
             }
@@ -7933,7 +7933,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GrantsList400Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -7943,7 +7943,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -7993,7 +7993,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GrantsGet200Response"
+                  "$ref": "#/components/schemas/GrantsGetResponse"
                 }
               }
             }
@@ -8003,7 +8003,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GrantsGet404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -8013,7 +8013,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -8071,7 +8071,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GrantsUpdate200Response"
+                  "$ref": "#/components/schemas/GrantsUpdateResponse"
                 }
               }
             }
@@ -8081,7 +8081,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GrantsUpdate400Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -8091,7 +8091,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GrantsUpdate403Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -8101,7 +8101,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GrantsUpdate404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -8111,7 +8111,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GrantsUpdate409Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -8121,7 +8121,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -8172,7 +8172,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GrantsDelete404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -8182,7 +8182,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GrantsDelete409Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -8192,7 +8192,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -8243,7 +8243,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GrantsArchive200Response"
+                  "$ref": "#/components/schemas/GrantsArchiveResponse"
                 }
               }
             }
@@ -8253,7 +8253,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GrantsArchive404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -8263,7 +8263,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -8334,7 +8334,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GrantsVisitorsList200Response"
+                  "$ref": "#/components/schemas/GrantsVisitorsListResponse"
                 }
               }
             }
@@ -8344,7 +8344,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GrantsVisitorsList400Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -8354,7 +8354,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GrantsVisitorsList404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -8364,7 +8364,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -8427,7 +8427,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GrantsVisitorsDeleteResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -8437,7 +8437,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -8478,7 +8478,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TenantsResumeResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -8488,7 +8488,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -8540,7 +8540,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TenantsSuspendResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -8550,7 +8550,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -8602,7 +8602,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TokensIssue200Response"
+                  "$ref": "#/components/schemas/TokensIssueResponse"
                 }
               }
             }
@@ -8612,7 +8612,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TokensIssue400Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -8622,7 +8622,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TokensIssue403Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -8632,7 +8632,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TokensIssue404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -8642,7 +8642,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -8707,7 +8707,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TokensRevokeResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -8717,7 +8717,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -8786,7 +8786,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TenantsUsage200Response"
+                  "$ref": "#/components/schemas/TenantsUsageResponse"
                 }
               }
             }
@@ -8796,7 +8796,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TenantsUsage400Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -8806,7 +8806,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TenantsUsage404Response"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -8816,7 +8816,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminErrorPayload"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -8922,37 +8922,19 @@
       }
     },
     "schemas": {
-      "AdminErrorPayload": {
+      "ErrorResponse": {
         "type": "object",
         "properties": {
           "error": {
-            "type": "object",
-            "properties": {
-              "code": {
-                "type": "string"
-              },
-              "message": {
-                "type": "string"
-              },
-              "details": {
-                "type": "object",
-                "additionalProperties": {}
-              }
-            },
-            "required": ["code", "message"],
-            "additionalProperties": false
+            "$ref": "#/components/schemas/EngineError"
           }
         },
         "required": ["error"],
         "additionalProperties": false
       },
-      "EngineErrorPayload": {
+      "EngineError": {
         "type": "object",
         "properties": {
-          "name": {
-            "type": "string",
-            "enum": ["EngineError"]
-          },
           "code": {
             "type": "string",
             "enum": [
@@ -8985,7 +8967,21 @@
               "UndoUnavailable",
               "IdempotencyKeyReused",
               "LayerDeleted",
-              "VisitorIdentityRequired"
+              "VisitorIdentityRequired",
+              "Conflict",
+              "EngineBusy",
+              "EngineRestarting",
+              "DocumentQuarantined",
+              "ThumbnailNotReady",
+              "TooManyRequests",
+              "GrantExpired",
+              "OriginRequired",
+              "OriginNotAllowed",
+              "FeatureNotEnabled",
+              "FeatureStopped",
+              "LicenseInvalid",
+              "LicenseUsageLimit",
+              "UpstreamError"
             ],
             "description": "Why the request failed. A newer server can add codes: read one your client doesn't know as `Unknown`."
           },
@@ -8994,10 +8990,11 @@
           },
           "details": {
             "type": "object",
-            "additionalProperties": {}
+            "additionalProperties": {},
+            "description": "What a code carries besides its message, as each code says."
           }
         },
-        "required": ["name", "code", "message"],
+        "required": ["code", "message"],
         "additionalProperties": false
       },
       "TenantFeature": {
@@ -26229,7 +26226,7 @@
         "required": ["id"],
         "additionalProperties": false
       },
-      "TenantsCreate200Response": {
+      "TenantsCreateResponse": {
         "type": "object",
         "properties": {
           "tenant": {
@@ -26255,7 +26252,7 @@
                 }
               },
               "createdAt": {
-                "type": "number"
+                "type": "integer"
               }
             },
             "required": ["id", "name", "autoProvisioned", "createdAt"],
@@ -26268,10 +26265,7 @@
         "required": ["tenant", "created"],
         "additionalProperties": false
       },
-      "TenantsCreate400Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "TenantsList200Response": {
+      "TenantsListResponse": {
         "type": "object",
         "properties": {
           "tenants": {
@@ -26299,7 +26293,7 @@
                   }
                 },
                 "createdAt": {
-                  "type": "number"
+                  "type": "integer"
                 }
               },
               "required": ["id", "name", "autoProvisioned", "createdAt"],
@@ -26311,13 +26305,10 @@
             "nullable": true
           }
         },
-        "required": ["tenants"],
+        "required": ["tenants", "nextCursor"],
         "additionalProperties": false
       },
-      "TenantsList400Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "TenantsGet200Response": {
+      "TenantsGetResponse": {
         "type": "object",
         "properties": {
           "tenant": {
@@ -26343,7 +26334,7 @@
                 }
               },
               "createdAt": {
-                "type": "number"
+                "type": "integer"
               }
             },
             "required": ["id", "name", "autoProvisioned", "createdAt"],
@@ -26352,9 +26343,6 @@
         },
         "required": ["tenant"],
         "additionalProperties": false
-      },
-      "TenantsGet404Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
       },
       "TenantsUpdateRequest": {
         "type": "object",
@@ -26370,7 +26358,7 @@
         "required": ["features"],
         "additionalProperties": false
       },
-      "TenantsUpdate200Response": {
+      "TenantsUpdateResponse": {
         "type": "object",
         "properties": {
           "tenant": {
@@ -26396,7 +26384,7 @@
                 }
               },
               "createdAt": {
-                "type": "number"
+                "type": "integer"
               }
             },
             "required": ["id", "name", "autoProvisioned", "createdAt"],
@@ -26406,20 +26394,11 @@
         "required": ["tenant"],
         "additionalProperties": false
       },
-      "TenantsUpdate400Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "TenantsUpdate404Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "TenantsDeleteResponse": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
       "DocumentsInitRequest": {
         "type": "object",
         "properties": {
           "contentLength": {
-            "type": "number",
+            "type": "integer",
             "minimum": 1
           },
           "contentSha256": {
@@ -26455,7 +26434,7 @@
             "pattern": "^[A-Za-z0-9_-]+$"
           },
           "uploadTtlSec": {
-            "type": "number",
+            "type": "integer",
             "minimum": 60,
             "maximum": 3600
           },
@@ -26467,7 +26446,7 @@
         "required": ["contentLength", "contentSha256"],
         "additionalProperties": false
       },
-      "DocumentsInit200Response": {
+      "DocumentsInitResponse": {
         "anyOf": [
           {
             "type": "object",
@@ -26501,7 +26480,7 @@
                     "nullable": true
                   },
                   "storageSizeBytes": {
-                    "type": "number",
+                    "type": "integer",
                     "nullable": true
                   },
                   "metadata": {
@@ -26526,10 +26505,10 @@
                     "nullable": true
                   },
                   "createdAt": {
-                    "type": "number"
+                    "type": "integer"
                   },
                   "updatedAt": {
-                    "type": "number"
+                    "type": "integer"
                   },
                   "createdBy": {
                     "type": "string",
@@ -26547,6 +26526,8 @@
                   "metadata",
                   "idempotencyKey",
                   "failureReason",
+                  "thumbnailState",
+                  "thumbnailUrl",
                   "createdAt",
                   "updatedAt",
                   "createdBy"
@@ -26579,7 +26560,7 @@
                             "enum": ["PUT"]
                           },
                           "expiresAt": {
-                            "type": "number"
+                            "type": "integer"
                           }
                         },
                         "required": ["url", "headers", "method", "expiresAt"],
@@ -26623,10 +26604,10 @@
                 "enum": ["resumed"]
               },
               "document": {
-                "$ref": "#/components/schemas/DocumentsInit200Response/anyOf/0/properties/document"
+                "$ref": "#/components/schemas/DocumentsInitResponse/anyOf/0/properties/document"
               },
               "upload": {
-                "$ref": "#/components/schemas/DocumentsInit200Response/anyOf/0/properties/upload"
+                "$ref": "#/components/schemas/DocumentsInitResponse/anyOf/0/properties/upload"
               }
             },
             "required": ["tag", "document", "upload"],
@@ -26640,19 +26621,13 @@
                 "enum": ["deduped"]
               },
               "document": {
-                "$ref": "#/components/schemas/DocumentsInit200Response/anyOf/0/properties/document"
+                "$ref": "#/components/schemas/DocumentsInitResponse/anyOf/0/properties/document"
               }
             },
             "required": ["tag", "document"],
             "additionalProperties": false
           }
         ]
-      },
-      "DocumentsInit400Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "DocumentsInit403Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
       },
       "DocumentsCommitRequest": {
         "type": "object",
@@ -26665,7 +26640,7 @@
         "required": ["sha256"],
         "additionalProperties": false
       },
-      "DocumentsCommit200Response": {
+      "DocumentsCommitResponse": {
         "type": "object",
         "properties": {
           "document": {
@@ -26693,7 +26668,7 @@
                 "nullable": true
               },
               "storageSizeBytes": {
-                "type": "number",
+                "type": "integer",
                 "nullable": true
               },
               "metadata": {
@@ -26718,10 +26693,10 @@
                 "nullable": true
               },
               "createdAt": {
-                "type": "number"
+                "type": "integer"
               },
               "updatedAt": {
-                "type": "number"
+                "type": "integer"
               },
               "createdBy": {
                 "type": "string",
@@ -26739,6 +26714,8 @@
               "metadata",
               "idempotencyKey",
               "failureReason",
+              "thumbnailState",
+              "thumbnailUrl",
               "createdAt",
               "updatedAt",
               "createdBy"
@@ -26749,13 +26726,7 @@
         "required": ["document"],
         "additionalProperties": false
       },
-      "DocumentsCommit400Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "DocumentsCommit404Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "DocumentsUploadProxy200Response": {
+      "DocumentsUploadProxyResponse": {
         "type": "object",
         "properties": {
           "sha256": {
@@ -26765,15 +26736,6 @@
         },
         "required": ["sha256"],
         "additionalProperties": false
-      },
-      "DocumentsUploadProxy400Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "DocumentsUploadProxy404Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "DocumentsUploadProxy409Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
       },
       "DocumentsImportFromRequest": {
         "type": "object",
@@ -26917,7 +26879,7 @@
                 "nullable": true
               },
               "storageSizeBytes": {
-                "type": "number",
+                "type": "integer",
                 "nullable": true
               },
               "metadata": {
@@ -26942,10 +26904,10 @@
                 "nullable": true
               },
               "createdAt": {
-                "type": "number"
+                "type": "integer"
               },
               "updatedAt": {
-                "type": "number"
+                "type": "integer"
               },
               "createdBy": {
                 "type": "string",
@@ -26963,6 +26925,8 @@
               "metadata",
               "idempotencyKey",
               "failureReason",
+              "thumbnailState",
+              "thumbnailUrl",
               "createdAt",
               "updatedAt",
               "createdBy"
@@ -27005,7 +26969,7 @@
                 "nullable": true
               },
               "storageSizeBytes": {
-                "type": "number",
+                "type": "integer",
                 "nullable": true
               },
               "metadata": {
@@ -27030,10 +26994,10 @@
                 "nullable": true
               },
               "createdAt": {
-                "type": "number"
+                "type": "integer"
               },
               "updatedAt": {
-                "type": "number"
+                "type": "integer"
               },
               "createdBy": {
                 "type": "string",
@@ -27051,6 +27015,8 @@
               "metadata",
               "idempotencyKey",
               "failureReason",
+              "thumbnailState",
+              "thumbnailUrl",
               "createdAt",
               "updatedAt",
               "createdBy"
@@ -27061,16 +27027,7 @@
         "required": ["tag", "document"],
         "additionalProperties": false
       },
-      "DocumentsImportFrom400Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "DocumentsImportFrom403Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "DocumentsImportFrom502Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "DocumentsList200Response": {
+      "DocumentsListResponse": {
         "type": "object",
         "properties": {
           "documents": {
@@ -27100,7 +27057,7 @@
                   "nullable": true
                 },
                 "storageSizeBytes": {
-                  "type": "number",
+                  "type": "integer",
                   "nullable": true
                 },
                 "metadata": {
@@ -27125,10 +27082,10 @@
                   "nullable": true
                 },
                 "createdAt": {
-                  "type": "number"
+                  "type": "integer"
                 },
                 "updatedAt": {
-                  "type": "number"
+                  "type": "integer"
                 },
                 "createdBy": {
                   "type": "string",
@@ -27146,6 +27103,8 @@
                 "metadata",
                 "idempotencyKey",
                 "failureReason",
+                "thumbnailState",
+                "thumbnailUrl",
                 "createdAt",
                 "updatedAt",
                 "createdBy"
@@ -27158,13 +27117,10 @@
             "nullable": true
           }
         },
-        "required": ["documents"],
+        "required": ["documents", "nextCursor"],
         "additionalProperties": false
       },
-      "DocumentsList400Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "DocumentsGet200Response": {
+      "DocumentsGetResponse": {
         "type": "object",
         "properties": {
           "document": {
@@ -27192,7 +27148,7 @@
                 "nullable": true
               },
               "storageSizeBytes": {
-                "type": "number",
+                "type": "integer",
                 "nullable": true
               },
               "metadata": {
@@ -27217,10 +27173,10 @@
                 "nullable": true
               },
               "createdAt": {
-                "type": "number"
+                "type": "integer"
               },
               "updatedAt": {
-                "type": "number"
+                "type": "integer"
               },
               "createdBy": {
                 "type": "string",
@@ -27238,6 +27194,8 @@
               "metadata",
               "idempotencyKey",
               "failureReason",
+              "thumbnailState",
+              "thumbnailUrl",
               "createdAt",
               "updatedAt",
               "createdBy"
@@ -27247,12 +27205,6 @@
         },
         "required": ["document"],
         "additionalProperties": false
-      },
-      "DocumentsGet403Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "DocumentsGet404Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
       },
       "DocumentsUpdateRequest": {
         "type": "object",
@@ -27268,7 +27220,7 @@
         "required": ["name"],
         "additionalProperties": false
       },
-      "DocumentsUpdate200Response": {
+      "DocumentsUpdateResponse": {
         "type": "object",
         "properties": {
           "document": {
@@ -27296,7 +27248,7 @@
                 "nullable": true
               },
               "storageSizeBytes": {
-                "type": "number",
+                "type": "integer",
                 "nullable": true
               },
               "metadata": {
@@ -27321,10 +27273,10 @@
                 "nullable": true
               },
               "createdAt": {
-                "type": "number"
+                "type": "integer"
               },
               "updatedAt": {
-                "type": "number"
+                "type": "integer"
               },
               "createdBy": {
                 "type": "string",
@@ -27342,6 +27294,8 @@
               "metadata",
               "idempotencyKey",
               "failureReason",
+              "thumbnailState",
+              "thumbnailUrl",
               "createdAt",
               "updatedAt",
               "createdBy"
@@ -27352,28 +27306,7 @@
         "required": ["document"],
         "additionalProperties": false
       },
-      "DocumentsUpdate400Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "DocumentsUpdate403Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "DocumentsUpdate404Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "DocumentsDownload403Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "DocumentsDownload404Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "DocumentsDelete403Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "DocumentsDelete404Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "DocumentsLayersList200Response": {
+      "DocumentsLayersListResponse": {
         "type": "object",
         "properties": {
           "layers": {
@@ -27396,17 +27329,17 @@
                   "nullable": true
                 },
                 "storageSizeBytes": {
-                  "type": "number",
+                  "type": "integer",
                   "nullable": true
                 },
                 "createdAt": {
-                  "type": "number"
+                  "type": "integer"
                 },
                 "updatedAt": {
-                  "type": "number"
+                  "type": "integer"
                 },
                 "lastSeenAt": {
-                  "type": "number",
+                  "type": "integer",
                   "nullable": true
                 }
               },
@@ -27428,48 +27361,7 @@
             "nullable": true
           }
         },
-        "required": ["layers"],
-        "additionalProperties": false
-      },
-      "DocumentsLayersList400Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "DocumentsLayersList403Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "DocumentsLayersList404Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "DocumentsLayersDelete403Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "DocumentsLayersDelete404Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "DocumentsLayersDelete409Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "DocumentsThumbnailResponse": {
-        "type": "object",
-        "properties": {
-          "error": {
-            "type": "object",
-            "properties": {
-              "code": {
-                "type": "string"
-              },
-              "message": {
-                "type": "string"
-              },
-              "state": {
-                "type": "string"
-              }
-            },
-            "required": ["code", "message", "state"],
-            "additionalProperties": false
-          }
-        },
-        "required": ["error"],
+        "required": ["layers", "nextCursor"],
         "additionalProperties": false
       },
       "FoldersCreateRequest": {
@@ -27491,7 +27383,7 @@
         "required": ["name"],
         "additionalProperties": false
       },
-      "FoldersCreate200Response": {
+      "FoldersCreateResponse": {
         "type": "object",
         "properties": {
           "folder": {
@@ -27511,10 +27403,10 @@
                 "type": "string"
               },
               "createdAt": {
-                "type": "number"
+                "type": "integer"
               },
               "updatedAt": {
-                "type": "number"
+                "type": "integer"
               },
               "createdBy": {
                 "type": "string",
@@ -27536,19 +27428,7 @@
         "required": ["folder"],
         "additionalProperties": false
       },
-      "FoldersCreate400Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "FoldersCreate403Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "FoldersCreate404Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "FoldersCreate409Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "FoldersList200Response": {
+      "FoldersListResponse": {
         "type": "object",
         "properties": {
           "folders": {
@@ -27570,10 +27450,10 @@
                   "type": "string"
                 },
                 "createdAt": {
-                  "type": "number"
+                  "type": "integer"
                 },
                 "updatedAt": {
-                  "type": "number"
+                  "type": "integer"
                 },
                 "createdBy": {
                   "type": "string",
@@ -27600,16 +27480,7 @@
         "required": ["folders", "nextCursor"],
         "additionalProperties": false
       },
-      "FoldersList400Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "FoldersList403Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "FoldersList404Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "FoldersGet200Response": {
+      "FoldersGetResponse": {
         "type": "object",
         "properties": {
           "folder": {
@@ -27629,10 +27500,10 @@
                 "type": "string"
               },
               "createdAt": {
-                "type": "number"
+                "type": "integer"
               },
               "updatedAt": {
-                "type": "number"
+                "type": "integer"
               },
               "createdBy": {
                 "type": "string",
@@ -27671,12 +27542,6 @@
         "required": ["folder", "path"],
         "additionalProperties": false
       },
-      "FoldersGet403Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "FoldersGet404Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
       "FoldersUpdateRequest": {
         "type": "object",
         "properties": {
@@ -27691,7 +27556,7 @@
         "required": ["name"],
         "additionalProperties": false
       },
-      "FoldersUpdate200Response": {
+      "FoldersUpdateResponse": {
         "type": "object",
         "properties": {
           "folder": {
@@ -27711,10 +27576,10 @@
                 "type": "string"
               },
               "createdAt": {
-                "type": "number"
+                "type": "integer"
               },
               "updatedAt": {
-                "type": "number"
+                "type": "integer"
               },
               "createdBy": {
                 "type": "string",
@@ -27735,18 +27600,6 @@
         },
         "required": ["folder"],
         "additionalProperties": false
-      },
-      "FoldersUpdate400Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "FoldersUpdate403Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "FoldersUpdate404Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "FoldersUpdate409Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
       },
       "FoldersMoveIntoRequest": {
         "type": "object",
@@ -27770,38 +27623,25 @@
         },
         "additionalProperties": false
       },
-      "FoldersMoveInto400Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "FoldersMoveInto403Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "FoldersMoveInto404Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "FoldersMoveInto409Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "FoldersDelete403Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "FoldersDelete404Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "FoldersDelete409Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
       "DeploymentLicenseStatusResponse": {
         "type": "object",
         "properties": {
-          "license": {},
+          "license": {
+            "type": "object",
+            "additionalProperties": {}
+          },
           "reporting": {
+            "type": "object",
+            "additionalProperties": {},
             "nullable": true
           },
           "usage": {
+            "type": "object",
+            "additionalProperties": {},
             "nullable": true
           }
         },
+        "required": ["license", "reporting", "usage"],
         "additionalProperties": false
       },
       "DeploymentModulesResponse": {
@@ -27947,7 +27787,7 @@
           }
         ]
       },
-      "TokensIssue200Response": {
+      "TokensIssueResponse": {
         "type": "object",
         "properties": {
           "token": {
@@ -27957,20 +27797,11 @@
             "type": "string"
           },
           "expiresAt": {
-            "type": "number"
+            "type": "integer"
           }
         },
         "required": ["token", "jti", "expiresAt"],
         "additionalProperties": false
-      },
-      "TokensIssue400Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "TokensIssue403Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "TokensIssue404Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
       },
       "TokensRevokeRequest": {
         "type": "object",
@@ -27987,10 +27818,7 @@
         },
         "additionalProperties": false
       },
-      "TokensRevokeResponse": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "TenantsUsage200Response": {
+      "TenantsUsageResponse": {
         "type": "object",
         "properties": {
           "tenantId": {
@@ -28006,29 +27834,23 @@
             "type": "object",
             "properties": {
               "pdf.views": {
-                "type": "number"
+                "type": "integer"
               },
               "pdf.uploads": {
-                "type": "number"
+                "type": "integer"
               },
               "storage.bytes": {
-                "type": "number"
+                "type": "integer"
               }
             },
             "required": ["pdf.views", "pdf.uploads", "storage.bytes"],
             "additionalProperties": {
-              "type": "number"
+              "type": "integer"
             }
           }
         },
         "required": ["tenantId", "periodStart", "periodEnd", "metrics"],
         "additionalProperties": false
-      },
-      "TenantsUsage400Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "TenantsUsage404Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
       },
       "TenantsSuspendRequest": {
         "type": "object",
@@ -28039,12 +27861,6 @@
           }
         },
         "additionalProperties": false
-      },
-      "TenantsSuspendResponse": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "TenantsResumeResponse": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
       },
       "GrantsCreateRequest": {
         "type": "object",
@@ -28168,7 +27984,7 @@
         "required": ["docId", "scope"],
         "additionalProperties": false
       },
-      "GrantsCreate200Response": {
+      "GrantsCreateResponse": {
         "type": "object",
         "properties": {
           "grant": {
@@ -28199,7 +28015,7 @@
                 "type": "boolean"
               },
               "visitorIdleSeconds": {
-                "type": "number",
+                "type": "integer",
                 "nullable": true
               },
               "visitorIdentity": {
@@ -28213,16 +28029,16 @@
                         "enum": ["required", "optional"]
                       },
                       "email": {
-                        "$ref": "#/components/schemas/GrantsCreate200Response/properties/grant/properties/visitorIdentity/properties/fields/properties/displayName"
+                        "$ref": "#/components/schemas/GrantsCreateResponse/properties/grant/properties/visitorIdentity/properties/fields/properties/displayName"
                       },
                       "title": {
-                        "$ref": "#/components/schemas/GrantsCreate200Response/properties/grant/properties/visitorIdentity/properties/fields/properties/displayName"
+                        "$ref": "#/components/schemas/GrantsCreateResponse/properties/grant/properties/visitorIdentity/properties/fields/properties/displayName"
                       },
                       "organization": {
-                        "$ref": "#/components/schemas/GrantsCreate200Response/properties/grant/properties/visitorIdentity/properties/fields/properties/displayName"
+                        "$ref": "#/components/schemas/GrantsCreateResponse/properties/grant/properties/visitorIdentity/properties/fields/properties/displayName"
                       },
                       "organizationalUnit": {
-                        "$ref": "#/components/schemas/GrantsCreate200Response/properties/grant/properties/visitorIdentity/properties/fields/properties/displayName"
+                        "$ref": "#/components/schemas/GrantsCreateResponse/properties/grant/properties/visitorIdentity/properties/fields/properties/displayName"
                       }
                     },
                     "additionalProperties": false
@@ -28271,34 +28087,34 @@
                 "type": "boolean"
               },
               "sessionTtlSeconds": {
-                "type": "number"
+                "type": "integer"
               },
               "disabled": {
                 "type": "boolean"
               },
               "archivedAt": {
-                "type": "number",
+                "type": "integer",
                 "nullable": true
               },
               "expiresAt": {
-                "type": "number",
+                "type": "integer",
                 "nullable": true
               },
               "exchangeCount": {
-                "type": "number"
+                "type": "integer"
               },
               "lastExchangedAt": {
-                "type": "number",
+                "type": "integer",
                 "nullable": true
               },
               "createdBy": {
                 "type": "string"
               },
               "createdAt": {
-                "type": "number"
+                "type": "integer"
               },
               "updatedAt": {
-                "type": "number"
+                "type": "integer"
               }
             },
             "required": [
@@ -28331,16 +28147,7 @@
         "required": ["grant"],
         "additionalProperties": false
       },
-      "GrantsCreate400Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "GrantsCreate403Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "GrantsCreate404Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "GrantsList200Response": {
+      "GrantsListResponse": {
         "type": "object",
         "properties": {
           "grants": {
@@ -28373,7 +28180,7 @@
                   "type": "boolean"
                 },
                 "visitorIdleSeconds": {
-                  "type": "number",
+                  "type": "integer",
                   "nullable": true
                 },
                 "visitorIdentity": {
@@ -28387,16 +28194,16 @@
                           "enum": ["required", "optional"]
                         },
                         "email": {
-                          "$ref": "#/components/schemas/GrantsList200Response/properties/grants/items/properties/visitorIdentity/properties/fields/properties/displayName"
+                          "$ref": "#/components/schemas/GrantsListResponse/properties/grants/items/properties/visitorIdentity/properties/fields/properties/displayName"
                         },
                         "title": {
-                          "$ref": "#/components/schemas/GrantsList200Response/properties/grants/items/properties/visitorIdentity/properties/fields/properties/displayName"
+                          "$ref": "#/components/schemas/GrantsListResponse/properties/grants/items/properties/visitorIdentity/properties/fields/properties/displayName"
                         },
                         "organization": {
-                          "$ref": "#/components/schemas/GrantsList200Response/properties/grants/items/properties/visitorIdentity/properties/fields/properties/displayName"
+                          "$ref": "#/components/schemas/GrantsListResponse/properties/grants/items/properties/visitorIdentity/properties/fields/properties/displayName"
                         },
                         "organizationalUnit": {
-                          "$ref": "#/components/schemas/GrantsList200Response/properties/grants/items/properties/visitorIdentity/properties/fields/properties/displayName"
+                          "$ref": "#/components/schemas/GrantsListResponse/properties/grants/items/properties/visitorIdentity/properties/fields/properties/displayName"
                         }
                       },
                       "additionalProperties": false
@@ -28445,34 +28252,34 @@
                   "type": "boolean"
                 },
                 "sessionTtlSeconds": {
-                  "type": "number"
+                  "type": "integer"
                 },
                 "disabled": {
                   "type": "boolean"
                 },
                 "archivedAt": {
-                  "type": "number",
+                  "type": "integer",
                   "nullable": true
                 },
                 "expiresAt": {
-                  "type": "number",
+                  "type": "integer",
                   "nullable": true
                 },
                 "exchangeCount": {
-                  "type": "number"
+                  "type": "integer"
                 },
                 "lastExchangedAt": {
-                  "type": "number",
+                  "type": "integer",
                   "nullable": true
                 },
                 "createdBy": {
                   "type": "string"
                 },
                 "createdAt": {
-                  "type": "number"
+                  "type": "integer"
                 },
                 "updatedAt": {
-                  "type": "number"
+                  "type": "integer"
                 }
               },
               "required": [
@@ -28507,13 +28314,10 @@
             "nullable": true
           }
         },
-        "required": ["grants"],
+        "required": ["grants", "nextCursor"],
         "additionalProperties": false
       },
-      "GrantsList400Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "GrantsGet200Response": {
+      "GrantsGetResponse": {
         "type": "object",
         "properties": {
           "grant": {
@@ -28544,7 +28348,7 @@
                 "type": "boolean"
               },
               "visitorIdleSeconds": {
-                "type": "number",
+                "type": "integer",
                 "nullable": true
               },
               "visitorIdentity": {
@@ -28558,16 +28362,16 @@
                         "enum": ["required", "optional"]
                       },
                       "email": {
-                        "$ref": "#/components/schemas/GrantsGet200Response/properties/grant/properties/visitorIdentity/properties/fields/properties/displayName"
+                        "$ref": "#/components/schemas/GrantsGetResponse/properties/grant/properties/visitorIdentity/properties/fields/properties/displayName"
                       },
                       "title": {
-                        "$ref": "#/components/schemas/GrantsGet200Response/properties/grant/properties/visitorIdentity/properties/fields/properties/displayName"
+                        "$ref": "#/components/schemas/GrantsGetResponse/properties/grant/properties/visitorIdentity/properties/fields/properties/displayName"
                       },
                       "organization": {
-                        "$ref": "#/components/schemas/GrantsGet200Response/properties/grant/properties/visitorIdentity/properties/fields/properties/displayName"
+                        "$ref": "#/components/schemas/GrantsGetResponse/properties/grant/properties/visitorIdentity/properties/fields/properties/displayName"
                       },
                       "organizationalUnit": {
-                        "$ref": "#/components/schemas/GrantsGet200Response/properties/grant/properties/visitorIdentity/properties/fields/properties/displayName"
+                        "$ref": "#/components/schemas/GrantsGetResponse/properties/grant/properties/visitorIdentity/properties/fields/properties/displayName"
                       }
                     },
                     "additionalProperties": false
@@ -28616,34 +28420,34 @@
                 "type": "boolean"
               },
               "sessionTtlSeconds": {
-                "type": "number"
+                "type": "integer"
               },
               "disabled": {
                 "type": "boolean"
               },
               "archivedAt": {
-                "type": "number",
+                "type": "integer",
                 "nullable": true
               },
               "expiresAt": {
-                "type": "number",
+                "type": "integer",
                 "nullable": true
               },
               "exchangeCount": {
-                "type": "number"
+                "type": "integer"
               },
               "lastExchangedAt": {
-                "type": "number",
+                "type": "integer",
                 "nullable": true
               },
               "createdBy": {
                 "type": "string"
               },
               "createdAt": {
-                "type": "number"
+                "type": "integer"
               },
               "updatedAt": {
-                "type": "number"
+                "type": "integer"
               }
             },
             "required": [
@@ -28675,9 +28479,6 @@
         },
         "required": ["grant"],
         "additionalProperties": false
-      },
-      "GrantsGet404Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
       },
       "GrantsUpdateRequest": {
         "type": "object",
@@ -28802,7 +28603,7 @@
         },
         "additionalProperties": false
       },
-      "GrantsUpdate200Response": {
+      "GrantsUpdateResponse": {
         "type": "object",
         "properties": {
           "grant": {
@@ -28833,7 +28634,7 @@
                 "type": "boolean"
               },
               "visitorIdleSeconds": {
-                "type": "number",
+                "type": "integer",
                 "nullable": true
               },
               "visitorIdentity": {
@@ -28847,16 +28648,16 @@
                         "enum": ["required", "optional"]
                       },
                       "email": {
-                        "$ref": "#/components/schemas/GrantsUpdate200Response/properties/grant/properties/visitorIdentity/properties/fields/properties/displayName"
+                        "$ref": "#/components/schemas/GrantsUpdateResponse/properties/grant/properties/visitorIdentity/properties/fields/properties/displayName"
                       },
                       "title": {
-                        "$ref": "#/components/schemas/GrantsUpdate200Response/properties/grant/properties/visitorIdentity/properties/fields/properties/displayName"
+                        "$ref": "#/components/schemas/GrantsUpdateResponse/properties/grant/properties/visitorIdentity/properties/fields/properties/displayName"
                       },
                       "organization": {
-                        "$ref": "#/components/schemas/GrantsUpdate200Response/properties/grant/properties/visitorIdentity/properties/fields/properties/displayName"
+                        "$ref": "#/components/schemas/GrantsUpdateResponse/properties/grant/properties/visitorIdentity/properties/fields/properties/displayName"
                       },
                       "organizationalUnit": {
-                        "$ref": "#/components/schemas/GrantsUpdate200Response/properties/grant/properties/visitorIdentity/properties/fields/properties/displayName"
+                        "$ref": "#/components/schemas/GrantsUpdateResponse/properties/grant/properties/visitorIdentity/properties/fields/properties/displayName"
                       }
                     },
                     "additionalProperties": false
@@ -28905,34 +28706,34 @@
                 "type": "boolean"
               },
               "sessionTtlSeconds": {
-                "type": "number"
+                "type": "integer"
               },
               "disabled": {
                 "type": "boolean"
               },
               "archivedAt": {
-                "type": "number",
+                "type": "integer",
                 "nullable": true
               },
               "expiresAt": {
-                "type": "number",
+                "type": "integer",
                 "nullable": true
               },
               "exchangeCount": {
-                "type": "number"
+                "type": "integer"
               },
               "lastExchangedAt": {
-                "type": "number",
+                "type": "integer",
                 "nullable": true
               },
               "createdBy": {
                 "type": "string"
               },
               "createdAt": {
-                "type": "number"
+                "type": "integer"
               },
               "updatedAt": {
-                "type": "number"
+                "type": "integer"
               }
             },
             "required": [
@@ -28965,19 +28766,7 @@
         "required": ["grant"],
         "additionalProperties": false
       },
-      "GrantsUpdate400Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "GrantsUpdate403Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "GrantsUpdate404Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "GrantsUpdate409Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "GrantsArchive200Response": {
+      "GrantsArchiveResponse": {
         "type": "object",
         "properties": {
           "grant": {
@@ -29008,7 +28797,7 @@
                 "type": "boolean"
               },
               "visitorIdleSeconds": {
-                "type": "number",
+                "type": "integer",
                 "nullable": true
               },
               "visitorIdentity": {
@@ -29022,16 +28811,16 @@
                         "enum": ["required", "optional"]
                       },
                       "email": {
-                        "$ref": "#/components/schemas/GrantsArchive200Response/properties/grant/properties/visitorIdentity/properties/fields/properties/displayName"
+                        "$ref": "#/components/schemas/GrantsArchiveResponse/properties/grant/properties/visitorIdentity/properties/fields/properties/displayName"
                       },
                       "title": {
-                        "$ref": "#/components/schemas/GrantsArchive200Response/properties/grant/properties/visitorIdentity/properties/fields/properties/displayName"
+                        "$ref": "#/components/schemas/GrantsArchiveResponse/properties/grant/properties/visitorIdentity/properties/fields/properties/displayName"
                       },
                       "organization": {
-                        "$ref": "#/components/schemas/GrantsArchive200Response/properties/grant/properties/visitorIdentity/properties/fields/properties/displayName"
+                        "$ref": "#/components/schemas/GrantsArchiveResponse/properties/grant/properties/visitorIdentity/properties/fields/properties/displayName"
                       },
                       "organizationalUnit": {
-                        "$ref": "#/components/schemas/GrantsArchive200Response/properties/grant/properties/visitorIdentity/properties/fields/properties/displayName"
+                        "$ref": "#/components/schemas/GrantsArchiveResponse/properties/grant/properties/visitorIdentity/properties/fields/properties/displayName"
                       }
                     },
                     "additionalProperties": false
@@ -29080,34 +28869,34 @@
                 "type": "boolean"
               },
               "sessionTtlSeconds": {
-                "type": "number"
+                "type": "integer"
               },
               "disabled": {
                 "type": "boolean"
               },
               "archivedAt": {
-                "type": "number",
+                "type": "integer",
                 "nullable": true
               },
               "expiresAt": {
-                "type": "number",
+                "type": "integer",
                 "nullable": true
               },
               "exchangeCount": {
-                "type": "number"
+                "type": "integer"
               },
               "lastExchangedAt": {
-                "type": "number",
+                "type": "integer",
                 "nullable": true
               },
               "createdBy": {
                 "type": "string"
               },
               "createdAt": {
-                "type": "number"
+                "type": "integer"
               },
               "updatedAt": {
-                "type": "number"
+                "type": "integer"
               }
             },
             "required": [
@@ -29140,10 +28929,7 @@
         "required": ["grant"],
         "additionalProperties": false
       },
-      "GrantsArchive404Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "GrantsVisitorsList200Response": {
+      "GrantsVisitorsListResponse": {
         "type": "object",
         "properties": {
           "visitors": {
@@ -29184,14 +28970,14 @@
                   "type": "boolean"
                 },
                 "consentedAt": {
-                  "type": "number",
+                  "type": "integer",
                   "nullable": true
                 },
                 "firstSeenAt": {
-                  "type": "number"
+                  "type": "integer"
                 },
                 "lastSeenAt": {
-                  "type": "number"
+                  "type": "integer"
                 },
                 "layer": {
                   "type": "object",
@@ -29200,7 +28986,7 @@
                       "type": "string"
                     },
                     "storageSizeBytes": {
-                      "type": "number",
+                      "type": "integer",
                       "nullable": true
                     }
                   },
@@ -29226,23 +29012,8 @@
             "nullable": true
           }
         },
-        "required": ["visitors"],
+        "required": ["visitors", "nextCursor"],
         "additionalProperties": false
-      },
-      "GrantsVisitorsList400Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "GrantsVisitorsList404Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "GrantsVisitorsDeleteResponse": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "GrantsDelete404Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "GrantsDelete409Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
       },
       "GrantsExchangeRequest": {
         "type": "object",
@@ -29294,7 +29065,7 @@
         "required": ["grant"],
         "additionalProperties": false
       },
-      "GrantsExchange200Response": {
+      "GrantsExchangeResponse": {
         "type": "object",
         "properties": {
           "token": {
@@ -29330,16 +29101,16 @@
                         "enum": ["required", "optional"]
                       },
                       "email": {
-                        "$ref": "#/components/schemas/GrantsExchange200Response/properties/visitor/properties/identityRequest/properties/fields/properties/displayName"
+                        "$ref": "#/components/schemas/GrantsExchangeResponse/properties/visitor/properties/identityRequest/properties/fields/properties/displayName"
                       },
                       "title": {
-                        "$ref": "#/components/schemas/GrantsExchange200Response/properties/visitor/properties/identityRequest/properties/fields/properties/displayName"
+                        "$ref": "#/components/schemas/GrantsExchangeResponse/properties/visitor/properties/identityRequest/properties/fields/properties/displayName"
                       },
                       "organization": {
-                        "$ref": "#/components/schemas/GrantsExchange200Response/properties/visitor/properties/identityRequest/properties/fields/properties/displayName"
+                        "$ref": "#/components/schemas/GrantsExchangeResponse/properties/visitor/properties/identityRequest/properties/fields/properties/displayName"
                       },
                       "organizationalUnit": {
-                        "$ref": "#/components/schemas/GrantsExchange200Response/properties/visitor/properties/identityRequest/properties/fields/properties/displayName"
+                        "$ref": "#/components/schemas/GrantsExchangeResponse/properties/visitor/properties/identityRequest/properties/fields/properties/displayName"
                       }
                     },
                     "additionalProperties": false
@@ -29360,7 +29131,7 @@
                   "invalid": {
                     "type": "array",
                     "items": {
-                      "$ref": "#/components/schemas/GrantsExchange200Response/properties/visitor/properties/identityRequest/properties/missing/items"
+                      "$ref": "#/components/schemas/GrantsExchangeResponse/properties/visitor/properties/identityRequest/properties/missing/items"
                     }
                   },
                   "purpose": {
@@ -29379,28 +29150,13 @@
             "additionalProperties": false
           },
           "expiresAt": {
-            "type": "number"
+            "type": "integer"
           }
         },
         "required": ["token", "docId", "layerName", "layerMode", "visitor", "expiresAt"],
         "additionalProperties": false
       },
-      "GrantsExchange400Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "GrantsExchange403Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "GrantsExchange404Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "GrantsExchange410Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "GrantsExchange422Response": {
-        "$ref": "#/components/schemas/AdminErrorPayload"
-      },
-      "DocHead200Response": {
+      "DocHeadResponse": {
         "type": "object",
         "properties": {
           "id": {
@@ -29516,10 +29272,7 @@
         ],
         "additionalProperties": false
       },
-      "DocHead404Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocManifest200Response": {
+      "DocManifestResponse": {
         "type": "object",
         "properties": {
           "docVersion": {
@@ -29608,25 +29361,25 @@
                 "enum": ["base", "layer"]
               },
               "annotations": {
-                "$ref": "#/components/schemas/DocManifest200Response/properties/scopes/properties/content"
+                "$ref": "#/components/schemas/DocManifestResponse/properties/scopes/properties/content"
               },
               "forms": {
-                "$ref": "#/components/schemas/DocManifest200Response/properties/scopes/properties/content"
+                "$ref": "#/components/schemas/DocManifestResponse/properties/scopes/properties/content"
               },
               "layout": {
-                "$ref": "#/components/schemas/DocManifest200Response/properties/scopes/properties/content"
+                "$ref": "#/components/schemas/DocManifestResponse/properties/scopes/properties/content"
               },
               "attachments": {
-                "$ref": "#/components/schemas/DocManifest200Response/properties/scopes/properties/content"
+                "$ref": "#/components/schemas/DocManifestResponse/properties/scopes/properties/content"
               },
               "metadata": {
-                "$ref": "#/components/schemas/DocManifest200Response/properties/scopes/properties/content"
+                "$ref": "#/components/schemas/DocManifestResponse/properties/scopes/properties/content"
               },
               "actions": {
-                "$ref": "#/components/schemas/DocManifest200Response/properties/scopes/properties/content"
+                "$ref": "#/components/schemas/DocManifestResponse/properties/scopes/properties/content"
               },
               "outline": {
-                "$ref": "#/components/schemas/DocManifest200Response/properties/scopes/properties/content"
+                "$ref": "#/components/schemas/DocManifestResponse/properties/scopes/properties/content"
               }
             },
             "required": [
@@ -29652,7 +29405,7 @@
               "judged": {
                 "allOf": [
                   {
-                    "$ref": "#/components/schemas/DocManifest200Response/properties/protection/properties/enforced"
+                    "$ref": "#/components/schemas/DocManifestResponse/properties/protection/properties/enforced"
                   }
                 ],
                 "nullable": true
@@ -29712,7 +29465,7 @@
                           }
                         },
                         "permission": {
-                          "$ref": "#/components/schemas/DocManifest200Response/properties/protection/properties/certification/properties/permission"
+                          "$ref": "#/components/schemas/DocManifestResponse/properties/protection/properties/certification/properties/permission"
                         }
                       },
                       "required": ["action", "fields"],
@@ -29778,76 +29531,34 @@
         ],
         "additionalProperties": false
       },
-      "DocManifest404Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocMetadataGet200Response": {
+      "DocMetadataGetResponse": {
         "$ref": "#/components/schemas/DocumentMetadata"
       },
-      "DocMetadataGet404Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocMetadataCustomGet200Response": {
+      "DocMetadataCustomGetResponse": {
         "type": "object",
         "additionalProperties": {
           "type": "string"
         }
       },
-      "DocMetadataCustomGet404Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocOutlineGet200Response": {
+      "DocOutlineGetResponse": {
         "$ref": "#/components/schemas/DocumentOutline"
       },
-      "DocOutlineGet404Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocAttachmentsList200Response": {
+      "DocAttachmentsListResponse": {
         "$ref": "#/components/schemas/AttachmentList"
       },
-      "DocAttachmentsList404Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocAttachmentsDownload400Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocAttachmentsDownload404Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocAttachmentsDownload413Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocFontsList200Response": {
+      "DocFontsListResponse": {
         "$ref": "#/components/schemas/FontList"
-      },
-      "DocFontsList404Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
       },
       "DocFontsResolveRequest": {
         "$ref": "#/components/schemas/FontResolveRequest"
       },
-      "DocFontsResolve200Response": {
+      "DocFontsResolveResponse": {
         "$ref": "#/components/schemas/FontResolution"
       },
-      "DocFontsResolve400Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocFontsResolve404Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocFontsProgramsGet200Response": {
+      "DocFontsProgramsGetResponse": {
         "$ref": "#/components/schemas/FontProgramInfo"
       },
-      "DocFontsProgramsGet404Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocFontsProgramsDownload403Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocFontsProgramsDownload404Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocSignaturesList200Response": {
+      "DocSignaturesListResponse": {
         "type": "object",
         "properties": {
           "chainValid": {
@@ -30018,7 +29729,7 @@
                       }
                     },
                     "permission": {
-                      "$ref": "#/components/schemas/DocSignaturesList200Response/properties/signatures/items/properties/docMdp"
+                      "$ref": "#/components/schemas/DocSignaturesListResponse/properties/signatures/items/properties/docMdp"
                     }
                   },
                   "required": ["action", "fields"],
@@ -30028,7 +29739,7 @@
                 "lock": {
                   "allOf": [
                     {
-                      "$ref": "#/components/schemas/DocSignaturesList200Response/properties/signatures/items/properties/fieldMdp"
+                      "$ref": "#/components/schemas/DocSignaturesListResponse/properties/signatures/items/properties/fieldMdp"
                     }
                   ],
                   "nullable": true
@@ -30142,7 +29853,7 @@
               "judged": {
                 "allOf": [
                   {
-                    "$ref": "#/components/schemas/DocSignaturesList200Response/properties/protection/properties/enforced"
+                    "$ref": "#/components/schemas/DocSignaturesListResponse/properties/protection/properties/enforced"
                   }
                 ],
                 "nullable": true
@@ -30155,7 +29866,7 @@
                     "minimum": 0
                   },
                   "permission": {
-                    "$ref": "#/components/schemas/DocSignaturesList200Response/properties/signatures/items/properties/docMdp"
+                    "$ref": "#/components/schemas/DocSignaturesListResponse/properties/signatures/items/properties/docMdp"
                   }
                 },
                 "required": ["signatureIndex", "permission"],
@@ -30176,7 +29887,7 @@
                       "enum": ["fieldmdp", "lock"]
                     },
                     "spec": {
-                      "$ref": "#/components/schemas/DocSignaturesList200Response/properties/signatures/items/properties/fieldMdp"
+                      "$ref": "#/components/schemas/DocSignaturesListResponse/properties/signatures/items/properties/fieldMdp"
                     }
                   },
                   "required": ["signatureIndex", "source", "spec"],
@@ -30194,10 +29905,7 @@
         "required": ["chainValid", "revisions", "signatures", "protection"],
         "additionalProperties": false
       },
-      "DocSignaturesList404Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocSignaturesAnalysis200Response": {
+      "DocSignaturesAnalysisResponse": {
         "type": "object",
         "properties": {
           "mode": {
@@ -30343,7 +30051,7 @@
               "findings": {
                 "type": "array",
                 "items": {
-                  "$ref": "#/components/schemas/DocSignaturesAnalysis200Response/properties/current/properties/primary"
+                  "$ref": "#/components/schemas/DocSignaturesAnalysisResponse/properties/current/properties/primary"
                 }
               },
               "method": {
@@ -30395,13 +30103,7 @@
         ],
         "additionalProperties": false
       },
-      "DocSignaturesAnalysis400Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocSignaturesAnalysis404Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocSignaturesPrepare200Response": {
+      "DocSignaturesPrepareResponse": {
         "type": "object",
         "properties": {
           "signingId": {
@@ -30479,15 +30181,6 @@
         ],
         "additionalProperties": false
       },
-      "DocSignaturesPrepare400Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocSignaturesPrepare404Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocSignaturesPrepare409Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
       "DocSignaturesCompleteRequest": {
         "type": "object",
         "properties": {
@@ -30514,7 +30207,7 @@
         "required": ["cms", "expectedVersion"],
         "additionalProperties": false
       },
-      "DocSignaturesComplete200Response": {
+      "DocSignaturesCompleteResponse": {
         "type": "object",
         "properties": {
           "status": {
@@ -30657,7 +30350,7 @@
                     }
                   },
                   "permission": {
-                    "$ref": "#/components/schemas/DocSignaturesComplete200Response/properties/signature/properties/docMdp"
+                    "$ref": "#/components/schemas/DocSignaturesCompleteResponse/properties/signature/properties/docMdp"
                   }
                 },
                 "required": ["action", "fields"],
@@ -30667,7 +30360,7 @@
               "lock": {
                 "allOf": [
                   {
-                    "$ref": "#/components/schemas/DocSignaturesComplete200Response/properties/signature/properties/fieldMdp"
+                    "$ref": "#/components/schemas/DocSignaturesCompleteResponse/properties/signature/properties/fieldMdp"
                   }
                 ],
                 "nullable": true
@@ -30810,7 +30503,7 @@
               "judged": {
                 "allOf": [
                   {
-                    "$ref": "#/components/schemas/DocSignaturesComplete200Response/properties/protection/properties/enforced"
+                    "$ref": "#/components/schemas/DocSignaturesCompleteResponse/properties/protection/properties/enforced"
                   }
                 ],
                 "nullable": true
@@ -30823,7 +30516,7 @@
                     "minimum": 0
                   },
                   "permission": {
-                    "$ref": "#/components/schemas/DocSignaturesComplete200Response/properties/signature/properties/docMdp"
+                    "$ref": "#/components/schemas/DocSignaturesCompleteResponse/properties/signature/properties/docMdp"
                   }
                 },
                 "required": ["signatureIndex", "permission"],
@@ -30844,7 +30537,7 @@
                       "enum": ["fieldmdp", "lock"]
                     },
                     "spec": {
-                      "$ref": "#/components/schemas/DocSignaturesComplete200Response/properties/signature/properties/fieldMdp"
+                      "$ref": "#/components/schemas/DocSignaturesCompleteResponse/properties/signature/properties/fieldMdp"
                     }
                   },
                   "required": ["signatureIndex", "source", "spec"],
@@ -30865,16 +30558,7 @@
         "required": ["status", "signature", "version", "previous", "protection", "meta"],
         "additionalProperties": false
       },
-      "DocSignaturesComplete400Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocSignaturesComplete404Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocSignaturesComplete409Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocSignaturesCancel200Response": {
+      "DocSignaturesCancelResponse": {
         "type": "object",
         "properties": {
           "status": {
@@ -30885,10 +30569,7 @@
         "required": ["status"],
         "additionalProperties": false
       },
-      "DocSignaturesCancel404Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocVersionsList200Response": {
+      "DocVersionsListResponse": {
         "type": "object",
         "properties": {
           "baseSha": {
@@ -30945,10 +30626,7 @@
         "required": ["baseSha", "versions"],
         "additionalProperties": false
       },
-      "DocVersionsList404Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocVersionsSignatures200Response": {
+      "DocVersionsSignaturesResponse": {
         "type": "object",
         "properties": {
           "chainValid": {
@@ -31119,7 +30797,7 @@
                       }
                     },
                     "permission": {
-                      "$ref": "#/components/schemas/DocVersionsSignatures200Response/properties/signatures/items/properties/docMdp"
+                      "$ref": "#/components/schemas/DocVersionsSignaturesResponse/properties/signatures/items/properties/docMdp"
                     }
                   },
                   "required": ["action", "fields"],
@@ -31129,7 +30807,7 @@
                 "lock": {
                   "allOf": [
                     {
-                      "$ref": "#/components/schemas/DocVersionsSignatures200Response/properties/signatures/items/properties/fieldMdp"
+                      "$ref": "#/components/schemas/DocVersionsSignaturesResponse/properties/signatures/items/properties/fieldMdp"
                     }
                   ],
                   "nullable": true
@@ -31243,7 +30921,7 @@
               "judged": {
                 "allOf": [
                   {
-                    "$ref": "#/components/schemas/DocVersionsSignatures200Response/properties/protection/properties/enforced"
+                    "$ref": "#/components/schemas/DocVersionsSignaturesResponse/properties/protection/properties/enforced"
                   }
                 ],
                 "nullable": true
@@ -31256,7 +30934,7 @@
                     "minimum": 0
                   },
                   "permission": {
-                    "$ref": "#/components/schemas/DocVersionsSignatures200Response/properties/signatures/items/properties/docMdp"
+                    "$ref": "#/components/schemas/DocVersionsSignaturesResponse/properties/signatures/items/properties/docMdp"
                   }
                 },
                 "required": ["signatureIndex", "permission"],
@@ -31277,7 +30955,7 @@
                       "enum": ["fieldmdp", "lock"]
                     },
                     "spec": {
-                      "$ref": "#/components/schemas/DocVersionsSignatures200Response/properties/signatures/items/properties/fieldMdp"
+                      "$ref": "#/components/schemas/DocVersionsSignaturesResponse/properties/signatures/items/properties/fieldMdp"
                     }
                   },
                   "required": ["signatureIndex", "source", "spec"],
@@ -31295,16 +30973,7 @@
         "required": ["chainValid", "revisions", "signatures", "protection"],
         "additionalProperties": false
       },
-      "DocVersionsSignatures404Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocVersionsSignatureContentsResponse": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocVersionsSignatureDigestResponse": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocVersionsAnalysis200Response": {
+      "DocVersionsAnalysisResponse": {
         "type": "object",
         "properties": {
           "mode": {
@@ -31450,7 +31119,7 @@
               "findings": {
                 "type": "array",
                 "items": {
-                  "$ref": "#/components/schemas/DocVersionsAnalysis200Response/properties/current/properties/primary"
+                  "$ref": "#/components/schemas/DocVersionsAnalysisResponse/properties/current/properties/primary"
                 }
               },
               "method": {
@@ -31502,22 +31171,7 @@
         ],
         "additionalProperties": false
       },
-      "DocVersionsAnalysis400Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocVersionsAnalysis404Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocVersionsDownloadResponse": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocVersionsRevisionResponse": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocRenderResponse": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocText200Response": {
+      "DocTextResponse": {
         "type": "object",
         "properties": {
           "text": {
@@ -31549,23 +31203,11 @@
         "required": ["text", "charCount"],
         "additionalProperties": false
       },
-      "DocText404Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocAnnotationsList200Response": {
+      "DocAnnotationsListResponse": {
         "$ref": "#/components/schemas/AnnotationList"
       },
-      "DocAnnotationsList404Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocAnnotationsListAll200Response": {
+      "DocAnnotationsListAllResponse": {
         "$ref": "#/components/schemas/AnnotationList"
-      },
-      "DocAnnotationsListAll404Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocAnnotationsListAll409Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
       },
       "DocChangesRequest": {
         "type": "object",
@@ -31599,7 +31241,7 @@
         "required": ["changes"],
         "additionalProperties": false
       },
-      "DocChanges200Response": {
+      "DocChangesResponse": {
         "type": "object",
         "properties": {
           "changes": {
@@ -31634,7 +31276,7 @@
                       "enum": ["refused"]
                     },
                     "error": {
-                      "$ref": "#/components/schemas/EngineErrorPayload"
+                      "$ref": "#/components/schemas/EngineError"
                     }
                   },
                   "required": ["opId", "status", "error"],
@@ -31647,23 +31289,11 @@
         "required": ["changes"],
         "additionalProperties": false
       },
-      "DocChanges400Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocChanges404Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocChanges409Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocChanges413Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
       "DocAnnotationsCreateRequest": {
         "type": "object",
         "additionalProperties": {}
       },
-      "DocAnnotationsCreate200Response": {
+      "DocAnnotationsCreateResponse": {
         "type": "object",
         "properties": {
           "annotation": {
@@ -31676,17 +31306,11 @@
         "required": ["annotation", "meta"],
         "additionalProperties": false
       },
-      "DocAnnotationsCreate400Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocAnnotationsCreate404Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
       "DocAnnotationsUpdateRequest": {
         "type": "object",
         "additionalProperties": {}
       },
-      "DocAnnotationsUpdate200Response": {
+      "DocAnnotationsUpdateResponse": {
         "type": "object",
         "properties": {
           "annotation": {
@@ -31713,13 +31337,7 @@
         "required": ["annotation", "appearance", "meta"],
         "additionalProperties": false
       },
-      "DocAnnotationsUpdate400Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocAnnotationsUpdate404Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocAnnotationsDelete200Response": {
+      "DocAnnotationsDeleteResponse": {
         "type": "object",
         "properties": {
           "meta": {
@@ -31728,9 +31346,6 @@
         },
         "required": ["meta"],
         "additionalProperties": false
-      },
-      "DocAnnotationsDelete404Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
       },
       "DocAnnotationsReorderRequest": {
         "type": "object",
@@ -31749,7 +31364,7 @@
         "required": ["refs", "position"],
         "additionalProperties": false
       },
-      "DocAnnotationsReorder200Response": {
+      "DocAnnotationsReorderResponse": {
         "type": "object",
         "properties": {
           "order": {
@@ -31765,17 +31380,11 @@
         "required": ["order", "meta"],
         "additionalProperties": false
       },
-      "DocAnnotationsReorder400Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocAnnotationsReorder404Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
       "DocAnnotationsFlattenRequest": {
         "type": "object",
         "additionalProperties": {}
       },
-      "DocAnnotationsFlatten200Response": {
+      "DocAnnotationsFlattenResponse": {
         "type": "object",
         "properties": {
           "page": {
@@ -31809,38 +31418,11 @@
         "required": ["page", "usage", "results", "meta"],
         "additionalProperties": false
       },
-      "DocAnnotationsFlatten400Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocAnnotationsFlatten404Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
       "DocAnnotationsExportAppearanceRequest": {
         "type": "object",
         "additionalProperties": {}
       },
-      "DocAnnotationsExportAppearance400Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocAnnotationsExportAppearance404Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocAnnotationsReadAppearance400Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocAnnotationsReadAppearance404Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocAnnotationsReadFile400Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocAnnotationsReadFile404Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocAnnotationsReadFile413Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocFormsList200Response": {
+      "DocFormsListResponse": {
         "type": "object",
         "properties": {
           "formKind": {
@@ -31877,14 +31459,11 @@
         "required": ["formKind", "needsAppearances", "fields", "widgets", "calculationOrder"],
         "additionalProperties": false
       },
-      "DocFormsList404Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
       "DocFormsSetValueRequest": {
         "type": "object",
         "additionalProperties": {}
       },
-      "DocFormsSetValue200Response": {
+      "DocFormsSetValueResponse": {
         "type": "object",
         "properties": {
           "field": {
@@ -31903,12 +31482,6 @@
         "required": ["field", "widgets", "meta"],
         "additionalProperties": false
       },
-      "DocFormsSetValue400Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocFormsSetValue404Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
       "DocFormsUpdateWidgetRequest": {
         "type": "object",
         "properties": {
@@ -31919,7 +31492,7 @@
         "required": ["patch"],
         "additionalProperties": false
       },
-      "DocFormsUpdateWidget200Response": {
+      "DocFormsUpdateWidgetResponse": {
         "type": "object",
         "properties": {
           "widget": {
@@ -31946,13 +31519,7 @@
         "required": ["widget", "appearance", "meta"],
         "additionalProperties": false
       },
-      "DocFormsUpdateWidget400Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocFormsUpdateWidget404Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocFormsDeleteWidget200Response": {
+      "DocFormsDeleteWidgetResponse": {
         "type": "object",
         "properties": {
           "widget": {
@@ -31977,12 +31544,6 @@
         "required": ["widget", "page", "field", "meta"],
         "additionalProperties": false
       },
-      "DocFormsDeleteWidget400Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocFormsDeleteWidget404Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
       "DocFormsReorderWidgetsRequest": {
         "type": "object",
         "properties": {
@@ -32000,7 +31561,7 @@
         "required": ["widgets", "position"],
         "additionalProperties": false
       },
-      "DocFormsReorderWidgets200Response": {
+      "DocFormsReorderWidgetsResponse": {
         "type": "object",
         "properties": {
           "page": {
@@ -32019,12 +31580,6 @@
         "required": ["page", "order", "meta"],
         "additionalProperties": false
       },
-      "DocFormsReorderWidgets400Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocFormsReorderWidgets404Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
       "DocFormsReorderCalculationsRequest": {
         "type": "object",
         "properties": {
@@ -32042,7 +31597,7 @@
         "required": ["fields", "position"],
         "additionalProperties": false
       },
-      "DocFormsReorderCalculations200Response": {
+      "DocFormsReorderCalculationsResponse": {
         "type": "object",
         "properties": {
           "calculationOrder": {
@@ -32058,12 +31613,6 @@
         "required": ["calculationOrder", "meta"],
         "additionalProperties": false
       },
-      "DocFormsReorderCalculations400Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocFormsReorderCalculations404Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
       "DocFormsResetRequest": {
         "type": "object",
         "properties": {
@@ -32076,7 +31625,7 @@
         },
         "additionalProperties": false
       },
-      "DocFormsReset200Response": {
+      "DocFormsResetResponse": {
         "type": "object",
         "properties": {
           "fields": {
@@ -32098,13 +31647,7 @@
         "required": ["fields", "widgets", "meta"],
         "additionalProperties": false
       },
-      "DocFormsReset400Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocFormsReset404Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocPagesViewports200Response": {
+      "DocPagesViewportsResponse": {
         "type": "object",
         "properties": {
           "viewports": {
@@ -32157,9 +31700,6 @@
         },
         "required": ["viewports"],
         "additionalProperties": false
-      },
-      "DocPagesViewports404Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
       },
       "DocPagesSetScaleRequest": {
         "type": "object",
@@ -32273,7 +31813,7 @@
         "required": ["measure"],
         "additionalProperties": false
       },
-      "DocPagesSetScale200Response": {
+      "DocPagesSetScaleResponse": {
         "type": "object",
         "properties": {
           "page": {
@@ -32286,17 +31826,11 @@
         "required": ["page", "meta"],
         "additionalProperties": false
       },
-      "DocPagesSetScale400Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocPagesSetScale404Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
       "DocPagesSetNameRequest": {
         "type": "object",
         "additionalProperties": {}
       },
-      "DocPagesSetName200Response": {
+      "DocPagesSetNameResponse": {
         "type": "object",
         "properties": {
           "layout": {
@@ -32392,16 +31926,16 @@
                           "additionalProperties": false
                         },
                         "crop": {
-                          "$ref": "#/components/schemas/DocPagesSetName200Response/properties/layout/properties/pages/items/properties/boxes/properties/media"
+                          "$ref": "#/components/schemas/DocPagesSetNameResponse/properties/layout/properties/pages/items/properties/boxes/properties/media"
                         },
                         "bleed": {
-                          "$ref": "#/components/schemas/DocPagesSetName200Response/properties/layout/properties/pages/items/properties/boxes/properties/media"
+                          "$ref": "#/components/schemas/DocPagesSetNameResponse/properties/layout/properties/pages/items/properties/boxes/properties/media"
                         },
                         "trim": {
-                          "$ref": "#/components/schemas/DocPagesSetName200Response/properties/layout/properties/pages/items/properties/boxes/properties/media"
+                          "$ref": "#/components/schemas/DocPagesSetNameResponse/properties/layout/properties/pages/items/properties/boxes/properties/media"
                         },
                         "art": {
-                          "$ref": "#/components/schemas/DocPagesSetName200Response/properties/layout/properties/pages/items/properties/boxes/properties/media"
+                          "$ref": "#/components/schemas/DocPagesSetNameResponse/properties/layout/properties/pages/items/properties/boxes/properties/media"
                         }
                       },
                       "required": ["media", "crop", "bleed", "trim", "art"],
@@ -32543,18 +32077,12 @@
         },
         "required": ["layout", "meta"],
         "additionalProperties": false
-      },
-      "DocPagesSetName400Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocPagesSetName404Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
       },
       "DocPagesRemoveNameRequest": {
         "type": "object",
         "additionalProperties": {}
       },
-      "DocPagesRemoveName200Response": {
+      "DocPagesRemoveNameResponse": {
         "type": "object",
         "properties": {
           "layout": {
@@ -32650,16 +32178,16 @@
                           "additionalProperties": false
                         },
                         "crop": {
-                          "$ref": "#/components/schemas/DocPagesRemoveName200Response/properties/layout/properties/pages/items/properties/boxes/properties/media"
+                          "$ref": "#/components/schemas/DocPagesRemoveNameResponse/properties/layout/properties/pages/items/properties/boxes/properties/media"
                         },
                         "bleed": {
-                          "$ref": "#/components/schemas/DocPagesRemoveName200Response/properties/layout/properties/pages/items/properties/boxes/properties/media"
+                          "$ref": "#/components/schemas/DocPagesRemoveNameResponse/properties/layout/properties/pages/items/properties/boxes/properties/media"
                         },
                         "trim": {
-                          "$ref": "#/components/schemas/DocPagesRemoveName200Response/properties/layout/properties/pages/items/properties/boxes/properties/media"
+                          "$ref": "#/components/schemas/DocPagesRemoveNameResponse/properties/layout/properties/pages/items/properties/boxes/properties/media"
                         },
                         "art": {
-                          "$ref": "#/components/schemas/DocPagesRemoveName200Response/properties/layout/properties/pages/items/properties/boxes/properties/media"
+                          "$ref": "#/components/schemas/DocPagesRemoveNameResponse/properties/layout/properties/pages/items/properties/boxes/properties/media"
                         }
                       },
                       "required": ["media", "crop", "bleed", "trim", "art"],
@@ -32802,17 +32330,11 @@
         "required": ["layout", "meta"],
         "additionalProperties": false
       },
-      "DocPagesRemoveName400Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocPagesRemoveName404Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
       "DocPagesFlattenRequest": {
         "type": "object",
         "additionalProperties": {}
       },
-      "DocPagesFlatten200Response": {
+      "DocPagesFlattenResponse": {
         "type": "object",
         "properties": {
           "pages": {
@@ -32849,21 +32371,9 @@
         "required": ["pages", "usage", "results", "meta"],
         "additionalProperties": false
       },
-      "DocPagesFlatten400Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocPagesFlatten404Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
       "DocPagesExtractRequest": {
         "type": "object",
         "additionalProperties": {}
-      },
-      "DocPagesExtract400Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocPagesExtract404Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
       },
       "DocRedactionsApplyRequest": {
         "type": "object",
@@ -32883,7 +32393,7 @@
         },
         "additionalProperties": false
       },
-      "DocRedactionsApply200Response": {
+      "DocRedactionsApplyResponse": {
         "type": "object",
         "properties": {
           "scope": {
@@ -32936,12 +32446,6 @@
         "required": ["scope", "results", "removedAnnotationCount", "meta"],
         "additionalProperties": false
       },
-      "DocRedactionsApply400Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocRedactionsApply404Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
       "DocDownloadLinkRequest": {
         "type": "object",
         "properties": {
@@ -32953,27 +32457,18 @@
         },
         "additionalProperties": false
       },
-      "DocDownloadLink200Response": {
+      "DocDownloadLinkResponse": {
         "type": "object",
         "properties": {
           "url": {
             "type": "string"
           },
           "expiresAt": {
-            "type": "number"
+            "type": "integer"
           }
         },
         "required": ["url", "expiresAt"],
         "additionalProperties": false
-      },
-      "DocDownloadLink404Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocDownloadLink501Response": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
-      },
-      "DocDownloadResponse": {
-        "$ref": "#/components/schemas/EngineErrorPayload"
       }
     }
   }

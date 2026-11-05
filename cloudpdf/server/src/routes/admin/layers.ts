@@ -7,6 +7,7 @@ import { requireTenantAccess } from '../../app/jwt-plugin';
 import type { DocumentsRepo } from '../../db/repos/documents.repo';
 import type { GrantsRepo } from '../../db/repos/grants.repo';
 import type { LayersRepo, ListedLayer } from '../../db/repos/page_state.repo';
+import { errorBody } from '../_helpers';
 
 export interface AdminLayersRoutesDeps {
   /** `LayerService.deleteLayer` where the engine runs, else `deleteStoredLayer`. */
@@ -40,9 +41,7 @@ export async function registerAdminLayersRoutes(
     const ctx = requireTenantAccess(req, tenantId, listOp.scope);
     const parsed = listOp.query.safeParse(req.query ?? {});
     if (!parsed.success) {
-      return reply
-        .code(400)
-        .send({ error: { code: 'InvalidArg', message: formatIssues(parsed.error.issues) } });
+      return reply.code(400).send(errorBody('InvalidArg', formatIssues(parsed.error.issues)));
     }
     const { limit, cursor, grantId } = parsed.data;
     const before = cursor === undefined ? undefined : decodeListCursor(cursor);
@@ -71,13 +70,11 @@ export async function registerAdminLayersRoutes(
     // them a grant that refuses every request.
     const linked = await grants.listByLayer(ctx.tenantId, id, layerName);
     if (linked.length > 0) {
-      return reply.code(409).send({
-        error: {
-          code: 'Conflict',
-          message: `grant ${linked[0]!.id} uses this layer: delete the grant first`,
-          details: { grantIds: linked.map((grant) => grant.id) },
-        },
-      });
+      return reply.code(409).send(
+        errorBody('Conflict', `grant ${linked[0]!.id} uses this layer: delete the grant first`, {
+          grantIds: linked.map((grant) => grant.id),
+        }),
+      );
     }
     await deleteLayer(ctx.tenantId, { docId: id, layerName });
     return reply.code(204).send();

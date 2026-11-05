@@ -16,7 +16,7 @@ public class TolerantReadingTest
         Assert.That(list.Annotations.Count(), Is.EqualTo(5));
 
         var form = File.ReadAllText(Environment.GetEnvironmentVariable("CLOUDPDF_FORM_FIXTURE")!);
-        var fields = JsonUtils.Deserialize<DocFormsList200Response>(form)!;
+        var fields = JsonUtils.Deserialize<DocFormsListResponse>(form)!;
         TestContext.Out.WriteLine($"fields: {fields.Fields.Count()}");
         Assert.That(fields.Fields.Count(), Is.EqualTo(2));
     }

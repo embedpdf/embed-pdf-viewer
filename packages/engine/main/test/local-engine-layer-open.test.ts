@@ -57,7 +57,6 @@ class RecordingTransport implements Transport {
         kind: 'reject',
         jobId: msg.jobId,
         error: {
-          name: 'EngineError',
           code: 'Unknown',
           message: `unexpected request ${msg.kind}`,
         },

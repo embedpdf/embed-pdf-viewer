@@ -41,14 +41,14 @@ export class LayersClient {
     public list(
         request: CloudPDF.documents.ListLayersRequest,
         requestOptions?: LayersClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocumentsLayersList200Response> {
+    ): core.HttpResponsePromise<CloudPDF.DocumentsLayersListResponse> {
         return core.HttpResponsePromise.fromPromise(this.__list(request, requestOptions));
     }
 
     private async __list(
         request: CloudPDF.documents.ListLayersRequest,
         requestOptions?: LayersClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocumentsLayersList200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.DocumentsLayersListResponse>> {
         const { tenantId, id, limit, cursor, grantId } = request;
         const _queryParams: Record<string, unknown> = {
             limit,
@@ -83,20 +83,26 @@ export class LayersClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return {
-                data: _response.body as CloudPDF.DocumentsLayersList200Response,
-                rawResponse: _response.rawResponse,
-            };
+            return { data: _response.body as CloudPDF.DocumentsLayersListResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 400:
-                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.BadRequestError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 403:
-                    throw new CloudPDF.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.ForbiddenError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -173,11 +179,20 @@ export class LayersClient {
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 403:
-                    throw new CloudPDF.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.ForbiddenError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 409:
-                    throw new CloudPDF.ConflictError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.ConflictError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,

@@ -261,7 +261,7 @@ export {
 
 export { EngineError, serializeError, deserializeError } from './errors/EngineError';
 export type { SerializedEngineError, EngineErrorOptions } from './errors/EngineError';
-export { EngineErrorCode } from './errors/EngineErrorCode';
+export { EngineErrorCode, isEngineErrorCode } from './errors/EngineErrorCode';
 
 export { isValidPageObjectNumber } from './identity/PageObjectNumber';
 export type { PageObjectNumber } from './identity/PageObjectNumber';

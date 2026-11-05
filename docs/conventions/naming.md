@@ -91,6 +91,23 @@ Spell out everything else: `error` (not `err`, `e`), `options` (not `opts`),
 - **`kind`** tags things that are: geometry, refs, borders, drafts.
 - Tag values use one style per union (kebab-case or camelCase), never both.
 
+## The HTTP API
+
+The contract (`cloudpdf/contract`) is what every SDK is generated from, so
+its rules hold in every language:
+
+- **Errors.** Every error response has one body,
+  `{ "error": { "code", "message", "details"? } }` (`ErrorResponse`), and a
+  refused change carries the same `error`. Codes come from one list,
+  `EngineErrorCode`; a client reads a code it doesn't know as `Unknown`.
+  `details` holds what a code carries, as the code's comment says.
+- **Whole numbers are integers.** A count, an index, a size in bytes and a
+  duration in seconds are `.int()`, so the SDKs type them as integers.
+- **A response field is always there.** It is `null` when there is nothing,
+  never left out: one spelling for "nothing".
+
+`cloudpdf/contract/test/consistency.test.ts` checks these on `openapi.json`.
+
 ## Capability vocabulary
 
 | Verb                                   | Meaning                                                                                  |
@@ -125,4 +142,4 @@ ESLint enforces the mechanical parts:
 - `id-denylist` for the spelled-out words above;
 - `@typescript-eslint/naming-convention` for casing.
 
-Review covers the rest.
+The contract test checks the HTTP API's rules. Review covers the rest.

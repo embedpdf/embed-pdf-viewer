@@ -3,6 +3,7 @@ import {
   EngineErrorCode,
   decodePageKey,
   type PageRef,
+  type SerializedEngineError,
 } from '@embedpdf/engine-core/runtime';
 import { SHAPES, type CachedReadKind, type TokenPin } from '@embedpdf/engine-core/wire';
 import type { FastifyReply } from 'fastify';
@@ -150,12 +151,24 @@ export async function readAtPins<T>(input: {
   }
 }
 
+/**
+ * The body of every error response (`ErrorResponseSchema`): a code from the
+ * one list, the message, and what the code carries.
+ */
+export function errorBody(
+  code: EngineErrorCode,
+  message: string,
+  details?: Record<string, unknown>,
+): { error: SerializedEngineError } {
+  return { error: details === undefined ? { code, message } : { code, message, details } };
+}
+
 /** `429` with `Retry-After`: the caller is over a request budget for `retryAfterMs` more. */
 export function tooManyRequests(reply: FastifyReply, retryAfterMs: number): FastifyReply {
   return reply
     .code(429)
     .header('retry-after', String(Math.ceil(retryAfterMs / 1000)))
-    .send({ error: { code: 'TooManyRequests', message: 'rate limited; retry later' } });
+    .send(errorBody(EngineErrorCode.TooManyRequests, 'rate limited; retry later'));
 }
 
 /**

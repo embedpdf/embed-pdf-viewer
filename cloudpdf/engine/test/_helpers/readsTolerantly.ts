@@ -1,7 +1,7 @@
 import { isDeepStrictEqual } from 'node:util';
 import { afterAll } from 'vitest';
 import { readingProblems, withUnknownFields } from '@embedpdf/engine-core/conformance';
-import { EngineErrorPayloadSchema } from '@embedpdf/engine-core/wire';
+import { EngineErrorSchema } from '@embedpdf/engine-core/wire';
 
 /**
  * Every JSON response this suite's client reads is read a second time with
@@ -33,7 +33,7 @@ type ParseSync = (this: Schema, input: ParseInput) => { status: string; value?: 
 
 /** The prototype that holds `_parseSync` for every schema the engine reads with. */
 function schemaPrototype(): { _parseSync: ParseSync } {
-  let prototype: object | null = Object.getPrototypeOf(EngineErrorPayloadSchema);
+  let prototype: object | null = Object.getPrototypeOf(EngineErrorSchema);
   while (prototype && !Object.prototype.hasOwnProperty.call(prototype, '_parseSync')) {
     prototype = Object.getPrototypeOf(prototype);
   }

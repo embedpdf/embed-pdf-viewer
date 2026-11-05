@@ -13,7 +13,7 @@ import {
 import {
   API_VERSION,
   applyCdnAccess,
-  EngineErrorPayloadSchema,
+  EngineErrorSchema,
   type CdnAccessInfoForApply,
 } from '@embedpdf/engine-core/wire';
 
@@ -734,7 +734,11 @@ export class HttpClient {
     if (payload && typeof payload === 'object' && 'error' in payload) {
       const inner = (payload as { error: unknown }).error;
       const parsed = trySerialized(inner);
-      if (parsed) throw new EngineError(parsed.code, parsed.message, { details: parsed.details });
+      if (parsed) {
+        // A code this client doesn't know reads as `Unknown`: the status says more.
+        const known = parsed.code === EngineErrorCode.Unknown ? code : parsed.code;
+        throw new EngineError(known, parsed.message, { details: parsed.details });
+      }
       const msg =
         typeof inner === 'object' && inner && 'message' in inner
           ? String((inner as { message: unknown }).message)
@@ -760,7 +764,7 @@ function mapStatusToCode(status: number): EngineErrorCode {
 }
 
 function trySerialized(value: unknown): SerializedEngineError | null {
-  const result = EngineErrorPayloadSchema.safeParse(value);
+  const result = EngineErrorSchema.safeParse(value);
   return result.success ? result.data : null;
 }
 

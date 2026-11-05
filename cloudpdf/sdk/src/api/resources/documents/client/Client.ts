@@ -45,14 +45,14 @@ export class DocumentsClient {
     public list(
         request: CloudPDF.ListDocumentsRequest,
         requestOptions?: DocumentsClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocumentsList200Response> {
+    ): core.HttpResponsePromise<CloudPDF.DocumentsListResponse> {
         return core.HttpResponsePromise.fromPromise(this.__list(request, requestOptions));
     }
 
     private async __list(
         request: CloudPDF.ListDocumentsRequest,
         requestOptions?: DocumentsClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocumentsList200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.DocumentsListResponse>> {
         const { tenantId, limit, cursor, state, q, folderId, sort, order } = request;
         const _queryParams: Record<string, unknown> = {
             limit,
@@ -91,13 +91,16 @@ export class DocumentsClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return { data: _response.body as CloudPDF.DocumentsList200Response, rawResponse: _response.rawResponse };
+            return { data: _response.body as CloudPDF.DocumentsListResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 400:
-                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.BadRequestError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -133,14 +136,14 @@ export class DocumentsClient {
     public get(
         request: CloudPDF.GetDocumentsRequest,
         requestOptions?: DocumentsClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocumentsGet200Response> {
+    ): core.HttpResponsePromise<CloudPDF.DocumentsGetResponse> {
         return core.HttpResponsePromise.fromPromise(this.__get(request, requestOptions));
     }
 
     private async __get(
         request: CloudPDF.GetDocumentsRequest,
         requestOptions?: DocumentsClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocumentsGet200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.DocumentsGetResponse>> {
         const { tenantId, id } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
@@ -166,15 +169,21 @@ export class DocumentsClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return { data: _response.body as CloudPDF.DocumentsGet200Response, rawResponse: _response.rawResponse };
+            return { data: _response.body as CloudPDF.DocumentsGetResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 403:
-                    throw new CloudPDF.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.ForbiddenError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -249,9 +258,15 @@ export class DocumentsClient {
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 403:
-                    throw new CloudPDF.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.ForbiddenError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -291,14 +306,14 @@ export class DocumentsClient {
     public update(
         request: CloudPDF.DocumentsUpdateRequest,
         requestOptions?: DocumentsClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocumentsUpdate200Response> {
+    ): core.HttpResponsePromise<CloudPDF.DocumentsUpdateResponse> {
         return core.HttpResponsePromise.fromPromise(this.__update(request, requestOptions));
     }
 
     private async __update(
         request: CloudPDF.DocumentsUpdateRequest,
         requestOptions?: DocumentsClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocumentsUpdate200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.DocumentsUpdateResponse>> {
         const { tenantId, id, ..._body } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
@@ -327,17 +342,26 @@ export class DocumentsClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return { data: _response.body as CloudPDF.DocumentsUpdate200Response, rawResponse: _response.rawResponse };
+            return { data: _response.body as CloudPDF.DocumentsUpdateResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 400:
-                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.BadRequestError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 403:
-                    throw new CloudPDF.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.ForbiddenError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -376,14 +400,14 @@ export class DocumentsClient {
     public commit(
         request: CloudPDF.DocumentsCommitRequest,
         requestOptions?: DocumentsClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocumentsCommit200Response> {
+    ): core.HttpResponsePromise<CloudPDF.DocumentsCommitResponse> {
         return core.HttpResponsePromise.fromPromise(this.__commit(request, requestOptions));
     }
 
     private async __commit(
         request: CloudPDF.DocumentsCommitRequest,
         requestOptions?: DocumentsClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocumentsCommit200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.DocumentsCommitResponse>> {
         const { tenantId, id, ..._body } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
@@ -412,15 +436,21 @@ export class DocumentsClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return { data: _response.body as CloudPDF.DocumentsCommit200Response, rawResponse: _response.rawResponse };
+            return { data: _response.body as CloudPDF.DocumentsCommitResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 400:
-                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.BadRequestError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -487,9 +517,15 @@ export class DocumentsClient {
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 403:
-                    throw new CloudPDF.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.ForbiddenError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -555,7 +591,10 @@ export class DocumentsClient {
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -596,14 +635,14 @@ export class DocumentsClient {
     public uploadProxy(
         request: CloudPDF.UploadProxyDocumentsRequest,
         requestOptions?: DocumentsClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocumentsUploadProxy200Response> {
+    ): core.HttpResponsePromise<CloudPDF.DocumentsUploadProxyResponse> {
         return core.HttpResponsePromise.fromPromise(this.__uploadProxy(request, requestOptions));
     }
 
     private async __uploadProxy(
         request: CloudPDF.UploadProxyDocumentsRequest,
         requestOptions?: DocumentsClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocumentsUploadProxy200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.DocumentsUploadProxyResponse>> {
         const _body = await core.newFormData();
         await _body.appendFile("file", request.file);
         const _maybeEncodedRequest = await _body.getRequest();
@@ -638,7 +677,7 @@ export class DocumentsClient {
         });
         if (_response.ok) {
             return {
-                data: _response.body as CloudPDF.DocumentsUploadProxy200Response,
+                data: _response.body as CloudPDF.DocumentsUploadProxyResponse,
                 rawResponse: _response.rawResponse,
             };
         }
@@ -646,11 +685,20 @@ export class DocumentsClient {
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 400:
-                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.BadRequestError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 409:
-                    throw new CloudPDF.ConflictError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.ConflictError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -737,12 +785,18 @@ export class DocumentsClient {
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 400:
-                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.BadRequestError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 403:
-                    throw new CloudPDF.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.ForbiddenError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 502:
                     throw new CloudPDF.BadGatewayError(
-                        _response.error.body as CloudPDF.DocumentsImportFrom502Response,
+                        _response.error.body as CloudPDF.ErrorResponse,
                         _response.rawResponse,
                     );
                 default:
@@ -776,21 +830,21 @@ export class DocumentsClient {
      * @example
      *     await client.documents.init({
      *         tenantId: "tenantId",
-     *         contentLength: 1.1,
+     *         contentLength: 1,
      *         contentSha256: "contentSha256"
      *     })
      */
     public init(
         request: CloudPDF.DocumentsInitRequest,
         requestOptions?: DocumentsClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocumentsInit200Response> {
+    ): core.HttpResponsePromise<CloudPDF.DocumentsInitResponse> {
         return core.HttpResponsePromise.fromPromise(this.__init(request, requestOptions));
     }
 
     private async __init(
         request: CloudPDF.DocumentsInitRequest,
         requestOptions?: DocumentsClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocumentsInit200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.DocumentsInitResponse>> {
         const { tenantId, ..._body } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
@@ -819,15 +873,21 @@ export class DocumentsClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return { data: _response.body as CloudPDF.DocumentsInit200Response, rawResponse: _response.rawResponse };
+            return { data: _response.body as CloudPDF.DocumentsInitResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 400:
-                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.BadRequestError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 403:
-                    throw new CloudPDF.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.ForbiddenError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,

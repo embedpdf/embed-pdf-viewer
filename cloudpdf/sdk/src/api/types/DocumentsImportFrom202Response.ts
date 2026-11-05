@@ -25,8 +25,8 @@ export namespace DocumentsImportFrom202Response {
         metadata: Record<string, unknown> | null;
         idempotencyKey: string | null;
         failureReason: string | null;
-        thumbnailState?: Document.ThumbnailState | undefined;
-        thumbnailUrl?: (string | null) | undefined;
+        thumbnailState: Document.ThumbnailState;
+        thumbnailUrl: string | null;
         createdAt: number;
         updatedAt: number;
         createdBy: string | null;

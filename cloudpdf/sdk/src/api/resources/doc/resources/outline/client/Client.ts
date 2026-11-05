@@ -39,14 +39,14 @@ export class OutlineClient {
     public get(
         request: CloudPDF.doc.GetOutlineRequest,
         requestOptions?: OutlineClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocOutlineGet200Response> {
+    ): core.HttpResponsePromise<CloudPDF.DocOutlineGetResponse> {
         return core.HttpResponsePromise.fromPromise(this.__get(request, requestOptions));
     }
 
     private async __get(
         request: CloudPDF.doc.GetOutlineRequest,
         requestOptions?: OutlineClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocOutlineGet200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.DocOutlineGetResponse>> {
         const { docId, layerName, "X-Document-Password": documentPassword } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
@@ -75,13 +75,16 @@ export class OutlineClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return { data: _response.body as CloudPDF.DocOutlineGet200Response, rawResponse: _response.rawResponse };
+            return { data: _response.body as CloudPDF.DocOutlineGetResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,

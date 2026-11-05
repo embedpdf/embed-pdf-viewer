@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 
-import { EngineErrorPayloadSchema, wirePaths, wireTemplates } from '@embedpdf/engine-core/wire';
+import { ErrorResponseSchema, wirePaths, wireTemplates } from '@embedpdf/engine-core/wire';
 
 import { adminOperations, adminWirePaths, allOperations, docOperations } from '../src/index';
 import { buildAdminOpenApiDocument, sdkOperationName } from '../src/openapi';
@@ -79,9 +79,9 @@ describe('operation registry', () => {
         if (Number(status) < 400 && types?.includes('application/json')) {
           expect(response.schema, `${op.operationId} ${status} must be typed`).toBeDefined();
         }
-        // Doc-plane errors speak the engine envelope, not the admin one.
+        // Every error has the one error body.
         if (Number(status) >= 400) {
-          expect(response.schema, `${op.operationId} ${status}`).toBe(EngineErrorPayloadSchema);
+          expect(response.schema, `${op.operationId} ${status}`).toBe(ErrorResponseSchema);
         }
       }
     }
@@ -260,16 +260,16 @@ describe('openapi document', () => {
     // the one `Annotation` component.
     const annotationRef = { $ref: '#/components/schemas/Annotation' };
     expect(schemas.AnnotationList.properties.annotations.items).toEqual(annotationRef);
-    expect(schemas.DocAnnotationsList200Response).toEqual({
+    expect(schemas.DocAnnotationsListResponse).toEqual({
       $ref: '#/components/schemas/AnnotationList',
     });
-    expect(schemas.DocAnnotationsListAll200Response).toEqual({
+    expect(schemas.DocAnnotationsListAllResponse).toEqual({
       $ref: '#/components/schemas/AnnotationList',
     });
-    expect(schemas.DocAnnotationsCreate200Response.properties.annotation).toEqual(annotationRef);
-    expect(schemas.DocAnnotationsUpdate200Response.properties.annotation).toEqual(annotationRef);
+    expect(schemas.DocAnnotationsCreateResponse.properties.annotation).toEqual(annotationRef);
+    expect(schemas.DocAnnotationsUpdateResponse.properties.annotation).toEqual(annotationRef);
     // Every form read and write names the one `FormField` component.
-    expect(schemas.DocFormsList200Response.properties.fields.items).toEqual({
+    expect(schemas.DocFormsListResponse.properties.fields.items).toEqual({
       $ref: '#/components/schemas/FormField',
     });
     expect(schemas.FormField.anyOf[0].properties.actions).toEqual({
@@ -308,12 +308,10 @@ describe('openapi document', () => {
     expect(op('forms.create').properties.draft).toEqual(ref('FormFieldDraft'));
     expect(op('forms.update').properties.patch).toEqual(ref('FormFieldPatch'));
     expect(op('metadata.update').properties.patch).toEqual(ref('MetadataPatch'));
-    const [applied, refused] = schemas.DocChanges200Response.properties.changes.items.anyOf;
+    const [applied, refused] = schemas.DocChangesResponse.properties.changes.items.anyOf;
     expect(applied.properties.result).toEqual(ref('ChangeResult'));
-    expect(refused.properties.error).toEqual(ref('EngineErrorPayload'));
-    // Every error response names the plane's one error envelope.
-    expect(schemas.DocChanges404Response).toEqual(ref('EngineErrorPayload'));
-    expect(schemas.TokensIssue400Response).toEqual(ref('AdminErrorPayload'));
+    // A refused change carries the same error as an error response.
+    expect(refused.properties.error).toEqual(ref('EngineError'));
   });
 });
 

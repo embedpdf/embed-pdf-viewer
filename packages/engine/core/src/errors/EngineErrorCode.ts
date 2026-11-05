@@ -136,6 +136,75 @@ export const EngineErrorCode = {
    * `doc.grant.identify()`.
    */
   VisitorIdentityRequired: 'VisitorIdentityRequired',
+  /**
+   * The request conflicts with what the server holds: a name that's taken,
+   * or a record in a state the request can't apply to. The message says
+   * which; `details.reason` names it where a route has more than one.
+   */
+  Conflict: 'Conflict',
+  /**
+   * The server's engines are full and shed the request (HTTP 503). Nothing
+   * ran: retry after the response's `Retry-After`.
+   */
+  EngineBusy: 'EngineBusy',
+  /**
+   * The engine serving the document restarted during the request (HTTP 503).
+   * Nothing ran: retry after the response's `Retry-After`.
+   */
+  EngineRestarting: 'EngineRestarting',
+  /**
+   * The document crashed the engine more than once and is refused until its
+   * quarantine ends (HTTP 422). The message says when.
+   */
+  DocumentQuarantined: 'DocumentQuarantined',
+  /**
+   * The document's thumbnail isn't there yet (HTTP 404). `details.state` is
+   * `pending`, `locked` or `failed`, so a dashboard can draw the right tile.
+   */
+  ThumbnailNotReady: 'ThumbnailNotReady',
+  /** Too many requests from this caller (HTTP 429). Retry later. */
+  TooManyRequests: 'TooManyRequests',
+  /** The grant expired (HTTP 410). */
+  GrantExpired: 'GrantExpired',
+  /** A grant exchange came without the page's `Origin` header. */
+  OriginRequired: 'OriginRequired',
+  /** The grant doesn't allow the page's origin (HTTP 403). */
+  OriginNotAllowed: 'OriginNotAllowed',
+  /**
+   * A module's route, and the tenant's features don't hold the module
+   * (HTTP 403). `details.feature` is the module's id.
+   */
+  FeatureNotEnabled: 'FeatureNotEnabled',
+  /**
+   * A module's route, and the tenant's features hold the module stopped
+   * (HTTP 402). `details.feature` is the module's id and `details.stopped`
+   * why: `'cap'` is a spending cap reached.
+   */
+  FeatureStopped: 'FeatureStopped',
+  /**
+   * The deployment's license doesn't allow the request (HTTP 403): no valid
+   * license, or one that allows reading only. `details.licenseCode` is the
+   * code the license status reports.
+   */
+  LicenseInvalid: 'LicenseInvalid',
+  /**
+   * The request would pass one of the license's usage limits (HTTP 403).
+   * `details.metric` and `details.limit` name it.
+   */
+  LicenseUsageLimit: 'LicenseUsageLimit',
+  /**
+   * Reading the document from where it's imported from failed in a way
+   * worth retrying (HTTP 502): the network, a timeout or the source's own
+   * error. Retry with the same idempotency key.
+   */
+  UpstreamError: 'UpstreamError',
 } as const;
 
 export type EngineErrorCode = (typeof EngineErrorCode)[keyof typeof EngineErrorCode];
+
+const ENGINE_ERROR_CODES: ReadonlySet<string> = new Set(Object.values(EngineErrorCode));
+
+/** Whether `value` is a code in the list: what a server may send, and a client may read. */
+export function isEngineErrorCode(value: unknown): value is EngineErrorCode {
+  return typeof value === 'string' && ENGINE_ERROR_CODES.has(value);
+}

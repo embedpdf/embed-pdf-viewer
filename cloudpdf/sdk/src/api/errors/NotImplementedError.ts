@@ -5,9 +5,9 @@ import * as errors from "../../errors/index.js";
 import type * as CloudPDF from "../index.js";
 
 export class NotImplementedError extends errors.CloudPDFError {
-    public declare readonly body: CloudPDF.DocDownloadLink501Response;
+    public declare readonly body: CloudPDF.ErrorResponse;
 
-    constructor(body: CloudPDF.DocDownloadLink501Response, rawResponse?: core.RawResponse) {
+    constructor(body: CloudPDF.ErrorResponse, rawResponse?: core.RawResponse) {
         super({
             message: "NotImplementedError",
             statusCode: 501,

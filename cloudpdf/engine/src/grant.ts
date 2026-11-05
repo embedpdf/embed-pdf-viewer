@@ -3,6 +3,7 @@ import {
   AbortError,
   EngineError,
   EngineErrorCode,
+  isEngineErrorCode,
   type DocumentGrant,
   type Identity,
   type GrantOpenRequest,
@@ -180,29 +181,23 @@ export async function exchangeGrant(
  * `EngineError` family as all other engine calls. The wire code and HTTP
  * status survive in `details`; the original error rides as `cause`.
  *
- * `GrantPassphraseRequired` and `VisitorIdentityRequired` keep their own
- * engine codes — the outcomes callers branch on programmatically (prompt for
- * the passphrase or the grant's questions, and retry); the latter's `details`
- * are the questions. Everything else maps by meaning, with the HTTP status as
- * the fallback discriminator.
+ * The server's code is the error's code: `GrantPassphraseRequired` and
+ * `VisitorIdentityRequired` are the outcomes callers branch on (prompt for
+ * the passphrase or the grant's questions, and retry); the latter's
+ * `details` are the questions. A code this client doesn't know falls back
+ * to the HTTP status.
  */
 export function engineErrorFromGrantExchange(error: GrantExchangeError): EngineError {
   const code =
-    error.code === 'GrantPassphraseRequired'
-      ? EngineErrorCode.GrantPassphraseRequired
-      : error.code === 'VisitorIdentityRequired'
-        ? EngineErrorCode.VisitorIdentityRequired
-        : error.code === 'NotFound'
-          ? EngineErrorCode.NotFound
-          : error.code === 'GrantExpired' ||
-              error.code === 'OriginNotAllowed' ||
-              error.code === 'OriginRequired'
-            ? EngineErrorCode.Forbidden
-            : error.status === 401
-              ? EngineErrorCode.Unauthenticated
-              : error.status === 400
-                ? EngineErrorCode.InvalidArg
-                : EngineErrorCode.Unknown;
+    isEngineErrorCode(error.code) && error.code !== EngineErrorCode.Unknown
+      ? error.code
+      : error.status === 401
+        ? EngineErrorCode.Unauthenticated
+        : error.status === 403
+          ? EngineErrorCode.Forbidden
+          : error.status === 400
+            ? EngineErrorCode.InvalidArg
+            : EngineErrorCode.Unknown;
   return new EngineError(code, `grant exchange failed: ${error.message}`, {
     details: { ...error.details, grantCode: error.code, status: error.status },
     cause: error,

@@ -17,7 +17,7 @@ describe("TenantsClient", () => {
                     autoProvisioned: true,
                     status: "active",
                     features: [{ id: "id" }],
-                    createdAt: 1.1,
+                    createdAt: 1,
                 },
             ],
             nextCursor: "nextCursor",
@@ -33,7 +33,7 @@ describe("TenantsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server.mockEndpoint().get("/v1/tenants").respondWith().statusCode(400).jsonBody(rawResponseBody).build();
 
@@ -53,7 +53,7 @@ describe("TenantsClient", () => {
                 autoProvisioned: true,
                 status: "active",
                 features: [{ id: "id" }],
-                createdAt: 1.1,
+                createdAt: 1,
             },
             created: true,
         };
@@ -77,7 +77,7 @@ describe("TenantsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { id: "id" };
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -106,7 +106,7 @@ describe("TenantsClient", () => {
                 autoProvisioned: true,
                 status: "active",
                 features: [{ id: "id" }],
-                createdAt: 1.1,
+                createdAt: 1,
             },
         };
 
@@ -128,7 +128,7 @@ describe("TenantsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -161,7 +161,7 @@ describe("TenantsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -189,7 +189,7 @@ describe("TenantsClient", () => {
                 autoProvisioned: true,
                 status: "active",
                 features: [{ id: "id" }],
-                createdAt: 1.1,
+                createdAt: 1,
             },
         };
 
@@ -217,7 +217,7 @@ describe("TenantsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { features: [{ id: "id" }, { id: "id" }] };
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -247,7 +247,7 @@ describe("TenantsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { features: [{ id: "id" }, { id: "id" }] };
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -289,7 +289,7 @@ describe("TenantsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -329,7 +329,7 @@ describe("TenantsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = {};
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -355,7 +355,7 @@ describe("TenantsClient", () => {
             tenantId: "tenantId",
             periodStart: "periodStart",
             periodEnd: "periodEnd",
-            metrics: { "pdf.views": 1.1, "pdf.uploads": 1.1, "storage.bytes": 1.1 },
+            metrics: { "pdf.views": 1, "pdf.uploads": 1, "storage.bytes": 1 },
         };
 
         server
@@ -376,7 +376,7 @@ describe("TenantsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -397,7 +397,7 @@ describe("TenantsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()

@@ -548,15 +548,22 @@ const engineErrorCodeValues = Object.values(EngineErrorCode) as [
   ...EngineErrorCode[],
 ];
 
-export const EngineErrorPayloadSchema: z.ZodType<SerializedEngineError> = z.object({
-  name: closed(z.literal('EngineError')),
+/** An error: the `error` of every error response, and of a refused change. */
+export const EngineErrorSchema: z.ZodType<SerializedEngineError> = z.object({
   code: readsUnknownAs(z.enum(engineErrorCodeValues), EngineErrorCode.Unknown).describe(
     "Why the request failed. A newer server can add codes: read one your client doesn't know " +
       'as `Unknown`.',
   ),
   message: z.string(),
-  details: z.record(z.string(), z.unknown()).optional(),
+  details: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .describe('What a code carries besides its message, as each code says.'),
 });
+
+/** Every error response's body, whichever route answers. */
+export const ErrorResponseSchema = z.object({ error: EngineErrorSchema });
+export type ErrorResponse = z.infer<typeof ErrorResponseSchema>;
 
 export const CachePinsSchema: z.ZodType<CachePins> = z.object({
   contentVersion: z.number().int().positive(),

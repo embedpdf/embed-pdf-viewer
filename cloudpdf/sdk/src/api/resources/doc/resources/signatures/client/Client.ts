@@ -42,14 +42,14 @@ export class SignaturesClient {
     public list(
         request: CloudPDF.doc.ListSignaturesRequest,
         requestOptions?: SignaturesClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocSignaturesList200Response> {
+    ): core.HttpResponsePromise<CloudPDF.DocSignaturesListResponse> {
         return core.HttpResponsePromise.fromPromise(this.__list(request, requestOptions));
     }
 
     private async __list(
         request: CloudPDF.doc.ListSignaturesRequest,
         requestOptions?: SignaturesClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocSignaturesList200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.DocSignaturesListResponse>> {
         const { docId, layerName, "X-Document-Password": documentPassword } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
@@ -78,16 +78,16 @@ export class SignaturesClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return {
-                data: _response.body as CloudPDF.DocSignaturesList200Response,
-                rawResponse: _response.rawResponse,
-            };
+            return { data: _response.body as CloudPDF.DocSignaturesListResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -123,14 +123,14 @@ export class SignaturesClient {
     public cancel(
         request: CloudPDF.doc.CancelSignaturesRequest,
         requestOptions?: SignaturesClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocSignaturesCancel200Response> {
+    ): core.HttpResponsePromise<CloudPDF.DocSignaturesCancelResponse> {
         return core.HttpResponsePromise.fromPromise(this.__cancel(request, requestOptions));
     }
 
     private async __cancel(
         request: CloudPDF.doc.CancelSignaturesRequest,
         requestOptions?: SignaturesClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocSignaturesCancel200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.DocSignaturesCancelResponse>> {
         const { docId, layerName, signingId, "X-Document-Password": documentPassword } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
@@ -159,16 +159,16 @@ export class SignaturesClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return {
-                data: _response.body as CloudPDF.DocSignaturesCancel200Response,
-                rawResponse: _response.rawResponse,
-            };
+            return { data: _response.body as CloudPDF.DocSignaturesCancelResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -213,14 +213,14 @@ export class SignaturesClient {
     public complete(
         request: CloudPDF.doc.DocSignaturesCompleteRequest,
         requestOptions?: SignaturesClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocSignaturesComplete200Response> {
+    ): core.HttpResponsePromise<CloudPDF.DocSignaturesCompleteResponse> {
         return core.HttpResponsePromise.fromPromise(this.__complete(request, requestOptions));
     }
 
     private async __complete(
         request: CloudPDF.doc.DocSignaturesCompleteRequest,
         requestOptions?: SignaturesClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocSignaturesComplete200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.DocSignaturesCompleteResponse>> {
         const { docId, layerName, signingId, "X-Document-Password": documentPassword, ..._body } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
@@ -253,7 +253,7 @@ export class SignaturesClient {
         });
         if (_response.ok) {
             return {
-                data: _response.body as CloudPDF.DocSignaturesComplete200Response,
+                data: _response.body as CloudPDF.DocSignaturesCompleteResponse,
                 rawResponse: _response.rawResponse,
             };
         }
@@ -261,11 +261,20 @@ export class SignaturesClient {
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 400:
-                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.BadRequestError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 409:
-                    throw new CloudPDF.ConflictError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.ConflictError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -303,14 +312,14 @@ export class SignaturesClient {
     public analysis(
         request: CloudPDF.doc.AnalysisSignaturesRequest,
         requestOptions?: SignaturesClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocSignaturesAnalysis200Response> {
+    ): core.HttpResponsePromise<CloudPDF.DocSignaturesAnalysisResponse> {
         return core.HttpResponsePromise.fromPromise(this.__analysis(request, requestOptions));
     }
 
     private async __analysis(
         request: CloudPDF.doc.AnalysisSignaturesRequest,
         requestOptions?: SignaturesClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocSignaturesAnalysis200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.DocSignaturesAnalysisResponse>> {
         const {
             docId,
             layerName,
@@ -356,7 +365,7 @@ export class SignaturesClient {
         });
         if (_response.ok) {
             return {
-                data: _response.body as CloudPDF.DocSignaturesAnalysis200Response,
+                data: _response.body as CloudPDF.DocSignaturesAnalysisResponse,
                 rawResponse: _response.rawResponse,
             };
         }
@@ -364,9 +373,15 @@ export class SignaturesClient {
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 400:
-                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.BadRequestError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -407,14 +422,14 @@ export class SignaturesClient {
     public prepare(
         request: CloudPDF.doc.PrepareSignaturesRequest,
         requestOptions?: SignaturesClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocSignaturesPrepare200Response> {
+    ): core.HttpResponsePromise<CloudPDF.DocSignaturesPrepareResponse> {
         return core.HttpResponsePromise.fromPromise(this.__prepare(request, requestOptions));
     }
 
     private async __prepare(
         request: CloudPDF.doc.PrepareSignaturesRequest,
         requestOptions?: SignaturesClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocSignaturesPrepare200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.DocSignaturesPrepareResponse>> {
         const _body = await core.newFormData();
         await _body.appendFile("file", request.file);
         const _maybeEncodedRequest = await _body.getRequest();
@@ -450,7 +465,7 @@ export class SignaturesClient {
         });
         if (_response.ok) {
             return {
-                data: _response.body as CloudPDF.DocSignaturesPrepare200Response,
+                data: _response.body as CloudPDF.DocSignaturesPrepareResponse,
                 rawResponse: _response.rawResponse,
             };
         }
@@ -458,11 +473,20 @@ export class SignaturesClient {
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 400:
-                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.BadRequestError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 409:
-                    throw new CloudPDF.ConflictError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.ConflictError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,

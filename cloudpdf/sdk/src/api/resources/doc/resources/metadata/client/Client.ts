@@ -45,14 +45,14 @@ export class MetadataClient {
     public get(
         request: CloudPDF.doc.GetMetadataRequest,
         requestOptions?: MetadataClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocMetadataGet200Response> {
+    ): core.HttpResponsePromise<CloudPDF.DocMetadataGetResponse> {
         return core.HttpResponsePromise.fromPromise(this.__get(request, requestOptions));
     }
 
     private async __get(
         request: CloudPDF.doc.GetMetadataRequest,
         requestOptions?: MetadataClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocMetadataGet200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.DocMetadataGetResponse>> {
         const { docId, layerName, "X-Document-Password": documentPassword } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
@@ -81,13 +81,16 @@ export class MetadataClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return { data: _response.body as CloudPDF.DocMetadataGet200Response, rawResponse: _response.rawResponse };
+            return { data: _response.body as CloudPDF.DocMetadataGetResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,

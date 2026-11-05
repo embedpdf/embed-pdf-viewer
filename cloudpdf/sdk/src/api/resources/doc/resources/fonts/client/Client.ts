@@ -46,14 +46,14 @@ export class FontsClient {
     public list(
         request: CloudPDF.doc.ListFontsRequest,
         requestOptions?: FontsClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocFontsList200Response> {
+    ): core.HttpResponsePromise<CloudPDF.DocFontsListResponse> {
         return core.HttpResponsePromise.fromPromise(this.__list(request, requestOptions));
     }
 
     private async __list(
         request: CloudPDF.doc.ListFontsRequest,
         requestOptions?: FontsClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocFontsList200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.DocFontsListResponse>> {
         const { docId, layerName, "X-Document-Password": documentPassword } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
@@ -82,13 +82,16 @@ export class FontsClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return { data: _response.body as CloudPDF.DocFontsList200Response, rawResponse: _response.rawResponse };
+            return { data: _response.body as CloudPDF.DocFontsListResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -129,14 +132,14 @@ export class FontsClient {
     public resolve(
         request: CloudPDF.doc.ResolveFontsRequest,
         requestOptions?: FontsClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocFontsResolve200Response> {
+    ): core.HttpResponsePromise<CloudPDF.DocFontsResolveResponse> {
         return core.HttpResponsePromise.fromPromise(this.__resolve(request, requestOptions));
     }
 
     private async __resolve(
         request: CloudPDF.doc.ResolveFontsRequest,
         requestOptions?: FontsClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocFontsResolve200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.DocFontsResolveResponse>> {
         const { docId, layerName, "X-Document-Password": documentPassword, body: _body } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
@@ -168,15 +171,21 @@ export class FontsClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return { data: _response.body as CloudPDF.DocFontsResolve200Response, rawResponse: _response.rawResponse };
+            return { data: _response.body as CloudPDF.DocFontsResolveResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 400:
-                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.BadRequestError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,

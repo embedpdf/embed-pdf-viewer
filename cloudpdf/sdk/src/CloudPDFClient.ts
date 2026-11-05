@@ -13,7 +13,7 @@ export declare namespace CloudPDFClient {
 
 /** Generated protocol client plus CloudPDF's handwritten workflow layer. */
 export class CloudPDFClient extends GeneratedCloudPDFClient {
-    public readonly uploads: Uploads<CloudPDF.DocumentsCommit200Response.Document>;
+    public readonly uploads: Uploads<CloudPDF.DocumentsCommitResponse.Document>;
 
     public constructor(options: CloudPDFClient.Options = {}) {
         // Generated requests fall back to SaaS by themselves; the passthrough
