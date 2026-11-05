@@ -132,6 +132,7 @@ export class LayerStateService {
         formsVersion: row.formsVersion,
         outlineVersion: row.outlineVersion,
         fontsVersion: row.fontsVersion,
+        contentsVersion: row.contentsVersion,
       };
     }
     return { sha256, byteLength: fallbackByteLength ?? 0, ...INITIAL_BASE_POINTERS };
@@ -299,6 +300,7 @@ export class LayerStateService {
       formsVersion: version.formsVersion,
       outlineVersion: version.outlineVersion,
       fontsVersion: version.fontsVersion,
+      contentsVersion: version.contentsVersion,
       // No layer writes have happened on the base view; a fresh subscriber's
       // gapless cursor starts at 0 ("everything in the log is new to me").
       auditHead: 0,
@@ -328,6 +330,7 @@ export class LayerStateService {
       | 'formsVersion'
       | 'outlineVersion'
       | 'fontsVersion'
+      | 'contentsVersion'
       | 'lastAuditId'
       | 'currentVersion'
       | 'currentArtifactKey'
@@ -350,6 +353,7 @@ export class LayerStateService {
       formsVersion: layer.formsVersion,
       outlineVersion: layer.outlineVersion,
       fontsVersion: layer.fontsVersion,
+      contentsVersion: layer.contentsVersion,
       // Written in the same transaction as the audit append, so a client
       // subscribing from this manifest can never miss a row (gapless cursor).
       auditHead: layer.lastAuditId,
@@ -381,6 +385,8 @@ export class LayerStateService {
     formsVersion?: number;
     /** The font list's pin, when the write changed the fonts the list shows. */
     fontsVersion?: number;
+    /** The contents pin, when the write moved a page's content or the page set. */
+    contentsVersion?: number;
     pages: DurablePageRow[];
   }): CacheDelta {
     return {
@@ -391,6 +397,7 @@ export class LayerStateService {
         : {}),
       ...(input.formsVersion !== undefined ? { formsVersion: input.formsVersion } : {}),
       ...(input.fontsVersion !== undefined ? { fontsVersion: input.fontsVersion } : {}),
+      ...(input.contentsVersion !== undefined ? { contentsVersion: input.contentsVersion } : {}),
       // Every ordinary commit writes an artifact: the layer holds edits not
       // yet sealed into a version (a signature's publish clears it again,
       // and refreshes the manifest instead of sending a delta).

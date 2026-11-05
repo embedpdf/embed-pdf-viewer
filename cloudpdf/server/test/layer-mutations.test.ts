@@ -491,13 +491,15 @@ describe('Phase 5 layer mutation pipeline', () => {
     expect(item.layout.pageCount).toBe(2);
     expect(item.layout.pages.map((page) => page.ref.objectNumber)).toEqual([1, 3]);
     expect(item.layout.pages.map((page) => page.index)).toEqual([0, 1]);
-    // The page set changed: the annotation list and the form move with the layout.
+    // The page set changed: the annotation list, the form and the contents
+    // move with the layout.
     expect(item.meta.cacheDelta).toEqual({
       previousDocVersion: 1,
       docVersion: 2,
       layoutVersion: 2,
       annotationsVersion: 2,
       formsVersion: 2,
+      contentsVersion: 2,
       working: true,
       pages: [],
     });

@@ -41,6 +41,8 @@ export interface CacheDelta {
   outlineVersion?: number;
   /** The fonts list's pin, when the write changed the fonts the list shows. */
   fontsVersion?: number;
+  /** The contents pin, when the write moved a page's content or the page set. */
+  contentsVersion?: number;
   /**
    * The layer's write serial after this mutation and whether an artifact
    * now exists (cloud only). Absorbing them keeps the client's cached

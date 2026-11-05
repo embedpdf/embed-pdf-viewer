@@ -580,7 +580,7 @@ export class CloudDocumentHandle implements DocumentHandle {
         ? { annotationsVersion: delta.annotationsVersion }
         : {}),
       ...(delta?.formsVersion !== undefined ? { formsVersion: delta.formsVersion } : {}),
-      // The plane pins a page-structure, metadata, attachment, outline or font write bumps:
+      // The plane pins a page-structure, metadata, attachment, outline, font or content write bumps:
       // absorbed so the next read addresses the fresh leaf.
       ...(delta?.layoutVersion !== undefined ? { layoutVersion: delta.layoutVersion } : {}),
       ...(delta?.metadataVersion !== undefined ? { metadataVersion: delta.metadataVersion } : {}),
@@ -589,6 +589,7 @@ export class CloudDocumentHandle implements DocumentHandle {
         : {}),
       ...(delta?.outlineVersion !== undefined ? { outlineVersion: delta.outlineVersion } : {}),
       ...(delta?.fontsVersion !== undefined ? { fontsVersion: delta.fontsVersion } : {}),
+      ...(delta?.contentsVersion !== undefined ? { contentsVersion: delta.contentsVersion } : {}),
       // The signing fences: every ordinary commit writes an artifact
       // (`working`), and the layer's write serial when the delta names it.
       ...(delta?.layerVersion !== undefined ? { layerVersion: delta.layerVersion } : {}),

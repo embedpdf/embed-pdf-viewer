@@ -375,29 +375,25 @@ each entry when its work lands, and the section with the last one.
 | Schemas that responses are parsed with are `.strict()`, nested ones too: `point` and `offset` in `Measure.schema.ts`, `WidgetAppearanceSchema`, `FormFieldValueSchema`, `LineLeaderSchema`, `LineDimensionCaptionSchema`, `ShapeDimensionCaptionSchema`, likely more (the unknown-field test finds the rest) | `engine-core` `dto/Measure.schema.ts`, `annotation/kinds/widget.shared.ts`, `forms/schema.ts` |
 | An unknown annotation subtype fails the whole list: `AnnotationSchema` is a `z.discriminatedUnion` with no fallback to `unsupported`                                                                                                                                                                         | `engine-core` `annotation/kinds/index.ts`                                                     |
 | The Python SDK fails a whole annotation list on an unknown subtype (pydantic's discriminator); the TypeScript, Go, Java and C# SDKs keep going                                                                                                                                                               | `fern/generators.yml` (`fern-python-sdk`)                                                     |
-| Search pins a client-computed `epoch` instead of `contentsVersion` and `layoutVersion`; `SEARCH_FOLD_VERSION` reaches no URL                                                                                                                                                                                 | `engine-core` `search/epoch.ts`, `wire/tokens.ts`                                             |
 
 ### Work, before 3.0.0
 
 Everything here is fixed into the 3.0 client or the 3.0.0 server, so it lands
 before 3.0.0. Every cached read is computed at its pins (one helper,
-`readAtPins`), and every token carries its engine value and shape; what is
-left:
+`readAtPins`), every token carries its engine value and shape, and search pins
+`contentsVersion` and `layoutVersion`; what is left:
 
-1. **`contentsVersion`**: a stored counter raised in the write's transaction
-   (a migration, like `annotations_version`), published in the manifest.
-   Search pins it and `layoutVersion` instead of its `epoch`.
-2. **Version headers**: the client sends `EmbedPDF-Version` and checks each
+1. **Version headers**: the client sends `EmbedPDF-Version` and checks each
    feature's minimum server version against `/head`; the server sends
    `EmbedPDF-Server-Version` and lists both in its CORS configuration; the
    headers go into the OpenAPI contract, and `pnpm api:sync` regenerates the
    SDKs to send them.
-3. **Tolerant reading**: no schema that parses responses uses `.strict()`,
+2. **Tolerant reading**: no schema that parses responses uses `.strict()`,
    nested ones included; an unknown annotation subtype parses as
    `unsupported` and a malformed known one still fails; the enums in responses
    are each given a fallback or marked closed; the Python SDK reads an unknown
    subtype; each SDK's generation check parses a fixture with unknown values.
-4. **Conformance** (both engines): the unknown-field test over real responses;
+3. **Conformance** (both engines): the unknown-field test over real responses;
    two servers with different `CLOUDPDF_FONTS` behind one round-robin address
    answer every request, and nothing is cached under a value that doesn't
    describe it; a request without `EmbedPDF-Version` is answered as the

@@ -9181,6 +9181,11 @@
             "exclusiveMinimum": true,
             "minimum": 0
           },
+          "contentsVersion": {
+            "type": "integer",
+            "exclusiveMinimum": true,
+            "minimum": 0
+          },
           "layerVersion": {
             "type": "integer",
             "minimum": 0
@@ -29531,6 +29536,12 @@
             "default": 1
           },
           "fontsVersion": {
+            "type": "integer",
+            "exclusiveMinimum": true,
+            "minimum": 0,
+            "default": 1
+          },
+          "contentsVersion": {
             "type": "integer",
             "exclusiveMinimum": true,
             "minimum": 0,
