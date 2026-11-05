@@ -470,6 +470,12 @@ export {
   type EngineValues,
   type TokenPin,
 } from './wire/cachedReads';
+export {
+  API_VERSION,
+  apiVersionOf,
+  parseApiVersion,
+  type ApiVersion,
+} from './wire/apiVersion';
 export type {
   AnnotationsExportToken,
   FontsToken,

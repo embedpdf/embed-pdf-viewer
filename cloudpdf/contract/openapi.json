@@ -16,6 +16,12 @@
       "x-fern-server-name": "Saas"
     }
   ],
+  "x-fern-global-headers": [
+    {
+      "header": "EmbedPDF-Version",
+      "type": "literal<\"3.0\">"
+    }
+  ],
   "paths": {
     "/v1/deployment/license/status": {
       "get": {

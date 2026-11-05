@@ -1,5 +1,6 @@
 import { describe, expect, test, vi } from 'vitest';
 import { AbortError } from '@embedpdf/engine-core/runtime';
+import { API_VERSION } from '@embedpdf/engine-core/wire';
 import { HttpClient } from '../src/transport/HttpClient';
 
 /**
@@ -192,6 +193,21 @@ describe('one client per open document', () => {
   });
 });
 
+describe('EmbedPDF-Version', () => {
+  test('every request to the server itself says which version the client speaks', async () => {
+    const { fetch, calls } = scriptedFetch([{ status: 200, body: {} }]);
+    const http = client(fetch);
+    await http.getJson('/v1/docs/docZ/head', (raw) => raw, signal());
+    await http.postJson('/v1/docs/docZ/annotations', {}, (raw) => raw, signal(), {
+      write: { opId: 'op1' },
+    });
+    expect(calls.map((call) => new Headers(call.init.headers).get('embedpdf-version'))).toEqual([
+      API_VERSION,
+      API_VERSION,
+    ]);
+  });
+});
+
 describe('reading through a CDN', () => {
   const textPath = '/v1/docs/d1/layers/default/text/pages/obj:3/data@contentVersion=1';
   const binding = {
@@ -213,6 +229,8 @@ describe('reading through a CDN', () => {
     http.setCdnAccess(binding);
     await http.getBytes(textPath, signal());
     expect(calls[0]!.url).toBe(`https://cdn.example.test${textPath}?token=signed`);
+    // A CDN serves cached reads, which never depend on the client's version.
+    expect(new Headers(calls[0]!.init.headers).get('embedpdf-version')).toBeNull();
   });
 
   test('cdn: false reads from the server itself, CDN credentials or not', async () => {
