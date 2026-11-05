@@ -5,6 +5,7 @@ import type * as CloudPDF from "../index.js";
 export interface DocFormsDeleteWidget200Response {
     widget: CloudPDF.AnnotationRef;
     page: CloudPDF.PageRef;
+    /** A form field, by its `family`. A newer server can add families: read one your client doesn't know as `unknown`, keeping the fields every field has, with `rawValue` an empty string when the body has none. */
     field: CloudPDF.FormField | null;
     meta: CloudPDF.FormMutationMeta;
 }

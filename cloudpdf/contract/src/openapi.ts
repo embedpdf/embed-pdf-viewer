@@ -65,7 +65,7 @@ const ENGINE_ERROR_REF = '#/components/schemas/EngineErrorPayload';
  * projection refers to the component instead of inlining it, so SDK
  * generators make one type per model, not one per place it appears.
  */
-const SHARED_COMPONENT_SCHEMAS = sharedComponents([
+export const SHARED_COMPONENT_SCHEMAS = sharedComponents([
   {
     AdminErrorPayload: AdminErrorPayloadSchema,
     EngineErrorPayload: EngineErrorPayloadSchema,

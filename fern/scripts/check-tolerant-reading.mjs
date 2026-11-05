@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 
-// Checks that a generated SDK reads a response from a newer server: the
-// fixture is an annotation list with an unknown field (at the top and nested),
-// an annotation of a subtype the SDK doesn't know, and an enum value it doesn't
-// know (docs/conventions/api-evolution.md, "Reading tolerantly"). Each language
-// reads it the way its client reads an annotation list response.
+// Checks that a generated SDK reads responses from a newer server: an
+// annotation list and a form with unknown fields (at the top and nested), an
+// enum value the SDK doesn't know, and a kind it doesn't know in each open
+// union (docs/conventions/api-evolution.md, "Reading tolerantly";
+// fern/tolerant-reading/open-unions.json). Each language reads them the way
+// its client reads an annotation list and a form response.
 //
 //   node fern/scripts/check-tolerant-reading.mjs <language>
 //
@@ -23,8 +24,11 @@ import { LANGUAGES } from './sdk-version.mjs';
 
 const repositoryDirectory = fileURLToPath(new URL('../../', import.meta.url));
 const checks = `${repositoryDirectory}fern/tolerant-reading`;
-const fixture = `${checks}/annotation-list.json`;
-const expected = 'annotations: 3';
+const fixtures = {
+  CLOUDPDF_ANNOTATIONS_FIXTURE: `${checks}/annotation-list.json`,
+  CLOUDPDF_FORM_FIXTURE: `${checks}/form.json`,
+};
+const expected = ['annotations: 5', 'fields: 2'];
 
 function sdkDirectory(language) {
   return language === 'typescript'
@@ -109,7 +113,7 @@ function planFor(language, sdk) {
 function run([command, args], cwd, env) {
   const result = spawnSync(command, args, {
     cwd,
-    env: { ...process.env, ...env, CLOUDPDF_FIXTURE: fixture },
+    env: { ...process.env, ...env, ...fixtures },
     encoding: 'utf8',
   });
   if (result.error) throw result.error;
@@ -138,12 +142,12 @@ function main() {
       if (prepared.status !== 0) throw new Error(`${language}: ${prepared.output}`);
     }
     const { status, output } = run(plan.run, plan.cwd, plan.env);
-    if (status !== 0 || (plan.prints && !output.includes(expected))) {
+    if (status !== 0 || (plan.prints && !expected.every((line) => output.includes(line)))) {
       throw new Error(
-        `${language}: the SDK doesn't read a response from a newer server\n${output}`,
+        `${language}: the SDK doesn't read responses from a newer server\n${output}`,
       );
     }
-    console.log(`${language}: reads a response from a newer server (${expected})`);
+    console.log(`${language}: reads responses from a newer server (${expected.join(', ')})`);
   } finally {
     for (const target of copied) rmSync(target, { force: true });
     plan.cleanup?.();

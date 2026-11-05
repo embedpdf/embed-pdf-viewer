@@ -187,58 +187,17 @@ if (language === 'python') {
     );
   }
 
-  // Clients read an annotation of a subtype they don't know, one a newer
-  // server sends, as `unsupported` (docs/conventions/api-evolution.md,
-  // "Reading tolerantly"). fern-python-sdk 5.26.0 has no setting for it: the
+  // Clients read an object of a kind they don't know, one a newer server
+  // sends, as its union's catch-all (docs/conventions/api-evolution.md,
+  // "Reading tolerantly"). fern-python-sdk 5.26.0 has no setting for it: each
   // union dispatches with pydantic's `discriminator`, which refuses an unknown
-  // tag and with it the whole list. Put a validator in front of that dispatch
-  // that turns an unknown subtype into `unsupported`; a known one goes on to
-  // its model as before. Fail if Fern changes the union's shape.
-  const annotationPath = `${outputDirectory}/src/cloudpdf/types/annotation.py`;
-  const annotationSource = readFileSync(annotationPath, 'utf8');
-  const generatedDispatch =
-    '        Annotation_Unsupported,\n    ],\n    pydantic.Field(discriminator="subtype"),\n]\n';
-  const unknownSubtypeAsUnsupported = `
-
-# An annotation of a subtype this SDK doesn't know, one a newer server sends,
-# reads as \`unsupported\`: the fields every annotation has, with
-# \`rawSubtypeCode\` and \`rawSubtypeName\` from the body when it carries them and
-# 0 and None when it doesn't. A subtype it knows is read as that subtype.
-# Added after generation by fern/scripts/record-sdk-metadata.mjs.
-if IS_PYDANTIC_V2:
-    _ANNOTATION_SUBTYPES = frozenset(
-        member.model_fields["subtype"].default
-        for member in typing.get_args(typing.get_args(Annotation)[0])
-    )
-
-    def _read_unknown_subtype_as_unsupported(value: typing.Any) -> typing.Any:
-        if not isinstance(value, dict):
-            return value
-        subtype = value.get("subtype")
-        if not isinstance(subtype, str) or subtype in _ANNOTATION_SUBTYPES:
-            return value
-        raw_code = value.get("rawSubtypeCode")
-        raw_name = value.get("rawSubtypeName")
-        return {
-            **value,
-            "subtype": "unsupported",
-            "rawSubtypeCode": raw_code if isinstance(raw_code, int) and not isinstance(raw_code, bool) else 0,
-            "rawSubtypeName": raw_name if isinstance(raw_name, str) else None,
-        }
-
-    Annotation = typing_extensions.Annotated[  # type: ignore[misc]
-        Annotation, pydantic.BeforeValidator(_read_unknown_subtype_as_unsupported)
-    ]
-`;
-  if (!annotationSource.endsWith(unknownSubtypeAsUnsupported)) {
-    if (
-      !annotationSource.endsWith(generatedDispatch) ||
-      !annotationSource.includes('\nAnnotation = typing_extensions.Annotated[\n    typing.Union[\n')
-    ) {
-      throw new Error('Python Annotation union changed; revisit the unknown-subtype patch');
-    }
-    writeFileSync(annotationPath, annotationSource + unknownSubtypeAsUnsupported);
-  }
+  // tag and with it the whole response. Put a validator in front of each open
+  // union's dispatch that turns an unknown kind into the catch-all; a known
+  // one goes on to its model as before. Fail if Fern changes a union's shape.
+  const openUnions = JSON.parse(
+    readFileSync(`${repositoryDirectory}fern/tolerant-reading/open-unions.json`, 'utf8'),
+  );
+  for (const union of openUnions) readUnknownKindAsCatchAll(union);
 }
 
 // The Ruby generator intentionally leaves registry metadata in its generated
@@ -462,4 +421,85 @@ signing {
 }
 `);
   writeFileSync(projectPath, project);
+}
+
+/**
+ * Appends to a Python open union's module a validator that reads a kind the
+ * SDK doesn't know as the union's catch-all (one row of
+ * fern/tolerant-reading/open-unions.json): the body's fields, with each
+ * `fill` field kept when the body carries it as its type and `otherwise`
+ * when it doesn't. Running it again leaves the module as it is.
+ */
+function readUnknownKindAsCatchAll({ name, tag, catchAll, fill }) {
+  const snake = (text) => text.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
+  const pythonValue = (value) => (value === null ? 'None' : JSON.stringify(value));
+  const isType = {
+    integer: (variable) => `isinstance(${variable}, int) and not isinstance(${variable}, bool)`,
+    string: (variable) => `isinstance(${variable}, str)`,
+  };
+  const modulePath = `${outputDirectory}/src/cloudpdf/types/${snake(name)}.py`;
+  const source = readFileSync(modulePath, 'utf8');
+  // Each union is its own module, so its names can't meet another union's.
+  const known = '_KNOWN_KINDS';
+  const reader = `_read_unknown_${tag}_as_${snake(catchAll)}`;
+  const comment = (text) =>
+    text
+      .split(' ')
+      .reduce(
+        (lines, word) => {
+          const last = lines[lines.length - 1];
+          if (`${last} ${word}`.length > 79) lines.push(`# ${word}`);
+          else lines[lines.length - 1] = `${last} ${word}`;
+          return lines;
+        },
+        ['#'],
+      )
+      .join('\n');
+  const reads = fill.map(({ field }) => `        ${snake(field)} = value.get("${field}")\n`);
+  const fills = fill.map(
+    ({ field, is, otherwise }) =>
+      `            "${field}": ${snake(field)} if ${isType[is](snake(field))} else ${pythonValue(otherwise)},\n`,
+  );
+  const kept =
+    fill.length === 0
+      ? ''
+      : `, keeping ${fill.map(({ field }) => `\`${field}\``).join(' and ')} when the body carries ${fill.length === 1 ? 'it' : 'them'}`;
+  const patch = `
+
+${comment(
+  `A ${name} of a ${tag} this SDK doesn't know, one a newer server sends, reads as ` +
+    `\`${catchAll}\`${kept}. A ${tag} it knows is read as that ${tag}. Added after ` +
+    'generation by fern/scripts/record-sdk-metadata.mjs from ' +
+    'fern/tolerant-reading/open-unions.json.',
+)}
+if IS_PYDANTIC_V2:
+    ${known} = frozenset(
+        member.model_fields["${tag}"].default
+        for member in typing.get_args(typing.get_args(${name})[0])
+    )
+
+    def ${reader}(value: typing.Any) -> typing.Any:
+        if not isinstance(value, dict):
+            return value
+        ${tag}_ = value.get("${tag}")
+        if not isinstance(${tag}_, str) or ${tag}_ in ${known}:
+            return value
+${reads.join('')}        return {
+            **value,
+            "${tag}": "${catchAll}",
+${fills.join('')}        }
+
+    ${name} = typing_extensions.Annotated[  # type: ignore[misc]
+        ${name}, pydantic.BeforeValidator(${reader})
+    ]
+`;
+  if (source.endsWith(patch)) return;
+  const pascal = catchAll.replace(/(^|-)([a-z])/g, (_, __, letter) => letter.toUpperCase());
+  const dispatch = new RegExp(
+    `\\n${name} = typing_extensions\\.Annotated\\[\\n    typing\\.Union\\[[^\\]]*\\b${name}_${pascal}\\b[^\\]]*\\],\\n    pydantic\\.Field\\(discriminator="${tag}"\\),\\n\\]\\n$`,
+  );
+  if (!dispatch.test(source) || !source.includes('IS_PYDANTIC_V2')) {
+    throw new Error(`Python ${name} union changed; revisit its unknown-${tag} patch`);
+  }
+  writeFileSync(modulePath, source + patch);
 }

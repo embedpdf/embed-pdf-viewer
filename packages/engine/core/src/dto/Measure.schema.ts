@@ -58,6 +58,9 @@ export const PageScaleInputSchema = z.object({ measure: PdfMeasureWriteSchema.nu
 export const PdfMeasurementSchema = withCatchAll(
   z.discriminatedUnion('subtype', [PdfMeasureSchema, geoMeasure, unknownMeasure]),
   'unknown',
+).describe(
+  "A measure, by its `subtype`. A newer server can add subtypes: read one your client doesn't " +
+    'know as `unknown`.',
 );
 export const PageMeasurementViewportSchema = z.object({
   bbox: PageBoxSchema,

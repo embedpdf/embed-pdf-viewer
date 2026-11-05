@@ -62,9 +62,15 @@ The client parses every response with the wire schemas in
   a catch-all kind. `readingProblems()` in `@embedpdf/engine-core/conformance`
   names every object that refuses unknown fields and every set that says
   neither; the contract's tests run it on every response.
-- **The generated SDKs read the same way.** Each SDK's generation check parses
-  a fixture response with an unknown field, an unknown annotation subtype and
-  an unknown enum value.
+- **The generated SDKs read the same way.** Every union with a catch-all is a
+  named component in the contract, so each SDK makes one type of it, and its
+  description tells a client author what an unknown kind reads as. Each SDK's
+  generation check reads fixture responses with an unknown field, an unknown
+  enum value and an unknown kind in every such union.
+  `fern/tolerant-reading/open-unions.json` lists the unions: the checks read
+  it, and so does the Python SDK's patch after generation, since
+  fern-python-sdk refuses an unknown kind. The contract's tests fail when a
+  union with a catch-all has no name, no row there or no fixture case.
 
 ## Versions on the wire
 
@@ -378,14 +384,7 @@ Routes are under `/v1/docs/:docId`, and each document route has a
 `engine` (that kind's value from `/head`) and `shape` (the client's number for
 that kind). A new cached read adds a row here.
 
-## Where the code is today
-
-This section lists where the code doesn't follow the rules above yet. Delete
-each entry when its work lands, and the section with the last one.
-
-| Gap                                                                                                                                                                                                                                                                         | Where                                                                             |
-| :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------- |
-| The Python SDK reads an unknown annotation subtype, but its other open unions still refuse an unknown kind: form fields, value entries, measures, link and outline targets, actions. Fern inlines each into separate Python types, which the annotation patch doesn't reach | `fern/scripts/record-sdk-metadata.mjs`, `fern/generators.yml` (`fern-python-sdk`) |
+## What's left
 
 ### Work, before 3.0.0
 

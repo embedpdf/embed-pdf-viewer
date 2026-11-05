@@ -49,6 +49,7 @@ export interface WidgetAnnotation {
     caption: string | null;
     checkStyle: WidgetAnnotation.CheckStyle | null;
     field: CloudPDF.FormFieldRef | null;
+    /** Its field's family. A newer server can add families: read one your client doesn't know as `unknown`. */
     fieldFamily: WidgetAnnotation.FieldFamily;
     hasMark: boolean;
 }
@@ -129,6 +130,7 @@ export namespace WidgetAnnotation {
         Diamond: "diamond",
     } as const;
     export type CheckStyle = (typeof CheckStyle)[keyof typeof CheckStyle];
+    /** Its field's family. A newer server can add families: read one your client doesn't know as `unknown`. */
     export const FieldFamily = {
         Text: "text",
         Checkbox: "checkbox",

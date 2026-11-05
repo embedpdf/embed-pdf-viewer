@@ -2,26 +2,29 @@
 
 import type * as CloudPDF from "../index.js";
 
-export type AnnotationPolygonMeasure =
-    | CloudPDF.AnnotationPolygonMeasure.Rectilinear
-    | CloudPDF.AnnotationPolygonMeasure.Geospatial
-    | CloudPDF.AnnotationPolygonMeasure.Unknown;
+/**
+ * A measure, by its `subtype`. A newer server can add subtypes: read one your client doesn't know as `unknown`.
+ */
+export type PdfMeasurement =
+    | CloudPDF.PdfMeasurement.Rectilinear
+    | CloudPDF.PdfMeasurement.Geospatial
+    | CloudPDF.PdfMeasurement.Unknown;
 
-export namespace AnnotationPolygonMeasure {
+export namespace PdfMeasurement {
     export interface Rectilinear {
         subtype: "rectilinear";
         ratio?: string | undefined;
-        x: AnnotationPolygonMeasureRectilinear.X.Item[];
-        y?: AnnotationPolygonMeasureRectilinear.Y.Item[] | undefined;
-        distance: AnnotationPolygonMeasureRectilinear.Distance.Item[];
-        area: AnnotationPolygonMeasureRectilinear.Area.Item[];
-        angle?: AnnotationPolygonMeasureRectilinear.Angle.Item[] | undefined;
-        slope?: AnnotationPolygonMeasureRectilinear.Slope.Item[] | undefined;
-        origin?: AnnotationPolygonMeasureRectilinear.Origin | undefined;
+        x: PdfMeasurementRectilinear.X.Item[];
+        y?: PdfMeasurementRectilinear.Y.Item[] | undefined;
+        distance: PdfMeasurementRectilinear.Distance.Item[];
+        area: PdfMeasurementRectilinear.Area.Item[];
+        angle?: PdfMeasurementRectilinear.Angle.Item[] | undefined;
+        slope?: PdfMeasurementRectilinear.Slope.Item[] | undefined;
+        origin?: PdfMeasurementRectilinear.Origin | undefined;
         cyx?: number | undefined;
     }
 
-    export namespace AnnotationPolygonMeasureRectilinear {
+    export namespace PdfMeasurementRectilinear {
         export type X = X.Item[];
 
         export namespace X {

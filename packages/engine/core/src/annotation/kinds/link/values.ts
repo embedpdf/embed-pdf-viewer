@@ -23,6 +23,9 @@ function linkTargetSchemasFor<Destination>(destination: z.ZodType<Destination>) 
       z.object({ kind: z.literal('unsupported') }),
     ]) as unknown as z.ZodType<PdfLinkTarget<Destination>>,
     'unsupported',
+  ).describe(
+    'Where a link goes, by its `kind`. A newer server can add kinds: read one your client ' +
+      "doesn't know as `unsupported`.",
   );
   /** Drafts and patches author `goto`, `uri` and the standard named verbs; see {@link PdfLinkTargetWritable}. */
   const named = z.object({

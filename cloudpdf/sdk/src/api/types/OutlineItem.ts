@@ -6,6 +6,7 @@ export interface OutlineItem {
     ref: CloudPDF.OutlineItemRef;
     parent: CloudPDF.OutlineItemRef | null;
     title: string;
+    /** Where a link goes, by its `kind`. A newer server can add kinds: read one your client doesn't know as `unsupported`. */
     target: CloudPDF.PdfLinkTarget | null;
     action: CloudPDF.PdfActionTree | null;
     open: boolean;

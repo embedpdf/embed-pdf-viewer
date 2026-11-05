@@ -7,9 +7,9 @@ import (
 	"testing"
 )
 
-// Reads the fixture the way the client reads an annotation list response.
+// Reads the fixtures the way the client reads an annotation list and a form response.
 func TestTolerantReading(t *testing.T) {
-	body, err := os.ReadFile(os.Getenv("CLOUDPDF_FIXTURE"))
+	body, err := os.ReadFile(os.Getenv("CLOUDPDF_ANNOTATIONS_FIXTURE"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -18,7 +18,20 @@ func TestTolerantReading(t *testing.T) {
 		t.Fatal(err)
 	}
 	fmt.Printf("annotations: %d\n", len(list.Annotations))
-	if len(list.Annotations) != 3 {
-		t.Fatalf("read %d annotations, expected 3", len(list.Annotations))
+	if len(list.Annotations) != 5 {
+		t.Fatalf("read %d annotations, expected 5", len(list.Annotations))
+	}
+
+	body, err = os.ReadFile(os.Getenv("CLOUDPDF_FORM_FIXTURE"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var form DocFormsList200Response
+	if err := json.Unmarshal(body, &form); err != nil {
+		t.Fatal(err)
+	}
+	fmt.Printf("fields: %d\n", len(form.Fields))
+	if len(form.Fields) != 2 {
+		t.Fatalf("read %d fields, expected 2", len(form.Fields))
 	}
 }

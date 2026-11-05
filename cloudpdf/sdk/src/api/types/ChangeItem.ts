@@ -234,12 +234,14 @@ export namespace ChangeItem {
         type: "forms.deleteWidget";
         widget: CloudPDF.AnnotationRef;
         page: CloudPDF.PageRef;
+        /** A form field, by its `family`. A newer server can add families: read one your client doesn't know as `unknown`, keeping the fields every field has, with `rawValue` an empty string when the body has none. */
         field: CloudPDF.FormField | null;
         meta: CloudPDF.FormMutationMeta;
     }
 
     export interface FormsRestoreWidget {
         type: "forms.restoreWidget";
+        /** A form field, by its `family`. A newer server can add families: read one your client doesn't know as `unknown`, keeping the fields every field has, with `rawValue` an empty string when the body has none. */
         field: CloudPDF.FormField | null;
         widgets: CloudPDF.WidgetAnnotation[];
         meta: CloudPDF.FormMutationMeta;

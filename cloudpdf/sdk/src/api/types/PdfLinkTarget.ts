@@ -2,6 +2,9 @@
 
 import type * as CloudPDF from "../index.js";
 
+/**
+ * Where a link goes, by its `kind`. A newer server can add kinds: read one your client doesn't know as `unsupported`.
+ */
 export type PdfLinkTarget =
     | CloudPDF.PdfLinkTarget.Goto
     | CloudPDF.PdfLinkTarget.Uri

@@ -166,6 +166,10 @@ export const AnnotationSchema: z.ZodType<Annotation> = withCatchAll(
     rawSubtypeName:
       typeof annotation.rawSubtypeName === 'string' ? annotation.rawSubtypeName : null,
   }),
+).describe(
+  'An annotation, by its `subtype`. A newer server can add subtypes: read one your client ' +
+    "doesn't know as `unsupported`, keeping the fields every annotation has, with " +
+    '`rawSubtypeCode` 0 and `rawSubtypeName` null when the body has neither.',
 );
 
 /** Validates a create's data against its kind. */
