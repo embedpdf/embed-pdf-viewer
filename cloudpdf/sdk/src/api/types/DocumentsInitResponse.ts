@@ -29,8 +29,8 @@ export namespace DocumentsInitResponse {
             failureReason: string | null;
             thumbnailState: Document.ThumbnailState;
             thumbnailUrl: string | null;
-            createdAt: number;
-            updatedAt: number;
+            createdAt: string;
+            updatedAt: string;
             createdBy: string | null;
         }
 
@@ -73,8 +73,8 @@ export namespace DocumentsInitResponse {
             failureReason: string | null;
             thumbnailState: Document.ThumbnailState;
             thumbnailUrl: string | null;
-            createdAt: number;
-            updatedAt: number;
+            createdAt: string;
+            updatedAt: string;
             createdBy: string | null;
         }
 
@@ -116,8 +116,8 @@ export namespace DocumentsInitResponse {
             failureReason: string | null;
             thumbnailState: Document.ThumbnailState;
             thumbnailUrl: string | null;
-            createdAt: number;
-            updatedAt: number;
+            createdAt: string;
+            updatedAt: string;
             createdBy: string | null;
         }
 

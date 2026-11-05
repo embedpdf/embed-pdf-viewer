@@ -337,7 +337,7 @@ describe('grant sessions (SDK)', () => {
       fetch: browserFetch('https://x.example'),
     });
     expect(session.docId).toBe('doc-sdk-pass');
-    expect(session.expiresAt).toBeGreaterThan(Date.now() / 1000);
+    expect(Date.parse(session.expiresAt)).toBeGreaterThan(Date.now());
 
     // The typed error is an instanceof, not just a shape.
     try {

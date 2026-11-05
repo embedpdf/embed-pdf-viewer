@@ -465,6 +465,8 @@ function registerSchema(
   const componentPath = ['components', 'schemas', name];
   const referenced = zodToJsonSchema(schema, {
     target: 'openApi3',
+    // A `Date` a write takes in process arrives over HTTP as its ISO string.
+    dateStrategy: 'format:date-time',
     $refStrategy: 'root',
     basePath: ['#', ...componentPath],
     override: (definition) => {

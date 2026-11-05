@@ -55,6 +55,7 @@ import type { CdnSigner, PurgeInput, PurgeReceipt, SignInput } from '../CdnSigne
 import { cloudfrontBase64 } from '../util/base64url';
 import { buildBaseUrlOverrides } from '../util/baseUrlOverrides';
 import { rsaSha1Sign } from '../util/rsa';
+import { isoTimeOfSeconds } from '../../time';
 
 export interface CloudFrontCdnSignerOptions {
   distributionDomain: string;
@@ -131,7 +132,7 @@ export class CloudFrontCdnSigner implements CdnSigner {
             ];
       return {
         adapter: 'cloudfront',
-        expiresAt: input.expiresAt,
+        expiresAt: isoTimeOfSeconds(input.expiresAt),
         cache: { scope: 'edge-shared', immutableVersionedReads: true },
         baseUrlOverrides,
         authHeader: null,
@@ -160,7 +161,7 @@ export class CloudFrontCdnSigner implements CdnSigner {
     });
     return {
       adapter: 'cloudfront',
-      expiresAt: input.expiresAt,
+      expiresAt: isoTimeOfSeconds(input.expiresAt),
       cache: { scope: 'edge-shared', immutableVersionedReads: true },
       baseUrlOverrides,
       authHeader: null,

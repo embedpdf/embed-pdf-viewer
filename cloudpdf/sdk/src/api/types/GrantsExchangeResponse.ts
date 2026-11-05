@@ -6,7 +6,7 @@ export interface GrantsExchangeResponse {
     layerName: string;
     layerMode: GrantsExchangeResponse.LayerMode;
     visitor: GrantsExchangeResponse.Visitor;
-    expiresAt: number;
+    expiresAt: string;
 }
 
 export namespace GrantsExchangeResponse {

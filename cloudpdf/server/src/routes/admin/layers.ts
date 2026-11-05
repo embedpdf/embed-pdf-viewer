@@ -1,4 +1,4 @@
-import { adminOperations, type AdminOperation } from '@cloudpdf/contract';
+import { adminOperations, type AdminLayerRecord, type AdminOperation } from '@cloudpdf/contract';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
 import { decodeListCursor, encodeListCursor } from './_cursor';
@@ -8,6 +8,7 @@ import type { DocumentsRepo } from '../../db/repos/documents.repo';
 import type { GrantsRepo } from '../../db/repos/grants.repo';
 import type { LayersRepo, ListedLayer } from '../../db/repos/page_state.repo';
 import { errorBody } from '../_helpers';
+import { isoTime, isoTimeOrNull } from '../../time';
 
 export interface AdminLayersRoutesDeps {
   /** `LayerService.deleteLayer` where the engine runs, else `deleteStoredLayer`. */
@@ -81,15 +82,15 @@ export async function registerAdminLayersRoutes(
   });
 }
 
-function layerPublic(layer: ListedLayer): Record<string, unknown> {
+function layerPublic(layer: ListedLayer): AdminLayerRecord {
   return {
     docId: layer.docId,
     layerName: layer.name,
     grantId: layer.grantId,
     visitorId: layer.visitorId,
     storageSizeBytes: layer.storageSizeBytes,
-    createdAt: layer.createdAt,
-    updatedAt: layer.updatedAt,
-    lastSeenAt: layer.lastSeenAt,
+    createdAt: isoTime(layer.createdAt),
+    updatedAt: isoTime(layer.updatedAt),
+    lastSeenAt: isoTimeOrNull(layer.lastSeenAt),
   };
 }

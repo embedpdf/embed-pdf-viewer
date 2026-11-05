@@ -1,6 +1,7 @@
 import type { DocCapability } from '@embedpdf/engine-core/runtime';
 import {
   closed,
+  IsoDateTimeSchema,
   ChangeRequestSchema,
   ChangeResponseSchema,
   PageScaleInputSchema,
@@ -57,6 +58,13 @@ import { z } from 'zod';
 
 const sha256Hex = /^[0-9a-f]{64}$/i;
 const docIdPattern = /^[A-Za-z0-9_-]+$/;
+
+/**
+ * A point in time a request gives: ISO 8601 with its offset (`Z` or
+ * `±HH:mm`), as every response says one. Without an offset the moment would
+ * depend on the server's zone, so it's refused.
+ */
+const InstantInputSchema = z.string().datetime({ offset: true });
 /**
  * Tenant ids share the doc-id charset: URL-safe by construction, since
  * they appear in every tenant-scoped path (and therefore in logs — do
@@ -207,8 +215,8 @@ export const AdminDocumentRecordSchema = z.object({
   thumbnailState: closed(z.enum(['pending', 'ready', 'locked', 'failed'])),
   /** Where to fetch the tile once `thumbnailState` is `ready`; null before. */
   thumbnailUrl: z.string().nullable(),
-  createdAt: z.number().int(),
-  updatedAt: z.number().int(),
+  createdAt: IsoDateTimeSchema,
+  updatedAt: IsoDateTimeSchema,
   createdBy: z.string().nullable(),
 });
 export type AdminDocumentRecord = z.infer<typeof AdminDocumentRecordSchema>;
@@ -233,7 +241,8 @@ export const AdminPresignedUploadSchema = z.object({
   url: z.string(),
   headers: z.record(z.string(), z.string()),
   method: closed(z.literal('PUT')),
-  expiresAt: z.number().int(),
+  /** When the URL stops taking the upload. */
+  expiresAt: IsoDateTimeSchema,
 });
 export type AdminPresignedUpload = z.infer<typeof AdminPresignedUploadSchema>;
 
@@ -499,8 +508,8 @@ export const FolderRecordSchema = z.object({
   tenantId: z.string(),
   parentId: z.string().describe('The folder it is in, or root.'),
   name: z.string(),
-  createdAt: z.number().int(),
-  updatedAt: z.number().int(),
+  createdAt: IsoDateTimeSchema,
+  updatedAt: IsoDateTimeSchema,
   createdBy: z.string().nullable(),
 });
 export type FolderRecord = z.infer<typeof FolderRecordSchema>;
@@ -618,12 +627,12 @@ export const AdminLayerRecordSchema = z.object({
   visitorId: z.string().nullable(),
   /** Bytes the layer stores: its changes over the document, not the whole PDF. */
   storageSizeBytes: z.number().int().nullable(),
-  /** Unix epoch ms of its first change. */
-  createdAt: z.number().int(),
-  /** Unix epoch ms of its last change. */
-  updatedAt: z.number().int(),
-  /** A visitor's layer: Unix epoch ms the visitor last opened it; null otherwise. */
-  lastSeenAt: z.number().int().nullable(),
+  /** Its first change. */
+  createdAt: IsoDateTimeSchema,
+  /** Its last change. */
+  updatedAt: IsoDateTimeSchema,
+  /** A visitor's layer: when the visitor last opened it; null otherwise. */
+  lastSeenAt: IsoDateTimeSchema.nullable(),
 });
 export type AdminLayerRecord = z.infer<typeof AdminLayerRecordSchema>;
 
@@ -658,11 +667,11 @@ export const AdminTokenRevokeRequestSchema = z.object({
   /** Optional human reason, written to the audit row. */
   reason: z.string().max(1024).optional(),
   /**
-   * The token's `exp` (unix seconds); the revocation row is garbage-collected
-   * once the token would have expired anyway. Defaults server-side to
-   * now + 30 days.
+   * When the token expires (its `exp`); the revocation row is
+   * garbage-collected once the token would have expired anyway. Defaults
+   * server-side to 30 days from now.
    */
-  expiresAtSeconds: z.number().int().positive().optional(),
+  expiresAt: InstantInputSchema.optional(),
 });
 export type AdminTokenRevokeRequest = z.infer<typeof AdminTokenRevokeRequestSchema>;
 
@@ -713,7 +722,7 @@ export const AdminTenantRecordSchema = z.object({
    * Optional because older servers omit it.
    */
   features: z.array(TenantFeatureSchema).optional(),
-  createdAt: z.number().int(),
+  createdAt: IsoDateTimeSchema,
 });
 export type AdminTenantRecord = z.infer<typeof AdminTenantRecordSchema>;
 
@@ -910,8 +919,8 @@ export type AdminTokenIssueRequest = z.infer<typeof AdminTokenIssueRequestSchema
 export const AdminTokenIssueResponseSchema = z.object({
   token: z.string(),
   jti: z.string(),
-  /** Unix seconds. */
-  expiresAt: z.number().int(),
+  /** When the token expires. */
+  expiresAt: IsoDateTimeSchema,
 });
 export type AdminTokenIssueResponse = z.infer<typeof AdminTokenIssueResponseSchema>;
 
@@ -1061,18 +1070,18 @@ export const GrantRecordSchema = z.object({
   /** Paused grants refuse exchange (404) but keep their configuration. */
   disabled: z.boolean(),
   /**
-   * Unix epoch ms the grant was archived: it refuses exchange for good and
-   * keeps what its visitors made. Null while it works.
+   * When the grant was archived: it refuses exchange for good and keeps what
+   * its visitors made. Null while it works.
    */
-  archivedAt: z.number().int().nullable(),
-  /** Unix epoch ms after which exchange returns 410; null = no expiry. */
-  expiresAt: z.number().int().nullable(),
+  archivedAt: IsoDateTimeSchema.nullable(),
+  /** When exchange starts returning 410; null = no expiry. */
+  expiresAt: IsoDateTimeSchema.nullable(),
   /** Total successful exchanges — a dashboard convenience, not the usage meter. */
   exchangeCount: z.number().int(),
-  lastExchangedAt: z.number().int().nullable(),
+  lastExchangedAt: IsoDateTimeSchema.nullable(),
   createdBy: z.string(),
-  createdAt: z.number().int(),
-  updatedAt: z.number().int(),
+  createdAt: IsoDateTimeSchema,
+  updatedAt: IsoDateTimeSchema,
 });
 export type GrantRecord = z.infer<typeof GrantRecordSchema>;
 
@@ -1124,8 +1133,8 @@ export const GrantCreateRequestSchema = z.object({
     .min(60)
     .max(60 * 60)
     .optional(),
-  /** Unix epoch ms after which the grant stops exchanging; left out or `null` for no expiry. */
-  expiresAt: z.number().int().positive().nullable().optional(),
+  /** When the grant stops exchanging; left out or `null` for no expiry. */
+  expiresAt: InstantInputSchema.nullable().optional(),
 });
 export type GrantCreateRequest = z.infer<typeof GrantCreateRequestSchema>;
 
@@ -1164,7 +1173,8 @@ export const GrantUpdateRequestSchema = z.object({
     .max(60 * 60)
     .optional(),
   disabled: z.boolean().optional(),
-  expiresAt: z.number().int().positive().nullable().optional(),
+  /** When the grant stops exchanging; `null` removes the expiry. */
+  expiresAt: InstantInputSchema.nullable().optional(),
 });
 export type GrantUpdateRequest = z.infer<typeof GrantUpdateRequestSchema>;
 
@@ -1216,10 +1226,10 @@ export const GrantVisitorRecordSchema = z.object({
   answers: GrantVisitorAnswersSchema,
   /** Whether their email was verified (not yet offered: always false). */
   emailVerified: z.boolean(),
-  /** Unix epoch ms they gave their answers; null for one who was asked nothing. */
-  consentedAt: z.number().int().nullable(),
-  firstSeenAt: z.number().int(),
-  lastSeenAt: z.number().int(),
+  /** When they gave their answers; null for one who was asked nothing. */
+  consentedAt: IsoDateTimeSchema.nullable(),
+  firstSeenAt: IsoDateTimeSchema,
+  lastSeenAt: IsoDateTimeSchema,
   /** Their own layer, when it holds changes (per-visitor grants). */
   layer: z
     .object({
@@ -1299,8 +1309,8 @@ export const GrantSessionResponseSchema = z.object({
      */
     identityRequest: GrantVisitorIdentityRequestSchema.nullable(),
   }),
-  /** Unix seconds when the session token expires; exchange again for a fresh one. */
-  expiresAt: z.number().int(),
+  /** When the session token expires; exchange again for a fresh one. */
+  expiresAt: IsoDateTimeSchema,
 });
 export type GrantSessionResponse = z.infer<typeof GrantSessionResponseSchema>;
 
@@ -2248,8 +2258,8 @@ export const DownloadLinkResponseSchema = z.object({
    * plain GET and no Authorization header. Use it as given.
    */
   url: z.string(),
-  /** Unix seconds after which the link no longer works. */
-  expiresAt: z.number().int(),
+  /** When the link stops working. */
+  expiresAt: IsoDateTimeSchema,
 });
 export type DownloadLinkResponse = z.infer<typeof DownloadLinkResponseSchema>;
 export const DocPageParamsSchema = DocLayerParamsSchema.extend({

@@ -1,3 +1,4 @@
+import type { IsoDateTime } from '../dto/IsoDateTime';
 import type { Identity } from '../auth/scope/types';
 import type { DocCapability, FieldRights, PdfBits, PluginPermission } from '../auth/scope';
 import type { AbortablePromise } from '../promise/AbortablePromise';
@@ -94,7 +95,8 @@ export type CdnAdapter = 'none' | 'cloudfront' | 'cloud-cdn' | 'bunny' | 'azure-
  */
 export interface CdnAccessInfo {
   readonly adapter: CdnAdapter;
-  readonly expiresAt: number;
+  /** When the CDN's signing expires: ISO 8601, UTC. */
+  readonly expiresAt: IsoDateTime;
   readonly cache: {
     readonly scope: 'browser-private' | 'edge-shared';
     readonly immutableVersionedReads: boolean;
@@ -144,7 +146,8 @@ export interface DocumentAccessInfo {
   readonly originPasswordPolicy: {
     readonly mode: 'not-needed' | 'client-retry' | 'server-session';
   };
-  readonly expiresAt: number;
+  /** When the token this access was given for expires: ISO 8601, UTC. */
+  readonly expiresAt: IsoDateTime;
   /**
    * The deployment's render lattice: canonical full-page
    * `viewport.width` points whose renders are durable, CDN-shared

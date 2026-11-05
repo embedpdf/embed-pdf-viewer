@@ -24,7 +24,7 @@ export interface GrantsCreateRequest {
     origins?: string[] | null;
     passphrase?: string;
     sessionTtlSeconds?: number;
-    expiresAt?: number | null;
+    expiresAt?: string | null;
 }
 
 export namespace GrantsCreateRequest {

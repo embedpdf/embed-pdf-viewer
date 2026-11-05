@@ -25,6 +25,7 @@ import type { DocumentsRepo } from '../../db/repos/documents.repo';
 import type { FoldersRepo } from '../../db/repos/folders.repo';
 import type { SecurityEventsRepo } from '../../db/repos/security-events.repo';
 import { errorBody } from '../_helpers';
+import { isoTime } from '../../time';
 
 export interface AdminTokensRoutesDeps {
   /** Present only when revocation is enabled — gates the revoke route. */
@@ -180,7 +181,7 @@ export async function registerAdminTokensRoutes(
           expiresAt: expiresAt * 1000,
         });
 
-        return reply.send({ token, jti, expiresAt });
+        return reply.send({ token, jti, expiresAt: isoTime(expiresAt * 1000) });
       },
     });
   }
@@ -201,14 +202,16 @@ export async function registerAdminTokensRoutes(
         if (!parsed.success) {
           return reply.code(400).send(errorBody('InvalidArg', 'invalid revoke body'));
         }
-        const defaultExpiresAt = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
-        const expiresAtSeconds = parsed.data.expiresAtSeconds ?? defaultExpiresAt;
+        const expiresAt =
+          parsed.data.expiresAt !== undefined
+            ? Date.parse(parsed.data.expiresAt)
+            : Date.now() + 30 * 24 * 60 * 60 * 1000;
 
         await guard.revoke({
           jti,
           tenantId: ctx.tenantId,
           reason: parsed.data.reason,
-          expiresAt: expiresAtSeconds * 1000,
+          expiresAt,
         });
         await deps.securityEvents.append({
           tenantId,
@@ -218,7 +221,7 @@ export async function registerAdminTokensRoutes(
           actor: ctx.sub,
           via: ctx.via,
           ...(parsed.data.reason ? { reason: parsed.data.reason } : {}),
-          expiresAt: expiresAtSeconds * 1000,
+          expiresAt,
         });
         return reply.code(204).send();
       },

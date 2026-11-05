@@ -2,5 +2,5 @@
 
 export interface DocDownloadLinkResponse {
     url: string;
-    expiresAt: number;
+    expiresAt: string;
 }

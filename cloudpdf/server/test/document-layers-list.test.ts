@@ -212,10 +212,10 @@ describe("a document's layers", () => {
       docId,
       grantId: perVisitor.id,
       visitorId: visitorLayer.slice('visitor-'.length),
-      lastSeenAt: expect.any(Number),
+      lastSeenAt: expect.any(String),
       storageSizeBytes: expect.any(Number),
-      createdAt: expect.any(Number),
-      updatedAt: expect.any(Number),
+      createdAt: expect.any(String),
+      updatedAt: expect.any(String),
     });
     for (const layer of [review, named]) {
       expect(layer).toMatchObject({ grantId: null, visitorId: null, lastSeenAt: null });

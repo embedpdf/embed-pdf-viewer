@@ -26177,7 +26177,8 @@
                 }
               },
               "createdAt": {
-                "type": "integer"
+                "type": "string",
+                "format": "date-time"
               }
             },
             "required": ["id", "name", "autoProvisioned", "createdAt"],
@@ -26218,7 +26219,8 @@
                   }
                 },
                 "createdAt": {
-                  "type": "integer"
+                  "type": "string",
+                  "format": "date-time"
                 }
               },
               "required": ["id", "name", "autoProvisioned", "createdAt"],
@@ -26259,7 +26261,8 @@
                 }
               },
               "createdAt": {
-                "type": "integer"
+                "type": "string",
+                "format": "date-time"
               }
             },
             "required": ["id", "name", "autoProvisioned", "createdAt"],
@@ -26309,7 +26312,8 @@
                 }
               },
               "createdAt": {
-                "type": "integer"
+                "type": "string",
+                "format": "date-time"
               }
             },
             "required": ["id", "name", "autoProvisioned", "createdAt"],
@@ -26430,10 +26434,11 @@
                     "nullable": true
                   },
                   "createdAt": {
-                    "type": "integer"
+                    "type": "string",
+                    "format": "date-time"
                   },
                   "updatedAt": {
-                    "type": "integer"
+                    "$ref": "#/components/schemas/DocumentsInitResponse/anyOf/0/properties/document/properties/createdAt"
                   },
                   "createdBy": {
                     "type": "string",
@@ -26485,7 +26490,7 @@
                             "enum": ["PUT"]
                           },
                           "expiresAt": {
-                            "type": "integer"
+                            "$ref": "#/components/schemas/DocumentsInitResponse/anyOf/0/properties/document/properties/createdAt"
                           }
                         },
                         "required": ["url", "headers", "method", "expiresAt"],
@@ -26618,10 +26623,11 @@
                 "nullable": true
               },
               "createdAt": {
-                "type": "integer"
+                "type": "string",
+                "format": "date-time"
               },
               "updatedAt": {
-                "type": "integer"
+                "$ref": "#/components/schemas/DocumentsCommitResponse/properties/document/properties/createdAt"
               },
               "createdBy": {
                 "type": "string",
@@ -26829,10 +26835,11 @@
                 "nullable": true
               },
               "createdAt": {
-                "type": "integer"
+                "type": "string",
+                "format": "date-time"
               },
               "updatedAt": {
-                "type": "integer"
+                "$ref": "#/components/schemas/DocumentsImportFrom200Response/properties/document/properties/createdAt"
               },
               "createdBy": {
                 "type": "string",
@@ -26919,10 +26926,11 @@
                 "nullable": true
               },
               "createdAt": {
-                "type": "integer"
+                "type": "string",
+                "format": "date-time"
               },
               "updatedAt": {
-                "type": "integer"
+                "$ref": "#/components/schemas/DocumentsImportFrom202Response/properties/document/properties/createdAt"
               },
               "createdBy": {
                 "type": "string",
@@ -27007,10 +27015,11 @@
                   "nullable": true
                 },
                 "createdAt": {
-                  "type": "integer"
+                  "type": "string",
+                  "format": "date-time"
                 },
                 "updatedAt": {
-                  "type": "integer"
+                  "$ref": "#/components/schemas/DocumentsListResponse/properties/documents/items/properties/createdAt"
                 },
                 "createdBy": {
                   "type": "string",
@@ -27098,10 +27107,11 @@
                 "nullable": true
               },
               "createdAt": {
-                "type": "integer"
+                "type": "string",
+                "format": "date-time"
               },
               "updatedAt": {
-                "type": "integer"
+                "$ref": "#/components/schemas/DocumentsGetResponse/properties/document/properties/createdAt"
               },
               "createdBy": {
                 "type": "string",
@@ -27198,10 +27208,11 @@
                 "nullable": true
               },
               "createdAt": {
-                "type": "integer"
+                "type": "string",
+                "format": "date-time"
               },
               "updatedAt": {
-                "type": "integer"
+                "$ref": "#/components/schemas/DocumentsUpdateResponse/properties/document/properties/createdAt"
               },
               "createdBy": {
                 "type": "string",
@@ -27258,13 +27269,18 @@
                   "nullable": true
                 },
                 "createdAt": {
-                  "type": "integer"
+                  "type": "string",
+                  "format": "date-time"
                 },
                 "updatedAt": {
-                  "type": "integer"
+                  "$ref": "#/components/schemas/DocumentsLayersListResponse/properties/layers/items/properties/createdAt"
                 },
                 "lastSeenAt": {
-                  "type": "integer",
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/DocumentsLayersListResponse/properties/layers/items/properties/createdAt"
+                    }
+                  ],
                   "nullable": true
                 }
               },
@@ -27328,10 +27344,11 @@
                 "type": "string"
               },
               "createdAt": {
-                "type": "integer"
+                "type": "string",
+                "format": "date-time"
               },
               "updatedAt": {
-                "type": "integer"
+                "$ref": "#/components/schemas/FoldersCreateResponse/properties/folder/properties/createdAt"
               },
               "createdBy": {
                 "type": "string",
@@ -27375,10 +27392,11 @@
                   "type": "string"
                 },
                 "createdAt": {
-                  "type": "integer"
+                  "type": "string",
+                  "format": "date-time"
                 },
                 "updatedAt": {
-                  "type": "integer"
+                  "$ref": "#/components/schemas/FoldersListResponse/properties/folders/items/properties/createdAt"
                 },
                 "createdBy": {
                   "type": "string",
@@ -27425,10 +27443,11 @@
                 "type": "string"
               },
               "createdAt": {
-                "type": "integer"
+                "type": "string",
+                "format": "date-time"
               },
               "updatedAt": {
-                "type": "integer"
+                "$ref": "#/components/schemas/FoldersGetResponse/properties/folder/properties/createdAt"
               },
               "createdBy": {
                 "type": "string",
@@ -27501,10 +27520,11 @@
                 "type": "string"
               },
               "createdAt": {
-                "type": "integer"
+                "type": "string",
+                "format": "date-time"
               },
               "updatedAt": {
-                "type": "integer"
+                "$ref": "#/components/schemas/FoldersUpdateResponse/properties/folder/properties/createdAt"
               },
               "createdBy": {
                 "type": "string",
@@ -27722,7 +27742,8 @@
             "type": "string"
           },
           "expiresAt": {
-            "type": "integer"
+            "type": "string",
+            "format": "date-time"
           }
         },
         "required": ["token", "jti", "expiresAt"],
@@ -27735,10 +27756,9 @@
             "type": "string",
             "maxLength": 1024
           },
-          "expiresAtSeconds": {
-            "type": "integer",
-            "exclusiveMinimum": true,
-            "minimum": 0
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
           }
         },
         "additionalProperties": false
@@ -27902,9 +27922,8 @@
             "maximum": 3600
           },
           "expiresAt": {
-            "type": "integer",
-            "exclusiveMinimum": true,
-            "minimum": 0,
+            "type": "string",
+            "format": "date-time",
             "nullable": true
           }
         },
@@ -28020,28 +28039,37 @@
                 "type": "boolean"
               },
               "archivedAt": {
-                "type": "integer",
+                "type": "string",
+                "format": "date-time",
                 "nullable": true
               },
               "expiresAt": {
-                "type": "integer",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/GrantsCreateResponse/properties/grant/properties/archivedAt"
+                  }
+                ],
                 "nullable": true
               },
               "exchangeCount": {
                 "type": "integer"
               },
               "lastExchangedAt": {
-                "type": "integer",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/GrantsCreateResponse/properties/grant/properties/archivedAt"
+                  }
+                ],
                 "nullable": true
               },
               "createdBy": {
                 "type": "string"
               },
               "createdAt": {
-                "type": "integer"
+                "$ref": "#/components/schemas/GrantsCreateResponse/properties/grant/properties/archivedAt"
               },
               "updatedAt": {
-                "type": "integer"
+                "$ref": "#/components/schemas/GrantsCreateResponse/properties/grant/properties/archivedAt"
               }
             },
             "required": [
@@ -28185,28 +28213,37 @@
                   "type": "boolean"
                 },
                 "archivedAt": {
-                  "type": "integer",
+                  "type": "string",
+                  "format": "date-time",
                   "nullable": true
                 },
                 "expiresAt": {
-                  "type": "integer",
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/GrantsListResponse/properties/grants/items/properties/archivedAt"
+                    }
+                  ],
                   "nullable": true
                 },
                 "exchangeCount": {
                   "type": "integer"
                 },
                 "lastExchangedAt": {
-                  "type": "integer",
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/GrantsListResponse/properties/grants/items/properties/archivedAt"
+                    }
+                  ],
                   "nullable": true
                 },
                 "createdBy": {
                   "type": "string"
                 },
                 "createdAt": {
-                  "type": "integer"
+                  "$ref": "#/components/schemas/GrantsListResponse/properties/grants/items/properties/archivedAt"
                 },
                 "updatedAt": {
-                  "type": "integer"
+                  "$ref": "#/components/schemas/GrantsListResponse/properties/grants/items/properties/archivedAt"
                 }
               },
               "required": [
@@ -28353,28 +28390,37 @@
                 "type": "boolean"
               },
               "archivedAt": {
-                "type": "integer",
+                "type": "string",
+                "format": "date-time",
                 "nullable": true
               },
               "expiresAt": {
-                "type": "integer",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/GrantsGetResponse/properties/grant/properties/archivedAt"
+                  }
+                ],
                 "nullable": true
               },
               "exchangeCount": {
                 "type": "integer"
               },
               "lastExchangedAt": {
-                "type": "integer",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/GrantsGetResponse/properties/grant/properties/archivedAt"
+                  }
+                ],
                 "nullable": true
               },
               "createdBy": {
                 "type": "string"
               },
               "createdAt": {
-                "type": "integer"
+                "$ref": "#/components/schemas/GrantsGetResponse/properties/grant/properties/archivedAt"
               },
               "updatedAt": {
-                "type": "integer"
+                "$ref": "#/components/schemas/GrantsGetResponse/properties/grant/properties/archivedAt"
               }
             },
             "required": [
@@ -28522,9 +28568,8 @@
             "type": "boolean"
           },
           "expiresAt": {
-            "type": "integer",
-            "exclusiveMinimum": true,
-            "minimum": 0,
+            "type": "string",
+            "format": "date-time",
             "nullable": true
           }
         },
@@ -28639,28 +28684,37 @@
                 "type": "boolean"
               },
               "archivedAt": {
-                "type": "integer",
+                "type": "string",
+                "format": "date-time",
                 "nullable": true
               },
               "expiresAt": {
-                "type": "integer",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/GrantsUpdateResponse/properties/grant/properties/archivedAt"
+                  }
+                ],
                 "nullable": true
               },
               "exchangeCount": {
                 "type": "integer"
               },
               "lastExchangedAt": {
-                "type": "integer",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/GrantsUpdateResponse/properties/grant/properties/archivedAt"
+                  }
+                ],
                 "nullable": true
               },
               "createdBy": {
                 "type": "string"
               },
               "createdAt": {
-                "type": "integer"
+                "$ref": "#/components/schemas/GrantsUpdateResponse/properties/grant/properties/archivedAt"
               },
               "updatedAt": {
-                "type": "integer"
+                "$ref": "#/components/schemas/GrantsUpdateResponse/properties/grant/properties/archivedAt"
               }
             },
             "required": [
@@ -28802,28 +28856,37 @@
                 "type": "boolean"
               },
               "archivedAt": {
-                "type": "integer",
+                "type": "string",
+                "format": "date-time",
                 "nullable": true
               },
               "expiresAt": {
-                "type": "integer",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/GrantsArchiveResponse/properties/grant/properties/archivedAt"
+                  }
+                ],
                 "nullable": true
               },
               "exchangeCount": {
                 "type": "integer"
               },
               "lastExchangedAt": {
-                "type": "integer",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/GrantsArchiveResponse/properties/grant/properties/archivedAt"
+                  }
+                ],
                 "nullable": true
               },
               "createdBy": {
                 "type": "string"
               },
               "createdAt": {
-                "type": "integer"
+                "$ref": "#/components/schemas/GrantsArchiveResponse/properties/grant/properties/archivedAt"
               },
               "updatedAt": {
-                "type": "integer"
+                "$ref": "#/components/schemas/GrantsArchiveResponse/properties/grant/properties/archivedAt"
               }
             },
             "required": [
@@ -28897,14 +28960,15 @@
                   "type": "boolean"
                 },
                 "consentedAt": {
-                  "type": "integer",
+                  "type": "string",
+                  "format": "date-time",
                   "nullable": true
                 },
                 "firstSeenAt": {
-                  "type": "integer"
+                  "$ref": "#/components/schemas/GrantsVisitorsListResponse/properties/visitors/items/properties/consentedAt"
                 },
                 "lastSeenAt": {
-                  "type": "integer"
+                  "$ref": "#/components/schemas/GrantsVisitorsListResponse/properties/visitors/items/properties/consentedAt"
                 },
                 "layer": {
                   "type": "object",
@@ -29077,7 +29141,8 @@
             "additionalProperties": false
           },
           "expiresAt": {
-            "type": "integer"
+            "type": "string",
+            "format": "date-time"
           }
         },
         "required": ["token", "docId", "layerName", "layerMode", "visitor", "expiresAt"],
@@ -30013,6 +30078,7 @@
           },
           "expiresAt": {
             "type": "string",
+            "format": "date-time",
             "nullable": true
           }
         },
@@ -30416,7 +30482,8 @@
                   "nullable": true
                 },
                 "createdAt": {
-                  "type": "integer"
+                  "type": "string",
+                  "format": "date-time"
                 }
               },
               "required": [
@@ -32191,7 +32258,8 @@
             "type": "string"
           },
           "expiresAt": {
-            "type": "integer"
+            "type": "string",
+            "format": "date-time"
           }
         },
         "required": ["url", "expiresAt"],

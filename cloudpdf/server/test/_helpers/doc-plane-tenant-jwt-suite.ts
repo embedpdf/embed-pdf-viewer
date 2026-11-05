@@ -139,7 +139,7 @@ export function runDocPlaneTenantJwt(dialect: DocPlaneTenantJwtDialect): void {
     async function issueTenantKey(
       sub: string,
       scope: ReadonlyArray<string>,
-    ): Promise<{ token: string; jti: string; expiresAt: number }> {
+    ): Promise<{ token: string; jti: string; expiresAt: string }> {
       const issued = await call(API_TOKEN, 'POST', `/v1/tenants/${OWN_TENANT}/tokens`, {
         kind: 'tenant',
         sub,
@@ -339,7 +339,7 @@ export function runDocPlaneTenantJwt(dialect: DocPlaneTenantJwtDialect): void {
         API_TOKEN,
         'POST',
         `/v1/tenants/${OWN_TENANT}/tokens/${key.jti}/revoke`,
-        { reason: 'dashboard', expiresAtSeconds: key.expiresAt },
+        { reason: 'dashboard', expiresAt: key.expiresAt },
       );
       expect(revoked.status, JSON.stringify(revoked.body)).toBe(204);
       // The guard caches "not revoked" for a while; a fresh replica would not have.

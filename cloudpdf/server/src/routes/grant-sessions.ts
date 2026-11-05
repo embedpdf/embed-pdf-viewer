@@ -23,6 +23,7 @@ import type { GrantsRepo } from '../db/repos/grants.repo';
 import type { GrantVisitorsRepo } from '../db/repos/grant_visitors.repo';
 import type { TenantUsageRepo } from '../db/repos/tenant_usage.repo';
 import type { UsageMeters } from '../licensing/UsageMeters';
+import { isoTime } from '../time';
 
 /** How long past a session's lifetime its renewal still continues the visit (a throttled timer, a slow network). */
 const VISIT_GRACE_SECONDS = 5 * 60;
@@ -284,7 +285,7 @@ export async function registerGrantSessionRoutes(
           keep: grant.layerMode === 'shared' || grant.keepVisitorLayers,
           identityRequest: pending,
         },
-        expiresAt: Math.floor(Date.now() / 1000) + ttl,
+        expiresAt: isoTime(Date.now() + ttl * 1000),
       });
     },
   });

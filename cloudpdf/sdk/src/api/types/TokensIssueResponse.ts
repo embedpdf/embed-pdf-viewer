@@ -3,5 +3,5 @@
 export interface TokensIssueResponse {
     token: string;
     jti: string;
-    expiresAt: number;
+    expiresAt: string;
 }

@@ -24,7 +24,7 @@ export interface GrantsUpdateRequest {
     passphrase?: string | null;
     sessionTtlSeconds?: number;
     disabled?: boolean;
-    expiresAt?: number | null;
+    expiresAt?: string | null;
 }
 
 export namespace GrantsUpdateRequest {

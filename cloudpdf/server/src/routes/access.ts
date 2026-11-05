@@ -33,6 +33,7 @@ import type { UsageMeters } from '../licensing/UsageMeters';
 import type { DerivedRenderService } from '../services/DerivedRenderService';
 import type { DocumentService } from '../services/DocumentService';
 import type { LayerService } from '../services/LayerService';
+import { isoTimeOfSeconds } from '../time';
 
 export interface AccessRouteDeps {
   service: DocumentService;
@@ -260,7 +261,7 @@ function buildAccessResponse(
     originPasswordPolicy: {
       mode: unlocked.probe.encryptionState === 'encrypted' ? 'server-session' : 'not-needed',
     },
-    expiresAt,
+    expiresAt: isoTimeOfSeconds(expiresAt),
     // The render lattice rides /access, never the manifest: manifests are
     // version-pinned immutable objects; the lattice is mutable deployment
     // policy.

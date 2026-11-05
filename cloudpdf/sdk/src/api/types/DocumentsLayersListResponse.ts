@@ -15,9 +15,9 @@ export namespace DocumentsLayersListResponse {
             grantId: string | null;
             visitorId: string | null;
             storageSizeBytes: number | null;
-            createdAt: number;
-            updatedAt: number;
-            lastSeenAt: number | null;
+            createdAt: string;
+            updatedAt: string;
+            lastSeenAt: string | null;
         }
     }
 }

@@ -18,7 +18,7 @@ export namespace DocumentsInitResponseCreatedUpload {
             url: string;
             headers: Record<string, string>;
             method: Presigned.Method;
-            expiresAt: number;
+            expiresAt: string;
         }
 
         export namespace Presigned {

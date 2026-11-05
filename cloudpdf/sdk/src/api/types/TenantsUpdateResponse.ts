@@ -13,7 +13,7 @@ export namespace TenantsUpdateResponse {
         autoProvisioned: boolean;
         status?: Tenant.Status | undefined;
         features?: CloudPDF.TenantFeature[] | undefined;
-        createdAt: number;
+        createdAt: string;
     }
 
     export namespace Tenant {

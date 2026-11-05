@@ -133,6 +133,10 @@ its rules hold in every language:
   `details` holds what a code carries, as the code's comment says.
 - **Whole numbers are integers.** A count, an index, a size in bytes and a
   duration in seconds are `.int()`, so the SDKs type them as integers.
+- **Points in time are ISO 8601 strings** (`IsoDateTimeSchema`), named `…At`:
+  a response says them in UTC (`…Z`), and a request gives them with an
+  offset. Durations are whole seconds, named `…Seconds`. A calendar day
+  (`YYYY-MM-DD`) is a date, not a point in time.
 - **One spelling for "nothing".** A response field is either always there,
   `null` when there is nothing, or left out when there is nothing; never
   both. A create takes `null` only where its read can be `null`

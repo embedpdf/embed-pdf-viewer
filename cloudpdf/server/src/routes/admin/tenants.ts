@@ -6,6 +6,7 @@ import {
   TenantUsageQuerySchema,
   adminOperations,
   type AdminOperation,
+  type AdminTenantRecord,
 } from '@cloudpdf/contract';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
@@ -25,6 +26,7 @@ import type { TenantRow, TenantsRepo } from '../../db/repos/tenants.repo';
 import { StorageKeys } from '../../storage/keys';
 import type { ObjectStore } from '../../storage/ObjectStore';
 import { errorBody } from '../_helpers';
+import { isoTime } from '../../time';
 
 export interface AdminTenantsRouteDeps {
   tenants: TenantsRepo;
@@ -243,13 +245,13 @@ function usageWindow(query: {
   return { from, to };
 }
 
-function tenantPublic(t: TenantRow): Record<string, unknown> {
+function tenantPublic(t: TenantRow): AdminTenantRecord {
   return {
     id: t.id,
     name: t.name,
     autoProvisioned: t.autoProvisioned,
     status: t.status,
     features: t.features,
-    createdAt: t.createdAt,
+    createdAt: isoTime(t.createdAt),
   };
 }

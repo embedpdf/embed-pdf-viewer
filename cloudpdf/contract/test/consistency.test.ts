@@ -113,6 +113,18 @@ const typeOf = (schema: Schema): string | undefined => {
   return arms.length > 0 && arms.every((type) => type === arms[0]) ? arms[0] : undefined;
 };
 
+/** A schema's string format, through refs and a nullable or union wrapper. */
+const formatOf = (schema: Schema & { format?: string }): string | undefined => {
+  const target = resolved(schema) as Schema & { format?: string };
+  if (target.format) return target.format;
+  const formats = [...(target.anyOf ?? []), ...(target.oneOf ?? []), ...(target.allOf ?? [])]
+    .filter((arm) => resolved(arm).type !== 'null')
+    .map(formatOf);
+  return formats.length > 0 && formats.every((format) => format === formats[0])
+    ? formats[0]
+    : undefined;
+};
+
 const unique = (places: string[]) => [...new Set(places)].sort();
 
 describe('naming rules in openapi.json', () => {
@@ -136,6 +148,16 @@ describe('naming rules in openapi.json', () => {
       .filter(({ schema }) => typeOf(schema) !== 'integer')
       .map(({ at }) => at);
     expect(unique(decimals)).toEqual([]);
+  });
+
+  test('a point in time is an ISO 8601 string', () => {
+    const notDates = everyProperty
+      .filter(({ name }) => /At$/.test(name))
+      // A field a write accepts only to take a read back, and ignores, says nothing (`{}`).
+      .filter(({ schema }) => Object.keys(resolved(schema)).length > 0)
+      .filter(({ schema }) => formatOf(schema) !== 'date-time')
+      .map(({ at }) => at);
+    expect(unique(notDates)).toEqual([]);
   });
 
   test('no response field is both nullable and optional', () => {
