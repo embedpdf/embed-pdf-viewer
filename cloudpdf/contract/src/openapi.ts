@@ -463,15 +463,27 @@ function registerSchema(
 ): Record<string, unknown> {
   if (schemas[name]) throw new Error(`Duplicate OpenAPI schema name: ${name}`);
   const componentPath = ['components', 'schemas', name];
+  // Where a nullable's schema was first written, and where a schema that
+  // isn't nullable points at one of those: see `withoutBorrowedNull`.
+  const nullableAt = new Set<string>();
+  const borrowsNull = new Set<string>();
   const referenced = zodToJsonSchema(schema, {
     target: 'openApi3',
     // A `Date` a write takes in process arrives over HTTP as its ISO string.
     dateStrategy: 'format:date-time',
     $refStrategy: 'root',
     basePath: ['#', ...componentPath],
-    override: (definition) => {
+    override: (definition, refs, seen) => {
       const sharedName = sharedComponentOf(definition);
       if (sharedName && sharedName !== name) return { $ref: `#/components/schemas/${sharedName}` };
+      const nullable =
+        (definition as { typeName?: string }).typeName === z.ZodFirstPartyTypeKind.ZodNullable;
+      if (nullable && !seen) nullableAt.add(refs.currentPath.join('/'));
+      // A place that is nullable itself says so beside the reference.
+      const at = refs.currentPath.join('/');
+      if (!nullable && seen && nullableAt.has(seen.path.join('/')) && !nullableAt.has(at)) {
+        borrowsNull.add(at);
+      }
       return wholeNumberEnumOf(definition) ?? ignoreOverride;
     },
   }) as Record<string, unknown>;
@@ -480,7 +492,14 @@ function registerSchema(
   // replace only the recursive back-edge with the same valid open schema (`{}`)
   // that zod-to-json-schema uses for its non-reference strategy.
   const canonical = collapseSharedReferenceAliases(referenced, referenced, componentPath);
-  schemas[name] = breakAncestorReferences(canonical, componentPath) as Record<string, unknown>;
+  const owned = withoutBorrowedNull(
+    canonical,
+    canonical,
+    componentPath,
+    componentPath,
+    borrowsNull,
+  );
+  schemas[name] = breakAncestorReferences(owned, componentPath) as Record<string, unknown>;
   return { $ref: `#/components/schemas/${name}` };
 }
 
@@ -521,6 +540,52 @@ function collapseSharedReferenceAliases(
       collapseSharedReferenceAliases(child, component, componentPath),
     ]),
   );
+}
+
+/**
+ * zod-to-json-schema writes a schema a model reuses once, at its first place,
+ * and points the others at it. When that first place is a nullable's, the
+ * schema is written there with the `nullable`, and every place that reuses
+ * the schema itself (not the nullable) took the `nullable` along: a grant's
+ * `createdAt` pointed at its `archivedAt` and read as nullable in every SDK.
+ * Those places (`borrowsNull`, found as the schema was written) get the
+ * schema without the `nullable`. A place that reuses the nullable itself
+ * keeps pointing at it.
+ */
+function withoutBorrowedNull(
+  value: unknown,
+  component: unknown,
+  componentPath: string[],
+  path: string[],
+  borrowsNull: ReadonlySet<string>,
+): unknown {
+  if (Array.isArray(value)) {
+    return value.map((child, index) =>
+      withoutBorrowedNull(child, component, componentPath, [...path, String(index)], borrowsNull),
+    );
+  }
+  if (!value || typeof value !== 'object') return value;
+
+  const record = value as Record<string, unknown>;
+  if (typeof record.$ref === 'string' && borrowsNull.has(['#', ...path].join('/'))) {
+    const target = resolveComponentReference(component, record.$ref, componentPath);
+    if (isRecord(target) && target.nullable === true) {
+      const { nullable: _borrowed, ...own } = target;
+      const { $ref: _ref, ...beside } = record;
+      return { ...own, ...beside };
+    }
+  }
+
+  return Object.fromEntries(
+    Object.entries(record).map(([key, child]) => [
+      key,
+      withoutBorrowedNull(child, component, componentPath, [...path, key], borrowsNull),
+    ]),
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 
 function resolveComponentReference(

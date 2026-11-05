@@ -14,8 +14,8 @@ export namespace GrantsVisitorsListResponse {
             answers: Item.Answers;
             emailVerified: boolean;
             consentedAt: string | null;
-            firstSeenAt: string | null;
-            lastSeenAt: string | null;
+            firstSeenAt: string;
+            lastSeenAt: string;
             layer: Item.Layer | null;
         }
 

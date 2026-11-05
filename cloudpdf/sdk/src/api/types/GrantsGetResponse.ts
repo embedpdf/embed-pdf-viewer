@@ -28,8 +28,8 @@ export namespace GrantsGetResponse {
         exchangeCount: number;
         lastExchangedAt: string | null;
         createdBy: string;
-        createdAt: string | null;
-        updatedAt: string | null;
+        createdAt: string;
+        updatedAt: string;
     }
 
     export namespace Grant {

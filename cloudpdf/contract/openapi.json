@@ -28066,10 +28066,12 @@
                 "type": "string"
               },
               "createdAt": {
-                "$ref": "#/components/schemas/GrantsCreateResponse/properties/grant/properties/archivedAt"
+                "type": "string",
+                "format": "date-time"
               },
               "updatedAt": {
-                "$ref": "#/components/schemas/GrantsCreateResponse/properties/grant/properties/archivedAt"
+                "type": "string",
+                "format": "date-time"
               }
             },
             "required": [
@@ -28240,10 +28242,12 @@
                   "type": "string"
                 },
                 "createdAt": {
-                  "$ref": "#/components/schemas/GrantsListResponse/properties/grants/items/properties/archivedAt"
+                  "type": "string",
+                  "format": "date-time"
                 },
                 "updatedAt": {
-                  "$ref": "#/components/schemas/GrantsListResponse/properties/grants/items/properties/archivedAt"
+                  "type": "string",
+                  "format": "date-time"
                 }
               },
               "required": [
@@ -28417,10 +28421,12 @@
                 "type": "string"
               },
               "createdAt": {
-                "$ref": "#/components/schemas/GrantsGetResponse/properties/grant/properties/archivedAt"
+                "type": "string",
+                "format": "date-time"
               },
               "updatedAt": {
-                "$ref": "#/components/schemas/GrantsGetResponse/properties/grant/properties/archivedAt"
+                "type": "string",
+                "format": "date-time"
               }
             },
             "required": [
@@ -28711,10 +28717,12 @@
                 "type": "string"
               },
               "createdAt": {
-                "$ref": "#/components/schemas/GrantsUpdateResponse/properties/grant/properties/archivedAt"
+                "type": "string",
+                "format": "date-time"
               },
               "updatedAt": {
-                "$ref": "#/components/schemas/GrantsUpdateResponse/properties/grant/properties/archivedAt"
+                "type": "string",
+                "format": "date-time"
               }
             },
             "required": [
@@ -28883,10 +28891,12 @@
                 "type": "string"
               },
               "createdAt": {
-                "$ref": "#/components/schemas/GrantsArchiveResponse/properties/grant/properties/archivedAt"
+                "type": "string",
+                "format": "date-time"
               },
               "updatedAt": {
-                "$ref": "#/components/schemas/GrantsArchiveResponse/properties/grant/properties/archivedAt"
+                "type": "string",
+                "format": "date-time"
               }
             },
             "required": [
@@ -28965,10 +28975,12 @@
                   "nullable": true
                 },
                 "firstSeenAt": {
-                  "$ref": "#/components/schemas/GrantsVisitorsListResponse/properties/visitors/items/properties/consentedAt"
+                  "type": "string",
+                  "format": "date-time"
                 },
                 "lastSeenAt": {
-                  "$ref": "#/components/schemas/GrantsVisitorsListResponse/properties/visitors/items/properties/consentedAt"
+                  "type": "string",
+                  "format": "date-time"
                 },
                 "layer": {
                   "type": "object",
