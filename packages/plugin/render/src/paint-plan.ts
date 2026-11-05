@@ -186,8 +186,8 @@ export interface ResolvedRenderOptions {
 export function resolveRenderOptions(options: {
   fullPage?: FullPageOptions;
   tiles?: TilesOptions | false;
-  format?: 'png' | 'webp' | 'bmp';
-  quality?: number;
+  format?: 'png' | 'webp' | 'bmp' | null;
+  quality?: number | null;
   debug?: boolean;
 }): ResolvedRenderOptions {
   const tiles = options.tiles === false ? undefined : options.tiles;
@@ -210,8 +210,8 @@ export function resolveRenderOptions(options: {
       settleMs: tiles?.settleMs ?? 150,
       fallbackPyramid: DEFAULT_TILE_PYRAMID,
     },
-    format: options.format,
-    quality: options.quality,
+    format: options.format ?? undefined,
+    quality: options.quality ?? undefined,
     debug: options.debug ?? false,
   };
 }

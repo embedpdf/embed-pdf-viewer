@@ -198,6 +198,18 @@ describe('the snapshot tool', () => {
     expect(fixture.imageCalls[0]!.options.viewport).toEqual({ kind: 'scale', scale: 1 });
     await fixture.kernel.destroy();
   });
+
+  it('takes its box look whole: a color left out follows the accent again', async () => {
+    const fixture = await bootTool({
+      config: { snapshot: { box: { fill: 'blue', stroke: 'navy' } } },
+    });
+    fixture.render.updateSettings({ snapshot: { box: { fill: 'red' } } });
+    expect(fixture.render.getSettings().snapshot).toEqual({
+      scale: 2,
+      box: { fill: 'red', stroke: null },
+    });
+    await fixture.kernel.destroy();
+  });
 });
 
 describe('a snapshot’s scale', () => {

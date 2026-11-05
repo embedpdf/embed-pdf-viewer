@@ -39,13 +39,14 @@ export interface EmbedPdfConfig {
    * cloud engine the document's token decides, and a share link takes it as the visitor's
    * answers to what the link asks. Change it later with
    * `inject(EpdfViewer).updateSettings({ identity })`.
+   * Left out or `null`: nobody.
    */
-  readonly identity?: Identity;
+  readonly identity?: Identity | null;
   /**
    * What the user may do, as permissions, in every document opened without a `scope` of its
-   * own. Left out, they may do everything.
+   * own. Left out or `null`, they may do everything.
    */
-  readonly scope?: readonly string[];
+  readonly scope?: readonly string[] | null;
   /** The color every part without a color of its own follows. CSS `--epdf-accent` wins over it. */
   readonly accent?: string;
   /** How pages look: `background` before the picture arrives, and the `shadow` under each page. */

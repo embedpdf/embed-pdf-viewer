@@ -84,7 +84,7 @@ export interface MirrorSpec<V> {
    * Read the whole value. `cursor` is the newest server event the snapshot
    * already contains (cloud engines); omit it when the engine has none.
    */
-  load(doc: DocumentHandle, signal: AbortSignal): Promise<{ value: V; cursor?: number | null }>;
+  load(doc: DocumentHandle, signal: AbortSignal): Promise<{ value: V; cursor?: number }>;
   /**
    * Apply one confirmed event. Pure, and the same for every origin. Return
    * `value` itself when the event does not apply, or `reload(...)` when the
@@ -399,7 +399,7 @@ export function createMirror<V>(spec: MirrorSpec<V>, env: MirrorEnvironment): Mi
     if (cell.read().status !== 'ready') cell.write({ ...cell.read(), status: 'loading' });
     const load = ++fullLoads;
     queued = [];
-    let loaded: { value: V; cursor?: number | null };
+    let loaded: { value: V; cursor?: number };
     try {
       loaded = await spec.load(env.doc, env.lifetime);
     } catch (error) {

@@ -96,11 +96,11 @@ describe('whole settings', () => {
       },
     );
     const settings = store.forInstance(() => {}).api;
-    // What the app registered replaces the default whole too.
-    expect(settings.getSettings().highlight).toEqual({ color: 'red' });
+    // What the app registered replaces the default whole too; what it leaves out is the default.
+    expect(settings.getSettings().highlight).toEqual({ color: 'red', activeColor: 'orange' });
     settings.updateSettings({ highlight: { activeColor: 'blue' }, reveal: false });
     expect(settings.getSettings()).toMatchObject({
-      highlight: { activeColor: 'blue' },
+      highlight: { color: 'yellow', activeColor: 'blue' },
       reveal: false,
     });
     const before = settings.getSettings();
@@ -123,8 +123,38 @@ describe('mergeSettings', () => {
   });
 
   it('replaces the whole settings instead of merging into them', () => {
-    const merged = mergeSettings(DEFAULTS, { highlight: { activeColor: 'blue' } }, ['highlight']);
-    expect(merged.highlight).toEqual({ activeColor: 'blue' });
+    const settings = mergeSettings(DEFAULTS, { highlight: { color: 'red' } });
+    const merged = mergeSettings(
+      settings,
+      { highlight: { activeColor: 'blue' } },
+      { defaults: DEFAULTS, whole: ['highlight'] },
+    );
+    // What the change leaves out takes its default, never the value before.
+    expect(merged.highlight).toEqual({ ...DEFAULTS.highlight, activeColor: 'blue' });
+  });
+
+  it('replaces a value inside a group by its path, while the group merges per key', () => {
+    interface Snapshot {
+      snapshot: { scale: number; box: { fill: string | null; stroke: string | null } };
+    }
+    const defaults: Snapshot = { snapshot: { scale: 2, box: { fill: null, stroke: null } } };
+    const declaration = { defaults, whole: ['snapshot.box'] as const };
+    const navy = mergeSettings(
+      defaults,
+      { snapshot: { box: { fill: 'blue', stroke: 'navy' } } },
+      declaration,
+    );
+    // A color left out, or given as undefined, is its default again.
+    const red = mergeSettings(
+      navy,
+      { snapshot: { scale: 3, box: { fill: 'red', stroke: undefined } } },
+      declaration,
+    );
+    expect(red).toEqual({ snapshot: { scale: 3, box: { fill: 'red', stroke: null } } });
+    // A change that leaves the box out keeps it, object and all.
+    expect(mergeSettings(red, { snapshot: { scale: 4 } }, declaration).snapshot.box).toBe(
+      red.snapshot.box,
+    );
   });
 });
 

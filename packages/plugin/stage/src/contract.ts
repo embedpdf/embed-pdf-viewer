@@ -455,11 +455,10 @@ export interface RevealOptions {
   behavior?: ScrollBehaviorKind;
   /**
    * Target rect in page space (points from the page's top-left, y down; the
-   * space annotation, selection and search rects use).
-   * Absent or `null` → the whole page (null accepted so nullable sources flow
-   * in directly). A zero-size rect is a point.
+   * space annotation, selection and search rects use). Left out: the whole
+   * page. A zero-size rect is a point.
    */
-  rect?: Rect | null;
+  rect?: Rect;
   zoom?: RevealZoom;
   anchor?: RevealAnchor;
 }

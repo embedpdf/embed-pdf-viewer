@@ -167,7 +167,10 @@ export interface ChromeSettings {
     /** Line width of both kinds, px. */
     readonly width: number;
   };
-  /** The box you drag to select several annotations. */
+  /**
+   * The box you drag to select several annotations, one value: a change
+   * replaces it whole, and a color it leaves out is `null` again.
+   */
   readonly marquee: {
     /** `null`: `accent` at 8%. */
     readonly fill: string | null;

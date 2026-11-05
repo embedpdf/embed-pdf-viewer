@@ -109,7 +109,7 @@ async function validateOne(
 
   if (internal) {
     cryptography = await verifyCmsSignature(internal);
-    const chain = await validateChain(internal, options.trust, at);
+    const chain = await validateChain(internal, options.trust ?? null, at);
     trust = chain.status;
     trustReason = chain.reason;
   }

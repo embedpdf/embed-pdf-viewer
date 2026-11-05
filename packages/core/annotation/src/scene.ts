@@ -253,7 +253,7 @@ export function layoutRedactLabel(
     region,
     label,
     text,
-    label.fonts ?? defaultPaintFonts(text?.fontFamily),
+    label.fonts ?? defaultPaintFonts(text?.fontFamily ?? null),
   );
   if (!laid) return [];
   const paint: Paint = { fill: text?.fontColor ?? '#ffffff', opacity: 1 };

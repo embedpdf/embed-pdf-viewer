@@ -34,8 +34,6 @@ export function linkChildRects(shape: Shape, style: Style): Rect[] {
 /** The writable projection of a `link` value: `goto`/`uri` pass through,
  *  read-only arms (`javascript`, `named`, `goto-remote`, `launch`,
  *  `unsupported`) yield `null` — they can be carried, never (re)written. */
-export function writableTarget(
-  target: PdfLinkTarget | null | undefined,
-): PdfLinkTargetWritable | null {
+export function writableTarget(target: PdfLinkTarget | null): PdfLinkTargetWritable | null {
   return target && (target.kind === 'goto' || target.kind === 'uri') ? target : null;
 }

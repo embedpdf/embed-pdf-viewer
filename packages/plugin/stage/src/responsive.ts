@@ -71,7 +71,7 @@ const paddingOf = (padding: StageSettingsPatch['padding']) =>
     : { top: 0, right: 0, bottom: 0, left: 0, ...padding };
 
 const zoomBoxOf = (look: StageSettingsPatch['zoomBox']) =>
-  look === undefined ? undefined : { fill: null, stroke: null, ...look };
+  look === undefined ? undefined : { fill: look.fill ?? null, stroke: look.stroke ?? null };
 
 /**
  * Setting-value equality: primitives by identity, the flat objects the

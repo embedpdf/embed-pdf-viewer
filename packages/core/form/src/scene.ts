@@ -12,14 +12,17 @@ import type { PdfRect } from '@embedpdf/engine-core/runtime';
 import type { DrawOp, PathSegment, Rgb, WidgetDrawing } from './drawing/types';
 
 /** Where a widget is: its box in page space, before the turn, and the turn. */
-export interface WidgetPlacement {
+export interface WidgetScenePlacement {
   readonly box: {
     readonly x: number;
     readonly y: number;
     readonly width: number;
     readonly height: number;
   };
-  /** Degrees clockwise, a quarter turn, about the middle of `box`. */
+  /**
+   * Degrees clockwise, a quarter turn, about the middle of `box`. Upright when
+   * left out or `null`, as a widget without one reads.
+   */
   readonly rotation?: number | null;
 }
 
@@ -34,7 +37,7 @@ const hexOf = (color: Rgb): string =>
 
 const round = (value: number) => Number(value.toFixed(3));
 
-export function widgetScene(drawing: WidgetDrawing, placement: WidgetPlacement): SceneNode[] {
+export function widgetScene(drawing: WidgetDrawing, placement: WidgetScenePlacement): SceneNode[] {
   const { box } = placement;
   const turn = ((((placement.rotation ?? 0) % 360) + 360) % 360) as 0 | 90 | 180 | 270;
   const centerX = box.x + box.width / 2;

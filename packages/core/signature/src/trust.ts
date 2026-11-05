@@ -39,7 +39,7 @@ export interface TrustVerdict {
  */
 export async function validateChain(
   cms: Uint8Array | ParsedCmsInternal,
-  trust: TrustPort | null | undefined,
+  trust: TrustPort | null,
   at: ValidationTime = { kind: 'now' },
 ): Promise<TrustVerdict> {
   if (!trust) return { status: 'unknown', reason: 'no trust anchors configured' };
