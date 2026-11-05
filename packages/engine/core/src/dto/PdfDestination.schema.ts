@@ -5,8 +5,8 @@ import { PageRefSchema } from '../identity/PageRef.schema';
 import { closed } from '../wire/reading';
 
 const page = PageRefSchema;
-/** Spec-nullable axis value: absent and `null` both mean "retain current". */
-const axis = z.number().nullable().optional();
+/** An axis value, always there: `null` keeps the viewer's current one, as in the file. */
+const axis = z.number().nullable();
 
 /**
  * Runtime schema for {@link PdfDestination}. Lives beside its DTO in `dto/`

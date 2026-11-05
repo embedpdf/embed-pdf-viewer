@@ -169,7 +169,7 @@ export function runDrawingDetailsConformance(
       }
     });
 
-    test('the text style given by itself wins over the rich body; a partial body merges over the current one', async () => {
+    test('the text style given by itself wins over the rich body; a given body is replaced whole', async () => {
       const doc = await opts.open(engine, 'drawing');
       try {
         const { page } = await firstPage(doc);
@@ -186,13 +186,22 @@ export function runDrawingDetailsConformance(
         expect(created.annotation.fontColor).toBe('#ff0000');
         expect(created.annotation.fontSize).toBe(20);
 
+        // Rich text without a body keeps the current one.
+        const retyped = await page.annotations.update(created.annotation.ref, {
+          richText: { paragraphs: [{ runs: [{ text: 'retyped' }] }] },
+        });
+        if (retyped.annotation.subtype !== 'free-text') throw new Error('expected a free text');
+        expect(retyped.annotation.fontSize).toBe(20);
+        expect(retyped.annotation.fontColor).toBe('#ff0000');
+
+        // A body is a value: what it leaves out takes the default, as on a comment.
         const italic = await page.annotations.update(created.annotation.ref, {
           richText: { body: { italic: true }, paragraphs: [{ runs: [{ text: 'restyled' }] }] },
         });
         if (italic.annotation.subtype !== 'free-text') throw new Error('expected a free text');
         expect(italic.annotation.richText.body.italic).toBe(true);
-        expect(italic.annotation.fontSize).toBe(20);
-        expect(italic.annotation.fontColor).toBe('#ff0000');
+        expect(italic.annotation.fontSize).toBe(12);
+        expect(italic.annotation.fontColor).toBe('#000000');
       } finally {
         await doc.close();
       }

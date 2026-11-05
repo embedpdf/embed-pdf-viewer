@@ -133,12 +133,13 @@ export function importAnnotations(ctx: ChangeContext, op: AnnotationImportOp): D
       authorizeCreate: (draft) => {
         authorizeUnprotected(ctx.authority, annotationWriteCapability(draft.subtype));
         // A restoring import writes attribution that isn't the caller's,
-        // under the rights checked above; a copy is the caller's own create.
+        // under the rights checked above; a copy is the caller's own create,
+        // and an item in no group goes in the caller's (see `attributionOf`).
         if (!rights) {
           authorizeAnnotationCreate(
             ctx.authority,
             draft.subtype,
-            (draft as { groupId?: string | null }).groupId,
+            (draft as { groupId?: string | null }).groupId ?? undefined,
           );
         }
       },

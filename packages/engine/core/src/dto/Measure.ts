@@ -87,12 +87,3 @@ export interface LineLeader {
   extension?: number;
   offset?: number;
 }
-export interface LineCaptionPatch {
-  enabled?: boolean;
-  position?: 'inline' | 'top' | null;
-  offset?: LineDimensionCaption['offset'] | null;
-}
-export interface ShapeCaptionPatch {
-  enabled?: boolean;
-  center?: PdfPoint | null;
-}

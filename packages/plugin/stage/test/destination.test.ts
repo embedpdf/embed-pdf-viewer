@@ -32,7 +32,9 @@ describe('a destination as a reveal', () => {
       zoom: 'fit-width',
       anchor: { y: 'start' },
     });
-    expect(revealOfDestination({ kind: 'fitH', page }, letter).anchor).toEqual({ y: 'keep' });
+    expect(revealOfDestination({ kind: 'fitH', page, y: null }, letter).anchor).toEqual({
+      y: 'keep',
+    });
   });
 
   test('fitV: a page-high strip at x, fit to height', () => {
@@ -60,6 +62,8 @@ describe('a destination as a reveal', () => {
       width: 612,
       height: 0,
     });
-    expect(revealOfDestination({ kind: 'fitBV', page }, letter).anchor).toEqual({ x: 'keep' });
+    expect(revealOfDestination({ kind: 'fitBV', page, x: null }, letter).anchor).toEqual({
+      x: 'keep',
+    });
   });
 });

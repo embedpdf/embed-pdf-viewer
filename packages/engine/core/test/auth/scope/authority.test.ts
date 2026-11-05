@@ -87,6 +87,33 @@ describe('authorizeAnnotationUpdate', () => {
   });
 });
 
+describe('authorizeAnnotationCreate', () => {
+  it("puts a create without a group in the caller's own", () => {
+    expect(authorizeAnnotationCreate(SELF_ONLY, 'square', undefined)).toEqual({
+      userId: 'bob',
+      displayName: 'Bob',
+      groupId: '5',
+    });
+  });
+
+  it('refuses no group to a caller who has one, as an update refuses removing it', () => {
+    expect(() => authorizeAnnotationCreate(SELF_ONLY, 'square', null)).toThrow(
+      expect.objectContaining({ code: EngineErrorCode.InvalidArg }),
+    );
+  });
+
+  it('puts a create in no group for a caller without one', () => {
+    const alone: AnnotationAuthority = {
+      identity: { userId: 'ann', displayName: 'Ann' },
+      grants: { scope: ['doc.annotate.modify'], pdfBits: decodePdfBits(null) },
+    };
+    expect(authorizeAnnotationCreate(alone, 'square', null)).toEqual({
+      userId: 'ann',
+      displayName: 'Ann',
+    });
+  });
+});
+
 describe('authorizeAnnotationDelete', () => {
   it('refuses all of a thread when one member is refused, naming each', () => {
     const members = [

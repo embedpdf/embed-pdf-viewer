@@ -213,10 +213,8 @@ export interface DocumentActionsSnapshot<Destination = PageDestination> {
   /** Action-form `/OpenAction`. Mutually exclusive with `openDestination` —
    *  `/OpenAction` is one entry, a dictionary or an array. */
   openAction: PdfActionTree<Destination> | null;
-  /** Destination-form `/OpenAction` — the initial view, not an action.
-   *  Optional on the wire for skew tolerance (absent ≡ null); the schema
-   *  defaults it, so parsed snapshots always carry the key. */
-  openDestination?: Destination | null;
+  /** Destination-form `/OpenAction` — the initial view, not an action. */
+  openDestination: Destination | null;
   willClose?: PdfActionTree<Destination>;
   willSave?: PdfActionTree<Destination>;
   didSave?: PdfActionTree<Destination>;

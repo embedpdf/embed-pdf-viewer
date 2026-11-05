@@ -1113,8 +1113,8 @@ export const GrantCreateRequestSchema = z.object({
    * permissions it holds itself.
    */
   scope: z.array(z.string().min(1).max(128)).min(1).max(64),
-  /** Origin allowlist; omit to allow any origin. */
-  origins: originPatternArray.optional(),
+  /** Origin allowlist; left out or `null` allows any origin, as a read says. */
+  origins: originPatternArray.nullable().optional(),
   /** Optional passphrase gate, checked at exchange. Stored as a hash; never returned. */
   passphrase: z.string().min(1).max(1024).optional(),
   /** Lifetime of exchanged session tokens. Default 600. */
@@ -1124,8 +1124,8 @@ export const GrantCreateRequestSchema = z.object({
     .min(60)
     .max(60 * 60)
     .optional(),
-  /** Unix epoch ms after which the grant stops exchanging; omit for no expiry. */
-  expiresAt: z.number().int().positive().optional(),
+  /** Unix epoch ms after which the grant stops exchanging; left out or `null` for no expiry. */
+  expiresAt: z.number().int().positive().nullable().optional(),
 });
 export type GrantCreateRequest = z.infer<typeof GrantCreateRequestSchema>;
 

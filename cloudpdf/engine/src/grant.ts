@@ -224,7 +224,7 @@ export interface GrantSessionOptions {
   /** The visitor's answers, sent with the first exchange: what the page knows (`OpenOptions.identity`). */
   identity?: VisitorAnswers;
   /** Where a kept visitor waits for the next visit; none keeps the visitor for this session only. */
-  visitorStore?: VisitorStore | null;
+  visitorStore?: VisitorStore;
   fetch?: typeof globalThis.fetch;
 }
 

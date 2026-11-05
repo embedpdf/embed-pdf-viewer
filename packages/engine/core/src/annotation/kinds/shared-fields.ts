@@ -89,7 +89,11 @@ export const annotationBaseFields = {
   reply: field.data(AnnotationReplySchema).writes(AnnotationReplyWriteSchema).nullable().optional(),
   /** `/Popup`, kept in sync by the engine from the popup's `parent`. */
   popup: field.engine(AnnotationRefSchema).nullable(),
-  /** `/EMBD_Metadata/GroupID`: the group that owns the annotation. */
+  /**
+   * `/EMBD_Metadata/GroupID`: the group that owns the annotation, `null` for
+   * none. A create left without it goes in the caller's own group; `null`
+   * asks for no group, refused to a caller who has one.
+   */
   groupId: field.data(z.string().min(1)).nullable().optional(),
   author: field.attribution(z.string()).nullable(),
   /** `/CreationDate`. */

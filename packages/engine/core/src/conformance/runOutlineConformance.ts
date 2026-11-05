@@ -188,7 +188,7 @@ export function runOutlineConformance(
           action: null,
           target: {
             kind: 'goto',
-            destination: { kind: 'xyz', page: FIRST_PAGE, x: 20, y: 20 },
+            destination: { kind: 'xyz', page: FIRST_PAGE, x: 20, y: 20, zoom: null },
           },
         });
         expect(itemOf(outline, A1)).toMatchObject({
@@ -221,7 +221,7 @@ export function runOutlineConformance(
         expect(outline.incomplete).toBe(false);
         const shared = {
           kind: 'goto',
-          destination: { kind: 'xyz', page: FIRST_PAGE, x: 10, y: 10 },
+          destination: { kind: 'xyz', page: FIRST_PAGE, x: 10, y: 10, zoom: null },
         };
         expect(itemOf(outline, SHARED_ONE)).toMatchObject({
           target: shared,
@@ -230,7 +230,10 @@ export function runOutlineConformance(
         expect(itemOf(outline, SHARED_TWO)).toMatchObject({ target: shared });
         expect(await linkTargetOf(doc)).toMatchObject(shared);
         expect(itemOf(outline, HYPERREF)).toMatchObject({
-          target: { kind: 'goto', destination: { kind: 'xyz', page: SECOND_PAGE, x: 0, y: 100 } },
+          target: {
+            kind: 'goto',
+            destination: { kind: 'xyz', page: SECOND_PAGE, x: 0, y: 100, zoom: null },
+          },
           action: { root: { type: 'goto' } },
         });
         expect(itemOf(outline, OLD_DESTS)).toMatchObject({
@@ -334,11 +337,14 @@ export function runOutlineConformance(
           italic: true,
         });
         const retargeted = await doc.outline.update(C1, {
-          target: { kind: 'goto', destination: { kind: 'xyz', page: SECOND_PAGE, x: 10, y: 40 } },
+          target: {
+            kind: 'goto',
+            destination: { kind: 'xyz', page: SECOND_PAGE, x: 10, y: 40, zoom: null },
+          },
         });
         expect(retargeted.item.target).toMatchObject({
           kind: 'goto',
-          destination: { kind: 'xyz', page: SECOND_PAGE, x: 10, y: 40 },
+          destination: { kind: 'xyz', page: SECOND_PAGE, x: 10, y: 40, zoom: null },
         });
         expect(retargeted.item.action).toMatchObject({ root: { type: 'goto' } });
       });

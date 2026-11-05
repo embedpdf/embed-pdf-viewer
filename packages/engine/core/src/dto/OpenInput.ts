@@ -173,7 +173,7 @@ export interface OpenOptions {
    * `security.passwordPrompt`); with a wrong one it opens locked too, and
    * the prompt's `incorrect` is `true`.
    */
-  password?: string | null;
+  password?: string;
 
   /**
    * Engine-local only. The scope strings to enforce on this handle's

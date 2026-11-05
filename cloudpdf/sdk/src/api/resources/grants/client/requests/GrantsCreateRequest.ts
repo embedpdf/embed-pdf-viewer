@@ -21,10 +21,10 @@ export interface GrantsCreateRequest {
     visitorIdentity?: GrantsCreateRequest.VisitorIdentity | null;
     identity?: CloudPDF.Identity | null;
     scope: string[];
-    origins?: string[];
+    origins?: string[] | null;
     passphrase?: string;
     sessionTtlSeconds?: number;
-    expiresAt?: number;
+    expiresAt?: number | null;
 }
 
 export namespace GrantsCreateRequest {
