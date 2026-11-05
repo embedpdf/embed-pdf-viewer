@@ -8,7 +8,7 @@ describe("TokensClient", () => {
     test("issue (1)", async () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
-        const rawRequestBody = { kind: "doc", sub: "sub", docId: "docId", scope: ["scope"], expiresIn: 1 };
+        const rawRequestBody = { kind: "doc", sub: "sub", docId: "docId", scope: ["scope"], expiresInSeconds: 1 };
         const rawResponseBody = { token: "token", jti: "jti", expiresAt: "2024-01-15T09:30:00Z" };
 
         server
@@ -27,7 +27,7 @@ describe("TokensClient", () => {
                 sub: "sub",
                 docId: "docId",
                 scope: ["scope"],
-                expiresIn: 1,
+                expiresInSeconds: 1,
             },
         });
         expect(response).toEqual(rawResponseBody);
@@ -36,7 +36,13 @@ describe("TokensClient", () => {
     test("issue (2)", async () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
-        const rawRequestBody = { kind: "doc", sub: "x", docId: "docId", scope: ["scope", "scope"], expiresIn: 7776000 };
+        const rawRequestBody = {
+            kind: "doc",
+            sub: "x",
+            docId: "docId",
+            scope: ["scope", "scope"],
+            expiresInSeconds: 7776000,
+        };
         const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
@@ -56,7 +62,7 @@ describe("TokensClient", () => {
                     sub: "x",
                     docId: "docId",
                     scope: ["scope", "scope"],
-                    expiresIn: 7776000,
+                    expiresInSeconds: 7776000,
                 },
             });
         }).rejects.toThrow(CloudPDF.BadRequestError);
@@ -65,7 +71,13 @@ describe("TokensClient", () => {
     test("issue (3)", async () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
-        const rawRequestBody = { kind: "doc", sub: "x", docId: "docId", scope: ["scope", "scope"], expiresIn: 7776000 };
+        const rawRequestBody = {
+            kind: "doc",
+            sub: "x",
+            docId: "docId",
+            scope: ["scope", "scope"],
+            expiresInSeconds: 7776000,
+        };
         const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
@@ -85,7 +97,7 @@ describe("TokensClient", () => {
                     sub: "x",
                     docId: "docId",
                     scope: ["scope", "scope"],
-                    expiresIn: 7776000,
+                    expiresInSeconds: 7776000,
                 },
             });
         }).rejects.toThrow(CloudPDF.ForbiddenError);
@@ -94,7 +106,13 @@ describe("TokensClient", () => {
     test("issue (4)", async () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
-        const rawRequestBody = { kind: "doc", sub: "x", docId: "docId", scope: ["scope", "scope"], expiresIn: 7776000 };
+        const rawRequestBody = {
+            kind: "doc",
+            sub: "x",
+            docId: "docId",
+            scope: ["scope", "scope"],
+            expiresInSeconds: 7776000,
+        };
         const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
@@ -114,7 +132,7 @@ describe("TokensClient", () => {
                     sub: "x",
                     docId: "docId",
                     scope: ["scope", "scope"],
-                    expiresIn: 7776000,
+                    expiresInSeconds: 7776000,
                 },
             });
         }).rejects.toThrow(CloudPDF.NotFoundError);

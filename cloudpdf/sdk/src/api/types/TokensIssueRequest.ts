@@ -16,14 +16,14 @@ export namespace TokensIssueRequest {
         scope: string[];
         identity?: CloudPDF.Identity | undefined;
         origins?: string[] | undefined;
-        expiresIn: number;
+        expiresInSeconds: number;
     }
 
     export interface Tenant {
         kind: "tenant";
         sub: string;
         scope: string[];
-        expiresIn: number;
+        expiresInSeconds: number;
     }
 
     export interface Upload {
@@ -35,6 +35,6 @@ export namespace TokensIssueRequest {
         maxFiles?: number | undefined;
         maxBytes?: number | undefined;
         origins?: string[] | undefined;
-        expiresIn: number;
+        expiresInSeconds: number;
     }
 }

@@ -670,13 +670,18 @@ export async function registerAnnotationRoutes(
   // An annotation's `appearance` resource: its drawing, as a one-page PDF. A
   // read that egresses content, gated by `doc.download` like the export above.
   app.get(
-    '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/:annotKey/resources/appearance',
+    '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/:annotationKey/resources/appearance',
     async (req, reply) => {
-      const { docId, layerName, pageKey, annotKey } = req.params as {
+      const {
+        docId,
+        layerName,
+        pageKey,
+        annotationKey: annotKey,
+      } = req.params as {
         docId: string;
         layerName: string;
         pageKey: string;
-        annotKey: string;
+        annotationKey: string;
       };
       const pageObjectNumber = resolvePageKeyParam(pageKey);
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
@@ -697,13 +702,18 @@ export async function registerAnnotationRoutes(
   );
 
   app.patch(
-    '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/:annotKey',
+    '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/:annotationKey',
     async (req, reply) => {
-      const { docId, layerName, pageKey, annotKey } = req.params as {
+      const {
+        docId,
+        layerName,
+        pageKey,
+        annotationKey: annotKey,
+      } = req.params as {
         docId: string;
         layerName: string;
         pageKey: string;
-        annotKey: string;
+        annotationKey: string;
       };
       const pageObjectNumber = resolvePageKeyParam(pageKey);
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
@@ -732,13 +742,18 @@ export async function registerAnnotationRoutes(
   );
 
   app.delete(
-    '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/:annotKey',
+    '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/:annotationKey',
     async (req, reply) => {
-      const { docId, layerName, pageKey, annotKey } = req.params as {
+      const {
+        docId,
+        layerName,
+        pageKey,
+        annotationKey: annotKey,
+      } = req.params as {
         docId: string;
         layerName: string;
         pageKey: string;
-        annotKey: string;
+        annotationKey: string;
       };
       const pageObjectNumber = resolvePageKeyParam(pageKey);
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);

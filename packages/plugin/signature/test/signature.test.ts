@@ -573,7 +573,7 @@ describe('facts from every session', () => {
       origin: remote,
       status: 'completed',
       signature: sealed,
-      version: { sha256: 'after', byteLength: 2 },
+      version: { sha256: 'after', sizeBytes: 2 },
       previous: { sha256: 'before', byteLength: 1 },
       protection,
       meta: {},

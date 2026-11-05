@@ -8,13 +8,13 @@ export interface AttachmentMutationMeta {
     opId: string;
     undoable: boolean;
     missingCharacters?: string[] | undefined;
-    changed: AttachmentMutationMeta.Changed.Item[];
+    changedRefs: AttachmentMutationMeta.ChangedRefs.Item[];
 }
 
 export namespace AttachmentMutationMeta {
-    export type Changed = Changed.Item[];
+    export type ChangedRefs = ChangedRefs.Item[];
 
-    export namespace Changed {
+    export namespace ChangedRefs {
         export interface Item {
             kind: Item.Kind;
             key: string;

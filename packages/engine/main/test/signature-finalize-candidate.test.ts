@@ -114,7 +114,10 @@ describe('signatures.finalizeCandidate', () => {
       },
       'open',
     );
-    const before = await call({ kind: 'signatures.list', effect: 'read', docId: 'sign' }, 'signatures.list');
+    const before = await call(
+      { kind: 'signatures.list', effect: 'read', docId: 'sign' },
+      'signatures.list',
+    );
     const field = before.snapshot.signatures.find((s) => s.fieldName === 'sig')!;
     expect(field.signed).toBe(false);
     const fieldObjectNumber = field.field.kind === 'objectNumber' ? field.field.objectNumber : -1;
@@ -128,14 +131,14 @@ describe('signatures.finalizeCandidate', () => {
         input: {
           field: { kind: 'fqn', name: 'sig' },
           certify: { permission: 2 },
-          contentsSize: CONTENTS_SIZE,
+          contentsSizeBytes: CONTENTS_SIZE,
         },
         // A tenant's write: no grants to check.
         authority: { identity: {}, grants: null, protection: null },
       },
       'signatures.prepare',
     );
-    expect(prepared.contentsSize).toBe(CONTENTS_SIZE);
+    expect(prepared.contentsSizeBytes).toBe(CONTENTS_SIZE);
 
     // What a server keeps: the candidate's tail past the base's length.
     const candidatePath = join(dir, `${prepared.signingId}.candidate.pdf`);
@@ -147,7 +150,12 @@ describe('signatures.finalizeCandidate', () => {
 
     // The preparing worker forgets the signing; another replica rebuilds it.
     const cancelled = await call(
-      { kind: 'signatures.cancel', effect: 'session', docId: 'sign', signingId: prepared.signingId },
+      {
+        kind: 'signatures.cancel',
+        effect: 'session',
+        docId: 'sign',
+        signingId: prepared.signingId,
+      },
       'signatures.cancel',
     );
     expect(cancelled.result.status).toBe('cancelled');
@@ -161,7 +169,7 @@ describe('signatures.finalizeCandidate', () => {
         effect: 'read',
         path: rebuilt,
         byteRange: prepared.byteRange,
-        contentsSize: prepared.contentsSize,
+        contentsSizeBytes: prepared.contentsSizeBytes,
         fieldObjectNumber,
         cms: FAKE_CMS.buffer.slice(0),
         password: null,
@@ -173,12 +181,12 @@ describe('signatures.finalizeCandidate', () => {
     expect(finalized.signature.byteRange).toEqual(prepared.byteRange);
     expect(finalized.signature.docMdp).toBe(2);
     expect(finalized.signature.catalogCertification).toBe(true);
-    expect(finalized.signature.contentsSize).toBe(FAKE_CMS.byteLength);
+    expect(finalized.signature.contentsSizeBytes).toBe(FAKE_CMS.byteLength);
     expect(finalized.protection.certification?.permission).toBe(2);
 
     // The version is the file: its own hash and length.
     const sealed = await readFile(rebuilt);
-    expect(finalized.version).toEqual({ sha256: sha256(sealed), byteLength: sealed.byteLength });
+    expect(finalized.version).toEqual({ sha256: sha256(sealed), sizeBytes: sealed.byteLength });
     // The prepare's digest is the digest of the finalized file's ranges:
     // installing the CMS changed nothing the signature covers.
     const [r0, r1, r2, r3] = prepared.byteRange;
@@ -203,7 +211,10 @@ describe('signatures.finalizeCandidate', () => {
       },
       'open',
     );
-    const after = await call({ kind: 'signatures.list', effect: 'read', docId: 'verify' }, 'signatures.list');
+    const after = await call(
+      { kind: 'signatures.list', effect: 'read', docId: 'verify' },
+      'signatures.list',
+    );
     expect(after.snapshot.chainValid).toBe(true);
     expect(after.snapshot.revisions).toHaveLength(before.snapshot.revisions.length + 1);
     const sig = after.snapshot.signatures.find((s) => s.fieldName === 'sig')!;
@@ -218,7 +229,10 @@ describe('signatures.finalizeCandidate', () => {
       'signatures.contents',
     );
     expect(new Uint8Array(contents.bytes)).toEqual(FAKE_CMS);
-    const version = await call({ kind: 'document.version', effect: 'read', docId: 'verify' }, 'document.version');
+    const version = await call(
+      { kind: 'document.version', effect: 'read', docId: 'verify' },
+      'document.version',
+    );
     expect(version.version).toEqual(finalized.version);
     await call({ kind: 'close', effect: 'close', docId: 'verify' }, 'close');
 
@@ -229,7 +243,7 @@ describe('signatures.finalizeCandidate', () => {
         effect: 'read',
         path: rebuilt,
         byteRange: prepared.byteRange,
-        contentsSize: prepared.contentsSize,
+        contentsSizeBytes: prepared.contentsSizeBytes,
         fieldObjectNumber,
         cms: FAKE_CMS.buffer.slice(0),
         password: null,
@@ -249,14 +263,18 @@ describe('signatures.finalizeCandidate', () => {
       effect: 'read' as const,
       path,
       byteRange: prepared.byteRange,
-      contentsSize: prepared.contentsSize,
+      contentsSizeBytes: prepared.contentsSizeBytes,
       fieldObjectNumber,
       cms: FAKE_CMS.buffer.slice(0),
       password: null,
     });
     const p1 = await fresh('r1.pdf');
     await rejects({ ...input(p1), byteRange: [r0, r1, r2, r3 + 1] }, 'InvalidArg', /does not span/);
-    await rejects({ ...input(p1), contentsSize: CONTENTS_SIZE - 1 }, 'InvalidArg', /hex digits/);
+    await rejects(
+      { ...input(p1), contentsSizeBytes: CONTENTS_SIZE - 1 },
+      'InvalidArg',
+      /hex digits/,
+    );
     await rejects(
       { ...input(p1), byteRange: [r0, r1 + 1, r2 + 1, r3 - 1] },
       'InvalidArg',

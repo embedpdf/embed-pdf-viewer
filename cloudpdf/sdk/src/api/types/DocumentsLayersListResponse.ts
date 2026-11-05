@@ -14,7 +14,7 @@ export namespace DocumentsLayersListResponse {
             layerName: string;
             grantId: string | null;
             visitorId: string | null;
-            storageSizeBytes: number | null;
+            sizeBytes: number | null;
             createdAt: string;
             updatedAt: string;
             lastSeenAt: string | null;

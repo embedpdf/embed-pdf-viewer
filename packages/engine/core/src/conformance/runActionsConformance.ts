@@ -231,7 +231,9 @@ export function runActionsConformance(
           payload: {
             url: 'https://uf.example.test/submit',
             fields: [{ kind: 'name', name: 'parent' }],
-            flags: { raw: 0, exclude: false, format: 'fdf', method: 'post' },
+            exclude: false,
+            format: 'fdf',
+            method: 'post',
           },
         });
         expect(rootOf('submit-compat-xfdf')).toMatchObject({
@@ -242,13 +244,10 @@ export function runActionsConformance(
               { kind: 'name', name: 'noexport' },
               { kind: 'name', name: 'plain' },
             ],
-            flags: {
-              raw: 35,
-              exclude: true,
-              includeNoValueFields: true,
-              format: 'xfdf',
-              method: 'post',
-            },
+            exclude: true,
+            includeNoValueFields: true,
+            format: 'xfdf',
+            method: 'post',
             charSet: 'utf-8',
           },
         });
@@ -257,7 +256,8 @@ export function runActionsConformance(
           payload: {
             url: 'https://example.test/pdf',
             fields: null,
-            flags: { raw: 264, format: 'pdf', method: 'get' },
+            format: 'pdf',
+            method: 'get',
           },
         });
 

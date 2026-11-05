@@ -240,7 +240,6 @@ describe('useActionsUiAdapter', () => {
   const websiteLink: PdfActionTree = {
     root: { type: 'uri', subtype: 'URI', uri: 'https://example.com', isMap: false, next: [] },
     incomplete: false,
-    warningFlags: 0,
     warnings: [],
   };
   const click: ActionContext = {

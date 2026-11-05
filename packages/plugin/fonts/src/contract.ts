@@ -73,7 +73,7 @@ export interface FontsCapability {
    * Rejects with `not-found` for a hash the list doesn't name,
    * `operation-cancelled` and `instance-closed`.
    */
-  getProgram(displayHash: string, options?: OperationOptions): Promise<FontProgramInfo>;
+  getProgram(displaySha256: string, options?: OperationOptions): Promise<FontProgramInfo>;
   /**
    * How a browser draws text in the font a box names (its `fontFamily`). A
    * standard font needs no list; another font is drawn in the standard font

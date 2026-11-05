@@ -935,7 +935,7 @@ async function resolvePageAndManifestForRead(input: {
       : await input.documentService.getManifest(input.scope.ctx, input.scope.docId);
   const page = manifest.pages.find((p) => p.page.objectNumber === input.pageObjectNumber);
   if (page) {
-    return { page, baseSha: manifest.baseSha };
+    return { page, baseSha: manifest.baseSha256 };
   }
   throw new EngineError(
     EngineErrorCode.NotFound,

@@ -350,7 +350,7 @@ export function readActionModel(
               payload: {
                 url,
                 fields,
-                flags: decodeSubmitFormFlags(state.flags),
+                ...decodeSubmitFormFlags(state.flags),
                 ...(charSet === null ? {} : { charSet }),
               },
               next,
@@ -375,7 +375,7 @@ export function readActionModel(
     const root = rootId === null ? null : readNode(rootId);
     const warnings = warningsFromFlags(warningFlags, incomplete);
     if (payloadDropped) warnings.push('payload-dropped');
-    return { root, incomplete, warningFlags, warnings };
+    return { root, incomplete, warnings };
   } finally {
     fn.EPDFAction_CloseModel(modelPtr);
   }

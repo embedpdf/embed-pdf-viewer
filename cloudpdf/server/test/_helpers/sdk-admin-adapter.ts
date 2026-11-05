@@ -46,7 +46,7 @@ class DocumentsAdapter {
         idempotencyKey: input['idempotencyKey'] as string | undefined,
         dedupMode: input['dedupMode'] as 'always-create' | 'reuse-existing' | undefined,
         docId: input['docId'] as string | undefined,
-        uploadTtlSec: input['uploadTtlSec'] as number | undefined,
+        uploadTtlSeconds: input['uploadTtlSeconds'] as number | undefined,
         uploadPreference: input['uploadPreference'] as 'auto' | 'presigned' | 'proxy' | undefined,
         signal: input['signal'] as AbortSignal | undefined,
         onProgress: input['onProgress'] as ((loaded: number, total: number) => void) | undefined,
@@ -63,7 +63,7 @@ class DocumentsAdapter {
       this.client.documents.uploadProxy({
         file: input.body,
         tenantId: this.tenantId,
-        id: input.docId,
+        docId: input.docId,
       }),
     );
   }
@@ -72,14 +72,14 @@ class DocumentsAdapter {
     return call(
       this.client.documents.commit({
         tenantId: this.tenantId,
-        id: input.docId,
+        docId: input.docId,
         sha256: input.sha256,
       }),
     );
   }
 
   async get(docId: string): Promise<any> {
-    return (await call(this.client.documents.get({ tenantId: this.tenantId, id: docId }))).document;
+    return (await call(this.client.documents.get({ tenantId: this.tenantId, docId }))).document;
   }
 
   async list(options: Record<string, unknown> = {}): Promise<any> {
@@ -99,18 +99,16 @@ class DocumentsAdapter {
   }
 
   async rename(docId: string, name: string): Promise<any> {
-    return (await call(this.client.documents.update({ tenantId: this.tenantId, id: docId, name })))
+    return (await call(this.client.documents.update({ tenantId: this.tenantId, docId, name })))
       .document;
   }
 
   async delete(docId: string): Promise<void> {
-    await call(this.client.documents.delete({ tenantId: this.tenantId, id: docId }));
+    await call(this.client.documents.delete({ tenantId: this.tenantId, docId }));
   }
 
   async download(docId: string): Promise<Uint8Array> {
-    const response = await call(
-      this.client.documents.download({ tenantId: this.tenantId, id: docId }),
-    );
+    const response = await call(this.client.documents.download({ tenantId: this.tenantId, docId }));
     return response.bytes();
   }
 }

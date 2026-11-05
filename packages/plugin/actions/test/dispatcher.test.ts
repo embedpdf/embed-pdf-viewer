@@ -25,7 +25,6 @@ const LIFECYCLE: ActionContext = {
 const tree = (root: PdfActionNode | null, incomplete = false): PdfActionTree => ({
   root,
   incomplete,
-  warningFlags: 0,
   warnings: incomplete ? ['incomplete'] : [],
 });
 
@@ -185,20 +184,17 @@ describe('actions dispatcher', () => {
       payload: {
         url: 'https://home.test/x',
         fields: null,
-        flags: {
-          raw: 0,
-          exclude: false,
-          includeNoValueFields: false,
-          format: 'fdf' as const,
-          method: 'post' as const,
-          submitCoordinates: false,
-          includeAppendSaves: false,
-          includeAnnotations: false,
-          canonicalFormat: false,
-          exclNonUserAnnots: false,
-          exclFKey: false,
-          embedForm: false,
-        },
+        exclude: false,
+        includeNoValueFields: false,
+        format: 'fdf' as const,
+        method: 'post' as const,
+        submitCoordinates: false,
+        includeAppendSaves: false,
+        includeAnnotations: false,
+        canonicalFormat: false,
+        exclNonUserAnnots: false,
+        exclFKey: false,
+        embedForm: false,
       },
       next: [],
     });

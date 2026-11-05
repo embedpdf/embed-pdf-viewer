@@ -245,7 +245,7 @@ describe('Phase 3 doc routes — GET /v1/docs/:docId/head', () => {
     const body = (await res.json()) as Record<string, unknown>;
     expect(body).toMatchObject({
       id: docId,
-      baseSha: seed.sha,
+      baseSha256: seed.sha,
       docVersion: 1,
       state: 'ready',
       encryption: { state: 'unknown', requiresPassword: null },

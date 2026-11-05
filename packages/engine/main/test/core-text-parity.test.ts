@@ -193,15 +193,15 @@ beforeAll(async () => {
   const loaded = async (hash: string) =>
     programFont(hash, await doc.fonts.getProgram(hash), await doc.fonts.downloadProgram(hash));
   const fallbacks = await Promise.all(resolution.runs[0]!.fallbacks.map(loaded));
-  lastResort = await loaded(list.lastResort.displayHash!);
+  lastResort = await loaded(list.lastResort.displaySha256!);
   fonts = { face: standardTextFont('helvetica'), fallbacks, lastResort };
 
   names.set('helvetica', 'Helvetica');
   names.set('helvetica-bold', 'Helvetica-Bold');
   names.set('times-roman', 'Times-Roman');
-  names.set(list.lastResort.displayHash!, 'EmbedPDFLastResort-Regular');
+  names.set(list.lastResort.displaySha256!, 'EmbedPDFLastResort-Regular');
   for (const font of list.fonts) {
-    const hash = font.programs[0]?.displayHash;
+    const hash = font.programs[0]?.displaySha256;
     if (hash && font.postScriptName) names.set(hash, font.postScriptName);
   }
 });

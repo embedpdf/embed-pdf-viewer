@@ -69,8 +69,9 @@ function predictedFile(op: CreateOp): Attachment {
     name: op.file.name,
     mimeType: op.file.mimeType ?? null,
     description: op.file.description ?? null,
-    size: bytes === undefined ? null : bytes instanceof Uint8Array ? bytes.byteLength : bytes.size,
-    checksum: null,
+    sizeBytes:
+      bytes === undefined ? null : bytes instanceof Uint8Array ? bytes.byteLength : bytes.size,
+    md5: null,
     createdAt: null,
     modifiedAt: null,
   };

@@ -279,7 +279,7 @@ describe('signing across replicas', () => {
     ]);
     const results = await Promise.all(
       [ra, rb].map((r) =>
-        json<{ status: string; version: { sha256: string; byteLength: number } }>(r),
+        json<{ status: string; version: { sha256: string; sizeBytes: number } }>(r),
       ),
     );
     expect(results.map((r) => r.status).sort()).toEqual(['already-completed', 'completed']);
@@ -309,10 +309,14 @@ describe('signing across replicas', () => {
       ['a', a],
       ['b', b],
     ] as const) {
-      const manifest = await json<{ baseSha: string; working: boolean; layerVersion: number }>(
+      const manifest = await json<{ baseSha256: string; working: boolean; layerVersion: number }>(
         await call(replica, 'GET', `${layer}/manifest`, 'alice'),
       );
-      expect(manifest).toMatchObject({ baseSha: version.sha256, working: false, layerVersion: 3 });
+      expect(manifest).toMatchObject({
+        baseSha256: version.sha256,
+        working: false,
+        layerVersion: 3,
+      });
       const snapshot = await json<{
         signatures: Array<{ fieldName: string; signed: boolean; coverage: string | null }>;
       }>(await call(replica, 'GET', `${layer}/signatures`, 'alice'));
@@ -341,7 +345,12 @@ describe('signing across replicas', () => {
     expect(published.counter).toBeGreaterThan(Math.max(...before));
     const versionBytes = Buffer.from(
       await (
-        await call(a, 'GET', `/v1/docs/${DOC}/layers/alice/versions/download/${version.sha256}`, 'alice')
+        await call(
+          a,
+          'GET',
+          `/v1/docs/${DOC}/layers/alice/versions/download/${version.sha256}`,
+          'alice',
+        )
       ).arrayBuffer(),
     ).toString('latin1');
     // The last trailer's /Size is one past the version's last object number.
@@ -369,10 +378,10 @@ describe('signing across replicas', () => {
     // Bob's layer, on both replicas: still over the upload, still his own
     // change, no signature; the document stays its upload.
     for (const replica of [a, b]) {
-      const bobManifest = await json<{ baseSha: string }>(
+      const bobManifest = await json<{ baseSha256: string }>(
         await call(replica, 'GET', `${bobLayer}/manifest`, 'bob'),
       );
-      expect(bobManifest.baseSha).toBe(seeded.sha);
+      expect(bobManifest.baseSha256).toBe(seeded.sha);
       const bobForm = await json<{ fields: Array<{ name: string; value: unknown }> }>(
         await call(replica, 'GET', `${bobLayer}/form`, 'bob'),
       );

@@ -44,7 +44,7 @@ export class ProgramsClient {
         request: CloudPDF.doc.fonts.DownloadProgramsRequest,
         requestOptions?: ProgramsClient.RequestOptions,
     ): Promise<core.WithRawResponse<core.BinaryResponse>> {
-        const { docId, layerName, displayHash, "X-Document-Password": documentPassword } = request;
+        const { docId, layerName, displaySha256, "X-Document-Password": documentPassword } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -60,7 +60,7 @@ export class ProgramsClient {
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)) ??
                     environments.CloudPDFEnvironment.Saas,
-                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/font-program-files/${core.url.encodePathParam(displayHash)}`,
+                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/font-program-files/${core.url.encodePathParam(displaySha256)}`,
             ),
             method: "GET",
             headers: _headers,
@@ -101,7 +101,7 @@ export class ProgramsClient {
             _response.error,
             _response.rawResponse,
             "GET",
-            "/v1/docs/{docId}/layers/{layerName}/font-program-files/{displayHash}",
+            "/v1/docs/{docId}/layers/{layerName}/font-program-files/{displaySha256}",
         );
     }
 
@@ -117,7 +117,7 @@ export class ProgramsClient {
      *     await client.doc.fonts.programs.get({
      *         docId: "docId",
      *         layerName: "layerName",
-     *         displayHash: "displayHash"
+     *         displaySha256: "displaySha256"
      *     })
      */
     public get(
@@ -131,7 +131,7 @@ export class ProgramsClient {
         request: CloudPDF.doc.fonts.GetProgramsRequest,
         requestOptions?: ProgramsClient.RequestOptions,
     ): Promise<core.WithRawResponse<CloudPDF.DocFontsProgramsGetResponse>> {
-        const { docId, layerName, displayHash, "X-Document-Password": documentPassword } = request;
+        const { docId, layerName, displaySha256, "X-Document-Password": documentPassword } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -147,7 +147,7 @@ export class ProgramsClient {
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)) ??
                     environments.CloudPDFEnvironment.Saas,
-                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/font-programs/${core.url.encodePathParam(displayHash)}`,
+                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/font-programs/${core.url.encodePathParam(displaySha256)}`,
             ),
             method: "GET",
             headers: _headers,
@@ -182,7 +182,7 @@ export class ProgramsClient {
             _response.error,
             _response.rawResponse,
             "GET",
-            "/v1/docs/{docId}/layers/{layerName}/font-programs/{displayHash}",
+            "/v1/docs/{docId}/layers/{layerName}/font-programs/{displaySha256}",
         );
     }
 }

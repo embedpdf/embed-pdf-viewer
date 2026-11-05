@@ -473,8 +473,6 @@ export interface SubmitIntent {
   includeNoValueFields: boolean;
   format: 'fdf' | 'html' | 'xfdf' | 'pdf';
   method: 'post' | 'get';
-  /** Raw ISO Table 240 word (0 for scripted submits without one). */
-  flagsRaw: number;
   charSet?: string;
 }
 
@@ -490,7 +488,6 @@ export interface ActionSubmitRequest {
   url: string | null;
   method: 'post' | 'get';
   format: 'fdf' | 'html' | 'xfdf' | 'pdf';
-  flagsRaw: number;
   charSet?: string;
   entries: FormSubmissionEntry[];
   origin: ActionOrigin;

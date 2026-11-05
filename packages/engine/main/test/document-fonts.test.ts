@@ -120,9 +120,9 @@ describe('doc.fonts (local engine)', () => {
     expect(list.fonts.slice(0, 14).map((font) => font.source)).toEqual(Array(14).fill('standard'));
     const helvetica = fontNamed(list.fonts, 'helvetica')!;
     expect(helvetica).toMatchObject({ canChoose: true, restrictions: [], familyName: 'Helvetica' });
-    expect(helvetica.programs[0]!.displayHash).toBe(standardFontProgram('helvetica').hash);
+    expect(helvetica.programs[0]!.displaySha256).toBe(standardFontProgram('helvetica').hash);
     expect(list.fallbacks).toEqual([]);
-    expect(list.lastResort.displayHash).toBe(LAST_RESORT_HASH);
+    expect(list.lastResort.displaySha256).toBe(LAST_RESORT_HASH);
 
     await engine.fonts.register({ key: 'roboto', data: roboto.slice() });
     await engine.fonts.addFallback('roboto');
@@ -130,8 +130,8 @@ describe('doc.fonts (local engine)', () => {
     const font = fontNamed(after.fonts, 'roboto')!;
     expect(font).toMatchObject({ source: 'engine', canChoose: true, restrictions: [] });
     expect(font.programs[0]).toMatchObject({
-      displayHash: sha256(roboto),
-      sourceHash: sha256(roboto),
+      displaySha256: sha256(roboto),
+      sourceSha256: sha256(roboto),
       format: 'truetype',
       canDownload: true,
     });
@@ -180,17 +180,17 @@ describe('doc.fonts (local engine)', () => {
     )!;
     expect(font).toMatchObject({ canChoose: true, restrictions: [] });
     const program = font.programs[0]!;
-    expect(program).toMatchObject({ sourceHash: sha256(misaligned), canDownload: true });
-    expect(program.displayHash).not.toBe(program.sourceHash);
+    expect(program).toMatchObject({ sourceSha256: sha256(misaligned), canDownload: true });
+    expect(program.displaySha256).not.toBe(program.sourceSha256);
 
-    const bytes = await doc.fonts.downloadProgram(program.displayHash!);
-    expect(sha256(bytes)).toBe(program.displayHash);
+    const bytes = await doc.fonts.downloadProgram(program.displaySha256!);
+    expect(sha256(bytes)).toBe(program.displaySha256);
     const tables = tablesOf(bytes);
     expect(tables.every((table) => table.offset % 4 === 0)).toBe(true);
     const byTag = (list: ReturnType<typeof tablesOf>) =>
       Object.fromEntries(list.map((table) => [table.tag, [...table.bytes]]));
     expect(byTag(tables)).toEqual(byTag(tablesOf(misaligned)));
-    const info = await doc.fonts.getProgram(program.displayHash!);
+    const info = await doc.fonts.getProgram(program.displaySha256!);
     expect(info.covers.some((range) => range.start <= 65 && 65 < range.start + range.count)).toBe(
       true,
     );

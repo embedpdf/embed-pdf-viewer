@@ -1080,7 +1080,7 @@ export class WorkerHost {
     const finalized = new CandidateFinalizer(this.runtime, this.baseDocuments).finalize({
       path: req.path,
       byteRange: req.byteRange,
-      contentsSize: req.contentsSize,
+      contentsSizeBytes: req.contentsSizeBytes,
       fieldObjectNumber: req.fieldObjectNumber,
       cms: new Uint8Array(req.cms),
       password: req.password ?? null,
@@ -1711,7 +1711,7 @@ export class WorkerHost {
     req: DocumentFontsProgramWorkerRequest,
   ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const reader = new DocumentFontReader(this.runtime, this.requireSession(req), this.fonts);
-    const program = reader.program(req.displayHash, req.part === 'data');
+    const program = reader.program(req.displaySha256, req.part === 'data');
     // The bytes are a copy out of the runtime's memory: they transfer.
     const bytes = program.bytes
       ? (program.bytes.buffer.slice(

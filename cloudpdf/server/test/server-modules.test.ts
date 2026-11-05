@@ -612,7 +612,7 @@ describe('a mounted module', () => {
 
     const month = await usage();
     expect(month.metrics['snapshot.saved']).toBe(4);
-    expect(month.metrics['pdf.views']).toBeTypeOf('number');
+    expect(month.metrics.pdfViews).toBeTypeOf('number');
 
     const day = (offset: number) =>
       new Date(Date.now() + offset * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);

@@ -416,8 +416,8 @@ describe('layers over base versions', () => {
       layerState.computeLayerScopes(alice.layer, alice.pages, alice.pages, head),
     );
     expect(manifest).toMatchObject({
-      baseSha: SHA1,
-      baseByteLength: 1234,
+      baseSha256: SHA1,
+      baseSizeBytes: 1234,
       layerVersion: 0,
       working: false,
       docVersion: 1,
@@ -433,7 +433,7 @@ describe('layers over base versions', () => {
       metadataVersion: 3,
       layerVersion: 0,
       working: false,
-      baseByteLength: 1234,
+      baseSizeBytes: 1234,
     });
     // A published version's facts fall back to the initial epochs only when uncatalogued.
     expect(await layerState.baseVersionFacts(DOC, 'f'.repeat(64), 55)).toEqual({

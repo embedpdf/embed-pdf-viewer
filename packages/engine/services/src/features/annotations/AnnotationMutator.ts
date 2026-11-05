@@ -247,7 +247,7 @@ export class AnnotationMutator {
       }
       // Apply /IRT + /RT changes (set/relink/clear, or RT-only). Only this
       // annotation is written; a popup relink and a shared `/Open` also write
-      // the other annotation, which `meta.changed` names after this one.
+      // the other annotation, which `meta.changedRefs` names after this one.
       let linkedParent: AnnotationRef | null = null;
       if (patch.reply !== undefined && !sameReply(patch.reply, currentDto.reply)) {
         writeAnnotationRelationship(

@@ -314,7 +314,7 @@ export class AnnotationsClient {
      *         docId: "docId",
      *         layerName: "layerName",
      *         pageKey: "pageKey",
-     *         annotKey: "annotKey"
+     *         annotationKey: "annotationKey"
      *     })
      */
     public delete(
@@ -332,7 +332,7 @@ export class AnnotationsClient {
             docId,
             layerName,
             pageKey,
-            annotKey,
+            annotationKey,
             "X-Document-Password": documentPassword,
             "Idempotency-Key": idempotencyKey,
         } = request;
@@ -352,7 +352,7 @@ export class AnnotationsClient {
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)) ??
                     environments.CloudPDFEnvironment.Saas,
-                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/annotations/pages/${core.url.encodePathParam(pageKey)}/items/${core.url.encodePathParam(annotKey)}`,
+                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/annotations/pages/${core.url.encodePathParam(pageKey)}/items/${core.url.encodePathParam(annotationKey)}`,
             ),
             method: "DELETE",
             headers: _headers,
@@ -390,7 +390,7 @@ export class AnnotationsClient {
             _response.error,
             _response.rawResponse,
             "DELETE",
-            "/v1/docs/{docId}/layers/{layerName}/annotations/pages/{pageKey}/items/{annotKey}",
+            "/v1/docs/{docId}/layers/{layerName}/annotations/pages/{pageKey}/items/{annotationKey}",
         );
     }
 
@@ -408,7 +408,7 @@ export class AnnotationsClient {
      *         docId: "docId",
      *         layerName: "layerName",
      *         pageKey: "pageKey",
-     *         annotKey: "annotKey",
+     *         annotationKey: "annotationKey",
      *         body: {
      *             "key": "value"
      *         }
@@ -429,7 +429,7 @@ export class AnnotationsClient {
             docId,
             layerName,
             pageKey,
-            annotKey,
+            annotationKey,
             "X-Document-Password": documentPassword,
             "Idempotency-Key": idempotencyKey,
             body: _body,
@@ -450,7 +450,7 @@ export class AnnotationsClient {
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)) ??
                     environments.CloudPDFEnvironment.Saas,
-                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/annotations/pages/${core.url.encodePathParam(pageKey)}/items/${core.url.encodePathParam(annotKey)}`,
+                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/annotations/pages/${core.url.encodePathParam(pageKey)}/items/${core.url.encodePathParam(annotationKey)}`,
             ),
             method: "PATCH",
             headers: _headers,
@@ -496,7 +496,7 @@ export class AnnotationsClient {
             _response.error,
             _response.rawResponse,
             "PATCH",
-            "/v1/docs/{docId}/layers/{layerName}/annotations/pages/{pageKey}/items/{annotKey}",
+            "/v1/docs/{docId}/layers/{layerName}/annotations/pages/{pageKey}/items/{annotationKey}",
         );
     }
 
@@ -517,7 +517,7 @@ export class AnnotationsClient {
         request: CloudPDF.doc.ReadAppearanceAnnotationsRequest,
         requestOptions?: AnnotationsClient.RequestOptions,
     ): Promise<core.WithRawResponse<core.BinaryResponse>> {
-        const { docId, layerName, pageKey, annotKey, "X-Document-Password": documentPassword } = request;
+        const { docId, layerName, pageKey, annotationKey, "X-Document-Password": documentPassword } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -533,7 +533,7 @@ export class AnnotationsClient {
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)) ??
                     environments.CloudPDFEnvironment.Saas,
-                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/annotations/pages/${core.url.encodePathParam(pageKey)}/items/${core.url.encodePathParam(annotKey)}/resources/appearance`,
+                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/annotations/pages/${core.url.encodePathParam(pageKey)}/items/${core.url.encodePathParam(annotationKey)}/resources/appearance`,
             ),
             method: "GET",
             headers: _headers,
@@ -574,7 +574,7 @@ export class AnnotationsClient {
             _response.error,
             _response.rawResponse,
             "GET",
-            "/v1/docs/{docId}/layers/{layerName}/annotations/pages/{pageKey}/items/{annotKey}/resources/appearance",
+            "/v1/docs/{docId}/layers/{layerName}/annotations/pages/{pageKey}/items/{annotationKey}/resources/appearance",
         );
     }
 
@@ -598,7 +598,7 @@ export class AnnotationsClient {
         request: CloudPDF.doc.ReadFileAnnotationsRequest,
         requestOptions?: AnnotationsClient.RequestOptions,
     ): Promise<core.WithRawResponse<core.BinaryResponse>> {
-        const { docId, layerName, pageKey, annotKey, "X-Document-Password": documentPassword } = request;
+        const { docId, layerName, pageKey, annotationKey, "X-Document-Password": documentPassword } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -614,7 +614,7 @@ export class AnnotationsClient {
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)) ??
                     environments.CloudPDFEnvironment.Saas,
-                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/annotations/pages/${core.url.encodePathParam(pageKey)}/items/${core.url.encodePathParam(annotKey)}/resources/file`,
+                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/annotations/pages/${core.url.encodePathParam(pageKey)}/items/${core.url.encodePathParam(annotationKey)}/resources/file`,
             ),
             method: "GET",
             headers: _headers,
@@ -660,7 +660,7 @@ export class AnnotationsClient {
             _response.error,
             _response.rawResponse,
             "GET",
-            "/v1/docs/{docId}/layers/{layerName}/annotations/pages/{pageKey}/items/{annotKey}/resources/file",
+            "/v1/docs/{docId}/layers/{layerName}/annotations/pages/{pageKey}/items/{annotationKey}/resources/file",
         );
     }
 

@@ -111,7 +111,12 @@ export class AttachmentMutator {
 
   /** A write's meta, naming the file it changed. Cloud coherence pins are a server concern. */
   meta(ref: AttachmentRef): AttachmentMutationMeta {
-    return { affectedPages: [], cacheDelta: null, ...this.session.writeStamp(), changed: [ref] };
+    return {
+      affectedPages: [],
+      cacheDelta: null,
+      ...this.session.writeStamp(),
+      changedRefs: [ref],
+    };
   }
 
   /** Delete an embedded file by key. Unlinks the tree entry only. */

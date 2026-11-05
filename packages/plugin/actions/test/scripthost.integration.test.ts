@@ -28,7 +28,6 @@ const fixturePath = resolve(
 const tree = (root: PdfActionNode): PdfActionTree => ({
   root,
   incomplete: false,
-  warningFlags: 0,
   warnings: [],
 });
 const script = (source: string, next: PdfActionNode[] = []): PdfActionNode => ({

@@ -273,8 +273,8 @@ export type OpenDocumentResponse = z.infer<typeof OpenDocumentResponseSchema>;
  */
 export const DocumentHeadSchema = z.object({
   id: z.string(),
-  baseSha: z.string(),
-  storageSizeBytes: z.number().int().nonnegative(),
+  baseSha256: z.string(),
+  sizeBytes: z.number().int().nonnegative(),
   docVersion: z.number().int().positive(),
   state: closed(z.enum(['pending', 'ready', 'failed', 'deleting'])),
   encryption: z.object({
@@ -330,14 +330,14 @@ export const ObjectNumberRangeSchema = z.object({
 /** See `EditSessionAccess`. */
 export const EditSessionAccessSchema = z.object({
   session: closed(z.enum(['new', 'revived', 'live'])),
-  expiresIn: z.number().int().nonnegative(),
+  expiresInSeconds: z.number().int().nonnegative(),
   objectNumbers: z.array(ObjectNumberRangeSchema),
 });
 
 /** See `EditSessionStatus`: the event stream's `session` event. */
 export const EditSessionStatusSchema = z.object({
   held: z.array(ObjectNumberRangeSchema),
-  expiresIn: z.number().int().nonnegative(),
+  expiresInSeconds: z.number().int().nonnegative(),
 });
 
 /** `POST …/object-numbers`: a bulk reservation. */
@@ -347,7 +347,7 @@ export const ObjectNumberReservationRequestSchema = z.object({
 
 export const ObjectNumberReservationResponseSchema = z.object({
   objectNumbers: z.array(ObjectNumberRangeSchema),
-  expiresIn: z.number().int().nonnegative(),
+  expiresInSeconds: z.number().int().nonnegative(),
 });
 
 /**
@@ -624,11 +624,11 @@ export const DocumentManifestSchema = z.object({
   fontsVersion: z.number().int().positive().default(1),
   contentsVersion: z.number().int().positive().default(1),
   auditHead: z.number().int().nonnegative(),
-  baseSha: z.string(),
+  baseSha256: z.string(),
   // Signing fences (absent on pre-signature servers: unwritten, unknown length).
   layerVersion: z.number().int().nonnegative().default(0),
   working: z.boolean().default(false),
-  baseByteLength: z.number().int().nonnegative().default(0),
+  baseSizeBytes: z.number().int().nonnegative().default(0),
   // Plane scopes: layer manifests only; absent = all-'layer'.
   scopes: LayerScopesSchema.optional(),
   // Defined further down; lazy so this schema can come first.
@@ -1189,7 +1189,7 @@ export const AnnotationListMutationMetaSchema: z.ZodType<AnnotationListMutationM
   opId: z.string(),
   undoable: z.boolean(),
   missingCharacters: z.array(z.string()).optional(),
-  changed: z.array(AnnotationRefSchema),
+  changedRefs: z.array(AnnotationRefSchema),
 });
 
 export const AnnotationCreateResultSchema: z.ZodType<AnnotationCreateResult> = z.object({
@@ -1796,7 +1796,7 @@ export const AttachmentMutationMetaSchema: z.ZodType<AttachmentMutationMeta> = z
   opId: z.string(),
   undoable: z.boolean(),
   missingCharacters: z.array(z.string()).optional(),
-  changed: z.array(AttachmentRefSchema),
+  changedRefs: z.array(AttachmentRefSchema),
 });
 
 export const AttachmentCreateResultSchema: z.ZodType<AttachmentCreateResult> = z.object({
@@ -1849,7 +1849,7 @@ export const OutlineMutationMetaSchema: z.ZodType<OutlineMutationMeta> = z.objec
   opId: z.string(),
   undoable: z.boolean(),
   missingCharacters: z.array(z.string()).optional(),
-  changed: z.array(OutlineItemRefSchema),
+  changedRefs: z.array(OutlineItemRefSchema),
 });
 
 /** One parent's children as a write left them; `parent: null` is the top level. */
@@ -1904,8 +1904,8 @@ export const OutlineWireComponents = {
 // Fonts: a document's font list, a program's facts, and a resolve.
 
 const fontProgramShape = {
-  displayHash: z.string().nullable(),
-  sourceHash: z.string().nullable(),
+  displaySha256: z.string().nullable(),
+  sourceSha256: z.string().nullable(),
   embedded: closed(z.enum(['whole', 'subset', 'none'])),
   format: closed(z.enum(['truetype', 'opentype', 'cff', 'type1', 'type3'])).nullable(),
   embeddingPermission: closed(z.enum(['installable', 'editable', 'preview-and-print'])).nullable(),
@@ -1946,7 +1946,7 @@ export const FontListSchema: z.ZodType<FontList> = z.object({
   lastResort: FontProgramSchema,
 });
 
-/** `GET …/font-programs/{displayHash}`: `doc.fonts.getProgram()`. */
+/** `GET …/font-programs/{displaySha256}`: `doc.fonts.getProgram()`. */
 export const FontProgramInfoSchema: z.ZodType<FontProgramInfo> = z.object({
   ...fontProgramShape,
   covers: z.array(
@@ -2048,7 +2048,7 @@ export const SignaturePreparedWireSchema = z.object({
   digest: Base64Schema,
   algorithm: closed(z.enum(['sha256', 'sha384', 'sha512'])),
   byteRange: ByteRangeSchema,
-  contentsSize: z.number().int().positive(),
+  contentsSizeBytes: z.number().int().positive(),
   subFilter: z.string(),
   expectedVersion: DocumentVersionRefSchema,
   expiresAt: IsoDateTimeSchema.nullable(),
@@ -2090,14 +2090,17 @@ export const FieldLockSpecSchema: z.ZodType<FieldLockSpec> = z.object({
 });
 
 export const SignatureSeedValueSchema: z.ZodType<SignatureSeedValue> = z.object({
-  requiredFlags: z.number().int(),
-  presentFlags: z.number().int(),
-  version: z.number().int().nullable(),
+  parserVersion: z.number().int().nullable(),
+  parserVersionRequired: z.boolean(),
   mdp: closed(z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)])).nullable(),
   filter: z.string().nullable(),
+  filterRequired: z.boolean(),
   subFilters: z.array(z.string()),
+  subFiltersRequired: z.boolean(),
   digestMethods: z.array(z.string()),
+  digestMethodsRequired: z.boolean(),
   reasons: z.array(z.string()),
+  reasonsRequired: z.boolean(),
   unsupportedRequired: z.boolean(),
 });
 
@@ -2111,7 +2114,7 @@ export const SignatureDTOSchema: z.ZodType<SignatureDTO> = z.object({
   filter: z.string().nullable(),
   subFilter: z.string().nullable(),
   byteRange: ByteRangeSchema.nullable(),
-  contentsSize: z.number().int().nonnegative(),
+  contentsSizeBytes: z.number().int().nonnegative(),
   coverage: closed(z.enum(['whole-revision', 'partial', 'malformed'])).nullable(),
   revisionIndex: z.number().int().nonnegative().nullable(),
   signer: z.object({
@@ -2170,7 +2173,7 @@ export const SignatureSnapshotSchema: z.ZodType<SignatureSnapshot> = z.object({
 
 export const BaseVersionInfoSchema: z.ZodType<BaseVersionInfo> = z.object({
   sha256: z.string().regex(/^[0-9a-f]{64}$/),
-  byteLength: z.number().int().nonnegative(),
+  sizeBytes: z.number().int().nonnegative(),
 });
 
 export const SignatureCompleteResultSchema: z.ZodType<SignatureCompleteResult> = z.object({
@@ -2260,7 +2263,7 @@ export const SignaturePrepareBodySchema = z.object({
   kind: z.enum(['signature', 'timestamp']).optional(),
   subFilter: z.enum(['adbe.pkcs7.detached', 'ETSI.CAdES.detached']).optional(),
   digest: z.enum(['sha256', 'sha384', 'sha512']).optional(),
-  contentsSize: z.number().int().positive().optional(),
+  contentsSizeBytes: z.number().int().positive().optional(),
   signer: SignatureSignerInputSchema.optional(),
   certify: z.object({ permission: DocMdpPermissionSchema }).optional(),
   lock: FieldLockSpecSchema.optional(),
@@ -2318,7 +2321,7 @@ export function analyzeInputFromQuery(
 /** One of a layer's versions: the upload, or one its signatures made. */
 export const LayerVersionSchema = z.object({
   sha256: z.string().regex(/^[0-9a-f]{64}$/),
-  byteLength: z.number().int().nonnegative(),
+  sizeBytes: z.number().int().nonnegative(),
   number: z.number().int().positive(),
   parentSha256: z.string().nullable(),
   producer: closed(z.enum(['upload', 'signature'])),
@@ -2329,7 +2332,7 @@ export type LayerVersion = z.infer<typeof LayerVersionSchema>;
 
 export const LayerVersionsSchema = z.object({
   /** The layer's base: the upload, or the version its last signature made. */
-  baseSha: z.string().regex(/^[0-9a-f]{64}$/),
+  baseSha256: z.string().regex(/^[0-9a-f]{64}$/),
   /** Oldest first: the upload, then the versions the layer's signatures made. */
   versions: z.array(LayerVersionSchema),
 });

@@ -82,8 +82,8 @@ export function runAttachmentConformance(
         for (const item of attachments) {
           const bytes = await doc.attachments.download(item.ref);
           expect(bytes).toBeInstanceOf(Uint8Array);
-          if (item.size !== null) {
-            expect(bytes.length).toBe(item.size);
+          if (item.sizeBytes !== null) {
+            expect(bytes.length).toBe(item.sizeBytes);
           }
         }
       } finally {
@@ -147,11 +147,11 @@ export function runAttachmentConformance(
         expect(AttachmentCreateResultSchema.safeParse(createdResult).success).toBe(true);
         const created = createdResult.attachment;
         expect(created.ref).toEqual(toAttachmentRef('0-conformance.bin'));
-        expect(createdResult.meta.changed).toEqual([created.ref]);
+        expect(createdResult.meta.changedRefs).toEqual([created.ref]);
         expect(created.name).toBe('0-conformance.bin');
         expect(created.mimeType).toBe('application/octet-stream');
         expect(created.description).toBe('added by conformance');
-        expect(created.size).toBe(data.length);
+        expect(created.sizeBytes).toBe(data.length);
 
         const { attachments: after } = await doc.attachments.list();
         expect(after.length).toBe(before.length + 1);
@@ -254,7 +254,7 @@ export function runAttachmentConformance(
         expect(file.name).toBe('conformance.bin');
         expect(file.mimeType).toBe('application/octet-stream');
         expect(file.description).toBe('attachment conformance payload');
-        expect(file.size).toBe(data.length);
+        expect(file.sizeBytes).toBe(data.length);
 
         // Bytes come back byte-identical as the `file` resource.
         const bytes = await annotations.downloadResource(dto.ref, 'file');
@@ -273,7 +273,7 @@ export function runAttachmentConformance(
           name: 'conformance.bin',
           mimeType: 'application/octet-stream',
           description: 'attachment conformance payload',
-          size: data.length,
+          sizeBytes: data.length,
         });
         const { annotation: updated } = await annotations.update(dto.ref, {
           ...dto,

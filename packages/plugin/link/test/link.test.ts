@@ -223,7 +223,7 @@ describe('link plugin', () => {
       type: 'annotations.reordered',
       page: toPageRef(1),
       order: [PAGE_ONE_LINKS[1]!.ref, PAGE_ONE_LINKS[0]!.ref],
-      meta: { changed: [PAGE_ONE_LINKS[1]!.ref] },
+      meta: { changedRefs: [PAGE_ONE_LINKS[1]!.ref] },
       origin: ORIGIN,
     });
     await settle();

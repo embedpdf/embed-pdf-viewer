@@ -44,16 +44,16 @@ export interface AdminDocumentsRouteDeps {
  *
  * The flow customers walk through:
  *   1. POST /v1/tenants/:tenantId/documents/init
- *      body: { contentLength, contentSha256, name?, metadata?, idempotencyKey?, dedupMode?, docId? }
+ *      body: { sizeBytes, contentSha256, name?, metadata?, idempotencyKey?, dedupMode?, docId? }
  *      -> { id, state, tag: 'created'|'resumed'|'deduped', upload?: { ... } }
  *
  *   2. (If not deduped:) PUT the bytes to `upload.url` (presigned) or
- *      POST multipart to `.../documents/:id/upload-proxy` when the
+ *      POST multipart to `.../documents/:docId/upload-proxy` when the
  *      deployment selected the bounded origin fallback.
  *
- *   3. POST .../documents/:id/commit
+ *   3. POST .../documents/:docId/commit
  *      body: { sha256 }
- *      -> { id, state, baseSha, ... }
+ *      -> { id, state, baseSha256, ... }
  *
  * Or, replacing all three when the bytes already live in the
  * customer's own storage — the server-side pull:
@@ -99,7 +99,7 @@ export async function registerAdminDocumentsRoutes(
     const result = await lifecycle.init({
       tenantId: ctx.tenantId,
       sub: ctx.sub,
-      contentLength: body.contentLength,
+      contentLength: body.sizeBytes,
       contentSha256: body.contentSha256,
       name: body.name,
       folderId: filing.folderId,
@@ -107,7 +107,7 @@ export async function registerAdminDocumentsRoutes(
       idempotencyKey: body.idempotencyKey ?? null,
       dedupMode: body.dedupMode,
       docId: body.docId,
-      uploadTtlSec: body.uploadTtlSec,
+      uploadTtlSec: body.uploadTtlSeconds,
       uploadPreference: body.uploadPreference,
       ...(ctx.via === 'upload-jwt'
         ? {
@@ -132,9 +132,9 @@ export async function registerAdminDocumentsRoutes(
     const upload = await lifecycle.issueUpload(
       result.doc.id,
       ctx.tenantId,
-      body.contentLength,
+      body.sizeBytes,
       (docId) => adminWirePaths.documentUploadProxy(tenantId, docId),
-      { ttlSec: body.uploadTtlSec, preference: body.uploadPreference },
+      { ttlSec: body.uploadTtlSeconds, preference: body.uploadPreference },
     );
     return reply.send({
       tag: result.tag,
@@ -145,7 +145,7 @@ export async function registerAdminDocumentsRoutes(
 
   const commitOp = adminOperations['documents.commit'];
   mount(commitOp, async (req, reply) => {
-    const { tenantId, id } = req.params as { tenantId: string; id: string };
+    const { tenantId, docId: id } = req.params as { tenantId: string; docId: string };
     const ctx = requireUploadAccess(req, tenantId, commitOp.scope);
     const body = parseCommitBody(req);
     if (ctx.via === 'upload-jwt') {
@@ -162,7 +162,7 @@ export async function registerAdminDocumentsRoutes(
 
   const uploadProxyOp = adminOperations['documents.uploadProxy'];
   mount(uploadProxyOp, async (req, reply) => {
-    const { tenantId, id } = req.params as { tenantId: string; id: string };
+    const { tenantId, docId: id } = req.params as { tenantId: string; docId: string };
     const ctx = requireUploadAccess(req, tenantId, uploadProxyOp.scope);
     if (ctx.via === 'upload-jwt') {
       await lifecycle.requireStartedByUploadToken(ctx.tenantId, id, ctx.jti);
@@ -256,7 +256,7 @@ export async function registerAdminDocumentsRoutes(
 
   const getOp = adminOperations['documents.get'];
   mount(getOp, async (req, reply) => {
-    const { tenantId, id } = req.params as { tenantId: string; id: string };
+    const { tenantId, docId: id } = req.params as { tenantId: string; docId: string };
     const ctx = requireTenantAccess(req, tenantId, getOp.scope);
     const doc = await lifecycle.get(ctx.tenantId, id);
     return reply.send({ document: docPublic(doc) });
@@ -264,7 +264,7 @@ export async function registerAdminDocumentsRoutes(
 
   const updateOp = adminOperations['documents.update'];
   mount(updateOp, async (req, reply) => {
-    const { tenantId, id } = req.params as { tenantId: string; id: string };
+    const { tenantId, docId: id } = req.params as { tenantId: string; docId: string };
     const ctx = requireTenantAccess(req, tenantId, updateOp.scope);
     const body = parseUpdateBody(req);
     const doc = await lifecycle.rename(ctx.tenantId, id, body.name);
@@ -273,7 +273,7 @@ export async function registerAdminDocumentsRoutes(
 
   const downloadOp = adminOperations['documents.download'];
   mount(downloadOp, async (req, reply) => {
-    const { tenantId, id } = req.params as { tenantId: string; id: string };
+    const { tenantId, docId: id } = req.params as { tenantId: string; docId: string };
     const ctx = await requireTenantContentAccess(req, tenantId, 'doc.download', () =>
       pdfBitsOf(lifecycle, tenantId, id),
     );
@@ -286,7 +286,7 @@ export async function registerAdminDocumentsRoutes(
 
   const deleteOp = adminOperations['documents.delete'];
   mount(deleteOp, async (req, reply) => {
-    const { tenantId, id } = req.params as { tenantId: string; id: string };
+    const { tenantId, docId: id } = req.params as { tenantId: string; docId: string };
     const ctx = requireTenantAccess(req, tenantId, deleteOp.scope);
     await lifecycle.delete(ctx.tenantId, id);
     return reply.code(204).send();
@@ -300,7 +300,7 @@ export async function registerAdminDocumentsRoutes(
    */
   const thumbnailOp = adminOperations['documents.thumbnail'];
   mount(thumbnailOp, async (req, reply) => {
-    const { tenantId, id } = req.params as { tenantId: string; id: string };
+    const { tenantId, docId: id } = req.params as { tenantId: string; docId: string };
     const ctx = await requireTenantContentAccess(req, tenantId, 'doc.render', () =>
       pdfBitsOf(lifecycle, tenantId, id),
     );
@@ -347,11 +347,11 @@ function uploadTokenFiling(
     throw makeError('InvalidArg', 400, 'an upload token always makes a new document');
   }
   const { max_bytes: maxBytes } = ctx.upload;
-  if (maxBytes !== undefined && body.contentLength > maxBytes) {
+  if (maxBytes !== undefined && body.sizeBytes > maxBytes) {
     throw makeError(
       'InvalidArg',
       400,
-      `the file is ${body.contentLength} bytes; this upload token takes at most ${maxBytes}`,
+      `the file is ${body.sizeBytes} bytes; this upload token takes at most ${maxBytes}`,
     );
   }
   return { folderId: ctx.upload.folder_id, metadata: ctx.upload.metadata ?? null };
@@ -439,8 +439,8 @@ function docPublic(d: {
     name: d.name,
     folderId: placeOfFolderId(d.folderId),
     state: d.state,
-    baseSha: d.baseSha,
-    storageSizeBytes: d.storageSizeBytes,
+    baseSha256: d.baseSha,
+    sizeBytes: d.storageSizeBytes,
     metadata: d.metadata,
     idempotencyKey: d.idempotencyKey,
     failureReason: d.failureReason,

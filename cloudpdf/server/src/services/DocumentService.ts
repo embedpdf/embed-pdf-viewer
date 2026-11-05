@@ -39,7 +39,7 @@ import {
   type DocumentProtection,
 } from '@embedpdf/engine-core/runtime';
 import { DEFAULT_LAYER_NAME, wirePaths } from '@embedpdf/engine-core/wire';
-import type { DocumentManifest, LayerScopes } from '@embedpdf/engine-core/wire';
+import type { DocumentHead, DocumentManifest, LayerScopes } from '@embedpdf/engine-core/wire';
 
 import type { LayerStateService } from './LayerStateService';
 import type { EditRequest } from './LayerWriteObjectNumbers';
@@ -65,49 +65,11 @@ import type { ObjectStore } from '../storage/ObjectStore';
 import type { ServerFonts } from './ServerFonts';
 import { EngineValues } from './EngineValues';
 
-/**
- * Public head shape returned by `GET /v1/docs/:docId/head`.
- *
- * `docVersion` is the single monotonic integer per document — bumps
- * on any mutation that could change the manifest's content (page
- * list, per-page content, per-page annotations, per-page weak-flag).
- * That makes `/manifest@docVersion=N` content-addressed and CDN-cacheable for
- * a year. `LayerService`'s mutation handlers are what bump it.
- */
-export interface DocumentHead {
-  id: string;
-  baseSha: string;
-  storageSizeBytes: number;
-  /** Cache-busting integer; bumps on every content-changing mutation. */
-  docVersion: number;
-  /** Lifecycle state, exposed so the SDK can render "deleting" / "failed" UI. */
-  state: DocumentRow['state'];
-  encryption: {
-    state: DocumentRow['security']['encryptionState'];
-    requiresPassword: boolean | null;
-  };
-  permissions: {
-    known: boolean;
-    bits: number | null;
-    allAllowed: boolean | null;
-    openedAs: NonNullable<DocumentRow['security']['pdfOpenedAs']> | null;
-    securityHandlerRevision: number | null;
-    canUpgradeToOwner: boolean;
-  };
-  access: {
-    required: boolean;
-    reasons: Array<'password' | 'cdn' | 'permissions-unknown'>;
-    endpoint?: string;
-  };
-  /** This server's engine value for each kind of cached read ({@link EngineValues}). */
-  engine: Readonly<Record<string, string>>;
-}
-
-// The manifest shape is owned by engine-core (the wire contract). Re-export
-// it here so existing `@cloudpdf/server` consumers keep their import path,
-// but there is a single source of truth — no server-local shadow that can
-// drift from the wire type (e.g. miss `layoutVersion`).
-export type { DocumentManifest } from '@embedpdf/engine-core/wire';
+// The head and manifest shapes are owned by engine-core (the wire contract).
+// Re-export them here so existing `@cloudpdf/server` consumers keep their
+// import path, but there is a single source of truth — no server-local shadow
+// that can drift from the wire type (e.g. miss `layoutVersion`).
+export type { DocumentHead, DocumentManifest } from '@embedpdf/engine-core/wire';
 
 export interface DocumentServiceOptions {
   /** The base version catalog (migration 030): the head's row supplies the manifest's pointers and byte length. */
@@ -588,15 +550,11 @@ export class DocumentService {
     const pages = await this.layerState.ensureBasePages(docId, () =>
       this.loadBasePages(ctx, docId),
     );
-    const version = await this.layerState.baseVersionFacts(
-      docId,
-      head.baseSha,
-      head.storageSizeBytes,
-    );
+    const version = await this.layerState.baseVersionFacts(docId, head.baseSha256, head.sizeBytes);
     const protection = await this.protectionOf(
       ctx,
       await this.requireReadyRow(ctx, docId),
-      head.baseSha,
+      head.baseSha256,
     );
     return this.layerState.buildBaseManifest(head, pages, version, protection);
   }
@@ -613,14 +571,14 @@ export class DocumentService {
     if (!layer) return head;
     // A layer's head is over its own base: the upload, or the version its
     // last signature made.
-    if (layer.baseSha === null || layer.baseSha === head.baseSha) {
+    if (layer.baseSha === null || layer.baseSha === head.baseSha256) {
       return { ...head, docVersion: layer.docVersion };
     }
     const base = await this.layerState.baseVersionFacts(docId, layer.baseSha, null);
     return {
       ...head,
-      baseSha: base.sha256,
-      storageSizeBytes: base.byteLength,
+      baseSha256: base.sha256,
+      sizeBytes: base.byteLength,
       docVersion: layer.docVersion,
     };
   }
@@ -654,8 +612,8 @@ export class DocumentService {
     const layer = await this.layerState.repos.layers.findByDocAndName(docId, layerName);
     const headVersion = await this.layerState.baseVersionFacts(
       docId,
-      head.baseSha,
-      head.storageSizeBytes,
+      head.baseSha256,
+      head.sizeBytes,
     );
     if (!layer) {
       const pages = await this.layerState.ensureBasePages(docId, () =>
@@ -669,7 +627,7 @@ export class DocumentService {
       return this.layerState.buildLayerManifest(
         docId,
         headVersion,
-        await this.protectionOf(ctx, row, head.baseSha),
+        await this.protectionOf(ctx, row, head.baseSha256),
         layerName,
         {
           docVersion: head.docVersion,
@@ -696,9 +654,9 @@ export class DocumentService {
     const pages = await this.layerState.ensureLayerPagesFromBase({ layerId: layer.id, docId });
     // The layer's own base version (law 2): the upload, or the version its
     // last signature made.
-    const layerBaseSha = layer.baseSha ?? head.baseSha;
+    const layerBaseSha = layer.baseSha ?? head.baseSha256;
     const layerVersion =
-      layerBaseSha === head.baseSha
+      layerBaseSha === head.baseSha256
         ? headVersion
         : await this.layerState.baseVersionFacts(docId, layerBaseSha, null);
     // Plane scopes: annotation writes own `annotations` only (renders/
@@ -886,14 +844,14 @@ export class DocumentService {
   ): Promise<{ baseSha: string; lastObjectNumber: number }> {
     const row = await this.requireReadyRow(ctx, docId);
     const head = await this.openOnPool(ctx, docId, await this.passwordForOpen(ctx, row, layerName));
-    const known = this.baseObjectNumbers.get(head.baseSha);
-    if (known !== undefined) return { baseSha: head.baseSha, lastObjectNumber: known };
+    const known = this.baseObjectNumbers.get(head.baseSha256);
+    if (known !== undefined) return { baseSha: head.baseSha256, lastObjectNumber: known };
     await this.ensureLayerOnPool(ctx, docId, layerName);
     const opened = this.lastObjectNumberAtOpen(docId, layerName);
     if (opened === undefined) {
       throw new EngineError(EngineErrorCode.Unknown, `layer ${layerName} of ${docId} is not open`);
     }
-    return { baseSha: head.baseSha, lastObjectNumber: opened };
+    return { baseSha: head.baseSha256, lastObjectNumber: opened };
   }
 
   /**
@@ -1220,7 +1178,7 @@ export class DocumentService {
     ctx: OpenContext,
     docId: string,
     layerName: string,
-    displayHash: string,
+    displaySha256: string,
     part: 'info' | 'data',
     signal?: AbortSignal,
   ): Promise<Extract<WorkerResultPayload, { tag: 'document.fonts.program' }>> {
@@ -1228,7 +1186,7 @@ export class DocumentService {
       ctx,
       docId,
       layerName,
-      { kind: 'document.fonts.program', displayHash, part },
+      { kind: 'document.fonts.program', displaySha256, part },
       'document.fonts.program',
       signal,
     );
@@ -2355,7 +2313,7 @@ export class DocumentService {
     // Law 2: a layer session materializes over the layer's base version:
     // the upload, or the version its last signature made. Its file is held
     // beside the upload's, keyed by sha, until the document closes.
-    const layerBaseSha = layer?.baseSha ?? head.baseSha;
+    const layerBaseSha = layer?.baseSha ?? head.baseSha256;
     const handle = await this.baseHandleFor(row, layerBaseSha);
     let layerHandle: LocalFileHandle | null = null;
     const layerOpen = layer
@@ -2722,8 +2680,8 @@ function buildHead(
 
   return {
     id: row.id,
-    baseSha,
-    storageSizeBytes: row.storageSizeBytes ?? 0,
+    baseSha256: baseSha,
+    sizeBytes: row.storageSizeBytes ?? 0,
     docVersion: row.docVersion,
     state: row.state,
     encryption: {

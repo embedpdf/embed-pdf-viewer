@@ -7,13 +7,13 @@ import type * as CloudPDF from "../../../../../../index.js";
  *     {
  *         docId: "docId",
  *         layerName: "layerName",
- *         sha: "sha"
+ *         sha256: "sha256"
  *     }
  */
 export interface AnalysisVersionsRequest {
     docId: string;
     layerName: string;
-    sha: string;
+    sha256: string;
     "since.signature"?: number;
     "since.revision"?: number;
     level?: CloudPDF.doc.AnalysisVersionsRequestLevel;

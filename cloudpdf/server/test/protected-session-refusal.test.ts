@@ -247,7 +247,7 @@ function urlOf(route: DocRoute): string {
     .replace(':sha', 'a'.repeat(64))
     .replace(':index', '0')
     .replace(':signingId', 'sig1')
-    .replace(':displayHash', 'a'.repeat(64))
+    .replace(':displaySha256', 'a'.repeat(64))
     .replace(':algorithm', 'sha256')
     .replace(':token', request?.token ?? 'contentVersion=1');
   return `${baseUrl}/v1/docs/${DOC}${path}${request?.query ?? ''}`;
@@ -353,7 +353,13 @@ describe('plugin permissions are checked where people grant them', () => {
     return fetch(`${baseUrl}/v1/tenants/${TENANT}/tokens`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${API_TOKEN}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ kind: 'doc', sub: 'viewer-1', docId: DOC, scope, expiresIn: 600 }),
+      body: JSON.stringify({
+        kind: 'doc',
+        sub: 'viewer-1',
+        docId: DOC,
+        scope,
+        expiresInSeconds: 600,
+      }),
     });
   }
 

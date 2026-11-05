@@ -2,8 +2,8 @@
 
 export interface DocHeadResponse {
     id: string;
-    baseSha: string;
-    storageSizeBytes: number;
+    baseSha256: string;
+    sizeBytes: number;
     docVersion: number;
     state: DocHeadResponse.State;
     encryption: DocHeadResponse.Encryption;

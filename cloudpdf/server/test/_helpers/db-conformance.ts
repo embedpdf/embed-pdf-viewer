@@ -371,13 +371,13 @@ export function runDbConformance(fx: DialectFixture): void {
         expect(await usage.count('tenant-1', meter, {}, nov4)).toBe(true);
 
         const month = await usage.snapshot('tenant-1', { from: '2026-11-01', to: '2026-12-01' });
-        expect(month.metrics).toMatchObject({ 'pdf.views': 2, 'pdf.uploads': 0, [meter]: 3 });
+        expect(month.metrics).toMatchObject({ pdfViews: 2, pdfUploads: 0, [meter]: 3 });
         const day = await usage.snapshot('tenant-1', { from: '2026-11-04', to: '2026-11-05' }, [
           meter,
           'other-module.pages',
         ]);
         expect(day.metrics).toMatchObject({
-          'pdf.views': 1,
+          pdfViews: 1,
           [meter]: 2,
           'other-module.pages': 0,
         });

@@ -129,8 +129,8 @@ export function readAttachmentFileInfo(
     name,
     mimeType: mimeType || null,
     description: description || null,
-    size,
-    checksum: checksum || null,
+    sizeBytes: size,
+    md5: checksum || null,
     createdAt: createdAt || null,
     modifiedAt: modifiedAt || null,
   };

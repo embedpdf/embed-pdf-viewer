@@ -87,7 +87,7 @@ export interface DocumentManifest {
    * stream open (the gapless-subscribe cursor).
    */
   auditHead: number;
-  baseSha: string;
+  baseSha256: string;
   /**
    * The layer's write serial (`layers.current_version`; 0 for the base view
    * and for a never-written layer) — the `editsVersion` half of the
@@ -100,8 +100,8 @@ export interface DocumentManifest {
    * while `layerVersion` keeps counting, so this is the only honest signal.
    */
   working: boolean;
-  /** Byte length of `baseSha`'s file — with the sha, the `BaseVersionInfo` a client signs. */
-  baseByteLength: number;
+  /** Size of `baseSha256`'s file — with the sha, the `BaseVersionInfo` a client signs. */
+  baseSizeBytes: number;
   /**
    * Plane scopes (layer manifests only; absent on base manifests and
    * on pre-plane servers = all-`'layer'`). Whole-layer by design — edge

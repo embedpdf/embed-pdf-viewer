@@ -177,11 +177,11 @@ function metadataSnapshot(title: string | null) {
   };
 }
 
-function headPayload(id: string, docVersion: number, baseSha = 'stub-sha', textEngine = 'e1') {
+function headPayload(id: string, docVersion: number, baseSha256 = 'stub-sha', textEngine = 'e1') {
   return {
     id,
-    baseSha,
-    storageSizeBytes: 1024,
+    baseSha256,
+    sizeBytes: 1024,
     docVersion,
     state: 'ready',
     encryption: { state: 'none', requiresPassword: false },
@@ -240,7 +240,7 @@ function buildStub(initial: ServerState): StubbedFixture {
           layoutVersion: state.layoutVersion,
           metadataVersion: state.metadataVersion,
           auditHead: 0,
-          baseSha: 'stub-sha',
+          baseSha256: 'stub-sha',
           protection: null,
           pages: [
             {
@@ -414,7 +414,7 @@ function buildStub(initial: ServerState): StubbedFixture {
               ],
             },
             affectedPages: [toPageRef(PAGE_OBJECT_NUMBER)],
-            changed: [created.ref],
+            changedRefs: [created.ref],
             opId: 'op-create',
             undoable: true,
           },
@@ -926,7 +926,7 @@ describe('CloudEngine schema parity — DocumentHeadSchema / DocumentManifestSch
   test('schemas accept the stub fixture payloads', () => {
     const head = DocumentHeadSchema.safeParse({
       ...headPayload(DOC_ID, 1, 'sha'),
-      storageSizeBytes: 1,
+      sizeBytes: 1,
     });
     expect(head.success).toBe(true);
 
@@ -935,7 +935,7 @@ describe('CloudEngine schema parity — DocumentHeadSchema / DocumentManifestSch
       layoutVersion: 1,
       metadataVersion: 1,
       auditHead: 0,
-      baseSha: 'sha',
+      baseSha256: 'sha',
       protection: null,
       pages: [
         {

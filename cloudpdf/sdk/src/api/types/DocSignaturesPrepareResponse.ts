@@ -5,7 +5,7 @@ export interface DocSignaturesPrepareResponse {
     digest: string;
     algorithm: DocSignaturesPrepareResponse.Algorithm;
     byteRange: unknown[];
-    contentsSize: number;
+    contentsSizeBytes: number;
     subFilter: string;
     expectedVersion: DocSignaturesPrepareResponse.ExpectedVersion;
     expiresAt: string | null;

@@ -22,7 +22,6 @@
       next: [],
     },
     incomplete: false,
-    warningFlags: 0,
     warnings: [],
   };
 

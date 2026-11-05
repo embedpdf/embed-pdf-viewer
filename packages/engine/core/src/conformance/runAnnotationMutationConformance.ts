@@ -195,7 +195,7 @@ export function runAnnotationMutationConformance(
         expect(result.annotation.subtype).toBe('highlight');
         expect(result.annotation.ref.kind).toBe('objectNumber');
 
-        expect(result.meta.changed.length).toBe(1);
+        expect(result.meta.changedRefs.length).toBe(1);
 
         // The annotation is actually on the page now, on top of the others.
         const after = await page.annotations.list();
@@ -1821,7 +1821,7 @@ export function runAnnotationMutationConformance(
           expect(AnnotationUpdateResultSchema.safeParse(result).success).toBe(true);
           expect(annotationKey(result.annotation.ref)).toBe(annotationKey(inline.ref));
           expect(result.annotation.nm).toBe(inline.nm);
-          expect(result.meta.changed).toEqual([inline.ref]);
+          expect(result.meta.changedRefs).toEqual([inline.ref]);
 
           // A later read finds it under the same name, changed.
           const after = await page.annotations.list();
@@ -1851,7 +1851,7 @@ export function runAnnotationMutationConformance(
           const result = await page.annotations.reorder([inline.ref], atBottom ? 'end' : 'start');
           const at = atBottom ? result.order.length - 1 : 0;
           expect(annotationKey(result.order[at]!)).toBe(annotationKey(inline.ref));
-          expect(result.meta.changed).toEqual([inline.ref]);
+          expect(result.meta.changedRefs).toEqual([inline.ref]);
           const after = (await page.annotations.list()).annotations[at]!;
           expect(annotationKey(after.ref)).toBe(annotationKey(inline.ref));
           expect(after.nm).toBe(inline.nm);
@@ -1886,7 +1886,7 @@ export function runAnnotationMutationConformance(
         expect(deletions).toEqual([[created.annotation.ref]]);
         expect(result.meta.affectedPages).toEqual([toPageRef(fix.pageObjectNumber)]);
         expect('cacheDelta' in result.meta).toBe(true);
-        expect(result.meta.changed).toEqual([created.annotation.ref]);
+        expect(result.meta.changedRefs).toEqual([created.annotation.ref]);
 
         // The annotation is gone.
         const after = await page.annotations.list();
@@ -1907,12 +1907,12 @@ export function runAnnotationMutationConformance(
           if (!inline) return;
 
           const result = await page.annotations.delete(inline.ref);
-          expect(result.meta.changed[0]).toEqual(inline.ref);
+          expect(result.meta.changedRefs[0]).toEqual(inline.ref);
           expect(result.meta.affectedPages).toEqual([toPageRef(fix.pageObjectNumber)]);
 
           // What went with it (popups, replies) goes; everything else keeps
           // its name.
-          const gone = new Set(result.meta.changed.map(annotationKey));
+          const gone = new Set(result.meta.changedRefs.map(annotationKey));
           const after = await page.annotations.list();
           expect(after.annotations.map((a) => annotationKey(a.ref))).toEqual(
             before.annotations.map((a) => annotationKey(a.ref)).filter((key) => !gone.has(key)),
@@ -1953,7 +1953,7 @@ export function runAnnotationMutationConformance(
     //  reorder() — the stacking order. Locked invariants:
     //  - The annotations go together, in the order given, next to a
     //    neighbour or at 'start' (bottom) / 'end' (top).
-    //  - The answer is the page's whole new order; `meta.changed` lists
+    //  - The answer is the page's whole new order; `meta.changedRefs` lists
     //    the moved annotations, which keep their names.
     //  - A row named twice or a neighbour that moves is InvalidArg; a
     //    neighbour that isn't on the page is NotFound; abort rejects.
@@ -1982,7 +1982,7 @@ export function runAnnotationMutationConformance(
         expect(AnnotationReorderResultSchema.safeParse(result).success).toBe(true);
         expect(result.meta.affectedPages).toEqual([toPageRef(fix.pageObjectNumber)]);
         expect('cacheDelta' in result.meta).toBe(true);
-        expect(result.meta.changed.map(annotationKey)).toEqual([annotationKey(a)]);
+        expect(result.meta.changedRefs.map(annotationKey)).toEqual([annotationKey(a)]);
         const afterC = [...others, annotationKey(b), annotationKey(c), annotationKey(a)];
         expect(result.order.map(annotationKey)).toEqual(afterC);
         expect(await listed()).toEqual(afterC);
@@ -2012,7 +2012,7 @@ export function runAnnotationMutationConformance(
         // The three go to the bottom in the order [3, 1, 2].
         const given = [ids[2].annotation.ref, ids[0].annotation.ref, ids[1].annotation.ref];
         const bottom = await page.annotations.reorder(given, 'start');
-        expect(bottom.meta.changed.map(annotationKey)).toEqual(given.map(annotationKey));
+        expect(bottom.meta.changedRefs.map(annotationKey)).toEqual(given.map(annotationKey));
         expect(bottom.order.slice(0, 3).map(annotationKey)).toEqual(given.map(annotationKey));
 
         const top = await page.annotations.reorder([ids[2].annotation.ref], 'end');
@@ -2108,7 +2108,7 @@ export function runAnnotationMutationConformance(
     //    `reply.type` is left out (ISO 32000 §12.5.6.2 default).
     //  - The DTO surfaces `reply` ({ to, type }); a top-level annotation
     //    reports `reply: null`.
-    //  - Linking writes only the reply: `meta.changed` names the reply,
+    //  - Linking writes only the reply: `meta.changedRefs` names the reply,
     //    and the parent keeps its name.
     //  - A cross-page parent is rejected with InvalidArg.
     // ─────────────────────────────────────────────────────────────────
@@ -2143,7 +2143,7 @@ export function runAnnotationMutationConformance(
           expect(reply.annotation.reply!.to.page.objectNumber).toBe(fix.pageObjectNumber);
         }
         // Only the reply was written.
-        expect(reply.meta.changed).toEqual([reply.annotation.ref]);
+        expect(reply.meta.changedRefs).toEqual([reply.annotation.ref]);
 
         // The relationship survives a fresh read.
         const after = await page.annotations.list();

@@ -292,17 +292,17 @@ describe("AnnotationsClient", () => {
                 modifiedBy: "modifiedBy",
                 importedBy: "importedBy",
                 actions: {
-                    activate: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    cursorEnter: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    cursorExit: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    mouseDown: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    mouseUp: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    focus: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    blur: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    pageOpen: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    pageClose: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    pageVisible: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    pageInvisible: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    activate: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    cursorEnter: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    cursorExit: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    mouseDown: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    mouseUp: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    focus: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    blur: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    pageOpen: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    pageClose: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    pageVisible: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    pageInvisible: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
                 },
                 richText: {
                     body: {
@@ -356,7 +356,9 @@ describe("AnnotationsClient", () => {
                 opId: "opId",
                 undoable: true,
                 missingCharacters: ["missingCharacters"],
-                changed: [{ kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 }],
+                changedRefs: [
+                    { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                ],
             },
         };
 
@@ -468,13 +470,15 @@ describe("AnnotationsClient", () => {
                 opId: "opId",
                 undoable: true,
                 missingCharacters: ["missingCharacters"],
-                changed: [{ kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 }],
+                changedRefs: [
+                    { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                ],
             },
         };
 
         server
             .mockEndpoint()
-            .delete("/v1/docs/docId/layers/layerName/annotations/pages/pageKey/items/annotKey")
+            .delete("/v1/docs/docId/layers/layerName/annotations/pages/pageKey/items/annotationKey")
             .respondWith()
             .statusCode(200)
             .jsonBody(rawResponseBody)
@@ -484,7 +488,7 @@ describe("AnnotationsClient", () => {
             docId: "docId",
             layerName: "layerName",
             pageKey: "pageKey",
-            annotKey: "annotKey",
+            annotationKey: "annotationKey",
         });
         expect(response).toEqual(rawResponseBody);
     });
@@ -497,7 +501,7 @@ describe("AnnotationsClient", () => {
 
         server
             .mockEndpoint()
-            .delete("/v1/docs/docId/layers/layerName/annotations/pages/pageKey/items/annotKey")
+            .delete("/v1/docs/docId/layers/layerName/annotations/pages/pageKey/items/annotationKey")
             .respondWith()
             .statusCode(404)
             .jsonBody(rawResponseBody)
@@ -508,7 +512,7 @@ describe("AnnotationsClient", () => {
                 docId: "docId",
                 layerName: "layerName",
                 pageKey: "pageKey",
-                annotKey: "annotKey",
+                annotationKey: "annotationKey",
             });
         }).rejects.toThrow(CloudPDF.NotFoundError);
     });
@@ -554,17 +558,17 @@ describe("AnnotationsClient", () => {
                 modifiedBy: "modifiedBy",
                 importedBy: "importedBy",
                 actions: {
-                    activate: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    cursorEnter: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    cursorExit: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    mouseDown: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    mouseUp: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    focus: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    blur: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    pageOpen: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    pageClose: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    pageVisible: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    pageInvisible: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    activate: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    cursorEnter: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    cursorExit: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    mouseDown: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    mouseUp: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    focus: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    blur: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    pageOpen: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    pageClose: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    pageVisible: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
+                    pageInvisible: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
                 },
                 richText: {
                     body: {
@@ -619,13 +623,15 @@ describe("AnnotationsClient", () => {
                 opId: "opId",
                 undoable: true,
                 missingCharacters: ["missingCharacters"],
-                changed: [{ kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 }],
+                changedRefs: [
+                    { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                ],
             },
         };
 
         server
             .mockEndpoint()
-            .patch("/v1/docs/docId/layers/layerName/annotations/pages/pageKey/items/annotKey")
+            .patch("/v1/docs/docId/layers/layerName/annotations/pages/pageKey/items/annotationKey")
             .jsonBody(rawRequestBody)
             .respondWith()
             .statusCode(200)
@@ -636,7 +642,7 @@ describe("AnnotationsClient", () => {
             docId: "docId",
             layerName: "layerName",
             pageKey: "pageKey",
-            annotKey: "annotKey",
+            annotationKey: "annotationKey",
             body: {
                 key: "value",
             },
@@ -652,7 +658,7 @@ describe("AnnotationsClient", () => {
 
         server
             .mockEndpoint()
-            .patch("/v1/docs/docId/layers/layerName/annotations/pages/pageKey/items/annotKey")
+            .patch("/v1/docs/docId/layers/layerName/annotations/pages/pageKey/items/annotationKey")
             .jsonBody(rawRequestBody)
             .respondWith()
             .statusCode(400)
@@ -664,7 +670,7 @@ describe("AnnotationsClient", () => {
                 docId: "docId",
                 layerName: "layerName",
                 pageKey: "pageKey",
-                annotKey: "annotKey",
+                annotationKey: "annotationKey",
                 body: {
                     string: {
                         key: "value",
@@ -682,7 +688,7 @@ describe("AnnotationsClient", () => {
 
         server
             .mockEndpoint()
-            .patch("/v1/docs/docId/layers/layerName/annotations/pages/pageKey/items/annotKey")
+            .patch("/v1/docs/docId/layers/layerName/annotations/pages/pageKey/items/annotationKey")
             .jsonBody(rawRequestBody)
             .respondWith()
             .statusCode(404)
@@ -694,7 +700,7 @@ describe("AnnotationsClient", () => {
                 docId: "docId",
                 layerName: "layerName",
                 pageKey: "pageKey",
-                annotKey: "annotKey",
+                annotationKey: "annotationKey",
                 body: {
                     string: {
                         key: "value",
@@ -857,7 +863,9 @@ describe("AnnotationsClient", () => {
                 opId: "opId",
                 undoable: true,
                 missingCharacters: ["missingCharacters"],
-                changed: [{ kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 }],
+                changedRefs: [
+                    { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                ],
             },
         };
 

@@ -70,7 +70,6 @@ describe('pages in page space', () => {
       actions: {
         open: {
           incomplete: false,
-          warningFlags: 0,
           warnings: [],
           root: {
             subtype: 'GoTo',
@@ -126,7 +125,6 @@ describe('render, form and measure values', () => {
       actions: {
         calculate: {
           incomplete: false,
-          warningFlags: 0,
           warnings: [],
           root: {
             subtype: 'GoTo',

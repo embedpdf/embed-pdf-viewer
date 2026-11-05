@@ -91,6 +91,7 @@ export type {
 export {
   actionWriteOf,
   decodeSubmitFormFlags,
+  encodeSubmitFormFlags,
   fieldScriptOf,
   isFieldScript,
   needsScriptRight,

@@ -109,7 +109,7 @@ export async function registerAdminFoldersRoutes(
     const ctx = requireTenantAccess(req, tenantId, moveIntoOp.scope);
     const body = parse(FolderMoveIntoRequestSchema, req.body);
     await folders.moveInto(ctx.tenantId, folderIdOfPlace(folderId), {
-      documentIds: body.documentIds ?? [],
+      documentIds: body.docIds ?? [],
       folderIds: body.folderIds ?? [],
     });
     return reply.code(204).send();

@@ -24,7 +24,6 @@ const websiteLink: PdfActionTree = {
     next: [],
   },
   incomplete: false,
-  warningFlags: 0,
   warnings: [],
 };
 

@@ -17,9 +17,9 @@ export interface TenantUsageSnapshot {
   periodEnd: string;
   /** The core's meters, then every module meter counted in the window or asked for. */
   metrics: {
-    'pdf.views': number;
-    'pdf.uploads': number;
-    'storage.bytes': number;
+    pdfViews: number;
+    pdfUploads: number;
+    storageBytes: number;
     [moduleMeter: string]: number;
   };
 }
@@ -118,9 +118,9 @@ export class TenantUsageRepo {
       periodStart: window.from,
       periodEnd: window.to,
       metrics: {
-        'pdf.views': views!,
-        'pdf.uploads': uploads!,
-        'storage.bytes': await this.currentStorageBytes(tenantId),
+        pdfViews: views!,
+        pdfUploads: uploads!,
+        storageBytes: await this.currentStorageBytes(tenantId),
         ...moduleMeters,
       },
     };

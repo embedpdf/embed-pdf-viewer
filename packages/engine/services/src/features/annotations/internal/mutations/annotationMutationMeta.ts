@@ -20,6 +20,6 @@ export function annotationMutationMeta(
     affectedPages: [toPageRef(pageObjectNumber)],
     cacheDelta: null,
     ...stamp,
-    changed: [...changed],
+    changedRefs: [...changed],
   };
 }

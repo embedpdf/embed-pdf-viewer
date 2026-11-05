@@ -15,7 +15,7 @@ const prepared = {
   digest,
   algorithm: 'sha256' as const,
   byteRange: [0, 100, 200, 50] as [number, number, number, number],
-  contentsSize: 8192,
+  contentsSizeBytes: 8192,
   subFilter: 'ETSI.CAdES.detached' as const,
   expectedVersion: { baseSha256: 'x', editsVersion: 0 },
   expiresAt: null,
@@ -101,7 +101,7 @@ describe('detached CMS: build → parse → verify', () => {
     expect(
       await verifyForCompletion({
         cms,
-        prepared: { ...prepared, contentsSize: 16 },
+        prepared: { ...prepared, contentsSizeBytes: 16 },
         profile: 'cades-b',
       }),
     ).toMatchObject({ ok: false, reason: 'too-large' });

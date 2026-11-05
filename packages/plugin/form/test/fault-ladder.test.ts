@@ -32,7 +32,6 @@ const ref = (fieldObjectNumber: number) => ({
 const action = (script: string): PdfActionTree => ({
   root: { type: 'javascript', subtype: 'JavaScript', script, next: [] },
   incomplete: false,
-  warningFlags: 0,
   warnings: [],
 });
 

@@ -87,9 +87,9 @@ function annotation(pageObjectNumber: number, index: number) {
 function headPayload(docVersion: number) {
   return {
     id: DOC_ID,
-    baseSha: 'stub-sha',
+    baseSha256: 'stub-sha',
     protection: null,
-    storageSizeBytes: 1024,
+    sizeBytes: 1024,
     docVersion,
     state: 'ready',
     encryption: { state: 'none', requiresPassword: false },
@@ -155,7 +155,7 @@ function buildStub(overrides: Partial<StubState> = {}): Stub {
         metadataVersion: 1,
         annotationsVersion: state.annotationsVersion,
         auditHead: state.auditHead,
-        baseSha: 'stub-sha',
+        baseSha256: 'stub-sha',
         protection: null,
         pages: PAGE_OBJECT_NUMBERS.map((pageObjectNumber) => ({
           page: toPageRef(pageObjectNumber),

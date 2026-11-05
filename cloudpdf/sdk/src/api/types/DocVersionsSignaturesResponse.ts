@@ -34,7 +34,7 @@ export namespace DocVersionsSignaturesResponse {
             filter: string | null;
             subFilter: string | null;
             byteRange: unknown[] | null;
-            contentsSize: number;
+            contentsSizeBytes: number;
             coverage: Item.Coverage | null;
             revisionIndex: number | null;
             signer: Item.Signer;
@@ -67,14 +67,17 @@ export namespace DocVersionsSignaturesResponse {
             }
 
             export interface SeedValue {
-                requiredFlags: number;
-                presentFlags: number;
-                version: number | null;
+                parserVersion: number | null;
+                parserVersionRequired: boolean;
                 mdp: number | null;
                 filter: string | null;
+                filterRequired: boolean;
                 subFilters: string[];
+                subFiltersRequired: boolean;
                 digestMethods: string[];
+                digestMethodsRequired: boolean;
                 reasons: string[];
+                reasonsRequired: boolean;
                 unsupportedRequired: boolean;
             }
         }

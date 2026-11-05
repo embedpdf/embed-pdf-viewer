@@ -254,7 +254,7 @@ function mutationMeta(pon, changedValue) {
   return {
     affectedPages: [pageRef(pon)],
     cacheDelta: null,
-    changed: [{ kind: 'objectNumber', page: pageRef(pon), objectNumber: changedValue }],
+    changedRefs: [{ kind: 'objectNumber', page: pageRef(pon), objectNumber: changedValue }],
   };
 }
 

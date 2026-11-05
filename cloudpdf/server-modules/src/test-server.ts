@@ -187,7 +187,7 @@ export async function launchTestServer(
       const bytes = new Uint8Array(pdf);
       const sha256 = createHash('sha256').update(bytes).digest('hex');
       const init = (await admin(adminWirePaths.documentsInit(TENANT), {
-        contentLength: bytes.byteLength,
+        sizeBytes: bytes.byteLength,
         contentSha256: sha256,
         ...(name !== undefined ? { name } : {}),
       })) as AdminDocumentInitResponse;

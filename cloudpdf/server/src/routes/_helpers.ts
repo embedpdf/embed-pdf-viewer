@@ -173,7 +173,7 @@ export function tooManyRequests(reply: FastifyReply, retryAfterMs: number): Fast
 
 /**
  * Decode the `:pageKey` route parameter (`obj:12`, the page-plane sibling
- * of `:annotKey` and `:fieldKey`) into a `PageRef`. Malformed keys answer
+ * of `:annotationKey` and `:fieldKey`) into a `PageRef`. Malformed keys answer
  * 400 InvalidArg. The segment arrives already URL-decoded.
  */
 export function parsePageKey(raw: string): PageRef {

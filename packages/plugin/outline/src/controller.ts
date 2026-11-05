@@ -66,7 +66,7 @@ function factOf(event: DocumentEvent): Omit<OutlineChangedEvent, 'origin'> | nul
     case 'outline.updated':
       return { type: 'updated', items: [event.item.ref] };
     case 'outline.moved':
-      return { type: 'moved', items: event.meta.changed };
+      return { type: 'moved', items: event.meta.changedRefs };
     case 'outline.deleted':
       return { type: 'deleted', items: event.deleted };
     case 'outline.restored':

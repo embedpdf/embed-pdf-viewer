@@ -39,10 +39,10 @@ export interface PaintFontSources {
   /** Load the document's font list, which {@link programOf} and {@link standardOf} read. */
   readonly loadList: () => Promise<void>;
   readonly resolve: (request: FontResolveRequest) => Promise<FontResolution>;
-  readonly getProgram: (displayHash: string) => Promise<FontProgramInfo>;
+  readonly getProgram: (displaySha256: string) => Promise<FontProgramInfo>;
   /** A program as a browser mounts it, in `style`, else in the style of the font it belongs to. */
   readonly programOf: (
-    displayHash: string,
+    displaySha256: string,
     style?: { weight: number; italic: boolean },
   ) => MountableFontProgram;
   /** The standard font a font whose program a browser can't get is drawn in. */

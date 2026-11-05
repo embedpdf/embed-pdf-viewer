@@ -29,7 +29,7 @@ export namespace DocSignaturesAnalysisResponse {
     export namespace Basis {
         export interface Version {
             sha256: string;
-            byteLength: number;
+            sizeBytes: number;
         }
 
         export const Source = {

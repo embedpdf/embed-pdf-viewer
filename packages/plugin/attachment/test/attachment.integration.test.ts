@@ -87,7 +87,7 @@ describe('reading', () => {
     expect(first).toMatchObject({
       id: 'doc:1.txt',
       home: { kind: 'document', ref: { kind: 'key', key: '1.txt' } },
-      size: 4,
+      sizeBytes: 4,
     });
     expect(attachment.get('doc:1.txt')).toBe(first);
     await kernel.destroy();
@@ -104,13 +104,13 @@ describe('adding and removing', () => {
     // "1 (2).txt" sorts before "1.txt": a space comes before a full stop.
     expect(namesOf(attachment)).toEqual(['1 (2).txt', '1.txt', 'attached.pdf']);
     const shown = named(attachment, '1 (2).txt');
-    expect(shown).toMatchObject({ mimeType: 'text/plain', size: 5, checksum: null });
+    expect(shown).toMatchObject({ mimeType: 'text/plain', sizeBytes: 5, md5: null });
     expect(attachment.isPending(shown)).toBe(true);
 
     await gated.release();
     const [added] = await adding;
-    expect(added).toMatchObject({ id: 'doc:1 (2).txt', name: '1 (2).txt', size: 5 });
-    expect(added!.checksum).not.toBeNull();
+    expect(added).toMatchObject({ id: 'doc:1 (2).txt', name: '1 (2).txt', sizeBytes: 5 });
+    expect(added!.md5).not.toBeNull();
     expect(attachment.isPending(added!)).toBe(false);
     expect(history.getUndoLabel()).toEqual({ key: 'attachment.add', count: 1 });
     expect(text((await attachment.download(added!)).bytes)).toBe('again');

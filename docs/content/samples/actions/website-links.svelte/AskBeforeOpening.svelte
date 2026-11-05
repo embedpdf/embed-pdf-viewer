@@ -18,7 +18,6 @@
       next: [],
     },
     incomplete: false,
-    warningFlags: 0,
     warnings: [],
   };
   const click: ActionContext = {

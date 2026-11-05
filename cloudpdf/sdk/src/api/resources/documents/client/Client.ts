@@ -130,7 +130,7 @@ export class DocumentsClient {
      * @example
      *     await client.documents.get({
      *         tenantId: "tenantId",
-     *         id: "id"
+     *         docId: "docId"
      *     })
      */
     public get(
@@ -144,7 +144,7 @@ export class DocumentsClient {
         request: CloudPDF.GetDocumentsRequest,
         requestOptions?: DocumentsClient.RequestOptions,
     ): Promise<core.WithRawResponse<CloudPDF.DocumentsGetResponse>> {
-        const { tenantId, id } = request;
+        const { tenantId, docId } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -157,7 +157,7 @@ export class DocumentsClient {
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)) ??
                     environments.CloudPDFEnvironment.Saas,
-                `v1/tenants/${core.url.encodePathParam(tenantId)}/documents/${core.url.encodePathParam(id)}`,
+                `v1/tenants/${core.url.encodePathParam(tenantId)}/documents/${core.url.encodePathParam(docId)}`,
             ),
             method: "GET",
             headers: _headers,
@@ -197,7 +197,7 @@ export class DocumentsClient {
             _response.error,
             _response.rawResponse,
             "GET",
-            "/v1/tenants/{tenantId}/documents/{id}",
+            "/v1/tenants/{tenantId}/documents/{docId}",
         );
     }
 
@@ -213,7 +213,7 @@ export class DocumentsClient {
      * @example
      *     await client.documents.delete({
      *         tenantId: "tenantId",
-     *         id: "id"
+     *         docId: "docId"
      *     })
      */
     public delete(
@@ -227,7 +227,7 @@ export class DocumentsClient {
         request: CloudPDF.DeleteDocumentsRequest,
         requestOptions?: DocumentsClient.RequestOptions,
     ): Promise<core.WithRawResponse<void>> {
-        const { tenantId, id } = request;
+        const { tenantId, docId } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -240,7 +240,7 @@ export class DocumentsClient {
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)) ??
                     environments.CloudPDFEnvironment.Saas,
-                `v1/tenants/${core.url.encodePathParam(tenantId)}/documents/${core.url.encodePathParam(id)}`,
+                `v1/tenants/${core.url.encodePathParam(tenantId)}/documents/${core.url.encodePathParam(docId)}`,
             ),
             method: "DELETE",
             headers: _headers,
@@ -280,7 +280,7 @@ export class DocumentsClient {
             _response.error,
             _response.rawResponse,
             "DELETE",
-            "/v1/tenants/{tenantId}/documents/{id}",
+            "/v1/tenants/{tenantId}/documents/{docId}",
         );
     }
 
@@ -299,7 +299,7 @@ export class DocumentsClient {
      * @example
      *     await client.documents.update({
      *         tenantId: "tenantId",
-     *         id: "id",
+     *         docId: "docId",
      *         name: "name"
      *     })
      */
@@ -314,7 +314,7 @@ export class DocumentsClient {
         request: CloudPDF.DocumentsUpdateRequest,
         requestOptions?: DocumentsClient.RequestOptions,
     ): Promise<core.WithRawResponse<CloudPDF.DocumentsUpdateResponse>> {
-        const { tenantId, id, ..._body } = request;
+        const { tenantId, docId, ..._body } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -327,7 +327,7 @@ export class DocumentsClient {
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)) ??
                     environments.CloudPDFEnvironment.Saas,
-                `v1/tenants/${core.url.encodePathParam(tenantId)}/documents/${core.url.encodePathParam(id)}`,
+                `v1/tenants/${core.url.encodePathParam(tenantId)}/documents/${core.url.encodePathParam(docId)}`,
             ),
             method: "PATCH",
             headers: _headers,
@@ -375,7 +375,7 @@ export class DocumentsClient {
             _response.error,
             _response.rawResponse,
             "PATCH",
-            "/v1/tenants/{tenantId}/documents/{id}",
+            "/v1/tenants/{tenantId}/documents/{docId}",
         );
     }
 
@@ -393,7 +393,7 @@ export class DocumentsClient {
      * @example
      *     await client.documents.commit({
      *         tenantId: "tenantId",
-     *         id: "id",
+     *         docId: "docId",
      *         sha256: "sha256"
      *     })
      */
@@ -408,7 +408,7 @@ export class DocumentsClient {
         request: CloudPDF.DocumentsCommitRequest,
         requestOptions?: DocumentsClient.RequestOptions,
     ): Promise<core.WithRawResponse<CloudPDF.DocumentsCommitResponse>> {
-        const { tenantId, id, ..._body } = request;
+        const { tenantId, docId, ..._body } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -421,7 +421,7 @@ export class DocumentsClient {
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)) ??
                     environments.CloudPDFEnvironment.Saas,
-                `v1/tenants/${core.url.encodePathParam(tenantId)}/documents/${core.url.encodePathParam(id)}/commit`,
+                `v1/tenants/${core.url.encodePathParam(tenantId)}/documents/${core.url.encodePathParam(docId)}/commit`,
             ),
             method: "POST",
             headers: _headers,
@@ -464,7 +464,7 @@ export class DocumentsClient {
             _response.error,
             _response.rawResponse,
             "POST",
-            "/v1/tenants/{tenantId}/documents/{id}/commit",
+            "/v1/tenants/{tenantId}/documents/{docId}/commit",
         );
     }
 
@@ -485,7 +485,7 @@ export class DocumentsClient {
         request: CloudPDF.DownloadDocumentsRequest,
         requestOptions?: DocumentsClient.RequestOptions,
     ): Promise<core.WithRawResponse<core.BinaryResponse>> {
-        const { tenantId, id } = request;
+        const { tenantId, docId } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -498,7 +498,7 @@ export class DocumentsClient {
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)) ??
                     environments.CloudPDFEnvironment.Saas,
-                `v1/tenants/${core.url.encodePathParam(tenantId)}/documents/${core.url.encodePathParam(id)}/download`,
+                `v1/tenants/${core.url.encodePathParam(tenantId)}/documents/${core.url.encodePathParam(docId)}/download`,
             ),
             method: "GET",
             headers: _headers,
@@ -539,7 +539,7 @@ export class DocumentsClient {
             _response.error,
             _response.rawResponse,
             "GET",
-            "/v1/tenants/{tenantId}/documents/{id}/download",
+            "/v1/tenants/{tenantId}/documents/{docId}/download",
         );
     }
 
@@ -559,7 +559,7 @@ export class DocumentsClient {
         request: CloudPDF.ThumbnailDocumentsRequest,
         requestOptions?: DocumentsClient.RequestOptions,
     ): Promise<core.WithRawResponse<core.BinaryResponse>> {
-        const { tenantId, id } = request;
+        const { tenantId, docId } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -572,7 +572,7 @@ export class DocumentsClient {
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)) ??
                     environments.CloudPDFEnvironment.Saas,
-                `v1/tenants/${core.url.encodePathParam(tenantId)}/documents/${core.url.encodePathParam(id)}/thumbnail`,
+                `v1/tenants/${core.url.encodePathParam(tenantId)}/documents/${core.url.encodePathParam(docId)}/thumbnail`,
             ),
             method: "GET",
             headers: _headers,
@@ -608,7 +608,7 @@ export class DocumentsClient {
             _response.error,
             _response.rawResponse,
             "GET",
-            "/v1/tenants/{tenantId}/documents/{id}/thumbnail",
+            "/v1/tenants/{tenantId}/documents/{docId}/thumbnail",
         );
     }
 
@@ -629,7 +629,7 @@ export class DocumentsClient {
      *     await client.documents.uploadProxy({
      *         file: fs.createReadStream("/path/to/your/file"),
      *         tenantId: "tenantId",
-     *         id: "id"
+     *         docId: "docId"
      *     })
      */
     public uploadProxy(
@@ -661,7 +661,7 @@ export class DocumentsClient {
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)) ??
                     environments.CloudPDFEnvironment.Saas,
-                `v1/tenants/${core.url.encodePathParam(request.tenantId)}/documents/${core.url.encodePathParam(request.id)}/upload-proxy`,
+                `v1/tenants/${core.url.encodePathParam(request.tenantId)}/documents/${core.url.encodePathParam(request.docId)}/upload-proxy`,
             ),
             method: "POST",
             headers: _headers,
@@ -712,7 +712,7 @@ export class DocumentsClient {
             _response.error,
             _response.rawResponse,
             "POST",
-            "/v1/tenants/{tenantId}/documents/{id}/upload-proxy",
+            "/v1/tenants/{tenantId}/documents/{docId}/upload-proxy",
         );
     }
 
@@ -817,7 +817,7 @@ export class DocumentsClient {
     }
 
     /**
-     * With an upload token, the document goes into the token's folder with the token's metadata, whatever the request says; contentLength must be within the token's maxBytes, and the token makes at most maxFiles documents (403 after). docId, idempotencyKey and dedupMode reuse-existing are refused (400): each could reach a document the token didn't make.
+     * With an upload token, the document goes into the token's folder with the token's metadata, whatever the request says; sizeBytes must be within the token's maxBytes, and the token makes at most maxFiles documents (403 after). docId, idempotencyKey and dedupMode reuse-existing are refused (400): each could reach a document the token didn't make.
      *
      * @param {CloudPDF.DocumentsInitRequest} request
      * @param {DocumentsClient.RequestOptions} requestOptions - Request-specific configuration.
@@ -830,7 +830,7 @@ export class DocumentsClient {
      * @example
      *     await client.documents.init({
      *         tenantId: "tenantId",
-     *         contentLength: 1,
+     *         sizeBytes: 1,
      *         contentSha256: "contentSha256"
      *     })
      */

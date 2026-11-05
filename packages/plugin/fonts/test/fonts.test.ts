@@ -27,9 +27,9 @@ import { fallbackHashes, fontForFace, foldFontList } from '../src/model';
 
 const hashOf = (seed: string) => seed.repeat(64).slice(0, 64);
 
-const program = (displayHash: string, over: Partial<FontProgram> = {}): FontProgram => ({
-  displayHash,
-  sourceHash: displayHash,
+const program = (displaySha256: string, over: Partial<FontProgram> = {}): FontProgram => ({
+  displaySha256,
+  sourceSha256: displaySha256,
   embedded: 'whole',
   format: 'truetype',
   embeddingPermission: 'installable',
@@ -110,7 +110,7 @@ function harness(options: { local?: boolean; list?: FontList; measurer?: HostTex
           program: isStandardFontName(name)
             ? standardFontProgram(name).hash
             : own?.canDownload
-              ? own.displayHash
+              ? own.displaySha256
               : null,
           fallbacks: fallbackHashes(current),
         };

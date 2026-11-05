@@ -283,7 +283,12 @@ export class OutlineMutator {
   }
 
   private meta(changed: OutlineItemRef[]): OutlineMutationMeta {
-    return { affectedPages: [], cacheDelta: null, ...this.session.writeStamp(), changed };
+    return {
+      affectedPages: [],
+      cacheDelta: null,
+      ...this.session.writeStamp(),
+      changedRefs: changed,
+    };
   }
 }
 

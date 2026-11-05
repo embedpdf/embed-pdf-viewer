@@ -9,8 +9,8 @@ export interface TenantsUsageResponse {
 
 export namespace TenantsUsageResponse {
     export interface Metrics {
-        "pdf.views": number;
-        "pdf.uploads": number;
-        "storage.bytes": number;
+        pdfViews: number;
+        pdfUploads: number;
+        storageBytes: number;
     }
 }

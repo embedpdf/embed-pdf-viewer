@@ -4,13 +4,13 @@
  * @example
  *     {
  *         tenantId: "tenantId",
- *         id: "id",
+ *         docId: "docId",
  *         name: "name"
  *     }
  */
 export interface DocumentsUpdateRequest {
     tenantId: string;
-    id: string;
+    docId: string;
     /** What people call the document: shown in dashboards, searched and sorted by. 1 to 255 characters, no control characters, no leading or trailing whitespace. Names need not be unique. */
     name: string;
 }

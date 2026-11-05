@@ -59,7 +59,7 @@ export function objectNumbersIn(ranges: readonly ObjectNumberRange[]): number[] 
  */
 export interface EditSessionAccess {
   readonly session: 'new' | 'revived' | 'live';
-  readonly expiresIn: number;
+  readonly expiresInSeconds: number;
   readonly objectNumbers: readonly ObjectNumberRange[];
 }
 
@@ -69,7 +69,7 @@ export interface EditSessionAccess {
  */
 export interface EditSessionStatus {
   readonly held: readonly ObjectNumberRange[];
-  readonly expiresIn: number;
+  readonly expiresInSeconds: number;
 }
 
 /** Numbers a session can no longer use, and why. */

@@ -203,7 +203,11 @@ function FileRow({ file, page, selected, pending, locale, onPick, onMenu }: File
     { clipped: () => nameText.current },
   );
   const details = [
-    pending ? t('attachments.adding') : file.size === null ? null : sizeText(file.size, locale),
+    pending
+      ? t('attachments.adding')
+      : file.sizeBytes === null
+        ? null
+        : sizeText(file.sizeBytes, locale),
     page === null ? null : t('attachments.onPage', { params: { page } }),
     file.description,
   ].filter((part): part is string => !!part);

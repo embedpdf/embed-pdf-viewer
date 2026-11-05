@@ -413,7 +413,7 @@ function normalized(bundle: AnnotationBundle, attribution: Attribution) {
       if (attribution === 'stamp') for (const field of STAMPED) delete fields[field];
       if (data.subtype === 'file-attachment' && data.file) {
         // A file's dates are facts about the file: they travel in either mode.
-        const { size: _size, checksum: _checksum, ...file } = data.file;
+        const { sizeBytes: _size, md5: _checksum, ...file } = data.file;
         fields.file = file;
       }
       return { data: pages(fields), resources };

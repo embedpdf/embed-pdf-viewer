@@ -30,7 +30,7 @@ export namespace GrantsVisitorsListResponse {
 
             export interface Layer {
                 layerName: string;
-                storageSizeBytes: number | null;
+                sizeBytes: number | null;
             }
         }
     }

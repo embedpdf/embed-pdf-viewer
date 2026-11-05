@@ -388,7 +388,7 @@ function metaOf(
     affectedPages: pages.map((page) => toPageRef(page)),
     cacheDelta: null,
     ...stamp,
-    changed: [
+    changedRefs: [
       ...placed.map(
         (at): AnnotationRef => ({
           kind: 'objectNumber',

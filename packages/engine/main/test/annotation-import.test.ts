@@ -463,7 +463,7 @@ describe.each(['wasm', 'native'] as const)('one create (%s runtime)', (prefer) =
     const held = await reply();
     expect(held.kind).toBe('resolve');
     if (held.kind !== 'resolve' || held.result.tag !== 'annotations.create') return;
-    expect(held.result.result.meta.changed).toHaveLength(1);
+    expect(held.result.result.meta.changedRefs).toHaveLength(1);
     expect(held.result.result.annotation.reply?.to).toEqual(weak);
   });
 });

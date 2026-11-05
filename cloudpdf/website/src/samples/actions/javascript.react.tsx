@@ -27,7 +27,6 @@ const links: OpenInput = { kind: 'grant', grant: 'shr_xs-9Y5qwuYrJ2BKtWzuo_2xy' 
 const script = (code: string): PdfActionTree => ({
   root: { type: 'javascript', subtype: 'JavaScript', script: code, next: [] },
   incomplete: false,
-  warningFlags: 0,
   warnings: [],
 });
 const click: ActionContext = {

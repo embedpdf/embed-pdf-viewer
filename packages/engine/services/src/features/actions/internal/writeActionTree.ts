@@ -1,4 +1,4 @@
-import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
+import { EngineError, EngineErrorCode, encodeSubmitFormFlags } from '@embedpdf/engine-core/runtime';
 import type {
   PdfActionTargetRef,
   PdfActionWrite,
@@ -35,7 +35,10 @@ export function writeActionTree(
       runtime.fn.EPDFAction_SetNext(docPtr, node, table, count),
     );
     if (!chained) {
-      throw new EngineError(EngineErrorCode.Unknown, `the ${action.type} action's next ones could not be set`);
+      throw new EngineError(
+        EngineErrorCode.Unknown,
+        `the ${action.type} action's next ones could not be set`,
+      );
     }
   }
   return node;
@@ -84,14 +87,17 @@ function createAction(
               url,
               targets,
               action.fields ? count : -1, // -1: no /Fields, every field
-              action.flags ?? 0,
+              encodeSubmitFormFlags(action),
             ),
           ),
         );
     }
   })();
   if (!made) {
-    throw new EngineError(EngineErrorCode.InvalidArg, `the ${action.type} action could not be written`);
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      `the ${action.type} action could not be written`,
+    );
   }
   return made;
 }

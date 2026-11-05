@@ -260,23 +260,23 @@ export class DocumentFontReader {
    * a hash neither names.
    */
   program(
-    displayHash: string,
+    displaySha256: string,
     data: boolean,
   ): { covers: CodePointRange[]; ascent: number; descent: number; bytes: Uint8Array | null } {
-    const engineFont = this.fonts.programFor(displayHash);
+    const engineFont = this.fonts.programFor(displaySha256);
     if (engineFont) return { ...engineFont.info(), bytes: data ? engineFont.bytes() : null };
 
     const program = this.faces()
       .flatMap((face) => face.programs)
-      .find((candidate) => candidate.displaySha256 === displayHash && candidate.objectNumber > 0);
+      .find((candidate) => candidate.displaySha256 === displaySha256 && candidate.objectNumber > 0);
     if (!program) {
-      throw new EngineError(EngineErrorCode.NotFound, `no font program ${displayHash}`);
+      throw new EngineError(EngineErrorCode.NotFound, `no font program ${displaySha256}`);
     }
     const { fn, mem } = this.runtime;
     const docPtr = this.session.requireDocPtr();
     // By the hash: a stream two font dictionaries read differently is two programs.
     return withScratch(mem, 32, (hash) => {
-      mem.writeBytes(hash, bytesOfHex(displayHash));
+      mem.writeBytes(hash, bytesOfHex(displaySha256));
       const covers = readRanges(this.runtime, (out, capacity) =>
         fn.EPDFDoc_GetFontDisplayProgramCoverage(docPtr, hash, out, capacity),
       );

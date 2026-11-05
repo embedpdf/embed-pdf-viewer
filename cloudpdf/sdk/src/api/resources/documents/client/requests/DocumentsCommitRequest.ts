@@ -4,12 +4,12 @@
  * @example
  *     {
  *         tenantId: "tenantId",
- *         id: "id",
+ *         docId: "docId",
  *         sha256: "sha256"
  *     }
  */
 export interface DocumentsCommitRequest {
     tenantId: string;
-    id: string;
+    docId: string;
     sha256: string;
 }

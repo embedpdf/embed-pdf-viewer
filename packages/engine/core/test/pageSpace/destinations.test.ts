@@ -106,7 +106,6 @@ describe('values that carry destinations', () => {
   test('every goto in an action tree converts, down its next chain', () => {
     const tree: PdfActionTree<PdfDestination> = {
       incomplete: false,
-      warningFlags: 0,
       warnings: [],
       root: {
         subtype: 'GoTo',

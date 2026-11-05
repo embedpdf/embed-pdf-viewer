@@ -1446,7 +1446,7 @@ await client.documents.list({
 ```typescript
 await client.documents.get({
     tenantId: "tenantId",
-    id: "id"
+    docId: "docId"
 });
 
 ```
@@ -1498,7 +1498,7 @@ await client.documents.get({
 ```typescript
 await client.documents.delete({
     tenantId: "tenantId",
-    id: "id"
+    docId: "docId"
 });
 
 ```
@@ -1564,7 +1564,7 @@ A document that is being deleted answers 404.
 ```typescript
 await client.documents.update({
     tenantId: "tenantId",
-    id: "id",
+    docId: "docId",
     name: "name"
 });
 
@@ -1631,7 +1631,7 @@ An upload token commits only the documents it started; any other document answer
 ```typescript
 await client.documents.commit({
     tenantId: "tenantId",
-    id: "id",
+    docId: "docId",
     sha256: "sha256"
 });
 
@@ -1684,7 +1684,7 @@ await client.documents.commit({
 ```typescript
 await client.documents.download({
     tenantId: "tenantId",
-    id: "id"
+    docId: "docId"
 });
 
 ```
@@ -1736,7 +1736,7 @@ await client.documents.download({
 ```typescript
 await client.documents.thumbnail({
     tenantId: "tenantId",
-    id: "id"
+    docId: "docId"
 });
 
 ```
@@ -1803,7 +1803,7 @@ This bounded origin-mediated fallback must only be used after documents.init ret
 await client.documents.uploadProxy({
     file: fs.createReadStream("/path/to/your/file"),
     tenantId: "tenantId",
-    id: "id"
+    docId: "docId"
 });
 
 ```
@@ -1921,7 +1921,7 @@ await client.documents.importFrom({
 <dl>
 <dd>
 
-With an upload token, the document goes into the token's folder with the token's metadata, whatever the request says; contentLength must be within the token's maxBytes, and the token makes at most maxFiles documents (403 after). docId, idempotencyKey and dedupMode reuse-existing are refused (400): each could reach a document the token didn't make.
+With an upload token, the document goes into the token's folder with the token's metadata, whatever the request says; sizeBytes must be within the token's maxBytes, and the token makes at most maxFiles documents (403 after). docId, idempotencyKey and dedupMode reuse-existing are refused (400): each could reach a document the token didn't make.
 </dd>
 </dl>
 </dd>
@@ -1938,7 +1938,7 @@ With an upload token, the document goes into the token's folder with the token's
 ```typescript
 await client.documents.init({
     tenantId: "tenantId",
-    contentLength: 1,
+    sizeBytes: 1,
     contentSha256: "contentSha256"
 });
 
@@ -2291,7 +2291,7 @@ await client.folders.update({
 <dl>
 <dd>
 
-Up to 1,000 ids in total. A folder moves with everything in it. 404 NotFound names the ids that do not exist or are being deleted in `details.documentIds` and `details.folderIds`. 409 Conflict carries `details.reason`: `cycle` (the destination is a moved folder or inside one; `details.folderId`), `too-deep` (the move would nest folders deeper than 100 levels; `details.maxDepth`) or `name-taken` (a moved folder's name is taken in the destination, ignoring case; `details.name`).
+Up to 1,000 ids in total. A folder moves with everything in it. 404 NotFound names the ids that do not exist or are being deleted in `details.docIds` and `details.folderIds`. 409 Conflict carries `details.reason`: `cycle` (the destination is a moved folder or inside one; `details.folderId`), `too-deep` (the move would nest folders deeper than 100 levels; `details.maxDepth`) or `name-taken` (a moved folder's name is taken in the destination, ignoring case; `details.name`).
 </dd>
 </dl>
 </dd>
@@ -2380,7 +2380,7 @@ await client.tokens.issue({
         sub: "sub",
         docId: "docId",
         scope: ["scope"],
-        expiresIn: 1
+        expiresInSeconds: 1
     }
 });
 
@@ -2691,7 +2691,7 @@ await client.doc.annotations.delete({
     docId: "docId",
     layerName: "layerName",
     pageKey: "pageKey",
-    annotKey: "annotKey"
+    annotationKey: "annotationKey"
 });
 
 ```
@@ -2745,7 +2745,7 @@ await client.doc.annotations.update({
     docId: "docId",
     layerName: "layerName",
     pageKey: "pageKey",
-    annotKey: "annotKey",
+    annotationKey: "annotationKey",
     body: {
         "key": "value"
     }
@@ -2802,7 +2802,7 @@ await client.doc.annotations.readAppearance({
     docId: "docId",
     layerName: "layerName",
     pageKey: "pageKey",
-    annotKey: "annotKey"
+    annotationKey: "annotationKey"
 });
 
 ```
@@ -2870,7 +2870,7 @@ await client.doc.annotations.readFile({
     docId: "docId",
     layerName: "layerName",
     pageKey: "pageKey",
-    annotKey: "annotKey"
+    annotationKey: "annotationKey"
 });
 
 ```
@@ -3562,7 +3562,7 @@ await client.doc.forms.deleteWidget({
     docId: "docId",
     layerName: "layerName",
     pageKey: "pageKey",
-    annotKey: "annotKey"
+    annotationKey: "annotationKey"
 });
 
 ```
@@ -3616,7 +3616,7 @@ await client.doc.forms.updateWidget({
     docId: "docId",
     layerName: "layerName",
     pageKey: "pageKey",
-    annotKey: "annotKey",
+    annotationKey: "annotationKey",
     patch: {}
 });
 
@@ -4640,7 +4640,7 @@ Exactly one of `since.signature` / `since.revision`; `until=<revision>` defaults
 await client.doc.versions.analysis({
     docId: "docId",
     layerName: "layerName",
-    sha: "sha"
+    sha256: "sha256"
 });
 
 ```
@@ -4693,7 +4693,7 @@ await client.doc.versions.analysis({
 await client.doc.versions.download({
     docId: "docId",
     layerName: "layerName",
-    sha: "sha"
+    sha256: "sha256"
 });
 
 ```
@@ -4746,7 +4746,7 @@ await client.doc.versions.download({
 await client.doc.versions.revision({
     docId: "docId",
     layerName: "layerName",
-    sha: "sha",
+    sha256: "sha256",
     index: 1
 });
 
@@ -4800,7 +4800,7 @@ await client.doc.versions.revision({
 await client.doc.versions.signatures({
     docId: "docId",
     layerName: "layerName",
-    sha: "sha"
+    sha256: "sha256"
 });
 
 ```
@@ -4867,7 +4867,7 @@ await client.doc.versions.signatures({
 await client.doc.versions.signatureContents({
     docId: "docId",
     layerName: "layerName",
-    sha: "sha",
+    sha256: "sha256",
     fieldKey: "fieldKey"
 });
 
@@ -4935,7 +4935,7 @@ What a CMS verifier compares its message digest to.
 await client.doc.versions.signatureDigest({
     docId: "docId",
     layerName: "layerName",
-    sha: "sha",
+    sha256: "sha256",
     fieldKey: "fieldKey",
     algorithm: "sha1"
 });
@@ -5005,7 +5005,7 @@ A document token needs any one of the listed capabilities: one that may write te
 await client.doc.fonts.programs.download({
     docId: "docId",
     layerName: "layerName",
-    displayHash: "displayHash"
+    displaySha256: "displaySha256"
 });
 
 ```
@@ -5058,7 +5058,7 @@ await client.doc.fonts.programs.download({
 await client.doc.fonts.programs.get({
     docId: "docId",
     layerName: "layerName",
-    displayHash: "displayHash"
+    displaySha256: "displaySha256"
 });
 
 ```
@@ -5164,7 +5164,7 @@ await client.doc.metadata.custom.get({
 ```typescript
 await client.documents.layers.list({
     tenantId: "tenantId",
-    id: "id"
+    docId: "docId"
 });
 
 ```
@@ -5216,7 +5216,7 @@ await client.documents.layers.list({
 ```typescript
 await client.documents.layers.delete({
     tenantId: "tenantId",
-    id: "id",
+    docId: "docId",
     layerName: "layerName"
 });
 

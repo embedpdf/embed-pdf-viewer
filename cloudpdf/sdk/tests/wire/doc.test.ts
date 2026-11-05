@@ -11,8 +11,8 @@ describe("DocClient", () => {
 
         const rawResponseBody = {
             id: "id",
-            baseSha: "baseSha",
-            storageSizeBytes: 1,
+            baseSha256: "baseSha256",
+            sizeBytes: 1,
             docVersion: 1,
             state: "pending",
             encryption: { state: "unknown", requiresPassword: true },
@@ -325,10 +325,10 @@ describe("DocClient", () => {
             fontsVersion: 1,
             contentsVersion: 1,
             auditHead: 1,
-            baseSha: "baseSha",
+            baseSha256: "baseSha256",
             layerVersion: 1,
             working: true,
-            baseByteLength: 1,
+            baseSizeBytes: 1,
             scopes: {
                 content: "base",
                 annotations: "base",

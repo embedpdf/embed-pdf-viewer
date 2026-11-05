@@ -365,7 +365,6 @@ describe('AcroJS prelude', () => {
           ],
         },
         incomplete: false,
-        warningFlags: 0,
         warnings: [],
       }),
     ).toBe('root();\n;\nnext();');
@@ -374,7 +373,6 @@ describe('AcroJS prelude', () => {
       javaScriptProgramFromActionTree({
         root: null,
         incomplete: true,
-        warningFlags: 4,
         warnings: ['incomplete'],
       }),
     ).toThrow(/incomplete/);

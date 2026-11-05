@@ -9,7 +9,7 @@ import type { OutlineItemRef } from '../identity/OutlineItemRef';
  * nothing a caller holds goes stale.
  */
 export interface OutlineMutationMeta extends MutationMeta {
-  changed: OutlineItemRef[];
+  changedRefs: OutlineItemRef[];
 }
 
 /**
@@ -37,7 +37,7 @@ export interface OutlineUpdateResult<D = PageDestination> {
 /**
  * Result of `doc.outline.move()`: the children of every parent the move
  * changed (the parents the items left and the one they went to), and in
- * `meta.changed` the items that moved. An item that lost its last child is
+ * `meta.changedRefs` the items that moved. An item that lost its last child is
  * no longer open: a leaf has no open state.
  */
 export interface OutlineMoveResult {
@@ -46,7 +46,7 @@ export interface OutlineMoveResult {
 }
 
 /**
- * Result of `doc.outline.delete()`: in `meta.changed`, what went: the item
+ * Result of `doc.outline.delete()`: in `meta.changedRefs`, what went: the item
  * first, then the items under it (see `deletedOutlineItemsOf`).
  */
 export interface OutlineDeleteResult {
@@ -66,5 +66,5 @@ export interface OutlineRestoreResult<D = PageDestination> {
 
 /** What a delete removed, as its `outline.deleted` event names it: the item first. */
 export function deletedOutlineItemsOf(result: OutlineDeleteResult): OutlineItemRef[] {
-  return result.meta.changed;
+  return result.meta.changedRefs;
 }

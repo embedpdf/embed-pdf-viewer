@@ -127,32 +127,32 @@ export async function registerFontRoutes(app: FastifyInstance, deps: FontRouteDe
     );
   });
 
-  app.get('/v1/docs/:docId/layers/:layerName/font-programs/:displayHash', async (req, reply) => {
-    const { docId, layerName, displayHash } = req.params as {
+  app.get('/v1/docs/:docId/layers/:layerName/font-programs/:displaySha256', async (req, reply) => {
+    const { docId, layerName, displaySha256 } = req.params as {
       docId: string;
       layerName: string;
-      displayHash: string;
+      displaySha256: string;
     };
     const ctx = await layerRead(req, service, docId, layerName, 'layer-font-programs');
-    const info = await programInfo(service, ctx, docId, layerName, displayHash, reply);
+    const info = await programInfo(service, ctx, docId, layerName, displaySha256, reply);
     setImmutableCache(reply);
     return info;
   });
 
   app.get(
-    '/v1/docs/:docId/layers/:layerName/font-program-files/:displayHash',
+    '/v1/docs/:docId/layers/:layerName/font-program-files/:displaySha256',
     async (req, reply) => {
-      const { docId, layerName, displayHash } = req.params as {
+      const { docId, layerName, displaySha256 } = req.params as {
         docId: string;
         layerName: string;
-        displayHash: string;
+        displaySha256: string;
       };
       const ctx = await mayWriteText(req, service, docId, layerName);
       const signal = abortSignalOf(reply);
-      const builtIn = loadBuiltInProgram(displayHash);
+      const builtIn = loadBuiltInProgram(displaySha256);
       const bytes = builtIn
         ? await builtIn
-        : await documentProgramBytes(service, ctx, docId, layerName, displayHash, signal, reply);
+        : await documentProgramBytes(service, ctx, docId, layerName, displaySha256, signal, reply);
       return sendProgram(reply, bytes);
     },
   );
@@ -161,14 +161,14 @@ export async function registerFontRoutes(app: FastifyInstance, deps: FontRouteDe
   // keeps one copy: for a document token that may write text in its own
   // document, and for a tenant token or the API token, which own every
   // document. A font not served is not found.
-  app.get('/v1/font-program-files/:displayHash', async (req, reply) => {
-    const { displayHash } = req.params as { displayHash: string };
+  app.get('/v1/font-program-files/:displaySha256', async (req, reply) => {
+    const { displaySha256 } = req.params as { displaySha256: string };
     const claims = req.tenant?.claims;
     if (claims && isDocUserClaims(claims)) {
       await mayWriteText(req, service, claims.doc_id, claims.layer_name ?? 'default');
     }
     const bytes = await notFoundUncached(reply, () =>
-      service.serverFonts.programData(displayHash, abortSignalOf(reply)),
+      service.serverFonts.programData(displaySha256, abortSignalOf(reply)),
     );
     return sendProgram(reply, bytes);
   });
@@ -230,20 +230,20 @@ async function programInfo(
   ctx: OpenContext,
   docId: string,
   layerName: string,
-  displayHash: string,
+  displaySha256: string,
   reply: FastifyReply,
 ): Promise<FontProgramInfo> {
-  const builtIn = builtInProgramInfo(displayHash);
+  const builtIn = builtInProgramInfo(displaySha256);
   if (builtIn) return builtIn;
   const signal = abortSignalOf(reply);
   const program = await notFoundUncached(reply, async () =>
-    listedProgram(await fontListIn(service, ctx, docId, layerName, signal), displayHash),
+    listedProgram(await fontListIn(service, ctx, docId, layerName, signal), displaySha256),
   );
   const info = await service.readLayerFontProgram(
     ctx,
     docId,
     layerName,
-    displayHash,
+    displaySha256,
     'info',
     signal,
   );
@@ -255,18 +255,18 @@ async function documentProgramBytes(
   ctx: OpenContext,
   docId: string,
   layerName: string,
-  displayHash: string,
+  displaySha256: string,
   signal: AbortSignal,
   reply: FastifyReply,
 ): Promise<Uint8Array> {
   await notFoundUncached(reply, async () =>
-    downloadableProgram(await fontListIn(service, ctx, docId, layerName, signal), displayHash),
+    downloadableProgram(await fontListIn(service, ctx, docId, layerName, signal), displaySha256),
   );
   const program = await service.readLayerFontProgram(
     ctx,
     docId,
     layerName,
-    displayHash,
+    displaySha256,
     'data',
     signal,
   );

@@ -8,7 +8,7 @@ import type { Attachment, AttachmentRef } from '../dto/Attachment';
  * and no per-page pin.
  */
 export interface AttachmentMutationMeta extends MutationMeta {
-  changed: AttachmentRef[];
+  changedRefs: AttachmentRef[];
 }
 
 /**
@@ -40,5 +40,5 @@ export interface AttachmentDeleteResult {
  * listeners that didn't make the call.
  */
 export function deletedAttachmentOf(result: AttachmentDeleteResult): AttachmentRef | null {
-  return result.meta.changed[0] ?? null;
+  return result.meta.changedRefs[0] ?? null;
 }

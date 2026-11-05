@@ -133,6 +133,14 @@ its rules hold in every language:
   `details` holds what a code carries, as the code's comment says.
 - **Whole numbers are integers.** A count, an index, a size in bytes and a
   duration in seconds are `.int()`, so the SDKs type them as integers.
+- **Sizes in bytes end in `Bytes`**, and a file's size is `sizeBytes`.
+- **A hash names its algorithm**: `sha256`, `baseSha256`, `md5`.
+- **Flags are named booleans**, flat on their object, never a bit word: the
+  engine reads and writes the PDF's bits and the API names them.
+- **Names are camelCase, without dots.** A path parameter is spelled out
+  and follows the same rules (`docId`, `annotationKey`, `sha256`,
+  `displaySha256`), as the SDKs name their arguments after it. A map keyed by name (custom metadata, a module's meters) keeps
+  its keys as they are.
 - **Points in time are ISO 8601 strings** (`IsoDateTimeSchema`), named `…At`:
   a response says them in UTC (`…Z`), and a request gives them with an
   offset. Durations are whole seconds, named `…Seconds`. A calendar day

@@ -132,8 +132,8 @@ describe('the font per grapheme', () => {
     const measured: [string, boolean][] = [];
     const font = programPaintFont(
       {
-        displayHash: program.hash,
-        sourceHash: program.hash,
+        displaySha256: program.hash,
+        sourceSha256: program.hash,
         embedded: 'whole',
         format: 'truetype',
         embeddingPermission: 'installable',

@@ -26,7 +26,7 @@ const tick = () => new Promise((resolve) => setTimeout(resolve, 5));
 
 function newPool(): CloudObjectNumberPool {
   return new CloudObjectNumberPool({
-    reserve: async () => ({ objectNumbers: [], expiresIn: 900 }),
+    reserve: async () => ({ objectNumbers: [], expiresInSeconds: 900 }),
   });
 }
 
@@ -95,7 +95,11 @@ describe('the write line', () => {
 
   test('the numbers a write names are spent when it commits, and the caller’s when it fails', async () => {
     const pool = newPool();
-    pool.opened({ session: 'new', expiresIn: 900, objectNumbers: [{ first: 10, count: 3 }] });
+    pool.opened({
+      session: 'new',
+      expiresInSeconds: 900,
+      objectNumbers: [{ first: 10, count: 3 }],
+    });
     const writes = new CloudWrites(pool);
     const [spent, kept] = [pool.take()!, pool.take()!];
     await writes.run('ok', signal(), (line) => line.send(async () => 'ok'), [spent]);
@@ -109,7 +113,7 @@ describe('the write line', () => {
     ).rejects.toThrow('down');
     const lost: number[] = [];
     pool.onLost((event) => lost.push(...event.numbers));
-    pool.sync({ held: [{ first: 12, count: 1 }], expiresIn: 900 });
+    pool.sync({ held: [{ first: 12, count: 1 }], expiresInSeconds: 900 });
     // Off the server's list: the spent one isn't reported, the kept one is.
     expect(lost).toEqual([kept]);
   });
@@ -228,7 +232,11 @@ describe('changes in the line', () => {
 
   test('a request that fails fails every change in it, and their numbers stay the callers’', async () => {
     const pool = newPool();
-    pool.opened({ session: 'new', expiresIn: 900, objectNumbers: [{ first: 10, count: 2 }] });
+    pool.opened({
+      session: 'new',
+      expiresInSeconds: 900,
+      objectNumbers: [{ first: 10, count: 2 }],
+    });
     const writes = new CloudWrites(pool, async () => {
       throw new EngineError(EngineErrorCode.Network, 'down');
     });
@@ -240,7 +248,7 @@ describe('changes in the line', () => {
     expect(results.map((result) => result.status)).toEqual(['rejected', 'rejected']);
     const lost: number[] = [];
     pool.onLost((event) => lost.push(...event.numbers));
-    pool.sync({ held: [], expiresIn: 900 });
+    pool.sync({ held: [], expiresInSeconds: 900 });
     // Neither was spent: both are reported lost when the server forgets them.
     expect(lost.sort()).toEqual([a, b]);
   });

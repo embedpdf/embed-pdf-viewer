@@ -34,8 +34,6 @@ export interface FormSubmissionRequest {
     url: string | null;
     format: 'fdf' | 'html' | 'xfdf' | 'pdf';
     method: 'post' | 'get';
-    /** Raw ISO Table 240 flag word (0 for scripted submits without one). */
-    flagsRaw: number;
     /** /CharSet (PDF 2.0), extracted but never encoded by this stack. */
     charSet?: string;
   };
@@ -64,7 +62,6 @@ export const FormSubmissionRequestSchema: z.ZodType<FormSubmissionRequest> = z.o
     url: z.string().nullable(),
     format: z.enum(['fdf', 'html', 'xfdf', 'pdf']),
     method: z.enum(['post', 'get']),
-    flagsRaw: z.number().int().nonnegative(),
     charSet: z.string().optional(),
   }),
   origin: z.enum(['user', 'hover', 'lifecycle']),

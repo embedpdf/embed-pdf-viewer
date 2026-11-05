@@ -21,7 +21,7 @@ const row = (kind: string, payload: Record<string, unknown>): StreamRow => ({
   id: 7,
   kind,
   sub: 'alice',
-  payload: { ...payload, meta: { cacheDelta, changed: ['secret'] } },
+  payload: { ...payload, meta: { cacheDelta, changedRefs: ['secret'] } },
 });
 const withheld = (kind: string): StreamRow => ({
   id: 7,
