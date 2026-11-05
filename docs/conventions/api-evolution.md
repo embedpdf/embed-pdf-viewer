@@ -17,8 +17,8 @@ may depend on both sides being the same version.
 2. Clients read tolerantly: an unknown field is ignored, and an unknown kind or
    value falls back to its catch-all instead of failing the response. A known
    kind with a malformed body still fails.
-3. Every request says which version the client speaks, and every response says
-   which version the server is.
+3. Every request to the server says which version the client speaks, and every
+   response says which version the server is.
 4. A cached response's URL alone decides its content. The URL names everything
    the content depends on, the server computes it from exactly the document
    state the URL names, and nothing else changes it, not even the client's
@@ -62,13 +62,17 @@ The client parses every response with the wire schemas in
 
 ## Versions on the wire
 
-- **The client sends `EmbedPDF-Version: <major>.<minor>`** on every request:
-  the contract version it was built against. The engine and viewer packages
-  release together under one version (the Changesets `fixed` group), so this
-  is that release's major and minor. The generated SDKs send the contract
-  version they were generated from. A request without the header (a plain
-  `curl`) is answered as the server's own version. The header chooses how the
-  server answers live reads and writes; cached responses never depend on it.
+- **The client sends `EmbedPDF-Version: <major>.<minor>`** on every request
+  to the server itself: the contract version it was built against. The engine,
+  viewer, server and SDK packages release together under one version (the
+  Changesets `fixed` group), so this is that release's major and minor
+  (`API_VERSION` in `@embedpdf/engine-core/wire`). The generated SDKs send the
+  version they were generated from (a literal header in the contract's
+  `x-fern-global-headers`). A request without the header (a plain `curl`) is
+  answered as the server's own version. The header chooses how the server
+  answers live reads and writes; cached responses never depend on it. So a
+  request through a CDN leaves it out: a CDN serves cached reads, and there
+  the header would cost every URL a CORS preflight.
 - **The server sends `EmbedPDF-Server-Version: <major>.<minor>`** on every
   response. A cached response carries the version of the server that produced
   it, which can be older or newer than the server answering now, so a client
@@ -76,10 +80,14 @@ The client parses every response with the wire schemas in
 - **A client feature that needs a newer server names the minimum version it
   needs.** The client checks it against `/head` before using the feature.
   Against an older server, that feature fails with an error that names both
-  versions, and everything else keeps working. A server of another major is
-  refused outright.
-- **A server supports every earlier version of its major.** Additive changes
-  need nothing for that. A breaking change needs a version change.
+  versions, and everything else keeps working.
+- **A server answers every version of its major and refuses another.** An
+  older minor is answered through the version changes: additive changes need
+  none, a breaking change needs one. A newer minor is answered as the server's
+  own version. A client of another major gets a 400 that names both versions,
+  and so does a header that isn't `<major>.<minor>`. The server decides, not
+  the client, so a server of a later major that can still answer older clients
+  may do so.
 - **The headers are in the server's CORS configuration**:
   `embedpdf-version` among the allowed request headers,
   `embedpdf-server-version` among the exposed response headers, and
@@ -371,7 +379,6 @@ each entry when its work lands, and the section with the last one.
 
 | Gap                                                                                                                                                                                                                                                                                                          | Where                                                                                         |
 | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------------------- |
-| No version headers, and the CORS configuration allows neither                                                                                                                                                                                                                                                | `cloudpdf/engine` `HttpClient`, `cloudpdf/server` routes and `app/buildApp.ts`                |
 | Schemas that responses are parsed with are `.strict()`, nested ones too: `point` and `offset` in `Measure.schema.ts`, `WidgetAppearanceSchema`, `FormFieldValueSchema`, `LineLeaderSchema`, `LineDimensionCaptionSchema`, `ShapeDimensionCaptionSchema`, likely more (the unknown-field test finds the rest) | `engine-core` `dto/Measure.schema.ts`, `annotation/kinds/widget.shared.ts`, `forms/schema.ts` |
 | An unknown annotation subtype fails the whole list: `AnnotationSchema` is a `z.discriminatedUnion` with no fallback to `unsupported`                                                                                                                                                                         | `engine-core` `annotation/kinds/index.ts`                                                     |
 | The Python SDK fails a whole annotation list on an unknown subtype (pydantic's discriminator); the TypeScript, Go, Java and C# SDKs keep going                                                                                                                                                               | `fern/generators.yml` (`fern-python-sdk`)                                                     |
@@ -380,20 +387,16 @@ each entry when its work lands, and the section with the last one.
 
 Everything here is fixed into the 3.0 client or the 3.0.0 server, so it lands
 before 3.0.0. Every cached read is computed at its pins (one helper,
-`readAtPins`), every token carries its engine value and shape, and search pins
-`contentsVersion` and `layoutVersion`; what is left:
+`readAtPins`), every token carries its engine value and shape, search pins
+`contentsVersion` and `layoutVersion`, and every request and response carries
+its version header; what is left:
 
-1. **Version headers**: the client sends `EmbedPDF-Version` and checks each
-   feature's minimum server version against `/head`; the server sends
-   `EmbedPDF-Server-Version` and lists both in its CORS configuration; the
-   headers go into the OpenAPI contract, and `pnpm api:sync` regenerates the
-   SDKs to send them.
-2. **Tolerant reading**: no schema that parses responses uses `.strict()`,
+1. **Tolerant reading**: no schema that parses responses uses `.strict()`,
    nested ones included; an unknown annotation subtype parses as
    `unsupported` and a malformed known one still fails; the enums in responses
    are each given a fallback or marked closed; the Python SDK reads an unknown
    subtype; each SDK's generation check parses a fixture with unknown values.
-3. **Conformance** (both engines): the unknown-field test over real responses;
+2. **Conformance** (both engines): the unknown-field test over real responses;
    two servers with different `CLOUDPDF_FONTS` behind one round-robin address
    answer every request, and nothing is cached under a value that doesn't
    describe it; a request without `EmbedPDF-Version` is answered as the
@@ -403,6 +406,9 @@ before 3.0.0. Every cached read is computed at its pins (one helper,
 
 - The version-change machinery, built with the first breaking change that
   needs it.
+- The client's minimum-version check, built with the first feature that needs
+  a newer server. Every 3.x server sends its version, so a later client can
+  check any of them.
 - The runtime's release check renders the test PDFs with the old and the new
   runtime and lists the pages that differ, which decides `drawing`.
 - CI keeps the 3.0.0 server image as an older server for the client's suite,

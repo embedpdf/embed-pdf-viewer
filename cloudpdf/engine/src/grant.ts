@@ -11,6 +11,7 @@ import {
   type VisitorIdentityRequest,
   visitorIdentityRequestOf,
 } from '@embedpdf/engine-core/runtime';
+import { API_VERSION } from '@embedpdf/engine-core/wire';
 
 import type { WriteGate } from './document/CloudWrites';
 
@@ -144,7 +145,7 @@ export async function exchangeGrant(
   const doFetch = opts.fetch ?? globalThis.fetch;
   const res = await doFetch(`${baseUrl.replace(/\/$/, '')}/v1/grant-sessions`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', 'EmbedPDF-Version': API_VERSION },
     body: JSON.stringify({
       grant,
       ...(opts.passphrase !== undefined ? { passphrase: opts.passphrase } : {}),

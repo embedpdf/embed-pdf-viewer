@@ -151,6 +151,13 @@ describe('openapi document', () => {
     expect(committed).toEqual(generated);
   });
 
+  test('the SDKs send EmbedPDF-Version: the major and minor of the release', () => {
+    const doc = buildAdminOpenApiDocument({ version: '3.4.1-next.2' });
+    expect(doc['x-fern-global-headers']).toEqual([
+      { header: 'EmbedPDF-Version', type: 'literal<"3.4">' },
+    ]);
+  });
+
   test('every registry operation appears exactly once in the document', () => {
     const doc = buildAdminOpenApiDocument({ version: pkg.version }) as {
       paths: Record<string, Record<string, { operationId: string }>>;

@@ -88,6 +88,17 @@ than the one above it, and only the last one ever reaches a browser.
 [How authentication works →](/docs/api-reference/authentication) — minting,
 signing modes, revocation, and the full capability tables.
 
+## Versions
+
+Every SDK sends `EmbedPDF-Version` with each request: the API version it was
+generated from, such as `3.0`. Every response carries `EmbedPDF-Server-Version`,
+the version of the server that answered.
+
+Within a major version the API only grows, so an SDK keeps working as the server
+updates. A request without the header, such as a plain `curl`, is answered as the
+server's own version. A request from another major version gets a `400` that
+names both versions.
+
 ## Resources
 
 <ApiResources />

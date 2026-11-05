@@ -11,6 +11,7 @@ import {
   type TokenSource,
 } from '@embedpdf/engine-core/runtime';
 import {
+  API_VERSION,
   applyCdnAccess,
   EngineErrorPayloadSchema,
   type CdnAccessInfoForApply,
@@ -580,6 +581,10 @@ export class HttpClient {
       }
     }
     if (extraHeader) headers.set(extraHeader.name, extraHeader.value);
+    // The version this client speaks, on every request to the server itself.
+    // A CDN serves cached reads, whose answers never depend on it, and there
+    // the header would cost every URL a CORS preflight.
+    if (!routedToCdn) headers.set('EmbedPDF-Version', API_VERSION);
     // Document affinity key: origin-bound doc requests only (a CDN GET is a
     // "simple" request today — a custom header would create preflights
     // for zero routing value). Same extraction as the chart's uri-mode

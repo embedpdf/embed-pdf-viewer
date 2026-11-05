@@ -14,6 +14,7 @@ import multipart from '@fastify/multipart';
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 import { sql, type Kysely } from 'kysely';
 
+import { registerApiVersion } from './api-version';
 import type { AuthFailureLimiterOptions } from './auth-failure-limiter';
 import { DrainCoordinator } from './drain';
 import { createEngineCounters, type EngineCounters } from './engine-counters';
@@ -620,6 +621,7 @@ async function buildAppUnchecked(opts: LicensedAppOptions): Promise<AppBundle> {
     // codec separately enforces a 512-char limit, so this stays bounded.
     maxParamLength: 512,
   });
+  registerApiVersion(app);
   const routes: MountedRoute[] = [];
   app.addHook('onRoute', (route) => {
     for (const method of [route.method].flat()) routes.push({ method, url: route.url });
@@ -680,6 +682,8 @@ async function buildAppUnchecked(opts: LicensedAppOptions): Promise<AppBundle> {
         // Document affinity: SDKs may send the document routing key; the server
         // never parses it, but the preflight must allow it.
         'x-cloudpdf-doc',
+        // The version the client speaks.
+        'embedpdf-version',
       ],
       // Response headers cross-origin JS may read (nothing is safelisted
       // beyond the basics): the backpressure hint + the advisory
@@ -693,6 +697,8 @@ async function buildAppUnchecked(opts: LicensedAppOptions): Promise<AppBundle> {
         'embedpdf-object-numbers',
         // This server's engine value, on an answer to a URL that named another.
         'embedpdf-engine',
+        // The version this server is.
+        'embedpdf-server-version',
       ],
       credentials: false,
       maxAge: 86_400,
