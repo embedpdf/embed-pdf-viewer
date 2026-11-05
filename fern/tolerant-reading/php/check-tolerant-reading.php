@@ -1,9 +1,12 @@
 <?php
 
-// Reads the fixture the way the client reads an annotation list response.
+// Reads the fixtures the way the client reads an annotation list and a form response.
 require __DIR__ . '/vendor/autoload.php';
 
 use CloudPDF\Types\AnnotationList;
+use CloudPDF\Types\DocFormsList200Response;
 
-$list = AnnotationList::fromJson(file_get_contents(getenv('CLOUDPDF_FIXTURE')));
+$list = AnnotationList::fromJson(file_get_contents(getenv('CLOUDPDF_ANNOTATIONS_FIXTURE')));
 echo 'annotations: ' . count($list->annotations) . "\n";
+$form = DocFormsList200Response::fromJson(file_get_contents(getenv('CLOUDPDF_FORM_FIXTURE')));
+echo 'fields: ' . count($form->fields) . "\n";

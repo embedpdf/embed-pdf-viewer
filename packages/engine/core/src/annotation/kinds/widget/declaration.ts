@@ -80,6 +80,9 @@ export const WidgetDeclaration = defineKind('widget', {
         'unknown',
       ]),
       'unknown',
+    ).describe(
+      "Its field's family. A newer server can add families: read one your client doesn't " +
+        'know as `unknown`.',
     ),
   ),
   /**

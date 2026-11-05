@@ -3,16 +3,21 @@ using NUnit.Framework;
 
 namespace CloudPDF.Test;
 
-/// <summary>Reads the fixture the way the client reads an annotation list response.</summary>
+/// <summary>Reads the fixtures the way the client reads an annotation list and a form response.</summary>
 [TestFixture]
 public class TolerantReadingTest
 {
     [Test]
-    public void ReadsAResponseFromANewerServer()
+    public void ReadsResponsesFromANewerServer()
     {
-        var body = File.ReadAllText(Environment.GetEnvironmentVariable("CLOUDPDF_FIXTURE")!);
-        var list = JsonUtils.Deserialize<AnnotationList>(body)!;
+        var annotations = File.ReadAllText(Environment.GetEnvironmentVariable("CLOUDPDF_ANNOTATIONS_FIXTURE")!);
+        var list = JsonUtils.Deserialize<AnnotationList>(annotations)!;
         TestContext.Out.WriteLine($"annotations: {list.Annotations.Count()}");
-        Assert.That(list.Annotations.Count(), Is.EqualTo(3));
+        Assert.That(list.Annotations.Count(), Is.EqualTo(5));
+
+        var form = File.ReadAllText(Environment.GetEnvironmentVariable("CLOUDPDF_FORM_FIXTURE")!);
+        var fields = JsonUtils.Deserialize<DocFormsList200Response>(form)!;
+        TestContext.Out.WriteLine($"fields: {fields.Fields.Count()}");
+        Assert.That(fields.Fields.Count(), Is.EqualTo(2));
     }
 }

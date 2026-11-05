@@ -117,6 +117,18 @@ function tagOf(options: z.ZodTypeAny[]): string | undefined {
   );
 }
 
+/** A union a response carries with a catch-all kind (`withCatchAll`). */
+export interface OpenUnion {
+  /** Where the walk first reached it. */
+  at: string;
+  /** The field whose value names the kind. */
+  tag: string;
+  /** The kind a kind the client doesn't know reads as. */
+  catchAll: string;
+  /** Every kind the union lists, the catch-all included. */
+  kinds: string[];
+}
+
 /**
  * Where reading a response with `schema` isn't tolerant
  * (docs/conventions/api-evolution.md, "Reading tolerantly"): an object that
@@ -126,11 +138,59 @@ function tagOf(options: z.ZodTypeAny[]): string | undefined {
  */
 export function readingProblems(schema: z.ZodTypeAny, path = 'response'): string[] {
   const problems: string[] = [];
+  walk(schema, path, { problem: (problem) => problems.push(problem), openUnion: () => {} });
+  return problems;
+}
+
+/** Every union with a catch-all kind a response read with `schema` carries, nested ones included. */
+export function openUnionsIn(schema: z.ZodTypeAny, path = 'response'): OpenUnion[] {
+  const unions: OpenUnion[] = [];
+  walk(schema, path, { problem: () => {}, openUnion: (union) => unions.push(union) });
+  return unions;
+}
+
+/** `schema` itself as a union with a catch-all kind, or `undefined` when it isn't one. */
+export function openUnionOf(schema: z.ZodTypeAny): OpenUnion | undefined {
+  const def = defOf(schema);
+  switch (def.typeName) {
+    case 'ZodLazy':
+      return openUnionOf(def.getter());
+    case 'ZodOptional':
+    case 'ZodNullable':
+      return openUnionOf(def.innerType);
+    case 'ZodEffects': {
+      const reading = readingOf(schema);
+      const inner = defOf(def.schema);
+      return reading && 'unknownAs' in reading && inner.typeName === 'ZodDiscriminatedUnion'
+        ? unionAt('response', inner, reading.unknownAs)
+        : undefined;
+    }
+    default:
+      return undefined;
+  }
+}
+
+function unionAt(at: string, union: AnyDef, catchAll: string): OpenUnion {
+  return {
+    at,
+    tag: union.discriminator,
+    catchAll,
+    kinds: [...(union.optionsMap as Map<unknown, unknown>).keys()].map(String),
+  };
+}
+
+function walk(
+  schema: z.ZodTypeAny,
+  path: string,
+  report: { problem(problem: string): void; openUnion(union: OpenUnion): void },
+): void {
   const seen = new Set<unknown>();
 
   const unmarked = (set: z.ZodTypeAny, at: string) => {
     if (!readingOf(set)) {
-      problems.push(`${at}: ${describeSet(defOf(set))} is neither closed nor read with a fallback`);
+      report.problem(
+        `${at}: ${describeSet(defOf(set))} is neither closed nor read with a fallback`,
+      );
     }
   };
 
@@ -141,7 +201,7 @@ export function readingProblems(schema: z.ZodTypeAny, path = 'response'): string
     seen.add(def);
     switch (def.typeName) {
       case 'ZodObject': {
-        if (def.unknownKeys === 'strict') problems.push(`${at}: refuses unknown fields`);
+        if (def.unknownKeys === 'strict') report.problem(`${at}: refuses unknown fields`);
         const shape = def.shape() as Record<string, z.ZodTypeAny>;
         for (const [key, field] of Object.entries(shape)) {
           if (key === discriminator) continue;
@@ -187,6 +247,7 @@ export function readingProblems(schema: z.ZodTypeAny, path = 'response'): string
         // An open enum is read whole; a union with a catch-all still reads each kind.
         const inner = defOf(def.schema);
         if (inner.typeName === 'ZodDiscriminatedUnion') {
+          if ('unknownAs' in reading) report.openUnion(unionAt(at, inner, reading.unknownAs));
           seen.add(inner);
           for (const [kind, option] of inner.optionsMap as Map<unknown, z.ZodTypeAny>) {
             visit(option, `${at}<${String(kind)}>`, inner.discriminator);
@@ -236,5 +297,4 @@ export function readingProblems(schema: z.ZodTypeAny, path = 'response'): string
   };
 
   visit(schema, path);
-  return problems;
 }

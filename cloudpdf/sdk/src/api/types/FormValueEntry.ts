@@ -2,13 +2,16 @@
 
 import type * as CloudPDF from "../index.js";
 
-export type FormFieldComboboxValueEntry =
-    | CloudPDF.FormFieldComboboxValueEntry.None
-    | CloudPDF.FormFieldComboboxValueEntry.Scalar
-    | CloudPDF.FormFieldComboboxValueEntry.Array
-    | CloudPDF.FormFieldComboboxValueEntry.Unsupported;
+/**
+ * A field's stored value, by its `kind`. A newer server can add kinds: read one your client doesn't know as `unsupported`.
+ */
+export type FormValueEntry =
+    | CloudPDF.FormValueEntry.None
+    | CloudPDF.FormValueEntry.Scalar
+    | CloudPDF.FormValueEntry.Array
+    | CloudPDF.FormValueEntry.Unsupported;
 
-export namespace FormFieldComboboxValueEntry {
+export namespace FormValueEntry {
     export interface None {
         kind: "none";
     }

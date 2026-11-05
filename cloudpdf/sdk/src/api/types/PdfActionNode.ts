@@ -2,6 +2,9 @@
 
 import type * as CloudPDF from "../index.js";
 
+/**
+ * An action, by its `type`. A newer server can add types: read one your client doesn't know as `unknown`, keeping its `subtype` and `next`.
+ */
 export type PdfActionNode =
     | CloudPDF.PdfActionNode.Javascript
     | CloudPDF.PdfActionNode.Goto

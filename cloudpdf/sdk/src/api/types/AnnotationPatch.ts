@@ -1182,7 +1182,13 @@ export namespace AnnotationPatch {
             export type Type = (typeof Type)[keyof typeof Type];
         }
 
-        export type Target = CloudPDF.PdfLinkTargetWritable | null | CloudPDF.PdfLinkTarget | null;
+        export type Target =
+            | CloudPDF.PdfLinkTargetWritable
+            | null
+            /**
+             * Where a link goes, by its `kind`. A newer server can add kinds: read one your client doesn't know as `unsupported`. */
+            | CloudPDF.PdfLinkTarget
+            | null;
     }
 
     export interface Ink {

@@ -13,7 +13,8 @@ export namespace DocPagesViewports200Response {
         export interface Item {
             bbox: Item.Bbox;
             name: string | null;
-            measure: CloudPDF.DocPagesViewports200ResponseViewportsItemMeasure | null;
+            /** A measure, by its `subtype`. A newer server can add subtypes: read one your client doesn't know as `unknown`. */
+            measure: CloudPDF.PdfMeasurement | null;
             owned: boolean;
         }
 

@@ -2,6 +2,7 @@
 
 export interface EngineErrorPayload {
     name: EngineErrorPayload.Name;
+    /** Why the request failed. A newer server can add codes: read one your client doesn't know as `Unknown`. */
     code: EngineErrorPayload.Code;
     message: string;
     details?: Record<string, unknown> | undefined;
@@ -12,6 +13,7 @@ export namespace EngineErrorPayload {
         EngineError: "EngineError",
     } as const;
     export type Name = (typeof Name)[keyof typeof Name];
+    /** Why the request failed. A newer server can add codes: read one your client doesn't know as `Unknown`. */
     export const Code = {
         Unknown: "Unknown",
         InvalidArg: "InvalidArg",

@@ -60,10 +60,12 @@ import {
   FormFieldDTOSchema,
   FormFieldPatchSchema,
   FormFieldWidgetSchema,
+  FormValueEntrySchema,
   FormWidgetSchema,
   WidgetPlacementSchema,
 } from '../forms/schema';
 import { FormFieldRefSchema, FormFieldValueSchema } from '../forms/schema';
+import { PdfMeasurementSchema } from '../dto/Measure.schema';
 import {
   PageBoxSchema,
   PageQuadSchema,
@@ -548,7 +550,10 @@ const engineErrorCodeValues = Object.values(EngineErrorCode) as [
 
 export const EngineErrorPayloadSchema: z.ZodType<SerializedEngineError> = z.object({
   name: closed(z.literal('EngineError')),
-  code: readsUnknownAs(z.enum(engineErrorCodeValues), EngineErrorCode.Unknown),
+  code: readsUnknownAs(z.enum(engineErrorCodeValues), EngineErrorCode.Unknown).describe(
+    "Why the request failed. A newer server can add codes: read one your client doesn't know " +
+      'as `Unknown`.',
+  ),
   message: z.string(),
   details: z.record(z.string(), z.unknown()).optional(),
 });
@@ -1238,6 +1243,7 @@ export const AnnotationWireComponents = {
   AnnotationPatch: AnnotationPatchSchema,
   PdfLinkTarget: PdfLinkTargetSchema,
   PdfLinkTargetWritable: PdfLinkTargetWritableSchema,
+  PdfMeasurement: PdfMeasurementSchema,
   AnnotationList: AnnotationListSchema,
   AnnotationMutationMeta: AnnotationListMutationMetaSchema,
   AnnotationPosition: AnnotationPositionSchema,
@@ -1276,6 +1282,7 @@ export const FormMutationMetaSchema: z.ZodType<FormMutationMeta> = z.object({
 export const FormWireComponents = {
   FormFieldRef: FormFieldRefSchema,
   FormField: FormFieldDTOSchema,
+  FormValueEntry: FormValueEntrySchema,
   FormFieldValue: FormFieldValueSchema,
   FormWidget: FormWidgetSchema,
   FormFieldDraft: FormFieldDraftSchema,

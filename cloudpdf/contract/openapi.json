@@ -8986,7 +8986,8 @@
               "IdempotencyKeyReused",
               "LayerDeleted",
               "VisitorIdentityRequired"
-            ]
+            ],
+            "description": "Why the request failed. A newer server can add codes: read one your client doesn't know as `Unknown`."
           },
           "message": {
             "type": "string"
@@ -10062,7 +10063,8 @@
             "required": ["type", "subtype", "next"],
             "additionalProperties": false
           }
-        ]
+        ],
+        "description": "An action, by its `type`. A newer server can add types: read one your client doesn't know as `unknown`, keeping its `subtype` and `next`."
       },
       "PdfActionTree": {
         "type": "object",
@@ -12118,133 +12120,13 @@
                 "nullable": true
               },
               "measure": {
-                "anyOf": [
+                "allOf": [
                   {
-                    "type": "object",
-                    "properties": {
-                      "subtype": {
-                        "type": "string",
-                        "enum": ["rectilinear"]
-                      },
-                      "ratio": {
-                        "type": "string"
-                      },
-                      "x": {
-                        "type": "array",
-                        "items": {
-                          "type": "object",
-                          "properties": {
-                            "unit": {
-                              "type": "string"
-                            },
-                            "conversion": {
-                              "type": "number"
-                            },
-                            "fraction": {
-                              "type": "string",
-                              "enum": ["decimal", "fraction", "round", "truncate"]
-                            },
-                            "precision": {
-                              "type": "integer"
-                            },
-                            "fixed": {
-                              "type": "boolean"
-                            },
-                            "thousands": {
-                              "type": "string"
-                            },
-                            "decimal": {
-                              "type": "string"
-                            },
-                            "prefixSpacing": {
-                              "type": "string"
-                            },
-                            "suffixSpacing": {
-                              "type": "string"
-                            },
-                            "labelPosition": {
-                              "type": "string",
-                              "enum": ["suffix", "prefix"]
-                            }
-                          },
-                          "required": ["unit"],
-                          "additionalProperties": false
-                        }
-                      },
-                      "y": {
-                        "type": "array",
-                        "items": {
-                          "$ref": "#/components/schemas/Annotation/anyOf/6/properties/measure/anyOf/0/properties/x/items"
-                        }
-                      },
-                      "distance": {
-                        "type": "array",
-                        "items": {
-                          "$ref": "#/components/schemas/Annotation/anyOf/6/properties/measure/anyOf/0/properties/x/items"
-                        }
-                      },
-                      "area": {
-                        "type": "array",
-                        "items": {
-                          "$ref": "#/components/schemas/Annotation/anyOf/6/properties/measure/anyOf/0/properties/x/items"
-                        }
-                      },
-                      "angle": {
-                        "type": "array",
-                        "items": {
-                          "$ref": "#/components/schemas/Annotation/anyOf/6/properties/measure/anyOf/0/properties/x/items"
-                        }
-                      },
-                      "slope": {
-                        "type": "array",
-                        "items": {
-                          "$ref": "#/components/schemas/Annotation/anyOf/6/properties/measure/anyOf/0/properties/x/items"
-                        }
-                      },
-                      "origin": {
-                        "type": "object",
-                        "properties": {
-                          "x": {
-                            "$ref": "#/components/schemas/Annotation/anyOf/6/properties/measure/anyOf/0/properties/x/items/properties/conversion"
-                          },
-                          "y": {
-                            "$ref": "#/components/schemas/Annotation/anyOf/6/properties/measure/anyOf/0/properties/x/items/properties/conversion"
-                          }
-                        },
-                        "required": ["x", "y"],
-                        "additionalProperties": false
-                      },
-                      "cyx": {
-                        "$ref": "#/components/schemas/Annotation/anyOf/6/properties/measure/anyOf/0/properties/x/items/properties/conversion"
-                      }
-                    },
-                    "required": ["subtype", "x", "distance", "area"],
-                    "additionalProperties": false
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "subtype": {
-                        "type": "string",
-                        "enum": ["geospatial"]
-                      }
-                    },
-                    "required": ["subtype"],
-                    "additionalProperties": false
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "subtype": {
-                        "type": "string",
-                        "enum": ["unknown"]
-                      }
-                    },
-                    "required": ["subtype"],
-                    "additionalProperties": false
+                    "$ref": "#/components/schemas/PdfMeasurement"
                   }
                 ],
-                "nullable": true
+                "nullable": true,
+                "description": "A measure, by its `subtype`. A newer server can add subtypes: read one your client doesn't know as `unknown`."
               },
               "cloudyIntensity": {
                 "type": "number",
@@ -12518,10 +12400,11 @@
               "measure": {
                 "allOf": [
                   {
-                    "$ref": "#/components/schemas/Annotation/anyOf/6/properties/measure"
+                    "$ref": "#/components/schemas/PdfMeasurement"
                   }
                 ],
-                "nullable": true
+                "nullable": true,
+                "description": "A measure, by its `subtype`. A newer server can add subtypes: read one your client doesn't know as `unknown`."
               },
               "lineEndings": {
                 "type": "object",
@@ -12812,10 +12695,11 @@
               "measure": {
                 "allOf": [
                   {
-                    "$ref": "#/components/schemas/Annotation/anyOf/6/properties/measure"
+                    "$ref": "#/components/schemas/PdfMeasurement"
                   }
                 ],
-                "nullable": true
+                "nullable": true,
+                "description": "A measure, by its `subtype`. A newer server can add subtypes: read one your client doesn't know as `unknown`."
               },
               "captionEnabled": {
                 "type": "boolean",
@@ -12843,13 +12727,13 @@
                 "type": "object",
                 "properties": {
                   "length": {
-                    "$ref": "#/components/schemas/Annotation/anyOf/6/properties/measure/anyOf/0/properties/x/items/properties/conversion"
+                    "type": "number"
                   },
                   "extension": {
-                    "$ref": "#/components/schemas/Annotation/anyOf/6/properties/measure/anyOf/0/properties/x/items/properties/conversion"
+                    "$ref": "#/components/schemas/Annotation/anyOf/8/properties/leader/properties/length"
                   },
                   "offset": {
-                    "$ref": "#/components/schemas/Annotation/anyOf/6/properties/measure/anyOf/0/properties/x/items/properties/conversion"
+                    "$ref": "#/components/schemas/Annotation/anyOf/8/properties/leader/properties/length"
                   }
                 },
                 "required": ["length"],
@@ -13059,7 +12943,8 @@
                     "$ref": "#/components/schemas/PdfLinkTarget"
                   }
                 ],
-                "nullable": true
+                "nullable": true,
+                "description": "Where a link goes, by its `kind`. A newer server can add kinds: read one your client doesn't know as `unsupported`."
               }
             },
             "required": [
@@ -15141,7 +15026,8 @@
             ],
             "additionalProperties": false
           }
-        ]
+        ],
+        "description": "An annotation, by its `subtype`. A newer server can add subtypes: read one your client doesn't know as `unsupported`, keeping the fields every annotation has, with `rawSubtypeCode` 0 and `rawSubtypeName` null when the body has neither."
       },
       "AnnotationRef": {
         "anyOf": [
@@ -19652,7 +19538,8 @@
                         "$ref": "#/components/schemas/PdfLinkTarget"
                       }
                     ],
-                    "nullable": true
+                    "nullable": true,
+                    "description": "Where a link goes, by its `kind`. A newer server can add kinds: read one your client doesn't know as `unsupported`."
                   }
                 ]
               }
@@ -20857,7 +20744,8 @@
             "required": ["kind"],
             "additionalProperties": false
           }
-        ]
+        ],
+        "description": "Where a link goes, by its `kind`. A newer server can add kinds: read one your client doesn't know as `unsupported`."
       },
       "PdfLinkTargetWritable": {
         "anyOf": [
@@ -20905,6 +20793,135 @@
             "additionalProperties": false
           }
         ]
+      },
+      "PdfMeasurement": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "subtype": {
+                "type": "string",
+                "enum": ["rectilinear"]
+              },
+              "ratio": {
+                "type": "string"
+              },
+              "x": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "unit": {
+                      "type": "string"
+                    },
+                    "conversion": {
+                      "type": "number"
+                    },
+                    "fraction": {
+                      "type": "string",
+                      "enum": ["decimal", "fraction", "round", "truncate"]
+                    },
+                    "precision": {
+                      "type": "integer"
+                    },
+                    "fixed": {
+                      "type": "boolean"
+                    },
+                    "thousands": {
+                      "type": "string"
+                    },
+                    "decimal": {
+                      "type": "string"
+                    },
+                    "prefixSpacing": {
+                      "type": "string"
+                    },
+                    "suffixSpacing": {
+                      "type": "string"
+                    },
+                    "labelPosition": {
+                      "type": "string",
+                      "enum": ["suffix", "prefix"]
+                    }
+                  },
+                  "required": ["unit"],
+                  "additionalProperties": false
+                }
+              },
+              "y": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/PdfMeasurement/anyOf/0/properties/x/items"
+                }
+              },
+              "distance": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/PdfMeasurement/anyOf/0/properties/x/items"
+                }
+              },
+              "area": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/PdfMeasurement/anyOf/0/properties/x/items"
+                }
+              },
+              "angle": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/PdfMeasurement/anyOf/0/properties/x/items"
+                }
+              },
+              "slope": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/PdfMeasurement/anyOf/0/properties/x/items"
+                }
+              },
+              "origin": {
+                "type": "object",
+                "properties": {
+                  "x": {
+                    "$ref": "#/components/schemas/PdfMeasurement/anyOf/0/properties/x/items/properties/conversion"
+                  },
+                  "y": {
+                    "$ref": "#/components/schemas/PdfMeasurement/anyOf/0/properties/x/items/properties/conversion"
+                  }
+                },
+                "required": ["x", "y"],
+                "additionalProperties": false
+              },
+              "cyx": {
+                "$ref": "#/components/schemas/PdfMeasurement/anyOf/0/properties/x/items/properties/conversion"
+              }
+            },
+            "required": ["subtype", "x", "distance", "area"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "subtype": {
+                "type": "string",
+                "enum": ["geospatial"]
+              }
+            },
+            "required": ["subtype"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "subtype": {
+                "type": "string",
+                "enum": ["unknown"]
+              }
+            },
+            "required": ["subtype"],
+            "additionalProperties": false
+          }
+        ],
+        "description": "A measure, by its `subtype`. A newer server can add subtypes: read one your client doesn't know as `unknown`."
       },
       "AnnotationList": {
         "type": "object",
@@ -21403,64 +21420,10 @@
                 "nullable": true
               },
               "valueEntry": {
-                "anyOf": [
-                  {
-                    "type": "object",
-                    "properties": {
-                      "kind": {
-                        "type": "string",
-                        "enum": ["none"]
-                      }
-                    },
-                    "required": ["kind"],
-                    "additionalProperties": false
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "kind": {
-                        "type": "string",
-                        "enum": ["scalar"]
-                      },
-                      "value": {
-                        "type": "string"
-                      }
-                    },
-                    "required": ["kind", "value"],
-                    "additionalProperties": false
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "kind": {
-                        "type": "string",
-                        "enum": ["array"]
-                      },
-                      "values": {
-                        "type": "array",
-                        "items": {
-                          "type": "string"
-                        }
-                      }
-                    },
-                    "required": ["kind", "values"],
-                    "additionalProperties": false
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "kind": {
-                        "type": "string",
-                        "enum": ["unsupported"]
-                      }
-                    },
-                    "required": ["kind"],
-                    "additionalProperties": false
-                  }
-                ]
+                "$ref": "#/components/schemas/FormValueEntry"
               },
               "defaultValueEntry": {
-                "$ref": "#/components/schemas/FormField/anyOf/0/properties/valueEntry"
+                "$ref": "#/components/schemas/FormValueEntry"
               },
               "actions": {
                 "$ref": "#/components/schemas/PdfFieldActions"
@@ -21587,10 +21550,10 @@
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/mappingName"
               },
               "valueEntry": {
-                "$ref": "#/components/schemas/FormField/anyOf/0/properties/valueEntry"
+                "$ref": "#/components/schemas/FormValueEntry"
               },
               "defaultValueEntry": {
-                "$ref": "#/components/schemas/FormField/anyOf/0/properties/valueEntry"
+                "$ref": "#/components/schemas/FormValueEntry"
               },
               "actions": {
                 "$ref": "#/components/schemas/PdfFieldActions"
@@ -21719,10 +21682,10 @@
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/mappingName"
               },
               "valueEntry": {
-                "$ref": "#/components/schemas/FormField/anyOf/0/properties/valueEntry"
+                "$ref": "#/components/schemas/FormValueEntry"
               },
               "defaultValueEntry": {
-                "$ref": "#/components/schemas/FormField/anyOf/0/properties/valueEntry"
+                "$ref": "#/components/schemas/FormValueEntry"
               },
               "actions": {
                 "$ref": "#/components/schemas/PdfFieldActions"
@@ -21822,10 +21785,10 @@
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/mappingName"
               },
               "valueEntry": {
-                "$ref": "#/components/schemas/FormField/anyOf/0/properties/valueEntry"
+                "$ref": "#/components/schemas/FormValueEntry"
               },
               "defaultValueEntry": {
-                "$ref": "#/components/schemas/FormField/anyOf/0/properties/valueEntry"
+                "$ref": "#/components/schemas/FormValueEntry"
               },
               "actions": {
                 "$ref": "#/components/schemas/PdfFieldActions"
@@ -21942,10 +21905,10 @@
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/mappingName"
               },
               "valueEntry": {
-                "$ref": "#/components/schemas/FormField/anyOf/0/properties/valueEntry"
+                "$ref": "#/components/schemas/FormValueEntry"
               },
               "defaultValueEntry": {
-                "$ref": "#/components/schemas/FormField/anyOf/0/properties/valueEntry"
+                "$ref": "#/components/schemas/FormValueEntry"
               },
               "actions": {
                 "$ref": "#/components/schemas/PdfFieldActions"
@@ -22060,10 +22023,10 @@
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/mappingName"
               },
               "valueEntry": {
-                "$ref": "#/components/schemas/FormField/anyOf/0/properties/valueEntry"
+                "$ref": "#/components/schemas/FormValueEntry"
               },
               "defaultValueEntry": {
-                "$ref": "#/components/schemas/FormField/anyOf/0/properties/valueEntry"
+                "$ref": "#/components/schemas/FormValueEntry"
               },
               "actions": {
                 "$ref": "#/components/schemas/PdfFieldActions"
@@ -22148,10 +22111,10 @@
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/mappingName"
               },
               "valueEntry": {
-                "$ref": "#/components/schemas/FormField/anyOf/0/properties/valueEntry"
+                "$ref": "#/components/schemas/FormValueEntry"
               },
               "defaultValueEntry": {
-                "$ref": "#/components/schemas/FormField/anyOf/0/properties/valueEntry"
+                "$ref": "#/components/schemas/FormValueEntry"
               },
               "actions": {
                 "$ref": "#/components/schemas/PdfFieldActions"
@@ -22236,10 +22199,10 @@
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/mappingName"
               },
               "valueEntry": {
-                "$ref": "#/components/schemas/FormField/anyOf/0/properties/valueEntry"
+                "$ref": "#/components/schemas/FormValueEntry"
               },
               "defaultValueEntry": {
-                "$ref": "#/components/schemas/FormField/anyOf/0/properties/valueEntry"
+                "$ref": "#/components/schemas/FormValueEntry"
               },
               "actions": {
                 "$ref": "#/components/schemas/PdfFieldActions"
@@ -22300,7 +22263,66 @@
             ],
             "additionalProperties": false
           }
-        ]
+        ],
+        "description": "A form field, by its `family`. A newer server can add families: read one your client doesn't know as `unknown`, keeping the fields every field has, with `rawValue` an empty string when the body has none."
+      },
+      "FormValueEntry": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": ["none"]
+              }
+            },
+            "required": ["kind"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": ["scalar"]
+              },
+              "value": {
+                "type": "string"
+              }
+            },
+            "required": ["kind", "value"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": ["array"]
+              },
+              "values": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": ["kind", "values"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": ["unsupported"]
+              }
+            },
+            "required": ["kind"],
+            "additionalProperties": false
+          }
+        ],
+        "description": "A field's stored value, by its `kind`. A newer server can add kinds: read one your client doesn't know as `unsupported`."
       },
       "FormFieldValue": {
         "type": "object",
@@ -23206,7 +23228,8 @@
               "pushbutton",
               "signature",
               "unknown"
-            ]
+            ],
+            "description": "Its field's family. A newer server can add families: read one your client doesn't know as `unknown`."
           },
           "hasMark": {
             "type": "boolean"
@@ -23597,7 +23620,8 @@
                 "$ref": "#/components/schemas/PdfLinkTarget"
               }
             ],
-            "nullable": true
+            "nullable": true,
+            "description": "Where a link goes, by its `kind`. A newer server can add kinds: read one your client doesn't know as `unsupported`."
           },
           "action": {
             "allOf": [
@@ -25209,7 +25233,8 @@
                     "$ref": "#/components/schemas/FormField"
                   }
                 ],
-                "nullable": true
+                "nullable": true,
+                "description": "A form field, by its `family`. A newer server can add families: read one your client doesn't know as `unknown`, keeping the fields every field has, with `rawValue` an empty string when the body has none."
               },
               "meta": {
                 "$ref": "#/components/schemas/FormMutationMeta"
@@ -25231,7 +25256,8 @@
                     "$ref": "#/components/schemas/FormField"
                   }
                 ],
-                "nullable": true
+                "nullable": true,
+                "description": "A form field, by its `family`. A newer server can add families: read one your client doesn't know as `unknown`, keeping the fields every field has, with `rawValue` an empty string when the body has none."
               },
               "widgets": {
                 "type": "array",
@@ -31941,7 +31967,8 @@
                 "$ref": "#/components/schemas/FormField"
               }
             ],
-            "nullable": true
+            "nullable": true,
+            "description": "A form field, by its `family`. A newer server can add families: read one your client doesn't know as `unknown`, keeping the fields every field has, with `rawValue` an empty string when the body has none."
           },
           "meta": {
             "$ref": "#/components/schemas/FormMutationMeta"
@@ -32111,133 +32138,13 @@
                   "nullable": true
                 },
                 "measure": {
-                  "anyOf": [
+                  "allOf": [
                     {
-                      "type": "object",
-                      "properties": {
-                        "subtype": {
-                          "type": "string",
-                          "enum": ["rectilinear"]
-                        },
-                        "ratio": {
-                          "type": "string"
-                        },
-                        "x": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "unit": {
-                                "type": "string"
-                              },
-                              "conversion": {
-                                "type": "number"
-                              },
-                              "fraction": {
-                                "type": "string",
-                                "enum": ["decimal", "fraction", "round", "truncate"]
-                              },
-                              "precision": {
-                                "type": "integer"
-                              },
-                              "fixed": {
-                                "type": "boolean"
-                              },
-                              "thousands": {
-                                "type": "string"
-                              },
-                              "decimal": {
-                                "type": "string"
-                              },
-                              "prefixSpacing": {
-                                "type": "string"
-                              },
-                              "suffixSpacing": {
-                                "type": "string"
-                              },
-                              "labelPosition": {
-                                "type": "string",
-                                "enum": ["suffix", "prefix"]
-                              }
-                            },
-                            "required": ["unit"],
-                            "additionalProperties": false
-                          }
-                        },
-                        "y": {
-                          "type": "array",
-                          "items": {
-                            "$ref": "#/components/schemas/DocPagesViewports200Response/properties/viewports/items/properties/measure/anyOf/0/properties/x/items"
-                          }
-                        },
-                        "distance": {
-                          "type": "array",
-                          "items": {
-                            "$ref": "#/components/schemas/DocPagesViewports200Response/properties/viewports/items/properties/measure/anyOf/0/properties/x/items"
-                          }
-                        },
-                        "area": {
-                          "type": "array",
-                          "items": {
-                            "$ref": "#/components/schemas/DocPagesViewports200Response/properties/viewports/items/properties/measure/anyOf/0/properties/x/items"
-                          }
-                        },
-                        "angle": {
-                          "type": "array",
-                          "items": {
-                            "$ref": "#/components/schemas/DocPagesViewports200Response/properties/viewports/items/properties/measure/anyOf/0/properties/x/items"
-                          }
-                        },
-                        "slope": {
-                          "type": "array",
-                          "items": {
-                            "$ref": "#/components/schemas/DocPagesViewports200Response/properties/viewports/items/properties/measure/anyOf/0/properties/x/items"
-                          }
-                        },
-                        "origin": {
-                          "type": "object",
-                          "properties": {
-                            "x": {
-                              "$ref": "#/components/schemas/DocPagesViewports200Response/properties/viewports/items/properties/measure/anyOf/0/properties/x/items/properties/conversion"
-                            },
-                            "y": {
-                              "$ref": "#/components/schemas/DocPagesViewports200Response/properties/viewports/items/properties/measure/anyOf/0/properties/x/items/properties/conversion"
-                            }
-                          },
-                          "required": ["x", "y"],
-                          "additionalProperties": false
-                        },
-                        "cyx": {
-                          "$ref": "#/components/schemas/DocPagesViewports200Response/properties/viewports/items/properties/measure/anyOf/0/properties/x/items/properties/conversion"
-                        }
-                      },
-                      "required": ["subtype", "x", "distance", "area"],
-                      "additionalProperties": false
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "subtype": {
-                          "type": "string",
-                          "enum": ["geospatial"]
-                        }
-                      },
-                      "required": ["subtype"],
-                      "additionalProperties": false
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "subtype": {
-                          "type": "string",
-                          "enum": ["unknown"]
-                        }
-                      },
-                      "required": ["subtype"],
-                      "additionalProperties": false
+                      "$ref": "#/components/schemas/PdfMeasurement"
                     }
                   ],
-                  "nullable": true
+                  "nullable": true,
+                  "description": "A measure, by its `subtype`. A newer server can add subtypes: read one your client doesn't know as `unknown`."
                 },
                 "owned": {
                   "type": "boolean"

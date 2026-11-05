@@ -57,6 +57,9 @@ export const FormValueEntrySchema: z.ZodType<FormValueEntry> = withCatchAll(
     z.object({ kind: z.literal('unsupported') }),
   ]),
   'unsupported',
+).describe(
+  "A field's stored value, by its `kind`. A newer server can add kinds: read one your client " +
+    "doesn't know as `unsupported`.",
 );
 
 const FormFieldBaseShape = {
@@ -145,6 +148,10 @@ export const FormFieldDTOSchema: z.ZodType<FormFieldDTO> = withCatchAll(
   ]) as unknown as z.ZodType<FormFieldDTO>,
   'unknown',
   (field) => ({ ...field, rawValue: typeof field.rawValue === 'string' ? field.rawValue : '' }),
+).describe(
+  'A form field, by its `family`. A newer server can add families: read one your client ' +
+    "doesn't know as `unknown`, keeping the fields every field has, with `rawValue` an empty " +
+    'string when the body has none.',
 );
 
 export const FormKindSchema: z.ZodType<FormKind> = closed(z.enum(['none', 'acroform', 'xfa']));

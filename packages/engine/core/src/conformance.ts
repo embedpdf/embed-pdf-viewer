@@ -239,4 +239,11 @@ export {
   type DocumentFontsConformanceOptions,
 } from './conformance/runDocumentFontsConformance';
 export { drawnTextOf, type DrawnRun, type DrawnText } from './conformance/drawnText';
-export { readingProblems, UNKNOWN_FIELD, withUnknownFields } from './conformance/tolerantReading';
+export {
+  openUnionOf,
+  openUnionsIn,
+  readingProblems,
+  UNKNOWN_FIELD,
+  withUnknownFields,
+} from './conformance/tolerantReading';
+export type { OpenUnion } from './conformance/tolerantReading';

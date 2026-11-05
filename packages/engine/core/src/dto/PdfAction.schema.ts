@@ -90,6 +90,9 @@ function actionSchemasFor<Destination>(destination: z.ZodType<Destination>) {
     withCatchAll(
       z.discriminatedUnion('type', [...arms]) as unknown as z.ZodType<PdfActionNode<Destination>>,
       'unknown',
+    ).describe(
+      'An action, by its `type`. A newer server can add types: read one your client ' +
+        "doesn't know as `unknown`, keeping its `subtype` and `next`.",
     ),
   );
   const tree: z.ZodType<PdfActionTree<Destination>> = z.object({

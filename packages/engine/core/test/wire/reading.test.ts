@@ -3,7 +3,13 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 import { z } from 'zod';
 
-import { readingProblems, UNKNOWN_FIELD, withUnknownFields } from '../../src/conformance';
+import {
+  openUnionOf,
+  openUnionsIn,
+  readingProblems,
+  UNKNOWN_FIELD,
+  withUnknownFields,
+} from '../../src/conformance';
 import {
   AnnotationAppearanceBatchSchema,
   AnnotationListSchema,
@@ -12,6 +18,7 @@ import {
   EditSessionStatusSchema,
   EngineErrorPayloadSchema,
   FormFieldDTOSchema,
+  FormSnapshotSchema,
   PdfLinkTargetSchema,
   PdfMeasurementSchema,
   readsUnknownAs,
@@ -156,24 +163,56 @@ describe('the other sets with a catch-all', () => {
   });
 });
 
-describe('the fixture every generated SDK reads', () => {
-  // fern/scripts/check-tolerant-reading.mjs reads it with each SDK; reading
-  // it here keeps it a valid response from a newer server as the contract grows.
-  test('reads as a square, an unsupported annotation and a widget of an unknown family', () => {
-    const fixture: unknown = JSON.parse(
+describe('the fixtures every generated SDK reads', () => {
+  // fern/scripts/check-tolerant-reading.mjs reads them with each SDK; reading
+  // them here keeps them valid responses from a newer server as the contract grows.
+  const fixture = (name: string): unknown =>
+    JSON.parse(
       readFileSync(
-        new URL('../../../../../fern/tolerant-reading/annotation-list.json', import.meta.url),
+        new URL(`../../../../../fern/tolerant-reading/${name}`, import.meta.url),
         'utf8',
       ),
     );
-    const list = AnnotationListSchema.parse(fixture) as {
-      annotations: Array<{ subtype: string; fieldFamily?: string }>;
+
+  test('the annotation list reads each kind it does not know as its catch-all', () => {
+    const list = AnnotationListSchema.parse(fixture('annotation-list.json')) as {
+      annotations: Array<Record<string, any>>;
     };
-    expect(list.annotations.map(({ subtype, fieldFamily }) => [subtype, fieldFamily])).toEqual([
-      ['square', undefined],
-      ['unsupported', undefined],
-      ['widget', 'unknown'],
+    expect(list.annotations.map(({ subtype }) => subtype)).toEqual([
+      'square',
+      'unsupported',
+      'widget',
+      'line',
+      'link',
     ]);
+    const [, , widget, line, link] = list.annotations;
+    expect(widget!.fieldFamily).toBe('unknown');
+    expect(line!.measure).toEqual({ subtype: 'unknown' });
+    expect(link!.target).toEqual({ kind: 'unsupported' });
+    expect(link!.actions.activate.root).toMatchObject({ type: 'unknown', next: [] });
+  });
+
+  test('the form reads a field of an unknown family and a value of an unknown kind', () => {
+    const form = FormSnapshotSchema.parse(fixture('form.json')) as {
+      fields: Array<Record<string, any>>;
+    };
+    expect(form.fields.map(({ family }) => family)).toEqual(['text', 'unknown']);
+    expect(form.fields[0]!.valueEntry).toEqual({ kind: 'unsupported' });
+    expect(form.fields[1]).toMatchObject({ name: 'Ticket', rawValue: '' });
+  });
+});
+
+describe('openUnionOf and openUnionsIn', () => {
+  test('name a union with a catch-all and every one a response carries', () => {
+    expect(openUnionOf(FormFieldDTOSchema)).toMatchObject({ tag: 'family', catchAll: 'unknown' });
+    expect(openUnionOf(FormSnapshotSchema)).toBeUndefined();
+    expect(openUnionsIn(FormSnapshotSchema).map(({ tag, catchAll }) => [tag, catchAll])).toEqual(
+      expect.arrayContaining([
+        ['family', 'unknown'],
+        ['kind', 'unsupported'],
+        ['type', 'unknown'],
+      ]),
+    );
   });
 });
 

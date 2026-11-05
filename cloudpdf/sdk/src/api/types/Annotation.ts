@@ -2,6 +2,9 @@
 
 import type * as CloudPDF from "../index.js";
 
+/**
+ * An annotation, by its `subtype`. A newer server can add subtypes: read one your client doesn't know as `unsupported`, keeping the fields every annotation has, with `rawSubtypeCode` 0 and `rawSubtypeName` null when the body has neither.
+ */
 export type Annotation =
     | CloudPDF.Annotation.Highlight
     | CloudPDF.Annotation.Underline
@@ -736,7 +739,8 @@ export namespace Annotation {
         captionEnabled: boolean | null;
         captionCenter: AnnotationPolygon.CaptionCenter | null;
         intent: AnnotationPolygon.Intent | null;
-        measure: CloudPDF.AnnotationPolygonMeasure | null;
+        /** A measure, by its `subtype`. A newer server can add subtypes: read one your client doesn't know as `unknown`. */
+        measure: CloudPDF.PdfMeasurement | null;
         cloudyIntensity: number | null;
     }
 
@@ -854,7 +858,8 @@ export namespace Annotation {
         captionEnabled: boolean | null;
         captionCenter: AnnotationPolyline.CaptionCenter | null;
         intent: AnnotationPolyline.Intent | null;
-        measure: CloudPDF.AnnotationPolylineMeasure | null;
+        /** A measure, by its `subtype`. A newer server can add subtypes: read one your client doesn't know as `unknown`. */
+        measure: CloudPDF.PdfMeasurement | null;
         lineEndings: AnnotationPolyline.LineEndings;
     }
 
@@ -1004,7 +1009,8 @@ export namespace Annotation {
         lineEndings: AnnotationLine.LineEndings;
         rotation: number | null;
         intent: AnnotationLine.Intent | null;
-        measure: CloudPDF.AnnotationLineMeasure | null;
+        /** A measure, by its `subtype`. A newer server can add subtypes: read one your client doesn't know as `unknown`. */
+        measure: CloudPDF.PdfMeasurement | null;
         captionEnabled: boolean | null;
         captionPosition: AnnotationLine.CaptionPosition;
         captionOffset: AnnotationLine.CaptionOffset | null;
@@ -1167,6 +1173,7 @@ export namespace Annotation {
         modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
+        /** Where a link goes, by its `kind`. A newer server can add kinds: read one your client doesn't know as `unsupported`. */
         target: CloudPDF.PdfLinkTarget | null;
     }
 
