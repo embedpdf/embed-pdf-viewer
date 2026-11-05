@@ -54,7 +54,7 @@ const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY
                     (click)="save(file)"
                   >
                     <bdi>{{ nameOf(file) }}</bdi>
-                    <span class="row-size">{{ sizeOf(file.size) }}</span>
+                    <span class="row-size">{{ sizeOf(file.sizeBytes) }}</span>
                   </button>
                   <button
                     type="button"

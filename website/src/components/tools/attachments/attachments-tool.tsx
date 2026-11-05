@@ -25,7 +25,7 @@ const loadOpenPdf = () => import('../shared/open-pdf');
 type Carried = {
   readonly key: string;
   readonly name: string;
-  readonly size: number | null;
+  readonly sizeBytes: number | null;
   readonly mimeType: string | null;
   readonly description: string | null;
 } & (
@@ -55,7 +55,7 @@ async function carriedFiles(doc: DocumentHandle): Promise<Carried[]> {
     key: `document:${attachment.name}`,
     ref: attachment.ref,
     name: attachment.name,
-    size: attachment.size,
+    sizeBytes: attachment.sizeBytes,
     mimeType: attachment.mimeType,
     description: attachment.description,
   }));
@@ -74,7 +74,7 @@ async function carriedFiles(doc: DocumentHandle): Promise<Carried[]> {
         page: annotation.page,
         pageNumber,
         name: annotation.file.name || 'Attached file',
-        size: annotation.file.size,
+        sizeBytes: annotation.file.sizeBytes,
         mimeType: annotation.file.mimeType,
         description: annotation.file.description ?? annotation.contents ?? null,
       },
@@ -308,7 +308,7 @@ export function AttachmentsTool({ file }: { file: OpenFile }) {
                 </p>
                 <p className="text-ep-soft m-0 mt-0.5 font-sans text-[13px]">
                   {kindOf(item.name)}
-                  {item.size !== null && `, ${formatSize(item.size)}`}
+                  {item.sizeBytes !== null && `, ${formatSize(item.sizeBytes)}`}
                   {item.kind === 'page' && `, on page ${item.pageNumber}`}
                 </p>
                 {item.description && (

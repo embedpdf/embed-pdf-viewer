@@ -57,7 +57,7 @@ const welcome = async (): Promise<OpenInput> => {
                     (click)="save(file)"
                   >
                     <bdi>{{ nameOf(file) }}</bdi>
-                    <span class="row-size">{{ sizeOf(file.size) }}</span>
+                    <span class="row-size">{{ sizeOf(file.sizeBytes) }}</span>
                   </button>
                   <button
                     type="button"
