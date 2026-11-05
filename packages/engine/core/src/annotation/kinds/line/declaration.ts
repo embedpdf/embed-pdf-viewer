@@ -26,8 +26,8 @@ export const LineDeclaration = defineKind('line', {
   ...pointsTurnFields,
   intent: field.data(LineIntentSchema).nullable().optional(),
   measure: measureField,
-  /** `/Cap`: paint `/Contents` on the line. */
-  captionEnabled: field.data(z.boolean()).nullable().optional(),
+  /** `/Cap`: paint `/Contents` on the line. A file without `/Cap` reads `false`, its default. */
+  captionEnabled: field.data(z.boolean()).optional(),
   /** `/CP`. */
   captionPosition: field.data(closed(z.enum(['inline', 'top']))).optional(),
   /** `/CO`, along the line and its normal; `null` is the normal position. */

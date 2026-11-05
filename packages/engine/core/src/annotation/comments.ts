@@ -76,8 +76,11 @@ export interface CommentThreadReview {
    * the classified summaries above deliberately drop superseded refs.
    */
   statusRefs: AnnotationRef[];
-  /** `byReviewer[currentUserId]`; only set when the option was given. */
-  mine?: ReviewStatus | null;
+  /**
+   * `byReviewer[currentUserId]`: `null` when that reviewer has none, or when
+   * no `currentUserId` was given.
+   */
+  mine: ReviewStatus | null;
 }
 
 export interface CommentThread<T extends Annotation = Annotation> {
@@ -250,10 +253,8 @@ function computeReview(
     lastChange,
     markedBy,
     statusRefs: states.map((a) => a.ref),
+    mine: opts.currentUserId === undefined ? null : (byReviewer[opts.currentUserId] ?? null),
   };
-  if (opts.currentUserId !== undefined) {
-    review.mine = byReviewer[opts.currentUserId] ?? null;
-  }
   return review;
 }
 

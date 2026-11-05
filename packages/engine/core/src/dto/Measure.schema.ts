@@ -86,16 +86,6 @@ export const LineDimensionCaptionSchema = z
 export const ShapeDimensionCaptionSchema = z
   .object({ enabled: z.boolean(), center: pointWrite.optional() })
   .strict();
-export const LineCaptionPatchSchema = z
-  .object({
-    enabled: z.boolean().optional(),
-    position: z.enum(['inline', 'top']).nullable().optional(),
-    offset: offset.nullable().optional(),
-  })
-  .strict();
-export const ShapeCaptionPatchSchema = z
-  .object({ enabled: z.boolean().optional(), center: pointWrite.nullable().optional() })
-  .strict();
 export const LineLeaderSchema = z.object({
   length: float,
   extension: float.refine((n) => n >= 0).optional(),

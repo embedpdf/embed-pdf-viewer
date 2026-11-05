@@ -1011,7 +1011,7 @@ export namespace Annotation {
         intent: AnnotationLine.Intent | null;
         /** A measure, by its `subtype`. A newer server can add subtypes: read one your client doesn't know as `unknown`. */
         measure: CloudPDF.PdfMeasurement | null;
-        captionEnabled: boolean | null;
+        captionEnabled: boolean;
         captionPosition: AnnotationLine.CaptionPosition;
         captionOffset: AnnotationLine.CaptionOffset | null;
         leader: AnnotationLine.Leader | null;

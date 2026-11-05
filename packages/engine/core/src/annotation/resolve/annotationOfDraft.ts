@@ -28,9 +28,9 @@ export interface DraftContext<Box = unknown> {
   /** The ref the read names it by. */
   readonly ref: AnnotationRef;
   /**
-   * The name the engine gives it when the draft has no `nm`: a fresh UUIDv7
-   * the engine mints. Left out, the prediction says `null` until the engine
-   * answers.
+   * The name the engine gives it when the draft leaves `nm` out: a fresh
+   * UUIDv7 the engine mints. Left out, the prediction says `null` until the
+   * engine answers. A draft's `nm: null` asks for no name.
    */
   readonly nm?: string;
   /** Who creates it and when, as the engine stamps it. Left out, a read says `null`. */
@@ -88,7 +88,7 @@ export function annotationOfResolvedDraft<C extends Coordinates>(
       read[name] = null;
     }
   }
-  if (read.nm === null && context.nm !== undefined) read.nm = context.nm;
+  if (given.nm === undefined && context.nm !== undefined) read.nm = context.nm;
   read.ref = context.ref;
   read.page = context.ref.page;
   read.hasAppearance = !UNBAKED_KINDS.has(subtype);

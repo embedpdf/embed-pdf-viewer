@@ -157,7 +157,10 @@ describe('annotations in page space', () => {
   test("a link's destination is measured on the page it goes to", () => {
     const link = read({
       subtype: 'link',
-      target: { kind: 'goto', destination: { kind: 'xyz', page: OTHER, left: -250, top: 350 } },
+      target: {
+        kind: 'goto',
+        destination: { kind: 'xyz', page: OTHER, left: -250, top: 350, zoom: null },
+      },
       actions: {
         activate: {
           incomplete: false,
@@ -174,7 +177,7 @@ describe('annotations in page space', () => {
     });
     const page = pageAnnotationOf(link, visible, boxOf);
     expect(page).toMatchObject({
-      target: { destination: { kind: 'xyz', page: OTHER, x: 50, y: 40 } },
+      target: { destination: { kind: 'xyz', page: OTHER, x: 50, y: 40, zoom: null } },
       actions: { activate: { root: { destination: { kind: 'fitH', page: PAGE, y: 32 } } } },
     });
     expect(pdfAnnotationOf(page, visible, boxOf)).toEqual(link);

@@ -194,7 +194,7 @@ describe('PDF action schemas', () => {
     expect(PdfActionTreeSchema.parse(tree)).toEqual(tree);
   });
 
-  test('catalog snapshot keeps name-tree order and defaults openDestination', () => {
+  test('catalog snapshot keeps name-tree order and always says openDestination', () => {
     const action = {
       root: { type: 'javascript' as const, subtype: 'JavaScript', script: '', next: [] },
       incomplete: false,
@@ -207,13 +207,12 @@ describe('PDF action schemas', () => {
         { name: 'second', action },
       ],
       openAction: null,
+      openDestination: null,
       willSave: action,
     };
-    // A pre-payload response (no openDestination key) parses and gains the key.
-    expect(DocumentActionsSnapshotSchema.parse(snapshot)).toEqual({
-      ...snapshot,
-      openDestination: null,
-    });
+    expect(DocumentActionsSnapshotSchema.parse(snapshot)).toEqual(snapshot);
+    const { openDestination: _left, ...without } = snapshot;
+    expect(DocumentActionsSnapshotSchema.safeParse(without).success).toBe(false);
   });
 
   test('carries a destination-form OpenAction and rejects both forms at once', () => {

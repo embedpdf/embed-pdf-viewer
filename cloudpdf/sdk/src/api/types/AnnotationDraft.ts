@@ -996,7 +996,7 @@ export namespace AnnotationDraft {
         rotation?: (number | null) | undefined;
         intent?: (AnnotationDraftLine.Intent | null) | undefined;
         measure?: (CloudPDF.AnnotationDraftLineMeasure | null) | undefined;
-        captionEnabled?: (boolean | null) | undefined;
+        captionEnabled?: boolean | undefined;
         captionPosition?: AnnotationDraftLine.CaptionPosition | undefined;
         captionOffset?: (AnnotationDraftLine.CaptionOffset | null) | undefined;
         leader?: (AnnotationDraftLine.Leader | null) | undefined;

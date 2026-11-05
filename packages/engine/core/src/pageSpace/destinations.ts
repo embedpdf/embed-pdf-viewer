@@ -29,11 +29,11 @@ export type DestinationBox = PdfRect | VisibleBoxOf;
 const boxFor = (page: PageRef, box: DestinationBox): PdfRect =>
   typeof box === 'function' ? box(page) : box;
 
-type Axis = number | null | undefined;
+type Axis = number | null;
 
-/** An axis value that may keep the current one (`null`) or be left out. */
+/** An axis value, converted unless it keeps the current one (`null`). */
 const across = (value: Axis, convert: (value: number) => number): Axis =>
-  value == null ? value : convert(value);
+  value === null ? null : convert(value);
 
 /**
  * A destination in the file's coordinates, in page space: for one read by
@@ -50,21 +50,17 @@ export function pageDestinationOf(
   switch (destination.kind) {
     case 'xyz': {
       const { left, top, ...rest } = destination;
-      return {
-        ...rest,
-        ...('left' in destination ? { x: x(left) } : {}),
-        ...('top' in destination ? { y: y(top) } : {}),
-      };
+      return { ...rest, x: x(left), y: y(top) };
     }
     case 'fitH':
     case 'fitBH': {
       const { top, ...rest } = destination;
-      return { ...rest, ...('top' in destination ? { y: y(top) } : {}) };
+      return { ...rest, y: y(top) };
     }
     case 'fitV':
     case 'fitBV': {
       const { left, ...rest } = destination;
-      return { ...rest, ...('left' in destination ? { x: x(left) } : {}) };
+      return { ...rest, x: x(left) };
     }
     case 'fitR': {
       const { left, bottom, right, top, ...rest } = destination;
@@ -98,21 +94,17 @@ export function pdfDestinationOf(
   switch (destination.kind) {
     case 'xyz': {
       const { x, y, ...rest } = destination;
-      return {
-        ...rest,
-        ...('x' in destination ? { left: left(x) } : {}),
-        ...('y' in destination ? { top: top(y) } : {}),
-      };
+      return { ...rest, left: left(x), top: top(y) };
     }
     case 'fitH':
     case 'fitBH': {
       const { y, ...rest } = destination;
-      return { ...rest, ...('y' in destination ? { top: top(y) } : {}) };
+      return { ...rest, top: top(y) };
     }
     case 'fitV':
     case 'fitBV': {
       const { x, ...rest } = destination;
-      return { ...rest, ...('x' in destination ? { left: left(x) } : {}) };
+      return { ...rest, left: left(x) };
     }
     case 'fitR': {
       const { x, y, width, height, ...rest } = destination;

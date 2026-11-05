@@ -140,14 +140,14 @@ export async function registerAdminGrantsRoutes(
       ...(body.visitorIdentity !== undefined ? { visitorIdentity: body.visitorIdentity } : {}),
       ...(body.identity !== undefined ? { identity: body.identity } : {}),
       scope: body.scope,
-      ...(body.origins !== undefined ? { origins: body.origins } : {}),
+      ...(body.origins != null ? { origins: body.origins } : {}),
       ...(body.passphrase !== undefined
         ? { passphraseHash: hashGrantPassphrase(body.passphrase) }
         : {}),
       ...(body.sessionTtlSeconds !== undefined
         ? { sessionTtlSeconds: body.sessionTtlSeconds }
         : {}),
-      ...(body.expiresAt !== undefined ? { expiresAt: body.expiresAt } : {}),
+      ...(body.expiresAt != null ? { expiresAt: body.expiresAt } : {}),
       createdBy: ctx.sub,
     });
     await securityEvents.append({

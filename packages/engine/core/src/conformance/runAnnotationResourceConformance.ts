@@ -538,7 +538,8 @@ const PDF_MAGIC = [0x25, 0x50, 0x44, 0x46]; // %PDF
  * it a fresh one.
  */
 function copyOnItsPage(dto: Annotation): AnnotationDraft {
-  return { ...(JSON.parse(JSON.stringify(dto)) as AnnotationDraft), nm: null };
+  const { nm: _name, ...copy } = JSON.parse(JSON.stringify(dto)) as AnnotationDraft;
+  return copy as AnnotationDraft;
 }
 
 /**

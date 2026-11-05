@@ -200,7 +200,6 @@ LayerVersionSchema [VariableDeclaration] (from packages/engine/core/src/wire/sch
 LayerVersions [TypeAliasDeclaration] (from packages/engine/core/src/wire/schemas.ts): export type LayerVersions = z.infer<typeof LayerVersionsSchema>;
 LayerVersionsSchema [VariableDeclaration] (from packages/engine/core/src/wire/schemas.ts): LayerVersionsSchema = z.object({ baseSha: z.string().regex(/^[0-9a-f]{ 64} $/), versions: z.array(LayerVersionSchema), } )
 LayoutTokenSchema [VariableDeclaration] (from packages/engine/core/src/wire/tokenSchemas.ts): LayoutTokenSchema ={ fields: ['engine', 'layoutVersion', 'shape'], } as const satisfies TokenSchema
-LineCaptionPatchSchema [VariableDeclaration] (from packages/engine/core/src/dto/Measure.schema.ts): LineCaptionPatchSchema = z .object({ enabled: z.boolean().optional(), position: z.enum(['inline', 'top']).nullable().optional(), offset: offset.nullable().optional(), } ) .strict()
 LineDTOSchema [VariableDeclaration] (from packages/engine/core/src/annotation/kinds/line/index.ts): LineDTOSchema = LineDeclaration.readSchema
 LineDimensionCaptionSchema [VariableDeclaration] (from packages/engine/core/src/dto/Measure.schema.ts): LineDimensionCaptionSchema = z .object({ enabled: z.boolean(), position: z.enum(['inline', 'top']).optional(), offset: offset.optional(), } ) .strict()
 LineDraftSchema [VariableDeclaration] (from packages/engine/core/src/annotation/kinds/line/index.ts): LineDraftSchema = LineDeclaration.createSchema
@@ -337,7 +336,6 @@ SearchSnippetSchema [VariableDeclaration] (from packages/engine/core/src/wire/sc
 SearchToken [InterfaceDeclaration] (from packages/engine/core/src/wire/tokens.ts): export interface SearchToken{ contentsVersion: number; layoutVersion: number; query: SearchQuery; from?: number; skip: number; limit?: SearchLimit; pin: TokenPin; }
 SearchTokenSchema [VariableDeclaration] (from packages/engine/core/src/wire/tokenSchemas.ts): SearchTokenSchema ={ fields: [ 'contentsVersion', 'engine', 'from', 'ignoreWhitespace', 'layoutVersion', 'limitMatches', 'limitPages', 'matchCase', 'matchDiacritics', 'q', 'regex', 'shape', 'skip', 'wholeWord', ], maxLength: 2048, } as const satisfies TokenSchema
 SetReading [TypeAliasDeclaration] (from packages/engine/core/src/wire/reading.ts): export type SetReading ={ readonly closed: true} |{ readonly unknownAs: string} ;
-ShapeCaptionPatchSchema [VariableDeclaration] (from packages/engine/core/src/dto/Measure.schema.ts): ShapeCaptionPatchSchema = z .object({ enabled: z.boolean().optional(), center: pointWrite.nullable().optional()} ) .strict()
 ShapeDimensionCaptionSchema [VariableDeclaration] (from packages/engine/core/src/dto/Measure.schema.ts): ShapeDimensionCaptionSchema = z .object({ enabled: z.boolean(), center: pointWrite.optional()} ) .strict()
 SignatureAppearanceBody [TypeAliasDeclaration] (from packages/engine/core/src/wire/schemas.ts): export type SignatureAppearanceBody = z.infer<typeof SignatureAppearanceBodySchema>;
 SignatureAppearanceBodySchema [VariableDeclaration] (from packages/engine/core/src/wire/schemas.ts): SignatureAppearanceBodySchema = z.object({ resources: AppearanceResourceKeysSchema, } )

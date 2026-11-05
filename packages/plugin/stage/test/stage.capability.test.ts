@@ -260,7 +260,10 @@ describe('getCurrentDestination', () => {
 
   it('names the page that reaches past the top, not the one above it in the padding', () => {
     const { stage } = harness(PORTRAIT);
-    stage.goToDestination({ kind: 'xyz', page: toPageRef(3), x: 0, y: 0 }, { behavior: 'instant' });
+    stage.goToDestination(
+      { kind: 'xyz', page: toPageRef(3), x: 0, y: 0, zoom: null },
+      { behavior: 'instant' },
+    );
     expect(stage.getCurrentDestination()).toMatchObject({ page: toPageRef(3), x: 0, y: 0 });
   });
 

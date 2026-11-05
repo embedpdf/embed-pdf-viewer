@@ -329,6 +329,21 @@ describe('grants', () => {
     );
   });
 
+  test('a create takes back the nothing a read hands out', async () => {
+    await seedDocument('doc-copied');
+    const original = await createGrant({ docId: 'doc-copied', scope: ['doc.open'] });
+    expect(original.grant).toMatchObject({ name: null, origins: null, expiresAt: null });
+    const { name, origins, expiresAt, visitorIdleSeconds, visitorIdentity, identity } =
+      original.grant!;
+    const copy = await createGrant({
+      docId: 'doc-copied',
+      scope: ['doc.open'],
+      ...{ name, origins, expiresAt, visitorIdleSeconds, visitorIdentity, identity },
+    });
+    expect(copy.status).toBe(200);
+    expect(copy.grant).toMatchObject({ name: null, origins: null, expiresAt: null });
+  });
+
   test('a grant gives only what its maker holds', async () => {
     await seedDocument('doc-held');
     const reader = tenantToken(['grants.manage', 'doc.open', 'doc.render']);

@@ -99,7 +99,7 @@ export class CloudEngine implements Engine {
         ...(input.passphrase !== undefined ? { passphrase: input.passphrase } : {}),
         ...(input.restart ? { restart: true } : {}),
         ...(answers ? { identity: answers } : {}),
-        visitorStore: this.visitorStore,
+        ...(this.visitorStore ? { visitorStore: this.visitorStore } : {}),
         fetch: this.http.fetchImpl,
       });
       const token = async () => {

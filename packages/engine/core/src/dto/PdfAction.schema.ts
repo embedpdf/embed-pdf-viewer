@@ -130,9 +130,7 @@ function actionSchemasFor<Destination>(destination: z.ZodType<Destination>) {
     .object({
       nameTreeScripts: z.array(z.object({ name: z.string(), action: tree })),
       openAction: tree.nullable(),
-      // Defaulted so a pre-payload server response (field absent) still parses
-      // and every parsed snapshot carries the key.
-      openDestination: destination.nullable().default(null),
+      openDestination: destination.nullable(),
       willClose: tree.optional(),
       willSave: tree.optional(),
       didSave: tree.optional(),
@@ -142,7 +140,7 @@ function actionSchemasFor<Destination>(destination: z.ZodType<Destination>) {
     .superRefine((snapshot, context) => {
       // `/OpenAction` is one catalog entry — a dictionary (action) or an array
       // (destination). Both non-null cannot come from a correct reader.
-      if (snapshot.openAction !== null && (snapshot.openDestination ?? null) !== null) {
+      if (snapshot.openAction !== null && snapshot.openDestination !== null) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
           message: 'openAction and openDestination are mutually exclusive',

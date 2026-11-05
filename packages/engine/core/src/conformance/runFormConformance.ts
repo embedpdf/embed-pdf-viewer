@@ -778,6 +778,10 @@ export function runFormConformance(
           fontSize: 11,
           fontColor: '#cc0000',
         });
+        // A font can't be removed: `null` beside one is refused.
+        await expect(doc.forms.updateWidget(widget, { fontSize: null })).rejects.toMatchObject({
+          code: 'InvalidArg',
+        });
       } finally {
         await doc.close();
       }

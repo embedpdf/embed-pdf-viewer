@@ -176,11 +176,11 @@ describe('link plugin', () => {
     expect(
       harness.link.resolve({
         kind: 'goto',
-        destination: { kind: 'xyz', page: toPageRef(2), x: 100, y: 50 },
+        destination: { kind: 'xyz', page: toPageRef(2), x: 100, y: 50, zoom: null },
       }),
     ).toEqual({
       kind: 'destination',
-      destination: { kind: 'xyz', page: toPageRef(2), x: 100, y: 50 },
+      destination: { kind: 'xyz', page: toPageRef(2), x: 100, y: 50, zoom: null },
     });
     // A page the document doesn't have can't be gone to: the target is reported.
     expect(

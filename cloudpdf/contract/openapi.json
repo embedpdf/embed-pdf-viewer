@@ -9480,7 +9480,7 @@
                 "$ref": "#/components/schemas/PageDestination/anyOf/0/properties/x"
               }
             },
-            "required": ["kind", "page"],
+            "required": ["kind", "page", "x", "y", "zoom"],
             "additionalProperties": false
           },
           {
@@ -9511,7 +9511,7 @@
                 "$ref": "#/components/schemas/PageDestination/anyOf/0/properties/x"
               }
             },
-            "required": ["kind", "page"],
+            "required": ["kind", "page", "y"],
             "additionalProperties": false
           },
           {
@@ -9528,7 +9528,7 @@
                 "$ref": "#/components/schemas/PageDestination/anyOf/0/properties/x"
               }
             },
-            "required": ["kind", "page"],
+            "required": ["kind", "page", "x"],
             "additionalProperties": false
           },
           {
@@ -9587,7 +9587,7 @@
                 "$ref": "#/components/schemas/PageDestination/anyOf/0/properties/x"
               }
             },
-            "required": ["kind", "page"],
+            "required": ["kind", "page", "y"],
             "additionalProperties": false
           },
           {
@@ -9604,7 +9604,7 @@
                 "$ref": "#/components/schemas/PageDestination/anyOf/0/properties/x"
               }
             },
-            "required": ["kind", "page"],
+            "required": ["kind", "page", "x"],
             "additionalProperties": false
           }
         ]
@@ -10194,8 +10194,7 @@
                 "$ref": "#/components/schemas/PageDestination"
               }
             ],
-            "nullable": true,
-            "default": null
+            "nullable": true
           },
           "willClose": {
             "$ref": "#/components/schemas/PdfActionTree"
@@ -10213,7 +10212,7 @@
             "$ref": "#/components/schemas/PdfActionTree"
           }
         },
-        "required": ["nameTreeScripts", "openAction"],
+        "required": ["nameTreeScripts", "openAction", "openDestination"],
         "additionalProperties": false
       },
       "FieldScriptWrite": {
@@ -12699,8 +12698,7 @@
                 "description": "A measure, by its `subtype`. A newer server can add subtypes: read one your client doesn't know as `unknown`."
               },
               "captionEnabled": {
-                "type": "boolean",
-                "nullable": true
+                "type": "boolean"
               },
               "captionPosition": {
                 "type": "string",
@@ -16512,8 +16510,7 @@
                 "nullable": true
               },
               "captionEnabled": {
-                "type": "boolean",
-                "nullable": true
+                "type": "boolean"
               },
               "captionPosition": {
                 "type": "string",
@@ -19377,8 +19374,7 @@
                 "nullable": true
               },
               "captionEnabled": {
-                "type": "boolean",
-                "nullable": true
+                "type": "boolean"
               },
               "captionPosition": {
                 "type": "string",
@@ -27892,7 +27888,8 @@
               "pattern": "^https?:\\/\\/(\\*\\.)?[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*(:\\d{1,5})?$"
             },
             "minItems": 1,
-            "maxItems": 32
+            "maxItems": 32,
+            "nullable": true
           },
           "passphrase": {
             "type": "string",
@@ -27907,7 +27904,8 @@
           "expiresAt": {
             "type": "integer",
             "exclusiveMinimum": true,
-            "minimum": 0
+            "minimum": 0,
+            "nullable": true
           }
         },
         "required": ["docId", "scope"],

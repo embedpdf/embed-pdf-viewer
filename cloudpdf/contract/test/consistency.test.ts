@@ -142,12 +142,47 @@ describe('naming rules in openapi.json', () => {
     const both = responseProperties
       .filter(({ schema, required }) => !required && isNullable(schema))
       .map(({ at }) => at);
-    // The one exception: a destination's axes, where left out and `null` both
-    // keep the viewer's value, as in the file.
-    expect(unique(both)).toEqual([
-      'PageDestination.x',
-      'PageDestination.y',
-      'PageDestination.zoom',
-    ]);
+    expect(unique(both)).toEqual([]);
+  });
+
+  test('a create takes null only where its read can be null', () => {
+    const schemas = spec.components.schemas;
+    const creates: Array<[string, Schema, Schema]> = [
+      ['AnnotationDraft', schemas.AnnotationDraft!, schemas.Annotation!],
+      ['WidgetPlacement', schemas.WidgetPlacement!, schemas.WidgetAnnotation!],
+      ['OutlineItemDraft', schemas.OutlineItemDraft!, schemas.OutlineItem!],
+      ['FormFieldDraft', schemas.FormFieldDraft!, schemas.FormField!],
+      [
+        'GrantsCreateRequest',
+        schemas.GrantsCreateRequest!,
+        resolved(schemas.GrantsGetResponse!).properties!.grant!,
+      ],
+    ];
+    const nullsWithoutRead = creates.flatMap(([name, create, read]) => {
+      const readFields = fieldsOf(read);
+      return Object.entries(fieldsOf(create))
+        .filter(([, field]) => field.some(isNullable))
+        .filter(([key]) => !(readFields[key] ?? []).some(isNullable))
+        .map(([key]) => `${name}.${key}`);
+    });
+    expect(unique(nullsWithoutRead)).toEqual([]);
   });
 });
+
+/** Each top-level field of an object or a union of objects, with every arm's schema for it. */
+function fieldsOf(schema: Schema): Record<string, Schema[]> {
+  const target = resolved(schema);
+  const fields: Record<string, Schema[]> = {};
+  const add = (from: Record<string, Schema[]>) => {
+    for (const [key, values] of Object.entries(from)) (fields[key] ??= []).push(...values);
+  };
+  add(
+    Object.fromEntries(
+      Object.entries(target.properties ?? {}).map(([key, value]) => [key, [value]]),
+    ),
+  );
+  for (const arm of [...(target.anyOf ?? []), ...(target.oneOf ?? []), ...(target.allOf ?? [])]) {
+    add(fieldsOf(arm));
+  }
+  return fields;
+}

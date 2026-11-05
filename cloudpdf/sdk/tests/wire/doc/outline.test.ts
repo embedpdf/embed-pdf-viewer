@@ -17,7 +17,13 @@ describe("OutlineClient", () => {
                     title: "title",
                     target: {
                         kind: "goto",
-                        destination: { kind: "xyz", page: { kind: "objectNumber", objectNumber: 1 } },
+                        destination: {
+                            kind: "xyz",
+                            page: { kind: "objectNumber", objectNumber: 1 },
+                            x: null,
+                            y: null,
+                            zoom: null,
+                        },
                     },
                     action: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
                     open: true,

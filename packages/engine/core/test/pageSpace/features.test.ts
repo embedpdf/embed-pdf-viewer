@@ -75,7 +75,13 @@ describe('pages in page space', () => {
           root: {
             subtype: 'GoTo',
             type: 'goto' as const,
-            destination: { kind: 'xyz' as const, page: toPageRef(6), left: -250, top: 350 },
+            destination: {
+              kind: 'xyz' as const,
+              page: toPageRef(6),
+              left: -250,
+              top: 350,
+              zoom: null,
+            },
             next: [],
           },
         },
@@ -88,7 +94,7 @@ describe('pages in page space', () => {
       namedPages: [],
     });
     expect(pages[0]!.actions?.open?.root).toMatchObject({
-      destination: { kind: 'xyz', page: toPageRef(6), x: 50, y: 40 },
+      destination: { kind: 'xyz', page: toPageRef(6), x: 50, y: 40, zoom: null },
     });
     expect('actions' in pages[1]!).toBe(false);
   });

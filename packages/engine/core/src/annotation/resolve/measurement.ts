@@ -142,8 +142,7 @@ export function resolveMeasurementDraft(
     if (draft.subtype === 'line') {
       resolved = {
         ...draft,
-        // `null` is a line without a caption flag, as a read says.
-        captionEnabled: draft.captionEnabled === undefined ? false : draft.captionEnabled,
+        captionEnabled: draft.captionEnabled ?? false,
         captionPosition: draft.captionPosition ?? 'inline',
         captionOffset: draft.captionOffset ?? null,
       };

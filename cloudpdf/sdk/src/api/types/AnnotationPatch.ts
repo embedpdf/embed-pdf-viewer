@@ -982,7 +982,7 @@ export namespace AnnotationPatch {
         rotation?: (number | null) | undefined;
         intent?: (AnnotationPatchLine.Intent | null) | undefined;
         measure?: (CloudPDF.AnnotationPatchLineMeasure | null) | undefined;
-        captionEnabled?: (boolean | null) | undefined;
+        captionEnabled?: boolean | undefined;
         captionPosition?: AnnotationPatchLine.CaptionPosition | undefined;
         captionOffset?: (AnnotationPatchLine.CaptionOffset | null) | undefined;
         leader?: (AnnotationPatchLine.Leader | null) | undefined;

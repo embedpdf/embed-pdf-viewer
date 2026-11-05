@@ -83,7 +83,37 @@ Spell out everything else: `error` (not `err`, `e`), `options` (not `opts`),
 - Contract fields and state fields are `readonly`.
 - Getters return `T | null` for "absent". Optional inputs and optional data
   fields use `?:`. One API never uses both `undefined` and `null` for the same
-  meaning.
+  meaning: [Nothing](#nothing-left-out-or-null) says which to use where.
+
+## Nothing: left out or `null`
+
+"Left out" is a key that isn't there (`?:`); "`null`" is the key, set to
+`null`. These rules hold in every API: the engine's, the viewer's and the
+HTTP contract.
+
+- **Reads.** A field the API hands out (a response, a return value, a getter,
+  an event, state, a setting) has one spelling for "nothing". A record's field
+  is always there, `null` when there is nothing; left out is for a key that
+  doesn't apply (a field another kind in the union has). Never `T | undefined`
+  on a read.
+- **Inputs take back what reads hand out.** Where a read can say `null`, an
+  input that takes the same value accepts `null`, meaning "nothing". `null`
+  never means "the default", and an input whose read is never `null` takes no
+  `null`.
+- **Creates.** Left out is the default; `null` is "nothing". A grouped
+  caller's annotation create left without `groupId` goes in their group;
+  `groupId: null` is no group, refused to a caller who has one.
+- **Patches.** A top-level key left out keeps the value; `null` removes it.
+  A field that can't change or be removed may carry the value a read gave
+  back unchanged, which is no change; any other value is refused.
+- **Objects inside a patch.** A value (a destination, a rect, a rich-text
+  body, a file) is replaced whole: what it leaves out takes its default, never
+  the current value. A map keyed by name (actions by trigger, custom metadata
+  by key) is patched per key: left out keeps, `null` removes.
+- **Options and parameters.** Left out is the default. `null` only for a value
+  a read can hand out as `null`, or where `null` is a named value of its own
+  (`move(ref, null)` moves to the top level). A parameter is `T | null` or
+  optional, never both.
 
 ## Discriminated unions
 
@@ -105,7 +135,8 @@ its rules hold in every language:
   duration in seconds are `.int()`, so the SDKs type them as integers.
 - **One spelling for "nothing".** A response field is either always there,
   `null` when there is nothing, or left out when there is nothing; never
-  both.
+  both. A create takes `null` only where its read can be `null`
+  ([Nothing](#nothing-left-out-or-null)).
 
 `cloudpdf/contract/test/consistency.test.ts` checks these on `openapi.json`.
 

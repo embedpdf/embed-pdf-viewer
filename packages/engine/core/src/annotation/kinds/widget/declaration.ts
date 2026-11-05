@@ -32,7 +32,10 @@ export const WidgetDeclaration = defineKind('widget', {
   /**
    * The font `/DA` names, as a free text names its font: a standard font's
    * name, a registered font's key, or the family of a font the document has.
-   * `null` when `/DA` names none. A write takes a standard name or a key.
+   * The widget's `/DA`, else the form's; `null` when neither names one. A
+   * write takes a standard name or a key; a font can't be removed, so `null`
+   * is only the read sent back, and is refused beside a font (the same for
+   * `fontSize` and `fontColor`).
    */
   fontFamily: field.data(FontNameSchema).nullable().optional(),
   fontSize: field.data(z.number().nonnegative()).nullable().optional(),

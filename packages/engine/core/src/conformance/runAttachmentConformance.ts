@@ -262,13 +262,13 @@ export function runAttachmentConformance(
         expect(Array.from(bytes.slice(0, 16))).toEqual(Array.from(data.slice(0, 16)));
         expect(bytes.every((byte, i) => byte === data[i])).toBe(true);
 
-        // A read goes back in: into a create (its name cleared, as a copy on
-        // the same page needs), with the bytes it downloaded, and into an
-        // update that sends its file back unchanged.
-        const { annotation: copy } = await annotations.create(
-          { ...dto, nm: null },
-          { resources: { file: bytes } },
-        );
+        // A read goes back in: into a create (its name left out, so the copy
+        // on the same page gets a fresh one), with the bytes it downloaded,
+        // and into an update that sends its file back unchanged.
+        const { nm: _name, ...unnamed } = dto;
+        const { annotation: copy } = await annotations.create(unnamed, {
+          resources: { file: bytes },
+        });
         expect((copy as FileAttachmentAnnotation).file).toMatchObject({
           name: 'conformance.bin',
           mimeType: 'application/octet-stream',
