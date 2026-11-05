@@ -17,7 +17,7 @@ describe("TenantsClient", () => {
                     autoProvisioned: true,
                     status: "active",
                     features: [{ id: "id" }],
-                    createdAt: 1,
+                    createdAt: "2024-01-15T09:30:00Z",
                 },
             ],
             nextCursor: "nextCursor",
@@ -53,7 +53,7 @@ describe("TenantsClient", () => {
                 autoProvisioned: true,
                 status: "active",
                 features: [{ id: "id" }],
-                createdAt: 1,
+                createdAt: "2024-01-15T09:30:00Z",
             },
             created: true,
         };
@@ -106,7 +106,7 @@ describe("TenantsClient", () => {
                 autoProvisioned: true,
                 status: "active",
                 features: [{ id: "id" }],
-                createdAt: 1,
+                createdAt: "2024-01-15T09:30:00Z",
             },
         };
 
@@ -189,7 +189,7 @@ describe("TenantsClient", () => {
                 autoProvisioned: true,
                 status: "active",
                 features: [{ id: "id" }],
-                createdAt: 1,
+                createdAt: "2024-01-15T09:30:00Z",
             },
         };
 

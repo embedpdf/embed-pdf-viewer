@@ -27,8 +27,8 @@ export namespace DocumentsImportFrom200Response {
         failureReason: string | null;
         thumbnailState: Document.ThumbnailState;
         thumbnailUrl: string | null;
-        createdAt: number;
-        updatedAt: number;
+        createdAt: string;
+        updatedAt: string;
         createdBy: string | null;
     }
 

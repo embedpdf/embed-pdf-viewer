@@ -23,8 +23,8 @@ export namespace DocumentsListResponse {
             failureReason: string | null;
             thumbnailState: Item.ThumbnailState;
             thumbnailUrl: string | null;
-            createdAt: number;
-            updatedAt: number;
+            createdAt: string;
+            updatedAt: string;
             createdBy: string | null;
         }
 

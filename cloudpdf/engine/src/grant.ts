@@ -61,8 +61,8 @@ export interface GrantSession {
     /** What the grant asks before this visitor's first change, unanswered; `null` when nothing. */
     identityRequest: VisitorIdentityRequest | null;
   };
-  /** Unix seconds when `token` expires. */
-  expiresAt: number;
+  /** When `token` expires: ISO 8601. */
+  expiresAt: string;
 }
 
 export interface GrantExchangeOptions {
@@ -209,6 +209,11 @@ function asEngineError(error: unknown): unknown {
   return error instanceof GrantExchangeError ? engineErrorFromGrantExchange(error) : error;
 }
 
+/** Seconds until `session`'s token expires. */
+function secondsLeft(session: GrantSession): number {
+  return (Date.parse(session.expiresAt) - Date.now()) / 1000;
+}
+
 /** Renew this many seconds before `expiresAt` so in-flight requests never race expiry. */
 const RENEW_MARGIN_SECONDS = 60;
 /** After a renewal on the timer failed, try again this much later; a request says why meanwhile. */
@@ -295,7 +300,7 @@ export class GrantSessionSource {
     if (this.lost) throw this.lost;
     if (!this.asked) {
       const session = this.session;
-      if (session && session.expiresAt - Date.now() / 1000 > RENEW_MARGIN_SECONDS) {
+      if (session && secondsLeft(session) > RENEW_MARGIN_SECONDS) {
         return session.token;
       }
       this.inflight ??= this.exchange().finally(() => {
@@ -447,7 +452,7 @@ export class GrantSessionSource {
     const asked = this.asked;
     const session = this.session;
     if (!asked || !session) return this.token();
-    if (session.expiresAt - Date.now() / 1000 > LAST_USE_MARGIN_SECONDS) return session.token;
+    if (secondsLeft(session) > LAST_USE_MARGIN_SECONDS) return session.token;
     if (this.openListeners.size === 0) throw asked.refusal;
     await asked.resumed;
     return this.token();
@@ -457,7 +462,7 @@ export class GrantSessionSource {
   private untilRenewalMs(): number {
     const session = this.session;
     if (!session) return 0;
-    const renewAt = (session.expiresAt - RENEW_MARGIN_SECONDS + 1) * 1000;
+    const renewAt = Date.parse(session.expiresAt) - (RENEW_MARGIN_SECONDS - 1) * 1000;
     return Math.max(1_000, renewAt - Date.now());
   }
 

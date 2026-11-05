@@ -151,6 +151,33 @@ describe('openapi document', () => {
     expect(committed).toEqual(generated);
   });
 
+  test("a reused schema doesn't take another field's null along", () => {
+    const doc = buildAdminOpenApiDocument({ version: pkg.version }) as Record<string, any>;
+    const resolved = (schema: Record<string, any>): Record<string, any> =>
+      schema.$ref
+        ? resolved(
+            schema.$ref
+              .slice(2)
+              .split('/')
+              .reduce((node: any, key: string) => node[key], doc),
+          )
+        : schema;
+    const nullable = (schema: Record<string, any>): boolean =>
+      schema.nullable === true || (schema.allOf ?? []).some((arm: any) => nullable(resolved(arm)));
+    const schemas = doc.components.schemas;
+    // The first use of the date-time schema is a nullable field's.
+    const grant = schemas.GrantsGetResponse.properties.grant.properties;
+    expect(nullable(grant.archivedAt)).toBe(true);
+    expect(nullable(grant.createdAt)).toBe(false);
+    expect(nullable(grant.updatedAt)).toBe(false);
+    const visitor = schemas.GrantsVisitorsListResponse.properties.visitors.items.properties;
+    expect(nullable(visitor.consentedAt)).toBe(true);
+    expect(nullable(visitor.firstSeenAt)).toBe(false);
+    // One nullable schema reused is nullable everywhere it's used.
+    const xyz = schemas.PageDestination.anyOf[0].properties;
+    expect(nullable(resolved(xyz.y))).toBe(true);
+  });
+
   test('the SDKs send EmbedPDF-Version: the major and minor of the release', () => {
     const doc = buildAdminOpenApiDocument({ version: '3.4.1-next.2' });
     expect(doc['x-fern-global-headers']).toEqual([

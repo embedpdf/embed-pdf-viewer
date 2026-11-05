@@ -19,7 +19,7 @@ describe("VersionsClient", () => {
                     parentSha256: "parentSha256",
                     producer: "upload",
                     signingId: "signingId",
-                    createdAt: 1,
+                    createdAt: "2024-01-15T09:30:00Z",
                 },
             ],
         };

@@ -13,8 +13,8 @@ export namespace FoldersGetResponse {
         /** The folder it is in, or root. */
         parentId: string;
         name: string;
-        createdAt: number;
-        updatedAt: number;
+        createdAt: string;
+        updatedAt: string;
         createdBy: string | null;
     }
 

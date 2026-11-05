@@ -23,13 +23,13 @@ export namespace GrantsUpdateResponse {
         passphraseProtected: boolean;
         sessionTtlSeconds: number;
         disabled: boolean;
-        archivedAt: number | null;
-        expiresAt: number | null;
+        archivedAt: string | null;
+        expiresAt: string | null;
         exchangeCount: number;
-        lastExchangedAt: number | null;
+        lastExchangedAt: string | null;
         createdBy: string;
-        createdAt: number;
-        updatedAt: number;
+        createdAt: string;
+        updatedAt: string;
     }
 
     export namespace Grant {

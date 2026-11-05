@@ -37,6 +37,7 @@ import {
   setNoStore,
 } from './_helpers';
 import { requireSharedDocRead } from './_planeGuard';
+import { isoTime } from '../time';
 
 export interface DocsRouteDeps {
   service: DocumentService;
@@ -436,7 +437,7 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
     setNoStore(reply);
     return {
       url: `${req.protocol}://${req.host}${path}?link=${encodeURIComponent(linkToken)}`,
-      expiresAt: Math.floor(Date.now() / 1000) + expiresIn,
+      expiresAt: isoTime(Date.now() + expiresIn * 1000),
     };
   });
 

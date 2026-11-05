@@ -10,6 +10,7 @@
 import type { CdnAccessInfo } from '@embedpdf/engine-core/runtime';
 
 import type { CdnSigner, PurgeInput, PurgeReceipt, SignInput } from '../CdnSigner';
+import { isoTimeOfSeconds } from '../../time';
 
 export class NoneCdnSigner implements CdnSigner {
   readonly info = { kind: 'none' as const };
@@ -17,7 +18,7 @@ export class NoneCdnSigner implements CdnSigner {
   buildAccess(input: SignInput): CdnAccessInfo {
     return {
       adapter: 'none',
-      expiresAt: input.expiresAt,
+      expiresAt: isoTimeOfSeconds(input.expiresAt),
       cache: {
         scope: 'browser-private',
         immutableVersionedReads: true,

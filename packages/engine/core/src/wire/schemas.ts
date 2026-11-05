@@ -435,7 +435,8 @@ export const AccessResponseSchema = z.object({
     adapter: closed(
       z.enum(['none', 'cloudfront', 'cloud-cdn', 'bunny', 'azure-fd', 'custom-hmac']),
     ),
-    expiresAt: z.number().int().positive(),
+    /** When the CDN's signing for this access expires. */
+    expiresAt: IsoDateTimeSchema,
     cache: z.object({
       scope: closed(z.enum(['browser-private', 'edge-shared'])),
       immutableVersionedReads: z.boolean(),
@@ -482,7 +483,8 @@ export const AccessResponseSchema = z.object({
   originPasswordPolicy: z.object({
     mode: closed(z.enum(['not-needed', 'client-retry', 'server-session'])),
   }),
-  expiresAt: z.number().int().positive(),
+  /** When the token this access was given for expires. */
+  expiresAt: IsoDateTimeSchema,
   /**
    * The deployment's render lattice — the canonical parameter points the
    * server treats as durable, CDN-shared artifacts. Lives here and never in
@@ -2049,7 +2051,7 @@ export const SignaturePreparedWireSchema = z.object({
   contentsSize: z.number().int().positive(),
   subFilter: z.string(),
   expectedVersion: DocumentVersionRefSchema,
-  expiresAt: z.string().nullable(),
+  expiresAt: IsoDateTimeSchema.nullable(),
 });
 export type SignaturePreparedWire = z.infer<typeof SignaturePreparedWireSchema>;
 
@@ -2321,7 +2323,7 @@ export const LayerVersionSchema = z.object({
   parentSha256: z.string().nullable(),
   producer: closed(z.enum(['upload', 'signature'])),
   signingId: z.string().nullable(),
-  createdAt: z.number().int(),
+  createdAt: IsoDateTimeSchema,
 });
 export type LayerVersion = z.infer<typeof LayerVersionSchema>;
 

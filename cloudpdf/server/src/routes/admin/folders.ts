@@ -6,6 +6,7 @@ import {
   FolderUpdateRequestSchema,
   adminOperations,
   type AdminOperation,
+  type FolderRecord,
 } from '@cloudpdf/contract';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { z } from 'zod';
@@ -17,6 +18,7 @@ import { requireTenantAccess } from '../../app/jwt-plugin';
 import { nameKeyOf } from '../../db/names';
 import type { FolderRow } from '../../db/repos/folders.repo';
 import type { FolderService } from '../../services/FolderService';
+import { isoTime } from '../../time';
 
 export interface AdminFoldersRouteDeps {
   folders: FolderService;
@@ -123,14 +125,14 @@ export async function registerAdminFoldersRoutes(
   });
 }
 
-function folderPublic(folder: FolderRow): Record<string, unknown> {
+function folderPublic(folder: FolderRow): FolderRecord {
   return {
     id: folder.id,
     tenantId: folder.tenantId,
     parentId: placeOfFolderId(folder.parentId),
     name: folder.name,
-    createdAt: folder.createdAt,
-    updatedAt: folder.updatedAt,
+    createdAt: isoTime(folder.createdAt),
+    updatedAt: isoTime(folder.updatedAt),
     createdBy: folder.createdBy,
   };
 }

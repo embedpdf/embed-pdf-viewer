@@ -5,6 +5,8 @@ import {
   GrantVisitorListQuerySchema,
   adminOperations,
   type AdminOperation,
+  type GrantRecord,
+  type GrantVisitorRecord,
 } from '@cloudpdf/contract';
 import { validateScopeArray, type Identity } from '@embedpdf/engine-core/runtime';
 import { DEFAULT_LAYER_NAME } from '@embedpdf/engine-core/wire';
@@ -22,6 +24,7 @@ import type { GrantLayerMode, GrantRow, GrantsRepo } from '../../db/repos/grants
 import type { LayersRepo } from '../../db/repos/page_state.repo';
 import type { SecurityEventsRepo } from '../../db/repos/security-events.repo';
 import { errorBody } from '../_helpers';
+import { isoTime, isoTimeOrNull } from '../../time';
 
 export interface AdminGrantsRoutesDeps {
   grants: GrantsRepo;
@@ -147,7 +150,7 @@ export async function registerAdminGrantsRoutes(
       ...(body.sessionTtlSeconds !== undefined
         ? { sessionTtlSeconds: body.sessionTtlSeconds }
         : {}),
-      ...(body.expiresAt != null ? { expiresAt: body.expiresAt } : {}),
+      ...(body.expiresAt != null ? { expiresAt: Date.parse(body.expiresAt) } : {}),
       createdBy: ctx.sub,
     });
     await securityEvents.append({
@@ -269,7 +272,9 @@ export async function registerAdminGrantsRoutes(
         ? { sessionTtlSeconds: body.sessionTtlSeconds }
         : {}),
       ...(body.disabled !== undefined ? { disabled: body.disabled } : {}),
-      ...(body.expiresAt !== undefined ? { expiresAt: body.expiresAt } : {}),
+      ...(body.expiresAt !== undefined
+        ? { expiresAt: body.expiresAt === null ? null : Date.parse(body.expiresAt) }
+        : {}),
     });
     if (!updated) {
       return reply.code(404).send(errorBody('NotFound', `grant does not exist: ${grantId}`));
@@ -445,20 +450,20 @@ function archivedConflict(reply: FastifyReply, grantId: string): FastifyReply {
 }
 
 /** Wire shape of a visitor (`GrantVisitorRecord`). */
-function visitorPublic(v: ListedGrantVisitor): Record<string, unknown> {
+function visitorPublic(v: ListedGrantVisitor): GrantVisitorRecord {
   return {
     visitorId: v.visitorId,
     answers: v.answers,
     emailVerified: v.emailVerifiedAt !== null,
-    consentedAt: v.consentedAt,
-    firstSeenAt: v.firstSeenAt,
-    lastSeenAt: v.lastSeenAt,
+    consentedAt: isoTimeOrNull(v.consentedAt),
+    firstSeenAt: isoTime(v.firstSeenAt),
+    lastSeenAt: isoTime(v.lastSeenAt),
     layer: v.layer ? { layerName: v.layer.name, storageSizeBytes: v.layer.storageSizeBytes } : null,
   };
 }
 
 /** Wire shape: the scrypt envelope never leaves the row. */
-function grantPublic(g: GrantRow): Record<string, unknown> {
+function grantPublic(g: GrantRow): GrantRecord {
   return {
     id: g.id,
     tenantId: g.tenantId,
@@ -475,12 +480,12 @@ function grantPublic(g: GrantRow): Record<string, unknown> {
     passphraseProtected: g.passphraseHash !== null,
     sessionTtlSeconds: g.sessionTtlSeconds,
     disabled: g.disabled,
-    archivedAt: g.archivedAt,
-    expiresAt: g.expiresAt,
+    archivedAt: isoTimeOrNull(g.archivedAt),
+    expiresAt: isoTimeOrNull(g.expiresAt),
     exchangeCount: g.exchangeCount,
-    lastExchangedAt: g.lastExchangedAt,
+    lastExchangedAt: isoTimeOrNull(g.lastExchangedAt),
     createdBy: g.createdBy,
-    createdAt: g.createdAt,
-    updatedAt: g.updatedAt,
+    createdAt: isoTime(g.createdAt),
+    updatedAt: isoTime(g.updatedAt),
   };
 }

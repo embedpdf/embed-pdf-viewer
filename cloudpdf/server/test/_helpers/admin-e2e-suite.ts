@@ -642,7 +642,7 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
       expect(claims['sub']).toBe('billing-service');
       expect(claims['tenant_id']).toBe('mint-t');
       expect(claims['jti']).toBe(issued.jti);
-      expect(claims['exp']).toBe(issued.expiresAt);
+      expect(claims['exp']).toBe(Date.parse(issued.expiresAt) / 1000);
 
       const delegated = createCloudAdmin({
         baseUrl: fx.baseUrl,

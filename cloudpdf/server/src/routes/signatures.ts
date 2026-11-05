@@ -68,6 +68,7 @@ import {
 } from '../app/jwt-plugin';
 import type { DocumentService, OpenContext } from '../services/DocumentService';
 import type { LayerService } from '../services/LayerService';
+import { isoTime } from '../time';
 
 interface SignatureRouteDeps {
   service: DocumentService;
@@ -328,7 +329,7 @@ export async function registerSignatureRoutes(
         parentSha256: v.parentSha256,
         producer: v.producerKind,
         signingId: v.producerRef,
-        createdAt: v.createdAt,
+        createdAt: isoTime(v.createdAt),
       })),
     };
   });

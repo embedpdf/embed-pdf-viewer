@@ -17,7 +17,7 @@ export namespace TenantsListResponse {
             autoProvisioned: boolean;
             status?: Item.Status | undefined;
             features?: CloudPDF.TenantFeature[] | undefined;
-            createdAt: number;
+            createdAt: string;
         }
 
         export namespace Item {

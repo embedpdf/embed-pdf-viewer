@@ -488,7 +488,7 @@ describe('ending a grant', () => {
 
     const archived = await archiveGrant(grant.id);
     expect(archived.status).toBe(200);
-    expect(archived.body.grant.archivedAt).toEqual(expect.any(Number));
+    expect(archived.body.grant.archivedAt).toEqual(expect.any(String));
     // Final: no exchange, with or without a handle, and no more changes.
     expect((await exchange({ grant: grant.id })).status).toBe(404);
     expect(

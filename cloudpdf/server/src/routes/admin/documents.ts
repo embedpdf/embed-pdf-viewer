@@ -12,6 +12,8 @@ import {
   type AdminOperation,
   type DocumentListSort,
   type ListOrder,
+  type AdminDocumentRecord,
+  type AdminInitUpload,
 } from '@cloudpdf/contract';
 import { decodePdfBits, type PdfBits } from '@embedpdf/engine-core/runtime';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
@@ -26,9 +28,10 @@ import {
   type UploadAccessContext,
 } from '../../app/jwt-plugin';
 import { listPositionOf } from '../../db/repos/documents.repo';
-import type { DocumentLifecycleService } from '../../services/DocumentLifecycleService';
+import type { DocumentLifecycleService, InitUpload } from '../../services/DocumentLifecycleService';
 import type { ObjectStore } from '../../storage/ObjectStore';
 import { errorBody } from '../_helpers';
+import { isoTime } from '../../time';
 
 export interface AdminDocumentsRouteDeps {
   lifecycle: DocumentLifecycleService;
@@ -136,7 +139,7 @@ export async function registerAdminDocumentsRoutes(
     return reply.send({
       tag: result.tag,
       document: docPublic(result.doc),
-      upload,
+      upload: uploadPublic(upload),
     });
   });
 
@@ -418,18 +421,18 @@ function docPublic(d: {
   tenantId: string;
   name: string;
   folderId: string | null;
-  state: string;
+  state: AdminDocumentRecord['state'];
   baseSha: string | null;
   storageSizeBytes: number | null;
   metadata: Record<string, unknown> | null;
   idempotencyKey: string | null;
   failureReason: string | null;
-  thumbnailState: string;
+  thumbnailState: AdminDocumentRecord['thumbnailState'];
   thumbnailKey: string | null;
   createdAt: number;
   updatedAt: number;
   createdBy: string | null;
-}): Record<string, unknown> {
+}): AdminDocumentRecord {
   return {
     id: d.id,
     tenantId: d.tenantId,
@@ -446,10 +449,19 @@ function docPublic(d: {
     thumbnailState: d.thumbnailState,
     thumbnailUrl:
       d.thumbnailState === 'ready' ? adminWirePaths.documentThumbnail(d.tenantId, d.id) : null,
-    createdAt: d.createdAt,
-    updatedAt: d.updatedAt,
+    createdAt: isoTime(d.createdAt),
+    updatedAt: isoTime(d.updatedAt),
     createdBy: d.createdBy,
   };
+}
+
+function uploadPublic(upload: InitUpload): AdminInitUpload {
+  return upload.kind === 'presigned'
+    ? {
+        ...upload,
+        presigned: { ...upload.presigned, expiresAt: isoTime(upload.presigned.expiresAt) },
+      }
+    : upload;
 }
 
 function makeError(code: string, status: number, message: string): Error {

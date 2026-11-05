@@ -16,7 +16,7 @@ export namespace DocVersionsListResponse {
             parentSha256: string | null;
             producer: Item.Producer;
             signingId: string | null;
-            createdAt: number;
+            createdAt: string;
         }
 
         export namespace Item {

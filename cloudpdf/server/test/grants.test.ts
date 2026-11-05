@@ -197,7 +197,7 @@ describe('grants', () => {
     expect(ok.status).toBe(200);
     expect(ok.json.docId).toBe('doc-grant');
     expect(ok.json.layerName).toBe('default');
-    expect(ok.json.expiresAt).toBeGreaterThan(Math.floor(Date.now() / 1000) + 500);
+    expect(Date.parse(ok.json.expiresAt)).toBeGreaterThan(Date.now() + 500_000);
     expect(await head('doc-grant', ok.json.token, 'https://acme.com')).toBe(200);
 
     // Wildcard subdomain matches one-or-more labels; the bare apex does not.
@@ -233,7 +233,9 @@ describe('grants', () => {
     expect((await exchange({ grant: grant.id }, 'https://acme.com')).status).toBe(200);
 
     // Expiry → 410 Gone (distinct from revocation: the embed can say "expired").
-    expect((await patch({ expiresAt: Date.now() - 1_000 })).status).toBe(200);
+    expect((await patch({ expiresAt: new Date(Date.now() - 1_000).toISOString() })).status).toBe(
+      200,
+    );
     expect((await exchange({ grant: grant.id }, 'https://acme.com')).status).toBe(410);
     expect((await patch({ expiresAt: null })).status).toBe(200);
 

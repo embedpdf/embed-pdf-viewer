@@ -38,6 +38,7 @@ import type { CdnSigner, PurgeInput, PurgeReceipt, SignInput } from '../CdnSigne
 import { base64url } from '../util/base64url';
 import { buildBaseUrlOverrides } from '../util/baseUrlOverrides';
 import { hmacSha1 } from '../util/hmac';
+import { isoTimeOfSeconds } from '../../time';
 
 export interface CloudCdnSignerOptions {
   urlPrefix: string;
@@ -78,7 +79,7 @@ export class CloudCdnSigner implements CdnSigner {
     });
     return {
       adapter: 'cloud-cdn',
-      expiresAt: input.expiresAt,
+      expiresAt: isoTimeOfSeconds(input.expiresAt),
       cache: { scope: 'edge-shared', immutableVersionedReads: true },
       baseUrlOverrides: buildBaseUrlOverrides(this.cdnOrigin, input.coverage),
       authHeader: null,

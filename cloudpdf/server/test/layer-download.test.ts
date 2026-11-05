@@ -323,7 +323,7 @@ describe('a download link', () => {
     expect(made.url).toMatch(
       new RegExp(`^${baseUrl}/v1/docs/${DOC}/layers/${layer}/download@.+\\?link=`),
     );
-    expect(made.expiresAt).toBeGreaterThan(Math.floor(Date.now() / 1000) + 100);
+    expect(Date.parse(made.expiresAt)).toBeGreaterThan(Date.now() + 100_000);
 
     const { result: res, dispatched } = await jobsDuring(() => fetch(made.url));
     const bytes = await bytesOf(res);

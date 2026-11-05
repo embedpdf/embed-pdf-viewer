@@ -9,7 +9,7 @@ describe("TokensClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { kind: "doc", sub: "sub", docId: "docId", scope: ["scope"], expiresIn: 1 };
-        const rawResponseBody = { token: "token", jti: "jti", expiresAt: 1 };
+        const rawResponseBody = { token: "token", jti: "jti", expiresAt: "2024-01-15T09:30:00Z" };
 
         server
             .mockEndpoint()

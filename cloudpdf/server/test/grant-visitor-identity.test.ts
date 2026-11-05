@@ -450,9 +450,9 @@ describe("a grant's visitors", () => {
         visitorId: visitorIdOf(ben),
         answers: { displayName: 'Ben' },
         emailVerified: false,
-        consentedAt: expect.any(Number),
-        firstSeenAt: expect.any(Number),
-        lastSeenAt: expect.any(Number),
+        consentedAt: expect.any(String),
+        firstSeenAt: expect.any(String),
+        lastSeenAt: expect.any(String),
         layer: null,
       },
     ]);
@@ -462,7 +462,7 @@ describe("a grant's visitors", () => {
       expect.objectContaining({
         visitorId: visitorIdOf(ann),
         answers: { displayName: 'Ann' },
-        firstSeenAt: 1000,
+        firstSeenAt: new Date(1000).toISOString(),
         layer: { layerName: ann.layerName, storageSizeBytes: expect.any(Number) },
       }),
     ]);
