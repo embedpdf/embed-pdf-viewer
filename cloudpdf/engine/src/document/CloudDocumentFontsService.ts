@@ -14,6 +14,7 @@ import {
   FontProgramInfoSchema,
   FontResolutionSchema,
   wirePaths,
+  tokenPinOf,
 } from '@embedpdf/engine-core/wire';
 
 import type { ManifestAccessor } from './CloudDocumentHandle';
@@ -84,7 +85,10 @@ export class CloudDocumentFontsService implements DocumentFontsService {
   private listOf(signal: AbortSignal): Promise<FontList> {
     const buildPath = async (s: AbortSignal): Promise<string> => {
       const manifest = await this.manifest.get(s);
-      const token = { fontsVersion: manifest.fontsVersion, serverFonts: manifest.serverFonts };
+      const token = {
+        fontsVersion: manifest.fontsVersion,
+        pin: tokenPinOf('fonts', manifest.engine),
+      };
       // A document's fonts are wherever its drawings are: while the layer
       // inherits its pages, annotations and form, it has the base's.
       return planesInherited(manifest, ['content', 'annotations', 'forms'])

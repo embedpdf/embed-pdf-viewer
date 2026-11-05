@@ -1,4 +1,5 @@
 import { PermissionDenied } from '../auth/scope/errors';
+import type { TokenPin } from '../wire/cachedReads';
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import type { PageRenderTransform } from '../geometry/pageTransform';
@@ -270,11 +271,8 @@ export interface PageRenderQuery {
   contentVersion?: number;
   annotationVersion?: number;
   widgetVersion?: number;
-  /**
-   * The server's fonts it was drawn with (`DocumentManifest.serverFonts`):
-   * required with the pins, since fallback fonts draw page text.
-   */
-  serverFonts?: string;
+  /** The engine value and shape of a versioned request: required with the pins. */
+  pin?: TokenPin;
 }
 
 /**

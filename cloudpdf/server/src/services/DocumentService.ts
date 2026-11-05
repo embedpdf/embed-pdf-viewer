@@ -63,6 +63,7 @@ import { StorageKeys } from '../storage/keys';
 import { readLayerArtifactHeader } from '../storage/layerArtifact';
 import type { ObjectStore } from '../storage/ObjectStore';
 import type { ServerFonts } from './ServerFonts';
+import { EngineValues } from './EngineValues';
 
 /**
  * Public head shape returned by `GET /v1/docs/:docId/head`.
@@ -98,6 +99,8 @@ export interface DocumentHead {
     reasons: Array<'password' | 'cdn' | 'permissions-unknown'>;
     endpoint?: string;
   };
+  /** This server's engine value for each kind of cached read ({@link EngineValues}). */
+  engine: Readonly<Record<string, string>>;
 }
 
 // The manifest shape is owned by engine-core (the wire contract). Re-export
@@ -239,6 +242,8 @@ export class DocumentService {
   private readonly layerState: LayerStateService;
   /** The server's fonts (see {@link DocumentServiceOptions.serverFonts}). */
   readonly serverFonts: ServerFonts;
+  /** This server's engine values, which its fonts are one input of. */
+  readonly engineValues: EngineValues;
   private readonly passwordVerifications: PdfPasswordVerificationsRepo | null;
   private readonly passwordSessions: PdfPasswordSessionsRepo | null;
   private readonly passwordSessionServerSecret: { id: string; secret: string | Buffer } | null;
@@ -331,6 +336,7 @@ export class DocumentService {
     this.pool = opts.pool;
     this.layerState = opts.layerState;
     this.serverFonts = opts.serverFonts;
+    this.engineValues = new EngineValues(opts.serverFonts);
     this.passwordVerifications = opts.passwordVerifications ?? null;
     this.passwordSessions = opts.passwordSessions ?? null;
     this.passwordSessionServerSecret = opts.passwordSessionServerSecret ?? null;
@@ -531,7 +537,7 @@ export class DocumentService {
    */
   async getHead(ctx: OpenContext, docId: string): Promise<DocumentHead> {
     const row = await this.requireReadyRow(ctx, docId);
-    const head = buildHead(row, this.cdnAccessRequired);
+    const head = buildHead(row, this.cdnAccessRequired, await this.engineValues.values());
     void this.warm(ctx, docId).catch(() => undefined);
     return head;
   }
@@ -562,7 +568,7 @@ export class DocumentService {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected open payload: ${result.tag}`);
       }
       this.recordOpened(baseSha, result);
-      const head = buildHead(row, this.cdnAccessRequired);
+      const head = buildHead(row, this.cdnAccessRequired, await this.engineValues.values());
       this.replaceBaseHandle(docId, baseSha, handle);
       handle = null;
       return head;
@@ -592,13 +598,7 @@ export class DocumentService {
       await this.requireReadyRow(ctx, docId),
       head.baseSha,
     );
-    return this.layerState.buildBaseManifest(
-      head,
-      pages,
-      version,
-      protection,
-      await this.serverFonts.fingerprint(),
-    );
+    return this.layerState.buildBaseManifest(head, pages, version, protection);
   }
 
   async getLayerHead(ctx: OpenContext, docId: string, layerName: string): Promise<DocumentHead> {
@@ -686,7 +686,6 @@ export class DocumentService {
         },
         pages,
         this.layerState.computeLayerScopes(null, [], []),
-        await this.serverFonts.fingerprint(),
       );
     }
 
@@ -713,7 +712,6 @@ export class DocumentService {
       layer,
       pages,
       this.layerState.computeLayerScopes(layer, pages, basePages, headVersion),
-      await this.serverFonts.fingerprint(),
     );
   }
 
@@ -2696,7 +2694,11 @@ function layerSessionKey(docId: string, layerName: string): string {
   return `${docId}::${layerName}`;
 }
 
-function buildHead(row: DocumentRow, cdnAccessRequired: boolean): DocumentHead {
+function buildHead(
+  row: DocumentRow,
+  cdnAccessRequired: boolean,
+  engine: DocumentHead['engine'],
+): DocumentHead {
   const baseSha = requireBaseSha(row);
   const permissions = {
     known: row.security.pdfPermissionsBits !== null,
@@ -2733,6 +2735,7 @@ function buildHead(row: DocumentRow, cdnAccessRequired: boolean): DocumentHead {
       reasons,
       ...(reasons.length > 0 ? { endpoint: wirePaths.access(row.id, DEFAULT_LAYER_NAME) } : {}),
     },
+    engine,
   };
 }
 

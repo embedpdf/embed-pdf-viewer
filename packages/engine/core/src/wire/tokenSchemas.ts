@@ -1,34 +1,34 @@
 import type { TokenSchema } from './token';
 
 export const DocTokenSchema = {
-  fields: ['docVersion'],
+  fields: ['docVersion', 'engine', 'shape'],
 } as const satisfies TokenSchema;
 
 export const ContentTokenSchema = {
-  fields: ['contentVersion'],
+  fields: ['contentVersion', 'engine', 'shape'],
 } as const satisfies TokenSchema;
 
 export const LayoutTokenSchema = {
-  fields: ['layoutVersion', 'format'],
+  fields: ['engine', 'layoutVersion', 'shape'],
 } as const satisfies TokenSchema;
 
 export const MetadataTokenSchema = {
-  fields: ['metadataVersion'],
+  fields: ['engine', 'metadataVersion', 'shape'],
 } as const satisfies TokenSchema;
 
 export const AnnotationTokenSchema = {
-  fields: ['annotationVersion'],
+  fields: ['annotationVersion', 'engine', 'shape'],
 } as const satisfies TokenSchema;
 
 /** Doc-level bulk annotations listing pin (plural, vs the per-page
  *  `annotationVersion` token above). */
 export const AnnotationsAllTokenSchema = {
-  fields: ['annotationsVersion'],
+  fields: ['annotationsVersion', 'engine', 'shape'],
 } as const satisfies TokenSchema;
 
 /** The form (`form@`): its fields, widget rows and calculation order. */
 export const FormTokenSchema = {
-  fields: ['formsVersion'],
+  fields: ['engine', 'formsVersion', 'shape'],
 } as const satisfies TokenSchema;
 
 /**
@@ -37,21 +37,21 @@ export const FormTokenSchema = {
  * and the selection, canonical so one selection is one URL.
  */
 export const AnnotationsExportTokenSchema = {
-  fields: ['annotationsVersion', 'include', 'layoutVersion', 'selection'],
+  fields: ['annotationsVersion', 'engine', 'include', 'layoutVersion', 'selection', 'shape'],
   maxLength: 4096,
 } as const satisfies TokenSchema;
 
 export const FormExportTokenSchema = {
-  fields: ['formsVersion', 'layoutVersion', 'selection'],
+  fields: ['engine', 'formsVersion', 'layoutVersion', 'selection', 'shape'],
   maxLength: 4096,
 } as const satisfies TokenSchema;
 
 export const ActionsTokenSchema = {
-  fields: ['actionsVersion'],
+  fields: ['actionsVersion', 'engine', 'shape'],
 } as const satisfies TokenSchema;
 
 export const AttachmentsTokenSchema = {
-  fields: ['attachmentsVersion'],
+  fields: ['attachmentsVersion', 'engine', 'shape'],
 } as const satisfies TokenSchema;
 
 /**
@@ -59,15 +59,12 @@ export const AttachmentsTokenSchema = {
  * page space, so a page delete or a box change moves what it reads.
  */
 export const OutlineTokenSchema = {
-  fields: ['layoutVersion', 'outlineVersion'],
+  fields: ['engine', 'layoutVersion', 'outlineVersion', 'shape'],
 } as const satisfies TokenSchema;
 
-/**
- * The font list: its own pin and the server's fonts' fingerprint, which lists
- * the server's fonts beside the document's.
- */
+/** The font list: its own pin. It lists the server's fonts too, which its engine value names. */
 export const FontsTokenSchema = {
-  fields: ['fontsVersion', 'serverFonts'],
+  fields: ['engine', 'fontsVersion', 'shape'],
 } as const satisfies TokenSchema;
 
 /**
@@ -79,11 +76,20 @@ export const AnalysisTokenSchema = {
   // `policy`: the judging policy version the caller expects — part of the
   // cache key, so a policy bump never serves a verdict judged under another
   // policy.
-  fields: ['docVersion', 'since.signature', 'since.revision', 'level', 'policy', 'detail'],
+  fields: [
+    'docVersion',
+    'engine',
+    'since.signature',
+    'since.revision',
+    'level',
+    'policy',
+    'detail',
+    'shape',
+  ],
 } as const;
 
 export const DownloadTokenSchema = {
-  fields: ['docVersion', 'mode'],
+  fields: ['docVersion', 'engine', 'mode', 'shape'],
   maxLength: 128,
 } as const satisfies TokenSchema;
 
@@ -107,10 +113,11 @@ export const RenderTokenSchema = {
     'annotationVersion',
     'background',
     'contentVersion',
+    'engine',
     'format',
     'quality',
     'rotation',
-    'serverFonts',
+    'shape',
     'target.kind',
     'target.rect.height',
     'target.rect.width',
@@ -136,8 +143,8 @@ export const RenderTokenSchema = {
  */
 export const SearchTokenSchema = {
   fields: [
+    'engine',
     'epoch',
-    'format',
     'from',
     'ignoreWhitespace',
     'limitMatches',
@@ -146,6 +153,7 @@ export const SearchTokenSchema = {
     'matchDiacritics',
     'q',
     'regex',
+    'shape',
     'skip',
     'wholeWord',
   ],
@@ -164,11 +172,12 @@ export const SearchTokenSchema = {
 export const AnnotationAppearancesRenderTokenSchema = {
   fields: [
     'annotationVersion',
+    'engine',
     'format',
     'modes',
     'quality',
     'rotation',
-    'serverFonts',
+    'shape',
     'viewport.kind',
     'viewport.scale',
     'viewport.width',
@@ -183,11 +192,12 @@ export const AnnotationAppearancesRenderTokenSchema = {
  */
 export const WidgetAppearancesRenderTokenSchema = {
   fields: [
+    'engine',
     'format',
     'modes',
     'quality',
     'rotation',
-    'serverFonts',
+    'shape',
     'viewport.kind',
     'viewport.scale',
     'viewport.width',

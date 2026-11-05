@@ -35,6 +35,7 @@ import {
 } from '../src/index';
 import { buildAppForTesting } from '../src/app/buildApp';
 import { createValidTestLicenseGate } from '../src/licensing/testing';
+import { pinOf } from './_helpers/pins';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixturePath = resolve(
@@ -542,6 +543,7 @@ describe('digital signatures over the wire (native runtime)', () => {
     const tokenFor = (policyVersion: number) =>
       encodeAnalysisToken({
         docVersion: manifest.docVersion,
+        pin: pinOf('analysis'),
         since: { signatureIndex: 0 },
         policyVersion,
       });

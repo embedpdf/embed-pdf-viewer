@@ -15,7 +15,9 @@ import {
   encodeSearchToken,
   wirePaths,
   type SearchToken,
+  tokenPinOf,
 } from '@embedpdf/engine-core/wire';
+import type { CloudManifest } from './CloudDocumentHandle';
 
 import type { ManifestAccessor } from './CloudDocumentHandle';
 import type { HttpClient } from '../transport/HttpClient';
@@ -99,9 +101,10 @@ export class CloudDocumentSearchService implements DocumentSearchService {
         }
       }
 
-      const mint = (epoch: string) =>
+      const mint = (current: CloudManifest) =>
         encodeSearchToken({
-          epoch,
+          pin: tokenPinOf('search', current.engine),
+          epoch: searchContentEpoch(current),
           query,
           ...(from !== undefined ? { from } : {}),
           skip: 0,
@@ -109,13 +112,13 @@ export class CloudDocumentSearchService implements DocumentSearchService {
         });
       try {
         const manifest = await this.manifest.get(signal);
-        return await get(mint(searchContentEpoch(manifest)));
+        return await get(mint(manifest));
       } catch (err) {
         if (!EngineError.is(err, EngineErrorCode.NotFound)) throw err;
         // Our cached manifest is behind the layer — the standard
         // versioned-read retry: refresh once, re-mint, re-issue.
         const fresh = await this.manifest.refresh(signal);
-        return await get(mint(searchContentEpoch(fresh)));
+        return await get(mint(fresh));
       }
     });
   }

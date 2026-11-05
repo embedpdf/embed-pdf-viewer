@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
-import { serverFontsFingerprint } from '../src/services/ServerFonts';
 import {
   createAnnotation,
   docToken,
@@ -11,11 +10,11 @@ import {
   type Replica,
   type ReplicaCluster,
 } from './_helpers/two-replica-harness';
+import { ENGINE } from './_helpers/pins';
 
 const TENANT = 'tenant-pinned';
 const DOC = 'docpinned001';
 const LAYER = 'alice';
-const SERVER_FONTS = serverFontsFingerprint([], []);
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 interface LayerPins {
@@ -36,7 +35,7 @@ const ANNOTATION_PINNED_READS: ReadonlyArray<{
     name: 'the page drawn with its annotations',
     path: (pins) =>
       `render/annotations/pages/obj:1/data@annotationVersion=${pins.page.annotationVersion},` +
-      `contentVersion=${pins.page.contentVersion},format=webp,serverFonts=${SERVER_FONTS},` +
+      `contentVersion=${pins.page.contentVersion},engine=${ENGINE.render},format=webp,shape=1,` +
       'viewport.kind=width,viewport.width=320',
     jobs: ['pages.render', 'pages.renderEncoded'],
   },
@@ -44,18 +43,21 @@ const ANNOTATION_PINNED_READS: ReadonlyArray<{
     name: "the page's annotation appearances",
     path: (pins) =>
       `annotations/pages/obj:1/appearances@annotationVersion=${pins.page.annotationVersion},` +
-      `format=webp,serverFonts=${SERVER_FONTS},viewport.kind=scale,viewport.scale=1`,
+      `engine=${ENGINE.annotationAppearances},format=webp,shape=1,viewport.kind=scale,viewport.scale=1`,
     jobs: ['annotations.renderAppearances', 'annotations.renderAppearancesEncoded'],
   },
   {
     name: "the page's annotations",
     path: (pins) =>
-      `annotations/pages/obj:1/items@annotationVersion=${pins.page.annotationVersion}`,
+      `annotations/pages/obj:1/items@annotationVersion=${pins.page.annotationVersion},` +
+      `engine=${ENGINE.annotations},shape=1`,
     jobs: ['annotations.list'],
   },
   {
     name: "the document's annotations",
-    path: (pins) => `annotations/items@annotationsVersion=${pins.annotationsVersion}`,
+    path: (pins) =>
+      `annotations/items@annotationsVersion=${pins.annotationsVersion},` +
+      `engine=${ENGINE.annotationsAll},shape=1`,
     jobs: ['annotations.list'],
   },
 ];
@@ -168,7 +170,10 @@ describe('pinned reads under concurrent layer writes', () => {
 
     // Page text is pinned to the page's content, which an annotation write
     // leaves alone: the read waits for the write and is answered.
-    const response = pinnedGet(`text/pages/obj:1/data@contentVersion=${pins.page.contentVersion}`);
+    const response = pinnedGet(
+      `text/pages/obj:1/data@contentVersion=${pins.page.contentVersion},` +
+        `engine=${ENGINE.text},shape=1`,
+    );
     await sleep(100);
     upload.release();
 
@@ -182,7 +187,8 @@ describe('pinned reads under concurrent layer writes', () => {
     const pins = await layerPins();
     const reading = holdNextRead(replica, ['annotations.list']);
     const response = pinnedGet(
-      `annotations/pages/obj:1/items@annotationVersion=${pins.page.annotationVersion}`,
+      `annotations/pages/obj:1/items@annotationVersion=${pins.page.annotationVersion},` +
+        `engine=${ENGINE.annotations},shape=1`,
     );
     await reading.held;
 

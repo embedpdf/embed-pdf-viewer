@@ -6,7 +6,13 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { signDevToken } from '@cloudpdf/server';
 import { toPageRef, type DocumentManifest, type FontList } from '@embedpdf/engine-core/runtime';
-import { renderImageOptionsToWire, wirePaths } from '@embedpdf/engine-core/wire';
+import {
+  renderImageOptionsToWire,
+  SHAPES,
+  tokenPinOf,
+  wirePaths,
+  type EngineValues,
+} from '@embedpdf/engine-core/wire';
 import {
   buildDbSeededFixture,
   docScopedToken,
@@ -27,7 +33,8 @@ const sha256 = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest(
 
 const TENANT_ID = 'cloud-font-routes-tenant';
 const DOC_ID = 'font-routes';
-const OTHER_FONTS = '0123456789abcdef';
+/** An engine value another server could have. */
+const OTHER_ENGINE = '0123456789ab';
 
 let fx: DbSeededFixture;
 let fontDir: string;
@@ -87,30 +94,43 @@ const reader = () =>
 const get = (path: string, token: string) =>
   fetch(`${fx.baseUrl}${path}`, { headers: { authorization: `Bearer ${token}` } });
 
-async function manifest(): Promise<DocumentManifest> {
+/** The manifest, and the engine values of the `/head` it was read after. */
+async function manifest(): Promise<DocumentManifest & { engine: EngineValues }> {
   const head = (await (await get(wirePaths.layerHead(DOC_ID, 'default'), writer())).json()) as {
     docVersion: number;
+    engine: EngineValues;
   };
-  const response = await get(wirePaths.layerManifest(DOC_ID, 'default', head.docVersion), writer());
-  return (await response.json()) as DocumentManifest;
+  const response = await get(
+    wirePaths.layerManifest(
+      DOC_ID,
+      'default',
+      head.docVersion,
+      tokenPinOf('manifest', head.engine),
+    ),
+    writer(),
+  );
+  return { ...((await response.json()) as DocumentManifest), engine: head.engine };
 }
 
 describe('the server’s font routes', () => {
-  test('the list caches like every pinned read; another server’s fonts are not this list', async () => {
+  test('the list caches like every pinned read; one for another server’s fonts is answered uncached', async () => {
     const current = await manifest();
-    expect(current.serverFonts).toMatch(/^[0-9a-f]{16}$/);
-    const token = { fontsVersion: current.fontsVersion, serverFonts: current.serverFonts };
+    const token = { fontsVersion: current.fontsVersion, pin: tokenPinOf('fonts', current.engine) };
     const list = await get(wirePaths.layerFonts(DOC_ID, 'default', token), writer());
     expect(list.status).toBe(200);
     // No CDN in front of this server: only the caller's browser may keep it.
     expect(list.headers.get('cache-control')).toBe('private, max-age=31536000, immutable');
 
     const elsewhere = await get(
-      wirePaths.layerFonts(DOC_ID, 'default', { ...token, serverFonts: OTHER_FONTS }),
+      wirePaths.layerFonts(DOC_ID, 'default', {
+        ...token,
+        pin: { ...token.pin, engine: OTHER_ENGINE },
+      }),
       writer(),
     );
-    expect(elsewhere.status).toBe(404);
+    expect(elsewhere.status).toBe(200);
     expect(elsewhere.headers.get('cache-control')).toBe('private, no-store');
+    expect(elsewhere.headers.get('embedpdf-engine')).toBe(current.engine.fonts);
   });
 
   test('a font the server keeps to itself is listed and written with, never sent', async () => {
@@ -119,7 +139,7 @@ describe('the server’s font routes', () => {
       await get(
         wirePaths.layerFonts(DOC_ID, 'default', {
           fontsVersion: current.fontsVersion,
-          serverFonts: current.serverFonts,
+          pin: tokenPinOf('fonts', current.engine),
         }),
         writer(),
       )
@@ -150,10 +170,10 @@ describe('the server’s font routes', () => {
     }
   });
 
-  test('a picture drawn with other server fonts is not this server’s', async () => {
+  test('a picture for another server’s fonts is drawn with this one’s, uncached', async () => {
     const current = await manifest();
     const page = current.pages[0]!;
-    const picture = (serverFonts: string) =>
+    const picture = (engine: string) =>
       wirePaths.layerPageRender(
         DOC_ID,
         'default',
@@ -161,12 +181,15 @@ describe('the server’s font routes', () => {
         toPageRef(page.page.objectNumber),
         renderImageOptionsToWire(
           { format: 'webp', viewport: { kind: 'width', width: 64 } },
-          { contentVersion: page.cache.contentVersion, serverFonts },
+          { contentVersion: page.cache.contentVersion, pin: { engine, shape: SHAPES.render } },
         ),
       );
-    expect((await get(picture(current.serverFonts), writer())).status).toBe(200);
-    const elsewhere = await get(picture(OTHER_FONTS), writer());
-    expect(elsewhere.status).toBe(404);
+    const own = await get(picture(current.engine.render!), writer());
+    expect(own.status).toBe(200);
+    expect(own.headers.get('cache-control')).toBe('private, max-age=31536000, immutable');
+    const elsewhere = await get(picture(OTHER_ENGINE), writer());
+    expect(elsewhere.status).toBe(200);
     expect(elsewhere.headers.get('cache-control')).toBe('private, no-store');
+    expect(elsewhere.headers.get('embedpdf-engine')).toBe(current.engine.render);
   });
 });

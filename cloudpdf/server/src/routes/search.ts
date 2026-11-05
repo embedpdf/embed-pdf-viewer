@@ -9,7 +9,12 @@ import {
   type SearchLimit,
   type WorkerJobId,
 } from '@embedpdf/engine-core/runtime';
-import { decodeSearchToken, encodeSearchToken } from '@embedpdf/engine-core/wire';
+import {
+  decodeSearchToken,
+  encodeSearchToken,
+  SHAPES,
+  type TokenPin,
+} from '@embedpdf/engine-core/wire';
 import { requireLayerDocAccessOnly, requireLayerResource } from '../app/jwt-plugin';
 import type { DocumentService, OpenContext } from '../services/DocumentService';
 import {
@@ -28,6 +33,8 @@ interface SearchRouteDeps {
 interface SearchGetState {
   /** Content epoch the caller pinned; absent on the unversioned form. */
   epoch?: string;
+  /** The token's engine value and shape; absent on the unversioned form. */
+  pin?: TokenPin;
   query: SearchQuery;
   /** The scan origin, by page object number. */
   from?: number;
@@ -161,10 +168,16 @@ async function runSearchSlice(
       }
       return result.slice;
     },
-    pinned: versioned,
+    token: state.pin && { kind: 'search', pin: state.pin },
   });
 
   versioned ? setImmutableCache(reply) : setNoStore(reply);
+  // A cursor names this server's own engine value: the next slice is this
+  // server's to answer.
+  const cursorPin = {
+    engine: await documentService.engineValues.of('search'),
+    shape: SHAPES.search,
+  };
   return {
     ...slice,
     // The worker's session cursor never crosses the wire — continuation
@@ -173,6 +186,7 @@ async function runSearchSlice(
       slice.nextCursor === null
         ? null
         : encodeSearchToken({
+            pin: cursorPin,
             epoch,
             query: state.query,
             ...(state.from !== undefined ? { from: state.from } : {}),

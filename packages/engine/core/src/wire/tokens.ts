@@ -31,15 +31,18 @@ import type { AnnotationExportSelection } from '../transfer/exportSelection';
 import type { FormExportSelection } from '../transfer/formExport';
 import type { ModificationLevel } from '../signature/types';
 import type { SearchLimit, SearchQuery } from '../search/types';
+import type { TokenPin } from './cachedReads';
 
 export interface DownloadToken {
   docVersion: number;
   mode: PdfSaveMode;
+  pin: TokenPin;
 }
 
 /** The layer analysis token: the pin plus the flat `AnalyzeInput` (until = the working copy). */
 export interface AnalysisToken {
   docVersion: number;
+  pin: TokenPin;
   since: { signatureIndex: number } | { revisionIndex: number };
   exploratoryLevel?: ModificationLevel;
   /** The judging policy version the caller expects (`SIGNATURE_POLICY_VERSION`); keys the cache. */
@@ -50,6 +53,7 @@ export interface AnalysisToken {
 
 export const encodeAnalysisToken = (input: AnalysisToken): string =>
   encodeToken(AnalysisTokenSchema, {
+    ...pinFields(input.pin),
     docVersion: input.docVersion,
     'since.signature': 'signatureIndex' in input.since ? input.since.signatureIndex : undefined,
     'since.revision': 'revisionIndex' in input.since ? input.since.revisionIndex : undefined,
@@ -67,6 +71,7 @@ export const decodeAnalysisToken = (raw: string): AnalysisToken => {
   }
   return {
     docVersion: decodePositiveInteger(t.docVersion, 'docVersion'),
+    pin: decodePin(t),
     since:
       sinceSignature !== undefined
         ? { signatureIndex: decodeNonNegativeInteger(sinceSignature, 'since.signature') }
@@ -99,61 +104,80 @@ function decodeNonNegativeInteger(raw: string | undefined, field: string): numbe
   return Number(raw);
 }
 
-export const encodeDocToken = (docVersion: number): string =>
-  encodeToken(DocTokenSchema, { docVersion });
-export const decodeDocToken = (raw: string): number =>
-  decodePositiveInteger(decodeToken(DocTokenSchema, raw).docVersion, 'docVersion');
+export const encodeDocToken = (docVersion: number, pin: TokenPin): string =>
+  encodeToken(DocTokenSchema, { docVersion, ...pinFields(pin) });
+export const decodeDocToken = (raw: string): { docVersion: number; pin: TokenPin } => {
+  const t = decodeToken(DocTokenSchema, raw);
+  return { docVersion: decodePositiveInteger(t.docVersion, 'docVersion'), pin: decodePin(t) };
+};
 
-export const encodeContentToken = (contentVersion: number): string =>
-  encodeToken(ContentTokenSchema, { contentVersion });
-export const decodeContentToken = (raw: string): number =>
-  decodePositiveInteger(decodeToken(ContentTokenSchema, raw).contentVersion, 'contentVersion');
+export const encodeContentToken = (contentVersion: number, pin: TokenPin): string =>
+  encodeToken(ContentTokenSchema, { contentVersion, ...pinFields(pin) });
+export const decodeContentToken = (raw: string): { contentVersion: number; pin: TokenPin } => {
+  const t = decodeToken(ContentTokenSchema, raw);
+  return {
+    contentVersion: decodePositiveInteger(t.contentVersion, 'contentVersion'),
+    pin: decodePin(t),
+  };
+};
 
-/**
- * The shape of the page list a layout read answers with, in its token: an
- * answer is cached for good under its URL, so a client asks for the shape it
- * reads, and an answer cached before the shape changed is never read as this
- * one. 2: with the page label sections (`labels`). The server answers every
- * format with the current shape.
- */
-export const LAYOUT_FORMAT = 2;
+export const encodeLayoutToken = (layoutVersion: number, pin: TokenPin): string =>
+  encodeToken(LayoutTokenSchema, { layoutVersion, ...pinFields(pin) });
+export const decodeLayoutToken = (raw: string): { layoutVersion: number; pin: TokenPin } => {
+  const t = decodeToken(LayoutTokenSchema, raw);
+  return {
+    layoutVersion: decodePositiveInteger(t.layoutVersion, 'layoutVersion'),
+    pin: decodePin(t),
+  };
+};
 
-export const encodeLayoutToken = (layoutVersion: number): string =>
-  encodeToken(LayoutTokenSchema, { layoutVersion, format: LAYOUT_FORMAT });
-export const decodeLayoutToken = (raw: string): number =>
-  decodePositiveInteger(decodeToken(LayoutTokenSchema, raw).layoutVersion, 'layoutVersion');
+export const encodeMetadataToken = (metadataVersion: number, pin: TokenPin): string =>
+  encodeToken(MetadataTokenSchema, { metadataVersion, ...pinFields(pin) });
+export const decodeMetadataToken = (raw: string): { metadataVersion: number; pin: TokenPin } => {
+  const t = decodeToken(MetadataTokenSchema, raw);
+  return {
+    metadataVersion: decodePositiveInteger(t.metadataVersion, 'metadataVersion'),
+    pin: decodePin(t),
+  };
+};
 
-export const encodeMetadataToken = (metadataVersion: number): string =>
-  encodeToken(MetadataTokenSchema, { metadataVersion });
-export const decodeMetadataToken = (raw: string): number =>
-  decodePositiveInteger(decodeToken(MetadataTokenSchema, raw).metadataVersion, 'metadataVersion');
+export const encodeAnnotationToken = (annotationVersion: number, pin: TokenPin): string =>
+  encodeToken(AnnotationTokenSchema, { annotationVersion, ...pinFields(pin) });
+export const decodeAnnotationToken = (
+  raw: string,
+): { annotationVersion: number; pin: TokenPin } => {
+  const t = decodeToken(AnnotationTokenSchema, raw);
+  return {
+    annotationVersion: decodePositiveInteger(t.annotationVersion, 'annotationVersion'),
+    pin: decodePin(t),
+  };
+};
 
-export const encodeAnnotationToken = (annotationVersion: number): string =>
-  encodeToken(AnnotationTokenSchema, { annotationVersion });
-export const decodeAnnotationToken = (raw: string): number =>
-  decodePositiveInteger(
-    decodeToken(AnnotationTokenSchema, raw).annotationVersion,
-    'annotationVersion',
-  );
+export const encodeAnnotationsAllToken = (annotationsVersion: number, pin: TokenPin): string =>
+  encodeToken(AnnotationsAllTokenSchema, { annotationsVersion, ...pinFields(pin) });
+export const decodeAnnotationsAllToken = (
+  raw: string,
+): { annotationsVersion: number; pin: TokenPin } => {
+  const t = decodeToken(AnnotationsAllTokenSchema, raw);
+  return {
+    annotationsVersion: decodePositiveInteger(t.annotationsVersion, 'annotationsVersion'),
+    pin: decodePin(t),
+  };
+};
 
-export const encodeAnnotationsAllToken = (annotationsVersion: number): string =>
-  encodeToken(AnnotationsAllTokenSchema, { annotationsVersion });
-export const decodeAnnotationsAllToken = (raw: string): number =>
-  decodePositiveInteger(
-    decodeToken(AnnotationsAllTokenSchema, raw).annotationsVersion,
-    'annotationsVersion',
-  );
-
-export const encodeFormToken = (formsVersion: number): string =>
-  encodeToken(FormTokenSchema, { formsVersion });
-export const decodeFormToken = (raw: string): number =>
-  decodePositiveInteger(decodeToken(FormTokenSchema, raw).formsVersion, 'formsVersion');
+export const encodeFormToken = (formsVersion: number, pin: TokenPin): string =>
+  encodeToken(FormTokenSchema, { formsVersion, ...pinFields(pin) });
+export const decodeFormToken = (raw: string): { formsVersion: number; pin: TokenPin } => {
+  const t = decodeToken(FormTokenSchema, raw);
+  return { formsVersion: decodePositiveInteger(t.formsVersion, 'formsVersion'), pin: decodePin(t) };
+};
 
 /** What a `doc.annotations.export` leaf is: two pins and a selection. */
 export interface AnnotationsExportToken {
   annotationsVersion: number;
   layoutVersion: number;
   selection: AnnotationExportSelection;
+  pin: TokenPin;
 }
 
 /** A selection as the token holds it: pages by object number, refs as `[page, annotKey]` (`obj:42`, `base:2`). */
@@ -179,6 +203,7 @@ export const encodeAnnotationsExportToken = (token: AnnotationsExportToken): str
     wire.r = [...refs.keys()].sort().map((key) => refs.get(key)!);
   }
   return encodeToken(AnnotationsExportTokenSchema, {
+    ...pinFields(token.pin),
     annotationsVersion: token.annotationsVersion,
     layoutVersion: token.layoutVersion,
     include: selection.include === 'references' ? 'references' : undefined,
@@ -223,6 +248,7 @@ export const decodeAnnotationsExportToken = (raw: string): AnnotationsExportToke
     annotationsVersion: decodePositiveInteger(query.annotationsVersion, 'annotationsVersion'),
     layoutVersion: decodePositiveInteger(query.layoutVersion, 'layoutVersion'),
     selection,
+    pin: decodePin(query),
   };
 };
 
@@ -231,6 +257,7 @@ export interface FormExportToken {
   formsVersion: number;
   layoutVersion: number;
   selection: FormExportSelection;
+  pin: TokenPin;
 }
 
 /** A form selection as the token holds it: pages by object number, fields by key (`obj:12`, `fqn:a.b`). */
@@ -249,6 +276,7 @@ export const encodeFormExportToken = (token: FormExportToken): string => {
   }
   if (selection.fields) wire.f = [...new Set(selection.fields.map(encodeFieldRefKey))].sort();
   return encodeToken(FormExportTokenSchema, {
+    ...pinFields(token.pin),
     formsVersion: token.formsVersion,
     layoutVersion: token.layoutVersion,
     selection: wire.p || wire.f ? encodeTokenText(JSON.stringify(wire)) : undefined,
@@ -282,22 +310,30 @@ export const decodeFormExportToken = (raw: string): FormExportToken => {
     formsVersion: decodePositiveInteger(query.formsVersion, 'formsVersion'),
     layoutVersion: decodePositiveInteger(query.layoutVersion, 'layoutVersion'),
     selection,
+    pin: decodePin(query),
   };
 };
 
-export const encodeActionsToken = (actionsVersion: number): string =>
-  encodeToken(ActionsTokenSchema, { actionsVersion });
-export const decodeActionsToken = (raw: string): number =>
-  decodePositiveInteger(decodeToken(ActionsTokenSchema, raw).actionsVersion, 'actionsVersion');
+export const encodeActionsToken = (actionsVersion: number, pin: TokenPin): string =>
+  encodeToken(ActionsTokenSchema, { actionsVersion, ...pinFields(pin) });
+export const decodeActionsToken = (raw: string): { actionsVersion: number; pin: TokenPin } => {
+  const t = decodeToken(ActionsTokenSchema, raw);
+  return {
+    actionsVersion: decodePositiveInteger(t.actionsVersion, 'actionsVersion'),
+    pin: decodePin(t),
+  };
+};
 
 /** What an outline leaf is: the outline's pin and the layout's. */
 export interface OutlineToken {
   outlineVersion: number;
   layoutVersion: number;
+  pin: TokenPin;
 }
 
 export const encodeOutlineToken = (token: OutlineToken): string =>
   encodeToken(OutlineTokenSchema, {
+    ...pinFields(token.pin),
     layoutVersion: token.layoutVersion,
     outlineVersion: token.outlineVersion,
   });
@@ -306,47 +342,50 @@ export const decodeOutlineToken = (raw: string): OutlineToken => {
   return {
     outlineVersion: decodePositiveInteger(query.outlineVersion, 'outlineVersion'),
     layoutVersion: decodePositiveInteger(query.layoutVersion, 'layoutVersion'),
+    pin: decodePin(query),
   };
 };
 
-/** What a font list is: the document's fonts' pin and the server's fonts' fingerprint. */
+/** What a font list is: the document's fonts' pin. */
 export interface FontsToken {
   fontsVersion: number;
-  serverFonts: string;
+  pin: TokenPin;
 }
 
 export const encodeFontsToken = (token: FontsToken): string =>
-  encodeToken(FontsTokenSchema, {
-    fontsVersion: token.fontsVersion,
-    serverFonts: token.serverFonts,
-  });
+  encodeToken(FontsTokenSchema, { fontsVersion: token.fontsVersion, ...pinFields(token.pin) });
 export const decodeFontsToken = (raw: string): FontsToken => {
   const query = decodeToken(FontsTokenSchema, raw);
-  const serverFonts = query.serverFonts;
-  if (serverFonts === undefined || !/^[0-9a-f]{1,64}$/.test(serverFonts)) {
-    throw new Error('token field "serverFonts" must be a hex fingerprint');
-  }
   return {
     fontsVersion: decodePositiveInteger(query.fontsVersion, 'fontsVersion'),
-    serverFonts,
+    pin: decodePin(query),
   };
 };
 
-export const encodeAttachmentsToken = (attachmentsVersion: number): string =>
-  encodeToken(AttachmentsTokenSchema, { attachmentsVersion });
-export const decodeAttachmentsToken = (raw: string): number =>
-  decodePositiveInteger(
-    decodeToken(AttachmentsTokenSchema, raw).attachmentsVersion,
-    'attachmentsVersion',
-  );
+export const encodeAttachmentsToken = (attachmentsVersion: number, pin: TokenPin): string =>
+  encodeToken(AttachmentsTokenSchema, { attachmentsVersion, ...pinFields(pin) });
+export const decodeAttachmentsToken = (
+  raw: string,
+): { attachmentsVersion: number; pin: TokenPin } => {
+  const t = decodeToken(AttachmentsTokenSchema, raw);
+  return {
+    attachmentsVersion: decodePositiveInteger(t.attachmentsVersion, 'attachmentsVersion'),
+    pin: decodePin(t),
+  };
+};
 
 export const encodeDownloadToken = (input: DownloadToken): string =>
-  encodeToken(DownloadTokenSchema, { docVersion: input.docVersion, mode: input.mode });
+  encodeToken(DownloadTokenSchema, {
+    docVersion: input.docVersion,
+    mode: input.mode,
+    ...pinFields(input.pin),
+  });
 export const decodeDownloadToken = (raw: string): DownloadToken => {
   const decoded = decodeToken(DownloadTokenSchema, raw);
   return {
     docVersion: decodePositiveInteger(decoded.docVersion, 'docVersion'),
     mode: decodePdfSaveMode(decoded.mode),
+    pin: decodePin(decoded),
   };
 };
 
@@ -406,23 +445,14 @@ export interface SearchToken {
   from?: number;
   skip: number;
   limit?: SearchLimit;
+  pin: TokenPin;
 }
-
-/**
- * The search result representation this client speaks — part of the token
- * (and therefore the versioned URL), so a response-shape change can never
- * serve a stale CDN body to a newer client: new tokens are new cache keys,
- * and old tokens fail decode on new servers. Deliberately always encoded —
- * an exception to the omit-defaults rule, because its entire job is to
- * change the token bytes when the format changes.
- */
-export const SEARCH_RESULT_FORMAT = 'ranges1';
 
 export const encodeSearchToken = (input: SearchToken): string => {
   const q = input.query;
   return encodeToken(SearchTokenSchema, {
+    ...pinFields(input.pin),
     epoch: input.epoch,
-    format: SEARCH_RESULT_FORMAT,
     q: encodeTokenText(q.text),
     // Canonical keys: every default is omitted, never encoded as false/0.
     regex: q.regex ? true : undefined,
@@ -441,12 +471,6 @@ export const decodeSearchToken = (raw: string): SearchToken => {
   const t = decodeToken(SearchTokenSchema, raw);
   if (t.epoch === undefined) throw new Error('search token is missing "epoch"');
   if (t.q === undefined) throw new Error('search token is missing "q"');
-  if (t.format !== SEARCH_RESULT_FORMAT) {
-    throw new Error(
-      `search token has unsupported result format "${t.format ?? 'legacy'}" ` +
-        `(expected "${SEARCH_RESULT_FORMAT}")`,
-    );
-  }
   const query: SearchQuery = {
     text: decodeTokenText(t.q),
     ...(t.regex === 'true' ? { regex: true } : {}),
@@ -463,6 +487,7 @@ export const decodeSearchToken = (raw: string): SearchToken => {
       : decodePositiveInteger(t.limitMatches, 'limitMatches');
   return {
     epoch: t.epoch,
+    pin: decodePin(t),
     query,
     ...(t.from === undefined ? {} : { from: decodePositiveInteger(t.from, 'from') }),
     skip: t.skip === undefined ? 0 : decodePositiveInteger(t.skip, 'skip'),
@@ -515,6 +540,17 @@ export function decodeTokenText(encoded: string): string {
     }
   }
   return new TextDecoder('utf-8', { fatal: true }).decode(Uint8Array.from(bytes));
+}
+
+/** A pin as token fields. */
+function pinFields(pin: TokenPin): { engine: string; shape: number } {
+  return { engine: pin.engine, shape: pin.shape };
+}
+
+/** The pin every cached read's token carries. */
+function decodePin(query: TokenQuery): TokenPin {
+  if (query.engine === undefined) throw new Error('token is missing "engine"');
+  return { engine: query.engine, shape: decodePositiveInteger(query.shape, 'shape') };
 }
 
 function decodePositiveInteger(raw: string | undefined, field: string): number {

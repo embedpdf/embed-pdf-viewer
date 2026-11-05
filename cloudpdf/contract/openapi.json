@@ -29457,6 +29457,13 @@
             },
             "required": ["required", "reasons"],
             "additionalProperties": false
+          },
+          "engine": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9.-]+$"
+            }
           }
         },
         "required": [
@@ -29467,7 +29474,8 @@
           "state",
           "encryption",
           "permissions",
-          "access"
+          "access",
+          "engine"
         ],
         "additionalProperties": false
       },
@@ -29527,9 +29535,6 @@
             "exclusiveMinimum": true,
             "minimum": 0,
             "default": 1
-          },
-          "serverFonts": {
-            "type": "string"
           },
           "auditHead": {
             "type": "integer",
@@ -29723,7 +29728,6 @@
           "docVersion",
           "layoutVersion",
           "metadataVersion",
-          "serverFonts",
           "auditHead",
           "baseSha",
           "protection",

@@ -3,7 +3,7 @@ import type { AnnotationRef } from '../../src/identity/AnnotationRef';
 import { toPageRef } from '../../src/identity/PageRef';
 import { decodeAnnotationsExportToken, encodeAnnotationsExportToken } from '../../src/wire/tokens';
 
-const pins = { annotationsVersion: 4, layoutVersion: 2 };
+const pins = { annotationsVersion: 4, layoutVersion: 2, pin: { engine: 'e1', shape: 1 } };
 const page = toPageRef(3);
 const byNumber = (annotObjectNumber: number): AnnotationRef => ({
   kind: 'objectNumber',
@@ -14,7 +14,7 @@ const byNumber = (annotObjectNumber: number): AnnotationRef => ({
 describe('the annotation export token', () => {
   test('is the two pins alone for the whole document with its threads', () => {
     expect(encodeAnnotationsExportToken({ ...pins, selection: {} })).toBe(
-      'annotationsVersion=4,layoutVersion=2',
+      'annotationsVersion=4,engine=e1,layoutVersion=2,shape=1',
     );
   });
 

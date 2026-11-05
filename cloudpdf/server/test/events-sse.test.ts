@@ -21,6 +21,7 @@ import { buildAppForTesting } from '../src/app/buildApp';
 import { InProcessRealtimeBus } from '../src/realtime/RealtimeBus';
 import { createValidTestLicenseGate } from '../src/licensing/testing';
 import { appliedResult, postChange } from './_helpers/changes';
+import { ENGINE } from './_helpers/pins';
 
 const STUB_ENTRY = new URL('./_helpers/stub-worker-entry.cjs', import.meta.url);
 const SECRET = 'events-sse-secret';
@@ -367,7 +368,7 @@ describe('GET /events — the SSE half of the document event stream', () => {
     const token = docToken(tenantId, docId, layerName);
 
     const before = await fetch(
-      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/manifest@docVersion=1`,
+      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/manifest@docVersion=1,engine=${ENGINE.manifest},shape=1`,
       { headers: { Authorization: `Bearer ${token}` } },
     );
     expect(before.status).toBe(200);
@@ -380,7 +381,7 @@ describe('GET /events — the SSE half of the document event stream', () => {
     );
 
     const after = await fetch(
-      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/manifest@docVersion=2`,
+      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/manifest@docVersion=2,engine=${ENGINE.manifest},shape=1`,
       { headers: { Authorization: `Bearer ${token}` } },
     );
     expect(after.status).toBe(200);

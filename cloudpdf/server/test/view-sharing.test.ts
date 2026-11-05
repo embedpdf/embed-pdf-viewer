@@ -22,6 +22,7 @@ import type { CdnSigner, SignInput } from '../src/cdn/CdnSigner';
 import { createValidTestLicenseGate } from '../src/licensing/testing';
 import { appliedResult, postChange, type ChangeTarget } from './_helpers/changes';
 import { serverFontsFingerprint } from '../src/services/ServerFonts';
+import { ENGINE } from './_helpers/pins';
 
 /** The stub worker's server fonts: it registers none. */
 const SERVER_FONTS = serverFontsFingerprint([], []);
@@ -40,11 +41,11 @@ const STUB_ENTRY = new URL('./_helpers/stub-worker-entry.cjs', import.meta.url);
 const SECRET = 'view-sharing-secret';
 
 /** Canonical lattice token: durable read-through → countable single render. */
-const W320_TOKEN = `background=white,contentVersion=1,format=webp,serverFonts=${SERVER_FONTS},viewport.kind=width,viewport.width=320`;
+const W320_TOKEN = `background=white,contentVersion=1,engine=${ENGINE.render},format=webp,shape=1,viewport.kind=width,viewport.width=320`;
 /** The picture with annotations: its own path (`/render/annotations/…`), its own pins. */
-const W320_ANNOTATIONS_TOKEN = `annotationVersion=1,background=white,contentVersion=1,format=webp,serverFonts=${SERVER_FONTS},viewport.kind=width,viewport.width=320`;
+const W320_ANNOTATIONS_TOKEN = `annotationVersion=1,background=white,contentVersion=1,engine=${ENGINE.render},format=webp,shape=1,viewport.kind=width,viewport.width=320`;
 /** The picture with form fields (`/render/fields/…`). */
-const W320_FIELDS_TOKEN = `background=white,contentVersion=1,format=webp,serverFonts=${SERVER_FONTS},viewport.kind=width,viewport.width=320,widgetVersion=1`;
+const W320_FIELDS_TOKEN = `background=white,contentVersion=1,engine=${ENGINE.render},format=webp,shape=1,viewport.kind=width,viewport.width=320,widgetVersion=1`;
 
 const ALL_BASE = {
   content: 'base',
@@ -100,13 +101,13 @@ describe('plane-scoped view sharing', () => {
     }
 
     const sharedReads = [
-      `/v1/docs/${docId}/layout@layoutVersion=1`,
-      `/v1/docs/${docId}/annotations/pages/obj:1/items@annotationVersion=1`,
+      `/v1/docs/${docId}/layout@engine=${ENGINE.layout},layoutVersion=1,shape=1`,
+      `/v1/docs/${docId}/annotations/pages/obj:1/items@annotationVersion=1,engine=${ENGINE.annotations},shape=1`,
       `/v1/docs/${docId}/render/pages/obj:1/data@${W320_TOKEN}`,
-      `/v1/docs/${docId}/text/pages/obj:1/data@contentVersion=1`,
-      `/v1/docs/${docId}/actions@actionsVersion=1`,
-      `/v1/docs/${docId}/metadata@metadataVersion=1`,
-      `/v1/docs/${docId}/metadata/custom@metadataVersion=1`,
+      `/v1/docs/${docId}/text/pages/obj:1/data@contentVersion=1,engine=${ENGINE.text},shape=1`,
+      `/v1/docs/${docId}/actions@actionsVersion=1,engine=${ENGINE.actions},shape=1`,
+      `/v1/docs/${docId}/metadata@engine=${ENGINE.metadata},metadataVersion=1,shape=1`,
+      `/v1/docs/${docId}/metadata/custom@engine=${ENGINE.metadata},metadataVersion=1,shape=1`,
     ];
     for (const path of sharedReads) {
       const a = await fetch(`${fx.baseUrl}${path}`, {
@@ -178,16 +179,19 @@ describe('plane-scoped view sharing', () => {
     expect((await fetch(render, { headers: aliceAuth })).status).toBe(200);
     expect(
       (
-        await fetch(`${fx.baseUrl}/v1/docs/${docId}/text/pages/obj:1/data@contentVersion=1`, {
-          headers: aliceAuth,
-        })
+        await fetch(
+          `${fx.baseUrl}/v1/docs/${docId}/text/pages/obj:1/data@contentVersion=1,engine=${ENGINE.text},shape=1`,
+          {
+            headers: aliceAuth,
+          },
+        )
       ).status,
     ).toBe(200);
 
     // Annotation-plane reads flip: shared paths refuse (404 → the SDK's
     // manifest-refresh rail), the layer path serves, and Bob's pristine
     // layer keeps sharing.
-    const sharedItems = `${fx.baseUrl}/v1/docs/${docId}/annotations/pages/obj:1/items@annotationVersion=1`;
+    const sharedItems = `${fx.baseUrl}/v1/docs/${docId}/annotations/pages/obj:1/items@annotationVersion=1,engine=${ENGINE.annotations},shape=1`;
     expect((await fetch(sharedItems, { headers: aliceAuth })).status).toBe(404);
     expect((await fetch(sharedItems, { headers: bobAuth })).status).toBe(200);
     expect(
@@ -230,7 +234,7 @@ describe('plane-scoped view sharing', () => {
     expect(
       (
         await fetch(
-          `${fx.baseUrl}/v1/docs/${docId}/annotations/pages/obj:1/items@annotationVersion=1`,
+          `${fx.baseUrl}/v1/docs/${docId}/annotations/pages/obj:1/items@annotationVersion=1,engine=${ENGINE.annotations},shape=1`,
           {
             headers: aliceAuth,
           },
@@ -241,30 +245,39 @@ describe('plane-scoped view sharing', () => {
     // The layout leaf itself is owned: shared path refused, layer path serves.
     expect(
       (
-        await fetch(`${fx.baseUrl}/v1/docs/${docId}/layout@layoutVersion=1`, {
-          headers: aliceAuth,
-        })
+        await fetch(
+          `${fx.baseUrl}/v1/docs/${docId}/layout@engine=${ENGINE.layout},layoutVersion=1,shape=1`,
+          {
+            headers: aliceAuth,
+          },
+        )
       ).status,
     ).toBe(404);
     expect(
       (
-        await fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/alice/layout@layoutVersion=2`, {
-          headers: aliceAuth,
-        })
+        await fetch(
+          `${fx.baseUrl}/v1/docs/${docId}/layers/alice/layout@engine=${ENGINE.layout},layoutVersion=2,shape=1`,
+          {
+            headers: aliceAuth,
+          },
+        )
       ).status,
     ).toBe(200);
     // Bob's pristine layer still shares the layout leaf.
     expect(
       (
-        await fetch(`${fx.baseUrl}/v1/docs/${docId}/layout@layoutVersion=1`, {
-          headers: auth(docToken(tenantId, docId, 'bob')),
-        })
+        await fetch(
+          `${fx.baseUrl}/v1/docs/${docId}/layout@engine=${ENGINE.layout},layoutVersion=1,shape=1`,
+          {
+            headers: auth(docToken(tenantId, docId, 'bob')),
+          },
+        )
       ).status,
     ).toBe(200);
 
     // The outline is read in page space (its targets name pages), so the base
     // outline needs the layout plane too: refused for alice, shared for bob.
-    const outline = `${fx.baseUrl}/v1/docs/${docId}/outline@layoutVersion=1,outlineVersion=1`;
+    const outline = `${fx.baseUrl}/v1/docs/${docId}/outline@engine=${ENGINE.outline},layoutVersion=1,outlineVersion=1,shape=1`;
     expect((await fetch(outline, { headers: aliceAuth })).status).toBe(404);
     expect((await fetch(outline, { headers: auth(docToken(tenantId, docId, 'bob')) })).status).toBe(
       200,
@@ -296,8 +309,8 @@ describe('plane-scoped view sharing', () => {
     const aliceAuth = auth(docToken(tenantId, docId, 'alice'));
     const bobAuth = auth(docToken(tenantId, docId, 'bob'));
     const render = `${fx.baseUrl}/v1/docs/${docId}/render/pages/obj:1/data@${W320_TOKEN}`;
-    const text = `${fx.baseUrl}/v1/docs/${docId}/text/pages/obj:1/data@contentVersion=1`;
-    const items = `${fx.baseUrl}/v1/docs/${docId}/annotations/pages/obj:1/items@annotationVersion=1`;
+    const text = `${fx.baseUrl}/v1/docs/${docId}/text/pages/obj:1/data@contentVersion=1,engine=${ENGINE.text},shape=1`;
+    const items = `${fx.baseUrl}/v1/docs/${docId}/annotations/pages/obj:1/items@annotationVersion=1,engine=${ENGINE.annotations},shape=1`;
     for (const url of [render, text, items]) {
       expect((await fetch(url, { headers: aliceAuth })).status, url).toBe(404);
       expect((await fetch(url, { headers: bobAuth })).status, url).toBe(200);
@@ -305,9 +318,12 @@ describe('plane-scoped view sharing', () => {
     // …but the attachments and metadata planes were never touched.
     expect(
       (
-        await fetch(`${fx.baseUrl}/v1/docs/${docId}/attachments@attachmentsVersion=1`, {
-          headers: aliceAuth,
-        })
+        await fetch(
+          `${fx.baseUrl}/v1/docs/${docId}/attachments@attachmentsVersion=1,engine=${ENGINE.attachments},shape=1`,
+          {
+            headers: aliceAuth,
+          },
+        )
       ).status,
     ).toBe(200);
     // Tenant/admin tokens are not layer-pinned — base stays theirs.
@@ -413,7 +429,7 @@ describe('plane-scoped view sharing', () => {
       },
     });
     const aliceAuth = auth(docToken(tenantId, docId, 'alice'));
-    const shared = `${fx.baseUrl}/v1/docs/${docId}/text/pages/obj:1/data@contentVersion=1`;
+    const shared = `${fx.baseUrl}/v1/docs/${docId}/text/pages/obj:1/data@contentVersion=1,engine=${ENGINE.text},shape=1`;
 
     // Locked: the shared read refuses until alice unlocks her layer.
     const blocked = await fetch(shared, { headers: aliceAuth });
@@ -449,7 +465,7 @@ describe('attachments plane (independent axis)', () => {
     await tearDown(fx);
   });
 
-  const ATT_TOKEN = 'attachmentsVersion=1';
+  const ATT_TOKEN = `attachmentsVersion=1,engine=${ENGINE.attachments},shape=1`;
 
   test('undiverged layers list attachments at ONE shared base URL — zero layer sessions', async () => {
     const tenantId = 'tenant-attshare';
@@ -564,7 +580,7 @@ describe('attachments plane (independent axis)', () => {
 
     // Origin: both base halves refused for alice, granted for bob.
     for (const path of ['metadata', 'metadata/custom']) {
-      const url = `${fx.baseUrl}/v1/docs/${docId}/${path}@metadataVersion=1`;
+      const url = `${fx.baseUrl}/v1/docs/${docId}/${path}@engine=${ENGINE.metadata},metadataVersion=1,shape=1`;
       const aliceRead = await fetch(url, { headers: auth(docToken(tenantId, docId, 'alice')) });
       expect(aliceRead.status, path).toBe(404);
       const bobRead = await fetch(url, { headers: auth(docToken(tenantId, docId, 'bob')) });
@@ -617,13 +633,13 @@ describe('attachments plane (independent axis)', () => {
 
     // Origin: base outline refused for alice, granted for bob; the layer
     // path serves alice at her own pins.
-    const url = `${fx.baseUrl}/v1/docs/${docId}/outline@layoutVersion=1,outlineVersion=1`;
+    const url = `${fx.baseUrl}/v1/docs/${docId}/outline@engine=${ENGINE.outline},layoutVersion=1,outlineVersion=1,shape=1`;
     const aliceAuth = auth(docToken(tenantId, docId, 'alice'));
     expect((await fetch(url, { headers: aliceAuth })).status).toBe(404);
     expect((await fetch(url, { headers: auth(docToken(tenantId, docId, 'bob')) })).status).toBe(
       200,
     );
-    const layerUrl = `${fx.baseUrl}/v1/docs/${docId}/layers/alice/outline@layoutVersion=1,outlineVersion=2`;
+    const layerUrl = `${fx.baseUrl}/v1/docs/${docId}/layers/alice/outline@engine=${ENGINE.outline},layoutVersion=1,outlineVersion=2,shape=1`;
     const layerRead = await fetch(layerUrl, { headers: aliceAuth });
     expect(layerRead.status).toBe(200);
     expect(await layerRead.json()).toEqual({ items: [], incomplete: false });

@@ -82,11 +82,12 @@ runtime is [thread-confined](/docs/server/getting-started/how-it-works), so ever
 own copy). From then on, any character a document's fonts can't draw, in a page's text or in an
 appearance the server writes, is filled from the first fallback font that has it.
 
-Pictures depend on the fallback fonts, so every picture's URL and the font list's carry a
-fingerprint of the server's fonts. When you change them, every page is drawn again once and the
-font list is read again; a restart that changes nothing keeps every cached picture. During a
-rolling deploy, a replica answers only URLs with its own fonts, and clients that reach another
-read the document again.
+Pictures depend on the fallback fonts, so the server's fonts are part of the engine value every
+picture's URL and the font list's carry. When you change them, every page is drawn again once and
+the font list is read again; a restart that changes nothing keeps every cached picture. During a
+rolling deploy, a replica asked for a URL with another engine value draws the picture with its own
+fonts and answers it uncached, so nothing is cached under the wrong fonts and no request fails;
+the client then reads the document's head again.
 
 ## Embedding via `buildApp`
 

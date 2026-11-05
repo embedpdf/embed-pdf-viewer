@@ -7,7 +7,7 @@ import {
   type AttachmentWriteVerb,
   type DocumentAttachmentsService,
 } from '@embedpdf/engine-core/runtime';
-import { AttachmentListSchema, wirePaths } from '@embedpdf/engine-core/wire';
+import { AttachmentListSchema, wirePaths, tokenPinOf } from '@embedpdf/engine-core/wire';
 
 import type { ManifestAccessor } from './CloudDocumentHandle';
 import { planesInherited } from './planes';
@@ -53,9 +53,15 @@ export class CloudDocumentAttachmentsService implements Omit<
         // Plane-scope rule: the listing depends on the `attachments` plane —
         // while inherited, one CDN object serves every visitor's sidebar
         // from the base worker session.
+        const pin = tokenPinOf('attachments', manifest.engine);
         return planesInherited(manifest, ['attachments'])
-          ? wirePaths.docAttachments(this.docId, manifest.attachmentsVersion)
-          : wirePaths.layerAttachments(this.docId, this.layerName, manifest.attachmentsVersion);
+          ? wirePaths.docAttachments(this.docId, manifest.attachmentsVersion, pin)
+          : wirePaths.layerAttachments(
+              this.docId,
+              this.layerName,
+              manifest.attachmentsVersion,
+              pin,
+            );
       };
       return this.http.getJsonWithRefresh(
         buildPath,
@@ -83,13 +89,15 @@ export class CloudDocumentAttachmentsService implements Omit<
       const buildPath = async (s: AbortSignal): Promise<string> => {
         const manifest = await this.manifest.get(s);
         // Same plane switch as list(): the byte leaf shares too.
+        const pin = tokenPinOf('attachments', manifest.engine);
         return planesInherited(manifest, ['attachments'])
-          ? wirePaths.docAttachmentFile(this.docId, ref.key, manifest.attachmentsVersion)
+          ? wirePaths.docAttachmentFile(this.docId, ref.key, manifest.attachmentsVersion, pin)
           : wirePaths.layerAttachmentFile(
               this.docId,
               this.layerName,
               ref.key,
               manifest.attachmentsVersion,
+              pin,
             );
       };
       const file = await this.http.getFileWithRefresh(

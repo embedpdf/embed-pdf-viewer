@@ -41,6 +41,7 @@ import {
   AnnotationsExportRequestSchema,
   decodeAnnotationsExportToken,
   type AnnotationsExportToken,
+  type TokenPin,
 } from '@embedpdf/engine-core/wire';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
@@ -123,11 +124,7 @@ export async function registerAnnotationRoutes(
       signal: abortSignalOf(reply),
       scope: { kind: 'base', ctx, docId },
       pageObjectNumber: resolvePageKeyParam(pageKey),
-      requestedVersion: parseTokenOrInvalidArg(
-        decodeAnnotationToken,
-        token,
-        'annotationVersion token',
-      ),
+      requested: parseTokenOrInvalidArg(decodeAnnotationToken, token, 'annotationVersion token'),
     });
   });
 
@@ -181,11 +178,7 @@ export async function registerAnnotationRoutes(
         signal: abortSignalOf(reply),
         scope: { kind: 'layer', ctx, docId, layerName },
         pageObjectNumber: resolvePageKeyParam(pageKey),
-        requestedVersion: parseTokenOrInvalidArg(
-          decodeAnnotationToken,
-          token,
-          'annotationVersion token',
-        ),
+        requested: parseTokenOrInvalidArg(decodeAnnotationToken, token, 'annotationVersion token'),
       });
     },
   );
@@ -228,7 +221,7 @@ export async function registerAnnotationRoutes(
       reply,
       signal: abortSignalOf(reply),
       scope: { kind: 'base', ctx, docId },
-      requestedVersion: parseTokenOrInvalidArg(
+      requested: parseTokenOrInvalidArg(
         decodeAnnotationsAllToken,
         token,
         'annotationsVersion token',
@@ -250,7 +243,7 @@ export async function registerAnnotationRoutes(
       reply,
       signal: abortSignalOf(reply),
       scope: { kind: 'layer', ctx, docId, layerName },
-      requestedVersion: parseTokenOrInvalidArg(
+      requested: parseTokenOrInvalidArg(
         decodeAnnotationsAllToken,
         token,
         'annotationsVersion token',
@@ -325,8 +318,10 @@ export async function registerAnnotationRoutes(
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
       const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
       const ctx = requireLayerResource(req, docId, layerName, 'layer-annotations-export', pdfBits);
-      const request = parseOrInvalidArg<AnnotationsExportToken>(
-        AnnotationsExportRequestSchema as unknown as SchemaLike<AnnotationsExportToken>,
+      const request = parseOrInvalidArg<Omit<AnnotationsExportToken, 'pin'>>(
+        AnnotationsExportRequestSchema as unknown as SchemaLike<
+          Omit<AnnotationsExportToken, 'pin'>
+        >,
         req.body,
         'request body',
       );
@@ -925,19 +920,19 @@ async function readAnnotations(input: {
   signal: AbortSignal;
   scope: ReadScope;
   pageObjectNumber: number;
-  requestedVersion?: number;
+  requested?: { annotationVersion: number; pin: TokenPin };
 }) {
   const scope = input.scope;
   const assertCurrent = async () => {
     const page = await resolvePageForRead(input);
     if (
-      input.requestedVersion !== undefined &&
-      input.requestedVersion !== page.cache.annotationVersion
+      input.requested !== undefined &&
+      input.requested.annotationVersion !== page.cache.annotationVersion
     ) {
       throw new EngineError(
         EngineErrorCode.NotFound,
         `${scope.kind === 'layer' ? 'layer ' : ''}annotation version ${
-          input.requestedVersion
+          input.requested.annotationVersion
         } no longer current (current=${page.cache.annotationVersion}) for page ${
           input.pageObjectNumber
         }`,
@@ -984,10 +979,10 @@ async function readAnnotations(input: {
     layerName: scope.kind === 'layer' ? scope.layerName : undefined,
     assertCurrent,
     read,
-    pinned: input.requestedVersion !== undefined,
+    token: input.requested && { kind: 'annotations', pin: input.requested.pin },
   });
 
-  input.requestedVersion === undefined ? setNoStore(input.reply) : setImmutableCache(input.reply);
+  input.requested === undefined ? setNoStore(input.reply) : setImmutableCache(input.reply);
   return list;
 }
 
@@ -1003,7 +998,8 @@ async function exportAnnotations(input: {
   reply: FastifyReply;
   signal: AbortSignal;
   scope: ReadScope;
-  token: AnnotationsExportToken;
+  /** A POST carries its pins in its body, without an engine value or shape. */
+  token: Omit<AnnotationsExportToken, 'pin'> & { pin?: TokenPin };
   /** A GET at its token is immutable; a POST is answered uncached. */
   cache?: 'immutable' | 'no-store';
 }) {
@@ -1057,6 +1053,7 @@ async function exportAnnotations(input: {
     layerName,
     assertCurrent,
     read,
+    token: { kind: 'annotationsExport', pin: token.pin },
   });
   return sendBundle(input.reply, bundle, input.cache ?? 'immutable');
 }
@@ -1075,7 +1072,7 @@ async function readAnnotationsAll(input: {
   reply: FastifyReply;
   signal: AbortSignal;
   scope: ReadScope;
-  requestedVersion?: number;
+  requested?: { annotationsVersion: number; pin: TokenPin };
 }) {
   const scope = input.scope;
   const getManifest = () =>
@@ -1112,7 +1109,7 @@ async function readAnnotationsAll(input: {
     return result.list;
   };
 
-  const requested = input.requestedVersion;
+  const { requested } = input;
   if (requested !== undefined) {
     let auditHead: DocumentManifest['auditHead'] | undefined;
     let checked = false;
@@ -1124,16 +1121,17 @@ async function readAnnotationsAll(input: {
       assertCurrent: async () => {
         const manifest = await getManifest();
         const current = manifest.annotationsVersion ?? 1;
-        if (requested !== current) {
+        if (requested.annotationsVersion !== current) {
           throw new EngineError(
             EngineErrorCode.NotFound,
-            `${scope.kind === 'layer' ? 'layer ' : ''}annotations version ${requested} no longer current (current=${current})`,
+            `${scope.kind === 'layer' ? 'layer ' : ''}annotations version ${requested.annotationsVersion} no longer current (current=${current})`,
           );
         }
         if (!checked) auditHead = manifest.auditHead;
         checked = true;
       },
       read,
+      token: { kind: 'annotationsAll', pin: requested.pin },
     });
     setImmutableCache(input.reply);
     return { ...list, auditHead };

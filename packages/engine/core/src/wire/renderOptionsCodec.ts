@@ -11,16 +11,17 @@ import {
   type AnnotationAppearanceRenderOptions,
 } from '../dto/AnnotationRender';
 import type { PageImageOptions, PageRenderOptions } from '../dto/PageRender';
+import type { TokenPin } from './cachedReads';
 
 /**
  * A picture's pins: `contentVersion`, the pins of what its family draws, and
- * the server's fonts it is drawn with (fallback fonts draw page text).
+ * the render engine value and shape every cached read carries.
  */
 export interface RenderVersions {
   contentVersion: number;
   annotationVersion?: number;
   widgetVersion?: number;
-  serverFonts: string;
+  pin: TokenPin;
 }
 
 /**
@@ -56,7 +57,8 @@ export function renderImageOptionsToWire(
     usage === 'print' || viewport === undefined || viewport.kind === 'thumbnail'
       ? {}
       : { viewport };
-  return flatten({ ...wireOptions, ...sized, ...versions });
+  const { pin, ...pins } = versions;
+  return flatten({ ...wireOptions, ...sized, ...pins, engine: pin.engine, shape: pin.shape });
 }
 
 /**
@@ -95,7 +97,7 @@ export function pageRenderOptionsFromImageOptions(options: PageImageOptions): Pa
  */
 export interface AnnotationRenderVersion {
   annotationVersion: number;
-  serverFonts: string;
+  pin: TokenPin;
 }
 
 /**
@@ -109,7 +111,8 @@ export function annotationAppearancesImageOptionsToWire(
 ): WireFlat {
   return appearancesToWire(options, {
     annotationVersion: versions.annotationVersion,
-    serverFonts: versions.serverFonts,
+    engine: versions.pin.engine,
+    shape: versions.pin.shape,
   });
 }
 
@@ -129,7 +132,7 @@ export function annotationAppearancesImageOptionsToToken(
  */
 export interface WidgetRenderVersion {
   widgetVersion: number;
-  serverFonts: string;
+  pin: TokenPin;
 }
 
 /** The widget twin of {@link annotationAppearancesImageOptionsToWire}. */
@@ -139,7 +142,8 @@ export function widgetAppearancesImageOptionsToWire(
 ): WireFlat {
   return appearancesToWire(options, {
     widgetVersion: versions.widgetVersion,
-    serverFonts: versions.serverFonts,
+    engine: versions.pin.engine,
+    shape: versions.pin.shape,
   });
 }
 

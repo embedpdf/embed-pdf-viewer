@@ -127,13 +127,14 @@ export async function registerSignatureRoutes(
       layerName,
       assertCurrent: async () => {
         const manifest = await service.getLayerManifest(ctx, docId, layerName);
-        if (requested === manifest.docVersion) return;
+        if (requested.docVersion === manifest.docVersion) return;
         throw new EngineError(
           EngineErrorCode.NotFound,
-          `signatures version ${requested} no longer current (current=${manifest.docVersion})`,
+          `signatures version ${requested.docVersion} no longer current (current=${manifest.docVersion})`,
         );
       },
       read: () => readSignatures(ctx, docId, layerName, abortSignalOf(reply)),
+      token: { kind: 'signatures', pin: requested.pin },
     });
     setImmutableCache(reply);
     return snapshot;
@@ -184,6 +185,7 @@ export async function registerSignatureRoutes(
         );
       },
       read: () => analyzeLayer(ctx, docId, layerName, input, abortSignalOf(reply)),
+      token: { kind: 'analysis', pin: requested.pin },
     });
     return finishAnalysisReply(reply, analysis);
   });
