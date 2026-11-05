@@ -4,7 +4,8 @@
 // annotation list and a form with unknown fields (at the top and nested), an
 // enum value the SDK doesn't know, and a kind it doesn't know in each open
 // union (docs/conventions/api-evolution.md, "Reading tolerantly";
-// fern/tolerant-reading/open-unions.json). Each language reads them the way
+// fern/tolerant-reading/open-unions.json). Both carry null dates too, which
+// fern-php-sdk read as an error before 2.30. Each language reads them the way
 // its client reads an annotation list and a form response.
 //
 //   node fern/scripts/check-tolerant-reading.mjs <language>

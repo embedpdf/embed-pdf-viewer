@@ -11,10 +11,10 @@
       "mappingName": null,
       "groupId": null,
       "createdBy": null,
-      "createdAt": "2026-11-04T10:00:00Z",
+      "createdAt": null,
       "filledBy": null,
       "filledByName": null,
-      "filledAt": "2026-11-04T10:30:00Z",
+      "filledAt": null,
       "importedBy": null,
       "ref": {
         "kind": "objectNumber",

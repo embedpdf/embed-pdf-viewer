@@ -62,7 +62,7 @@ groups:
   php:
     generators:
       - name: fern-php-sdk
-        version: 2.18.1
+        version: 2.30.14
         output:
           location: local-file-system
           path: ../sdks/php
