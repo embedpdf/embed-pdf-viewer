@@ -25,7 +25,7 @@ describe("OutlineClient", () => {
                             zoom: null,
                         },
                     },
-                    action: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    action: { root: null, incomplete: true, warnings: ["cycle-dropped"] },
                     open: true,
                     color: "color",
                     bold: true,

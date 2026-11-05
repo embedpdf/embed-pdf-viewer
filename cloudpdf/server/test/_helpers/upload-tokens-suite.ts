@@ -96,7 +96,7 @@ export function runUploadTokens(dialect: UploadTokensDialect): void {
       const res = await call('POST', `/v1/tenants/${TENANT}/tokens`, minter, {
         kind: 'upload',
         sub: 'user-381',
-        expiresIn: 600,
+        expiresInSeconds: 600,
         ...request,
       });
       expect(res.status, await res.clone().text()).toBe(200);
@@ -108,7 +108,7 @@ export function runUploadTokens(dialect: UploadTokensDialect): void {
         'POST',
         `/v1/tenants/${TENANT}/documents/init`,
         token,
-        { contentLength: pdf.byteLength, contentSha256: sha256, name: 'Contract.pdf', ...body },
+        { sizeBytes: pdf.byteLength, contentSha256: sha256, name: 'Contract.pdf', ...body },
         headers,
       );
     }
@@ -161,7 +161,7 @@ export function runUploadTokens(dialect: UploadTokensDialect): void {
         const refused = await call('POST', `/v1/tenants/${TENANT}/tokens`, issuer, {
           kind: 'upload',
           sub: 'user-381',
-          expiresIn: 600,
+          expiresInSeconds: 600,
         });
         expect(refused.status).toBe(403);
 
@@ -178,7 +178,7 @@ export function runUploadTokens(dialect: UploadTokensDialect): void {
           kind: 'upload',
           sub: 'user-381',
           folderId: 'fld_000000000000000000000000',
-          expiresIn: 600,
+          expiresInSeconds: 600,
         });
         expect(res.status).toBe(404);
       });
@@ -188,7 +188,7 @@ export function runUploadTokens(dialect: UploadTokensDialect): void {
           kind: 'upload',
           sub: 'user-381',
           metadata: { note: 'x'.repeat(5000) },
-          expiresIn: 600,
+          expiresInSeconds: 600,
         });
         expect(res.status).toBe(400);
       });
@@ -249,7 +249,7 @@ export function runUploadTokens(dialect: UploadTokensDialect): void {
 
       test('it sends files to, and commits, only documents it started', async () => {
         const own = await call('POST', `/v1/tenants/${TENANT}/documents/init`, API_TOKEN, {
-          contentLength: pdf.byteLength,
+          sizeBytes: pdf.byteLength,
           contentSha256: sha256,
         });
         const { document } = (await own.json()) as { document: { id: string } };
@@ -263,7 +263,7 @@ export function runUploadTokens(dialect: UploadTokensDialect): void {
       test("another tenant's path is refused", async () => {
         const token = await uploadToken();
         const res = await call('POST', `/v1/tenants/${OTHER_TENANT}/documents/init`, token, {
-          contentLength: pdf.byteLength,
+          sizeBytes: pdf.byteLength,
           contentSha256: sha256,
         });
         expect(res.status).toBe(403);
@@ -290,7 +290,11 @@ export function runUploadTokens(dialect: UploadTokensDialect): void {
           ['GET', `/v1/tenants/${TENANT}/documents/${id}/download`],
           ['DELETE', `/v1/tenants/${TENANT}/documents/${id}`],
           ['GET', `/v1/tenants/${TENANT}/folders`],
-          ['POST', `/v1/tenants/${TENANT}/tokens`, { kind: 'upload', sub: 'x', expiresIn: 600 }],
+          [
+            'POST',
+            `/v1/tenants/${TENANT}/tokens`,
+            { kind: 'upload', sub: 'x', expiresInSeconds: 600 },
+          ],
           ['GET', `/v1/docs/${id}`],
           ['GET', `/v1/tenants/${TENANT}/usage`],
         ];

@@ -228,13 +228,14 @@ if (language === 'ruby') {
   }
   uploadClient = uploadClient.replace(generatedMultipartBlock, patchedMultipartBlock);
   uploadClient = uploadClient.replace(
-    '# @option params [String] :id\n      #\n      # @example\n      #   client.documents.upload_proxy(\n      #     tenant_id: "tenantId",\n      #     id: "id"\n      #   )',
-    '# @option params [String] :id\n      # @option params [#read] :file\n      #\n      # @example\n      #   client.documents.upload_proxy(\n      #     tenant_id: "tenantId",\n      #     id: "id",\n      #     file: File.open("document.pdf", "rb")\n      #   )',
+    '# @option params [String] :doc_id\n      #\n      # @example\n      #   client.documents.upload_proxy(\n      #     tenant_id: "tenantId",\n      #     doc_id: "docId"\n      #   )',
+    '# @option params [String] :doc_id\n      # @option params [#read] :file\n      #\n      # @example\n      #   client.documents.upload_proxy(\n      #     tenant_id: "tenantId",\n      #     doc_id: "docId",\n      #     file: File.open("document.pdf", "rb")\n      #   )',
   );
   writeFileSync(uploadClientPath, uploadClient);
 
   const uploadTypePath = `${outputDirectory}/lib/CloudPDF/documents/types/upload_proxy_documents_request.rb`;
-  const generatedIdField = '        field :id, -> { String }, optional: false, nullable: false\n';
+  const generatedIdField =
+    '        field :doc_id, -> { String }, optional: false, nullable: false, api_name: "docId"\n';
   const patchedFileField = '        field :file, -> { Object }, optional: false, nullable: false\n';
   const uploadTypeSource = readFileSync(uploadTypePath, 'utf8');
   if (
@@ -251,7 +252,7 @@ if (language === 'ruby') {
   const referencePath = `${outputDirectory}/reference.md`;
   const generatedReferenceExample = `client.documents.upload_proxy(
   tenant_id: "tenantId",
-  id: "id"
+  doc_id: "docId"
 )`;
   const patchedReferenceExample = 'File.open("document.pdf", "rb") do |file|';
   const referenceSource = readFileSync(referencePath, 'utf8');
@@ -269,7 +270,7 @@ if (language === 'ruby') {
         `File.open("document.pdf", "rb") do |file|
   client.documents.upload_proxy(
     tenant_id: "tenantId",
-    id: "id",
+    doc_id: "docId",
     file: file
   )
 end`,

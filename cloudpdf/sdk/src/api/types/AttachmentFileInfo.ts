@@ -4,8 +4,8 @@ export interface AttachmentFileInfo {
     name: string;
     mimeType: string | null;
     description: string | null;
-    size: number | null;
-    checksum: string | null;
+    sizeBytes: number | null;
+    md5: string | null;
     createdAt: string | null;
     modifiedAt: string | null;
 }

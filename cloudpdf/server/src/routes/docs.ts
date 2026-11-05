@@ -422,7 +422,7 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
       mode: 'incremental' as const,
       pin: { engine: await service.engineValues.of('download'), shape: SHAPES.download },
     };
-    const expiresIn = parsed.data.expiresIn ?? DEFAULT_DOWNLOAD_LINK_SECONDS;
+    const expiresIn = parsed.data.expiresInSeconds ?? DEFAULT_DOWNLOAD_LINK_SECONDS;
     const linkToken = deps.sign({
       sub: `link:${ctx.sub}`,
       tenant_id: ctx.tenantId,

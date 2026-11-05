@@ -71,8 +71,8 @@ function tokenProtocol(baseUrl: string, token: string): UploadProtocol {
     return {
         init: async ({ tenantId, ...body }, options): Promise<unknown> =>
             json(`${tenantPath(tenantId)}/init`, authorization, body, options),
-        commit: async ({ tenantId, id, ...body }, options): Promise<unknown> =>
-            json(`${tenantPath(tenantId)}/${encodeURIComponent(String(id))}/commit`, authorization, body, options),
+        commit: async ({ tenantId, docId, ...body }, options): Promise<unknown> =>
+            json(`${tenantPath(tenantId)}/${encodeURIComponent(docId)}/commit`, authorization, body, options),
         proxy: async (url, form, options): Promise<Response> =>
             send(`${baseUrl}${url}`, {
                 method: "POST",

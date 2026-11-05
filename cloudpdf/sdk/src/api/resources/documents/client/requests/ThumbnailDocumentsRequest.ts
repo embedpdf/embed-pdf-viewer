@@ -4,10 +4,10 @@
  * @example
  *     {
  *         tenantId: "tenantId",
- *         id: "id"
+ *         docId: "docId"
  *     }
  */
 export interface ThumbnailDocumentsRequest {
     tenantId: string;
-    id: string;
+    docId: string;
 }

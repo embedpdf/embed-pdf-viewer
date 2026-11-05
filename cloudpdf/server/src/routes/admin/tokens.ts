@@ -133,7 +133,7 @@ export async function registerAdminTokensRoutes(
         if (uploadFolderId !== null) await deps.folders.requireOwned(uploadFolderId, tenantId);
 
         const jti = randomUUID();
-        const expiresAt = Math.floor(Date.now() / 1000) + body.expiresIn;
+        const expiresAt = Math.floor(Date.now() / 1000) + body.expiresInSeconds;
 
         const token =
           body.kind === 'doc'
@@ -145,7 +145,7 @@ export async function registerAdminTokensRoutes(
                 ...(body.origins ? { origins: body.origins } : {}),
                 scope: body.scope,
                 jti,
-                ttlSeconds: body.expiresIn,
+                ttlSeconds: body.expiresInSeconds,
                 extras: identityExtras(body),
               })
             : body.kind === 'upload'
@@ -160,14 +160,14 @@ export async function registerAdminTokensRoutes(
                   },
                   ...(body.origins ? { origins: body.origins } : {}),
                   jti,
-                  ttlSeconds: body.expiresIn,
+                  ttlSeconds: body.expiresInSeconds,
                 })
               : sign({
                   sub: body.sub,
                   tenant_id: tenantId,
                   scope: body.scope,
                   jti,
-                  ttlSeconds: body.expiresIn,
+                  ttlSeconds: body.expiresInSeconds,
                 });
 
         await deps.securityEvents.append({

@@ -5,7 +5,6 @@ import type * as CloudPDF from "../index.js";
 export interface PdfActionTree {
     root: CloudPDF.PdfActionNode | null;
     incomplete: boolean;
-    warningFlags: number;
     warnings: PdfActionTree.Warnings.Item[];
 }
 

@@ -15,8 +15,8 @@ const fileNamed = (key: string, index = 0): Attachment => ({
   name: key,
   mimeType: 'text/plain',
   description: null,
-  size: 4,
-  checksum: '098f6bcd4621d373cade4e832627b4f6',
+  sizeBytes: 4,
+  md5: '098f6bcd4621d373cade4e832627b4f6',
   createdAt: null,
   modifiedAt: null,
 });
@@ -79,8 +79,8 @@ describe('files', () => {
     expect(shown![1]).toMatchObject({
       name: 'b.txt',
       mimeType: 'text/csv',
-      size: 7,
-      checksum: null,
+      sizeBytes: 7,
+      md5: null,
     });
     expect(predictFiles(files, { ...create, file: { name: 'a.txt' } })).toBe(files);
     expect(

@@ -255,7 +255,7 @@ describe('digital signatures over the wire (native runtime)', () => {
     expect(stale.status).toBe(409);
     const completed = await json<{
       status: string;
-      version: { sha256: string; byteLength: number };
+      version: { sha256: string; sizeBytes: number };
       signature: { signed: boolean; coverage: string; docMdp: number; revisionIndex: number };
       meta: { cacheDelta: null; affectedPages: unknown[] };
     }>(
@@ -280,7 +280,7 @@ describe('digital signatures over the wire (native runtime)', () => {
 
     // The catalog and the head.
     const versions = await json<{
-      baseSha: string;
+      baseSha256: string;
       versions: Array<{
         number: number;
         sha256: string;
@@ -290,7 +290,7 @@ describe('digital signatures over the wire (native runtime)', () => {
       }>;
     }>(await call('GET', `/v1/docs/${docId}/layers/alice/versions`, docId, 'alice'));
     // Alice's versions: the upload, then hers; her base is her new version.
-    expect(versions.baseSha).toBe(completed.version.sha256);
+    expect(versions.baseSha256).toBe(completed.version.sha256);
     expect(versions.versions).toEqual([
       expect.objectContaining({
         number: 1,
@@ -306,16 +306,16 @@ describe('digital signatures over the wire (native runtime)', () => {
         signingId: prepared.signingId,
       }),
     ]);
-    const head = await json<{ baseSha: string; docVersion: number }>(
+    const head = await json<{ baseSha256: string; docVersion: number }>(
       await call('GET', `/v1/docs/${docId}/head`, docId, 'alice'),
     );
-    expect(head.baseSha).toBe(seeded.sha);
-    const layerHead = await json<{ baseSha: string; storageSizeBytes: number }>(
+    expect(head.baseSha256).toBe(seeded.sha);
+    const layerHead = await json<{ baseSha256: string; sizeBytes: number }>(
       await call('GET', `${layer}/head`, docId, 'alice'),
     );
     expect(layerHead).toMatchObject({
-      baseSha: completed.version.sha256,
-      storageSizeBytes: completed.version.byteLength,
+      baseSha256: completed.version.sha256,
+      sizeBytes: completed.version.sizeBytes,
     });
 
     // Immutable version reads: snapshot, contents, digest, download, revision prefix.
@@ -328,7 +328,7 @@ describe('digital signatures over the wire (native runtime)', () => {
     expect(vsig.headers.get('cache-control')).toContain('immutable');
     const vsnap = await json<{
       revisions: Array<{ end: number }>;
-      signatures: Array<{ fieldName: string; contentsSize: number }>;
+      signatures: Array<{ fieldName: string; contentsSizeBytes: number }>;
     }>(vsig);
     expect(vsnap.revisions).toHaveLength(2);
     const contents = await call(
@@ -354,7 +354,7 @@ describe('digital signatures over the wire (native runtime)', () => {
       'alice',
     );
     const published = new Uint8Array(await download.arrayBuffer());
-    expect(published.byteLength).toBe(completed.version.byteLength);
+    expect(published.byteLength).toBe(completed.version.sizeBytes);
     expect(sha256(published)).toBe(completed.version.sha256);
     const rev0 = await call(
       'GET',
@@ -388,15 +388,15 @@ describe('digital signatures over the wire (native runtime)', () => {
 
     // The layer is clean over its new version; the fill survived in its bytes.
     const manifest = await json<{
-      baseSha: string;
-      baseByteLength: number;
+      baseSha256: string;
+      baseSizeBytes: number;
       layerVersion: number;
       working: boolean;
       scopes: Record<string, string>;
     }>(await call('GET', `${layer}/manifest`, docId, 'alice'));
     expect(manifest).toMatchObject({
-      baseSha: completed.version.sha256,
-      baseByteLength: completed.version.byteLength,
+      baseSha256: completed.version.sha256,
+      baseSizeBytes: completed.version.sizeBytes,
       layerVersion: 3,
       working: false,
     });
@@ -705,10 +705,10 @@ describe('digital signatures over the wire (native runtime)', () => {
 
     // Alice's signature moved only her layer: Bob is still over the upload,
     // owning just the plane he wrote.
-    const bobManifest = await json<{ baseSha: string; scopes: Record<string, string> }>(
+    const bobManifest = await json<{ baseSha256: string; scopes: Record<string, string> }>(
       await call('GET', `${bob}/manifest`, docId, 'bob'),
     );
-    expect(bobManifest.baseSha).toBe(seeded.sha);
+    expect(bobManifest.baseSha256).toBe(seeded.sha);
     expect(bobManifest.scopes).toMatchObject({ content: 'base', forms: 'layer' });
 
     // Bob signs too, over his own base, into a version of his own.
@@ -744,10 +744,10 @@ describe('digital signatures over the wire (native runtime)', () => {
     );
     expect(bobDone.status).toBe('completed');
     expect(bobDone.version.sha256).not.toBe(done.version.sha256);
-    const aliceManifest = await json<{ baseSha: string }>(
+    const aliceManifest = await json<{ baseSha256: string }>(
       await call('GET', `${alice}/manifest`, docId, 'alice'),
     );
-    expect(aliceManifest.baseSha).toBe(done.version.sha256);
+    expect(aliceManifest.baseSha256).toBe(done.version.sha256);
     // Bob's reads work over his version: his own fill, never Alice's.
     const bobForm = await json<{ fields: Array<{ name: string; value: unknown }> }>(
       await call('GET', `${bob}/form`, docId, 'bob'),
@@ -758,11 +758,11 @@ describe('digital signatures over the wire (native runtime)', () => {
 
     // A new layer starts on the upload: nobody's fill or signature.
     const carol = await json<{
-      baseSha: string;
+      baseSha256: string;
       scopes: Record<string, string>;
       docVersion: number;
     }>(await call('GET', `/v1/docs/${docId}/layers/carol/manifest`, docId, 'carol'));
-    expect(carol.baseSha).toBe(seeded.sha);
+    expect(carol.baseSha256).toBe(seeded.sha);
     expect(new Set(Object.values(carol.scopes))).toEqual(new Set(['base']));
     const carolForm = await json<{ fields: Array<{ name: string; value: unknown }> }>(
       await call('GET', `/v1/docs/${docId}/layers/carol/form`, docId, 'carol'),
@@ -805,10 +805,10 @@ describe('digital signatures over the wire (native runtime)', () => {
     expect((await call('GET', `${bob}/versions/download/${seeded.sha}`, docId, 'bob')).status).toBe(
       200,
     );
-    const bobVersions = await json<{ baseSha: string; versions: Array<{ sha256: string }> }>(
+    const bobVersions = await json<{ baseSha256: string; versions: Array<{ sha256: string }> }>(
       await call('GET', `${bob}/versions`, docId, 'bob'),
     );
-    expect(bobVersions.baseSha).toBe(bobDone.version.sha256);
+    expect(bobVersions.baseSha256).toBe(bobDone.version.sha256);
     expect(bobVersions.versions.map((v) => v.sha256)).toEqual([seeded.sha, bobDone.version.sha256]);
     // A tenant token reads any layer's versions, through that layer.
     const tenantToken = signDevToken(SECRET, { sub: 'admin', tenant_id: TENANT, scope: ['*'] });

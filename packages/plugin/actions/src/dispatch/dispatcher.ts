@@ -216,7 +216,6 @@ export function createDispatcher(
   const namedTree = (name: PdfNamedAction): PdfActionTree => ({
     root: { type: 'named', subtype: 'Named', name, next: [] },
     incomplete: false,
-    warningFlags: 0,
     warnings: [],
   });
   const namedContext = (context?: Partial<ActionContext>): ActionContext => ({

@@ -54,29 +54,29 @@ export class CloudDocumentFontsService implements DocumentFontsService {
     );
   }
 
-  getProgram(displayHash: string): AbortablePromise<FontProgramInfo> {
+  getProgram(displaySha256: string): AbortablePromise<FontProgramInfo> {
     return this.run((signal) =>
       this.http.getJson(
-        wirePaths.layerFontProgram(this.docId, this.layerName, displayHash),
+        wirePaths.layerFontProgram(this.docId, this.layerName, displaySha256),
         (raw) => FontProgramInfoSchema.parse(raw),
         signal,
       ),
     );
   }
 
-  downloadProgram(displayHash: string): AbortablePromise<Uint8Array> {
+  downloadProgram(displaySha256: string): AbortablePromise<Uint8Array> {
     return this.run(async (signal) => {
       const list = await this.listOf(signal);
-      downloadableProgram(list, displayHash);
+      downloadableProgram(list, displaySha256);
       const serverFont = list.fonts.some(
         (font) =>
           font.source === 'engine' &&
-          font.programs.some((program) => program.displayHash === displayHash),
+          font.programs.some((program) => program.displaySha256 === displaySha256),
       );
       return this.http.getBytes(
         serverFont
-          ? wirePaths.fontProgramFile(displayHash)
-          : wirePaths.layerFontProgramFile(this.docId, this.layerName, displayHash),
+          ? wirePaths.fontProgramFile(displaySha256)
+          : wirePaths.layerFontProgramFile(this.docId, this.layerName, displaySha256),
         signal,
       );
     });

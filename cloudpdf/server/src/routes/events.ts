@@ -182,8 +182,8 @@ export async function registerEventsRoutes(
         });
         if (!status || closed) return;
         const held = JSON.stringify(status.held);
-        const expiresAt = Date.now() + status.expiresIn * 1000;
-        // `expiresIn` is in whole seconds: a second's drift is no move.
+        const expiresAt = Date.now() + status.expiresInSeconds * 1000;
+        // `expiresInSeconds` is whole: a second's drift is no move.
         if (lastSession?.held === held && expiresAt <= lastSession.expiresAt + 1000) return;
         lastSession = { held, expiresAt };
         raw.write(`event: session\ndata: ${JSON.stringify(status)}\n\n`);

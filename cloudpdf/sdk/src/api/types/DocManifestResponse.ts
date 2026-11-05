@@ -14,10 +14,10 @@ export interface DocManifestResponse {
     fontsVersion?: number | undefined;
     contentsVersion?: number | undefined;
     auditHead: number;
-    baseSha: string;
+    baseSha256: string;
     layerVersion?: number | undefined;
     working?: boolean | undefined;
-    baseByteLength?: number | undefined;
+    baseSizeBytes?: number | undefined;
     scopes?: DocManifestResponse.Scopes | undefined;
     protection: DocManifestResponse.Protection | null;
     pages: DocManifestResponse.Pages.Item[];

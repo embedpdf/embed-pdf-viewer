@@ -622,7 +622,7 @@ function writeDelete(ctx: ChangeContext, ref: AnnotationRef, rights?: StepRights
       {
         kind: 'annotation.restore',
         page: ref.page,
-        members: result.meta.changed,
+        members: result.meta.changedRefs,
         capture,
         unlinked: captureAfter(ctx.runtime, ctx.session, pending),
         ...(rights ? { rights } : {}),

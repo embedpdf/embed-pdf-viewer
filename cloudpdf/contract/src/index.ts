@@ -206,8 +206,9 @@ export const AdminDocumentRecordSchema = z.object({
   name: z.string(),
   folderId: z.string().describe('The folder the document is in, or root.'),
   state: DocumentStateSchema,
-  baseSha: z.string().nullable(),
-  storageSizeBytes: z.number().int().nullable(),
+  baseSha256: z.string().nullable(),
+  /** The size of the PDF, in bytes; null until its upload is committed. */
+  sizeBytes: z.number().int().nullable(),
   metadata: z.record(z.string(), z.unknown()).nullable(),
   idempotencyKey: z.string().nullable(),
   failureReason: z.string().nullable(),
@@ -222,7 +223,7 @@ export const AdminDocumentRecordSchema = z.object({
 export type AdminDocumentRecord = z.infer<typeof AdminDocumentRecordSchema>;
 
 export const AdminDocumentInitRequestSchema = z.object({
-  contentLength: z.number().int().min(1),
+  sizeBytes: z.number().int().min(1),
   contentSha256: z.string().regex(sha256Hex),
   /** Defaults to the document id. */
   name: DocumentNameSchema.optional(),
@@ -232,7 +233,7 @@ export const AdminDocumentInitRequestSchema = z.object({
   idempotencyKey: z.string().optional(),
   dedupMode: DedupModeSchema.optional(),
   docId: z.string().regex(docIdPattern).optional(),
-  uploadTtlSec: z.number().int().min(60).max(3600).optional(),
+  uploadTtlSeconds: z.number().int().min(60).max(3600).optional(),
   uploadPreference: UploadPreferenceSchema.optional(),
 });
 export type AdminDocumentInitRequest = z.infer<typeof AdminDocumentInitRequestSchema>;
@@ -573,7 +574,7 @@ export type FolderDeleteQuery = z.infer<typeof FolderDeleteQuerySchema>;
 export const FOLDER_MOVE_MAX_IDS = 1000;
 
 export const FolderMoveIntoRequestSchema = z.object({
-  documentIds: z.array(z.string().regex(docIdPattern)).max(FOLDER_MOVE_MAX_IDS).optional(),
+  docIds: z.array(z.string().regex(docIdPattern)).max(FOLDER_MOVE_MAX_IDS).optional(),
   folderIds: z.array(z.string().regex(folderIdPattern)).max(FOLDER_MOVE_MAX_IDS).optional(),
 });
 export type FolderMoveIntoRequest = z.infer<typeof FolderMoveIntoRequestSchema>;
@@ -590,7 +591,7 @@ export type AdminTenantParams = z.infer<typeof AdminTenantParamsSchema>;
 
 export const AdminTenantDocParamsSchema = z.object({
   tenantId: z.string().regex(tenantIdPattern),
-  id: z.string().regex(docIdPattern),
+  docId: z.string().regex(docIdPattern),
 });
 export type AdminTenantDocParams = z.infer<typeof AdminTenantDocParamsSchema>;
 
@@ -626,7 +627,7 @@ export const AdminLayerRecordSchema = z.object({
   /** That visitor; null for a layer a grant or token names. */
   visitorId: z.string().nullable(),
   /** Bytes the layer stores: its changes over the document, not the whole PDF. */
-  storageSizeBytes: z.number().int().nullable(),
+  sizeBytes: z.number().int().nullable(),
   /** Its first change. */
   createdAt: IsoDateTimeSchema,
   /** Its last change. */
@@ -848,7 +849,7 @@ export const AdminTokenIssueDocRequestSchema = z.object({
    */
   origins: originPatternArray.optional(),
   /** Token lifetime in seconds. */
-  expiresIn: z
+  expiresInSeconds: z
     .number()
     .int()
     .min(60)
@@ -866,7 +867,7 @@ export const AdminTokenIssueTenantRequestSchema = z.object({
    */
   scope: z.array(z.string().min(1).max(128)).min(1).max(64),
   /** Token lifetime in seconds. */
-  expiresIn: z
+  expiresInSeconds: z
     .number()
     .int()
     .min(60)
@@ -901,7 +902,7 @@ export const AdminTokenIssueUploadRequestSchema = z.object({
   /** Origin lock, as on a doc token: the websites the token works on. */
   origins: originPatternArray.optional(),
   /** Token lifetime in seconds. */
-  expiresIn: z
+  expiresInSeconds: z
     .number()
     .int()
     .min(60)
@@ -1234,7 +1235,7 @@ export const GrantVisitorRecordSchema = z.object({
   layer: z
     .object({
       layerName: z.string(),
-      storageSizeBytes: z.number().int().nullable(),
+      sizeBytes: z.number().int().nullable(),
     })
     .nullable(),
 });
@@ -1339,10 +1340,10 @@ export type TenantUsageQuery = z.infer<typeof TenantUsageQuerySchema>;
 /**
  * Per-tenant usage facts for a window of UTC days: a month, or `from` to
  * `to`. Deliberately opinion-free: no limits, no plans, no billing state —
- * those belong to whoever operates the deployment. `pdf.views` counts
+ * those belong to whoever operates the deployment. `pdfViews` counts
  * grant exchanges plus authorized `/v1/access` requests, deduplicated (a
  * grant session that later establishes access is not counted twice).
- * `storage.bytes` is what the tenant stores now, whatever the window.
+ * `storageBytes` is what the tenant stores now, whatever the window.
  */
 export const TenantUsageResponseSchema = z.object({
   tenantId: z.string(),
@@ -1350,17 +1351,18 @@ export const TenantUsageResponseSchema = z.object({
   periodStart: z.string(),
   /** The day after the last one reported, `YYYY-MM-DD`. */
   periodEnd: z.string(),
+  /** The core's meters. */
+  metrics: z.object({
+    pdfViews: z.number().int(),
+    pdfUploads: z.number().int(),
+    storageBytes: z.number().int(),
+  }),
   /**
-   * The core's meters, then each installed module's (`protected-display.views`),
-   * 0 when nothing counted it, and any other module meter counted in the window.
+   * The modules' meters by their names (`protected-display.views`): each
+   * installed module's, 0 when nothing counted it, and any other module meter
+   * counted in the window.
    */
-  metrics: z
-    .object({
-      'pdf.views': z.number().int(),
-      'pdf.uploads': z.number().int(),
-      'storage.bytes': z.number().int(),
-    })
-    .catchall(z.number().int()),
+  moduleMeters: z.record(z.string(), z.number().int()),
 });
 export type TenantUsageResponse = z.infer<typeof TenantUsageResponseSchema>;
 
@@ -1622,14 +1624,14 @@ export const adminOperations = {
       403: errorResponse,
     },
     notes:
-      "With an upload token, the document goes into the token's folder with the token's metadata, whatever the request says; contentLength must be within the token's maxBytes, and the token makes at most maxFiles documents (403 after). docId, idempotencyKey and dedupMode reuse-existing are refused (400): each could reach a document the token didn't make.",
+      "With an upload token, the document goes into the token's folder with the token's metadata, whatever the request says; sizeBytes must be within the token's maxBytes, and the token makes at most maxFiles documents (403 after). docId, idempotencyKey and dedupMode reuse-existing are refused (400): each could reach a document the token didn't make.",
   },
   'documents.commit': {
     operationId: 'documents.commit',
     title: 'Commit upload',
     summary: 'Finish an upload: verify the SHA-256 and promote the document to ready.',
     method: 'POST',
-    path: '/v1/tenants/:tenantId/documents/:id/commit',
+    path: '/v1/tenants/:tenantId/documents/:docId/commit',
     credentials: ['api-token', 'tenant-jwt', 'upload-jwt'],
     scope: ['docs.create'],
     params: AdminTenantDocParamsSchema,
@@ -1646,7 +1648,7 @@ export const adminOperations = {
     title: 'Upload document through the origin',
     summary: 'Upload a bounded PDF through the API when the initialized transfer kind is proxy.',
     method: 'POST',
-    path: '/v1/tenants/:tenantId/documents/:id/upload-proxy',
+    path: '/v1/tenants/:tenantId/documents/:docId/upload-proxy',
     credentials: ['api-token', 'tenant-jwt', 'upload-jwt'],
     scope: ['docs.create'],
     params: AdminTenantDocParamsSchema,
@@ -1704,7 +1706,7 @@ export const adminOperations = {
     title: 'Get document',
     summary: 'Fetch one document record.',
     method: 'GET',
-    path: '/v1/tenants/:tenantId/documents/:id',
+    path: '/v1/tenants/:tenantId/documents/:docId',
     credentials: ['api-token', 'tenant-jwt'],
     scope: ['docs.read'],
     params: AdminTenantDocParamsSchema,
@@ -1719,7 +1721,7 @@ export const adminOperations = {
     title: 'Update document',
     summary: 'Rename a document.',
     method: 'PATCH',
-    path: '/v1/tenants/:tenantId/documents/:id',
+    path: '/v1/tenants/:tenantId/documents/:docId',
     credentials: ['api-token', 'tenant-jwt'],
     scope: ['docs.update'],
     params: AdminTenantDocParamsSchema,
@@ -1737,7 +1739,7 @@ export const adminOperations = {
     title: 'Download document',
     summary: 'Download the stored base PDF bytes.',
     method: 'GET',
-    path: '/v1/tenants/:tenantId/documents/:id/download',
+    path: '/v1/tenants/:tenantId/documents/:docId/download',
     credentials: ['api-token', 'tenant-jwt'],
     scope: [],
     docCapabilities: ['doc.download'],
@@ -1753,7 +1755,7 @@ export const adminOperations = {
     title: 'Delete document',
     summary: 'Delete a document and its stored artifacts.',
     method: 'DELETE',
-    path: '/v1/tenants/:tenantId/documents/:id',
+    path: '/v1/tenants/:tenantId/documents/:docId',
     credentials: ['api-token', 'tenant-jwt'],
     scope: ['docs.delete'],
     params: AdminTenantDocParamsSchema,
@@ -1769,7 +1771,7 @@ export const adminOperations = {
     summary:
       "A document's layers that hold changes, newest first, cursor-paginated: the ones grants and your tokens name, and each grant visitor's own.",
     method: 'GET',
-    path: '/v1/tenants/:tenantId/documents/:id/layers',
+    path: '/v1/tenants/:tenantId/documents/:docId/layers',
     credentials: ['api-token', 'tenant-jwt'],
     scope: ['docs.read'],
     params: AdminTenantDocParamsSchema,
@@ -1787,7 +1789,7 @@ export const adminOperations = {
     summary:
       "Delete a layer and everything it stored. A layer that was written can't be used again under its name; one nobody wrote stays usable.",
     method: 'DELETE',
-    path: '/v1/tenants/:tenantId/documents/:id/layers/:layerName',
+    path: '/v1/tenants/:tenantId/documents/:docId/layers/:layerName',
     credentials: ['api-token', 'tenant-jwt'],
     scope: ['docs.delete'],
     params: AdminTenantDocLayerParamsSchema,
@@ -1803,7 +1805,7 @@ export const adminOperations = {
     title: 'Get thumbnail',
     summary: 'Fetch the warmed dashboard-tile render for a document.',
     method: 'GET',
-    path: '/v1/tenants/:tenantId/documents/:id/thumbnail',
+    path: '/v1/tenants/:tenantId/documents/:docId/thumbnail',
     credentials: ['api-token', 'tenant-jwt'],
     scope: [],
     docCapabilities: ['doc.render'],
@@ -1905,7 +1907,7 @@ export const adminOperations = {
       409: errorResponse,
     },
     notes:
-      "Up to 1,000 ids in total. A folder moves with everything in it. 404 NotFound names the ids that do not exist or are being deleted in `details.documentIds` and `details.folderIds`. 409 Conflict carries `details.reason`: `cycle` (the destination is a moved folder or inside one; `details.folderId`), `too-deep` (the move would nest folders deeper than 100 levels; `details.maxDepth`) or `name-taken` (a moved folder's name is taken in the destination, ignoring case; `details.name`).",
+      "Up to 1,000 ids in total. A folder moves with everything in it. 404 NotFound names the ids that do not exist or are being deleted in `details.docIds` and `details.folderIds`. 409 Conflict carries `details.reason`: `cycle` (the destination is a moved folder or inside one; `details.folderId`), `too-deep` (the move would nest folders deeper than 100 levels; `details.maxDepth`) or `name-taken` (a moved folder's name is taken in the destination, ignoring case; `details.name`).",
   },
   'folders.delete': {
     operationId: 'folders.delete',
@@ -2243,7 +2245,7 @@ export const DocLayerParamsSchema = DocIdParamsSchema.extend({
 
 export const DownloadLinkRequestSchema = z.object({
   /** Seconds the link works for: 60 to 3600, default 300. */
-  expiresIn: z
+  expiresInSeconds: z
     .number()
     .int()
     .min(60)
@@ -2268,11 +2270,11 @@ export const DocPageParamsSchema = DocLayerParamsSchema.extend({
     .min(1)
     .regex(/^obj:[1-9][0-9]*$/)
     .describe(
-      "The page's address, `obj:N`: the page's indirect object number, the durable identity every `PageLayout.ref` carries. Mirrors `annotKey` and `fieldKey`.",
+      "The page's address, `obj:N`: the page's indirect object number, the durable identity every `PageLayout.ref` carries. Mirrors `annotationKey` and `fieldKey`.",
     ),
 });
 export const DocAnnotationParamsSchema = DocPageParamsSchema.extend({
-  annotKey: z
+  annotationKey: z
     .string()
     .min(1)
     .regex(/^(obj:[1-9][0-9]*|base:(0|[1-9][0-9]*))$/)
@@ -2320,14 +2322,14 @@ const docCredentials = ['api-token', 'tenant-jwt', 'doc-jwt'] as const;
 
 /** A font program, by the hash of the file a browser loads. */
 export const DocFontProgramParamsSchema = DocLayerParamsSchema.extend({
-  displayHash: z.string().regex(sha256Hex),
+  displaySha256: z.string().regex(sha256Hex),
 });
 export const DocSigningParamsSchema = DocLayerParamsSchema.extend({
   signingId: z.string().min(1),
 });
 const sha256Pattern = /^[0-9a-f]{64}$/;
 export const DocVersionParamsSchema = DocLayerParamsSchema.extend({
-  sha: z.string().regex(sha256Pattern),
+  sha256: z.string().regex(sha256Pattern),
 });
 export const DocVersionFieldParamsSchema = DocVersionParamsSchema.extend({
   fieldKey: z.string().min(1),

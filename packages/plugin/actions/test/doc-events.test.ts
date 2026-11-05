@@ -27,7 +27,6 @@ const USER: ActionContext = {
 const tree = (root: PdfActionNode | null): PdfActionTree => ({
   root,
   incomplete: false,
-  warningFlags: 0,
   warnings: [],
 });
 const script = (source: string, next: PdfActionNode[] = []): PdfActionNode => ({
@@ -44,7 +43,6 @@ const named = (name: string): PdfActionNode => ({
 });
 
 const FLAGS_ZERO = {
-  raw: 0,
   exclude: false,
   includeNoValueFields: false,
   format: 'fdf' as const,
@@ -60,7 +58,7 @@ const FLAGS_ZERO = {
 const submitPayload = (overrides: Partial<SubmitFormPayload> = {}): SubmitFormPayload => ({
   url: 'https://home.test/submit',
   fields: null,
-  flags: FLAGS_ZERO,
+  ...FLAGS_ZERO,
   ...overrides,
 });
 const submitNode = (payload: SubmitFormPayload | undefined): PdfActionNode => ({
@@ -356,7 +354,6 @@ describe('the submit sink chain', () => {
       url: intent.url,
       method: intent.method,
       format: intent.format,
-      flagsRaw: intent.flagsRaw,
       entries: [{ name: 'plain', value: 'visible' }],
       origin: actionContext.origin,
       event: actionContext.event,
@@ -378,7 +375,6 @@ describe('the submit sink chain', () => {
       url: intent.url,
       method: intent.method,
       format: intent.format,
-      flagsRaw: intent.flagsRaw,
       entries: [{ name: 'plain', value: 'visible' }],
       origin: actionContext.origin,
       event: actionContext.event,
@@ -388,7 +384,7 @@ describe('the submit sink chain', () => {
     expect(formsSubmit).toHaveBeenCalledTimes(1);
     expect(formsSubmit.mock.calls[0]?.[0]).toMatchObject({
       entries: [{ name: 'plain', value: 'visible' }],
-      intent: { url: 'https://home.test/submit', format: 'fdf', method: 'post', flagsRaw: 0 },
+      intent: { url: 'https://home.test/submit', format: 'fdf', method: 'post' },
       origin: 'user',
     });
   });
@@ -400,7 +396,6 @@ describe('the submit sink chain', () => {
       url: intent.url,
       method: intent.method,
       format: intent.format,
-      flagsRaw: intent.flagsRaw,
       entries: [],
       origin: actionContext.origin,
       event: actionContext.event,
@@ -425,7 +420,6 @@ describe('the submit sink chain', () => {
       url: intent.url,
       method: intent.method,
       format: intent.format,
-      flagsRaw: intent.flagsRaw,
       entries: [],
       origin: actionContext.origin,
       event: actionContext.event,
@@ -441,7 +435,6 @@ describe('the submit sink chain', () => {
       url: intent.url,
       method: intent.method,
       format: intent.format,
-      flagsRaw: intent.flagsRaw,
       entries: [],
       origin: actionContext.origin,
       event: actionContext.event,

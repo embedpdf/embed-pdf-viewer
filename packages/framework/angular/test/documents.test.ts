@@ -258,7 +258,6 @@ describe('EpdfPageEdit', () => {
 const websiteLink: PdfActionTree = {
   root: { type: 'uri', subtype: 'URI', uri: 'https://www.embedpdf.com', isMap: false, next: [] },
   incomplete: false,
-  warningFlags: 0,
   warnings: [],
 };
 const click: ActionContext = {

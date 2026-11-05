@@ -260,8 +260,8 @@ describe('req.meters counts for the tenant', () => {
     const usage = await fetch(`${baseUrl}/v1/tenants/${TENANT}/usage`, {
       headers: { Authorization: `Bearer ${API_TOKEN}` },
     });
-    const { metrics } = (await usage.json()) as { metrics: Record<string, number> };
-    expect(metrics['review.reads']).toBe(1);
+    const { moduleMeters } = (await usage.json()) as { moduleMeters: Record<string, number> };
+    expect(moduleMeters['review.reads']).toBe(1);
   });
 });
 

@@ -13,7 +13,7 @@ import type { AnnotationRef } from '../identity/AnnotationRef';
  *
  * A font is a face (family, weight, italic) backed by programs: the font files
  * behind it. Programs are named by hash, the CSS family a browser mounts one
- * under is named by its {@link FontProgram.displayHash}, and a hash is never a
+ * under is named by its {@link FontProgram.displaySha256}, and a hash is never a
  * permission: each document decides what may be done with a program.
  */
 export interface FontList {
@@ -74,13 +74,13 @@ export interface FontProgram {
    * none (a Type 3 font, a font the PDF only names). Programs are downloaded and
    * named by it.
    */
-  displayHash: string | null;
+  displaySha256: string | null;
   /**
    * SHA-256 (hex) of the file the engine lays text out with and puts in the PDF;
    * `null` when the document doesn't hold one (a standard font, one the PDF
    * only names).
    */
-  sourceHash: string | null;
+  sourceSha256: string | null;
   embedded: 'whole' | 'subset' | 'none';
   /** `null` when nothing is embedded. */
   format: FontFormat | null;

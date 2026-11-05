@@ -337,22 +337,22 @@ export const wirePaths = {
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/fonts/resolve`,
 
   /** GET: a program's facts (`doc.fonts.getProgram()`), content-addressed by its display hash. */
-  layerFontProgram: (docId: string, layerName: string, displayHash: string) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/font-programs/${encodeURIComponent(displayHash)}`,
+  layerFontProgram: (docId: string, layerName: string, displaySha256: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/font-programs/${encodeURIComponent(displaySha256)}`,
 
   /**
    * GET: a program's bytes (`doc.fonts.downloadProgram()`), for a token that
    * may write text in the document. Private: never cached on a shared CDN.
    */
-  layerFontProgramFile: (docId: string, layerName: string, displayHash: string) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/font-program-files/${encodeURIComponent(displayHash)}`,
+  layerFontProgramFile: (docId: string, layerName: string, displaySha256: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/font-program-files/${encodeURIComponent(displaySha256)}`,
 
   /**
    * GET: a served server font's bytes, one URL for every document, so a
    * browser keeps one copy. Any valid token; private.
    */
-  fontProgramFile: (displayHash: string) =>
-    `/v1/font-program-files/${encodeURIComponent(displayHash)}`,
+  fontProgramFile: (displaySha256: string) =>
+    `/v1/font-program-files/${encodeURIComponent(displaySha256)}`,
 
   /**
    * Immutable base /EmbeddedFiles listing: the shared-URL variant an
@@ -892,8 +892,8 @@ export const wireTemplates = {
   layerOutline: '/v1/docs/:docId/layers/:layerName/outline',
   layerFonts: '/v1/docs/:docId/layers/:layerName/fonts',
   layerFontsResolve: '/v1/docs/:docId/layers/:layerName/fonts/resolve',
-  layerFontProgram: '/v1/docs/:docId/layers/:layerName/font-programs/:displayHash',
-  layerFontProgramFile: '/v1/docs/:docId/layers/:layerName/font-program-files/:displayHash',
+  layerFontProgram: '/v1/docs/:docId/layers/:layerName/font-programs/:displaySha256',
+  layerFontProgramFile: '/v1/docs/:docId/layers/:layerName/font-program-files/:displaySha256',
   layerAttachments: '/v1/docs/:docId/layers/:layerName/attachments',
   layerAttachmentFile: '/v1/docs/:docId/layers/:layerName/attachment-files/:fileKey/data',
   layerRenderPage: '/v1/docs/:docId/layers/:layerName/render/pages/:pageKey/data',
@@ -901,7 +901,7 @@ export const wireTemplates = {
   layerAnnotationItemsAll: '/v1/docs/:docId/layers/:layerName/annotations/items',
   layerAnnotationItems: '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items',
   layerAnnotationItem:
-    '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/:annotKey',
+    '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/:annotationKey',
   layerAnnotationItemsReorder:
     '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/reorder',
   layerAnnotationItemsFlatten:
@@ -909,11 +909,11 @@ export const wireTemplates = {
   layerAnnotationItemsAppearance:
     '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/appearance',
   layerAnnotationItemAppearanceResource:
-    '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/:annotKey/resources/appearance',
+    '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/:annotationKey/resources/appearance',
   layerAnnotationItemFileResource:
-    '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/:annotKey/resources/file',
+    '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/:annotationKey/resources/file',
   layerForm: '/v1/docs/:docId/layers/:layerName/form',
-  layerFormWidget: '/v1/docs/:docId/layers/:layerName/form/widgets/:pageKey/:annotKey',
+  layerFormWidget: '/v1/docs/:docId/layers/:layerName/form/widgets/:pageKey/:annotationKey',
   layerFormWidgetsReorder: '/v1/docs/:docId/layers/:layerName/form/widgets/:pageKey/reorder',
   layerFormCalculationsReorder: '/v1/docs/:docId/layers/:layerName/form/calculations/reorder',
   layerFormFieldValue: '/v1/docs/:docId/layers/:layerName/form/fields/:fieldKey/value',
@@ -937,12 +937,12 @@ export const wireTemplates = {
   layerSignatureComplete: '/v1/docs/:docId/layers/:layerName/signatures/:signingId/complete',
   layerSignatureCancel: '/v1/docs/:docId/layers/:layerName/signatures/:signingId',
   layerVersions: '/v1/docs/:docId/layers/:layerName/versions',
-  layerVersionSignatures: '/v1/docs/:docId/layers/:layerName/versions/signatures/:sha',
+  layerVersionSignatures: '/v1/docs/:docId/layers/:layerName/versions/signatures/:sha256',
   layerVersionSignatureContents:
-    '/v1/docs/:docId/layers/:layerName/versions/signatures/:sha/:fieldKey/contents',
+    '/v1/docs/:docId/layers/:layerName/versions/signatures/:sha256/:fieldKey/contents',
   layerVersionSignatureDigest:
-    '/v1/docs/:docId/layers/:layerName/versions/signatures/:sha/:fieldKey/digest/:algorithm',
-  layerVersionAnalysis: '/v1/docs/:docId/layers/:layerName/versions/analysis/:sha',
-  layerVersionDownload: '/v1/docs/:docId/layers/:layerName/versions/download/:sha',
-  layerVersionRevision: '/v1/docs/:docId/layers/:layerName/versions/revisions/:sha/:index',
+    '/v1/docs/:docId/layers/:layerName/versions/signatures/:sha256/:fieldKey/digest/:algorithm',
+  layerVersionAnalysis: '/v1/docs/:docId/layers/:layerName/versions/analysis/:sha256',
+  layerVersionDownload: '/v1/docs/:docId/layers/:layerName/versions/download/:sha256',
+  layerVersionRevision: '/v1/docs/:docId/layers/:layerName/versions/revisions/:sha256/:index',
 } as const;

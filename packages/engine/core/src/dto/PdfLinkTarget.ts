@@ -65,5 +65,5 @@ export function actionTreeOf<Destination>(
       : target.kind === 'goto'
         ? { type: 'goto', subtype: 'GoTo', destination: target.destination, next: [] }
         : { type: 'named', subtype: 'Named', name: target.name, next: [] };
-  return { root, incomplete: false, warningFlags: 0, warnings: [] };
+  return { root, incomplete: false, warnings: [] };
 }

@@ -192,7 +192,7 @@ AUTH=(-H "Authorization: Bearer $API_TOKEN")
 
 INIT=$(curl -sf -X POST "$BASE/documents/init" "${AUTH[@]}" \
   -H 'content-type: application/json' \
-  -d "{\"contentLength\":$LEN,\"contentSha256\":\"$SHA\",\"uploadPreference\":\"proxy\"}")
+  -d "{\"sizeBytes\":$LEN,\"contentSha256\":\"$SHA\",\"uploadPreference\":\"proxy\"}")
 DOC=$(printf '%s' "$INIT" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p' | head -1)
 [[ -n "$DOC" ]] || { echo "init failed: $INIT"; exit 1; }
 curl -sf -X POST "$BASE/documents/$DOC/upload-proxy" "${AUTH[@]}" \

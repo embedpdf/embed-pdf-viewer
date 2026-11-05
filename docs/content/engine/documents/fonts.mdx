@@ -288,7 +288,7 @@ in the same order, ending with the last-resort font that draws the boxes:
 ```ts
 const { lastResort } = await doc.fonts.list();
 const [run] = runs;
-const hashes = [run.program, ...run.fallbacks, lastResort.displayHash].filter((hash) => hash !== null);
+const hashes = [run.program, ...run.fallbacks, lastResort.displaySha256].filter((hash) => hash !== null);
 
 for (const hash of hashes) {
   const face = new FontFace(`font-${hash}`, await doc.fonts.downloadProgram(hash));
@@ -309,8 +309,8 @@ A font's file is its program. `programs` on each font, and `getProgram(hash)`, d
 
 | Field                 | What it is                                                                                                         |
 | :-------------------- | :----------------------------------------------------------------------------------------------------------------- |
-| `displayHash`         | SHA-256 of the file a browser loads. You download and name programs by it.                                         |
-| `sourceHash`          | SHA-256 of the file the engine lays text out with and puts in the PDF; `null` when the document doesn't hold one.  |
+| `displaySha256`       | SHA-256 of the file a browser loads. You download and name programs by it.                                         |
+| `sourceSha256`        | SHA-256 of the file the engine lays text out with and puts in the PDF; `null` when the document doesn't hold one.  |
 | `embedded`            | `'whole'`, `'subset'`, or `'none'` when the PDF only names the font.                                               |
 | `format`              | `'truetype'`, `'opentype'`, `'cff'`, `'type1'` or `'type3'`; `null` when nothing is embedded.                      |
 | `embeddingPermission` | What the font's licence says: `'installable'`, `'editable'` or `'preview-and-print'`; `null` when it says nothing. |
@@ -414,11 +414,11 @@ them exactly as the engine draws them.
 
 PDFs, forms especially, often carry their fonts as Type 1 or CFF, which browsers can't load. For
 those the engine builds a program a browser can load, with the same letters, the same widths and
-the same characters, and `displayHash` names it. That's why a program has two hashes: they're the
+the same characters, and `displaySha256` names it. That's why a program has two hashes: they're the
 same for a TrueType or OpenType font and differ for these.
 
 Two of a PDF's fonts can read one such file with other widths or character codes. Each gets a
-program of its own, so the font lists the file twice under one `sourceHash`, and `resolve()` gives a
+program of its own, so the font lists the file twice under one `sourceSha256`, and `resolve()` gives a
 box the program its own font reads.
 
 ### A hash is not a permission

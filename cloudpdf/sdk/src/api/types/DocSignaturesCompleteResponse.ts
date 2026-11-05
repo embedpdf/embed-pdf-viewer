@@ -28,7 +28,7 @@ export namespace DocSignaturesCompleteResponse {
         filter: string | null;
         subFilter: string | null;
         byteRange: unknown[] | null;
-        contentsSize: number;
+        contentsSizeBytes: number;
         coverage: Signature.Coverage | null;
         revisionIndex: number | null;
         signer: Signature.Signer;
@@ -61,21 +61,24 @@ export namespace DocSignaturesCompleteResponse {
         }
 
         export interface SeedValue {
-            requiredFlags: number;
-            presentFlags: number;
-            version: number | null;
+            parserVersion: number | null;
+            parserVersionRequired: boolean;
             mdp: number | null;
             filter: string | null;
+            filterRequired: boolean;
             subFilters: string[];
+            subFiltersRequired: boolean;
             digestMethods: string[];
+            digestMethodsRequired: boolean;
             reasons: string[];
+            reasonsRequired: boolean;
             unsupportedRequired: boolean;
         }
     }
 
     export interface Version {
         sha256: string;
-        byteLength: number;
+        sizeBytes: number;
     }
 
     export interface Previous {

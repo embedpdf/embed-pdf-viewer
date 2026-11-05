@@ -11,6 +11,6 @@ export interface FoldersMoveIntoRequest {
     tenantId: string;
     /** A folder id, or root for the top level. */
     folderId: string;
-    documentIds?: string[];
+    docIds?: string[];
     folderIds?: string[];
 }

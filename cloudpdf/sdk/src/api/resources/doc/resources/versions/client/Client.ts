@@ -119,7 +119,7 @@ export class VersionsClient {
      *     await client.doc.versions.analysis({
      *         docId: "docId",
      *         layerName: "layerName",
-     *         sha: "sha"
+     *         sha256: "sha256"
      *     })
      */
     public analysis(
@@ -136,7 +136,7 @@ export class VersionsClient {
         const {
             docId,
             layerName,
-            sha,
+            sha256,
             "since.signature": sinceSignature,
             "since.revision": sinceRevision,
             level,
@@ -166,7 +166,7 @@ export class VersionsClient {
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)) ??
                     environments.CloudPDFEnvironment.Saas,
-                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/versions/analysis/${core.url.encodePathParam(sha)}`,
+                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/versions/analysis/${core.url.encodePathParam(sha256)}`,
             ),
             method: "GET",
             headers: _headers,
@@ -210,7 +210,7 @@ export class VersionsClient {
             _response.error,
             _response.rawResponse,
             "GET",
-            "/v1/docs/{docId}/layers/{layerName}/versions/analysis/{sha}",
+            "/v1/docs/{docId}/layers/{layerName}/versions/analysis/{sha256}",
         );
     }
 
@@ -230,7 +230,7 @@ export class VersionsClient {
         request: CloudPDF.doc.DownloadVersionsRequest,
         requestOptions?: VersionsClient.RequestOptions,
     ): Promise<core.WithRawResponse<core.BinaryResponse>> {
-        const { docId, layerName, sha, "X-Document-Password": documentPassword } = request;
+        const { docId, layerName, sha256, "X-Document-Password": documentPassword } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -246,7 +246,7 @@ export class VersionsClient {
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)) ??
                     environments.CloudPDFEnvironment.Saas,
-                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/versions/download/${core.url.encodePathParam(sha)}`,
+                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/versions/download/${core.url.encodePathParam(sha256)}`,
             ),
             method: "GET",
             headers: _headers,
@@ -282,7 +282,7 @@ export class VersionsClient {
             _response.error,
             _response.rawResponse,
             "GET",
-            "/v1/docs/{docId}/layers/{layerName}/versions/download/{sha}",
+            "/v1/docs/{docId}/layers/{layerName}/versions/download/{sha256}",
         );
     }
 
@@ -302,7 +302,7 @@ export class VersionsClient {
         request: CloudPDF.doc.RevisionVersionsRequest,
         requestOptions?: VersionsClient.RequestOptions,
     ): Promise<core.WithRawResponse<core.BinaryResponse>> {
-        const { docId, layerName, sha, index, "X-Document-Password": documentPassword } = request;
+        const { docId, layerName, sha256, index, "X-Document-Password": documentPassword } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -318,7 +318,7 @@ export class VersionsClient {
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)) ??
                     environments.CloudPDFEnvironment.Saas,
-                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/versions/revisions/${core.url.encodePathParam(sha)}/${core.url.encodePathParam(index)}`,
+                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/versions/revisions/${core.url.encodePathParam(sha256)}/${core.url.encodePathParam(index)}`,
             ),
             method: "GET",
             headers: _headers,
@@ -354,7 +354,7 @@ export class VersionsClient {
             _response.error,
             _response.rawResponse,
             "GET",
-            "/v1/docs/{docId}/layers/{layerName}/versions/revisions/{sha}/{index}",
+            "/v1/docs/{docId}/layers/{layerName}/versions/revisions/{sha256}/{index}",
         );
     }
 
@@ -370,7 +370,7 @@ export class VersionsClient {
      *     await client.doc.versions.signatures({
      *         docId: "docId",
      *         layerName: "layerName",
-     *         sha: "sha"
+     *         sha256: "sha256"
      *     })
      */
     public signatures(
@@ -384,7 +384,7 @@ export class VersionsClient {
         request: CloudPDF.doc.SignaturesVersionsRequest,
         requestOptions?: VersionsClient.RequestOptions,
     ): Promise<core.WithRawResponse<CloudPDF.DocVersionsSignaturesResponse>> {
-        const { docId, layerName, sha, "X-Document-Password": documentPassword } = request;
+        const { docId, layerName, sha256, "X-Document-Password": documentPassword } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -400,7 +400,7 @@ export class VersionsClient {
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)) ??
                     environments.CloudPDFEnvironment.Saas,
-                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/versions/signatures/${core.url.encodePathParam(sha)}`,
+                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/versions/signatures/${core.url.encodePathParam(sha256)}`,
             ),
             method: "GET",
             headers: _headers,
@@ -438,7 +438,7 @@ export class VersionsClient {
             _response.error,
             _response.rawResponse,
             "GET",
-            "/v1/docs/{docId}/layers/{layerName}/versions/signatures/{sha}",
+            "/v1/docs/{docId}/layers/{layerName}/versions/signatures/{sha256}",
         );
     }
 
@@ -460,7 +460,7 @@ export class VersionsClient {
         request: CloudPDF.doc.SignatureContentsVersionsRequest,
         requestOptions?: VersionsClient.RequestOptions,
     ): Promise<core.WithRawResponse<core.BinaryResponse>> {
-        const { docId, layerName, sha, fieldKey, "X-Document-Password": documentPassword } = request;
+        const { docId, layerName, sha256, fieldKey, "X-Document-Password": documentPassword } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -476,7 +476,7 @@ export class VersionsClient {
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)) ??
                     environments.CloudPDFEnvironment.Saas,
-                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/versions/signatures/${core.url.encodePathParam(sha)}/${core.url.encodePathParam(fieldKey)}/contents`,
+                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/versions/signatures/${core.url.encodePathParam(sha256)}/${core.url.encodePathParam(fieldKey)}/contents`,
             ),
             method: "GET",
             headers: _headers,
@@ -512,7 +512,7 @@ export class VersionsClient {
             _response.error,
             _response.rawResponse,
             "GET",
-            "/v1/docs/{docId}/layers/{layerName}/versions/signatures/{sha}/{fieldKey}/contents",
+            "/v1/docs/{docId}/layers/{layerName}/versions/signatures/{sha256}/{fieldKey}/contents",
         );
     }
 
@@ -534,7 +534,7 @@ export class VersionsClient {
         request: CloudPDF.doc.SignatureDigestVersionsRequest,
         requestOptions?: VersionsClient.RequestOptions,
     ): Promise<core.WithRawResponse<core.BinaryResponse>> {
-        const { docId, layerName, sha, fieldKey, algorithm, "X-Document-Password": documentPassword } = request;
+        const { docId, layerName, sha256, fieldKey, algorithm, "X-Document-Password": documentPassword } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -550,7 +550,7 @@ export class VersionsClient {
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)) ??
                     environments.CloudPDFEnvironment.Saas,
-                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/versions/signatures/${core.url.encodePathParam(sha)}/${core.url.encodePathParam(fieldKey)}/digest/${core.url.encodePathParam(algorithm)}`,
+                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/versions/signatures/${core.url.encodePathParam(sha256)}/${core.url.encodePathParam(fieldKey)}/digest/${core.url.encodePathParam(algorithm)}`,
             ),
             method: "GET",
             headers: _headers,
@@ -586,7 +586,7 @@ export class VersionsClient {
             _response.error,
             _response.rawResponse,
             "GET",
-            "/v1/docs/{docId}/layers/{layerName}/versions/signatures/{sha}/{fieldKey}/digest/{algorithm}",
+            "/v1/docs/{docId}/layers/{layerName}/versions/signatures/{sha256}/{fieldKey}/digest/{algorithm}",
         );
     }
 }

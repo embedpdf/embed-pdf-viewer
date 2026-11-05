@@ -355,7 +355,8 @@ describe("TenantsClient", () => {
             tenantId: "tenantId",
             periodStart: "periodStart",
             periodEnd: "periodEnd",
-            metrics: { "pdf.views": 1, "pdf.uploads": 1, "storage.bytes": 1 },
+            metrics: { pdfViews: 1, pdfUploads: 1, storageBytes: 1 },
+            moduleMeters: { key: 1 },
         };
 
         server

@@ -7,11 +7,11 @@ import type * as core from "../../../../../core/index.js";
  *     {
  *         file: fs.createReadStream("/path/to/your/file"),
  *         tenantId: "tenantId",
- *         id: "id"
+ *         docId: "docId"
  *     }
  */
 export interface UploadProxyDocumentsRequest {
     tenantId: string;
-    id: string;
+    docId: string;
     file: core.file.Uploadable;
 }

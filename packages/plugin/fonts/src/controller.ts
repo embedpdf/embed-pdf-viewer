@@ -80,24 +80,24 @@ export function createFontsController(ctx: PluginContext<void>) {
    * the engine, the first time it's mounted.
    */
   const programOf = (
-    displayHash: string,
+    displaySha256: string,
     style: { weight: number; italic: boolean },
   ): MountableFontProgram => {
-    const standard = standardFontOfProgramFamily(fontProgramFamily(displayHash));
+    const standard = standardFontOfProgramFamily(fontProgramFamily(displaySha256));
     if (standard) return standardFontProgram(standard);
-    if (displayHash === LAST_RESORT_HASH) return lastResortFontProgram();
-    let program = programs.get(displayHash);
+    if (displaySha256 === LAST_RESORT_HASH) return lastResortFontProgram();
+    let program = programs.get(displaySha256);
     if (!program) {
       let bytes: Promise<Uint8Array> | null = null;
       program = {
-        hash: displayHash,
-        family: fontProgramFamily(displayHash),
+        hash: displaySha256,
+        family: fontProgramFamily(displaySha256),
         weight: style.weight,
         style: style.italic ? 'italic' : 'normal',
         load: () => {
           if (!bytes) {
             const loading = Promise.resolve().then(() =>
-              ctx.doc.fonts.downloadProgram(displayHash),
+              ctx.doc.fonts.downloadProgram(displaySha256),
             );
             // A load that failed is tried again next time.
             loading.catch(() => {
@@ -108,7 +108,7 @@ export function createFontsController(ctx: PluginContext<void>) {
           return bytes;
         },
       };
-      programs.set(displayHash, program);
+      programs.set(displaySha256, program);
     }
     return program;
   };
@@ -182,12 +182,12 @@ export function createFontsController(ctx: PluginContext<void>) {
   };
 
   /** A program's coverage and metrics, read once per hash (a failed read is tried again). */
-  const programInfoOf = (displayHash: string): Promise<FontProgramInfo> => {
-    let info = programInfos.get(displayHash);
+  const programInfoOf = (displaySha256: string): Promise<FontProgramInfo> => {
+    let info = programInfos.get(displaySha256);
     if (!info) {
-      info = ctx.doc.fonts.getProgram(displayHash);
-      programInfos.set(displayHash, info);
-      info.catch(() => programInfos.delete(displayHash));
+      info = ctx.doc.fonts.getProgram(displaySha256);
+      programInfos.set(displaySha256, info);
+      info.catch(() => programInfos.delete(displaySha256));
     }
     return info;
   };
@@ -306,7 +306,7 @@ export function createFontsController(ctx: PluginContext<void>) {
   const listedCss = (font: Font): FontCss => {
     const program = font.programs[0];
     const mountable =
-      program?.displayHash && program.canDownload ? programOf(program.displayHash, font) : null;
+      program?.displaySha256 && program.canDownload ? programOf(program.displaySha256, font) : null;
     if (!mountable || refused(mountable)) {
       return standardCss(
         standardFontForFace({ family: font.familyName, weight: font.weight, italic: font.italic }),
@@ -327,11 +327,11 @@ export function createFontsController(ctx: PluginContext<void>) {
     refresh: () => list.refresh(),
     resolve: async (request, options) =>
       ctx.cancellable(options?.signal, ctx.doc.fonts.resolve(request)),
-    getProgram: async (displayHash, options) =>
+    getProgram: async (displaySha256, options) =>
       // Another caller may share the read: cancelling this one leaves it running.
       ctx.cancellable(
         options?.signal,
-        programInfoOf(displayHash).then((value) => value),
+        programInfoOf(displaySha256).then((value) => value),
       ),
     getPaintFonts: (font, text) => paintFonts.get(font, text),
     getPaintFontsEpoch: () => paintFontsEpoch,
@@ -378,7 +378,7 @@ export function createFontsController(ctx: PluginContext<void>) {
       const font = list
         .get()
         ?.fonts.find((candidate) =>
-          candidate.programs.some((program) => program.displayHash?.startsWith(prefix)),
+          candidate.programs.some((program) => program.displaySha256?.startsWith(prefix)),
         );
       return font ? { family: font.familyName, weight: font.weight, italic: font.italic } : null;
     },

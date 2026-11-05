@@ -39,11 +39,11 @@ export async function verifyForCompletion(input: {
   profile: CompletionProfile;
 }): Promise<CompletionGate> {
   const { cms, prepared, profile } = input;
-  if (cms.byteLength > prepared.contentsSize) {
+  if (cms.byteLength > prepared.contentsSizeBytes) {
     return {
       ok: false,
       reason: 'too-large',
-      detail: `the CMS is ${cms.byteLength} bytes; ${prepared.contentsSize} were reserved`,
+      detail: `the CMS is ${cms.byteLength} bytes; ${prepared.contentsSizeBytes} were reserved`,
     };
   }
   if (profile === 'timestamp') return verifyTimestampToken(cms, prepared);

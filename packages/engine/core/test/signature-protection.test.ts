@@ -21,7 +21,7 @@ const sig = (over: Partial<SignatureDTO>): SignatureDTO => ({
   filter: 'Adobe.PPKLite',
   subFilter: 'ETSI.CAdES.detached',
   byteRange: [0, 10, 20, 5],
-  contentsSize: 8,
+  contentsSizeBytes: 8,
   coverage: 'whole-revision',
   revisionIndex: 1,
   signer: { name: null, reason: null, location: null, contactInfo: null, signedAt: null },

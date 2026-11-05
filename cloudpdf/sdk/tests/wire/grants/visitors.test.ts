@@ -18,7 +18,7 @@ describe("VisitorsClient", () => {
                     consentedAt: "2024-01-15T09:30:00Z",
                     firstSeenAt: "2024-01-15T09:30:00Z",
                     lastSeenAt: "2024-01-15T09:30:00Z",
-                    layer: { layerName: "layerName", storageSizeBytes: null },
+                    layer: { layerName: "layerName", sizeBytes: null },
                 },
             ],
             nextCursor: "nextCursor",

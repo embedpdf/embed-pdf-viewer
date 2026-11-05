@@ -247,8 +247,8 @@ export default defineServerModule({
 `oncePerDay`, only the first count with that key each UTC day adds one; the server keeps the key as
 its hash, for that day only. A meter the module didn't declare is an error in the module.
 
-The tenant's usage reports each installed module's meter by its whole name, next to the core's,
-and `0` when nothing counted it:
+The tenant's usage reports each installed module's meter in `moduleMeters`, by its whole name, and
+`0` when nothing counted it. The core's meters are in `metrics`:
 
 ```sh
 curl "localhost:3000/v1/tenants/fernquill/usage?from=2026-11-03&to=2026-12-03" \
@@ -261,9 +261,11 @@ curl "localhost:3000/v1/tenants/fernquill/usage?from=2026-11-03&to=2026-12-03" \
   "periodStart": "2026-11-03",
   "periodEnd": "2026-12-03",
   "metrics": {
-    "pdf.views": 1840,
-    "pdf.uploads": 52,
-    "storage.bytes": 73400320,
+    "pdfViews": 1840,
+    "pdfUploads": 52,
+    "storageBytes": 73400320
+  },
+  "moduleMeters": {
     "snapshot.saved": 311
   }
 }
@@ -271,7 +273,7 @@ curl "localhost:3000/v1/tenants/fernquill/usage?from=2026-11-03&to=2026-12-03" \
 
 Usage is counted per UTC day, so it adds up over any window: `from` the first day and `to` the
 day after the last, up to 366 days, or `period=2026-11` for a calendar month (the current one by
-default). `storage.bytes` is what the tenant stores now, whatever the window. The server records
+default). `storageBytes` is what the tenant stores now, whatever the window. The server records
 and reports; limits and prices are yours.
 
 ## From the viewer

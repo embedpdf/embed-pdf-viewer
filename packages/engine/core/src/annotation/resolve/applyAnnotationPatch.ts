@@ -50,9 +50,9 @@ export function readValueOf(name: string, value: unknown, current: unknown): unk
       };
       const read = current as AttachmentFileInfo | null;
       // The name, type and description are one value, replaced whole; what
-      // the bytes say (size, checksum, dates) stays until new bytes come.
+      // the bytes say (size, MD5, dates) stays until new bytes come.
       return {
-        ...(read ?? { size: null, checksum: null, createdAt: null, modifiedAt: null }),
+        ...(read ?? { sizeBytes: null, md5: null, createdAt: null, modifiedAt: null }),
         name: written.name,
         mimeType: written.mimeType ?? null,
         description: written.description ?? null,

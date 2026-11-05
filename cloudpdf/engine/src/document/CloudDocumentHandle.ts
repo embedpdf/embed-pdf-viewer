@@ -915,8 +915,8 @@ export class CloudDocumentHandle implements DocumentHandle {
 function fallbackUnknownHead(id: string): DocumentHead {
   return {
     id,
-    baseSha: '',
-    storageSizeBytes: 0,
+    baseSha256: '',
+    sizeBytes: 0,
     docVersion: 1,
     state: 'ready',
     encryption: { state: 'unknown', requiresPassword: null },

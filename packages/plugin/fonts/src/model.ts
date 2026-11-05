@@ -45,10 +45,10 @@ export function fontForFace(list: FontList, face: FaceRequest): Font | undefined
 /** The weight and italic of the font a program belongs to; regular when no listed font has it. */
 export function styleOfProgram(
   list: FontList | null,
-  displayHash: string,
+  displaySha256: string,
 ): { weight: number; italic: boolean } {
   const font = list?.fonts.find((candidate) =>
-    candidate.programs.some((program) => program.displayHash === displayHash),
+    candidate.programs.some((program) => program.displaySha256 === displaySha256),
   );
   return font ? { weight: font.weight, italic: font.italic } : { weight: 400, italic: false };
 }
@@ -58,7 +58,7 @@ export function fallbackHashes(list: FontList | null): string[] {
   if (!list) return [];
   const hashes: string[] = [];
   for (const name of list.fallbacks) {
-    const hash = fontNamed(list, name)?.programs[0]?.displayHash;
+    const hash = fontNamed(list, name)?.programs[0]?.displaySha256;
     if (hash) hashes.push(hash);
   }
   return hashes;

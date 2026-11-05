@@ -313,7 +313,7 @@
               "type": "string",
               "minLength": 1,
               "pattern": "^obj:[1-9][0-9]*$",
-              "description": "The page's address, `obj:N`: the page's indirect object number, the durable identity every `PageLayout.ref` carries. Mirrors `annotKey` and `fieldKey`."
+              "description": "The page's address, `obj:N`: the page's indirect object number, the durable identity every `PageLayout.ref` carries. Mirrors `annotationKey` and `fieldKey`."
             }
           },
           {
@@ -406,7 +406,7 @@
               "type": "string",
               "minLength": 1,
               "pattern": "^obj:[1-9][0-9]*$",
-              "description": "The page's address, `obj:N`: the page's indirect object number, the durable identity every `PageLayout.ref` carries. Mirrors `annotKey` and `fieldKey`."
+              "description": "The page's address, `obj:N`: the page's indirect object number, the durable identity every `PageLayout.ref` carries. Mirrors `annotationKey` and `fieldKey`."
             }
           },
           {
@@ -482,7 +482,7 @@
         }
       }
     },
-    "/v1/docs/{docId}/layers/{layerName}/annotations/pages/{pageKey}/items/{annotKey}": {
+    "/v1/docs/{docId}/layers/{layerName}/annotations/pages/{pageKey}/items/{annotationKey}": {
       "patch": {
         "operationId": "doc.annotations.update",
         "x-fern-sdk-group-name": ["doc", "annotations"],
@@ -529,11 +529,11 @@
               "type": "string",
               "minLength": 1,
               "pattern": "^obj:[1-9][0-9]*$",
-              "description": "The page's address, `obj:N`: the page's indirect object number, the durable identity every `PageLayout.ref` carries. Mirrors `annotKey` and `fieldKey`."
+              "description": "The page's address, `obj:N`: the page's indirect object number, the durable identity every `PageLayout.ref` carries. Mirrors `annotationKey` and `fieldKey`."
             }
           },
           {
-            "name": "annotKey",
+            "name": "annotationKey",
             "in": "path",
             "required": true,
             "schema": {
@@ -661,11 +661,11 @@
               "type": "string",
               "minLength": 1,
               "pattern": "^obj:[1-9][0-9]*$",
-              "description": "The page's address, `obj:N`: the page's indirect object number, the durable identity every `PageLayout.ref` carries. Mirrors `annotKey` and `fieldKey`."
+              "description": "The page's address, `obj:N`: the page's indirect object number, the durable identity every `PageLayout.ref` carries. Mirrors `annotationKey` and `fieldKey`."
             }
           },
           {
-            "name": "annotKey",
+            "name": "annotationKey",
             "in": "path",
             "required": true,
             "schema": {
@@ -728,7 +728,7 @@
         }
       }
     },
-    "/v1/docs/{docId}/layers/{layerName}/annotations/pages/{pageKey}/items/{annotKey}/resources/appearance": {
+    "/v1/docs/{docId}/layers/{layerName}/annotations/pages/{pageKey}/items/{annotationKey}/resources/appearance": {
       "get": {
         "operationId": "doc.annotations.readAppearance",
         "x-fern-sdk-group-name": ["doc", "annotations"],
@@ -775,11 +775,11 @@
               "type": "string",
               "minLength": 1,
               "pattern": "^obj:[1-9][0-9]*$",
-              "description": "The page's address, `obj:N`: the page's indirect object number, the durable identity every `PageLayout.ref` carries. Mirrors `annotKey` and `fieldKey`."
+              "description": "The page's address, `obj:N`: the page's indirect object number, the durable identity every `PageLayout.ref` carries. Mirrors `annotationKey` and `fieldKey`."
             }
           },
           {
-            "name": "annotKey",
+            "name": "annotationKey",
             "in": "path",
             "required": true,
             "schema": {
@@ -844,7 +844,7 @@
         }
       }
     },
-    "/v1/docs/{docId}/layers/{layerName}/annotations/pages/{pageKey}/items/{annotKey}/resources/file": {
+    "/v1/docs/{docId}/layers/{layerName}/annotations/pages/{pageKey}/items/{annotationKey}/resources/file": {
       "get": {
         "operationId": "doc.annotations.readFile",
         "x-fern-sdk-group-name": ["doc", "annotations"],
@@ -892,11 +892,11 @@
               "type": "string",
               "minLength": 1,
               "pattern": "^obj:[1-9][0-9]*$",
-              "description": "The page's address, `obj:N`: the page's indirect object number, the durable identity every `PageLayout.ref` carries. Mirrors `annotKey` and `fieldKey`."
+              "description": "The page's address, `obj:N`: the page's indirect object number, the durable identity every `PageLayout.ref` carries. Mirrors `annotationKey` and `fieldKey`."
             }
           },
           {
-            "name": "annotKey",
+            "name": "annotationKey",
             "in": "path",
             "required": true,
             "schema": {
@@ -1018,7 +1018,7 @@
               "type": "string",
               "minLength": 1,
               "pattern": "^obj:[1-9][0-9]*$",
-              "description": "The page's address, `obj:N`: the page's indirect object number, the durable identity every `PageLayout.ref` carries. Mirrors `annotKey` and `fieldKey`."
+              "description": "The page's address, `obj:N`: the page's indirect object number, the durable identity every `PageLayout.ref` carries. Mirrors `annotationKey` and `fieldKey`."
             }
           },
           {
@@ -1133,7 +1133,7 @@
               "type": "string",
               "minLength": 1,
               "pattern": "^obj:[1-9][0-9]*$",
-              "description": "The page's address, `obj:N`: the page's indirect object number, the durable identity every `PageLayout.ref` carries. Mirrors `annotKey` and `fieldKey`."
+              "description": "The page's address, `obj:N`: the page's indirect object number, the durable identity every `PageLayout.ref` carries. Mirrors `annotationKey` and `fieldKey`."
             }
           },
           {
@@ -1256,7 +1256,7 @@
               "type": "string",
               "minLength": 1,
               "pattern": "^obj:[1-9][0-9]*$",
-              "description": "The page's address, `obj:N`: the page's indirect object number, the durable identity every `PageLayout.ref` carries. Mirrors `annotKey` and `fieldKey`."
+              "description": "The page's address, `obj:N`: the page's indirect object number, the durable identity every `PageLayout.ref` carries. Mirrors `annotationKey` and `fieldKey`."
             }
           },
           {
@@ -1856,7 +1856,7 @@
         }
       }
     },
-    "/v1/docs/{docId}/layers/{layerName}/font-program-files/{displayHash}": {
+    "/v1/docs/{docId}/layers/{layerName}/font-program-files/{displaySha256}": {
       "get": {
         "operationId": "doc.fonts.programs.download",
         "x-fern-sdk-group-name": ["doc", "fonts", "programs"],
@@ -1902,7 +1902,7 @@
             }
           },
           {
-            "name": "displayHash",
+            "name": "displaySha256",
             "in": "path",
             "required": true,
             "schema": {
@@ -1965,7 +1965,7 @@
         }
       }
     },
-    "/v1/docs/{docId}/layers/{layerName}/font-programs/{displayHash}": {
+    "/v1/docs/{docId}/layers/{layerName}/font-programs/{displaySha256}": {
       "get": {
         "operationId": "doc.fonts.programs.get",
         "x-fern-sdk-group-name": ["doc", "fonts", "programs"],
@@ -2005,7 +2005,7 @@
             }
           },
           {
-            "name": "displayHash",
+            "name": "displaySha256",
             "in": "path",
             "required": true,
             "schema": {
@@ -2671,7 +2671,7 @@
         }
       }
     },
-    "/v1/docs/{docId}/layers/{layerName}/form/widgets/{pageKey}/{annotKey}": {
+    "/v1/docs/{docId}/layers/{layerName}/form/widgets/{pageKey}/{annotationKey}": {
       "patch": {
         "operationId": "doc.forms.updateWidget",
         "x-fern-sdk-group-name": ["doc", "forms"],
@@ -2718,11 +2718,11 @@
               "type": "string",
               "minLength": 1,
               "pattern": "^obj:[1-9][0-9]*$",
-              "description": "The page's address, `obj:N`: the page's indirect object number, the durable identity every `PageLayout.ref` carries. Mirrors `annotKey` and `fieldKey`."
+              "description": "The page's address, `obj:N`: the page's indirect object number, the durable identity every `PageLayout.ref` carries. Mirrors `annotationKey` and `fieldKey`."
             }
           },
           {
-            "name": "annotKey",
+            "name": "annotationKey",
             "in": "path",
             "required": true,
             "schema": {
@@ -2850,11 +2850,11 @@
               "type": "string",
               "minLength": 1,
               "pattern": "^obj:[1-9][0-9]*$",
-              "description": "The page's address, `obj:N`: the page's indirect object number, the durable identity every `PageLayout.ref` carries. Mirrors `annotKey` and `fieldKey`."
+              "description": "The page's address, `obj:N`: the page's indirect object number, the durable identity every `PageLayout.ref` carries. Mirrors `annotationKey` and `fieldKey`."
             }
           },
           {
-            "name": "annotKey",
+            "name": "annotationKey",
             "in": "path",
             "required": true,
             "schema": {
@@ -2974,7 +2974,7 @@
               "type": "string",
               "minLength": 1,
               "pattern": "^obj:[1-9][0-9]*$",
-              "description": "The page's address, `obj:N`: the page's indirect object number, the durable identity every `PageLayout.ref` carries. Mirrors `annotKey` and `fieldKey`."
+              "description": "The page's address, `obj:N`: the page's indirect object number, the durable identity every `PageLayout.ref` carries. Mirrors `annotationKey` and `fieldKey`."
             }
           },
           {
@@ -3429,7 +3429,7 @@
               "type": "string",
               "minLength": 1,
               "pattern": "^obj:[1-9][0-9]*$",
-              "description": "The page's address, `obj:N`: the page's indirect object number, the durable identity every `PageLayout.ref` carries. Mirrors `annotKey` and `fieldKey`."
+              "description": "The page's address, `obj:N`: the page's indirect object number, the durable identity every `PageLayout.ref` carries. Mirrors `annotationKey` and `fieldKey`."
             }
           },
           {
@@ -3552,7 +3552,7 @@
               "type": "string",
               "minLength": 1,
               "pattern": "^obj:[1-9][0-9]*$",
-              "description": "The page's address, `obj:N`: the page's indirect object number, the durable identity every `PageLayout.ref` carries. Mirrors `annotKey` and `fieldKey`."
+              "description": "The page's address, `obj:N`: the page's indirect object number, the durable identity every `PageLayout.ref` carries. Mirrors `annotationKey` and `fieldKey`."
             }
           },
           {
@@ -4200,7 +4200,7 @@
               "type": "string",
               "minLength": 1,
               "pattern": "^obj:[1-9][0-9]*$",
-              "description": "The page's address, `obj:N`: the page's indirect object number, the durable identity every `PageLayout.ref` carries. Mirrors `annotKey` and `fieldKey`."
+              "description": "The page's address, `obj:N`: the page's indirect object number, the durable identity every `PageLayout.ref` carries. Mirrors `annotationKey` and `fieldKey`."
             }
           },
           {
@@ -4836,7 +4836,7 @@
               "type": "string",
               "minLength": 1,
               "pattern": "^obj:[1-9][0-9]*$",
-              "description": "The page's address, `obj:N`: the page's indirect object number, the durable identity every `PageLayout.ref` carries. Mirrors `annotKey` and `fieldKey`."
+              "description": "The page's address, `obj:N`: the page's indirect object number, the durable identity every `PageLayout.ref` carries. Mirrors `annotationKey` and `fieldKey`."
             }
           },
           {
@@ -4967,7 +4967,7 @@
         }
       }
     },
-    "/v1/docs/{docId}/layers/{layerName}/versions/analysis/{sha}": {
+    "/v1/docs/{docId}/layers/{layerName}/versions/analysis/{sha256}": {
       "get": {
         "operationId": "doc.versions.analysis",
         "x-fern-sdk-group-name": ["doc", "versions"],
@@ -5008,7 +5008,7 @@
             }
           },
           {
-            "name": "sha",
+            "name": "sha256",
             "in": "path",
             "required": true,
             "schema": {
@@ -5115,7 +5115,7 @@
         }
       }
     },
-    "/v1/docs/{docId}/layers/{layerName}/versions/download/{sha}": {
+    "/v1/docs/{docId}/layers/{layerName}/versions/download/{sha256}": {
       "get": {
         "operationId": "doc.versions.download",
         "x-fern-sdk-group-name": ["doc", "versions"],
@@ -5155,7 +5155,7 @@
             }
           },
           {
-            "name": "sha",
+            "name": "sha256",
             "in": "path",
             "required": true,
             "schema": {
@@ -5208,7 +5208,7 @@
         }
       }
     },
-    "/v1/docs/{docId}/layers/{layerName}/versions/revisions/{sha}/{index}": {
+    "/v1/docs/{docId}/layers/{layerName}/versions/revisions/{sha256}/{index}": {
       "get": {
         "operationId": "doc.versions.revision",
         "x-fern-sdk-group-name": ["doc", "versions"],
@@ -5248,7 +5248,7 @@
             }
           },
           {
-            "name": "sha",
+            "name": "sha256",
             "in": "path",
             "required": true,
             "schema": {
@@ -5310,7 +5310,7 @@
         }
       }
     },
-    "/v1/docs/{docId}/layers/{layerName}/versions/signatures/{sha}": {
+    "/v1/docs/{docId}/layers/{layerName}/versions/signatures/{sha256}": {
       "get": {
         "operationId": "doc.versions.signatures",
         "x-fern-sdk-group-name": ["doc", "versions"],
@@ -5350,7 +5350,7 @@
             }
           },
           {
-            "name": "sha",
+            "name": "sha256",
             "in": "path",
             "required": true,
             "schema": {
@@ -5402,7 +5402,7 @@
         }
       }
     },
-    "/v1/docs/{docId}/layers/{layerName}/versions/signatures/{sha}/{fieldKey}/contents": {
+    "/v1/docs/{docId}/layers/{layerName}/versions/signatures/{sha256}/{fieldKey}/contents": {
       "get": {
         "operationId": "doc.versions.signatureContents",
         "x-fern-sdk-group-name": ["doc", "versions"],
@@ -5443,7 +5443,7 @@
             }
           },
           {
-            "name": "sha",
+            "name": "sha256",
             "in": "path",
             "required": true,
             "schema": {
@@ -5505,7 +5505,7 @@
         }
       }
     },
-    "/v1/docs/{docId}/layers/{layerName}/versions/signatures/{sha}/{fieldKey}/digest/{algorithm}": {
+    "/v1/docs/{docId}/layers/{layerName}/versions/signatures/{sha256}/{fieldKey}/digest/{algorithm}": {
       "get": {
         "operationId": "doc.versions.signatureDigest",
         "x-fern-sdk-group-name": ["doc", "versions"],
@@ -5546,7 +5546,7 @@
             }
           },
           {
-            "name": "sha",
+            "name": "sha256",
             "in": "path",
             "required": true,
             "schema": {
@@ -6153,7 +6153,7 @@
         }
       }
     },
-    "/v1/tenants/{tenantId}/documents/{id}": {
+    "/v1/tenants/{tenantId}/documents/{docId}": {
       "get": {
         "operationId": "documents.get",
         "x-fern-sdk-group-name": ["documents"],
@@ -6180,7 +6180,7 @@
             }
           },
           {
-            "name": "id",
+            "name": "docId",
             "in": "path",
             "required": true,
             "schema": {
@@ -6259,7 +6259,7 @@
             }
           },
           {
-            "name": "id",
+            "name": "docId",
             "in": "path",
             "required": true,
             "schema": {
@@ -6357,7 +6357,7 @@
             }
           },
           {
-            "name": "id",
+            "name": "docId",
             "in": "path",
             "required": true,
             "schema": {
@@ -6403,7 +6403,7 @@
         }
       }
     },
-    "/v1/tenants/{tenantId}/documents/{id}/commit": {
+    "/v1/tenants/{tenantId}/documents/{docId}/commit": {
       "post": {
         "operationId": "documents.commit",
         "x-fern-sdk-group-name": ["documents"],
@@ -6434,7 +6434,7 @@
             }
           },
           {
-            "name": "id",
+            "name": "docId",
             "in": "path",
             "required": true,
             "schema": {
@@ -6497,7 +6497,7 @@
         }
       }
     },
-    "/v1/tenants/{tenantId}/documents/{id}/download": {
+    "/v1/tenants/{tenantId}/documents/{docId}/download": {
       "get": {
         "operationId": "documents.download",
         "x-fern-sdk-group-name": ["documents"],
@@ -6525,7 +6525,7 @@
             }
           },
           {
-            "name": "id",
+            "name": "docId",
             "in": "path",
             "required": true,
             "schema": {
@@ -6579,7 +6579,7 @@
         }
       }
     },
-    "/v1/tenants/{tenantId}/documents/{id}/layers": {
+    "/v1/tenants/{tenantId}/documents/{docId}/layers": {
       "get": {
         "operationId": "documents.layers.list",
         "x-fern-sdk-group-name": ["documents", "layers"],
@@ -6606,7 +6606,7 @@
             }
           },
           {
-            "name": "id",
+            "name": "docId",
             "in": "path",
             "required": true,
             "schema": {
@@ -6698,7 +6698,7 @@
         }
       }
     },
-    "/v1/tenants/{tenantId}/documents/{id}/layers/{layerName}": {
+    "/v1/tenants/{tenantId}/documents/{docId}/layers/{layerName}": {
       "delete": {
         "operationId": "documents.layers.delete",
         "x-fern-sdk-group-name": ["documents", "layers"],
@@ -6725,7 +6725,7 @@
             }
           },
           {
-            "name": "id",
+            "name": "docId",
             "in": "path",
             "required": true,
             "schema": {
@@ -6791,7 +6791,7 @@
         }
       }
     },
-    "/v1/tenants/{tenantId}/documents/{id}/thumbnail": {
+    "/v1/tenants/{tenantId}/documents/{docId}/thumbnail": {
       "get": {
         "operationId": "documents.thumbnail",
         "x-fern-sdk-group-name": ["documents"],
@@ -6819,7 +6819,7 @@
             }
           },
           {
-            "name": "id",
+            "name": "docId",
             "in": "path",
             "required": true,
             "schema": {
@@ -6869,7 +6869,7 @@
         }
       }
     },
-    "/v1/tenants/{tenantId}/documents/{id}/upload-proxy": {
+    "/v1/tenants/{tenantId}/documents/{docId}/upload-proxy": {
       "post": {
         "operationId": "documents.uploadProxy",
         "x-fern-sdk-group-name": ["documents"],
@@ -6900,7 +6900,7 @@
             }
           },
           {
-            "name": "id",
+            "name": "docId",
             "in": "path",
             "required": true,
             "schema": {
@@ -7089,7 +7089,7 @@
         "x-fern-sdk-method-name": "init",
         "x-docs-title": "Initialize upload",
         "summary": "Begin an upload: create (or resume/dedupe) a pending document and issue upload access.",
-        "description": "With an upload token, the document goes into the token's folder with the token's metadata, whatever the request says; contentLength must be within the token's maxBytes, and the token makes at most maxFiles documents (403 after). docId, idempotencyKey and dedupMode reuse-existing are refused (400): each could reach a document the token didn't make.",
+        "description": "With an upload token, the document goes into the token's folder with the token's metadata, whatever the request says; sizeBytes must be within the token's maxBytes, and the token makes at most maxFiles documents (403 after). docId, idempotencyKey and dedupMode reuse-existing are refused (400): each could reach a document the token didn't make.",
         "security": [
           {
             "apiToken": []
@@ -7665,7 +7665,7 @@
         "x-fern-sdk-method-name": "moveInto",
         "x-docs-title": "Move into folder",
         "summary": "Move documents and folders into a folder, or to the top level with root. All of them move, or none do.",
-        "description": "Up to 1,000 ids in total. A folder moves with everything in it. 404 NotFound names the ids that do not exist or are being deleted in `details.documentIds` and `details.folderIds`. 409 Conflict carries `details.reason`: `cycle` (the destination is a moved folder or inside one; `details.folderId`), `too-deep` (the move would nest folders deeper than 100 levels; `details.maxDepth`) or `name-taken` (a moved folder's name is taken in the destination, ignoring case; `details.name`).",
+        "description": "Up to 1,000 ids in total. A folder moves with everything in it. 404 NotFound names the ids that do not exist or are being deleted in `details.docIds` and `details.folderIds`. 409 Conflict carries `details.reason`: `cycle` (the destination is a moved folder or inside one; `details.folderId`), `too-deep` (the move would nest folders deeper than 100 levels; `details.maxDepth`) or `name-taken` (a moved folder's name is taken in the destination, ignoring case; `details.name`).",
         "security": [
           {
             "apiToken": []
@@ -9854,70 +9854,60 @@
                     },
                     "nullable": true
                   },
-                  "flags": {
-                    "type": "object",
-                    "properties": {
-                      "raw": {
-                        "type": "integer",
-                        "minimum": 0
-                      },
-                      "exclude": {
-                        "type": "boolean"
-                      },
-                      "includeNoValueFields": {
-                        "type": "boolean"
-                      },
-                      "format": {
-                        "type": "string",
-                        "enum": ["fdf", "html", "xfdf", "pdf"]
-                      },
-                      "method": {
-                        "type": "string",
-                        "enum": ["post", "get"]
-                      },
-                      "submitCoordinates": {
-                        "type": "boolean"
-                      },
-                      "includeAppendSaves": {
-                        "type": "boolean"
-                      },
-                      "includeAnnotations": {
-                        "type": "boolean"
-                      },
-                      "canonicalFormat": {
-                        "type": "boolean"
-                      },
-                      "exclNonUserAnnots": {
-                        "type": "boolean"
-                      },
-                      "exclFKey": {
-                        "type": "boolean"
-                      },
-                      "embedForm": {
-                        "type": "boolean"
-                      }
-                    },
-                    "required": [
-                      "raw",
-                      "exclude",
-                      "includeNoValueFields",
-                      "format",
-                      "method",
-                      "submitCoordinates",
-                      "includeAppendSaves",
-                      "includeAnnotations",
-                      "canonicalFormat",
-                      "exclNonUserAnnots",
-                      "exclFKey",
-                      "embedForm"
-                    ],
-                    "additionalProperties": false
+                  "exclude": {
+                    "type": "boolean"
+                  },
+                  "includeNoValueFields": {
+                    "type": "boolean"
+                  },
+                  "format": {
+                    "type": "string",
+                    "enum": ["fdf", "html", "xfdf", "pdf"]
+                  },
+                  "method": {
+                    "type": "string",
+                    "enum": ["post", "get"]
+                  },
+                  "submitCoordinates": {
+                    "type": "boolean"
+                  },
+                  "includeAppendSaves": {
+                    "type": "boolean"
+                  },
+                  "includeAnnotations": {
+                    "type": "boolean"
+                  },
+                  "canonicalFormat": {
+                    "type": "boolean"
+                  },
+                  "exclNonUserAnnots": {
+                    "type": "boolean"
+                  },
+                  "exclFKey": {
+                    "type": "boolean"
+                  },
+                  "embedForm": {
+                    "type": "boolean"
                   },
                   "charSet": {
                     "type": "string"
                   }
                 },
-                "required": ["url", "fields", "flags"],
+                "required": [
+                  "url",
+                  "fields",
+                  "exclude",
+                  "includeNoValueFields",
+                  "format",
+                  "method",
+                  "submitCoordinates",
+                  "includeAppendSaves",
+                  "includeAnnotations",
+                  "canonicalFormat",
+                  "exclNonUserAnnots",
+                  "exclFKey",
+                  "embedForm"
+                ],
                 "additionalProperties": false
               }
             },
@@ -10077,10 +10067,6 @@
           "incomplete": {
             "type": "boolean"
           },
-          "warningFlags": {
-            "type": "integer",
-            "minimum": 0
-          },
           "warnings": {
             "type": "array",
             "items": {
@@ -10089,7 +10075,7 @@
             }
           }
         },
-        "required": ["root", "incomplete", "warningFlags", "warnings"],
+        "required": ["root", "incomplete", "warnings"],
         "additionalProperties": false
       },
       "PdfFieldActions": {
@@ -10415,9 +10401,40 @@
                 },
                 "nullable": true
               },
-              "flags": {
-                "type": "integer",
-                "minimum": 0
+              "exclude": {
+                "type": "boolean"
+              },
+              "includeNoValueFields": {
+                "type": "boolean"
+              },
+              "format": {
+                "type": "string",
+                "enum": ["fdf", "html", "xfdf", "pdf"]
+              },
+              "method": {
+                "type": "string",
+                "enum": ["post", "get"]
+              },
+              "submitCoordinates": {
+                "type": "boolean"
+              },
+              "includeAppendSaves": {
+                "type": "boolean"
+              },
+              "includeAnnotations": {
+                "type": "boolean"
+              },
+              "canonicalFormat": {
+                "type": "boolean"
+              },
+              "exclNonUserAnnots": {
+                "type": "boolean"
+              },
+              "exclFKey": {
+                "type": "boolean"
+              },
+              "embedForm": {
+                "type": "boolean"
               },
               "next": {
                 "type": "array",
@@ -20952,14 +20969,14 @@
               "type": "string"
             }
           },
-          "changed": {
+          "changedRefs": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/AnnotationRef"
             }
           }
         },
-        "required": ["affectedPages", "cacheDelta", "opId", "undoable", "changed"],
+        "required": ["affectedPages", "cacheDelta", "opId", "undoable", "changedRefs"],
         "additionalProperties": false
       },
       "AnnotationPosition": {
@@ -23736,14 +23753,14 @@
               "type": "string"
             }
           },
-          "changed": {
+          "changedRefs": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/OutlineItemRef"
             }
           }
         },
-        "required": ["affectedPages", "cacheDelta", "opId", "undoable", "changed"],
+        "required": ["affectedPages", "cacheDelta", "opId", "undoable", "changedRefs"],
         "additionalProperties": false
       },
       "AttachmentRef": {
@@ -23775,12 +23792,12 @@
             "type": "string",
             "nullable": true
           },
-          "size": {
+          "sizeBytes": {
             "type": "integer",
             "minimum": 0,
             "nullable": true
           },
-          "checksum": {
+          "md5": {
             "type": "string",
             "nullable": true
           },
@@ -23802,8 +23819,8 @@
           "name",
           "mimeType",
           "description",
-          "size",
-          "checksum",
+          "sizeBytes",
+          "md5",
           "createdAt",
           "modifiedAt"
         ],
@@ -23837,12 +23854,12 @@
             "type": "string",
             "nullable": true
           },
-          "size": {
+          "sizeBytes": {
             "type": "integer",
             "minimum": 0,
             "nullable": true
           },
-          "checksum": {
+          "md5": {
             "type": "string",
             "nullable": true
           },
@@ -23869,8 +23886,8 @@
           "name",
           "mimeType",
           "description",
-          "size",
-          "checksum",
+          "sizeBytes",
+          "md5",
           "createdAt",
           "modifiedAt",
           "index"
@@ -23936,14 +23953,14 @@
               "type": "string"
             }
           },
-          "changed": {
+          "changedRefs": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/AttachmentRef"
             }
           }
         },
-        "required": ["affectedPages", "cacheDelta", "opId", "undoable", "changed"],
+        "required": ["affectedPages", "cacheDelta", "opId", "undoable", "changedRefs"],
         "additionalProperties": false
       },
       "ChangeOp": {
@@ -25838,11 +25855,11 @@
       "FontProgram": {
         "type": "object",
         "properties": {
-          "displayHash": {
+          "displaySha256": {
             "type": "string",
             "nullable": true
           },
-          "sourceHash": {
+          "sourceSha256": {
             "type": "string",
             "nullable": true
           },
@@ -25865,8 +25882,8 @@
           }
         },
         "required": [
-          "displayHash",
-          "sourceHash",
+          "displaySha256",
+          "sourceSha256",
           "embedded",
           "format",
           "embeddingPermission",
@@ -25959,11 +25976,11 @@
       "FontProgramInfo": {
         "type": "object",
         "properties": {
-          "displayHash": {
+          "displaySha256": {
             "type": "string",
             "nullable": true
           },
-          "sourceHash": {
+          "sourceSha256": {
             "type": "string",
             "nullable": true
           },
@@ -26011,8 +26028,8 @@
           }
         },
         "required": [
-          "displayHash",
-          "sourceHash",
+          "displaySha256",
+          "sourceSha256",
           "embedded",
           "format",
           "embeddingPermission",
@@ -26326,7 +26343,7 @@
       "DocumentsInitRequest": {
         "type": "object",
         "properties": {
-          "contentLength": {
+          "sizeBytes": {
             "type": "integer",
             "minimum": 1
           },
@@ -26362,7 +26379,7 @@
             "type": "string",
             "pattern": "^[A-Za-z0-9_-]+$"
           },
-          "uploadTtlSec": {
+          "uploadTtlSeconds": {
             "type": "integer",
             "minimum": 60,
             "maximum": 3600
@@ -26372,7 +26389,7 @@
             "enum": ["auto", "presigned", "proxy"]
           }
         },
-        "required": ["contentLength", "contentSha256"],
+        "required": ["sizeBytes", "contentSha256"],
         "additionalProperties": false
       },
       "DocumentsInitResponse": {
@@ -26404,11 +26421,11 @@
                     "type": "string",
                     "enum": ["pending", "ready", "failed", "deleting"]
                   },
-                  "baseSha": {
+                  "baseSha256": {
                     "type": "string",
                     "nullable": true
                   },
-                  "storageSizeBytes": {
+                  "sizeBytes": {
                     "type": "integer",
                     "nullable": true
                   },
@@ -26451,8 +26468,8 @@
                   "name",
                   "folderId",
                   "state",
-                  "baseSha",
-                  "storageSizeBytes",
+                  "baseSha256",
+                  "sizeBytes",
                   "metadata",
                   "idempotencyKey",
                   "failureReason",
@@ -26593,11 +26610,11 @@
                 "type": "string",
                 "enum": ["pending", "ready", "failed", "deleting"]
               },
-              "baseSha": {
+              "baseSha256": {
                 "type": "string",
                 "nullable": true
               },
-              "storageSizeBytes": {
+              "sizeBytes": {
                 "type": "integer",
                 "nullable": true
               },
@@ -26640,8 +26657,8 @@
               "name",
               "folderId",
               "state",
-              "baseSha",
-              "storageSizeBytes",
+              "baseSha256",
+              "sizeBytes",
               "metadata",
               "idempotencyKey",
               "failureReason",
@@ -26805,11 +26822,11 @@
                 "type": "string",
                 "enum": ["pending", "ready", "failed", "deleting"]
               },
-              "baseSha": {
+              "baseSha256": {
                 "type": "string",
                 "nullable": true
               },
-              "storageSizeBytes": {
+              "sizeBytes": {
                 "type": "integer",
                 "nullable": true
               },
@@ -26852,8 +26869,8 @@
               "name",
               "folderId",
               "state",
-              "baseSha",
-              "storageSizeBytes",
+              "baseSha256",
+              "sizeBytes",
               "metadata",
               "idempotencyKey",
               "failureReason",
@@ -26896,11 +26913,11 @@
                 "type": "string",
                 "enum": ["pending", "ready", "failed", "deleting"]
               },
-              "baseSha": {
+              "baseSha256": {
                 "type": "string",
                 "nullable": true
               },
-              "storageSizeBytes": {
+              "sizeBytes": {
                 "type": "integer",
                 "nullable": true
               },
@@ -26943,8 +26960,8 @@
               "name",
               "folderId",
               "state",
-              "baseSha",
-              "storageSizeBytes",
+              "baseSha256",
+              "sizeBytes",
               "metadata",
               "idempotencyKey",
               "failureReason",
@@ -26985,11 +27002,11 @@
                   "type": "string",
                   "enum": ["pending", "ready", "failed", "deleting"]
                 },
-                "baseSha": {
+                "baseSha256": {
                   "type": "string",
                   "nullable": true
                 },
-                "storageSizeBytes": {
+                "sizeBytes": {
                   "type": "integer",
                   "nullable": true
                 },
@@ -27032,8 +27049,8 @@
                 "name",
                 "folderId",
                 "state",
-                "baseSha",
-                "storageSizeBytes",
+                "baseSha256",
+                "sizeBytes",
                 "metadata",
                 "idempotencyKey",
                 "failureReason",
@@ -27077,11 +27094,11 @@
                 "type": "string",
                 "enum": ["pending", "ready", "failed", "deleting"]
               },
-              "baseSha": {
+              "baseSha256": {
                 "type": "string",
                 "nullable": true
               },
-              "storageSizeBytes": {
+              "sizeBytes": {
                 "type": "integer",
                 "nullable": true
               },
@@ -27124,8 +27141,8 @@
               "name",
               "folderId",
               "state",
-              "baseSha",
-              "storageSizeBytes",
+              "baseSha256",
+              "sizeBytes",
               "metadata",
               "idempotencyKey",
               "failureReason",
@@ -27178,11 +27195,11 @@
                 "type": "string",
                 "enum": ["pending", "ready", "failed", "deleting"]
               },
-              "baseSha": {
+              "baseSha256": {
                 "type": "string",
                 "nullable": true
               },
-              "storageSizeBytes": {
+              "sizeBytes": {
                 "type": "integer",
                 "nullable": true
               },
@@ -27225,8 +27242,8 @@
               "name",
               "folderId",
               "state",
-              "baseSha",
-              "storageSizeBytes",
+              "baseSha256",
+              "sizeBytes",
               "metadata",
               "idempotencyKey",
               "failureReason",
@@ -27264,7 +27281,7 @@
                   "type": "string",
                   "nullable": true
                 },
-                "storageSizeBytes": {
+                "sizeBytes": {
                   "type": "integer",
                   "nullable": true
                 },
@@ -27289,7 +27306,7 @@
                 "layerName",
                 "grantId",
                 "visitorId",
-                "storageSizeBytes",
+                "sizeBytes",
                 "createdAt",
                 "updatedAt",
                 "lastSeenAt"
@@ -27549,7 +27566,7 @@
       "FoldersMoveIntoRequest": {
         "type": "object",
         "properties": {
-          "documentIds": {
+          "docIds": {
             "type": "array",
             "items": {
               "type": "string",
@@ -27648,13 +27665,13 @@
                 "minItems": 1,
                 "maxItems": 32
               },
-              "expiresIn": {
+              "expiresInSeconds": {
                 "type": "integer",
                 "minimum": 60,
                 "maximum": 7776000
               }
             },
-            "required": ["kind", "sub", "docId", "scope", "expiresIn"],
+            "required": ["kind", "sub", "docId", "scope", "expiresInSeconds"],
             "additionalProperties": false
           },
           {
@@ -27679,13 +27696,13 @@
                 "minItems": 1,
                 "maxItems": 64
               },
-              "expiresIn": {
+              "expiresInSeconds": {
                 "type": "integer",
                 "minimum": 60,
                 "maximum": 7776000
               }
             },
-            "required": ["kind", "sub", "scope", "expiresIn"],
+            "required": ["kind", "sub", "scope", "expiresInSeconds"],
             "additionalProperties": false
           },
           {
@@ -27721,13 +27738,13 @@
               "origins": {
                 "$ref": "#/components/schemas/TokensIssueRequest/anyOf/0/properties/origins"
               },
-              "expiresIn": {
+              "expiresInSeconds": {
                 "type": "integer",
                 "minimum": 60,
                 "maximum": 7776000
               }
             },
-            "required": ["kind", "sub", "expiresIn"],
+            "required": ["kind", "sub", "expiresInSeconds"],
             "additionalProperties": false
           }
         ]
@@ -27778,23 +27795,27 @@
           "metrics": {
             "type": "object",
             "properties": {
-              "pdf.views": {
+              "pdfViews": {
                 "type": "integer"
               },
-              "pdf.uploads": {
+              "pdfUploads": {
                 "type": "integer"
               },
-              "storage.bytes": {
+              "storageBytes": {
                 "type": "integer"
               }
             },
-            "required": ["pdf.views", "pdf.uploads", "storage.bytes"],
+            "required": ["pdfViews", "pdfUploads", "storageBytes"],
+            "additionalProperties": false
+          },
+          "moduleMeters": {
+            "type": "object",
             "additionalProperties": {
               "type": "integer"
             }
           }
         },
-        "required": ["tenantId", "periodStart", "periodEnd", "metrics"],
+        "required": ["tenantId", "periodStart", "periodEnd", "metrics", "moduleMeters"],
         "additionalProperties": false
       },
       "TenantsSuspendRequest": {
@@ -28988,12 +29009,12 @@
                     "layerName": {
                       "type": "string"
                     },
-                    "storageSizeBytes": {
+                    "sizeBytes": {
                       "type": "integer",
                       "nullable": true
                     }
                   },
-                  "required": ["layerName", "storageSizeBytes"],
+                  "required": ["layerName", "sizeBytes"],
                   "additionalProperties": false,
                   "nullable": true
                 }
@@ -29166,10 +29187,10 @@
           "id": {
             "type": "string"
           },
-          "baseSha": {
+          "baseSha256": {
             "type": "string"
           },
-          "storageSizeBytes": {
+          "sizeBytes": {
             "type": "integer",
             "minimum": 0
           },
@@ -29265,8 +29286,8 @@
         },
         "required": [
           "id",
-          "baseSha",
-          "storageSizeBytes",
+          "baseSha256",
+          "sizeBytes",
           "docVersion",
           "state",
           "encryption",
@@ -29340,7 +29361,7 @@
             "type": "integer",
             "minimum": 0
           },
-          "baseSha": {
+          "baseSha256": {
             "type": "string"
           },
           "layerVersion": {
@@ -29352,7 +29373,7 @@
             "type": "boolean",
             "default": false
           },
-          "baseByteLength": {
+          "baseSizeBytes": {
             "type": "integer",
             "minimum": 0,
             "default": 0
@@ -29499,7 +29520,7 @@
           "layoutVersion",
           "metadataVersion",
           "auditHead",
-          "baseSha",
+          "baseSha256",
           "protection",
           "pages"
         ],
@@ -29627,7 +29648,7 @@
                   ],
                   "nullable": true
                 },
-                "contentsSize": {
+                "contentsSizeBytes": {
                   "type": "integer",
                   "minimum": 0
                 },
@@ -29699,15 +29720,12 @@
                 "seedValue": {
                   "type": "object",
                   "properties": {
-                    "requiredFlags": {
-                      "type": "integer"
-                    },
-                    "presentFlags": {
-                      "type": "integer"
-                    },
-                    "version": {
+                    "parserVersion": {
                       "type": "integer",
                       "nullable": true
+                    },
+                    "parserVersionRequired": {
+                      "type": "boolean"
                     },
                     "mdp": {
                       "type": "integer",
@@ -29718,11 +29736,17 @@
                       "type": "string",
                       "nullable": true
                     },
+                    "filterRequired": {
+                      "type": "boolean"
+                    },
                     "subFilters": {
                       "type": "array",
                       "items": {
                         "type": "string"
                       }
+                    },
+                    "subFiltersRequired": {
+                      "type": "boolean"
                     },
                     "digestMethods": {
                       "type": "array",
@@ -29730,25 +29754,34 @@
                         "type": "string"
                       }
                     },
+                    "digestMethodsRequired": {
+                      "type": "boolean"
+                    },
                     "reasons": {
                       "type": "array",
                       "items": {
                         "type": "string"
                       }
                     },
+                    "reasonsRequired": {
+                      "type": "boolean"
+                    },
                     "unsupportedRequired": {
                       "type": "boolean"
                     }
                   },
                   "required": [
-                    "requiredFlags",
-                    "presentFlags",
-                    "version",
+                    "parserVersion",
+                    "parserVersionRequired",
                     "mdp",
                     "filter",
+                    "filterRequired",
                     "subFilters",
+                    "subFiltersRequired",
                     "digestMethods",
+                    "digestMethodsRequired",
                     "reasons",
+                    "reasonsRequired",
                     "unsupportedRequired"
                   ],
                   "additionalProperties": false,
@@ -29765,7 +29798,7 @@
                 "filter",
                 "subFilter",
                 "byteRange",
-                "contentsSize",
+                "contentsSizeBytes",
                 "coverage",
                 "revisionIndex",
                 "signer",
@@ -29861,12 +29894,12 @@
                     "type": "string",
                     "pattern": "^[0-9a-f]{64}$"
                   },
-                  "byteLength": {
+                  "sizeBytes": {
                     "type": "integer",
                     "minimum": 0
                   }
                 },
-                "required": ["sha256", "byteLength"],
+                "required": ["sha256", "sizeBytes"],
                 "additionalProperties": false
               },
               "editsVersion": {
@@ -30065,7 +30098,7 @@
               }
             ]
           },
-          "contentsSize": {
+          "contentsSizeBytes": {
             "type": "integer",
             "exclusiveMinimum": true,
             "minimum": 0
@@ -30099,7 +30132,7 @@
           "digest",
           "algorithm",
           "byteRange",
-          "contentsSize",
+          "contentsSizeBytes",
           "subFilter",
           "expectedVersion",
           "expiresAt"
@@ -30199,7 +30232,7 @@
                 ],
                 "nullable": true
               },
-              "contentsSize": {
+              "contentsSizeBytes": {
                 "type": "integer",
                 "minimum": 0
               },
@@ -30271,15 +30304,12 @@
               "seedValue": {
                 "type": "object",
                 "properties": {
-                  "requiredFlags": {
-                    "type": "integer"
-                  },
-                  "presentFlags": {
-                    "type": "integer"
-                  },
-                  "version": {
+                  "parserVersion": {
                     "type": "integer",
                     "nullable": true
+                  },
+                  "parserVersionRequired": {
+                    "type": "boolean"
                   },
                   "mdp": {
                     "type": "integer",
@@ -30290,11 +30320,17 @@
                     "type": "string",
                     "nullable": true
                   },
+                  "filterRequired": {
+                    "type": "boolean"
+                  },
                   "subFilters": {
                     "type": "array",
                     "items": {
                       "type": "string"
                     }
+                  },
+                  "subFiltersRequired": {
+                    "type": "boolean"
                   },
                   "digestMethods": {
                     "type": "array",
@@ -30302,25 +30338,34 @@
                       "type": "string"
                     }
                   },
+                  "digestMethodsRequired": {
+                    "type": "boolean"
+                  },
                   "reasons": {
                     "type": "array",
                     "items": {
                       "type": "string"
                     }
                   },
+                  "reasonsRequired": {
+                    "type": "boolean"
+                  },
                   "unsupportedRequired": {
                     "type": "boolean"
                   }
                 },
                 "required": [
-                  "requiredFlags",
-                  "presentFlags",
-                  "version",
+                  "parserVersion",
+                  "parserVersionRequired",
                   "mdp",
                   "filter",
+                  "filterRequired",
                   "subFilters",
+                  "subFiltersRequired",
                   "digestMethods",
+                  "digestMethodsRequired",
                   "reasons",
+                  "reasonsRequired",
                   "unsupportedRequired"
                 ],
                 "additionalProperties": false,
@@ -30337,7 +30382,7 @@
               "filter",
               "subFilter",
               "byteRange",
-              "contentsSize",
+              "contentsSizeBytes",
               "coverage",
               "revisionIndex",
               "signer",
@@ -30356,12 +30401,12 @@
                 "type": "string",
                 "pattern": "^[0-9a-f]{64}$"
               },
-              "byteLength": {
+              "sizeBytes": {
                 "type": "integer",
                 "minimum": 0
               }
             },
-            "required": ["sha256", "byteLength"],
+            "required": ["sha256", "sizeBytes"],
             "additionalProperties": false
           },
           "previous": {
@@ -30459,7 +30504,7 @@
       "DocVersionsListResponse": {
         "type": "object",
         "properties": {
-          "baseSha": {
+          "baseSha256": {
             "type": "string",
             "pattern": "^[0-9a-f]{64}$"
           },
@@ -30472,7 +30517,7 @@
                   "type": "string",
                   "pattern": "^[0-9a-f]{64}$"
                 },
-                "byteLength": {
+                "sizeBytes": {
                   "type": "integer",
                   "minimum": 0
                 },
@@ -30500,7 +30545,7 @@
               },
               "required": [
                 "sha256",
-                "byteLength",
+                "sizeBytes",
                 "number",
                 "parentSha256",
                 "producer",
@@ -30511,7 +30556,7 @@
             }
           }
         },
-        "required": ["baseSha", "versions"],
+        "required": ["baseSha256", "versions"],
         "additionalProperties": false
       },
       "DocVersionsSignaturesResponse": {
@@ -30609,7 +30654,7 @@
                   ],
                   "nullable": true
                 },
-                "contentsSize": {
+                "contentsSizeBytes": {
                   "type": "integer",
                   "minimum": 0
                 },
@@ -30681,15 +30726,12 @@
                 "seedValue": {
                   "type": "object",
                   "properties": {
-                    "requiredFlags": {
-                      "type": "integer"
-                    },
-                    "presentFlags": {
-                      "type": "integer"
-                    },
-                    "version": {
+                    "parserVersion": {
                       "type": "integer",
                       "nullable": true
+                    },
+                    "parserVersionRequired": {
+                      "type": "boolean"
                     },
                     "mdp": {
                       "type": "integer",
@@ -30700,11 +30742,17 @@
                       "type": "string",
                       "nullable": true
                     },
+                    "filterRequired": {
+                      "type": "boolean"
+                    },
                     "subFilters": {
                       "type": "array",
                       "items": {
                         "type": "string"
                       }
+                    },
+                    "subFiltersRequired": {
+                      "type": "boolean"
                     },
                     "digestMethods": {
                       "type": "array",
@@ -30712,25 +30760,34 @@
                         "type": "string"
                       }
                     },
+                    "digestMethodsRequired": {
+                      "type": "boolean"
+                    },
                     "reasons": {
                       "type": "array",
                       "items": {
                         "type": "string"
                       }
                     },
+                    "reasonsRequired": {
+                      "type": "boolean"
+                    },
                     "unsupportedRequired": {
                       "type": "boolean"
                     }
                   },
                   "required": [
-                    "requiredFlags",
-                    "presentFlags",
-                    "version",
+                    "parserVersion",
+                    "parserVersionRequired",
                     "mdp",
                     "filter",
+                    "filterRequired",
                     "subFilters",
+                    "subFiltersRequired",
                     "digestMethods",
+                    "digestMethodsRequired",
                     "reasons",
+                    "reasonsRequired",
                     "unsupportedRequired"
                   ],
                   "additionalProperties": false,
@@ -30747,7 +30804,7 @@
                 "filter",
                 "subFilter",
                 "byteRange",
-                "contentsSize",
+                "contentsSizeBytes",
                 "coverage",
                 "revisionIndex",
                 "signer",
@@ -30843,12 +30900,12 @@
                     "type": "string",
                     "pattern": "^[0-9a-f]{64}$"
                   },
-                  "byteLength": {
+                  "sizeBytes": {
                     "type": "integer",
                     "minimum": 0
                   }
                 },
-                "required": ["sha256", "byteLength"],
+                "required": ["sha256", "sizeBytes"],
                 "additionalProperties": false
               },
               "editsVersion": {
@@ -32255,7 +32312,7 @@
       "DocDownloadLinkRequest": {
         "type": "object",
         "properties": {
-          "expiresIn": {
+          "expiresInSeconds": {
             "type": "integer",
             "minimum": 60,
             "maximum": 3600

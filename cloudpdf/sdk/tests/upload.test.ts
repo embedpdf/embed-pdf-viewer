@@ -78,7 +78,7 @@ describe("upload() from the browser", () => {
         const [init, put, commit] = calls as [Call, Call, Call];
         expect(new Headers(init.init.headers).get("Authorization")).toBe(`Bearer ${token}`);
         expect(JSON.parse(String(init.init.body))).toMatchObject({
-            contentLength: 4,
+            sizeBytes: 4,
             name: "Support agreement.pdf",
         });
         expect(JSON.parse(String(init.init.body))).not.toHaveProperty("tenantId");

@@ -2302,7 +2302,7 @@ export class LayerService {
           wanted > 0 && this.takeIssueTurn(ctx) ? await objectNumbers.issue(trx, key, wanted) : [];
         return {
           session: touched.state,
-          expiresIn: secondsOf(touched.expiresIn),
+          expiresInSeconds: secondsOf(touched.expiresIn),
           objectNumbers: rangesOf(issued),
         };
       });
@@ -2317,7 +2317,7 @@ export class LayerService {
   async reserveObjectNumbers(
     ctx: LayerWriteContext,
     input: { docId: string; layerName: string; count: number },
-  ): Promise<{ objectNumbers: ObjectNumberRange[]; expiresIn: number }> {
+  ): Promise<{ objectNumbers: ObjectNumberRange[]; expiresInSeconds: number }> {
     const objectNumbers = this.requireObjectNumbers();
     if (
       !Number.isInteger(input.count) ||
@@ -2340,7 +2340,7 @@ export class LayerService {
         if (issued.length < input.count) {
           throw new EngineError(EngineErrorCode.LayerFull, 'no more object numbers to hand out');
         }
-        return { objectNumbers: rangesOf(issued), expiresIn: secondsOf(touched.expiresIn) };
+        return { objectNumbers: rangesOf(issued), expiresInSeconds: secondsOf(touched.expiresIn) };
       });
   }
 
@@ -2376,7 +2376,7 @@ export class LayerService {
         await objectNumbers.issue(trx, key, FIRST_OBJECT_NUMBERS);
         held = await objectNumbers.held(trx, key);
       }
-      return { held, expiresIn: secondsOf(touched.expiresIn) };
+      return { held, expiresInSeconds: secondsOf(touched.expiresIn) };
     });
   }
 
@@ -3044,11 +3044,11 @@ export class LayerService {
       // The layer signs over its own base: the upload, or the version its
       // last signature made. Other layers' signatures never move it.
       const head = await this.requireDocumentService().getHead(ctx, input.docId);
-      const baseSha = layer.baseSha ?? head.baseSha;
+      const baseSha = layer.baseSha ?? head.baseSha256;
       const baseVersion = await this.layerState.baseVersionFacts(
         input.docId,
         baseSha,
-        head.storageSizeBytes,
+        head.sizeBytes,
       );
       const fieldObjectNumber = await this.resolveSignatureField(
         input.docId,
@@ -3273,7 +3273,7 @@ export class LayerService {
                     jobId,
                     path: candidatePath,
                     byteRange: prepared.byteRange,
-                    contentsSize: prepared.contentsSize,
+                    contentsSizeBytes: prepared.contentsSizeBytes,
                     fieldObjectNumber: signing.fieldObjectNumber,
                     cms: cmsBytes,
                     password: null as string | null,
@@ -3621,7 +3621,7 @@ export class LayerService {
   private async uploadVersionObject(
     key: string,
     candidatePath: string,
-    version: { sha256: string; byteLength: number },
+    version: { sha256: string; sizeBytes: number },
   ): Promise<void> {
     const storage = this.requireStorage();
     const alreadyThere = async (): Promise<boolean> =>
@@ -3629,7 +3629,7 @@ export class LayerService {
     if (await alreadyThere()) return;
     try {
       const put = await storage.put(key, createReadStream(candidatePath), {
-        contentLength: version.byteLength,
+        contentLength: version.sizeBytes,
       });
       if (put.sha256 !== version.sha256) {
         throw new EngineError(
@@ -3802,7 +3802,7 @@ export class LayerService {
           docId: input.docId,
           layerId: layer.id,
           sha256: finalized.version.sha256,
-          byteLength: finalized.version.byteLength,
+          byteLength: finalized.version.sizeBytes,
           parent,
           signingId: signing.id,
           storageKey: input.versionKey,
@@ -3857,7 +3857,7 @@ export class LayerService {
           artifactVersion: nextVersion,
           artifactKey: input.versionKey,
           artifactSha: finalized.version.sha256,
-          artifactSize: finalized.version.byteLength,
+          artifactSize: finalized.version.sizeBytes,
           // A signing answers a retry by the signing itself.
           idempotencyKey: null,
           // The event names the signing, as the local engine's does.

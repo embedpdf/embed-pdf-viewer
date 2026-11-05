@@ -10,8 +10,8 @@ describe("ProgramsClient", () => {
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
         const rawResponseBody = {
-            displayHash: "displayHash",
-            sourceHash: "sourceHash",
+            displaySha256: "displaySha256",
+            sourceSha256: "sourceSha256",
             embedded: "whole",
             format: "truetype",
             embeddingPermission: "installable",
@@ -23,7 +23,7 @@ describe("ProgramsClient", () => {
 
         server
             .mockEndpoint()
-            .get("/v1/docs/docId/layers/layerName/font-programs/displayHash")
+            .get("/v1/docs/docId/layers/layerName/font-programs/displaySha256")
             .respondWith()
             .statusCode(200)
             .jsonBody(rawResponseBody)
@@ -32,7 +32,7 @@ describe("ProgramsClient", () => {
         const response = await client.doc.fonts.programs.get({
             docId: "docId",
             layerName: "layerName",
-            displayHash: "displayHash",
+            displaySha256: "displaySha256",
         });
         expect(response).toEqual(rawResponseBody);
     });
@@ -45,7 +45,7 @@ describe("ProgramsClient", () => {
 
         server
             .mockEndpoint()
-            .get("/v1/docs/docId/layers/layerName/font-programs/displayHash")
+            .get("/v1/docs/docId/layers/layerName/font-programs/displaySha256")
             .respondWith()
             .statusCode(404)
             .jsonBody(rawResponseBody)
@@ -55,7 +55,7 @@ describe("ProgramsClient", () => {
             return await client.doc.fonts.programs.get({
                 docId: "docId",
                 layerName: "layerName",
-                displayHash: "displayHash",
+                displaySha256: "displaySha256",
             });
         }).rejects.toThrow(CloudPDF.NotFoundError);
     });

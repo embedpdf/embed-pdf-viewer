@@ -19,7 +19,7 @@ export interface AdminLayersRoutesDeps {
 }
 
 /**
- * A document's layers under `/v1/tenants/:tenantId/documents/:id/layers`,
+ * A document's layers under `/v1/tenants/:tenantId/documents/:docId/layers`,
  * for a backend with its API token: listing them finds what grant
  * visitors filled in, and deleting a user's layer deletes their data.
  */
@@ -38,7 +38,7 @@ export async function registerAdminLayersRoutes(
 
   const listOp = adminOperations['documents.layers.list'];
   mount(listOp, async (req, reply) => {
-    const { tenantId, id } = req.params as { tenantId: string; id: string };
+    const { tenantId, docId: id } = req.params as { tenantId: string; docId: string };
     const ctx = requireTenantAccess(req, tenantId, listOp.scope);
     const parsed = listOp.query.safeParse(req.query ?? {});
     if (!parsed.success) {
@@ -61,9 +61,13 @@ export async function registerAdminLayersRoutes(
 
   const deleteOp = adminOperations['documents.layers.delete'];
   mount(deleteOp, async (req, reply) => {
-    const { tenantId, id, layerName } = req.params as {
+    const {
+      tenantId,
+      docId: id,
+      layerName,
+    } = req.params as {
       tenantId: string;
-      id: string;
+      docId: string;
       layerName: string;
     };
     const ctx = requireTenantAccess(req, tenantId, deleteOp.scope);
@@ -88,7 +92,7 @@ function layerPublic(layer: ListedLayer): AdminLayerRecord {
     layerName: layer.name,
     grantId: layer.grantId,
     visitorId: layer.visitorId,
-    storageSizeBytes: layer.storageSizeBytes,
+    sizeBytes: layer.storageSizeBytes,
     createdAt: isoTime(layer.createdAt),
     updatedAt: isoTime(layer.updatedAt),
     lastSeenAt: isoTimeOrNull(layer.lastSeenAt),

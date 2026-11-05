@@ -138,7 +138,7 @@ export class FolderService {
           'NotFound',
           404,
           'some documents or folders do not exist in this tenant',
-          { documentIds: missingDocumentIds, folderIds: missingFolderIds },
+          { docIds: missingDocumentIds, folderIds: missingFolderIds },
         );
       }
 

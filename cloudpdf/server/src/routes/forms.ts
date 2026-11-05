@@ -220,10 +220,13 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
 
   // A widget's place and look: a form write (`doc.forms.updateWidget`).
   app.patch(
-    '/v1/docs/:docId/layers/:layerName/form/widgets/:pageKey/:annotKey',
+    '/v1/docs/:docId/layers/:layerName/form/widgets/:pageKey/:annotationKey',
     async (req, reply) => {
       const { docId, layerName } = layerParams(req);
-      const { pageKey, annotKey } = req.params as { pageKey: string; annotKey: string };
+      const { pageKey, annotationKey: annotKey } = req.params as {
+        pageKey: string;
+        annotationKey: string;
+      };
       const widget = decodeAnnotKey(
         { kind: 'objectNumber', objectNumber: resolvePageKeyParam(pageKey) },
         annotKey,
@@ -333,10 +336,13 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
 
   // A widget leaves its page and its field: a form write (`doc.forms.deleteWidget`).
   app.delete(
-    '/v1/docs/:docId/layers/:layerName/form/widgets/:pageKey/:annotKey',
+    '/v1/docs/:docId/layers/:layerName/form/widgets/:pageKey/:annotationKey',
     async (req, reply) => {
       const { docId, layerName } = layerParams(req);
-      const { pageKey, annotKey } = req.params as { pageKey: string; annotKey: string };
+      const { pageKey, annotationKey: annotKey } = req.params as {
+        pageKey: string;
+        annotationKey: string;
+      };
       const widget = decodeAnnotKey(
         { kind: 'objectNumber', objectNumber: resolvePageKeyParam(pageKey) },
         annotKey,

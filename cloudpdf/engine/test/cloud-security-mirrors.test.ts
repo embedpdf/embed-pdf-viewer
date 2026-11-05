@@ -32,8 +32,8 @@ function docToken(claims: Record<string, unknown>): string {
 function head(): DocumentHead {
   return {
     id: DOC_ID,
-    baseSha: 'stub-sha',
-    storageSizeBytes: 1024,
+    baseSha256: 'stub-sha',
+    sizeBytes: 1024,
     docVersion: 1,
     state: 'ready',
     encryption: { state: 'none', requiresPassword: false },

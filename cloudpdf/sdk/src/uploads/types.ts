@@ -42,7 +42,7 @@ export interface UploadCreateInput {
     idempotencyKey?: string;
     dedupMode?: DedupMode;
     docId?: string;
-    uploadTtlSec?: number;
+    uploadTtlSeconds?: number;
     /** `auto` prefers a presigned object-store PUT and is recommended. */
     uploadPreference?: UploadPreference;
     signal?: AbortSignal;
@@ -74,7 +74,10 @@ export interface PresignedTransfer {
 
 export interface UploadProtocol {
     init(request: Record<string, unknown>, options: UploadRequestOptions): Promise<unknown>;
-    commit(request: Record<string, unknown>, options: UploadRequestOptions): Promise<unknown>;
+    commit(
+        request: { tenantId: string; docId: string; sha256: string },
+        options: UploadRequestOptions,
+    ): Promise<unknown>;
     proxy(
         url: string,
         form: FormData,

@@ -59,7 +59,6 @@ export function createOpenSequence(
             next: [],
           },
           incomplete: false,
-          warningFlags: 0,
           warnings: [],
         };
         steps.push({

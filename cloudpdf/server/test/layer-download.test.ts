@@ -319,7 +319,7 @@ describe('a download link', () => {
   test('downloads the layer with a plain GET, without the engine, and is not cached', async () => {
     const layer = 'linked';
     await edit(layer);
-    const made = await json(await mint(layer, { expiresIn: 120 }));
+    const made = await json(await mint(layer, { expiresInSeconds: 120 }));
     expect(made.url).toMatch(
       new RegExp(`^${baseUrl}/v1/docs/${DOC}/layers/${layer}/download@.+\\?link=`),
     );
@@ -377,7 +377,7 @@ describe('a download link', () => {
 
   test('making one needs doc.download, and an expiry in range', async () => {
     expect((await mint('linked', {}, ['doc.open'])).status).toBe(403);
-    expect((await mint('linked', { expiresIn: 30 })).status).toBe(400);
-    expect((await mint('linked', { expiresIn: 7200 })).status).toBe(400);
+    expect((await mint('linked', { expiresInSeconds: 30 })).status).toBe(400);
+    expect((await mint('linked', { expiresInSeconds: 7200 })).status).toBe(400);
   });
 });

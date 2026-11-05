@@ -8,5 +8,5 @@ export interface OutlineMutationMeta {
     opId: string;
     undoable: boolean;
     missingCharacters?: string[] | undefined;
-    changed: CloudPDF.OutlineItemRef[];
+    changedRefs: CloudPDF.OutlineItemRef[];
 }

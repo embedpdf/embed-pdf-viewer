@@ -37,13 +37,13 @@ export interface DocumentFontsService {
    * editor needs to lay text out with it. Rejects with `NotFound` for a hash
    * the list doesn't name.
    */
-  getProgram(displayHash: string): AbortablePromise<FontProgramInfo>;
+  getProgram(displaySha256: string): AbortablePromise<FontProgramInfo>;
   /**
    * The display file of a program the document's fonts name. Rejects with
    * `NotFound` for a hash the list doesn't name, and `InvalidArg` for a
    * program whose `canDownload` is false.
    */
-  downloadProgram(displayHash: string): AbortablePromise<Uint8Array>;
+  downloadProgram(displaySha256: string): AbortablePromise<Uint8Array>;
 }
 
 /**

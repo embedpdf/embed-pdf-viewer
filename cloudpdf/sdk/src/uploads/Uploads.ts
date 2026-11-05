@@ -36,7 +36,7 @@ export class Uploads<Document = unknown> {
         const init = (await this.protocol.init(
             {
                 tenantId: input.tenantId,
-                contentLength: source.size,
+                sizeBytes: source.size,
                 contentSha256: source.sha256,
                 name: input.name,
                 folderId: input.folderId,
@@ -44,7 +44,7 @@ export class Uploads<Document = unknown> {
                 idempotencyKey: input.idempotencyKey,
                 dedupMode: input.dedupMode,
                 docId: input.docId,
-                uploadTtlSec: input.uploadTtlSec,
+                uploadTtlSeconds: input.uploadTtlSeconds,
                 uploadPreference: input.uploadPreference,
             },
             requestOptions,
@@ -94,7 +94,7 @@ export class Uploads<Document = unknown> {
         const committed = (await this.protocol.commit(
             {
                 tenantId: input.tenantId,
-                id: (init.document as { id: string }).id,
+                docId: (init.document as { id: string }).id,
                 sha256: source.sha256,
             },
             requestOptions,

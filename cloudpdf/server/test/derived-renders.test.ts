@@ -558,7 +558,7 @@ async function adminUpload(
     method: 'POST',
     headers,
     body: JSON.stringify({
-      contentLength: bytes.byteLength,
+      sizeBytes: bytes.byteLength,
       contentSha256: sha256,
       ...(opts?.idempotencyKey ? { idempotencyKey: opts.idempotencyKey } : {}),
     }),

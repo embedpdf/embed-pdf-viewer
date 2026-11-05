@@ -21,8 +21,7 @@ export const PdfActionTargetRefSchema: z.ZodType<PdfActionTargetRef> = closed(
   ]),
 ) as unknown as z.ZodType<PdfActionTargetRef>;
 
-const SubmitFormFlagsSchema = z.object({
-  raw: z.number().int().nonnegative(),
+const submitFormFlags = {
   exclude: z.boolean(),
   includeNoValueFields: z.boolean(),
   format: closed(z.enum(['fdf', 'html', 'xfdf', 'pdf'])),
@@ -34,7 +33,12 @@ const SubmitFormFlagsSchema = z.object({
   exclNonUserAnnots: z.boolean(),
   exclFKey: z.boolean(),
   embedForm: z.boolean(),
-});
+};
+
+/** A write's flags: each optional, off (or `'fdf'`, `'post'`) when left out. */
+const submitFormFlagWrites = Object.fromEntries(
+  Object.entries(submitFormFlags).map(([name, schema]) => [name, schema.optional()]),
+) as { [Name in keyof typeof submitFormFlags]: z.ZodOptional<(typeof submitFormFlags)[Name]> };
 
 /**
  * The action schemas for one kind of destination: in the file's coordinates
@@ -71,7 +75,7 @@ function actionSchemasFor<Destination>(destination: z.ZodType<Destination>) {
         .object({
           url: z.string(),
           fields: z.array(PdfActionTargetRefSchema).nullable(),
-          flags: SubmitFormFlagsSchema,
+          ...submitFormFlags,
           charSet: z.string().optional(),
         })
         .optional(),
@@ -98,7 +102,6 @@ function actionSchemasFor<Destination>(destination: z.ZodType<Destination>) {
   const tree: z.ZodType<PdfActionTree<Destination>> = z.object({
     root: node.nullable(),
     incomplete: z.boolean(),
-    warningFlags: z.number().int().nonnegative(),
     warnings: z.array(
       closed(z.enum(['cycle-dropped', 'malformed-next', 'incomplete', 'payload-dropped'])),
     ),
@@ -183,7 +186,7 @@ function actionWriteSchemasFor<Destination>(destination: z.ZodType<Destination>)
       type: z.literal('submit-form'),
       url: z.string().min(1),
       fields: z.array(PdfActionTargetRefSchema).nullable(),
-      flags: z.number().int().nonnegative().optional(),
+      ...submitFormFlagWrites,
       ...next(),
     }),
   ] as const;

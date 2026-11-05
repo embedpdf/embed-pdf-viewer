@@ -4,12 +4,12 @@
  * @example
  *     {
  *         tenantId: "tenantId",
- *         id: "id"
+ *         docId: "docId"
  *     }
  */
 export interface ListLayersRequest {
     tenantId: string;
-    id: string;
+    docId: string;
     limit?: number;
     cursor?: string;
     grantId?: string;

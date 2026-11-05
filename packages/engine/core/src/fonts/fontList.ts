@@ -150,8 +150,8 @@ export function restrictionsOfProgram(program: FontProgramFacts): FontRestrictio
 function documentProgramOf(program: FontProgramFacts): FontProgram {
   const displayable = isDisplayable(program);
   return {
-    displayHash: displayable ? program.displaySha256 : null,
-    sourceHash: program.embedded === 'none' ? null : program.sha256,
+    displaySha256: displayable ? program.displaySha256 : null,
+    sourceSha256: program.embedded === 'none' ? null : program.sha256,
     embedded: program.embedded,
     format: program.embedded === 'none' ? null : program.format,
     embeddingPermission:
@@ -312,8 +312,8 @@ function engineFontOf(font: EngineFontFacts): Font {
     restrictions,
     programs: [
       {
-        displayHash: font.sha256,
-        sourceHash: font.sha256,
+        displaySha256: font.sha256,
+        sourceSha256: font.sha256,
         embedded: 'none',
         format: font.format,
         embeddingPermission: identity.embeddingPermission,
@@ -336,8 +336,8 @@ function standardFontOf(name: StandardFont, builtIn: BuiltInPrograms): Font {
     restrictions: [],
     programs: [
       {
-        displayHash: builtIn.standardDisplayHash(name),
-        sourceHash: null,
+        displaySha256: builtIn.standardDisplayHash(name),
+        sourceSha256: null,
         embedded: 'none',
         format: null,
         embeddingPermission: null,
@@ -364,8 +364,8 @@ export function fontListOf(facts: FontListFacts, builtIn: BuiltInPrograms): Font
     ],
     fallbacks: [...facts.fallbacks],
     lastResort: {
-      displayHash: builtIn.lastResortDisplayHash,
-      sourceHash: null,
+      displaySha256: builtIn.lastResortDisplayHash,
+      sourceSha256: null,
       embedded: 'none',
       format: 'truetype',
       embeddingPermission: 'installable',
@@ -383,31 +383,31 @@ export const TEXT_WRITING_CAPABILITIES = [
 ] as const satisfies readonly DocCapability[];
 
 /** The program `list` names by its display hash: `NotFound` when none does. */
-export function listedProgram(list: FontList, displayHash: string): FontProgram {
+export function listedProgram(list: FontList, displaySha256: string): FontProgram {
   const program = [...list.fonts.flatMap((font) => font.programs), list.lastResort].find(
-    (candidate) => candidate.displayHash === displayHash,
+    (candidate) => candidate.displaySha256 === displaySha256,
   );
   if (!program) {
     throw new EngineError(
       EngineErrorCode.NotFound,
-      `no font in this document has the program ${displayHash}`,
+      `no font in this document has the program ${displaySha256}`,
     );
   }
   return program;
 }
 
 /**
- * The program `downloadProgram(displayHash)` hands out: as {@link listedProgram},
+ * The program `downloadProgram(displaySha256)` hands out: as {@link listedProgram},
  * and `InvalidArg` when it can't be downloaded.
  */
-export function downloadableProgram(list: FontList, displayHash: string): FontProgram {
-  const program = listedProgram(list, displayHash);
+export function downloadableProgram(list: FontList, displaySha256: string): FontProgram {
+  const program = listedProgram(list, displaySha256);
   if (!program.canDownload) {
     throw new EngineError(
       EngineErrorCode.InvalidArg,
-      `the program ${displayHash} can't be downloaded`,
+      `the program ${displaySha256} can't be downloaded`,
       {
-        details: { field: 'displayHash' },
+        details: { field: 'displaySha256' },
       },
     );
   }

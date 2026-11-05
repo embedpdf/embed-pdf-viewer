@@ -179,20 +179,20 @@ describe('digital signatures (cloud SDK, real runtime)', () => {
       expect(result.signature.docMdp).toBe(2);
       expect(result.previous).toEqual({ baseSha256: seeded.sha, editsVersion: 2 });
       expect(result.version.sha256).not.toBe(seeded.sha);
-      expect(result.version.byteLength).toBeGreaterThan(seeded.size);
+      expect(result.version.sizeBytes).toBeGreaterThan(seeded.size);
       expect(result.protection.certification?.permission).toBe(2);
 
       // The layer is clean over its new version, which isn't the document's (the
       // upload): every plane but actions is the layer's.
       const manifest = await fetchJson<{
-        baseSha: string;
-        baseByteLength: number;
+        baseSha256: string;
+        baseSizeBytes: number;
         layerVersion: number;
         working: boolean;
         scopes: Record<string, string>;
       }>(`/v1/docs/${DOC_ID}/layers/alice/manifest`, 'alice');
-      expect(manifest.baseSha).toBe(result.version.sha256);
-      expect(manifest.baseByteLength).toBe(result.version.byteLength);
+      expect(manifest.baseSha256).toBe(result.version.sha256);
+      expect(manifest.baseSizeBytes).toBe(result.version.sizeBytes);
       expect(manifest.working).toBe(false);
       // A fresh layer (0) → the fill (1) → prepare (2) → complete (3).
       expect(manifest.layerVersion).toBe(3);
@@ -215,7 +215,7 @@ describe('digital signatures (cloud SDK, real runtime)', () => {
 
       // Signed bytes are served per version: contents, digest, the revision prefix, the whole file.
       const contents = await alice.doc.signatures.getContents({ kind: 'fqn', name: 'sig' });
-      expect(contents.byteLength).toBe(sig.contentsSize);
+      expect(contents.byteLength).toBe(sig.contentsSizeBytes);
       expect(contents[0]).toBe(0x30);
       const digest = await alice.doc.signatures.getDigest({ kind: 'fqn', name: 'sig' }, 'sha256');
       expect(digest.byteLength).toBe(32);
@@ -233,7 +233,7 @@ describe('digital signatures (cloud SDK, real runtime)', () => {
       expect(download.status).toBe(200);
       expect(download.headers.get('cache-control')).toContain('immutable');
       const sealed = new Uint8Array(await download.arrayBuffer());
-      expect(sealed.byteLength).toBe(result.version.byteLength);
+      expect(sealed.byteLength).toBe(result.version.sizeBytes);
       expect(sha256(sealed)).toBe(result.version.sha256);
       // Interop hook: dump the published version and its anchor for an
       // external validator (pyHanko) when asked.
@@ -252,7 +252,7 @@ describe('digital signatures (cloud SDK, real runtime)', () => {
 
       // Alice's versions: the upload, then her version 2, which is her base.
       const versions = await fetchJson<{
-        baseSha: string;
+        baseSha256: string;
         versions: Array<{
           sha256: string;
           number: number;
@@ -260,7 +260,7 @@ describe('digital signatures (cloud SDK, real runtime)', () => {
           producer: string;
         }>;
       }>(`/v1/docs/${DOC_ID}/layers/alice/versions`, 'alice');
-      expect(versions.baseSha).toBe(result.version.sha256);
+      expect(versions.baseSha256).toBe(result.version.sha256);
       expect(
         versions.versions.map((v) => [v.number, v.sha256, v.parentSha256, v.producer]),
       ).toEqual([
@@ -274,11 +274,11 @@ describe('digital signatures (cloud SDK, real runtime)', () => {
       expect(history.basis.version.sha256).toBe(result.version.sha256);
 
       // Bob is still over the upload, owning only the plane he wrote, and can sign.
-      const bobManifest = await fetchJson<{ baseSha: string; scopes: Record<string, string> }>(
+      const bobManifest = await fetchJson<{ baseSha256: string; scopes: Record<string, string> }>(
         `/v1/docs/${DOC_ID}/layers/bob/manifest`,
         'bob',
       );
-      expect(bobManifest.baseSha).toBe(seeded.sha);
+      expect(bobManifest.baseSha256).toBe(seeded.sha);
       expect(bobManifest.scopes).toMatchObject({ content: 'base', forms: 'layer' });
       expect((await bob.doc.signatures.list()).signatures.some((s) => s.signed)).toBe(false);
       const bobPrepared = await bob.doc.signatures.prepare({ field: { kind: 'fqn', name: 'sig' } });
@@ -435,10 +435,10 @@ describe('digital signatures (cloud SDK, real runtime)', () => {
       ]);
 
       const versions = await fetchJson<{
-        baseSha: string;
+        baseSha256: string;
         versions: Array<{ sha256: string; number: number; parentSha256: string | null }>;
       }>(`/v1/docs/${docId}/layers/erin/versions`, 'erin', docId);
-      expect(versions.baseSha).toBe(second.version.sha256);
+      expect(versions.baseSha256).toBe(second.version.sha256);
       expect(versions.versions.map((v) => [v.number, v.sha256, v.parentSha256])).toEqual([
         [1, seeded3.sha, null],
         [2, first.version.sha256, seeded3.sha],

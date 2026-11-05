@@ -463,7 +463,7 @@ describe("a grant's visitors", () => {
         visitorId: visitorIdOf(ann),
         answers: { displayName: 'Ann' },
         firstSeenAt: new Date(1000).toISOString(),
-        layer: { layerName: ann.layerName, storageSizeBytes: expect.any(Number) },
+        layer: { layerName: ann.layerName, sizeBytes: expect.any(Number) },
       }),
     ]);
     expect(second.body.nextCursor).toBeNull();

@@ -144,7 +144,7 @@ export function runDocPlaneTenantJwt(dialect: DocPlaneTenantJwtDialect): void {
         kind: 'tenant',
         sub,
         scope,
-        expiresIn: 30 * 24 * 60 * 60,
+        expiresInSeconds: 30 * 24 * 60 * 60,
       });
       expect(issued.status, JSON.stringify(issued.body)).toBe(200);
       return issued.body;
@@ -324,7 +324,7 @@ export function runDocPlaneTenantJwt(dialect: DocPlaneTenantJwtDialect): void {
           kind: 'tenant',
           sub: 'apikey:bogus',
           scope,
-          expiresIn: 3600,
+          expiresInSeconds: 3600,
         });
         expect(refused.status, JSON.stringify(scope)).toBe(400);
       }

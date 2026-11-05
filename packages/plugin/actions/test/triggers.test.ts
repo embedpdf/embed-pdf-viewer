@@ -26,7 +26,6 @@ import { createActionsTestContext } from './helpers/context';
 const tree = (root: PdfActionNode | null, incomplete = false): PdfActionTree => ({
   root,
   incomplete,
-  warningFlags: 0,
   warnings: [],
 });
 const named = (name: string, next: PdfActionNode[] = []): PdfActionNode => ({

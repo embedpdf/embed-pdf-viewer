@@ -8,5 +8,5 @@ export interface AnnotationMutationMeta {
     opId: string;
     undoable: boolean;
     missingCharacters?: string[] | undefined;
-    changed: CloudPDF.AnnotationRef[];
+    changedRefs: CloudPDF.AnnotationRef[];
 }

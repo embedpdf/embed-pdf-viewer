@@ -426,7 +426,7 @@ export function runDrawingDetailsConformance(
 
         // Writing one writes the other, and the result names both.
         const closed = await page.annotations.update(note.annotation.ref, { open: false });
-        expect(closed.meta.changed).toHaveLength(2);
+        expect(closed.meta.changedRefs).toHaveLength(2);
         let both = await readBoth();
         expect(both.note?.subtype === 'text' && both.note.open).toBe(false);
         expect(both.popup?.subtype === 'popup' && both.popup.open).toBe(false);

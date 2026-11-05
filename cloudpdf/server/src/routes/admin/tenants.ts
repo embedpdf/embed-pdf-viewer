@@ -7,6 +7,7 @@ import {
   adminOperations,
   type AdminOperation,
   type AdminTenantRecord,
+  type TenantUsageResponse,
 } from '@cloudpdf/contract';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
@@ -208,7 +209,12 @@ export async function registerAdminTenantsRoutes(
     if (typeof window === 'string') {
       return reply.code(400).send(errorBody('InvalidArg', window));
     }
-    return reply.send(await tenantUsage.snapshot(tenantId, window, deps.moduleMeters));
+    const usage: TenantUsageResponse = await tenantUsage.snapshot(
+      tenantId,
+      window,
+      deps.moduleMeters,
+    );
+    return reply.send(usage);
   });
 }
 

@@ -12,8 +12,8 @@ export namespace DocumentsGetResponse {
         /** The folder the document is in, or root. */
         folderId: string;
         state: Document.State;
-        baseSha: string | null;
-        storageSizeBytes: number | null;
+        baseSha256: string | null;
+        sizeBytes: number | null;
         metadata: Record<string, unknown> | null;
         idempotencyKey: string | null;
         failureReason: string | null;

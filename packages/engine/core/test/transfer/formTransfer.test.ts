@@ -29,7 +29,6 @@ const tree = (node: NodeData): PdfActionTree =>
   ({
     root: { subtype: '', next: [], ...node },
     incomplete: false,
-    warningFlags: 0,
     warnings: [],
   }) as PdfActionTree;
 

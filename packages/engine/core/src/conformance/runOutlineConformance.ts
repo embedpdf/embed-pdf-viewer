@@ -409,7 +409,7 @@ export function runOutlineConformance(
     test('a move takes items together with the items under them, and names both parents', async () => {
       await withOutline(async (doc) => {
         const moved = await doc.outline.move([C, D], A, { after: A1 });
-        expect(moved.meta.changed).toEqual([C, D]);
+        expect(moved.meta.changedRefs).toEqual([C, D]);
         expect(orderOf(moved.orders, null)).toEqual([6, 7]);
         expect(orderOf(moved.orders, A)).toEqual([10, 8, 9]);
         const outline = await doc.outline.get();
@@ -446,7 +446,7 @@ export function runOutlineConformance(
       await withOutline(async (doc) => {
         const before = await doc.outline.get();
         const deleted = await doc.outline.delete(C);
-        expect(deleted.meta.changed).toEqual([C, C1]);
+        expect(deleted.meta.changedRefs).toEqual([C, C1]);
         expect(titles(await doc.outline.get())).toEqual(['A', 'A1', 'B', 'D']);
         const undo = await doc.apply({ undoOf: deleted.meta.opId });
         expect(undo.items.map((item) => item.type)).toEqual(['outline.restore']);
@@ -494,7 +494,7 @@ export function runOutlineConformance(
         ]);
         expect(outline[0]).toMatchObject({ item: { title: 'New', parent: C } });
         expect(outline[1]).toMatchObject({ item: { title: 'Newer' } });
-        expect(outline[2]).toMatchObject({ meta: { changed: [created] } });
+        expect(outline[2]).toMatchObject({ meta: { changedRefs: [created] } });
         expect(outline[3]).toMatchObject({ deleted: [created] });
       });
     });

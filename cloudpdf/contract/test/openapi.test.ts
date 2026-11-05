@@ -111,7 +111,7 @@ describe('operation registry', () => {
     const sub = (template: string): string =>
       template
         .replace(':tenantId', encodeURIComponent(tid))
-        .replace(':id', encodeURIComponent(id))
+        .replace(':docId', encodeURIComponent(id))
         .replace(':jti', encodeURIComponent(jti));
 
     expect(sub(adminOperations['documents.init'].path)).toBe(adminWirePaths.documentsInit(tid));

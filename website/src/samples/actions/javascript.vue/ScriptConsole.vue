@@ -8,7 +8,6 @@ import type { ActionContext, PdfActionTree } from '@embedpdf/vue/actions';
 const script = (code: string): PdfActionTree => ({
   root: { type: 'javascript', subtype: 'JavaScript', script: code, next: [] },
   incomplete: false,
-  warningFlags: 0,
   warnings: [],
 });
 const click: ActionContext = {

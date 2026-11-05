@@ -22,8 +22,8 @@ describe("FontsClient", () => {
                     restrictions: ["subset"],
                     programs: [
                         {
-                            displayHash: null,
-                            sourceHash: null,
+                            displaySha256: null,
+                            sourceSha256: null,
                             embedded: "whole",
                             format: null,
                             embeddingPermission: null,
@@ -34,8 +34,8 @@ describe("FontsClient", () => {
             ],
             fallbacks: ["fallbacks"],
             lastResort: {
-                displayHash: "displayHash",
-                sourceHash: "sourceHash",
+                displaySha256: "displaySha256",
+                sourceSha256: "sourceSha256",
                 embedded: "whole",
                 format: "truetype",
                 embeddingPermission: "installable",

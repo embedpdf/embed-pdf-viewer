@@ -160,6 +160,48 @@ describe('naming rules in openapi.json', () => {
     expect(unique(notDates)).toEqual([]);
   });
 
+  test('a field name is camelCase, without dots', () => {
+    const odd = everyProperty
+      .filter(({ name }) => !/^[a-z][A-Za-z0-9]*$/.test(name))
+      .map(({ at }) => at);
+    expect(unique(odd)).toEqual([]);
+  });
+
+  test('an object is named fields or a map, never both', () => {
+    // An "anything else" bag next to fields is untyped in most SDKs.
+    const both: string[] = [];
+    const visit = (node: unknown, at: string): void => {
+      if (typeof node !== 'object' || node === null) return;
+      const schema = node as Schema;
+      const isMap =
+        schema.additionalProperties !== undefined && schema.additionalProperties !== false;
+      if (schema.properties && isMap) both.push(at);
+      for (const [key, value] of Object.entries(node)) visit(value, `${at}/${key}`);
+    };
+    visit(spec, '#');
+    expect(both).toEqual([]);
+  });
+
+  test('a size in bytes ends in Bytes, and a hash names its algorithm', () => {
+    const unnamed = everyProperty
+      .filter(({ name }) =>
+        /^(contentLength|sha|checksum)$|(^b|B)yteLength$|(^s|S)ize$|Hash$/.test(name),
+      )
+      // A page's or a rich text's size is its dimensions or a font size, not bytes.
+      .filter(({ name, schema }) => !(/(^s|S)ize$/.test(name) && typeOf(schema) !== 'integer'))
+      .map(({ at }) => at);
+    expect(unique(unnamed)).toEqual([]);
+  });
+
+  test('a path parameter is spelled out, and a hash names its algorithm', () => {
+    const parameters = Object.keys(spec.paths).flatMap((path) =>
+      [...path.matchAll(/\{(\w+)\}/g)].map((match) => match[1]!),
+    );
+    expect(
+      [...new Set(parameters)].filter((name) => /^(id|sha|annotKey)$|Hash$/.test(name)),
+    ).toEqual([]);
+  });
+
   test('no response field is both nullable and optional', () => {
     const both = responseProperties
       .filter(({ schema, required }) => !required && isNullable(schema))

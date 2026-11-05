@@ -35,7 +35,7 @@ export class LayersClient {
      * @example
      *     await client.documents.layers.list({
      *         tenantId: "tenantId",
-     *         id: "id"
+     *         docId: "docId"
      *     })
      */
     public list(
@@ -49,7 +49,7 @@ export class LayersClient {
         request: CloudPDF.documents.ListLayersRequest,
         requestOptions?: LayersClient.RequestOptions,
     ): Promise<core.WithRawResponse<CloudPDF.DocumentsLayersListResponse>> {
-        const { tenantId, id, limit, cursor, grantId } = request;
+        const { tenantId, docId, limit, cursor, grantId } = request;
         const _queryParams: Record<string, unknown> = {
             limit,
             cursor,
@@ -67,7 +67,7 @@ export class LayersClient {
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)) ??
                     environments.CloudPDFEnvironment.Saas,
-                `v1/tenants/${core.url.encodePathParam(tenantId)}/documents/${core.url.encodePathParam(id)}/layers`,
+                `v1/tenants/${core.url.encodePathParam(tenantId)}/documents/${core.url.encodePathParam(docId)}/layers`,
             ),
             method: "GET",
             headers: _headers,
@@ -116,7 +116,7 @@ export class LayersClient {
             _response.error,
             _response.rawResponse,
             "GET",
-            "/v1/tenants/{tenantId}/documents/{id}/layers",
+            "/v1/tenants/{tenantId}/documents/{docId}/layers",
         );
     }
 
@@ -133,7 +133,7 @@ export class LayersClient {
      * @example
      *     await client.documents.layers.delete({
      *         tenantId: "tenantId",
-     *         id: "id",
+     *         docId: "docId",
      *         layerName: "layerName"
      *     })
      */
@@ -148,7 +148,7 @@ export class LayersClient {
         request: CloudPDF.documents.DeleteLayersRequest,
         requestOptions?: LayersClient.RequestOptions,
     ): Promise<core.WithRawResponse<void>> {
-        const { tenantId, id, layerName } = request;
+        const { tenantId, docId, layerName } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -161,7 +161,7 @@ export class LayersClient {
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)) ??
                     environments.CloudPDFEnvironment.Saas,
-                `v1/tenants/${core.url.encodePathParam(tenantId)}/documents/${core.url.encodePathParam(id)}/layers/${core.url.encodePathParam(layerName)}`,
+                `v1/tenants/${core.url.encodePathParam(tenantId)}/documents/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}`,
             ),
             method: "DELETE",
             headers: _headers,
@@ -206,7 +206,7 @@ export class LayersClient {
             _response.error,
             _response.rawResponse,
             "DELETE",
-            "/v1/tenants/{tenantId}/documents/{id}/layers/{layerName}",
+            "/v1/tenants/{tenantId}/documents/{docId}/layers/{layerName}",
         );
     }
 }

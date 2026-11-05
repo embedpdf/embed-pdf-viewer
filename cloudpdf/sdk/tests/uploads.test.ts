@@ -50,7 +50,7 @@ describe("Uploads.create", () => {
         expect(init.headers).toEqual({ "Content-Type": "application/pdf", "x-signed": "yes" });
         expect(new Headers(init.headers).has("Authorization")).toBe(false);
         expect(protocol.commit).toHaveBeenCalledWith(
-            { tenantId: "tenant-1", id: "doc-1", sha256 },
+            { tenantId: "tenant-1", docId: "doc-1", sha256 },
             { abortSignal: undefined },
         );
     });

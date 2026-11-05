@@ -69,7 +69,7 @@ function Files() {
                 onClick={() => save(file)}
               >
                 <bdi>{displayNameOf(file)}</bdi>
-                <span className="row-size">{sizeOf(file.size)}</span>
+                <span className="row-size">{sizeOf(file.sizeBytes)}</span>
               </button>
               <button
                 type="button"

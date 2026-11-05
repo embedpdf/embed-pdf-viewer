@@ -304,10 +304,10 @@ export class LayerStateService {
       // No layer writes have happened on the base view; a fresh subscriber's
       // gapless cursor starts at 0 ("everything in the log is new to me").
       auditHead: 0,
-      baseSha: head.baseSha,
+      baseSha256: head.baseSha256,
       layerVersion: 0,
       working: false,
-      baseByteLength: version.byteLength,
+      baseSizeBytes: version.byteLength,
       protection,
       pages: pages.map((page) => this.toManifestPage(page)),
     };
@@ -357,13 +357,13 @@ export class LayerStateService {
       // Written in the same transaction as the audit append, so a client
       // subscribing from this manifest can never miss a row (gapless cursor).
       auditHead: layer.lastAuditId,
-      baseSha: base.sha256,
+      baseSha256: base.sha256,
       // The signing fences a client pins: the layer's write serial, and
       // whether an artifact (edits not yet sealed into a version) exists —
       // `currentVersion > 0` alone no longer says so after a publish.
       layerVersion: layer.currentVersion,
       working: layer.currentArtifactKey !== null,
-      baseByteLength: base.byteLength,
+      baseSizeBytes: base.byteLength,
       scopes,
       protection,
       pages: pages.map((page) => this.toManifestPage(page)),

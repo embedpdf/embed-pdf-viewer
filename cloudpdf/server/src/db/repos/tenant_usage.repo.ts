@@ -15,13 +15,14 @@ export interface TenantUsageSnapshot {
   tenantId: string;
   periodStart: string;
   periodEnd: string;
-  /** The core's meters, then every module meter counted in the window or asked for. */
+  /** The core's meters. */
   metrics: {
-    'pdf.views': number;
-    'pdf.uploads': number;
-    'storage.bytes': number;
-    [moduleMeter: string]: number;
+    pdfViews: number;
+    pdfUploads: number;
+    storageBytes: number;
   };
+  /** Every module meter counted in the window or asked for, by its name. */
+  moduleMeters: Record<string, number>;
 }
 
 /**
@@ -118,11 +119,11 @@ export class TenantUsageRepo {
       periodStart: window.from,
       periodEnd: window.to,
       metrics: {
-        'pdf.views': views!,
-        'pdf.uploads': uploads!,
-        'storage.bytes': await this.currentStorageBytes(tenantId),
-        ...moduleMeters,
+        pdfViews: views!,
+        pdfUploads: uploads!,
+        storageBytes: await this.currentStorageBytes(tenantId),
       },
+      moduleMeters,
     };
   }
 

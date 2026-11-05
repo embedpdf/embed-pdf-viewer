@@ -102,7 +102,7 @@ export function runSignatureConformance(
         expect(doc.security.allows('doc.pages.assemble')).toBe(true);
         if (isLocalDocument(doc)) {
           const version = await doc.version();
-          expect(version.byteLength).toBe(bytes.byteLength);
+          expect(version.sizeBytes).toBe(bytes.byteLength);
           expect(version.sha256).toBe(await sha256Hex(bytes));
         }
         let caught: unknown;
@@ -141,7 +141,7 @@ export function runSignatureConformance(
           expect(typeof sig.signer.signedAt).toBe('string');
           expect(sig.docMdp).toBeNull();
           expect(sig.catalogCertification).toBe(false);
-          expect(sig.contentsSize > 0).toBe(true);
+          expect(sig.contentsSizeBytes > 0).toBe(true);
           expect(sig.byteRange![0]).toBe(0);
           expect(sig.byteRange![2] + sig.byteRange![3]).toBe(snapshot.revisions[i + 1].end);
         }
@@ -154,7 +154,7 @@ export function runSignatureConformance(
         // The DER object, exactly as long as its TLV declares.
         const first = snapshot.signatures[0];
         const contents = await doc.signatures.getContents(first.field);
-        expect(contents.byteLength).toBe(first.contentsSize);
+        expect(contents.byteLength).toBe(first.contentsSizeBytes);
         expect(contents[0]).toBe(0x30);
 
         // The digest is what the file's own bytes hash to over the range.
@@ -351,7 +351,7 @@ export function runSignatureConformance(
           expect(sig.signed).toBe(true);
           expect(sig.coverage).toBe('partial');
           expect(sig.revisionIndex).toBeNull();
-          expect(sig.contentsSize).toBe(13);
+          expect(sig.contentsSizeBytes).toBe(13);
           expect((await doc.signatures.getContents(sig.field)).byteLength).toBe(13);
           expect((await doc.signatures.getDigest(sig.field, 'sha256')).byteLength).toBe(32);
         }
@@ -580,13 +580,13 @@ function runSigningTests(
         field: sigRef(),
         subFilter: 'ETSI.CAdES.detached',
         digest: 'sha256',
-        contentsSize: 1024,
+        contentsSizeBytes: 1024,
         signer: { reason: 'conformance' },
       });
       expect(prepared.digest.byteLength).toBe(32);
       expect(prepared.algorithm).toBe('sha256');
       expect(prepared.subFilter).toBe('ETSI.CAdES.detached');
-      expect(prepared.contentsSize).toBe(1024);
+      expect(prepared.contentsSizeBytes).toBe(1024);
       expect(prepared.byteRange[0]).toBe(0);
       expect(prepared.byteRange[2] > prepared.byteRange[1]).toBe(true);
       expect(prepared.expectedVersion.baseSha256).toBe(v0.sha256);
@@ -629,7 +629,7 @@ function runSigningTests(
       expect(result.signature.revisionIndex).toBe(1);
       expect(result.signature.subFilter).toBe('ETSI.CAdES.detached');
       expect(result.signature.signer.reason).toBe('conformance');
-      expect(result.signature.contentsSize).toBe(FAKE_CMS.byteLength);
+      expect(result.signature.contentsSizeBytes).toBe(FAKE_CMS.byteLength);
       expect(result.previous).toEqual(prepared.expectedVersion);
       expect(result.version.sha256 === v0.sha256).toBe(false);
       expect(result.protection.judged).toBe('annotate');
@@ -650,7 +650,7 @@ function runSigningTests(
 
       // download() is the sealed file, byte for byte: nothing is re-saved.
       const bytes = await doc.download();
-      expect(bytes.byteLength).toBe(result.version.byteLength);
+      expect(bytes.byteLength).toBe(result.version.sizeBytes);
       expect(await sha256Hex(bytes)).toBe(result.version.sha256);
       reopened = await reopen(engine, opts, `${fx().id}-signed`, bytes);
       const fresh = await reopened.signatures.list();

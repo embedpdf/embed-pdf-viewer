@@ -164,7 +164,6 @@ describe('annotations in page space', () => {
       actions: {
         activate: {
           incomplete: false,
-          warningFlags: 0,
           warnings: [],
           root: {
             subtype: 'GoTo',

@@ -251,7 +251,7 @@ describe("a grant's layer policy", () => {
         docId: DOC,
         layerName: 'visitor-0123',
         scope: ['*'],
-        expiresIn: 600,
+        expiresInSeconds: 600,
       },
     });
     expect(issued.status).toBe(400);
@@ -570,7 +570,7 @@ describe('views', () => {
   const views = async () => {
     const usage = await call('GET', `/v1/tenants/${TENANT}/usage`, { token: API_TOKEN });
     expect(usage.status).toBe(200);
-    return usage.body.metrics['pdf.views'] as number;
+    return usage.body.metrics.pdfViews as number;
   };
 
   test('a visit is one view however often it renews; a new or returning visit is another', async () => {

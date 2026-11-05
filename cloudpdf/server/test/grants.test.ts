@@ -430,12 +430,12 @@ describe('grants', () => {
 
   test('views: exchange counts once, /v1/access dedupes grant sessions', async () => {
     await seedDocument('doc-views');
-    const before = (await usageSnapshot()).metrics['pdf.views']!;
+    const before = (await usageSnapshot()).metrics.pdfViews!;
 
     const created = await createGrant({ docId: 'doc-views', scope: ['doc.open', 'doc.render'] });
     const session = await exchange({ grant: created.grant!.id }, 'https://viewer.example');
     expect(session.status).toBe(200);
-    expect((await usageSnapshot()).metrics['pdf.views']).toBe(before + 1);
+    expect((await usageSnapshot()).metrics.pdfViews).toBe(before + 1);
 
     // The grant session establishing access is not a second view.
     const access = await fetch(`${fx.baseUrl}/v1/access`, {
@@ -447,7 +447,7 @@ describe('grants', () => {
       body: JSON.stringify({ docId: 'doc-views' }),
     });
     expect(access.status).toBe(200);
-    expect((await usageSnapshot()).metrics['pdf.views']).toBe(before + 1);
+    expect((await usageSnapshot()).metrics.pdfViews).toBe(before + 1);
 
     // An ordinary viewer session (backend-minted doc JWT) counts at /v1/access.
     const viewerJwt = signDevToken(SECRET, {
@@ -462,10 +462,10 @@ describe('grants', () => {
       body: JSON.stringify({ docId: 'doc-views' }),
     });
     expect(access2.status).toBe(200);
-    expect((await usageSnapshot()).metrics['pdf.views']).toBe(before + 2);
+    expect((await usageSnapshot()).metrics.pdfViews).toBe(before + 2);
 
     // storage.bytes reflects the seeded ready documents.
-    expect((await usageSnapshot()).metrics['storage.bytes']).toBeGreaterThan(0);
+    expect((await usageSnapshot()).metrics.storageBytes).toBeGreaterThan(0);
   });
 
   test('origin-locked doc JWTs minted via tokens.issue', async () => {
@@ -479,7 +479,7 @@ describe('grants', () => {
         docId: 'doc-locked',
         scope: ['doc.open'],
         origins: ['https://portal.acme.com'],
-        expiresIn: 600,
+        expiresInSeconds: 600,
       }),
     });
     expect(res.status).toBe(200);
@@ -550,7 +550,7 @@ describe('grants', () => {
     ).json()) as { folder: { id: string } };
     const moved = await fetch(
       `${fx.baseUrl}/v1/tenants/${TENANT}/folders/${folder.folder.id}/move-into`,
-      { method: 'POST', headers: auth, body: JSON.stringify({ documentIds: ['doc-in-folder'] }) },
+      { method: 'POST', headers: auth, body: JSON.stringify({ docIds: ['doc-in-folder'] }) },
     );
     expect(moved.status).toBe(204);
     const grant = (await createGrant({ docId: 'doc-in-folder', scope: ['doc.open'] })).grant!;

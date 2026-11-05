@@ -107,14 +107,14 @@ export class LocalDocumentFontsService implements LocalDocumentFontsServiceContr
     });
   }
 
-  getProgram(displayHash: string): AbortablePromise<FontProgramInfo> {
+  getProgram(displaySha256: string): AbortablePromise<FontProgramInfo> {
     return this.run(async (signal) => {
       const fonts = await loadCoreFonts();
-      const builtIn = fonts.builtInProgramInfo(displayHash);
+      const builtIn = fonts.builtInProgramInfo(displaySha256);
       if (builtIn) return builtIn;
-      const program = listedProgram(await this.listOf(fonts, signal), displayHash);
+      const program = listedProgram(await this.listOf(fonts, signal), displaySha256);
       const info = await this.request(
-        { kind: 'document.fonts.program', displayHash, part: 'info' },
+        { kind: 'document.fonts.program', displaySha256, part: 'info' },
         'document.fonts.program',
         signal,
       );
@@ -122,15 +122,15 @@ export class LocalDocumentFontsService implements LocalDocumentFontsServiceContr
     });
   }
 
-  downloadProgram(displayHash: string): AbortablePromise<Uint8Array> {
+  downloadProgram(displaySha256: string): AbortablePromise<Uint8Array> {
     return this.run(async (signal) => {
       this.guard.assertAnyCapability(TEXT_WRITING_CAPABILITIES);
       const fonts = await loadCoreFonts();
-      const builtIn = fonts.loadBuiltInProgram(displayHash);
+      const builtIn = fonts.loadBuiltInProgram(displaySha256);
       if (builtIn) return builtIn;
-      downloadableProgram(await this.listOf(fonts, signal), displayHash);
+      downloadableProgram(await this.listOf(fonts, signal), displaySha256);
       const payload = await this.request(
-        { kind: 'document.fonts.program', displayHash, part: 'data' },
+        { kind: 'document.fonts.program', displaySha256, part: 'data' },
         'document.fonts.program',
         signal,
       );

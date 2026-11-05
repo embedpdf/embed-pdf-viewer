@@ -116,12 +116,17 @@ export async function registerAttachmentRoutes(
   });
 
   app.get(
-    '/v1/docs/:docId/attachment-files/pages/:pageKey/items/:annotKey/data@:token',
+    '/v1/docs/:docId/attachment-files/pages/:pageKey/items/:annotationKey/data@:token',
     async (req, reply) => {
-      const { docId, pageKey, annotKey, token } = req.params as {
+      const {
+        docId,
+        pageKey,
+        annotationKey: annotKey,
+        token,
+      } = req.params as {
         docId: string;
         pageKey: string;
-        annotKey: string;
+        annotationKey: string;
         token: string;
       };
       // A FileAttachment annotation's bytes depend on both planes: the
@@ -217,13 +222,19 @@ export async function registerAttachmentRoutes(
   );
 
   app.get(
-    '/v1/docs/:docId/layers/:layerName/attachment-files/pages/:pageKey/items/:annotKey/data@:token',
+    '/v1/docs/:docId/layers/:layerName/attachment-files/pages/:pageKey/items/:annotationKey/data@:token',
     async (req, reply) => {
-      const { docId, layerName, pageKey, annotKey, token } = req.params as {
+      const {
+        docId,
+        layerName,
+        pageKey,
+        annotationKey: annotKey,
+        token,
+      } = req.params as {
         docId: string;
         layerName: string;
         pageKey: string;
-        annotKey: string;
+        annotationKey: string;
         token: string;
       };
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
@@ -292,11 +303,16 @@ export async function registerAttachmentRoutes(
   // An annotation's `file` resource, the twin of its `appearance` resource
   // (routes/annotations.ts): gated by `doc.download` the same way.
   app.get(wireTemplates.layerAnnotationItemFileResource, async (req, reply) => {
-    const { docId, layerName, pageKey, annotKey } = req.params as {
+    const {
+      docId,
+      layerName,
+      pageKey,
+      annotationKey: annotKey,
+    } = req.params as {
       docId: string;
       layerName: string;
       pageKey: string;
-      annotKey: string;
+      annotationKey: string;
     };
     const pageObjectNumber = resolvePageKeyParam(pageKey);
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);

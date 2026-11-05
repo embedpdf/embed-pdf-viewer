@@ -363,7 +363,7 @@ export interface SignaturesFinalizeCandidateWorkerRequest {
   /** The /ByteRange the prepare reported — the fence every check is made against. */
   byteRange: [number, number, number, number];
   /** The reserved /Contents size the prepare reported (the hole holds twice as many hex digits). */
-  contentsSize: number;
+  contentsSizeBytes: number;
   fieldObjectNumber: number;
   /** The detached CMS over the prepared digest. */
   cms: ArrayBuffer;
@@ -1473,7 +1473,7 @@ export interface DocumentFontsProgramWorkerRequest {
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
-  displayHash: string;
+  displaySha256: string;
   part: 'info' | 'data';
 }
 

@@ -185,7 +185,7 @@ export class SignatureMutator {
         `unsupported subFilter '${subFilter}'`,
       );
     }
-    const contentsSize = input.contentsSize ?? DEFAULT_CONTENTS_SIZE;
+    const contentsSize = input.contentsSizeBytes ?? DEFAULT_CONTENTS_SIZE;
     if (
       !Number.isInteger(contentsSize) ||
       contentsSize < MIN_CONTENTS_SIZE ||
@@ -248,7 +248,7 @@ export class SignatureMutator {
         digest: sealed.digest,
         algorithm,
         byteRange: sealed.byteRange,
-        contentsSize,
+        contentsSizeBytes: contentsSize,
         subFilter,
         expectedVersion,
         expiresAt: null,
@@ -305,10 +305,10 @@ export class SignatureMutator {
     if (input.cms.byteLength === 0 || input.cms[0] !== 0x30) {
       throw new EngineError(EngineErrorCode.SignatureRefused, 'the CMS is not a DER SEQUENCE');
     }
-    if (input.cms.byteLength > pending.prepared.contentsSize) {
+    if (input.cms.byteLength > pending.prepared.contentsSizeBytes) {
       throw new EngineError(
         EngineErrorCode.SignatureRefused,
-        `the CMS (${input.cms.byteLength} bytes) does not fit the reserved ${pending.prepared.contentsSize} bytes`,
+        `the CMS (${input.cms.byteLength} bytes) does not fit the reserved ${pending.prepared.contentsSizeBytes} bytes`,
       );
     }
 

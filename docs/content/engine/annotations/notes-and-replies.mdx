@@ -209,7 +209,7 @@ await page.annotations.update(popup.ref, { open: false });
 ```
 
 A note and its popup hold one `open`: set it on either, and both change (the update's
-`meta.changed` names both). A popup made without `open` takes its note's. Other annotations
+`meta.changedRefs` names both). A popup made without `open` takes its note's. Other annotations
 have no `open` of their own; their popup's is the only one.
 
 You don't need a popup to have a note. Add one when the document should say where the comment
@@ -224,7 +224,7 @@ showing a reply without its note.
 
 ```ts
 const { meta } = await page.annotations.delete(note.ref);
-// meta.changed names everything that went, the note first
+// meta.changedRefs names everything that went, the note first
 ```
 
 It's all or nothing: when the user may not delete one of them (someone else's reply, for a user who

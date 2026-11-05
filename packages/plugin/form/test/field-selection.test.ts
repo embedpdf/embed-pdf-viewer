@@ -43,7 +43,6 @@ const intent = (overrides: Partial<SubmitIntent> = {}): SubmitIntent => ({
   includeNoValueFields: false,
   format: 'fdf',
   method: 'post',
-  flagsRaw: 0,
   ...overrides,
 });
 

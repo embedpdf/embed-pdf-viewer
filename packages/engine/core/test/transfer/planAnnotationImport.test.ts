@@ -289,7 +289,6 @@ describe('planAnnotationImport', () => {
   test('reports the actions a copy leaves out, and not the one a link target carries', () => {
     const goto = {
       incomplete: false,
-      warningFlags: 0,
       warnings: [],
       root: { type: 'goto', subtype: 'GoTo', next: [], destination: { kind: 'fit', page: first } },
     };

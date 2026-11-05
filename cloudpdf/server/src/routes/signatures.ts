@@ -12,12 +12,12 @@
  *   content-addressed by base sha; immutable; the resource comes before the
  *   sha so each family keeps its own CDN prefix):
  *     GET  …/layers/:layerName/versions                                   the list (no-store)
- *     GET  …/layers/:layerName/versions/signatures/:sha
- *     GET  …/layers/:layerName/versions/signatures/:sha/:fieldKey/contents
- *     GET  …/layers/:layerName/versions/signatures/:sha/:fieldKey/digest/:algorithm
+ *     GET  …/layers/:layerName/versions/signatures/:sha256
+ *     GET  …/layers/:layerName/versions/signatures/:sha256/:fieldKey/contents
+ *     GET  …/layers/:layerName/versions/signatures/:sha256/:fieldKey/digest/:algorithm
  *     GET  …/layers/:layerName/versions/analysis/:sha?since.signature=|since.revision=&until=&level=
- *     GET  …/layers/:layerName/versions/download/:sha
- *     GET  …/layers/:layerName/versions/revisions/:sha/:index
+ *     GET  …/layers/:layerName/versions/download/:sha256
+ *     GET  …/layers/:layerName/versions/revisions/:sha256/:index
  *
  * A version is not a layer session: version reads open the version's file
  * into a transient session. Another layer's versions are 404.
@@ -47,6 +47,7 @@ import {
   VersionAnalysisQuerySchema,
   analyzeInputFromQuery,
   encodePrepared,
+  type LayerVersions,
 } from '@embedpdf/engine-core/wire';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 
@@ -320,11 +321,11 @@ export async function registerSignatureRoutes(
     const ctx = await versionCaller(req, docId, layerName, 'layer-versions');
     setNoStore(reply);
     const listed = await service.listVersions(ctx, docId, layerName);
-    return {
-      baseSha: listed.baseSha,
+    const versions: LayerVersions = {
+      baseSha256: listed.baseSha,
       versions: listed.versions.map((v) => ({
         sha256: v.sha256,
-        byteLength: v.byteLength,
+        sizeBytes: v.byteLength,
         number: v.number,
         parentSha256: v.parentSha256,
         producer: v.producerKind,
@@ -332,6 +333,7 @@ export async function registerSignatureRoutes(
         createdAt: isoTime(v.createdAt),
       })),
     };
+    return versions;
   });
 
   const versionSignatures = async (
@@ -361,11 +363,15 @@ export async function registerSignatureRoutes(
     return payload.snapshot;
   };
 
-  app.get('/v1/docs/:docId/layers/:layerName/versions/signatures/:sha', async (req, reply) => {
-    const { docId, layerName, sha } = req.params as {
+  app.get('/v1/docs/:docId/layers/:layerName/versions/signatures/:sha256', async (req, reply) => {
+    const {
+      docId,
+      layerName,
+      sha256: sha,
+    } = req.params as {
       docId: string;
       layerName: string;
-      sha: string;
+      sha256: string;
     };
     const ctx = await versionCaller(req, docId, layerName, 'layer-version-signatures');
     const snapshot = await versionSignatures(
@@ -380,12 +386,17 @@ export async function registerSignatureRoutes(
   });
 
   app.get(
-    '/v1/docs/:docId/layers/:layerName/versions/signatures/:sha/:fieldKey/contents',
+    '/v1/docs/:docId/layers/:layerName/versions/signatures/:sha256/:fieldKey/contents',
     async (req, reply) => {
-      const { docId, layerName, sha, fieldKey } = req.params as {
+      const {
+        docId,
+        layerName,
+        sha256: sha,
+        fieldKey,
+      } = req.params as {
         docId: string;
         layerName: string;
-        sha: string;
+        sha256: string;
         fieldKey: string;
       };
       const ctx = await versionCaller(req, docId, layerName, 'layer-version-signatures');
@@ -415,12 +426,18 @@ export async function registerSignatureRoutes(
   );
 
   app.get(
-    '/v1/docs/:docId/layers/:layerName/versions/signatures/:sha/:fieldKey/digest/:algorithm',
+    '/v1/docs/:docId/layers/:layerName/versions/signatures/:sha256/:fieldKey/digest/:algorithm',
     async (req, reply) => {
-      const { docId, layerName, sha, fieldKey, algorithm } = req.params as {
+      const {
+        docId,
+        layerName,
+        sha256: sha,
+        fieldKey,
+        algorithm,
+      } = req.params as {
         docId: string;
         layerName: string;
-        sha: string;
+        sha256: string;
         fieldKey: string;
         algorithm: string;
       };
@@ -457,11 +474,15 @@ export async function registerSignatureRoutes(
     },
   );
 
-  app.get('/v1/docs/:docId/layers/:layerName/versions/analysis/:sha', async (req, reply) => {
-    const { docId, layerName, sha } = req.params as {
+  app.get('/v1/docs/:docId/layers/:layerName/versions/analysis/:sha256', async (req, reply) => {
+    const {
+      docId,
+      layerName,
+      sha256: sha,
+    } = req.params as {
       docId: string;
       layerName: string;
-      sha: string;
+      sha256: string;
     };
     const ctx = await versionCaller(req, docId, layerName, 'layer-version-analysis');
     const query = parseOrInvalidArg(
@@ -497,11 +518,15 @@ export async function registerSignatureRoutes(
     return finishAnalysisReply(reply, payload.analysis);
   });
 
-  app.get('/v1/docs/:docId/layers/:layerName/versions/download/:sha', async (req, reply) => {
-    const { docId, layerName, sha } = req.params as {
+  app.get('/v1/docs/:docId/layers/:layerName/versions/download/:sha256', async (req, reply) => {
+    const {
+      docId,
+      layerName,
+      sha256: sha,
+    } = req.params as {
       docId: string;
       layerName: string;
-      sha: string;
+      sha256: string;
     };
     const ctx = await versionCaller(req, docId, layerName, 'layer-version-download');
     const version = await service.requireVersion(ctx, docId, layerName, requireSha(sha));
@@ -510,12 +535,17 @@ export async function registerSignatureRoutes(
   });
 
   app.get(
-    '/v1/docs/:docId/layers/:layerName/versions/revisions/:sha/:index',
+    '/v1/docs/:docId/layers/:layerName/versions/revisions/:sha256/:index',
     async (req, reply) => {
-      const { docId, layerName, sha, index } = req.params as {
+      const {
+        docId,
+        layerName,
+        sha256: sha,
+        index,
+      } = req.params as {
         docId: string;
         layerName: string;
-        sha: string;
+        sha256: string;
         index: string;
       };
       const ctx = await versionCaller(req, docId, layerName, 'layer-version-revisions');

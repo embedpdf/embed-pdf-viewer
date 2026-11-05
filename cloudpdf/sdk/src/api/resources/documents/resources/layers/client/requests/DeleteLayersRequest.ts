@@ -4,12 +4,12 @@
  * @example
  *     {
  *         tenantId: "tenantId",
- *         id: "id",
+ *         docId: "docId",
  *         layerName: "layerName"
  *     }
  */
 export interface DeleteLayersRequest {
     tenantId: string;
-    id: string;
+    docId: string;
     layerName: string;
 }

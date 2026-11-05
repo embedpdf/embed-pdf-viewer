@@ -39,7 +39,7 @@ export interface AnnotationUpdateResult<C extends Coordinates = PageCoordinates>
 /**
  * A delete: nothing exists after it, so only `meta`. Deleting an annotation
  * deletes its replies, grouped parts, review states and popups with it;
- * `meta.changed` names them all, the annotation first.
+ * `meta.changedRefs` names them all, the annotation first.
  */
 export interface AnnotationDeleteResult {
   meta: AnnotationListMutationMeta;
@@ -47,11 +47,11 @@ export interface AnnotationDeleteResult {
 
 /**
  * What a delete removed, as its `annotations.deleted` event names it for
- * listeners that didn't make the call: the refs in `meta.changed`, the
+ * listeners that didn't make the call: the refs in `meta.changedRefs`, the
  * annotation first.
  */
 export function deletedAnnotationsOf(result: AnnotationDeleteResult): AnnotationRef[] {
-  return result.meta.changed;
+  return result.meta.changedRefs;
 }
 
 /**
@@ -64,6 +64,6 @@ export function deletedAnnotationsOf(result: AnnotationDeleteResult): Annotation
 export interface AnnotationReorderResult {
   /** Every annotation of the page, widgets excepted, bottom to top. */
   order: AnnotationRef[];
-  /** `meta.changed` names the annotations that moved, in the order given. */
+  /** `meta.changedRefs` names the annotations that moved, in the order given. */
   meta: AnnotationListMutationMeta;
 }

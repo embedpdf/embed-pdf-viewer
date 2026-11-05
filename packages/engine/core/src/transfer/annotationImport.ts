@@ -105,7 +105,7 @@ export function annotationImportFacts(
         cacheDelta: index === last ? result.meta.cacheDelta : null,
         opId: result.meta.opId,
         undoable: result.meta.undoable,
-        changed: [annotation.ref],
+        changedRefs: [annotation.ref],
       },
     };
   });

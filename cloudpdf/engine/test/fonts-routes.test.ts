@@ -146,7 +146,7 @@ describe('the server’s font routes', () => {
     ).json()) as FontList;
     const font = list.fonts.find((candidate) => candidate.name === 'roboto-kept')!;
     expect(font).toMatchObject({ source: 'engine', canChoose: true, restrictions: ['not-served'] });
-    expect(font.programs[0]).toMatchObject({ displayHash: kept, canDownload: false });
+    expect(font.programs[0]).toMatchObject({ displaySha256: kept, canDownload: false });
 
     const refused = await get(wirePaths.layerFontProgramFile(DOC_ID, 'default', kept), writer());
     expect(refused.status).toBe(400);

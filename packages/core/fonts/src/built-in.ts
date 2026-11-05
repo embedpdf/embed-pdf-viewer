@@ -45,11 +45,11 @@ function rangesOf(codePoints: readonly number[]): CodePointRange[] {
 }
 
 /** A built-in program's facts, as `getProgram` answers; undefined for any other hash. */
-export function builtInProgramInfo(displayHash: string): FontProgramInfo | undefined {
-  const standard = standardFontOfHash(displayHash);
+export function builtInProgramInfo(displaySha256: string): FontProgramInfo | undefined {
+  const standard = standardFontOfHash(displaySha256);
   const program: FontProgram = {
-    displayHash,
-    sourceHash: null,
+    displaySha256,
+    sourceSha256: null,
     embedded: 'none',
     format: null,
     embeddingPermission: null,
@@ -64,7 +64,7 @@ export function builtInProgramInfo(displayHash: string): FontProgramInfo | undef
       descent: metrics.descent,
     };
   }
-  if (displayHash === LAST_RESORT_HASH) {
+  if (displaySha256 === LAST_RESORT_HASH) {
     return {
       ...program,
       format: 'truetype',
@@ -78,9 +78,9 @@ export function builtInProgramInfo(displayHash: string): FontProgramInfo | undef
 }
 
 /** A built-in program's bytes, as `downloadProgram` answers; undefined for any other hash. */
-export function loadBuiltInProgram(displayHash: string): Promise<Uint8Array> | undefined {
-  const standard = standardFontOfHash(displayHash);
+export function loadBuiltInProgram(displaySha256: string): Promise<Uint8Array> | undefined {
+  const standard = standardFontOfHash(displaySha256);
   if (standard) return standardFontProgram(standard).load();
-  if (displayHash === LAST_RESORT_HASH) return lastResortFontProgram().load();
+  if (displaySha256 === LAST_RESORT_HASH) return lastResortFontProgram().load();
   return undefined;
 }

@@ -418,7 +418,7 @@ export class FormsClient {
      *         docId: "docId",
      *         layerName: "layerName",
      *         pageKey: "pageKey",
-     *         annotKey: "annotKey"
+     *         annotationKey: "annotationKey"
      *     })
      */
     public deleteWidget(
@@ -436,7 +436,7 @@ export class FormsClient {
             docId,
             layerName,
             pageKey,
-            annotKey,
+            annotationKey,
             "X-Document-Password": documentPassword,
             "Idempotency-Key": idempotencyKey,
         } = request;
@@ -456,7 +456,7 @@ export class FormsClient {
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)) ??
                     environments.CloudPDFEnvironment.Saas,
-                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/form/widgets/${core.url.encodePathParam(pageKey)}/${core.url.encodePathParam(annotKey)}`,
+                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/form/widgets/${core.url.encodePathParam(pageKey)}/${core.url.encodePathParam(annotationKey)}`,
             ),
             method: "DELETE",
             headers: _headers,
@@ -499,7 +499,7 @@ export class FormsClient {
             _response.error,
             _response.rawResponse,
             "DELETE",
-            "/v1/docs/{docId}/layers/{layerName}/form/widgets/{pageKey}/{annotKey}",
+            "/v1/docs/{docId}/layers/{layerName}/form/widgets/{pageKey}/{annotationKey}",
         );
     }
 
@@ -517,7 +517,7 @@ export class FormsClient {
      *         docId: "docId",
      *         layerName: "layerName",
      *         pageKey: "pageKey",
-     *         annotKey: "annotKey",
+     *         annotationKey: "annotationKey",
      *         patch: {}
      *     })
      */
@@ -536,7 +536,7 @@ export class FormsClient {
             docId,
             layerName,
             pageKey,
-            annotKey,
+            annotationKey,
             "X-Document-Password": documentPassword,
             "Idempotency-Key": idempotencyKey,
             ..._body
@@ -557,7 +557,7 @@ export class FormsClient {
                 (await core.Supplier.get(this._options.baseUrl)) ??
                     (await core.Supplier.get(this._options.environment)) ??
                     environments.CloudPDFEnvironment.Saas,
-                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/form/widgets/${core.url.encodePathParam(pageKey)}/${core.url.encodePathParam(annotKey)}`,
+                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/form/widgets/${core.url.encodePathParam(pageKey)}/${core.url.encodePathParam(annotationKey)}`,
             ),
             method: "PATCH",
             headers: _headers,
@@ -603,7 +603,7 @@ export class FormsClient {
             _response.error,
             _response.rawResponse,
             "PATCH",
-            "/v1/docs/{docId}/layers/{layerName}/form/widgets/{pageKey}/{annotKey}",
+            "/v1/docs/{docId}/layers/{layerName}/form/widgets/{pageKey}/{annotationKey}",
         );
     }
 

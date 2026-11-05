@@ -163,13 +163,13 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
 
       expect(result.tag).toBe('created');
       expect(result.document.state).toBe('ready');
-      expect(result.document.baseSha).toBe(sha256Hex(bytes));
+      expect(result.document.baseSha256).toBe(sha256Hex(bytes));
       expect(result.document.metadata).toEqual({ name: 'Q1 Report' });
       expect(progressMax).toBe(bytes.byteLength);
 
       const back = await admin.documents.download(result.document.id);
       expect(back.byteLength).toBe(bytes.byteLength);
-      expect(sha256Hex(back)).toBe(result.document.baseSha);
+      expect(sha256Hex(back)).toBe(result.document.baseSha256);
 
       const page = await admin.documents.list();
       expect(page.documents.find((d) => d.id === result.document.id)).toBeTruthy();
@@ -267,7 +267,7 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
       const declaredButWrongSha = 'f'.repeat(64);
 
       const init = await admin.documents.init({
-        contentLength: bytes.byteLength,
+        sizeBytes: bytes.byteLength,
         contentSha256: declaredButWrongSha,
       });
       if (init.tag === 'deduped') throw new Error('unexpected dedup');
@@ -294,7 +294,7 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
       }).tenant('tenant-size-intent');
       const bytes = fakePdf(22, 600);
       const init = await admin.documents.init({
-        contentLength: bytes.byteLength + 1,
+        sizeBytes: bytes.byteLength + 1,
         contentSha256: sha256Hex(bytes),
       });
       if (init.tag === 'deduped') throw new Error('unexpected dedup');
@@ -478,7 +478,7 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
       const bytes = fakePdf(9, 4096);
 
       const init = await admin.documents.init({
-        contentLength: bytes.byteLength,
+        sizeBytes: bytes.byteLength,
         contentSha256: sha256Hex(bytes),
       });
       if (init.tag === 'deduped') throw new Error('unexpected dedup');
@@ -635,7 +635,7 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
       const issued = await root.tenant('mint-t').tokens.issueTenant({
         sub: 'billing-service',
         scope: ['docs.create', 'docs.read'],
-        expiresIn: 3600,
+        expiresInSeconds: 3600,
       });
 
       const claims = decodeJwtPayload(issued.token);
@@ -668,7 +668,7 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
         docId: doc.document.id,
         scope: ['doc.open', 'doc.render'],
         identity: { displayName: 'Jane', organization: 'Acme' },
-        expiresIn: 900,
+        expiresInSeconds: 900,
       });
       const claims = decodeJwtPayload(issued.token);
       expect(claims['doc_id']).toBe(doc.document.id);
@@ -706,7 +706,7 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
         sub: 'reader',
         docId: doc.document.id,
         scope: ['doc.open', 'doc.render.thumbnail'],
-        expiresIn: 900,
+        expiresInSeconds: 900,
       });
       expect(decodeJwtPayload(issued.token)['scope']).toEqual(['doc.open', 'doc.render.thumbnail']);
 
@@ -717,7 +717,7 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
             sub: 'reader',
             docId: doc.document.id,
             scope,
-            expiresIn: 900,
+            expiresInSeconds: 900,
           });
         } catch (e) {
           err = e as AdminError;
@@ -733,7 +733,7 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
       }).tenant('mint-esc');
       let err: AdminError | undefined;
       try {
-        await admin.tokens.issueTenant({ sub: 'self', scope: ['*'], expiresIn: 3600 });
+        await admin.tokens.issueTenant({ sub: 'self', scope: ['*'], expiresInSeconds: 3600 });
       } catch (e) {
         err = e as AdminError;
       }
@@ -751,7 +751,7 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
           sub: 'u',
           docId: 'whatever',
           scope: ['doc.open'],
-          expiresIn: 900,
+          expiresInSeconds: 900,
         });
       } catch (e) {
         err = e as AdminError;
@@ -768,10 +768,10 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
         .documents.create({ bytes: fakePdf(98, 301) });
 
       const attempts: Array<[Record<string, unknown>, number]> = [
-        [{ sub: 'u', docId: doc.document.id, scope: ['doc.hack'], expiresIn: 900 }, 400],
-        [{ sub: 'u', docId: 'does-not-exist', scope: ['doc.open'], expiresIn: 900 }, 404],
-        [{ sub: 'u', docId: foreign.document.id, scope: ['doc.open'], expiresIn: 900 }, 403],
-        [{ sub: 'u', docId: doc.document.id, scope: ['doc.open'], expiresIn: 30 }, 400],
+        [{ sub: 'u', docId: doc.document.id, scope: ['doc.hack'], expiresInSeconds: 900 }, 400],
+        [{ sub: 'u', docId: 'does-not-exist', scope: ['doc.open'], expiresInSeconds: 900 }, 404],
+        [{ sub: 'u', docId: foreign.document.id, scope: ['doc.open'], expiresInSeconds: 900 }, 403],
+        [{ sub: 'u', docId: doc.document.id, scope: ['doc.open'], expiresInSeconds: 30 }, 400],
       ];
       for (const [input, status] of attempts) {
         let err: AdminError | undefined;
@@ -789,7 +789,7 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
       const issued = await root.tenant('mint-audit').tokens.issueTenant({
         sub: 'audited-service',
         scope: ['docs.read'],
-        expiresIn: 3600,
+        expiresInSeconds: 3600,
       });
       await root.tenant('mint-audit').tokens.revoke(issued.jti, { reason: 'test cleanup' });
 
@@ -922,7 +922,7 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
       const bytes = fakePdf(62, 402);
       const wrongSha = 'f'.repeat(64);
       const init = await admin.documents.init({
-        contentLength: bytes.byteLength,
+        sizeBytes: bytes.byteLength,
         contentSha256: wrongSha,
       });
       if (init.tag === 'deduped') throw new Error('unexpected dedup');
@@ -1032,7 +1032,7 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
       const doc = await admin.documents.create({ bytes, name: 'Valid.pdf' });
       for (const name of ['', ' leading.pdf', 'trailing.pdf ', 'tab\there.pdf', 'a'.repeat(256)]) {
         const init = admin.documents.init({
-          contentLength: bytes.byteLength,
+          sizeBytes: bytes.byteLength,
           contentSha256: sha256Hex(bytes),
           name,
         });
@@ -1335,23 +1335,23 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
       const doc1 = (await admin.documents.create({ bytes: fakePdf(210, 300) })).document;
       const doc2 = (await admin.documents.create({ bytes: fakePdf(211, 300) })).document;
 
-      await admin.folders.moveInto(b.id, { documentIds: [doc1.id], folderIds: [a.id] });
+      await admin.folders.moveInto(b.id, { docIds: [doc1.id], folderIds: [a.id] });
       expect((await admin.folders.get(a.id)).folder.parentId).toBe(b.id);
       expect((await admin.documents.get(doc1.id)).folderId).toBe(b.id);
 
-      await admin.folders.moveInto('root', { documentIds: [doc1.id], folderIds: [a.id] });
+      await admin.folders.moveInto('root', { docIds: [doc1.id], folderIds: [a.id] });
       expect((await admin.documents.get(doc1.id)).folderId).toBe('root');
       expect((await admin.folders.get(a.id)).folder.parentId).toBe('root');
 
       const missing = await failureOf(
         admin.folders.moveInto(b.id, {
-          documentIds: [doc2.id, 'doc_missing'],
+          docIds: [doc2.id, 'doc_missing'],
           folderIds: [a.id, 'fld_000000000000000000000000'],
         }),
       );
       expect(missing?.status).toBe(404);
       expect(detailsOf(missing)).toEqual({
-        documentIds: ['doc_missing'],
+        docIds: ['doc_missing'],
         folderIds: ['fld_000000000000000000000000'],
       });
       expect((await admin.documents.get(doc2.id)).folderId).toBe('root');
@@ -1394,7 +1394,7 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
       const doc = (await admin.documents.create({ bytes: fakePdf(220, 300) })).document;
 
       const clash = await failureOf(
-        admin.folders.moveInto(target.id, { documentIds: [doc.id], folderIds: [same.id] }),
+        admin.folders.moveInto(target.id, { docIds: [doc.id], folderIds: [same.id] }),
       );
       expect(detailsOf(clash)).toEqual({ reason: 'name-taken', name: 'Same' });
       expect((await admin.documents.get(doc.id)).folderId).toBe('root');
@@ -1471,11 +1471,11 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
       expect((await readOnly.folders.get(folder.id)).folder.name).toBe('Scoped');
       expect((await failureOf(noUpdate.folders.rename(folder.id, 'Renamed')))?.status).toBe(403);
       expect(
-        (await failureOf(noUpdate.folders.moveInto(folder.id, { documentIds: [doc.id] })))?.status,
+        (await failureOf(noUpdate.folders.moveInto(folder.id, { docIds: [doc.id] })))?.status,
       ).toBe(403);
       expect((await failureOf(noDelete.folders.delete(folder.id)))?.status).toBe(403);
       await tenantAdmin('tenant-folders-scope', ['docs.update']).folders.moveInto(folder.id, {
-        documentIds: [doc.id],
+        docIds: [doc.id],
       });
       expect((await owner.documents.get(doc.id)).folderId).toBe(folder.id);
     });
@@ -1490,10 +1490,10 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
       expect((await failureOf(theirs.folders.delete(folder.id)))?.status).toBe(403);
       const target = await theirs.folders.create({ name: 'Target' });
       const moved = await failureOf(
-        theirs.folders.moveInto(target.id, { documentIds: [doc.id], folderIds: [folder.id] }),
+        theirs.folders.moveInto(target.id, { docIds: [doc.id], folderIds: [folder.id] }),
       );
       expect(moved?.status).toBe(404);
-      expect(detailsOf(moved)).toEqual({ documentIds: [doc.id], folderIds: [folder.id] });
+      expect(detailsOf(moved)).toEqual({ docIds: [doc.id], folderIds: [folder.id] });
     });
 
     test('opposite moves at the same time never make a loop', async () => {
@@ -1646,7 +1646,7 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
       const folder = await admin.folders.create({ name: 'Inbox' });
       const bytes = fakePdf(340, 300);
       const init = await admin.documents.init({
-        contentLength: bytes.byteLength,
+        sizeBytes: bytes.byteLength,
         contentSha256: sha256Hex(bytes),
         folderId: folder.id,
       });
@@ -1660,7 +1660,7 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
       expect([404, 409]).toContain(commit?.status);
       const loose = (await admin.documents.create({ bytes: fakePdf(341, 300) })).document;
       expect(
-        (await failureOf(admin.folders.moveInto(folder.id, { documentIds: [loose.id] })))?.status,
+        (await failureOf(admin.folders.moveInto(folder.id, { docIds: [loose.id] })))?.status,
       ).toBe(404);
     });
   });

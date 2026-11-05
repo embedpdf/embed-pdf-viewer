@@ -458,7 +458,7 @@ function visitorPublic(v: ListedGrantVisitor): GrantVisitorRecord {
     consentedAt: isoTimeOrNull(v.consentedAt),
     firstSeenAt: isoTime(v.firstSeenAt),
     lastSeenAt: isoTime(v.lastSeenAt),
-    layer: v.layer ? { layerName: v.layer.name, storageSizeBytes: v.layer.storageSizeBytes } : null,
+    layer: v.layer ? { layerName: v.layer.name, sizeBytes: v.layer.storageSizeBytes } : null,
   };
 }
 

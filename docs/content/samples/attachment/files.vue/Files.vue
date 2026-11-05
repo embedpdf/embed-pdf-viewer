@@ -43,7 +43,7 @@ function attach(event: Event) {
       >
         <button type="button" class="row-name" :disabled="!canDownload" @click="save(file)">
           <bdi>{{ displayNameOf(file) }}</bdi>
-          <span class="row-size">{{ sizeOf(file.size) }}</span>
+          <span class="row-size">{{ sizeOf(file.sizeBytes) }}</span>
         </button>
         <button
           type="button"

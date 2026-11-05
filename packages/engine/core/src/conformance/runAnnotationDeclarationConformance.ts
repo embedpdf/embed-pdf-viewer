@@ -564,7 +564,7 @@ export function runAnnotationDeclarationConformance(
 
         // A reply takes the replies under it, and its popup; the note stays.
         const replyDelete = await page.annotations.delete(reply.ref);
-        expect(replyDelete.meta.changed.length).toBe(3);
+        expect(replyDelete.meta.changedRefs.length).toBe(3);
         expect(await find(reply.ref)).toBe(undefined);
         expect(await find(nested.ref)).toBe(undefined);
         expect(await find(replyPopup.ref)).toBe(undefined);
@@ -576,9 +576,9 @@ export function runAnnotationDeclarationConformance(
         });
         try {
           const { meta } = await page.annotations.delete(note.ref);
-          expect(meta.changed.length).toBe(3);
-          expect(meta.changed[0]).toMatchObject({ kind: 'objectNumber' });
-          expect(deleted).toEqual([meta.changed]);
+          expect(meta.changedRefs.length).toBe(3);
+          expect(meta.changedRefs[0]).toMatchObject({ kind: 'objectNumber' });
+          expect(deleted).toEqual([meta.changedRefs]);
         } finally {
           stop();
         }
@@ -675,7 +675,7 @@ export function runAnnotationDeclarationConformance(
           resources: attachment.resources,
         });
         const fileOf = (dto: { subtype: string }) =>
-          (dto as { file?: { name: string; size?: number; checksum?: string } | null }).file;
+          (dto as { file?: { name: string; sizeBytes?: number; md5?: string } | null }).file;
         const original = fileOf(created)!;
 
         // The value replaces all of the metadata: leaving the description out removes it.
@@ -687,8 +687,8 @@ export function runAnnotationDeclarationConformance(
           name: 'renamed.txt',
           mimeType: 'text/plain',
           description: null,
-          size: original.size,
-          checksum: original.checksum,
+          sizeBytes: original.sizeBytes,
+          md5: original.md5,
           createdAt: (original as { createdAt?: string }).createdAt,
           modifiedAt: (original as { modifiedAt?: string }).modifiedAt,
         });
@@ -702,7 +702,7 @@ export function runAnnotationDeclarationConformance(
         expect(fileOf(replaced.annotation)).toMatchObject({
           name: 'renamed.txt',
           mimeType: 'text/plain',
-          size: bytes.byteLength,
+          sizeBytes: bytes.byteLength,
         });
         const read = await page.annotations.downloadResource(created.ref, 'file');
         expect(new TextDecoder().decode(read)).toBe('replaced bytes');

@@ -8,7 +8,6 @@ import { createAnnotationHoverFeed } from '../../src/tools/hover-feed';
 const tree = {
   root: { type: 'named', subtype: 'Named', name: 'x', next: [] },
   incomplete: false,
-  warningFlags: 0,
   warnings: [],
 };
 

@@ -16,7 +16,7 @@ describe("LayersClient", () => {
                     layerName: "layerName",
                     grantId: "grantId",
                     visitorId: "visitorId",
-                    storageSizeBytes: 1,
+                    sizeBytes: 1,
                     createdAt: "2024-01-15T09:30:00Z",
                     updatedAt: "2024-01-15T09:30:00Z",
                     lastSeenAt: "2024-01-15T09:30:00Z",
@@ -27,7 +27,7 @@ describe("LayersClient", () => {
 
         server
             .mockEndpoint()
-            .get("/v1/tenants/tenantId/documents/id/layers")
+            .get("/v1/tenants/tenantId/documents/docId/layers")
             .respondWith()
             .statusCode(200)
             .jsonBody(rawResponseBody)
@@ -35,7 +35,7 @@ describe("LayersClient", () => {
 
         const response = await client.documents.layers.list({
             tenantId: "tenantId",
-            id: "id",
+            docId: "docId",
         });
         expect(response).toEqual(rawResponseBody);
     });
@@ -48,7 +48,7 @@ describe("LayersClient", () => {
 
         server
             .mockEndpoint()
-            .get("/v1/tenants/tenantId/documents/id/layers")
+            .get("/v1/tenants/tenantId/documents/docId/layers")
             .respondWith()
             .statusCode(400)
             .jsonBody(rawResponseBody)
@@ -57,7 +57,7 @@ describe("LayersClient", () => {
         await expect(async () => {
             return await client.documents.layers.list({
                 tenantId: "tenantId",
-                id: "id",
+                docId: "docId",
             });
         }).rejects.toThrow(CloudPDF.BadRequestError);
     });
@@ -70,7 +70,7 @@ describe("LayersClient", () => {
 
         server
             .mockEndpoint()
-            .get("/v1/tenants/tenantId/documents/id/layers")
+            .get("/v1/tenants/tenantId/documents/docId/layers")
             .respondWith()
             .statusCode(403)
             .jsonBody(rawResponseBody)
@@ -79,7 +79,7 @@ describe("LayersClient", () => {
         await expect(async () => {
             return await client.documents.layers.list({
                 tenantId: "tenantId",
-                id: "id",
+                docId: "docId",
             });
         }).rejects.toThrow(CloudPDF.ForbiddenError);
     });
@@ -92,7 +92,7 @@ describe("LayersClient", () => {
 
         server
             .mockEndpoint()
-            .get("/v1/tenants/tenantId/documents/id/layers")
+            .get("/v1/tenants/tenantId/documents/docId/layers")
             .respondWith()
             .statusCode(404)
             .jsonBody(rawResponseBody)
@@ -101,7 +101,7 @@ describe("LayersClient", () => {
         await expect(async () => {
             return await client.documents.layers.list({
                 tenantId: "tenantId",
-                id: "id",
+                docId: "docId",
             });
         }).rejects.toThrow(CloudPDF.NotFoundError);
     });
@@ -112,14 +112,14 @@ describe("LayersClient", () => {
 
         server
             .mockEndpoint()
-            .delete("/v1/tenants/tenantId/documents/id/layers/layerName")
+            .delete("/v1/tenants/tenantId/documents/docId/layers/layerName")
             .respondWith()
             .statusCode(200)
             .build();
 
         const response = await client.documents.layers.delete({
             tenantId: "tenantId",
-            id: "id",
+            docId: "docId",
             layerName: "layerName",
         });
         expect(response).toEqual(undefined);
@@ -133,7 +133,7 @@ describe("LayersClient", () => {
 
         server
             .mockEndpoint()
-            .delete("/v1/tenants/tenantId/documents/id/layers/layerName")
+            .delete("/v1/tenants/tenantId/documents/docId/layers/layerName")
             .respondWith()
             .statusCode(403)
             .jsonBody(rawResponseBody)
@@ -142,7 +142,7 @@ describe("LayersClient", () => {
         await expect(async () => {
             return await client.documents.layers.delete({
                 tenantId: "tenantId",
-                id: "id",
+                docId: "docId",
                 layerName: "layerName",
             });
         }).rejects.toThrow(CloudPDF.ForbiddenError);
@@ -156,7 +156,7 @@ describe("LayersClient", () => {
 
         server
             .mockEndpoint()
-            .delete("/v1/tenants/tenantId/documents/id/layers/layerName")
+            .delete("/v1/tenants/tenantId/documents/docId/layers/layerName")
             .respondWith()
             .statusCode(404)
             .jsonBody(rawResponseBody)
@@ -165,7 +165,7 @@ describe("LayersClient", () => {
         await expect(async () => {
             return await client.documents.layers.delete({
                 tenantId: "tenantId",
-                id: "id",
+                docId: "docId",
                 layerName: "layerName",
             });
         }).rejects.toThrow(CloudPDF.NotFoundError);
@@ -179,7 +179,7 @@ describe("LayersClient", () => {
 
         server
             .mockEndpoint()
-            .delete("/v1/tenants/tenantId/documents/id/layers/layerName")
+            .delete("/v1/tenants/tenantId/documents/docId/layers/layerName")
             .respondWith()
             .statusCode(409)
             .jsonBody(rawResponseBody)
@@ -188,7 +188,7 @@ describe("LayersClient", () => {
         await expect(async () => {
             return await client.documents.layers.delete({
                 tenantId: "tenantId",
-                id: "id",
+                docId: "docId",
                 layerName: "layerName",
             });
         }).rejects.toThrow(CloudPDF.ConflictError);

@@ -49,7 +49,6 @@ export function createScriptEffects(
       url: intent.url,
       method: intent.method,
       format: intent.format,
-      flagsRaw: intent.flagsRaw,
       ...(intent.charSet === undefined ? {} : { charSet: intent.charSet }),
       entries: buildSubmitEntries(fields.view().snapshot?.fields ?? [], intent, diagnose),
       origin: actionContext.origin,

@@ -130,7 +130,7 @@ items as the neighbour.
 
 ```ts
 const { meta } = await doc.outline.delete(chapter.ref);
-meta.changed; // the chapter first, then the items under it
+meta.changedRefs; // the chapter first, then the items under it
 ```
 
 An undo brings the same items back, under the refs they had, at the place the item had. See

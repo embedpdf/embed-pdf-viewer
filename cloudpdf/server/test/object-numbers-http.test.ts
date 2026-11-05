@@ -173,7 +173,7 @@ describe('/access', () => {
     const layer = 'access';
     const opened = await access({ layer, session: 'cloud:s1' });
     expect(opened.status).toBe(200);
-    expect(opened.body.edit).toMatchObject({ session: 'new', expiresIn: 900 });
+    expect(opened.body.edit).toMatchObject({ session: 'new', expiresInSeconds: 900 });
     const first = objectNumbersIn(opened.body.edit.objectNumbers);
     expect(first).toHaveLength(8);
     // Past every object the document has.
@@ -556,7 +556,7 @@ describe('the bulk reservation', () => {
     });
     expect(reserved.status).toBe(200);
     expect(count(reserved.body.objectNumbers)).toBeGreaterThanOrEqual(100);
-    expect(reserved.body.expiresIn).toBe(900);
+    expect(reserved.body.expiresInSeconds).toBe(900);
     const [number] = objectNumbersIn(reserved.body.objectNumbers);
     expect((await createSquare(SECOND_PAGE, number!, { layer, session })).status).toBe(200);
 
@@ -602,7 +602,7 @@ describe('the event stream', () => {
     expect(sessionEvent).toBeDefined();
     const data = JSON.parse(sessionEvent!.data);
     expect(data.held).toEqual(handed);
-    expect(data.expiresIn).toBeGreaterThan(890);
+    expect(data.expiresInSeconds).toBeGreaterThan(890);
     expect(sessionEvent!.id).toBeUndefined();
 
     const quiet = await readEvents(layer, 'cloud:stream-viewer', () => false, 500);

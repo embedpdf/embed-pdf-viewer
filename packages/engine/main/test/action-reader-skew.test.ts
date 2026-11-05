@@ -36,7 +36,6 @@ describe('action reader ↔ runtime skew', () => {
     expect(tree).toEqual({
       root: { type: 'submit-form', subtype: '', next: [] },
       incomplete: false,
-      warningFlags: 0,
       warnings: [],
     });
   });

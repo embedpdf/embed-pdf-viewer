@@ -99,20 +99,25 @@ export interface SignatureSignerInput {
   signedAt?: DateInput;
 }
 
-/** The field's `/SV` seed value: what a signature on this field must satisfy. */
+/**
+ * The field's `/SV` seed value: what a signature on this field should, or
+ * must, satisfy. Each entry is a suggestion unless its `…Required` is true
+ * (the `/Ff` bits); an entry the seed value leaves out is `null` or empty.
+ */
 export interface SignatureSeedValue {
-  /** `/Ff` bits: which of the entries below are requirements rather than suggestions. */
-  requiredFlags: number;
-  /** Which entries are present at all (same bit layout, plus Cert/MDP/TimeStamp). */
-  presentFlags: number;
-  /** `/V`: the seed-value parser capability the signer needs (1 = PDF 1.5, 2 = PDF 1.7). */
-  version: number | null;
+  /** `/V`: the seed-value parser the signer needs (1 = PDF 1.5, 2 = PDF 1.7). */
+  parserVersion: number | null;
+  parserVersionRequired: boolean;
   /** `/MDP /P` when present: 0 = approval signature only. */
   mdp: 0 | 1 | 2 | 3 | null;
   filter: string | null;
+  filterRequired: boolean;
   subFilters: string[];
+  subFiltersRequired: boolean;
   digestMethods: string[];
+  digestMethodsRequired: boolean;
   reasons: string[];
+  reasonsRequired: boolean;
   /** A required entry this engine does not implement — signing this field is refused. */
   unsupportedRequired: boolean;
 }
@@ -135,7 +140,7 @@ export interface SignatureDTO {
   subFilter: string | null;
   byteRange: [number, number, number, number] | null;
   /** DER length of `/Contents` as its TLV declares (0 when unsigned or malformed). */
-  contentsSize: number;
+  contentsSizeBytes: number;
   /** `null` when unsigned. */
   coverage: SignatureCoverage | null;
   /** Which revision the signature seals; `null` unless coverage is `whole-revision`. */
@@ -200,7 +205,7 @@ export interface SignatureSnapshot {
  */
 export interface BaseVersionInfo {
   sha256: string;
-  byteLength: number;
+  sizeBytes: number;
 }
 
 /**
@@ -234,7 +239,7 @@ export interface SignaturePrepareInput {
   subFilter?: SignatureSubFilter;
   digest?: Exclude<DigestAlgorithm, 'sha1'>;
   /** Room reserved for the CMS, in bytes (256 .. 4 MiB). Default 8192. */
-  contentsSize?: number;
+  contentsSizeBytes?: number;
   /**
    * What the signature dictionary says about the signer — `/Name`, `/Reason`,
    * `/Location`, `/ContactInfo` and `/M` (`signedAt`, default: now): the
@@ -253,7 +258,7 @@ export interface SignaturePrepared {
   digest: Uint8Array;
   algorithm: Exclude<DigestAlgorithm, 'sha1'>;
   byteRange: [number, number, number, number];
-  contentsSize: number;
+  contentsSizeBytes: number;
   subFilter: SignatureSubFilter | 'ETSI.RFC3161';
   expectedVersion: DocumentVersionRef;
   /** ISO timestamp after which the candidate is discarded. */
