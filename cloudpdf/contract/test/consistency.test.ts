@@ -142,8 +142,8 @@ describe('naming rules in openapi.json', () => {
     const both = responseProperties
       .filter(({ schema, required }) => !required && isNullable(schema))
       .map(({ at }) => at);
-    // A destination's axes: left out and `null` both keep the viewer's
-    // value, as in the file. Undecided (docs/plans, API consistency).
+    // The one exception: a destination's axes, where left out and `null` both
+    // keep the viewer's value, as in the file.
     expect(unique(both)).toEqual([
       'PageDestination.x',
       'PageDestination.y',

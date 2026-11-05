@@ -104,7 +104,7 @@ export namespace DocManifestResponse {
 
         export interface Certification {
             signatureIndex: number;
-            permission: CloudPDF.DocMdpPermissionTwo;
+            permission: CloudPDF.DocMdpPermission;
         }
 
         export type FieldLocks = FieldLocks.Item[];

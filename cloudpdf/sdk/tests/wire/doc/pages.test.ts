@@ -289,7 +289,7 @@ describe("PagesClient", () => {
                         ref: { kind: "objectNumber", objectNumber: 1 },
                         label: null,
                         size: { width: 1.1, height: 1.1 },
-                        rotation: 1.1,
+                        rotation: 1,
                         userUnit: 1.1,
                         tabOrder: null,
                         boxes: {
@@ -423,7 +423,7 @@ describe("PagesClient", () => {
                         ref: { kind: "objectNumber", objectNumber: 1 },
                         label: null,
                         size: { width: 1.1, height: 1.1 },
-                        rotation: 1.1,
+                        rotation: 1,
                         userUnit: 1.1,
                         tabOrder: null,
                         boxes: {

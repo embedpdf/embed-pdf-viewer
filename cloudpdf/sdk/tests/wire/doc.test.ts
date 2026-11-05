@@ -342,7 +342,7 @@ describe("DocClient", () => {
             protection: {
                 enforced: "none",
                 judged: "none",
-                certification: { signatureIndex: 1, permission: 1.1 },
+                certification: { signatureIndex: 1, permission: 1 },
                 fieldLocks: [{ signatureIndex: 1, source: "fieldmdp", spec: { action: "all", fields: ["fields"] } }],
                 policyVersion: 1,
             },

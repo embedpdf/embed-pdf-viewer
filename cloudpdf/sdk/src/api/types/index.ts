@@ -64,7 +64,7 @@ export * from "./DocFormsSetValueResponse.js";
 export * from "./DocFormsUpdateWidgetResponse.js";
 export * from "./DocHeadResponse.js";
 export * from "./DocManifestResponse.js";
-export * from "./DocMdpPermissionTwo.js";
+export * from "./DocMdpPermission.js";
 export * from "./DocMetadataCustomGetResponse.js";
 export * from "./DocMetadataGetResponse.js";
 export * from "./DocOutlineGetResponse.js";

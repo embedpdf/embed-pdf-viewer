@@ -469,8 +469,8 @@ function registerSchema(
     basePath: ['#', ...componentPath],
     override: (definition) => {
       const sharedName = sharedComponentOf(definition);
-      if (!sharedName || sharedName === name) return ignoreOverride;
-      return { $ref: `#/components/schemas/${sharedName}` };
+      if (sharedName && sharedName !== name) return { $ref: `#/components/schemas/${sharedName}` };
+      return wholeNumberEnumOf(definition) ?? ignoreOverride;
     },
   }) as Record<string, unknown>;
   // Fern's OpenAPI importer currently expands property-level recursive refs
@@ -566,6 +566,22 @@ function breakAncestorReferences(value: unknown, path: string[]): unknown {
       breakAncestorReferences(child, [...path, key]),
     ]),
   );
+}
+
+/**
+ * A union of whole-number literals (a rotation, a DocMDP level) is one
+ * integer enum, not an `anyOf` of one-value enums: every SDK reads it as an
+ * integer, and a named one keeps its name.
+ */
+function wholeNumberEnumOf(definition: z.ZodTypeDef): Record<string, unknown> | undefined {
+  const union = definition as Partial<z.ZodUnionDef>;
+  if (union.typeName !== z.ZodFirstPartyTypeKind.ZodUnion || !union.options) return undefined;
+  const values = union.options.map((option) =>
+    option instanceof z.ZodLiteral ? (option.value as unknown) : undefined,
+  );
+  return values.every((value) => Number.isInteger(value))
+    ? { type: 'integer', enum: values }
+    : undefined;
 }
 
 function inlineSchemaOf(schema: z.ZodTypeAny): Record<string, unknown> {

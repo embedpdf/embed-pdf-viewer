@@ -17573,24 +17573,8 @@
                 "$ref": "#/components/schemas/AnnotationDraft/anyOf/0/properties/rect"
               },
               "rotation": {
-                "anyOf": [
-                  {
-                    "type": "number",
-                    "enum": [0]
-                  },
-                  {
-                    "type": "number",
-                    "enum": [90]
-                  },
-                  {
-                    "type": "number",
-                    "enum": [180]
-                  },
-                  {
-                    "type": "number",
-                    "enum": [270]
-                  }
-                ],
+                "type": "integer",
+                "enum": [0, 90, 180, 270],
                 "nullable": true
               },
               "color": {
@@ -22850,24 +22834,8 @@
             "$ref": "#/components/schemas/WidgetPlacement/properties/rect"
           },
           "rotation": {
-            "anyOf": [
-              {
-                "type": "number",
-                "enum": [0]
-              },
-              {
-                "type": "number",
-                "enum": [90]
-              },
-              {
-                "type": "number",
-                "enum": [180]
-              },
-              {
-                "type": "number",
-                "enum": [270]
-              }
-            ]
+            "type": "integer",
+            "enum": [0, 90, 180, 270]
           },
           "exportValue": {
             "type": "string",
@@ -23126,24 +23094,8 @@
             "$ref": "#/components/schemas/WidgetAnnotation/properties/rect"
           },
           "rotation": {
-            "anyOf": [
-              {
-                "type": "number",
-                "enum": [0]
-              },
-              {
-                "type": "number",
-                "enum": [90]
-              },
-              {
-                "type": "number",
-                "enum": [180]
-              },
-              {
-                "type": "number",
-                "enum": [270]
-              }
-            ],
+            "type": "integer",
+            "enum": [0, 90, 180, 270],
             "nullable": true
           },
           "color": {
@@ -23432,24 +23384,8 @@
             "$ref": "#/components/schemas/WidgetPatch/properties/rect"
           },
           "rotation": {
-            "anyOf": [
-              {
-                "type": "number",
-                "enum": [0]
-              },
-              {
-                "type": "number",
-                "enum": [90]
-              },
-              {
-                "type": "number",
-                "enum": [180]
-              },
-              {
-                "type": "number",
-                "enum": [270]
-              }
-            ],
+            "type": "integer",
+            "enum": [0, 90, 180, 270],
             "nullable": true
           },
           "color": {
@@ -24547,24 +24483,8 @@
                 "minItems": 1
               },
               "rotation": {
-                "anyOf": [
-                  {
-                    "type": "number",
-                    "enum": [0]
-                  },
-                  {
-                    "type": "number",
-                    "enum": [90]
-                  },
-                  {
-                    "type": "number",
-                    "enum": [180]
-                  },
-                  {
-                    "type": "number",
-                    "enum": [270]
-                  }
-                ]
+                "type": "integer",
+                "enum": [0, 90, 180, 270]
               }
             },
             "required": ["type", "pages", "rotation"],
@@ -25489,24 +25409,8 @@
                 }
               },
               "rotation": {
-                "anyOf": [
-                  {
-                    "type": "number",
-                    "enum": [0]
-                  },
-                  {
-                    "type": "number",
-                    "enum": [90]
-                  },
-                  {
-                    "type": "number",
-                    "enum": [180]
-                  },
-                  {
-                    "type": "number",
-                    "enum": [270]
-                  }
-                ]
+                "type": "integer",
+                "enum": [0, 90, 180, 270]
               },
               "layout": {
                 "type": "object",
@@ -25547,7 +25451,8 @@
                           "additionalProperties": false
                         },
                         "rotation": {
-                          "$ref": "#/components/schemas/ChangeItem/anyOf/29/properties/rotation"
+                          "type": "integer",
+                          "enum": [0, 90, 180, 270]
                         },
                         "userUnit": {
                           "type": "number",
@@ -26211,20 +26116,8 @@
         "additionalProperties": false
       },
       "DocMdpPermission": {
-        "anyOf": [
-          {
-            "type": "number",
-            "enum": [1]
-          },
-          {
-            "type": "number",
-            "enum": [2]
-          },
-          {
-            "type": "number",
-            "enum": [3]
-          }
-        ]
+        "type": "integer",
+        "enum": [1, 2, 3]
       },
       "FieldLockSpec": {
         "type": "object",
@@ -29742,24 +29635,8 @@
                       "nullable": true
                     },
                     "mdp": {
-                      "anyOf": [
-                        {
-                          "type": "number",
-                          "enum": [0]
-                        },
-                        {
-                          "type": "number",
-                          "enum": [1]
-                        },
-                        {
-                          "type": "number",
-                          "enum": [2]
-                        },
-                        {
-                          "type": "number",
-                          "enum": [3]
-                        }
-                      ],
+                      "type": "integer",
+                      "enum": [0, 1, 2, 3],
                       "nullable": true
                     },
                     "filter": {
@@ -29977,20 +29854,8 @@
                   "type": "boolean"
                 },
                 "permission": {
-                  "anyOf": [
-                    {
-                      "type": "number",
-                      "enum": [1]
-                    },
-                    {
-                      "type": "number",
-                      "enum": [2]
-                    },
-                    {
-                      "type": "number",
-                      "enum": [3]
-                    }
-                  ]
+                  "type": "integer",
+                  "enum": [1, 2, 3]
                 },
                 "fields": {}
               },
@@ -30341,24 +30206,8 @@
                     "nullable": true
                   },
                   "mdp": {
-                    "anyOf": [
-                      {
-                        "type": "number",
-                        "enum": [0]
-                      },
-                      {
-                        "type": "number",
-                        "enum": [1]
-                      },
-                      {
-                        "type": "number",
-                        "enum": [2]
-                      },
-                      {
-                        "type": "number",
-                        "enum": [3]
-                      }
-                    ],
+                    "type": "integer",
+                    "enum": [0, 1, 2, 3],
                     "nullable": true
                   },
                   "filter": {
@@ -30766,24 +30615,8 @@
                       "nullable": true
                     },
                     "mdp": {
-                      "anyOf": [
-                        {
-                          "type": "number",
-                          "enum": [0]
-                        },
-                        {
-                          "type": "number",
-                          "enum": [1]
-                        },
-                        {
-                          "type": "number",
-                          "enum": [2]
-                        },
-                        {
-                          "type": "number",
-                          "enum": [3]
-                        }
-                      ],
+                      "type": "integer",
+                      "enum": [0, 1, 2, 3],
                       "nullable": true
                     },
                     "filter": {
@@ -31001,20 +30834,8 @@
                   "type": "boolean"
                 },
                 "permission": {
-                  "anyOf": [
-                    {
-                      "type": "number",
-                      "enum": [1]
-                    },
-                    {
-                      "type": "number",
-                      "enum": [2]
-                    },
-                    {
-                      "type": "number",
-                      "enum": [3]
-                    }
-                  ]
+                  "type": "integer",
+                  "enum": [1, 2, 3]
                 },
                 "fields": {}
               },
@@ -31812,24 +31633,8 @@
                       "additionalProperties": false
                     },
                     "rotation": {
-                      "anyOf": [
-                        {
-                          "type": "number",
-                          "enum": [0]
-                        },
-                        {
-                          "type": "number",
-                          "enum": [90]
-                        },
-                        {
-                          "type": "number",
-                          "enum": [180]
-                        },
-                        {
-                          "type": "number",
-                          "enum": [270]
-                        }
-                      ]
+                      "type": "integer",
+                      "enum": [0, 90, 180, 270]
                     },
                     "userUnit": {
                       "type": "number",
@@ -32064,24 +31869,8 @@
                       "additionalProperties": false
                     },
                     "rotation": {
-                      "anyOf": [
-                        {
-                          "type": "number",
-                          "enum": [0]
-                        },
-                        {
-                          "type": "number",
-                          "enum": [90]
-                        },
-                        {
-                          "type": "number",
-                          "enum": [180]
-                        },
-                        {
-                          "type": "number",
-                          "enum": [270]
-                        }
-                      ]
+                      "type": "integer",
+                      "enum": [0, 90, 180, 270]
                     },
                     "userUnit": {
                       "type": "number",

@@ -5,7 +5,7 @@ import type * as CloudPDF from "../index.js";
 export interface FieldLockSpec {
     action: FieldLockSpec.Action;
     fields: string[];
-    permission?: CloudPDF.DocMdpPermissionTwo | undefined;
+    permission?: CloudPDF.DocMdpPermission | undefined;
 }
 
 export namespace FieldLockSpec {

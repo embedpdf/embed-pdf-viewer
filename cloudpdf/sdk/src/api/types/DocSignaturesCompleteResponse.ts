@@ -32,7 +32,7 @@ export namespace DocSignaturesCompleteResponse {
         coverage: Signature.Coverage | null;
         revisionIndex: number | null;
         signer: Signature.Signer;
-        docMdp: CloudPDF.DocMdpPermissionTwo | null;
+        docMdp: CloudPDF.DocMdpPermission | null;
         catalogCertification: boolean;
         fieldMdp: CloudPDF.FieldLockSpec | null;
         lock: CloudPDF.FieldLockSpec | null;
@@ -109,7 +109,7 @@ export namespace DocSignaturesCompleteResponse {
 
         export interface Certification {
             signatureIndex: number;
-            permission: CloudPDF.DocMdpPermissionTwo;
+            permission: CloudPDF.DocMdpPermission;
         }
 
         export type FieldLocks = FieldLocks.Item[];
