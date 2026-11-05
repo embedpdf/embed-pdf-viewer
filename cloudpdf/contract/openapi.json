@@ -12698,8 +12698,7 @@
                 "description": "A measure, by its `subtype`. A newer server can add subtypes: read one your client doesn't know as `unknown`."
               },
               "captionEnabled": {
-                "type": "boolean",
-                "nullable": true
+                "type": "boolean"
               },
               "captionPosition": {
                 "type": "string",
@@ -16511,8 +16510,7 @@
                 "nullable": true
               },
               "captionEnabled": {
-                "type": "boolean",
-                "nullable": true
+                "type": "boolean"
               },
               "captionPosition": {
                 "type": "string",
@@ -19376,8 +19374,7 @@
                 "nullable": true
               },
               "captionEnabled": {
-                "type": "boolean",
-                "nullable": true
+                "type": "boolean"
               },
               "captionPosition": {
                 "type": "string",

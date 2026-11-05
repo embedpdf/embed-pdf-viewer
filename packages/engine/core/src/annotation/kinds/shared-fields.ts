@@ -71,6 +71,11 @@ export const annotationBaseFields = {
    * annotations focus in. `null` for an annotation that isn't tagged.
    */
   structurePosition: field.engine(z.array(z.number().int().nonnegative())).nullable(),
+  /**
+   * `/NM`, the name that tells the annotation apart on its page for other PDF
+   * apps; not its identity (that's `ref`). A create left without it gets a
+   * fresh UUIDv7; `null` is no name. A page's names are unique.
+   */
   nm: field.data(z.string()).nullable().optional().createOnly(),
   rect: field.data(PdfRectSchema).space('box'),
   contents: field.data(z.string()).nullable().optional(),

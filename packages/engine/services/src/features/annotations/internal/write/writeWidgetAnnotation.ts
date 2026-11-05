@@ -157,6 +157,10 @@ export function applyWidgetStyle(
  * says now, so a colour change keeps the font and its size. A font is a
  * standard font's name or a registered font's key; naming the face `/DA`
  * already has keeps that font, whatever the document has it as.
+ *
+ * The font a read gives is the widget's `/DA`, else the form's: `null` only
+ * when neither has one. So `null` is that read sent back, which changes
+ * nothing; a font can't be removed, and `null` beside one is refused.
  */
 function applyWidgetFont(
   fn: PdfFunctions,
@@ -166,19 +170,29 @@ function applyWidgetFont(
   ctx: AnnotationWriteContext | undefined,
 ): void {
   const current = readDefaultAppearance(fn, mem, annotPtr);
-  const fontSize =
-    style.fontSize === undefined ? (current?.fontSize ?? 12) : (style.fontSize ?? 12);
-  const color =
-    style.fontColor === undefined ? (current?.color ?? '#000000') : (style.fontColor ?? '#000000');
+  const given = [style.fontFamily, style.fontSize, style.fontColor];
+  if (given.includes(null) && current !== null) {
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      "a widget's font can't be removed: send a font, or leave the font fields out",
+      { details: { field: 'fontFamily' } },
+    );
+  }
+  // Without a font anywhere, a `null` is the read sent back: no change.
+  const fontFamily = style.fontFamily ?? undefined;
+  const fontSize = style.fontSize ?? undefined;
+  const fontColor = style.fontColor ?? undefined;
+  if (fontFamily === undefined && fontSize === undefined && fontColor === undefined) return;
+  const size = fontSize ?? current?.fontSize ?? 12;
+  const color = fontColor ?? current?.color ?? '#000000';
   const keeps =
     current !== null &&
-    (style.fontFamily === undefined ||
-      (style.fontFamily !== null && namesCurrentFace(fn, mem, annotPtr, style.fontFamily, ctx)));
+    (fontFamily === undefined || namesCurrentFace(fn, mem, annotPtr, fontFamily, ctx));
   if (keeps) {
-    setDefaultAppearance(fn, annotPtr, KEEP_FONT_CODE, fontSize, color);
+    setDefaultAppearance(fn, annotPtr, KEEP_FONT_CODE, size, color);
     return;
   }
-  applyDefaultAppearance(fn, annotPtr, style.fontFamily ?? 'helvetica', fontSize, color, ctx);
+  applyDefaultAppearance(fn, annotPtr, fontFamily ?? 'helvetica', size, color, ctx);
 }
 
 /** Whether `font` names the face `/DA` has now. */

@@ -29,9 +29,8 @@ export function readLine(
     richText: readCommentRichText(fn, mem, annotPtr),
     ...readAnnotationMeasure(fn, mem, annotPtr),
     intent: lineIntentFromName(intent),
-    // An absent `/Cap` reads `null`, as on polygons and polylines; `/CP`
-    // reads its ISO default.
-    captionEnabled: fn.FPDFAnnot_HasKey(annotPtr, 'Cap') ? (caption?.enabled ?? false) : null,
+    // An absent `/Cap` and `/CP` read their ISO defaults.
+    captionEnabled: caption?.enabled ?? false,
     captionPosition: caption?.position ?? 'inline',
     captionOffset: caption?.offset ?? null,
     leader: leader ?? null,

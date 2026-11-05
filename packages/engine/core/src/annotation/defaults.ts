@@ -58,7 +58,7 @@ const MARKUP = { ...BASE, color: BLACK, opacity: 1 } as const;
 export const ANNOTATION_DEFAULTS = {
   square: STROKE,
   circle: STROKE,
-  line: { ...STROKE, lineEndings: NO_ENDINGS, captionPosition: 'inline' },
+  line: { ...STROKE, lineEndings: NO_ENDINGS, captionEnabled: false, captionPosition: 'inline' },
   polygon: STROKE,
   polyline: { ...STROKE, lineEndings: NO_ENDINGS },
   ink: STROKE,

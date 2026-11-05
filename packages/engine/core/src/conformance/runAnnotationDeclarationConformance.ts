@@ -1,3 +1,4 @@
+import { UUID_V7 } from './names';
 import { annotationReadDriftOf } from './annotationReadDrift';
 import { creatables, iconRect, PNG_1X1 } from './creatables';
 import type { ConformanceTestRunner } from './runMetadataConformance';
@@ -205,6 +206,17 @@ export function runAnnotationDeclarationConformance(
         await expect(
           page.annotations.update(created.ref, { nm: 'renamed-square' }),
         ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
+      });
+    });
+
+    test('a create left without a name gets a fresh one; nm: null names none', async () => {
+      await onAuthoringPage(async (page) => {
+        const square = creatables().find(({ data }) => data.subtype === 'square')!.data;
+        const { nm: _name, ...unnamed } = square as typeof square & { nm?: string | null };
+        const { annotation: named } = await page.annotations.create(unnamed);
+        expect(named.nm).toMatch(UUID_V7);
+        const { annotation: none } = await page.annotations.create({ ...unnamed, nm: null });
+        expect(none.nm).toBe(null);
       });
     });
 
@@ -432,21 +444,21 @@ export function runAnnotationDeclarationConformance(
       });
     });
 
-    test('a line without a caption flag reads captionEnabled: null', async () => {
+    test('a line without a caption flag reads captionEnabled: false, its default', async () => {
       await onAuthoringPage(async (page) => {
         const { annotation } = await page.annotations.create({
           subtype: 'line',
           linePoints: { start: { x: 40, y: 480 }, end: { x: 140, y: 480 } },
         } as never);
-        expect(annotation.subtype === 'line' && annotation.captionEnabled).toBe(null);
+        expect(annotation.subtype === 'line' && annotation.captionEnabled).toBe(false);
         const { annotation: flagged } = await page.annotations.update(annotation.ref, {
           captionEnabled: true,
         });
         expect(flagged.subtype === 'line' && flagged.captionEnabled).toBe(true);
         const { annotation: cleared } = await page.annotations.update(annotation.ref, {
-          captionEnabled: null,
+          captionEnabled: false,
         });
-        expect(cleared.subtype === 'line' && cleared.captionEnabled).toBe(null);
+        expect(cleared.subtype === 'line' && cleared.captionEnabled).toBe(false);
       });
     });
 
