@@ -763,13 +763,13 @@ export class CloudDocumentHandle implements DocumentHandle {
         // A change this connection may not read: the server sent only its
         // pins, absorbed so reads stay warm. Which family it changed is part
         // of what was withheld, so both planes flip: never wrong, only
-        // unshared until the next manifest.
+        // unshared until the next manifest. Its one event, when its pins
+        // moved the font list's, is `fonts.changed`, published below.
         if (row.withheld) {
           const meta = (row.payload as { meta?: MutationMeta } | null)?.meta;
           if (meta && row.originSessionId !== this.sessionId) {
             this.absorbMutation(meta, ['annotations', 'forms']);
           }
-          return;
         }
         // A new version, this handle's own included: in stream order, before
         // the `session` event that hands out its fresh numbers.
@@ -898,6 +898,10 @@ export class CloudDocumentHandle implements DocumentHandle {
         return;
       case 'signatures.cancelled':
         // Moves no pin a read uses, as an own cancel absorbs nothing.
+        return;
+      case 'fonts.changed':
+        // Ends a row whose own events, or its withheld pins, absorbed the
+        // font list's pin already.
         return;
       case 'stream.desynced':
         // The stream's own handler dropped the manifest already.
