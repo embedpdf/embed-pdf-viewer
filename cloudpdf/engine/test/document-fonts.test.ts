@@ -8,6 +8,7 @@ import {
   runDocumentFontsConformance,
   type ConformanceTestRunner,
 } from '@embedpdf/engine-core/conformance';
+import type { DocumentEvent } from '@embedpdf/engine-core/runtime';
 import { cloudEngine } from '../src/index';
 import {
   buildDbSeededFixture,
@@ -90,4 +91,76 @@ runDocumentFontsConformance(runner, {
       ),
     ),
   },
+});
+
+async function waitFor(predicate: () => boolean, what: string, timeoutMs = 10_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!predicate()) {
+    if (Date.now() > deadline) throw new Error(`timed out waiting for ${what}`);
+    await new Promise((r) => setTimeout(r, 25));
+  }
+}
+
+describe('remote fonts.changed', () => {
+  test('a remote write that embeds a font ends its events with fonts.changed, for a reader too', async () => {
+    const app = fixtureApp();
+    const docId = `fonts-${++docs}`;
+    await seedDocument(app, TENANT_ID, docId, await fixture('hello_world.pdf'));
+    const engines = [0, 1, 2].map(() => cloudEngine({ baseUrl: app.baseUrl }));
+    const [writer, editor, reader] = await Promise.all([
+      engines[0].open({ kind: 'token', token: docScopedToken(app, TENANT_ID, docId) }),
+      engines[1].open({ kind: 'token', token: docScopedToken(app, TENANT_ID, docId) }),
+      // May read no annotation: the write reaches it withheld, as only its pins.
+      engines[2].open({
+        kind: 'token',
+        token: signDevToken(app.secret, {
+          sub: 'cloud-test-reader',
+          tenant_id: TENANT_ID,
+          doc_id: docId,
+          scope: ['doc.open', 'doc.render'],
+        }),
+      }),
+    ]);
+    try {
+      const hasRoboto = async (doc: typeof editor) =>
+        (await doc.fonts.list()).fonts.some(
+          (font) => font.source === 'document' && font.familyName === 'Roboto',
+        );
+      expect(await hasRoboto(editor)).toBe(false);
+      expect(await hasRoboto(reader)).toBe(false);
+      const heardByEditor: DocumentEvent[] = [];
+      const heardByReader: DocumentEvent[] = [];
+      editor.events.subscribe((event) => heardByEditor.push(event));
+      reader.events.subscribe((event) => heardByReader.push(event));
+      // Give the lazy streams a beat to connect before the write.
+      await new Promise((r) => setTimeout(r, 300));
+
+      const page = (await writer.pages.list()).pages[0]!.ref;
+      await writer.page(page).annotations.create({
+        subtype: 'free-text',
+        box: { x: 20, y: 60, width: 200, height: 40 },
+        contents: 'Hello',
+        fontFamily: 'roboto',
+      });
+
+      await waitFor(() => heardByEditor.some((e) => e.type === 'fonts.changed'), 'the editor');
+      expect(heardByEditor.map((event) => event.type)).toEqual([
+        'annotations.created',
+        'fonts.changed',
+      ]);
+      const [created, changed] = heardByEditor;
+      expect(changed.origin.kind).toBe('remote');
+      expect('tx' in changed.origin && changed.origin.tx?.id).toBe(
+        'tx' in created.origin && created.origin.tx?.id,
+      );
+      await waitFor(() => heardByReader.length > 0, 'the reader');
+      expect(heardByReader.map((event) => event.type)).toEqual(['fonts.changed']);
+
+      expect(await hasRoboto(editor)).toBe(true);
+      expect(await hasRoboto(reader)).toBe(true);
+    } finally {
+      await Promise.all([writer.close(), editor.close(), reader.close()]);
+      await Promise.all(engines.map((engine) => engine.destroy()));
+    }
+  });
 });
