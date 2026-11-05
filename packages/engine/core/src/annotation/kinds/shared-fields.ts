@@ -16,6 +16,7 @@ import {
   PdfRotationSchema,
 } from '../../geometry/schemas';
 import { PageRefSchema } from '../../identity/PageRef.schema';
+import { closed } from '../../wire/reading';
 import {
   AnnotationBorderStyleSchema,
   DashArrayWriteSchema,
@@ -30,7 +31,7 @@ import type { FontName } from '../primitives';
 /** `/IRT` and `/RT`: the annotation this one replies to, and how it relates to it. */
 export const AnnotationReplySchema = z.object({
   to: AnnotationRefSchema,
-  type: z.enum(['reply', 'group']),
+  type: closed(z.enum(['reply', 'group'])),
 });
 
 /** A write may leave out `type`: an absent `/RT` means `'reply'` (ISO 32000-2 §12.5.6.2). */

@@ -56,6 +56,12 @@ The client parses every response with the wire schemas in
   kinds the client doesn't know yet, not for broken data.
 - **An enum read from the server either names its fallback value or is
   closed.** Adding a value to a closed enum is a breaking change.
+- **The schema says which.** In `@embedpdf/engine-core/wire`, `closed()`
+  marks a closed set (an enum, a literal or a union's kinds),
+  `readsUnknownAs()` an enum with a fallback and `withCatchAll()` a union with
+  a catch-all kind. `readingProblems()` in `@embedpdf/engine-core/conformance`
+  names every object that refuses unknown fields and every set that says
+  neither; the contract's tests run it on every response.
 - **The generated SDKs read the same way.** Each SDK's generation check parses
   a fixture response with an unknown field, an unknown annotation subtype and
   an unknown enum value.
@@ -377,30 +383,22 @@ that kind). A new cached read adds a row here.
 This section lists where the code doesn't follow the rules above yet. Delete
 each entry when its work lands, and the section with the last one.
 
-| Gap                                                                                                                                                                                                                                                                                                          | Where                                                                                         |
-| :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------------------- |
-| Schemas that responses are parsed with are `.strict()`, nested ones too: `point` and `offset` in `Measure.schema.ts`, `WidgetAppearanceSchema`, `FormFieldValueSchema`, `LineLeaderSchema`, `LineDimensionCaptionSchema`, `ShapeDimensionCaptionSchema`, likely more (the unknown-field test finds the rest) | `engine-core` `dto/Measure.schema.ts`, `annotation/kinds/widget.shared.ts`, `forms/schema.ts` |
-| An unknown annotation subtype fails the whole list: `AnnotationSchema` is a `z.discriminatedUnion` with no fallback to `unsupported`                                                                                                                                                                         | `engine-core` `annotation/kinds/index.ts`                                                     |
-| The Python SDK fails a whole annotation list on an unknown subtype (pydantic's discriminator); the TypeScript, Go, Java and C# SDKs keep going                                                                                                                                                               | `fern/generators.yml` (`fern-python-sdk`)                                                     |
+| Gap                                                                                                                                                                                                                                                                         | Where                                                                             |
+| :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------- |
+| The Python SDK reads an unknown annotation subtype, but its other open unions still refuse an unknown kind: form fields, value entries, measures, link and outline targets, actions. Fern inlines each into separate Python types, which the annotation patch doesn't reach | `fern/scripts/record-sdk-metadata.mjs`, `fern/generators.yml` (`fern-python-sdk`) |
 
 ### Work, before 3.0.0
 
 Everything here is fixed into the 3.0 client or the 3.0.0 server, so it lands
 before 3.0.0. Every cached read is computed at its pins (one helper,
 `readAtPins`), every token carries its engine value and shape, search pins
-`contentsVersion` and `layoutVersion`, and every request and response carries
-its version header; what is left:
+`contentsVersion` and `layoutVersion`, every request and response carries its
+version header, and every response is read tolerantly; what is left:
 
-1. **Tolerant reading**: no schema that parses responses uses `.strict()`,
-   nested ones included; an unknown annotation subtype parses as
-   `unsupported` and a malformed known one still fails; the enums in responses
-   are each given a fallback or marked closed; the Python SDK reads an unknown
-   subtype; each SDK's generation check parses a fixture with unknown values.
-2. **Conformance** (both engines): the unknown-field test over real responses;
-   two servers with different `CLOUDPDF_FONTS` behind one round-robin address
-   answer every request, and nothing is cached under a value that doesn't
-   describe it; a request without `EmbedPDF-Version` is answered as the
-   server's version.
+1. **Conformance** (both engines): two servers with different
+   `CLOUDPDF_FONTS` behind one round-robin address answer every request, and
+   nothing is cached under a value that doesn't describe it; a request without
+   `EmbedPDF-Version` is answered as the server's version.
 
 ### After 3.0.0
 

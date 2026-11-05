@@ -8,14 +8,12 @@ import type {
   RichTextRunStyle,
 } from './RichText';
 import { ColorSchema } from '../annotation/base.schema';
+import { closed } from '../wire/reading';
 
 /** How a paragraph's lines line up: a free text's `textAlign` too. */
-export const RichTextAlignSchema: z.ZodType<RichTextAlign> = z.enum([
-  'left',
-  'center',
-  'right',
-  'justify',
-]);
+export const RichTextAlignSchema: z.ZodType<RichTextAlign> = closed(
+  z.enum(['left', 'center', 'right', 'justify']),
+);
 
 const RichTextRunStyleShape = {
   family: z.string().min(1),
@@ -23,15 +21,15 @@ const RichTextRunStyleShape = {
   italic: z.boolean(),
   size: z.number().nonnegative(),
   color: ColorSchema,
-  decoration: z.array(z.enum(['underline', 'line-through', 'word'])),
-  script: z.enum(['normal', 'sub', 'super']),
+  decoration: z.array(closed(z.enum(['underline', 'line-through', 'word']))),
+  script: closed(z.enum(['normal', 'sub', 'super'])),
   letterSpacing: z.number(),
   horizontalScale: z.number().positive(),
   unknown: z.string().optional(),
 };
 const RichTextParagraphPropsShape = {
   align: RichTextAlignSchema,
-  dir: z.enum(['ltr', 'rtl']),
+  dir: closed(z.enum(['ltr', 'rtl'])),
   lineHeight: z.number().positive().optional(),
   margins: z
     .object({ top: z.number(), bottom: z.number(), left: z.number(), right: z.number() })

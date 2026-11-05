@@ -1,5 +1,6 @@
 import type { DocCapability } from '@embedpdf/engine-core/runtime';
 import {
+  closed,
   ChangeRequestSchema,
   ChangeResponseSchema,
   PageScaleInputSchema,
@@ -35,11 +36,12 @@ import {
   FontProgramInfoSchema,
   FontResolutionSchema,
   FontResolveRequestSchema,
+  IdentityInputSchema,
   IdentitySchema,
   PageFlattenResultSchema,
   PageNameResultSchema,
   RedactionApplyResultSchema,
-  RedactionApplyScopeSchema,
+  RedactionApplyScopeInputSchema,
   PageTextSnapshotSchema,
   ChangeAnalysisSchema,
   LayerVersionsSchema,
@@ -155,7 +157,7 @@ export type DedupMode = z.infer<typeof DedupModeSchema>;
 export const UploadPreferenceSchema = z.enum(['auto', 'presigned', 'proxy']);
 export type UploadPreference = z.infer<typeof UploadPreferenceSchema>;
 
-export const DocumentStateSchema = z.enum(['pending', 'ready', 'failed', 'deleting']);
+export const DocumentStateSchema = closed(z.enum(['pending', 'ready', 'failed', 'deleting']));
 export type DocumentState = z.infer<typeof DocumentStateSchema>;
 
 /** Any text a person can read: no control characters, no leading or trailing whitespace. */
@@ -202,7 +204,7 @@ export const AdminDocumentRecordSchema = z.object({
   idempotencyKey: z.string().nullable(),
   failureReason: z.string().nullable(),
   /** Dashboard tile lifecycle. Optional because older servers omit these fields. */
-  thumbnailState: z.enum(['pending', 'ready', 'locked', 'failed']).optional(),
+  thumbnailState: closed(z.enum(['pending', 'ready', 'locked', 'failed'])).optional(),
   thumbnailUrl: z.string().nullable().optional(),
   createdAt: z.number(),
   updatedAt: z.number(),
@@ -229,41 +231,45 @@ export type AdminDocumentInitRequest = z.infer<typeof AdminDocumentInitRequestSc
 export const AdminPresignedUploadSchema = z.object({
   url: z.string(),
   headers: z.record(z.string(), z.string()),
-  method: z.literal('PUT'),
+  method: closed(z.literal('PUT')),
   expiresAt: z.number(),
 });
 export type AdminPresignedUpload = z.infer<typeof AdminPresignedUploadSchema>;
 
-export const AdminInitUploadSchema = z.discriminatedUnion('kind', [
-  z.object({
-    kind: z.literal('presigned'),
-    presigned: AdminPresignedUploadSchema,
-    key: z.string(),
-  }),
-  z.object({
-    kind: z.literal('proxy'),
-    url: z.string(),
-    key: z.string(),
-  }),
-]);
+export const AdminInitUploadSchema = closed(
+  z.discriminatedUnion('kind', [
+    z.object({
+      kind: z.literal('presigned'),
+      presigned: AdminPresignedUploadSchema,
+      key: z.string(),
+    }),
+    z.object({
+      kind: z.literal('proxy'),
+      url: z.string(),
+      key: z.string(),
+    }),
+  ]),
+);
 export type AdminInitUpload = z.infer<typeof AdminInitUploadSchema>;
 
-export const AdminDocumentInitResponseSchema = z.discriminatedUnion('tag', [
-  z.object({
-    tag: z.literal('created'),
-    document: AdminDocumentRecordSchema,
-    upload: AdminInitUploadSchema,
-  }),
-  z.object({
-    tag: z.literal('resumed'),
-    document: AdminDocumentRecordSchema,
-    upload: AdminInitUploadSchema,
-  }),
-  z.object({
-    tag: z.literal('deduped'),
-    document: AdminDocumentRecordSchema,
-  }),
-]);
+export const AdminDocumentInitResponseSchema = closed(
+  z.discriminatedUnion('tag', [
+    z.object({
+      tag: z.literal('created'),
+      document: AdminDocumentRecordSchema,
+      upload: AdminInitUploadSchema,
+    }),
+    z.object({
+      tag: z.literal('resumed'),
+      document: AdminDocumentRecordSchema,
+      upload: AdminInitUploadSchema,
+    }),
+    z.object({
+      tag: z.literal('deduped'),
+      document: AdminDocumentRecordSchema,
+    }),
+  ]),
+);
 export type AdminDocumentInitResponse = z.infer<typeof AdminDocumentInitResponseSchema>;
 
 export const AdminDocumentCommitRequestSchema = z.object({
@@ -418,7 +424,7 @@ export const AdminDocumentImportResponseSchema = z.object({
    * `accepted` — async: the job is queued (HTTP 202); poll the
    * document until `ready` or `failed`.
    */
-  tag: z.enum(['imported', 'deduped', 'accepted']),
+  tag: closed(z.enum(['imported', 'deduped', 'accepted'])),
   document: AdminDocumentRecordSchema,
 });
 export type AdminDocumentImportResponse = z.infer<typeof AdminDocumentImportResponseSchema>;
@@ -714,7 +720,7 @@ export const TenantFeatureSchema = z.object({
     .string()
     .max(64)
     .regex(/^[a-z][a-z0-9]*(-[a-z0-9]+)*$/),
-  stopped: z.enum(['cap']).optional(),
+  stopped: closed(z.enum(['cap'])).optional(),
 });
 export type TenantFeature = z.infer<typeof TenantFeatureSchema>;
 
@@ -729,7 +735,7 @@ export const AdminTenantRecordSchema = z.object({
    * the operator must be able to inspect, resume, or delete a
    * suspended tenant. Optional because older servers omit it.
    */
-  status: z.enum(['active', 'suspended']).optional(),
+  status: closed(z.enum(['active', 'suspended'])).optional(),
   /**
    * The server modules this tenant may use; empty for a new tenant.
    * Optional because older servers omit it.
@@ -851,7 +857,7 @@ export const AdminTokenIssueDocRequestSchema = z.object({
    * open time. `displayName` becomes the author of the annotations the token
    * creates, `userId` and `groupId` their owner and group.
    */
-  identity: IdentitySchema.optional(),
+  identity: IdentityInputSchema.optional(),
   /**
    * Origin lock: web origins (scheme + host, optional port; one leading
    * `*.` wildcard label allowed) the minted token may be presented
@@ -973,7 +979,7 @@ export type AdminTokenIssueResponse = z.infer<typeof AdminTokenIssueResponseSche
  * reads and writes (`layerName`), or `'per-visitor'`, a layer of each
  * visitor's own (`visitor-<id>`), made at their first change.
  */
-export const GrantLayerModeSchema = z.enum(['shared', 'per-visitor']);
+export const GrantLayerModeSchema = closed(z.enum(['shared', 'per-visitor']));
 export type GrantLayerMode = z.infer<typeof GrantLayerModeSchema>;
 
 /** Delete a visitor after this long unseen: an hour to 30 days. */
@@ -983,7 +989,7 @@ const visitorIdleSecondsSchema = z
   .min(60 * 60)
   .max(30 * 24 * 60 * 60);
 
-const visitorQuestionSchema = z.enum(['required', 'optional']);
+const visitorQuestionSchema = closed(z.enum(['required', 'optional']));
 
 /**
  * What a grant asks its visitors, so what they add carries their name and
@@ -1006,7 +1012,7 @@ export const GrantVisitorIdentitySchema = z.object({
    * `'on-open'`: before the document opens (a lead gate). `'before-first-change'`:
    * reading is free, and the first change asks (a review grant).
    */
-  ask: z.enum(['on-open', 'before-first-change']),
+  ask: closed(z.enum(['on-open', 'before-first-change'])),
   /** Shown with the questions: why they're asked. */
   purpose: z.string().min(1).max(500).optional(),
   /** The link owner's privacy notice, linked from the questions. */
@@ -1024,13 +1030,9 @@ export const GrantVisitorAnswersSchema = z.object({
 });
 export type GrantVisitorAnswers = z.infer<typeof GrantVisitorAnswersSchema>;
 
-const visitorFieldSchema = z.enum([
-  'displayName',
-  'email',
-  'title',
-  'organization',
-  'organizationalUnit',
-]);
+const visitorFieldSchema = closed(
+  z.enum(['displayName', 'email', 'title', 'organization', 'organizationalUnit']),
+);
 
 /**
  * What a visitor is still asked: the details of `VisitorIdentityRequired`,
@@ -1131,7 +1133,7 @@ export const GrantCreateRequestSchema = z.object({
    * replaces the visitor's own (`visitor_<id>`). Omit or null for visitors
    * who are whoever they answer.
    */
-  identity: IdentitySchema.nullable().optional(),
+  identity: IdentityInputSchema.nullable().optional(),
   /**
    * Doc capability scopes the exchanged session will carry. Validated
    * server-side against the engine's scope vocabulary, same as
@@ -1179,7 +1181,7 @@ export const GrantUpdateRequestSchema = z.object({
   /** null stops asking; a change applies at each visitor's next exchange. */
   visitorIdentity: GrantVisitorIdentitySchema.nullable().optional(),
   /** Replaces the grant's identity; null clears it. Applies at each visitor's next exchange. */
-  identity: IdentitySchema.nullable().optional(),
+  identity: IdentityInputSchema.nullable().optional(),
   scope: z.array(z.string().min(1).max(128)).min(1).max(64).optional(),
   origins: originPatternArray.nullable().optional(),
   passphrase: z.string().min(1).max(1024).nullable().optional(),
@@ -1385,7 +1387,7 @@ export const ModulePermissionSchema = z.object({
   /** The whole permission: `protected-display.view`. */
   name: z.string(),
   /** `document`: in viewer tokens and grants; `tenant`: in tenant tokens and API keys. */
-  level: z.enum(['document', 'tenant']),
+  level: closed(z.enum(['document', 'tenant'])),
   /** What a grant or API key dialog says for it. */
   label: z.string(),
   description: z.string().optional(),
@@ -3302,7 +3304,7 @@ export const docOperations = {
     docCapabilities: ['doc.pages.modify', 'doc.annotate.modify', 'doc.redact'],
     requestHeaders: [documentPasswordHeader, idempotencyKeyHeader],
     params: DocLayerParamsSchema,
-    body: { contentType: 'application/json', schema: RedactionApplyScopeSchema },
+    body: { contentType: 'application/json', schema: RedactionApplyScopeInputSchema },
     responses: {
       200: { contentType: 'application/json', schema: RedactionApplyResultSchema },
       400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },

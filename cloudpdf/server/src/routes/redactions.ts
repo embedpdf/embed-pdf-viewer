@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { RedactionApplyScope } from '@embedpdf/engine-core/runtime';
-import { RedactionApplyScopeSchema } from '@embedpdf/engine-core/wire';
+import { RedactionApplyScopeInputSchema } from '@embedpdf/engine-core/wire';
 import { requireLayerCapability, requireLayerDocAccessOnly } from '../app/jwt-plugin';
 import type { DocumentService } from '../services/DocumentService';
 import type { LayerService } from '../services/LayerService';
@@ -52,7 +52,7 @@ export async function registerRedactionRoutes(
 
     // The body is what `redaction.apply()` takes: `{ pages }` or `{ annotations }`.
     const scope = parseOrInvalidArg<RedactionApplyScope>(
-      RedactionApplyScopeSchema as unknown as SchemaLike<RedactionApplyScope>,
+      RedactionApplyScopeInputSchema as unknown as SchemaLike<RedactionApplyScope>,
       req.body ?? {},
       'request body',
     );
