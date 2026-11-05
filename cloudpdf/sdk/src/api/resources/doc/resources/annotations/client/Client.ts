@@ -43,14 +43,14 @@ export class AnnotationsClient {
     public listAll(
         request: CloudPDF.doc.ListAllAnnotationsRequest,
         requestOptions?: AnnotationsClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocAnnotationsListAll200Response> {
+    ): core.HttpResponsePromise<CloudPDF.DocAnnotationsListAllResponse> {
         return core.HttpResponsePromise.fromPromise(this.__listAll(request, requestOptions));
     }
 
     private async __listAll(
         request: CloudPDF.doc.ListAllAnnotationsRequest,
         requestOptions?: AnnotationsClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocAnnotationsListAll200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.DocAnnotationsListAllResponse>> {
         const { docId, layerName, "X-Document-Password": documentPassword } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
@@ -80,7 +80,7 @@ export class AnnotationsClient {
         });
         if (_response.ok) {
             return {
-                data: _response.body as CloudPDF.DocAnnotationsListAll200Response,
+                data: _response.body as CloudPDF.DocAnnotationsListAllResponse,
                 rawResponse: _response.rawResponse,
             };
         }
@@ -88,9 +88,15 @@ export class AnnotationsClient {
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 409:
-                    throw new CloudPDF.ConflictError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.ConflictError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -126,14 +132,14 @@ export class AnnotationsClient {
     public list(
         request: CloudPDF.doc.ListAnnotationsRequest,
         requestOptions?: AnnotationsClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocAnnotationsList200Response> {
+    ): core.HttpResponsePromise<CloudPDF.DocAnnotationsListResponse> {
         return core.HttpResponsePromise.fromPromise(this.__list(request, requestOptions));
     }
 
     private async __list(
         request: CloudPDF.doc.ListAnnotationsRequest,
         requestOptions?: AnnotationsClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocAnnotationsList200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.DocAnnotationsListResponse>> {
         const { docId, layerName, pageKey, "X-Document-Password": documentPassword } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
@@ -162,16 +168,16 @@ export class AnnotationsClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return {
-                data: _response.body as CloudPDF.DocAnnotationsList200Response,
-                rawResponse: _response.rawResponse,
-            };
+            return { data: _response.body as CloudPDF.DocAnnotationsListResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -213,14 +219,14 @@ export class AnnotationsClient {
     public create(
         request: CloudPDF.doc.CreateAnnotationsRequest,
         requestOptions?: AnnotationsClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocAnnotationsCreate200Response> {
+    ): core.HttpResponsePromise<CloudPDF.DocAnnotationsCreateResponse> {
         return core.HttpResponsePromise.fromPromise(this.__create(request, requestOptions));
     }
 
     private async __create(
         request: CloudPDF.doc.CreateAnnotationsRequest,
         requestOptions?: AnnotationsClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocAnnotationsCreate200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.DocAnnotationsCreateResponse>> {
         const {
             docId,
             layerName,
@@ -261,7 +267,7 @@ export class AnnotationsClient {
         });
         if (_response.ok) {
             return {
-                data: _response.body as CloudPDF.DocAnnotationsCreate200Response,
+                data: _response.body as CloudPDF.DocAnnotationsCreateResponse,
                 rawResponse: _response.rawResponse,
             };
         }
@@ -269,9 +275,15 @@ export class AnnotationsClient {
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 400:
-                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.BadRequestError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -308,14 +320,14 @@ export class AnnotationsClient {
     public delete(
         request: CloudPDF.doc.DeleteAnnotationsRequest,
         requestOptions?: AnnotationsClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocAnnotationsDelete200Response> {
+    ): core.HttpResponsePromise<CloudPDF.DocAnnotationsDeleteResponse> {
         return core.HttpResponsePromise.fromPromise(this.__delete(request, requestOptions));
     }
 
     private async __delete(
         request: CloudPDF.doc.DeleteAnnotationsRequest,
         requestOptions?: AnnotationsClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocAnnotationsDelete200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.DocAnnotationsDeleteResponse>> {
         const {
             docId,
             layerName,
@@ -353,7 +365,7 @@ export class AnnotationsClient {
         });
         if (_response.ok) {
             return {
-                data: _response.body as CloudPDF.DocAnnotationsDelete200Response,
+                data: _response.body as CloudPDF.DocAnnotationsDeleteResponse,
                 rawResponse: _response.rawResponse,
             };
         }
@@ -361,7 +373,10 @@ export class AnnotationsClient {
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -402,14 +417,14 @@ export class AnnotationsClient {
     public update(
         request: CloudPDF.doc.UpdateAnnotationsRequest,
         requestOptions?: AnnotationsClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocAnnotationsUpdate200Response> {
+    ): core.HttpResponsePromise<CloudPDF.DocAnnotationsUpdateResponse> {
         return core.HttpResponsePromise.fromPromise(this.__update(request, requestOptions));
     }
 
     private async __update(
         request: CloudPDF.doc.UpdateAnnotationsRequest,
         requestOptions?: AnnotationsClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocAnnotationsUpdate200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.DocAnnotationsUpdateResponse>> {
         const {
             docId,
             layerName,
@@ -451,7 +466,7 @@ export class AnnotationsClient {
         });
         if (_response.ok) {
             return {
-                data: _response.body as CloudPDF.DocAnnotationsUpdate200Response,
+                data: _response.body as CloudPDF.DocAnnotationsUpdateResponse,
                 rawResponse: _response.rawResponse,
             };
         }
@@ -459,9 +474,15 @@ export class AnnotationsClient {
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 400:
-                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.BadRequestError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -531,9 +552,15 @@ export class AnnotationsClient {
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 400:
-                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.BadRequestError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -606,11 +633,20 @@ export class AnnotationsClient {
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 400:
-                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.BadRequestError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 413:
-                    throw new CloudPDF.ContentTooLargeError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.ContentTooLargeError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -683,9 +719,15 @@ export class AnnotationsClient {
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 400:
-                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.BadRequestError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -725,14 +767,14 @@ export class AnnotationsClient {
     public flatten(
         request: CloudPDF.doc.FlattenAnnotationsRequest,
         requestOptions?: AnnotationsClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocAnnotationsFlatten200Response> {
+    ): core.HttpResponsePromise<CloudPDF.DocAnnotationsFlattenResponse> {
         return core.HttpResponsePromise.fromPromise(this.__flatten(request, requestOptions));
     }
 
     private async __flatten(
         request: CloudPDF.doc.FlattenAnnotationsRequest,
         requestOptions?: AnnotationsClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocAnnotationsFlatten200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.DocAnnotationsFlattenResponse>> {
         const {
             docId,
             layerName,
@@ -773,7 +815,7 @@ export class AnnotationsClient {
         });
         if (_response.ok) {
             return {
-                data: _response.body as CloudPDF.DocAnnotationsFlatten200Response,
+                data: _response.body as CloudPDF.DocAnnotationsFlattenResponse,
                 rawResponse: _response.rawResponse,
             };
         }
@@ -781,9 +823,15 @@ export class AnnotationsClient {
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 400:
-                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.BadRequestError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -829,14 +877,14 @@ export class AnnotationsClient {
     public reorder(
         request: CloudPDF.doc.DocAnnotationsReorderRequest,
         requestOptions?: AnnotationsClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocAnnotationsReorder200Response> {
+    ): core.HttpResponsePromise<CloudPDF.DocAnnotationsReorderResponse> {
         return core.HttpResponsePromise.fromPromise(this.__reorder(request, requestOptions));
     }
 
     private async __reorder(
         request: CloudPDF.doc.DocAnnotationsReorderRequest,
         requestOptions?: AnnotationsClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocAnnotationsReorder200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.DocAnnotationsReorderResponse>> {
         const {
             docId,
             layerName,
@@ -877,7 +925,7 @@ export class AnnotationsClient {
         });
         if (_response.ok) {
             return {
-                data: _response.body as CloudPDF.DocAnnotationsReorder200Response,
+                data: _response.body as CloudPDF.DocAnnotationsReorderResponse,
                 rawResponse: _response.rawResponse,
             };
         }
@@ -885,9 +933,15 @@ export class AnnotationsClient {
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 400:
-                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.BadRequestError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,

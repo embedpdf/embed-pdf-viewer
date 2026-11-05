@@ -18,14 +18,14 @@ describe("DocumentsClient", () => {
                     folderId: "folderId",
                     state: "pending",
                     baseSha: "baseSha",
-                    storageSizeBytes: 1.1,
+                    storageSizeBytes: 1,
                     metadata: { key: "value" },
                     idempotencyKey: "idempotencyKey",
                     failureReason: "failureReason",
                     thumbnailState: "pending",
                     thumbnailUrl: "thumbnailUrl",
-                    createdAt: 1.1,
-                    updatedAt: 1.1,
+                    createdAt: 1,
+                    updatedAt: 1,
                     createdBy: "createdBy",
                 },
             ],
@@ -50,7 +50,7 @@ describe("DocumentsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -79,14 +79,14 @@ describe("DocumentsClient", () => {
                 folderId: "folderId",
                 state: "pending",
                 baseSha: "baseSha",
-                storageSizeBytes: 1.1,
+                storageSizeBytes: 1,
                 metadata: { key: "value" },
                 idempotencyKey: "idempotencyKey",
                 failureReason: "failureReason",
                 thumbnailState: "pending",
                 thumbnailUrl: "thumbnailUrl",
-                createdAt: 1.1,
-                updatedAt: 1.1,
+                createdAt: 1,
+                updatedAt: 1,
                 createdBy: "createdBy",
             },
         };
@@ -110,7 +110,7 @@ describe("DocumentsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -132,7 +132,7 @@ describe("DocumentsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -167,7 +167,7 @@ describe("DocumentsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -189,7 +189,7 @@ describe("DocumentsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -219,14 +219,14 @@ describe("DocumentsClient", () => {
                 folderId: "folderId",
                 state: "pending",
                 baseSha: "baseSha",
-                storageSizeBytes: 1.1,
+                storageSizeBytes: 1,
                 metadata: { key: "value" },
                 idempotencyKey: "idempotencyKey",
                 failureReason: "failureReason",
                 thumbnailState: "pending",
                 thumbnailUrl: "thumbnailUrl",
-                createdAt: 1.1,
-                updatedAt: 1.1,
+                createdAt: 1,
+                updatedAt: 1,
                 createdBy: "createdBy",
             },
         };
@@ -252,7 +252,7 @@ describe("DocumentsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { name: "x" };
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -276,7 +276,7 @@ describe("DocumentsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { name: "x" };
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -300,7 +300,7 @@ describe("DocumentsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { name: "x" };
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -332,14 +332,14 @@ describe("DocumentsClient", () => {
                 folderId: "folderId",
                 state: "pending",
                 baseSha: "baseSha",
-                storageSizeBytes: 1.1,
+                storageSizeBytes: 1,
                 metadata: { key: "value" },
                 idempotencyKey: "idempotencyKey",
                 failureReason: "failureReason",
                 thumbnailState: "pending",
                 thumbnailUrl: "thumbnailUrl",
-                createdAt: 1.1,
-                updatedAt: 1.1,
+                createdAt: 1,
+                updatedAt: 1,
                 createdBy: "createdBy",
             },
         };
@@ -365,7 +365,7 @@ describe("DocumentsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { sha256: "sha256" };
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -389,7 +389,7 @@ describe("DocumentsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { sha256: "sha256" };
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -422,14 +422,14 @@ describe("DocumentsClient", () => {
                 folderId: "folderId",
                 state: "pending",
                 baseSha: "baseSha",
-                storageSizeBytes: 1.1,
+                storageSizeBytes: 1,
                 metadata: { key: "value" },
                 idempotencyKey: "idempotencyKey",
                 failureReason: "failureReason",
                 thumbnailState: "pending",
                 thumbnailUrl: "thumbnailUrl",
-                createdAt: 1.1,
-                updatedAt: 1.1,
+                createdAt: 1,
+                updatedAt: 1,
                 createdBy: "createdBy",
             },
         };
@@ -457,7 +457,7 @@ describe("DocumentsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { source: { kind: "url", url: "url" } };
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -483,7 +483,7 @@ describe("DocumentsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { source: { kind: "url", url: "url" } };
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -509,7 +509,7 @@ describe("DocumentsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { source: { kind: "url", url: "url" } };
-        const rawResponseBody = { error: { code: "code", message: "message" } };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -534,7 +534,7 @@ describe("DocumentsClient", () => {
     test("init (1)", async () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
-        const rawRequestBody = { contentLength: 1.1, contentSha256: "contentSha256" };
+        const rawRequestBody = { contentLength: 1, contentSha256: "contentSha256" };
         const rawResponseBody = {
             tag: "created",
             document: {
@@ -544,19 +544,19 @@ describe("DocumentsClient", () => {
                 folderId: "folderId",
                 state: "pending",
                 baseSha: "baseSha",
-                storageSizeBytes: 1.1,
+                storageSizeBytes: 1,
                 metadata: { key: "value" },
                 idempotencyKey: "idempotencyKey",
                 failureReason: "failureReason",
                 thumbnailState: "pending",
                 thumbnailUrl: "thumbnailUrl",
-                createdAt: 1.1,
-                updatedAt: 1.1,
+                createdAt: 1,
+                updatedAt: 1,
                 createdBy: "createdBy",
             },
             upload: {
                 kind: "presigned",
-                presigned: { url: "url", headers: { key: "value" }, method: "PUT", expiresAt: 1.1 },
+                presigned: { url: "url", headers: { key: "value" }, method: "PUT", expiresAt: 1 },
                 key: "key",
             },
         };
@@ -572,7 +572,7 @@ describe("DocumentsClient", () => {
 
         const response = await client.documents.init({
             tenantId: "tenantId",
-            contentLength: 1.1,
+            contentLength: 1,
             contentSha256: "contentSha256",
         });
         expect(response).toEqual(rawResponseBody);
@@ -582,7 +582,7 @@ describe("DocumentsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { contentLength: 1, contentSha256: "contentSha256" };
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -606,7 +606,7 @@ describe("DocumentsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { contentLength: 1, contentSha256: "contentSha256" };
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()

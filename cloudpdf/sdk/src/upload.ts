@@ -31,7 +31,7 @@ export interface UploadOptions {
 
 export interface UploadResult {
     tag: "created" | "resumed" | "deduped";
-    document: CloudPDF.DocumentsCommit200Response.Document;
+    document: CloudPDF.DocumentsCommitResponse.Document;
 }
 
 /** An upload CloudPDF refused: `status` is the HTTP status, `code` CloudPDF's error code. */
@@ -50,7 +50,7 @@ export class UploadError extends Error {
 /** Uploads a PDF from the browser with an upload token, and returns the document. */
 export async function upload(file: Blob, options: UploadOptions): Promise<UploadResult> {
     const baseUrl = withoutTrailingSlashes(options.baseUrl ?? CloudPDFEnvironment.Saas);
-    const uploads = new Uploads<CloudPDF.DocumentsCommit200Response.Document>(
+    const uploads = new Uploads<CloudPDF.DocumentsCommitResponse.Document>(
         tokenProtocol(baseUrl, options.token),
         prepareInBrowser,
     );

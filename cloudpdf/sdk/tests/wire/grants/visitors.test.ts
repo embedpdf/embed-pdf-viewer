@@ -15,9 +15,9 @@ describe("VisitorsClient", () => {
                     visitorId: "visitorId",
                     answers: {},
                     emailVerified: true,
-                    consentedAt: 1.1,
-                    firstSeenAt: 1.1,
-                    lastSeenAt: 1.1,
+                    consentedAt: 1,
+                    firstSeenAt: 1,
+                    lastSeenAt: 1,
                     layer: { layerName: "layerName", storageSizeBytes: null },
                 },
             ],
@@ -43,7 +43,7 @@ describe("VisitorsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -65,7 +65,7 @@ describe("VisitorsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -106,7 +106,7 @@ describe("VisitorsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()

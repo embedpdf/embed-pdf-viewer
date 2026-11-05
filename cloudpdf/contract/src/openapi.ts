@@ -15,17 +15,18 @@ import {
   AttachmentWireComponents,
   ChangeWireComponents,
   DocumentWireComponents,
-  EngineErrorPayloadSchema,
+  EngineErrorSchema,
+  ErrorResponseSchema,
   FontWireComponents,
   FormWireComponents,
   OutlineWireComponents,
   PdfActionWireComponents,
+  SignatureWireComponents,
 } from '@embedpdf/engine-core/wire';
 import { z } from 'zod';
 import { ignoreOverride, zodToJsonSchema } from 'zod-to-json-schema';
 
 import {
-  AdminErrorPayloadSchema,
   ModuleManifestSchema,
   ModuleMeterSchema,
   ModulePermissionSchema,
@@ -40,6 +41,7 @@ import {
 
 const STATUS_TEXT: Record<number, string> = {
   200: 'OK',
+  202: 'Accepted',
   204: 'No content',
   400: 'Bad request',
   401: 'Unauthorized',
@@ -47,7 +49,10 @@ const STATUS_TEXT: Record<number, string> = {
   404: 'Not found',
   409: 'Conflict',
   410: 'Gone',
+  413: 'Payload too large',
   422: 'Unprocessable',
+  501: 'Not implemented',
+  502: 'Bad gateway',
 };
 
 const SECURITY_SCHEME: Record<AdminCredential, string> = {
@@ -57,8 +62,7 @@ const SECURITY_SCHEME: Record<AdminCredential, string> = {
   'upload-jwt': 'uploadToken',
 };
 
-const ADMIN_ERROR_REF = '#/components/schemas/AdminErrorPayload';
-const ENGINE_ERROR_REF = '#/components/schemas/EngineErrorPayload';
+const ERROR_RESPONSE_REF = '#/components/schemas/ErrorResponse';
 
 /**
  * Models with a stable public name: wherever a schema embeds one, the
@@ -67,8 +71,8 @@ const ENGINE_ERROR_REF = '#/components/schemas/EngineErrorPayload';
  */
 export const SHARED_COMPONENT_SCHEMAS = sharedComponents([
   {
-    AdminErrorPayload: AdminErrorPayloadSchema,
-    EngineErrorPayload: EngineErrorPayloadSchema,
+    ErrorResponse: ErrorResponseSchema,
+    EngineError: EngineErrorSchema,
     TenantFeature: TenantFeatureSchema,
     ModuleManifest: ModuleManifestSchema,
     ModulePermission: ModulePermissionSchema,
@@ -82,6 +86,7 @@ export const SHARED_COMPONENT_SCHEMAS = sharedComponents([
   AttachmentWireComponents,
   ChangeWireComponents,
   FontWireComponents,
+  SignatureWireComponents,
 ]);
 
 const SHARED_COMPONENT_BY_DEFINITION = new Map<z.ZodTypeDef, string>(
@@ -393,33 +398,35 @@ function responses(
   schemas: Record<string, Record<string, unknown>>,
 ): Record<string, unknown> {
   const out: Record<string, unknown> = {};
-  const typedResponses = Object.values(op.responses).filter((response) => response.schema).length;
+  const typedResponses = Object.values(op.responses).filter(
+    (response) => response.schema && response.schema !== ErrorResponseSchema,
+  ).length;
   for (const [status, response] of Object.entries(op.responses) as Array<
     [string, AdminOperationResponse]
   >) {
-    const schema = response.schema
-      ? registerSchema(
-          schemas,
-          `${sdkTypeName(op.operationId)}${typedResponses > 1 ? status : ''}Response`,
-          response.schema,
-        )
-      : undefined;
+    // Every error answers with the one error body: the response points to
+    // it, so no operation gets a type of its own for it.
+    const schema =
+      response.schema === ErrorResponseSchema
+        ? { $ref: ERROR_RESPONSE_REF }
+        : response.schema
+          ? registerSchema(
+              schemas,
+              `${sdkTypeName(op.operationId)}${typedResponses > 1 ? status : ''}Response`,
+              response.schema,
+            )
+          : undefined;
     out[status] = {
       description: STATUS_TEXT[Number(status)] ?? 'Response',
       ...(response.contentType ? { content: contentObject(response.contentType, schema) } : {}),
     };
   }
-  // Every operation can additionally fail with its plane's standard
-  // error envelope (401 from the auth hook, 403 from scope/capability
-  // checks, licensing 403s, 5xx). Admin surfaces speak the admin
-  // envelope; the doc plane speaks the engine's.
+  // Every operation can also fail in ways it doesn't list (401 from the
+  // auth hook, 403 from scope and capability checks, licensing, 5xx), with
+  // the same error body.
   out['default'] = {
     description: 'Error',
-    content: {
-      'application/json': {
-        schema: { $ref: op.credentials.includes('doc-jwt') ? ENGINE_ERROR_REF : ADMIN_ERROR_REF },
-      },
-    },
+    content: { 'application/json': { schema: { $ref: ERROR_RESPONSE_REF } } },
   };
   return out;
 }
@@ -462,8 +469,8 @@ function registerSchema(
     basePath: ['#', ...componentPath],
     override: (definition) => {
       const sharedName = sharedComponentOf(definition);
-      if (!sharedName || sharedName === name) return ignoreOverride;
-      return { $ref: `#/components/schemas/${sharedName}` };
+      if (sharedName && sharedName !== name) return { $ref: `#/components/schemas/${sharedName}` };
+      return wholeNumberEnumOf(definition) ?? ignoreOverride;
     },
   }) as Record<string, unknown>;
   // Fern's OpenAPI importer currently expands property-level recursive refs
@@ -559,6 +566,22 @@ function breakAncestorReferences(value: unknown, path: string[]): unknown {
       breakAncestorReferences(child, [...path, key]),
     ]),
   );
+}
+
+/**
+ * A union of whole-number literals (a rotation, a DocMDP level) is one
+ * integer enum, not an `anyOf` of one-value enums: every SDK reads it as an
+ * integer, and a named one keeps its name.
+ */
+function wholeNumberEnumOf(definition: z.ZodTypeDef): Record<string, unknown> | undefined {
+  const union = definition as Partial<z.ZodUnionDef>;
+  if (union.typeName !== z.ZodFirstPartyTypeKind.ZodUnion || !union.options) return undefined;
+  const values = union.options.map((option) =>
+    option instanceof z.ZodLiteral ? (option.value as unknown) : undefined,
+  );
+  return values.every((value) => Number.isInteger(value))
+    ? { type: 'integer', enum: values }
+    : undefined;
 }
 
 function inlineSchemaOf(schema: z.ZodTypeAny): Record<string, unknown> {

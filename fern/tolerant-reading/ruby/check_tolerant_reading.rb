@@ -5,5 +5,5 @@ require "cloudpdf"
 
 list = CloudPDF::Types::AnnotationList.load(File.read(ENV.fetch("CLOUDPDF_ANNOTATIONS_FIXTURE")))
 puts "annotations: #{list.annotations.length}"
-form = CloudPDF::Types::DocFormsList200Response.load(File.read(ENV.fetch("CLOUDPDF_FORM_FIXTURE")))
+form = CloudPDF::Types::DocFormsListResponse.load(File.read(ENV.fetch("CLOUDPDF_FORM_FIXTURE")))
 puts "fields: #{form.fields.length}"

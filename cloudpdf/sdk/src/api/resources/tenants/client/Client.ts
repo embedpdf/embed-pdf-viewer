@@ -37,14 +37,14 @@ export class TenantsClient {
     public list(
         request: CloudPDF.ListTenantsRequest = {},
         requestOptions?: TenantsClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.TenantsList200Response> {
+    ): core.HttpResponsePromise<CloudPDF.TenantsListResponse> {
         return core.HttpResponsePromise.fromPromise(this.__list(request, requestOptions));
     }
 
     private async __list(
         request: CloudPDF.ListTenantsRequest = {},
         requestOptions?: TenantsClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.TenantsList200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.TenantsListResponse>> {
         const { limit, cursor } = request;
         const _queryParams: Record<string, unknown> = {
             limit,
@@ -78,13 +78,16 @@ export class TenantsClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return { data: _response.body as CloudPDF.TenantsList200Response, rawResponse: _response.rawResponse };
+            return { data: _response.body as CloudPDF.TenantsListResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 400:
-                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.BadRequestError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -113,14 +116,14 @@ export class TenantsClient {
     public create(
         request: CloudPDF.TenantsCreateRequest,
         requestOptions?: TenantsClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.TenantsCreate200Response> {
+    ): core.HttpResponsePromise<CloudPDF.TenantsCreateResponse> {
         return core.HttpResponsePromise.fromPromise(this.__create(request, requestOptions));
     }
 
     private async __create(
         request: CloudPDF.TenantsCreateRequest,
         requestOptions?: TenantsClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.TenantsCreate200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.TenantsCreateResponse>> {
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
@@ -148,13 +151,16 @@ export class TenantsClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return { data: _response.body as CloudPDF.TenantsCreate200Response, rawResponse: _response.rawResponse };
+            return { data: _response.body as CloudPDF.TenantsCreateResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 400:
-                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.BadRequestError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -183,14 +189,14 @@ export class TenantsClient {
     public get(
         request: CloudPDF.GetTenantsRequest,
         requestOptions?: TenantsClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.TenantsGet200Response> {
+    ): core.HttpResponsePromise<CloudPDF.TenantsGetResponse> {
         return core.HttpResponsePromise.fromPromise(this.__get(request, requestOptions));
     }
 
     private async __get(
         request: CloudPDF.GetTenantsRequest,
         requestOptions?: TenantsClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.TenantsGet200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.TenantsGetResponse>> {
         const { tenantId } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
@@ -216,13 +222,16 @@ export class TenantsClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return { data: _response.body as CloudPDF.TenantsGet200Response, rawResponse: _response.rawResponse };
+            return { data: _response.body as CloudPDF.TenantsGetResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -292,7 +301,10 @@ export class TenantsClient {
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -327,14 +339,14 @@ export class TenantsClient {
     public update(
         request: CloudPDF.TenantsUpdateRequest,
         requestOptions?: TenantsClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.TenantsUpdate200Response> {
+    ): core.HttpResponsePromise<CloudPDF.TenantsUpdateResponse> {
         return core.HttpResponsePromise.fromPromise(this.__update(request, requestOptions));
     }
 
     private async __update(
         request: CloudPDF.TenantsUpdateRequest,
         requestOptions?: TenantsClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.TenantsUpdate200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.TenantsUpdateResponse>> {
         const { tenantId, ..._body } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
@@ -363,15 +375,21 @@ export class TenantsClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return { data: _response.body as CloudPDF.TenantsUpdate200Response, rawResponse: _response.rawResponse };
+            return { data: _response.body as CloudPDF.TenantsUpdateResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 400:
-                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.BadRequestError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -439,7 +457,10 @@ export class TenantsClient {
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -517,7 +538,10 @@ export class TenantsClient {
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -554,14 +578,14 @@ export class TenantsClient {
     public usage(
         request: CloudPDF.UsageTenantsRequest,
         requestOptions?: TenantsClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.TenantsUsage200Response> {
+    ): core.HttpResponsePromise<CloudPDF.TenantsUsageResponse> {
         return core.HttpResponsePromise.fromPromise(this.__usage(request, requestOptions));
     }
 
     private async __usage(
         request: CloudPDF.UsageTenantsRequest,
         requestOptions?: TenantsClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.TenantsUsage200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.TenantsUsageResponse>> {
         const { tenantId, period, from: from_, to } = request;
         const _queryParams: Record<string, unknown> = {
             period,
@@ -596,15 +620,21 @@ export class TenantsClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return { data: _response.body as CloudPDF.TenantsUsage200Response, rawResponse: _response.rawResponse };
+            return { data: _response.body as CloudPDF.TenantsUsageResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 400:
-                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.BadRequestError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,

@@ -79,9 +79,15 @@ export class ProgramsClient {
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 403:
-                    throw new CloudPDF.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.ForbiddenError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -117,14 +123,14 @@ export class ProgramsClient {
     public get(
         request: CloudPDF.doc.fonts.GetProgramsRequest,
         requestOptions?: ProgramsClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocFontsProgramsGet200Response> {
+    ): core.HttpResponsePromise<CloudPDF.DocFontsProgramsGetResponse> {
         return core.HttpResponsePromise.fromPromise(this.__get(request, requestOptions));
     }
 
     private async __get(
         request: CloudPDF.doc.fonts.GetProgramsRequest,
         requestOptions?: ProgramsClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocFontsProgramsGet200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.DocFontsProgramsGetResponse>> {
         const { docId, layerName, displayHash, "X-Document-Password": documentPassword } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
@@ -153,16 +159,16 @@ export class ProgramsClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return {
-                data: _response.body as CloudPDF.DocFontsProgramsGet200Response,
-                rawResponse: _response.rawResponse,
-            };
+            return { data: _response.body as CloudPDF.DocFontsProgramsGetResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,

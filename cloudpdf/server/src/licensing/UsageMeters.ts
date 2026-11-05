@@ -23,6 +23,7 @@ export interface LicenseUsageSnapshot {
 export class UsageLimitError extends Error {
   readonly code = 'LicenseUsageLimit';
   readonly status = 403;
+  readonly details: { metric: UsageMetric; limit: string };
 
   constructor(
     readonly metric: UsageMetric,
@@ -30,6 +31,7 @@ export class UsageLimitError extends Error {
   ) {
     super(`The licensed ${metric} limit of ${limit} has been reached`);
     this.name = 'UsageLimitError';
+    this.details = { metric, limit };
   }
 }
 

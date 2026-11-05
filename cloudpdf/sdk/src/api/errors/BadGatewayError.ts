@@ -5,9 +5,9 @@ import * as errors from "../../errors/index.js";
 import type * as CloudPDF from "../index.js";
 
 export class BadGatewayError extends errors.CloudPDFError {
-    public declare readonly body: CloudPDF.DocumentsImportFrom502Response;
+    public declare readonly body: CloudPDF.ErrorResponse;
 
-    constructor(body: CloudPDF.DocumentsImportFrom502Response, rawResponse?: core.RawResponse) {
+    constructor(body: CloudPDF.ErrorResponse, rawResponse?: core.RawResponse) {
         super({
             message: "BadGatewayError",
             statusCode: 502,

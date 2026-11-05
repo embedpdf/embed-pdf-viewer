@@ -28,6 +28,7 @@ import {
 import { listPositionOf } from '../../db/repos/documents.repo';
 import type { DocumentLifecycleService } from '../../services/DocumentLifecycleService';
 import type { ObjectStore } from '../../storage/ObjectStore';
+import { errorBody } from '../_helpers';
 
 export interface AdminDocumentsRouteDeps {
   lifecycle: DocumentLifecycleService;
@@ -302,23 +303,19 @@ export async function registerAdminDocumentsRoutes(
     );
     const doc = await lifecycle.get(ctx.tenantId, id);
     if (!storage || doc.thumbnailState !== 'ready' || !doc.thumbnailKey) {
-      return reply.code(404).send({
-        error: {
-          code: 'ThumbnailNotReady',
-          message: 'thumbnail is not ready to serve',
+      return reply.code(404).send(
+        errorBody('ThumbnailNotReady', 'thumbnail is not ready to serve', {
           state: doc.thumbnailState,
-        },
-      });
+        }),
+      );
     }
     const bytes = await storage.get(doc.thumbnailKey);
     if (!bytes) {
-      return reply.code(404).send({
-        error: {
-          code: 'ThumbnailNotReady',
-          message: 'thumbnail is not ready to serve',
-          state: 'pending',
-        },
-      });
+      return reply
+        .code(404)
+        .send(
+          errorBody('ThumbnailNotReady', 'thumbnail is not ready to serve', { state: 'pending' }),
+        );
     }
     return reply
       .type(doc.thumbnailKey.endsWith('.png') ? 'image/png' : 'image/webp')

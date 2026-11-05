@@ -26,7 +26,7 @@ func TestTolerantReading(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var form DocFormsList200Response
+	var form DocFormsListResponse
 	if err := json.Unmarshal(body, &form); err != nil {
 		t.Fatal(err)
 	}

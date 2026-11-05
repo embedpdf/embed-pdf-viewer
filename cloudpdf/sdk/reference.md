@@ -97,7 +97,7 @@ await client.deployment.modules();
 </details>
 
 ## Doc
-<details><summary><code>client.doc.<a href="/src/api/resources/doc/client/Client.ts">head</a>({ ...params }) -> CloudPDF.DocHead200Response</code></summary>
+<details><summary><code>client.doc.<a href="/src/api/resources/doc/client/Client.ts">head</a>({ ...params }) -> CloudPDF.DocHeadResponse</code></summary>
 <dl>
 <dd>
 
@@ -148,7 +148,7 @@ await client.doc.head({
 </dl>
 </details>
 
-<details><summary><code>client.doc.<a href="/src/api/resources/doc/client/Client.ts">changes</a>({ ...params }) -> CloudPDF.DocChanges200Response</code></summary>
+<details><summary><code>client.doc.<a href="/src/api/resources/doc/client/Client.ts">changes</a>({ ...params }) -> CloudPDF.DocChangesResponse</code></summary>
 <dl>
 <dd>
 
@@ -269,7 +269,7 @@ await client.doc.download({
 </dl>
 </details>
 
-<details><summary><code>client.doc.<a href="/src/api/resources/doc/client/Client.ts">downloadLink</a>({ ...params }) -> CloudPDF.DocDownloadLink200Response</code></summary>
+<details><summary><code>client.doc.<a href="/src/api/resources/doc/client/Client.ts">downloadLink</a>({ ...params }) -> CloudPDF.DocDownloadLinkResponse</code></summary>
 <dl>
 <dd>
 
@@ -335,7 +335,7 @@ await client.doc.downloadLink({
 </dl>
 </details>
 
-<details><summary><code>client.doc.<a href="/src/api/resources/doc/client/Client.ts">manifest</a>({ ...params }) -> CloudPDF.DocManifest200Response</code></summary>
+<details><summary><code>client.doc.<a href="/src/api/resources/doc/client/Client.ts">manifest</a>({ ...params }) -> CloudPDF.DocManifestResponse</code></summary>
 <dl>
 <dd>
 
@@ -454,7 +454,7 @@ await client.doc.render({
 </dl>
 </details>
 
-<details><summary><code>client.doc.<a href="/src/api/resources/doc/client/Client.ts">text</a>({ ...params }) -> CloudPDF.DocText200Response</code></summary>
+<details><summary><code>client.doc.<a href="/src/api/resources/doc/client/Client.ts">text</a>({ ...params }) -> CloudPDF.DocTextResponse</code></summary>
 <dl>
 <dd>
 
@@ -508,7 +508,7 @@ await client.doc.text({
 </details>
 
 ## Grants
-<details><summary><code>client.grants.<a href="/src/api/resources/grants/client/Client.ts">exchange</a>({ ...params }) -> CloudPDF.GrantsExchange200Response</code></summary>
+<details><summary><code>client.grants.<a href="/src/api/resources/grants/client/Client.ts">exchange</a>({ ...params }) -> CloudPDF.GrantsExchangeResponse</code></summary>
 <dl>
 <dd>
 
@@ -573,7 +573,7 @@ await client.grants.exchange({
 </dl>
 </details>
 
-<details><summary><code>client.grants.<a href="/src/api/resources/grants/client/Client.ts">list</a>({ ...params }) -> CloudPDF.GrantsList200Response</code></summary>
+<details><summary><code>client.grants.<a href="/src/api/resources/grants/client/Client.ts">list</a>({ ...params }) -> CloudPDF.GrantsListResponse</code></summary>
 <dl>
 <dd>
 
@@ -624,7 +624,7 @@ await client.grants.list({
 </dl>
 </details>
 
-<details><summary><code>client.grants.<a href="/src/api/resources/grants/client/Client.ts">create</a>({ ...params }) -> CloudPDF.GrantsCreate200Response</code></summary>
+<details><summary><code>client.grants.<a href="/src/api/resources/grants/client/Client.ts">create</a>({ ...params }) -> CloudPDF.GrantsCreateResponse</code></summary>
 <dl>
 <dd>
 
@@ -691,7 +691,7 @@ await client.grants.create({
 </dl>
 </details>
 
-<details><summary><code>client.grants.<a href="/src/api/resources/grants/client/Client.ts">get</a>({ ...params }) -> CloudPDF.GrantsGet200Response</code></summary>
+<details><summary><code>client.grants.<a href="/src/api/resources/grants/client/Client.ts">get</a>({ ...params }) -> CloudPDF.GrantsGetResponse</code></summary>
 <dl>
 <dd>
 
@@ -795,7 +795,7 @@ await client.grants.delete({
 </dl>
 </details>
 
-<details><summary><code>client.grants.<a href="/src/api/resources/grants/client/Client.ts">update</a>({ ...params }) -> CloudPDF.GrantsUpdate200Response</code></summary>
+<details><summary><code>client.grants.<a href="/src/api/resources/grants/client/Client.ts">update</a>({ ...params }) -> CloudPDF.GrantsUpdateResponse</code></summary>
 <dl>
 <dd>
 
@@ -847,7 +847,7 @@ await client.grants.update({
 </dl>
 </details>
 
-<details><summary><code>client.grants.<a href="/src/api/resources/grants/client/Client.ts">archive</a>({ ...params }) -> CloudPDF.GrantsArchive200Response</code></summary>
+<details><summary><code>client.grants.<a href="/src/api/resources/grants/client/Client.ts">archive</a>({ ...params }) -> CloudPDF.GrantsArchiveResponse</code></summary>
 <dl>
 <dd>
 
@@ -914,7 +914,7 @@ await client.grants.archive({
 </details>
 
 ## Tenants
-<details><summary><code>client.tenants.<a href="/src/api/resources/tenants/client/Client.ts">list</a>({ ...params }) -> CloudPDF.TenantsList200Response</code></summary>
+<details><summary><code>client.tenants.<a href="/src/api/resources/tenants/client/Client.ts">list</a>({ ...params }) -> CloudPDF.TenantsListResponse</code></summary>
 <dl>
 <dd>
 
@@ -963,7 +963,7 @@ await client.tenants.list();
 </dl>
 </details>
 
-<details><summary><code>client.tenants.<a href="/src/api/resources/tenants/client/Client.ts">create</a>({ ...params }) -> CloudPDF.TenantsCreate200Response</code></summary>
+<details><summary><code>client.tenants.<a href="/src/api/resources/tenants/client/Client.ts">create</a>({ ...params }) -> CloudPDF.TenantsCreateResponse</code></summary>
 <dl>
 <dd>
 
@@ -1014,7 +1014,7 @@ await client.tenants.create({
 </dl>
 </details>
 
-<details><summary><code>client.tenants.<a href="/src/api/resources/tenants/client/Client.ts">get</a>({ ...params }) -> CloudPDF.TenantsGet200Response</code></summary>
+<details><summary><code>client.tenants.<a href="/src/api/resources/tenants/client/Client.ts">get</a>({ ...params }) -> CloudPDF.TenantsGetResponse</code></summary>
 <dl>
 <dd>
 
@@ -1130,7 +1130,7 @@ await client.tenants.delete({
 </dl>
 </details>
 
-<details><summary><code>client.tenants.<a href="/src/api/resources/tenants/client/Client.ts">update</a>({ ...params }) -> CloudPDF.TenantsUpdate200Response</code></summary>
+<details><summary><code>client.tenants.<a href="/src/api/resources/tenants/client/Client.ts">update</a>({ ...params }) -> CloudPDF.TenantsUpdateResponse</code></summary>
 <dl>
 <dd>
 
@@ -1314,7 +1314,7 @@ await client.tenants.suspend({
 </dl>
 </details>
 
-<details><summary><code>client.tenants.<a href="/src/api/resources/tenants/client/Client.ts">usage</a>({ ...params }) -> CloudPDF.TenantsUsage200Response</code></summary>
+<details><summary><code>client.tenants.<a href="/src/api/resources/tenants/client/Client.ts">usage</a>({ ...params }) -> CloudPDF.TenantsUsageResponse</code></summary>
 <dl>
 <dd>
 
@@ -1380,7 +1380,7 @@ await client.tenants.usage({
 </details>
 
 ## Documents
-<details><summary><code>client.documents.<a href="/src/api/resources/documents/client/Client.ts">list</a>({ ...params }) -> CloudPDF.DocumentsList200Response</code></summary>
+<details><summary><code>client.documents.<a href="/src/api/resources/documents/client/Client.ts">list</a>({ ...params }) -> CloudPDF.DocumentsListResponse</code></summary>
 <dl>
 <dd>
 
@@ -1431,7 +1431,7 @@ await client.documents.list({
 </dl>
 </details>
 
-<details><summary><code>client.documents.<a href="/src/api/resources/documents/client/Client.ts">get</a>({ ...params }) -> CloudPDF.DocumentsGet200Response</code></summary>
+<details><summary><code>client.documents.<a href="/src/api/resources/documents/client/Client.ts">get</a>({ ...params }) -> CloudPDF.DocumentsGetResponse</code></summary>
 <dl>
 <dd>
 
@@ -1535,7 +1535,7 @@ await client.documents.delete({
 </dl>
 </details>
 
-<details><summary><code>client.documents.<a href="/src/api/resources/documents/client/Client.ts">update</a>({ ...params }) -> CloudPDF.DocumentsUpdate200Response</code></summary>
+<details><summary><code>client.documents.<a href="/src/api/resources/documents/client/Client.ts">update</a>({ ...params }) -> CloudPDF.DocumentsUpdateResponse</code></summary>
 <dl>
 <dd>
 
@@ -1602,7 +1602,7 @@ await client.documents.update({
 </dl>
 </details>
 
-<details><summary><code>client.documents.<a href="/src/api/resources/documents/client/Client.ts">commit</a>({ ...params }) -> CloudPDF.DocumentsCommit200Response</code></summary>
+<details><summary><code>client.documents.<a href="/src/api/resources/documents/client/Client.ts">commit</a>({ ...params }) -> CloudPDF.DocumentsCommitResponse</code></summary>
 <dl>
 <dd>
 
@@ -1773,7 +1773,7 @@ await client.documents.thumbnail({
 </dl>
 </details>
 
-<details><summary><code>client.documents.<a href="/src/api/resources/documents/client/Client.ts">uploadProxy</a>({ ...params }) -> CloudPDF.DocumentsUploadProxy200Response</code></summary>
+<details><summary><code>client.documents.<a href="/src/api/resources/documents/client/Client.ts">uploadProxy</a>({ ...params }) -> CloudPDF.DocumentsUploadProxyResponse</code></summary>
 <dl>
 <dd>
 
@@ -1909,7 +1909,7 @@ await client.documents.importFrom({
 </dl>
 </details>
 
-<details><summary><code>client.documents.<a href="/src/api/resources/documents/client/Client.ts">init</a>({ ...params }) -> CloudPDF.DocumentsInit200Response</code></summary>
+<details><summary><code>client.documents.<a href="/src/api/resources/documents/client/Client.ts">init</a>({ ...params }) -> CloudPDF.DocumentsInitResponse</code></summary>
 <dl>
 <dd>
 
@@ -1938,7 +1938,7 @@ With an upload token, the document goes into the token's folder with the token's
 ```typescript
 await client.documents.init({
     tenantId: "tenantId",
-    contentLength: 1.1,
+    contentLength: 1,
     contentSha256: "contentSha256"
 });
 
@@ -1977,7 +1977,7 @@ await client.documents.init({
 </details>
 
 ## Folders
-<details><summary><code>client.folders.<a href="/src/api/resources/folders/client/Client.ts">list</a>({ ...params }) -> CloudPDF.FoldersList200Response</code></summary>
+<details><summary><code>client.folders.<a href="/src/api/resources/folders/client/Client.ts">list</a>({ ...params }) -> CloudPDF.FoldersListResponse</code></summary>
 <dl>
 <dd>
 
@@ -2028,7 +2028,7 @@ await client.folders.list({
 </dl>
 </details>
 
-<details><summary><code>client.folders.<a href="/src/api/resources/folders/client/Client.ts">create</a>({ ...params }) -> CloudPDF.FoldersCreate200Response</code></summary>
+<details><summary><code>client.folders.<a href="/src/api/resources/folders/client/Client.ts">create</a>({ ...params }) -> CloudPDF.FoldersCreateResponse</code></summary>
 <dl>
 <dd>
 
@@ -2094,7 +2094,7 @@ await client.folders.create({
 </dl>
 </details>
 
-<details><summary><code>client.folders.<a href="/src/api/resources/folders/client/Client.ts">get</a>({ ...params }) -> CloudPDF.FoldersGet200Response</code></summary>
+<details><summary><code>client.folders.<a href="/src/api/resources/folders/client/Client.ts">get</a>({ ...params }) -> CloudPDF.FoldersGetResponse</code></summary>
 <dl>
 <dd>
 
@@ -2212,7 +2212,7 @@ await client.folders.delete({
 </dl>
 </details>
 
-<details><summary><code>client.folders.<a href="/src/api/resources/folders/client/Client.ts">update</a>({ ...params }) -> CloudPDF.FoldersUpdate200Response</code></summary>
+<details><summary><code>client.folders.<a href="/src/api/resources/folders/client/Client.ts">update</a>({ ...params }) -> CloudPDF.FoldersUpdateResponse</code></summary>
 <dl>
 <dd>
 
@@ -2346,7 +2346,7 @@ await client.folders.moveInto({
 </details>
 
 ## Tokens
-<details><summary><code>client.tokens.<a href="/src/api/resources/tokens/client/Client.ts">issue</a>({ ...params }) -> CloudPDF.TokensIssue200Response</code></summary>
+<details><summary><code>client.tokens.<a href="/src/api/resources/tokens/client/Client.ts">issue</a>({ ...params }) -> CloudPDF.TokensIssueResponse</code></summary>
 <dl>
 <dd>
 
@@ -2485,7 +2485,7 @@ await client.tokens.revoke({
 </details>
 
 ## Doc Annotations
-<details><summary><code>client.doc.annotations.<a href="/src/api/resources/doc/resources/annotations/client/Client.ts">listAll</a>({ ...params }) -> CloudPDF.DocAnnotationsListAll200Response</code></summary>
+<details><summary><code>client.doc.annotations.<a href="/src/api/resources/doc/resources/annotations/client/Client.ts">listAll</a>({ ...params }) -> CloudPDF.DocAnnotationsListAllResponse</code></summary>
 <dl>
 <dd>
 
@@ -2551,7 +2551,7 @@ await client.doc.annotations.listAll({
 </dl>
 </details>
 
-<details><summary><code>client.doc.annotations.<a href="/src/api/resources/doc/resources/annotations/client/Client.ts">list</a>({ ...params }) -> CloudPDF.DocAnnotationsList200Response</code></summary>
+<details><summary><code>client.doc.annotations.<a href="/src/api/resources/doc/resources/annotations/client/Client.ts">list</a>({ ...params }) -> CloudPDF.DocAnnotationsListResponse</code></summary>
 <dl>
 <dd>
 
@@ -2604,7 +2604,7 @@ await client.doc.annotations.list({
 </dl>
 </details>
 
-<details><summary><code>client.doc.annotations.<a href="/src/api/resources/doc/resources/annotations/client/Client.ts">create</a>({ ...params }) -> CloudPDF.DocAnnotationsCreate200Response</code></summary>
+<details><summary><code>client.doc.annotations.<a href="/src/api/resources/doc/resources/annotations/client/Client.ts">create</a>({ ...params }) -> CloudPDF.DocAnnotationsCreateResponse</code></summary>
 <dl>
 <dd>
 
@@ -2674,7 +2674,7 @@ await client.doc.annotations.create({
 </dl>
 </details>
 
-<details><summary><code>client.doc.annotations.<a href="/src/api/resources/doc/resources/annotations/client/Client.ts">delete</a>({ ...params }) -> CloudPDF.DocAnnotationsDelete200Response</code></summary>
+<details><summary><code>client.doc.annotations.<a href="/src/api/resources/doc/resources/annotations/client/Client.ts">delete</a>({ ...params }) -> CloudPDF.DocAnnotationsDeleteResponse</code></summary>
 <dl>
 <dd>
 
@@ -2728,7 +2728,7 @@ await client.doc.annotations.delete({
 </dl>
 </details>
 
-<details><summary><code>client.doc.annotations.<a href="/src/api/resources/doc/resources/annotations/client/Client.ts">update</a>({ ...params }) -> CloudPDF.DocAnnotationsUpdate200Response</code></summary>
+<details><summary><code>client.doc.annotations.<a href="/src/api/resources/doc/resources/annotations/client/Client.ts">update</a>({ ...params }) -> CloudPDF.DocAnnotationsUpdateResponse</code></summary>
 <dl>
 <dd>
 
@@ -2965,7 +2965,7 @@ await client.doc.annotations.exportAppearance({
 </dl>
 </details>
 
-<details><summary><code>client.doc.annotations.<a href="/src/api/resources/doc/resources/annotations/client/Client.ts">flatten</a>({ ...params }) -> CloudPDF.DocAnnotationsFlatten200Response</code></summary>
+<details><summary><code>client.doc.annotations.<a href="/src/api/resources/doc/resources/annotations/client/Client.ts">flatten</a>({ ...params }) -> CloudPDF.DocAnnotationsFlattenResponse</code></summary>
 <dl>
 <dd>
 
@@ -3021,7 +3021,7 @@ await client.doc.annotations.flatten({
 </dl>
 </details>
 
-<details><summary><code>client.doc.annotations.<a href="/src/api/resources/doc/resources/annotations/client/Client.ts">reorder</a>({ ...params }) -> CloudPDF.DocAnnotationsReorder200Response</code></summary>
+<details><summary><code>client.doc.annotations.<a href="/src/api/resources/doc/resources/annotations/client/Client.ts">reorder</a>({ ...params }) -> CloudPDF.DocAnnotationsReorderResponse</code></summary>
 <dl>
 <dd>
 
@@ -3151,7 +3151,7 @@ await client.doc.attachments.download({
 </dl>
 </details>
 
-<details><summary><code>client.doc.attachments.<a href="/src/api/resources/doc/resources/attachments/client/Client.ts">list</a>({ ...params }) -> CloudPDF.DocAttachmentsList200Response</code></summary>
+<details><summary><code>client.doc.attachments.<a href="/src/api/resources/doc/resources/attachments/client/Client.ts">list</a>({ ...params }) -> CloudPDF.DocAttachmentsListResponse</code></summary>
 <dl>
 <dd>
 
@@ -3218,7 +3218,7 @@ await client.doc.attachments.list({
 </details>
 
 ## Doc Fonts
-<details><summary><code>client.doc.fonts.<a href="/src/api/resources/doc/resources/fonts/client/Client.ts">list</a>({ ...params }) -> CloudPDF.DocFontsList200Response</code></summary>
+<details><summary><code>client.doc.fonts.<a href="/src/api/resources/doc/resources/fonts/client/Client.ts">list</a>({ ...params }) -> CloudPDF.DocFontsListResponse</code></summary>
 <dl>
 <dd>
 
@@ -3270,7 +3270,7 @@ await client.doc.fonts.list({
 </dl>
 </details>
 
-<details><summary><code>client.doc.fonts.<a href="/src/api/resources/doc/resources/fonts/client/Client.ts">resolve</a>({ ...params }) -> CloudPDF.DocFontsResolve200Response</code></summary>
+<details><summary><code>client.doc.fonts.<a href="/src/api/resources/doc/resources/fonts/client/Client.ts">resolve</a>({ ...params }) -> CloudPDF.DocFontsResolveResponse</code></summary>
 <dl>
 <dd>
 
@@ -3328,7 +3328,7 @@ await client.doc.fonts.resolve({
 </details>
 
 ## Doc Forms
-<details><summary><code>client.doc.forms.<a href="/src/api/resources/doc/resources/forms/client/Client.ts">list</a>({ ...params }) -> CloudPDF.DocFormsList200Response</code></summary>
+<details><summary><code>client.doc.forms.<a href="/src/api/resources/doc/resources/forms/client/Client.ts">list</a>({ ...params }) -> CloudPDF.DocFormsListResponse</code></summary>
 <dl>
 <dd>
 
@@ -3380,7 +3380,7 @@ await client.doc.forms.list({
 </dl>
 </details>
 
-<details><summary><code>client.doc.forms.<a href="/src/api/resources/doc/resources/forms/client/Client.ts">reorderCalculations</a>({ ...params }) -> CloudPDF.DocFormsReorderCalculations200Response</code></summary>
+<details><summary><code>client.doc.forms.<a href="/src/api/resources/doc/resources/forms/client/Client.ts">reorderCalculations</a>({ ...params }) -> CloudPDF.DocFormsReorderCalculationsResponse</code></summary>
 <dl>
 <dd>
 
@@ -3437,7 +3437,7 @@ await client.doc.forms.reorderCalculations({
 </dl>
 </details>
 
-<details><summary><code>client.doc.forms.<a href="/src/api/resources/doc/resources/forms/client/Client.ts">setValue</a>({ ...params }) -> CloudPDF.DocFormsSetValue200Response</code></summary>
+<details><summary><code>client.doc.forms.<a href="/src/api/resources/doc/resources/forms/client/Client.ts">setValue</a>({ ...params }) -> CloudPDF.DocFormsSetValueResponse</code></summary>
 <dl>
 <dd>
 
@@ -3493,7 +3493,7 @@ await client.doc.forms.setValue({
 </dl>
 </details>
 
-<details><summary><code>client.doc.forms.<a href="/src/api/resources/doc/resources/forms/client/Client.ts">reset</a>({ ...params }) -> CloudPDF.DocFormsReset200Response</code></summary>
+<details><summary><code>client.doc.forms.<a href="/src/api/resources/doc/resources/forms/client/Client.ts">reset</a>({ ...params }) -> CloudPDF.DocFormsResetResponse</code></summary>
 <dl>
 <dd>
 
@@ -3545,7 +3545,7 @@ await client.doc.forms.reset({
 </dl>
 </details>
 
-<details><summary><code>client.doc.forms.<a href="/src/api/resources/doc/resources/forms/client/Client.ts">deleteWidget</a>({ ...params }) -> CloudPDF.DocFormsDeleteWidget200Response</code></summary>
+<details><summary><code>client.doc.forms.<a href="/src/api/resources/doc/resources/forms/client/Client.ts">deleteWidget</a>({ ...params }) -> CloudPDF.DocFormsDeleteWidgetResponse</code></summary>
 <dl>
 <dd>
 
@@ -3599,7 +3599,7 @@ await client.doc.forms.deleteWidget({
 </dl>
 </details>
 
-<details><summary><code>client.doc.forms.<a href="/src/api/resources/doc/resources/forms/client/Client.ts">updateWidget</a>({ ...params }) -> CloudPDF.DocFormsUpdateWidget200Response</code></summary>
+<details><summary><code>client.doc.forms.<a href="/src/api/resources/doc/resources/forms/client/Client.ts">updateWidget</a>({ ...params }) -> CloudPDF.DocFormsUpdateWidgetResponse</code></summary>
 <dl>
 <dd>
 
@@ -3654,7 +3654,7 @@ await client.doc.forms.updateWidget({
 </dl>
 </details>
 
-<details><summary><code>client.doc.forms.<a href="/src/api/resources/doc/resources/forms/client/Client.ts">reorderWidgets</a>({ ...params }) -> CloudPDF.DocFormsReorderWidgets200Response</code></summary>
+<details><summary><code>client.doc.forms.<a href="/src/api/resources/doc/resources/forms/client/Client.ts">reorderWidgets</a>({ ...params }) -> CloudPDF.DocFormsReorderWidgetsResponse</code></summary>
 <dl>
 <dd>
 
@@ -3717,7 +3717,7 @@ await client.doc.forms.reorderWidgets({
 </details>
 
 ## Doc Metadata
-<details><summary><code>client.doc.metadata.<a href="/src/api/resources/doc/resources/metadata/client/Client.ts">get</a>({ ...params }) -> CloudPDF.DocMetadataGet200Response</code></summary>
+<details><summary><code>client.doc.metadata.<a href="/src/api/resources/doc/resources/metadata/client/Client.ts">get</a>({ ...params }) -> CloudPDF.DocMetadataGetResponse</code></summary>
 <dl>
 <dd>
 
@@ -3770,7 +3770,7 @@ await client.doc.metadata.get({
 </details>
 
 ## Doc Outline
-<details><summary><code>client.doc.outline.<a href="/src/api/resources/doc/resources/outline/client/Client.ts">get</a>({ ...params }) -> CloudPDF.DocOutlineGet200Response</code></summary>
+<details><summary><code>client.doc.outline.<a href="/src/api/resources/doc/resources/outline/client/Client.ts">get</a>({ ...params }) -> CloudPDF.DocOutlineGetResponse</code></summary>
 <dl>
 <dd>
 
@@ -3823,7 +3823,7 @@ await client.doc.outline.get({
 </details>
 
 ## Doc Pages
-<details><summary><code>client.doc.pages.<a href="/src/api/resources/doc/resources/pages/client/Client.ts">setScale</a>({ ...params }) -> CloudPDF.DocPagesSetScale200Response</code></summary>
+<details><summary><code>client.doc.pages.<a href="/src/api/resources/doc/resources/pages/client/Client.ts">setScale</a>({ ...params }) -> CloudPDF.DocPagesSetScaleResponse</code></summary>
 <dl>
 <dd>
 
@@ -3876,7 +3876,7 @@ await client.doc.pages.setScale({
 </dl>
 </details>
 
-<details><summary><code>client.doc.pages.<a href="/src/api/resources/doc/resources/pages/client/Client.ts">viewports</a>({ ...params }) -> CloudPDF.DocPagesViewports200Response</code></summary>
+<details><summary><code>client.doc.pages.<a href="/src/api/resources/doc/resources/pages/client/Client.ts">viewports</a>({ ...params }) -> CloudPDF.DocPagesViewportsResponse</code></summary>
 <dl>
 <dd>
 
@@ -4000,7 +4000,7 @@ await client.doc.pages.extract({
 </dl>
 </details>
 
-<details><summary><code>client.doc.pages.<a href="/src/api/resources/doc/resources/pages/client/Client.ts">flatten</a>({ ...params }) -> CloudPDF.DocPagesFlatten200Response</code></summary>
+<details><summary><code>client.doc.pages.<a href="/src/api/resources/doc/resources/pages/client/Client.ts">flatten</a>({ ...params }) -> CloudPDF.DocPagesFlattenResponse</code></summary>
 <dl>
 <dd>
 
@@ -4055,7 +4055,7 @@ await client.doc.pages.flatten({
 </dl>
 </details>
 
-<details><summary><code>client.doc.pages.<a href="/src/api/resources/doc/resources/pages/client/Client.ts">setName</a>({ ...params }) -> CloudPDF.DocPagesSetName200Response</code></summary>
+<details><summary><code>client.doc.pages.<a href="/src/api/resources/doc/resources/pages/client/Client.ts">setName</a>({ ...params }) -> CloudPDF.DocPagesSetNameResponse</code></summary>
 <dl>
 <dd>
 
@@ -4110,7 +4110,7 @@ await client.doc.pages.setName({
 </dl>
 </details>
 
-<details><summary><code>client.doc.pages.<a href="/src/api/resources/doc/resources/pages/client/Client.ts">removeName</a>({ ...params }) -> CloudPDF.DocPagesRemoveName200Response</code></summary>
+<details><summary><code>client.doc.pages.<a href="/src/api/resources/doc/resources/pages/client/Client.ts">removeName</a>({ ...params }) -> CloudPDF.DocPagesRemoveNameResponse</code></summary>
 <dl>
 <dd>
 
@@ -4166,7 +4166,7 @@ await client.doc.pages.removeName({
 </details>
 
 ## Doc Redactions
-<details><summary><code>client.doc.redactions.<a href="/src/api/resources/doc/resources/redactions/client/Client.ts">apply</a>({ ...params }) -> CloudPDF.DocRedactionsApply200Response</code></summary>
+<details><summary><code>client.doc.redactions.<a href="/src/api/resources/doc/resources/redactions/client/Client.ts">apply</a>({ ...params }) -> CloudPDF.DocRedactionsApplyResponse</code></summary>
 <dl>
 <dd>
 
@@ -4219,7 +4219,7 @@ await client.doc.redactions.apply({
 </details>
 
 ## Doc Signatures
-<details><summary><code>client.doc.signatures.<a href="/src/api/resources/doc/resources/signatures/client/Client.ts">list</a>({ ...params }) -> CloudPDF.DocSignaturesList200Response</code></summary>
+<details><summary><code>client.doc.signatures.<a href="/src/api/resources/doc/resources/signatures/client/Client.ts">list</a>({ ...params }) -> CloudPDF.DocSignaturesListResponse</code></summary>
 <dl>
 <dd>
 
@@ -4285,7 +4285,7 @@ await client.doc.signatures.list({
 </dl>
 </details>
 
-<details><summary><code>client.doc.signatures.<a href="/src/api/resources/doc/resources/signatures/client/Client.ts">cancel</a>({ ...params }) -> CloudPDF.DocSignaturesCancel200Response</code></summary>
+<details><summary><code>client.doc.signatures.<a href="/src/api/resources/doc/resources/signatures/client/Client.ts">cancel</a>({ ...params }) -> CloudPDF.DocSignaturesCancelResponse</code></summary>
 <dl>
 <dd>
 
@@ -4338,7 +4338,7 @@ await client.doc.signatures.cancel({
 </dl>
 </details>
 
-<details><summary><code>client.doc.signatures.<a href="/src/api/resources/doc/resources/signatures/client/Client.ts">complete</a>({ ...params }) -> CloudPDF.DocSignaturesComplete200Response</code></summary>
+<details><summary><code>client.doc.signatures.<a href="/src/api/resources/doc/resources/signatures/client/Client.ts">complete</a>({ ...params }) -> CloudPDF.DocSignaturesCompleteResponse</code></summary>
 <dl>
 <dd>
 
@@ -4410,7 +4410,7 @@ await client.doc.signatures.complete({
 </dl>
 </details>
 
-<details><summary><code>client.doc.signatures.<a href="/src/api/resources/doc/resources/signatures/client/Client.ts">analysis</a>({ ...params }) -> CloudPDF.DocSignaturesAnalysis200Response</code></summary>
+<details><summary><code>client.doc.signatures.<a href="/src/api/resources/doc/resources/signatures/client/Client.ts">analysis</a>({ ...params }) -> CloudPDF.DocSignaturesAnalysisResponse</code></summary>
 <dl>
 <dd>
 
@@ -4476,7 +4476,7 @@ await client.doc.signatures.analysis({
 </dl>
 </details>
 
-<details><summary><code>client.doc.signatures.<a href="/src/api/resources/doc/resources/signatures/client/Client.ts">prepare</a>({ ...params }) -> CloudPDF.DocSignaturesPrepare200Response</code></summary>
+<details><summary><code>client.doc.signatures.<a href="/src/api/resources/doc/resources/signatures/client/Client.ts">prepare</a>({ ...params }) -> CloudPDF.DocSignaturesPrepareResponse</code></summary>
 <dl>
 <dd>
 
@@ -4544,7 +4544,7 @@ await client.doc.signatures.prepare({
 </details>
 
 ## Doc Versions
-<details><summary><code>client.doc.versions.<a href="/src/api/resources/doc/resources/versions/client/Client.ts">list</a>({ ...params }) -> CloudPDF.DocVersionsList200Response</code></summary>
+<details><summary><code>client.doc.versions.<a href="/src/api/resources/doc/resources/versions/client/Client.ts">list</a>({ ...params }) -> CloudPDF.DocVersionsListResponse</code></summary>
 <dl>
 <dd>
 
@@ -4610,7 +4610,7 @@ await client.doc.versions.list({
 </dl>
 </details>
 
-<details><summary><code>client.doc.versions.<a href="/src/api/resources/doc/resources/versions/client/Client.ts">analysis</a>({ ...params }) -> CloudPDF.DocVersionsAnalysis200Response</code></summary>
+<details><summary><code>client.doc.versions.<a href="/src/api/resources/doc/resources/versions/client/Client.ts">analysis</a>({ ...params }) -> CloudPDF.DocVersionsAnalysisResponse</code></summary>
 <dl>
 <dd>
 
@@ -4784,7 +4784,7 @@ await client.doc.versions.revision({
 </dl>
 </details>
 
-<details><summary><code>client.doc.versions.<a href="/src/api/resources/doc/resources/versions/client/Client.ts">signatures</a>({ ...params }) -> CloudPDF.DocVersionsSignatures200Response</code></summary>
+<details><summary><code>client.doc.versions.<a href="/src/api/resources/doc/resources/versions/client/Client.ts">signatures</a>({ ...params }) -> CloudPDF.DocVersionsSignaturesResponse</code></summary>
 <dl>
 <dd>
 
@@ -5042,7 +5042,7 @@ await client.doc.fonts.programs.download({
 </dl>
 </details>
 
-<details><summary><code>client.doc.fonts.programs.<a href="/src/api/resources/doc/resources/fonts/resources/programs/client/Client.ts">get</a>({ ...params }) -> CloudPDF.DocFontsProgramsGet200Response</code></summary>
+<details><summary><code>client.doc.fonts.programs.<a href="/src/api/resources/doc/resources/fonts/resources/programs/client/Client.ts">get</a>({ ...params }) -> CloudPDF.DocFontsProgramsGetResponse</code></summary>
 <dl>
 <dd>
 
@@ -5096,7 +5096,7 @@ await client.doc.fonts.programs.get({
 </details>
 
 ## Doc Metadata Custom
-<details><summary><code>client.doc.metadata.custom.<a href="/src/api/resources/doc/resources/metadata/resources/custom/client/Client.ts">get</a>({ ...params }) -> CloudPDF.DocMetadataCustomGet200Response</code></summary>
+<details><summary><code>client.doc.metadata.custom.<a href="/src/api/resources/doc/resources/metadata/resources/custom/client/Client.ts">get</a>({ ...params }) -> CloudPDF.DocMetadataCustomGetResponse</code></summary>
 <dl>
 <dd>
 
@@ -5149,7 +5149,7 @@ await client.doc.metadata.custom.get({
 </details>
 
 ## Documents Layers
-<details><summary><code>client.documents.layers.<a href="/src/api/resources/documents/resources/layers/client/Client.ts">list</a>({ ...params }) -> CloudPDF.DocumentsLayersList200Response</code></summary>
+<details><summary><code>client.documents.layers.<a href="/src/api/resources/documents/resources/layers/client/Client.ts">list</a>({ ...params }) -> CloudPDF.DocumentsLayersListResponse</code></summary>
 <dl>
 <dd>
 
@@ -5255,7 +5255,7 @@ await client.documents.layers.delete({
 </details>
 
 ## Grants Visitors
-<details><summary><code>client.grants.visitors.<a href="/src/api/resources/grants/resources/visitors/client/Client.ts">list</a>({ ...params }) -> CloudPDF.GrantsVisitorsList200Response</code></summary>
+<details><summary><code>client.grants.visitors.<a href="/src/api/resources/grants/resources/visitors/client/Client.ts">list</a>({ ...params }) -> CloudPDF.GrantsVisitorsListResponse</code></summary>
 <dl>
 <dd>
 

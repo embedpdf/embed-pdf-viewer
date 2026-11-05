@@ -39,7 +39,7 @@ function fakeTransport() {
     handler({
       kind: 'reject',
       jobId,
-      error: { name: 'EngineError', code: 'Aborted', message: 'stopped' },
+      error: { code: 'Aborted', message: 'stopped' },
     } as WorkerResponse);
   /** The worker's answer to an open: the document is open there. */
   const opened = (jobId: number, docId: string) =>

@@ -351,7 +351,7 @@ describe('derived renders', () => {
     });
     expect(tile.status).toBe(404);
     const body = (await tile.json()) as { error: { state: string } };
-    expect(body.error.state).toBe('locked');
+    expect(body.error.details.state).toBe('locked');
   });
 
   test('dedup: same bytes twice → warm is an instant hit on the shared base tier', async () => {

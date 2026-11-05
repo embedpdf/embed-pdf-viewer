@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { GrantExchangeRequestSchema, adminOperations } from '@cloudpdf/contract';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 
-import { setNoStore, tooManyRequests } from './_helpers';
+import { errorBody, setNoStore, tooManyRequests } from './_helpers';
 import { AuthFailureLimiter } from '../app/auth-failure-limiter';
 import { RequestRateLimiter } from '../app/request-rate-limiter';
 import type { SignDevTokenInput } from '../auth/JwtVerifier';
@@ -116,9 +116,7 @@ export async function registerGrantSessionRoutes(
       const parsed = GrantExchangeRequestSchema.safeParse(req.body ?? {});
       if (!parsed.success) {
         ipFailures.recordFailure(req.ip);
-        return reply
-          .code(400)
-          .send({ error: { code: 'InvalidArg', message: 'invalid grant exchange request' } });
+        return reply.code(400).send(errorBody('InvalidArg', 'invalid grant exchange request'));
       }
       const { grant: grantId, passphrase, visitorHandle, restart } = parsed.data;
       const answersGiven = parsed.data.visitorIdentity;
@@ -129,9 +127,9 @@ export async function registerGrantSessionRoutes(
       const origin = req.headers['origin'];
       if (typeof origin !== 'string' || origin.length === 0) {
         ipFailures.recordFailure(req.ip);
-        return reply.code(403).send({
-          error: { code: 'OriginRequired', message: 'grant exchange requires an Origin header' },
-        });
+        return reply
+          .code(403)
+          .send(errorBody('OriginRequired', 'grant exchange requires an Origin header'));
       }
 
       // Volume tier, per grant — consumed before the row is fetched
@@ -156,27 +154,23 @@ export async function registerGrantSessionRoutes(
         return notFound(reply);
       }
       if (grant.expiresAt !== null && grant.expiresAt <= Date.now()) {
-        return reply.code(410).send({ error: { code: 'GrantExpired', message: 'grant expired' } });
+        return reply.code(410).send(errorBody('GrantExpired', 'grant expired'));
       }
       if (grant.origins && !matchesOrigin(origin, grant.origins)) {
         ipFailures.recordFailure(req.ip);
-        return reply
-          .code(403)
-          .send({ error: { code: 'OriginNotAllowed', message: 'origin not allowed' } });
+        return reply.code(403).send(errorBody('OriginNotAllowed', 'origin not allowed'));
       }
       if (grant.passphraseHash !== null) {
         if (passphrase === undefined) {
           // The normal first roundtrip for a protected grant — the
           // viewer shows a prompt and exchanges again. Not a probe.
-          return reply.code(422).send({
-            error: { code: 'GrantPassphraseRequired', message: 'this grant requires a passphrase' },
-          });
+          return reply
+            .code(422)
+            .send(errorBody('GrantPassphraseRequired', 'this grant requires a passphrase'));
         }
         if (!verifyGrantPassphrase(passphrase, grant.passphraseHash)) {
           ipFailures.recordFailure(req.ip);
-          return reply.code(422).send({
-            error: { code: 'GrantPassphraseRequired', message: 'incorrect passphrase' },
-          });
+          return reply.code(422).send(errorBody('GrantPassphraseRequired', 'incorrect passphrase'));
         }
       }
 
@@ -227,13 +221,11 @@ export async function registerGrantSessionRoutes(
       );
       const pending = settled.request;
       if (pending && (grant.visitorIdentity?.ask === 'on-open' || pending.invalid.length > 0)) {
-        return reply.code(422).send({
-          error: {
-            code: 'VisitorIdentityRequired',
-            message: "answer the grant's questions to open it",
-            details: pending,
-          },
-        });
+        return reply.code(422).send(
+          errorBody('VisitorIdentityRequired', "answer the grant's questions to open it", {
+            ...pending,
+          }),
+        );
       }
       if (Object.keys(settled.added).length > 0) {
         await visitors.record({
@@ -299,5 +291,5 @@ export async function registerGrantSessionRoutes(
 }
 
 function notFound(reply: FastifyReply): FastifyReply {
-  return reply.code(404).send({ error: { code: 'NotFound', message: 'unknown or revoked grant' } });
+  return reply.code(404).send(errorBody('NotFound', 'unknown or revoked grant'));
 }

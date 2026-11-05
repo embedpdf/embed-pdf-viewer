@@ -2,9 +2,12 @@
 
 import type * as core from "../../core/index.js";
 import * as errors from "../../errors/index.js";
+import type * as CloudPDF from "../index.js";
 
 export class ConflictError extends errors.CloudPDFError {
-    constructor(body?: unknown, rawResponse?: core.RawResponse) {
+    public declare readonly body: CloudPDF.ErrorResponse;
+
+    constructor(body: CloudPDF.ErrorResponse, rawResponse?: core.RawResponse) {
         super({
             message: "ConflictError",
             statusCode: 409,

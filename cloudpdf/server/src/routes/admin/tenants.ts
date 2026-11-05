@@ -24,6 +24,7 @@ import {
 import type { TenantRow, TenantsRepo } from '../../db/repos/tenants.repo';
 import { StorageKeys } from '../../storage/keys';
 import type { ObjectStore } from '../../storage/ObjectStore';
+import { errorBody } from '../_helpers';
 
 export interface AdminTenantsRouteDeps {
   tenants: TenantsRepo;
@@ -67,9 +68,7 @@ export async function registerAdminTenantsRoutes(
     requireApiToken(req);
     const parsed = AdminTenantCreateRequestSchema.safeParse(req.body);
     if (!parsed.success) {
-      return reply
-        .code(400)
-        .send({ error: { code: 'InvalidArg', message: formatIssues(parsed.error.issues) } });
+      return reply.code(400).send(errorBody('InvalidArg', formatIssues(parsed.error.issues)));
     }
     const { tenant, created } = await tenants.ensureExplicit(parsed.data);
     return reply.send({ tenant: tenantPublic(tenant), created });
@@ -80,9 +79,7 @@ export async function registerAdminTenantsRoutes(
     requireApiToken(req);
     const parsed = listOp.query.safeParse(req.query ?? {});
     if (!parsed.success) {
-      return reply
-        .code(400)
-        .send({ error: { code: 'InvalidArg', message: formatIssues(parsed.error.issues) } });
+      return reply.code(400).send(errorBody('InvalidArg', formatIssues(parsed.error.issues)));
     }
     const { limit, cursor } = parsed.data;
     const before = cursor === undefined ? undefined : decodeListCursor(cursor);
@@ -99,9 +96,7 @@ export async function registerAdminTenantsRoutes(
     const { tenantId } = req.params as { tenantId: string };
     const tenant = await tenants.findById(tenantId);
     if (!tenant) {
-      return reply
-        .code(404)
-        .send({ error: { code: 'NotFound', message: `tenant does not exist: ${tenantId}` } });
+      return reply.code(404).send(errorBody('NotFound', `tenant does not exist: ${tenantId}`));
     }
     return reply.send({ tenant: tenantPublic(tenant) });
   });
@@ -112,9 +107,7 @@ export async function registerAdminTenantsRoutes(
     const { tenantId } = req.params as { tenantId: string };
     const parsed = AdminTenantUpdateRequestSchema.safeParse(req.body);
     if (!parsed.success) {
-      return reply
-        .code(400)
-        .send({ error: { code: 'InvalidArg', message: formatIssues(parsed.error.issues) } });
+      return reply.code(400).send(errorBody('InvalidArg', formatIssues(parsed.error.issues)));
     }
     const { features } = parsed.data;
     // A feature switches a module, so it names one this server runs: a typo
@@ -122,19 +115,16 @@ export async function registerAdminTenantsRoutes(
     const unknown = features.find((feature) => !installed.has(feature.id));
     if (unknown) {
       const modules = installed.size > 0 ? [...installed].join(', ') : 'none';
-      return reply.code(400).send({
-        error: {
-          code: 'InvalidArg',
-          message: `no installed module is ${unknown.id} (installed: ${modules})`,
-        },
-      });
+      return reply
+        .code(400)
+        .send(
+          errorBody('InvalidArg', `no installed module is ${unknown.id} (installed: ${modules})`),
+        );
     }
     const existed = await tenants.setFeatures(tenantId, features);
     const tenant = existed ? await tenants.findById(tenantId) : null;
     if (!tenant) {
-      return reply
-        .code(404)
-        .send({ error: { code: 'NotFound', message: `tenant does not exist: ${tenantId}` } });
+      return reply.code(404).send(errorBody('NotFound', `tenant does not exist: ${tenantId}`));
     }
     // Prime this replica so the next module request sees the change;
     // siblings converge within the guard's TTL.
@@ -148,9 +138,7 @@ export async function registerAdminTenantsRoutes(
     const { tenantId } = req.params as { tenantId: string };
     const existing = await tenants.findById(tenantId);
     if (!existing) {
-      return reply
-        .code(404)
-        .send({ error: { code: 'NotFound', message: `tenant does not exist: ${tenantId}` } });
+      return reply.code(404).send(errorBody('NotFound', `tenant does not exist: ${tenantId}`));
     }
     await storage.deletePrefix(StorageKeys.tenantRoot(tenantId));
     await tenants.deleteCascadeDb(tenantId);
@@ -163,15 +151,11 @@ export async function registerAdminTenantsRoutes(
     const { tenantId } = req.params as { tenantId: string };
     const parsed = TenantSuspendRequestSchema.safeParse(req.body ?? {});
     if (!parsed.success) {
-      return reply
-        .code(400)
-        .send({ error: { code: 'InvalidArg', message: formatIssues(parsed.error.issues) } });
+      return reply.code(400).send(errorBody('InvalidArg', formatIssues(parsed.error.issues)));
     }
     const existed = await tenants.setStatus(tenantId, 'suspended');
     if (!existed) {
-      return reply
-        .code(404)
-        .send({ error: { code: 'NotFound', message: `tenant does not exist: ${tenantId}` } });
+      return reply.code(404).send(errorBody('NotFound', `tenant does not exist: ${tenantId}`));
     }
     // Prime this replica synchronously so the very next request 403s;
     // siblings converge within the guard's TTL.
@@ -193,9 +177,7 @@ export async function registerAdminTenantsRoutes(
     const { tenantId } = req.params as { tenantId: string };
     const existed = await tenants.setStatus(tenantId, 'active');
     if (!existed) {
-      return reply
-        .code(404)
-        .send({ error: { code: 'NotFound', message: `tenant does not exist: ${tenantId}` } });
+      return reply.code(404).send(errorBody('NotFound', `tenant does not exist: ${tenantId}`));
     }
     suspendedTenants.prime(tenantId, false);
     await securityEvents.append({
@@ -214,19 +196,15 @@ export async function registerAdminTenantsRoutes(
     requireTenantAccess(req, tenantId, usageOp.scope);
     const parsed = TenantUsageQuerySchema.safeParse(req.query ?? {});
     if (!parsed.success) {
-      return reply
-        .code(400)
-        .send({ error: { code: 'InvalidArg', message: formatIssues(parsed.error.issues) } });
+      return reply.code(400).send(errorBody('InvalidArg', formatIssues(parsed.error.issues)));
     }
     const tenant = await tenants.findById(tenantId);
     if (!tenant) {
-      return reply
-        .code(404)
-        .send({ error: { code: 'NotFound', message: `tenant does not exist: ${tenantId}` } });
+      return reply.code(404).send(errorBody('NotFound', `tenant does not exist: ${tenantId}`));
     }
     const window = usageWindow(parsed.data);
     if (typeof window === 'string') {
-      return reply.code(400).send({ error: { code: 'InvalidArg', message: window } });
+      return reply.code(400).send(errorBody('InvalidArg', window));
     }
     return reply.send(await tenantUsage.snapshot(tenantId, window, deps.moduleMeters));
   });

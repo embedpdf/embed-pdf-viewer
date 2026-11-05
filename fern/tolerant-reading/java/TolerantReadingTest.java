@@ -2,7 +2,7 @@ package com.cloudpdf.api;
 
 import com.cloudpdf.api.core.ObjectMappers;
 import com.cloudpdf.api.types.AnnotationList;
-import com.cloudpdf.api.types.DocFormsList200Response;
+import com.cloudpdf.api.types.DocFormsListResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Assertions;
@@ -18,7 +18,7 @@ public final class TolerantReadingTest {
         Assertions.assertEquals(5, list.getAnnotations().size());
 
         String form = Files.readString(Path.of(System.getenv("CLOUDPDF_FORM_FIXTURE")));
-        DocFormsList200Response fields = ObjectMappers.JSON_MAPPER.readValue(form, DocFormsList200Response.class);
+        DocFormsListResponse fields = ObjectMappers.JSON_MAPPER.readValue(form, DocFormsListResponse.class);
         System.out.println("fields: " + fields.getFields().size());
         Assertions.assertEquals(2, fields.getFields().size());
     }

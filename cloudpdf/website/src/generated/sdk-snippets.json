@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "canonicalVersion": "3.0.0-next.22",
-  "openapiSha256": "ae82df8ebd9f66272ccbf62b7fbd03b6cb9b4d4c06ab7b295ef54f7d9a77918b",
+  "openapiSha256": "1e5ed9622e6facc8011a76e2291690554210779ff3e2ecfad5a34f7b6213e1a3",
   "languages": {
     "typescript": {
       "label": "TypeScript",
@@ -2691,37 +2691,37 @@
     "documents.init": {
       "typescript": {
         "status": "available",
-        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  token: \"<token>\",\n});\n\nawait client.documents.init({\n  tenantId: \"tenantId\",\n  contentLength: 1.1,\n  contentSha256: \"contentSha256\"\n});",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  token: \"<token>\",\n});\n\nawait client.documents.init({\n  tenantId: \"tenantId\",\n  contentLength: 1,\n  contentSha256: \"contentSha256\"\n});",
         "frameLines": 6
       },
       "python": {
         "status": "available",
-        "source": "from cloudpdf import CloudPDFClient\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n)\n\nclient.documents.init(\n    tenant_id=\"tenantId\",\n    content_length=1.1,\n    content_sha256=\"contentSha256\",\n)",
+        "source": "from cloudpdf import CloudPDFClient\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n)\n\nclient.documents.init(\n    tenant_id=\"tenantId\",\n    content_length=1,\n    content_sha256=\"contentSha256\",\n)",
         "frameLines": 6
       },
       "php": {
         "status": "available",
-        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n);\n\n$client->documents->init(\n    'tenantId',\n    new DocumentsInitRequest([\n        'contentLength' => 1.1,\n        'contentSha256' => 'contentSha256',\n    ]),\n);",
+        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n);\n\n$client->documents->init(\n    'tenantId',\n    new DocumentsInitRequest([\n        'contentLength' => 1,\n        'contentSha256' => 'contentSha256',\n    ]),\n);",
         "frameLines": 6
       },
       "csharp": {
         "status": "available",
-        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\"\n);\n\nawait client.Documents.InitAsync(\n    new DocumentsInitRequest\n    {\n        TenantId = \"tenantId\",\n        ContentLength = 1.1,\n        ContentSha256 = \"contentSha256\",\n    }\n);",
+        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\"\n);\n\nawait client.Documents.InitAsync(\n    new DocumentsInitRequest\n    {\n        TenantId = \"tenantId\",\n        ContentLength = 1,\n        ContentSha256 = \"contentSha256\",\n    }\n);",
         "frameLines": 6
       },
       "go": {
         "status": "available",
-        "source": "import (\n    \"context\"\n\n    cloudpdf \"github.com/embedpdf/cloudpdf-sdk-go/v3\"\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n)\n\nrequest := &cloudpdf.DocumentsInitRequest{\n    TenantID: \"tenantId\",\n    ContentLength: 1.1,\n    ContentSha256: \"contentSha256\",\n}\nclient.Documents.Init(\n    context.TODO(),\n    request,\n)",
+        "source": "import (\n    \"context\"\n\n    cloudpdf \"github.com/embedpdf/cloudpdf-sdk-go/v3\"\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n)\n\nrequest := &cloudpdf.DocumentsInitRequest{\n    TenantID: \"tenantId\",\n    ContentLength: 1,\n    ContentSha256: \"contentSha256\",\n}\nclient.Documents.Init(\n    context.TODO(),\n    request,\n)",
         "frameLines": 12
       },
       "java": {
         "status": "available",
-        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .build();\n\nclient.documents().init(\n    \"tenantId\",\n    DocumentsInitRequest\n        .builder()\n        .contentLength(1.1)\n        .contentSha256(\"contentSha256\")\n        .build()\n);",
+        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .build();\n\nclient.documents().init(\n    \"tenantId\",\n    DocumentsInitRequest\n        .builder()\n        .contentLength(1)\n        .contentSha256(\"contentSha256\")\n        .build()\n);",
         "frameLines": 7
       },
       "ruby": {
         "status": "available",
-        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\"\n)\n\nclient.documents.init(\n  tenant_id: \"tenantId\",\n  content_length: 1.1,\n  content_sha256: \"contentSha256\"\n)",
+        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\"\n)\n\nclient.documents.init(\n  tenant_id: \"tenantId\",\n  content_length: 1,\n  content_sha256: \"contentSha256\"\n)",
         "frameLines": 6
       }
     },

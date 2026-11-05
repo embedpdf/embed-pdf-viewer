@@ -51,14 +51,14 @@ export class GrantsClient {
     public exchange(
         request: CloudPDF.GrantsExchangeRequest,
         requestOptions?: GrantsClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.GrantsExchange200Response> {
+    ): core.HttpResponsePromise<CloudPDF.GrantsExchangeResponse> {
         return core.HttpResponsePromise.fromPromise(this.__exchange(request, requestOptions));
     }
 
     private async __exchange(
         request: CloudPDF.GrantsExchangeRequest,
         requestOptions?: GrantsClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.GrantsExchange200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.GrantsExchangeResponse>> {
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             this._options?.headers,
             mergeOnlyDefinedHeaders({ "EmbedPDF-Version": requestOptions?.embedPdfVersion ?? "3.0" }),
@@ -84,25 +84,31 @@ export class GrantsClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return { data: _response.body as CloudPDF.GrantsExchange200Response, rawResponse: _response.rawResponse };
+            return { data: _response.body as CloudPDF.GrantsExchangeResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 400:
-                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
-                case 403:
-                    throw new CloudPDF.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
-                case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
-                case 410:
-                    throw new CloudPDF.GoneError(
-                        _response.error.body as CloudPDF.GrantsExchange410Response,
+                    throw new CloudPDF.BadRequestError(
+                        _response.error.body as CloudPDF.ErrorResponse,
                         _response.rawResponse,
                     );
+                case 403:
+                    throw new CloudPDF.ForbiddenError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
+                case 404:
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
+                case 410:
+                    throw new CloudPDF.GoneError(_response.error.body as CloudPDF.ErrorResponse, _response.rawResponse);
                 case 422:
                     throw new CloudPDF.UnprocessableEntityError(
-                        _response.error.body as CloudPDF.GrantsExchange422Response,
+                        _response.error.body as CloudPDF.ErrorResponse,
                         _response.rawResponse,
                     );
                 default:
@@ -133,14 +139,14 @@ export class GrantsClient {
     public list(
         request: CloudPDF.ListGrantsRequest,
         requestOptions?: GrantsClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.GrantsList200Response> {
+    ): core.HttpResponsePromise<CloudPDF.GrantsListResponse> {
         return core.HttpResponsePromise.fromPromise(this.__list(request, requestOptions));
     }
 
     private async __list(
         request: CloudPDF.ListGrantsRequest,
         requestOptions?: GrantsClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.GrantsList200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.GrantsListResponse>> {
         const { tenantId, limit, cursor, docId, archived } = request;
         const _queryParams: Record<string, unknown> = {
             limit,
@@ -176,13 +182,16 @@ export class GrantsClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return { data: _response.body as CloudPDF.GrantsList200Response, rawResponse: _response.rawResponse };
+            return { data: _response.body as CloudPDF.GrantsListResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 400:
-                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.BadRequestError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -217,14 +226,14 @@ export class GrantsClient {
     public create(
         request: CloudPDF.GrantsCreateRequest,
         requestOptions?: GrantsClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.GrantsCreate200Response> {
+    ): core.HttpResponsePromise<CloudPDF.GrantsCreateResponse> {
         return core.HttpResponsePromise.fromPromise(this.__create(request, requestOptions));
     }
 
     private async __create(
         request: CloudPDF.GrantsCreateRequest,
         requestOptions?: GrantsClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.GrantsCreate200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.GrantsCreateResponse>> {
         const { tenantId, ..._body } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
@@ -253,17 +262,26 @@ export class GrantsClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return { data: _response.body as CloudPDF.GrantsCreate200Response, rawResponse: _response.rawResponse };
+            return { data: _response.body as CloudPDF.GrantsCreateResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 400:
-                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.BadRequestError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 403:
-                    throw new CloudPDF.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.ForbiddenError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -298,14 +316,14 @@ export class GrantsClient {
     public get(
         request: CloudPDF.GetGrantsRequest,
         requestOptions?: GrantsClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.GrantsGet200Response> {
+    ): core.HttpResponsePromise<CloudPDF.GrantsGetResponse> {
         return core.HttpResponsePromise.fromPromise(this.__get(request, requestOptions));
     }
 
     private async __get(
         request: CloudPDF.GetGrantsRequest,
         requestOptions?: GrantsClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.GrantsGet200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.GrantsGetResponse>> {
         const { tenantId, grantId } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
@@ -331,13 +349,16 @@ export class GrantsClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return { data: _response.body as CloudPDF.GrantsGet200Response, rawResponse: _response.rawResponse };
+            return { data: _response.body as CloudPDF.GrantsGetResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -412,9 +433,15 @@ export class GrantsClient {
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 409:
-                    throw new CloudPDF.ConflictError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.ConflictError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -452,14 +479,14 @@ export class GrantsClient {
     public update(
         request: CloudPDF.GrantsUpdateRequest,
         requestOptions?: GrantsClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.GrantsUpdate200Response> {
+    ): core.HttpResponsePromise<CloudPDF.GrantsUpdateResponse> {
         return core.HttpResponsePromise.fromPromise(this.__update(request, requestOptions));
     }
 
     private async __update(
         request: CloudPDF.GrantsUpdateRequest,
         requestOptions?: GrantsClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.GrantsUpdate200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.GrantsUpdateResponse>> {
         const { tenantId, grantId, ..._body } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
@@ -488,19 +515,31 @@ export class GrantsClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return { data: _response.body as CloudPDF.GrantsUpdate200Response, rawResponse: _response.rawResponse };
+            return { data: _response.body as CloudPDF.GrantsUpdateResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 400:
-                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.BadRequestError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 403:
-                    throw new CloudPDF.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.ForbiddenError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 409:
-                    throw new CloudPDF.ConflictError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.ConflictError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -537,14 +576,14 @@ export class GrantsClient {
     public archive(
         request: CloudPDF.ArchiveGrantsRequest,
         requestOptions?: GrantsClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.GrantsArchive200Response> {
+    ): core.HttpResponsePromise<CloudPDF.GrantsArchiveResponse> {
         return core.HttpResponsePromise.fromPromise(this.__archive(request, requestOptions));
     }
 
     private async __archive(
         request: CloudPDF.ArchiveGrantsRequest,
         requestOptions?: GrantsClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.GrantsArchive200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.GrantsArchiveResponse>> {
         const { tenantId, grantId } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
@@ -570,13 +609,16 @@ export class GrantsClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return { data: _response.body as CloudPDF.GrantsArchive200Response, rawResponse: _response.rawResponse };
+            return { data: _response.body as CloudPDF.GrantsArchiveResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,

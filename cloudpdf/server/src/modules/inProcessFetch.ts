@@ -6,6 +6,7 @@
 import { Buffer } from 'node:buffer';
 
 import type { FastifyInstance, InjectOptions } from 'fastify';
+import { errorBody } from '../routes/_helpers';
 
 /** The origin in-process URLs carry; only their path and query reach the server. */
 export const IN_PROCESS_BASE_URL = 'http://cloudpdf.in-process';
@@ -20,12 +21,7 @@ export function inProcessFetch(app: FastifyInstance): typeof globalThis.fetch {
     // A 403 is what the cloud engine's stream client takes as final.
     if (request.headers.get('accept')?.includes('text/event-stream')) {
       return Response.json(
-        {
-          error: {
-            code: 'Forbidden',
-            message: "a module's connection to the server has no live event stream",
-          },
-        },
+        errorBody('Forbidden', "a module's connection to the server has no live event stream"),
         { status: 403 },
       );
     }
@@ -37,13 +33,10 @@ export function inProcessFetch(app: FastifyInstance): typeof globalThis.fetch {
     const url = new URL(request.url);
     if (url.origin !== IN_PROCESS_BASE_URL) {
       return Response.json(
-        {
-          error: {
-            name: 'EngineError',
-            code: 'Network',
-            message: `a module's connection reaches only its own server, not ${url.origin}`,
-          },
-        },
+        errorBody(
+          'Network',
+          `a module's connection reaches only its own server, not ${url.origin}`,
+        ),
         { status: 502 },
       );
     }

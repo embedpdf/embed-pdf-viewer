@@ -859,7 +859,10 @@ test('restricted licensing keeps reads and readiness available while blocking mu
 
     const write = await bundle.app.inject({ method: 'POST', url: '/unknown-write' });
     expect(write.statusCode).toBe(403);
-    expect(write.json().error.code).toBe('LICENSE_EXPIRED');
+    expect(write.json().error).toMatchObject({
+      code: 'LicenseInvalid',
+      details: { licenseCode: 'LICENSE_EXPIRED' },
+    });
   } finally {
     await bundle.shutdown();
   }
@@ -940,7 +943,10 @@ describe('the public API has no way around the license key', () => {
       try {
         const write = await bundle.app.inject({ method: 'POST', url: '/unknown-write' });
         expect(write.statusCode).toBe(403);
-        expect(write.json().error.code).toBe(license.getStatus().code);
+        expect(write.json().error).toMatchObject({
+          code: 'LicenseInvalid',
+          details: { licenseCode: license.getStatus().code },
+        });
       } finally {
         await bundle.shutdown();
       }

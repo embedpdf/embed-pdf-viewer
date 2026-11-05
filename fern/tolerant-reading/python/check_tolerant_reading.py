@@ -7,7 +7,7 @@ import typing
 import pydantic
 from cloudpdf.core.pydantic_utilities import parse_obj_as
 from cloudpdf.types.annotation_list import AnnotationList
-from cloudpdf.types.doc_forms_list200response import DocFormsList200Response
+from cloudpdf.types.doc_forms_list_response import DocFormsListResponse
 
 with open(os.environ["CLOUDPDF_ANNOTATIONS_FIXTURE"], encoding="utf-8") as fixture:
     body = json.load(fixture)
@@ -34,7 +34,7 @@ else:
     sys.exit("read a malformed square")
 
 with open(os.environ["CLOUDPDF_FORM_FIXTURE"], encoding="utf-8") as fixture:
-    form = typing.cast(DocFormsList200Response, parse_obj_as(type_=DocFormsList200Response, object_=json.load(fixture)))
+    form = typing.cast(DocFormsListResponse, parse_obj_as(type_=DocFormsListResponse, object_=json.load(fixture)))
 
 print(f"fields: {len(form.fields)}")
 text, barcode = form.fields

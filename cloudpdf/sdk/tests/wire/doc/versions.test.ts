@@ -43,7 +43,7 @@ describe("VersionsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -77,7 +77,7 @@ describe("VersionsClient", () => {
                     revisionIndex: 1,
                     source: "docmdp",
                     own: true,
-                    permission: 1.1,
+                    permission: 1,
                     fields: { key: "value" },
                 },
             ],
@@ -113,7 +113,7 @@ describe("VersionsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -136,7 +136,7 @@ describe("VersionsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()
@@ -177,7 +177,7 @@ describe("VersionsClient", () => {
                     coverage: "whole-revision",
                     revisionIndex: 1,
                     signer: { name: null, reason: null, location: null, contactInfo: null, signedAt: null },
-                    docMdp: 1.1,
+                    docMdp: 1,
                     catalogCertification: true,
                     fieldMdp: { action: "all", fields: ["fields"] },
                     lock: { action: "all", fields: ["fields"] },
@@ -197,8 +197,8 @@ describe("VersionsClient", () => {
             protection: {
                 enforced: "none",
                 judged: "none",
-                certification: { signatureIndex: 1, permission: 1.1 },
-                fieldLocks: [{ signatureIndex: 1, source: "fieldmdp", spec: null }],
+                certification: { signatureIndex: 1, permission: 1 },
+                fieldLocks: [{ signatureIndex: 1, source: "fieldmdp", spec: { action: "all", fields: ["fields"] } }],
                 policyVersion: 1,
             },
         };
@@ -223,7 +223,7 @@ describe("VersionsClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        const rawResponseBody = { key: "value" };
+        const rawResponseBody = { error: { code: "Unknown", message: "message" } };
 
         server
             .mockEndpoint()

@@ -50,14 +50,14 @@ export class TokensClient {
     public issue(
         request: CloudPDF.IssueTokensRequest,
         requestOptions?: TokensClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.TokensIssue200Response> {
+    ): core.HttpResponsePromise<CloudPDF.TokensIssueResponse> {
         return core.HttpResponsePromise.fromPromise(this.__issue(request, requestOptions));
     }
 
     private async __issue(
         request: CloudPDF.IssueTokensRequest,
         requestOptions?: TokensClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.TokensIssue200Response>> {
+    ): Promise<core.WithRawResponse<CloudPDF.TokensIssueResponse>> {
         const { tenantId, body: _body } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
@@ -86,17 +86,26 @@ export class TokensClient {
             logging: this._options.logging,
         });
         if (_response.ok) {
-            return { data: _response.body as CloudPDF.TokensIssue200Response, rawResponse: _response.rawResponse };
+            return { data: _response.body as CloudPDF.TokensIssueResponse, rawResponse: _response.rawResponse };
         }
 
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 400:
-                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.BadRequestError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 403:
-                    throw new CloudPDF.ForbiddenError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.ForbiddenError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.NotFoundError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,
@@ -175,7 +184,10 @@ export class TokensClient {
         if (_response.error.reason === "status-code") {
             switch (_response.error.statusCode) {
                 case 400:
-                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                    throw new CloudPDF.BadRequestError(
+                        _response.error.body as CloudPDF.ErrorResponse,
+                        _response.rawResponse,
+                    );
                 default:
                     throw new errors.CloudPDFError({
                         statusCode: _response.error.statusCode,

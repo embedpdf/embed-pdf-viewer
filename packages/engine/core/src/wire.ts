@@ -71,7 +71,8 @@ export {
   LayerScopesSchema,
   CacheDeltaSchema,
   MutationMetaSchema,
-  EngineErrorPayloadSchema,
+  EngineErrorSchema,
+  ErrorResponseSchema,
   AnnotationListSchema,
   PageTextSnapshotSchema,
   PageGeometrySnapshotSchema,
@@ -93,6 +94,7 @@ export {
   AnnotationReorderBodySchema,
   AnnotationReorderResultSchema,
   DocumentWireComponents,
+  SignatureWireComponents,
   FormMutationMetaSchema,
   FormWireComponents,
   FormSetValueResultSchema,
@@ -472,12 +474,7 @@ export {
   type EngineValues,
   type TokenPin,
 } from './wire/cachedReads';
-export {
-  API_VERSION,
-  apiVersionOf,
-  parseApiVersion,
-  type ApiVersion,
-} from './wire/apiVersion';
+export { API_VERSION, apiVersionOf, parseApiVersion, type ApiVersion } from './wire/apiVersion';
 export type {
   AnnotationsExportToken,
   FontsToken,
