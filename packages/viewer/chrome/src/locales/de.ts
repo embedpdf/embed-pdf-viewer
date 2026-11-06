@@ -504,7 +504,7 @@ export const de: Locale = {
       lineStart: 'Anfang',
       lineEnd: 'Ende',
       empty: 'Wählen Sie ein Zeichenwerkzeug oder eine Anmerkung aus, um den Stil zu bearbeiten.',
-      selected: '{count} ausgewählt',
+      selected: { one: '{count} ausgewählt', other: '{count} ausgewählt' },
       toolDefaults: 'Standardwerte: {tool}',
       defaults: 'Standardwerte',
       fontGroups: {
@@ -536,8 +536,7 @@ export const de: Locale = {
       dropHint: 'Oder Dateien hier ablegen',
       adding: 'Wird hinzugefügt…',
       onPage: 'Seite {page}',
-      count: '{count} Datei',
-      countPlural: '{count} Dateien',
+      count: { one: '{count} Datei', other: '{count} Dateien' },
     },
     outline: {
       filter: 'Lesezeichen filtern',
@@ -593,8 +592,7 @@ export const de: Locale = {
       emptyReadOnly: 'Dieses Dokument enthält keine Kommentare.',
       anonymous: 'Gast',
       page: 'Seite {page}',
-      count: '{count} Kommentar',
-      countPlural: '{count} Kommentare',
+      count: { one: '{count} Kommentar', other: '{count} Kommentare' },
       reply: 'Antworten',
       replyPlaceholder: 'Antworten…',
       addPlaceholder: 'Kommentar hinzufügen…',
@@ -621,7 +619,7 @@ export const de: Locale = {
       searchWholeWord: 'Nur ganze Wörter',
       searchRegex: 'Regulärer Ausdruck',
       searchSearching: 'Suche läuft…',
-      searchResults: '{count} Treffer gefunden',
+      searchResults: { one: '{count} Treffer gefunden', other: '{count} Treffer gefunden' },
       searchNoResults: 'Keine Treffer',
       searchPrevious: 'Vorheriger Treffer',
       searchNext: 'Nächster Treffer',
@@ -638,9 +636,15 @@ export const de: Locale = {
       redactionText: 'Textmarkierung',
       redactionRemove: 'Markierung entfernen',
       redactConfirmTitle: 'Schwärzungen anwenden?',
-      redactConfirmBody:
-        'Inhalt unter den Schwärzungsmarkierungen ({count}) endgültig entfernen. Dies kann nicht rückgängig gemacht werden.',
-      redactConfirmCollateral: 'Außerdem werden weitere Anmerkungen entfernt: {count}.',
+      redactConfirmBody: {
+        one: 'Inhalt unter {count} Schwärzungsmarkierung endgültig entfernen. Dies kann nicht rückgängig gemacht werden.',
+        other:
+          'Inhalt unter {count} Schwärzungsmarkierungen endgültig entfernen. Dies kann nicht rückgängig gemacht werden.',
+      },
+      redactConfirmCollateral: {
+        one: 'Außerdem wird {count} weitere Anmerkung entfernt.',
+        other: 'Außerdem werden {count} weitere Anmerkungen entfernt.',
+      },
       redactApply: 'Anwenden',
       redactApplying: 'Wird angewendet…',
       formatLabel: 'Format',

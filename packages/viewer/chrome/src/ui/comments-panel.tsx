@@ -167,9 +167,7 @@ export function CommentsPanel() {
                   </h3>
                   {count > 0 && (
                     <p className="text-fg-muted text-xs">
-                      {t(count === 1 ? 'comments.count' : 'comments.countPlural', {
-                        params: { count: String(count) },
-                      })}
+                      {t('comments.count', { params: { count } })}
                     </p>
                   )}
                 </div>

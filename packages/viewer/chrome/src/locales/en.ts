@@ -513,7 +513,7 @@ export const en: Locale = {
       lineStart: 'Start',
       lineEnd: 'End',
       empty: 'Pick a draw tool or select an annotation to edit its style.',
-      selected: '{count} selected',
+      selected: { one: '{count} selected', other: '{count} selected' },
       toolDefaults: '{tool} defaults',
       defaults: 'Defaults',
       // The font picker's groups, a font's style after its family's name, and why a font can't be
@@ -547,8 +547,7 @@ export const en: Locale = {
       dropHint: 'Or drop files here',
       adding: 'Adding…',
       onPage: 'Page {page}',
-      count: '{count} file',
-      countPlural: '{count} files',
+      count: { one: '{count} file', other: '{count} files' },
     },
     outline: {
       filter: 'Filter outline',
@@ -605,8 +604,7 @@ export const en: Locale = {
       emptyReadOnly: 'No comments on this document.',
       anonymous: 'Guest',
       page: 'Page {page}',
-      count: '{count} comment',
-      countPlural: '{count} comments',
+      count: { one: '{count} comment', other: '{count} comments' },
       reply: 'Reply',
       replyPlaceholder: 'Reply…',
       addPlaceholder: 'Add a comment…',
@@ -633,7 +631,7 @@ export const en: Locale = {
       searchWholeWord: 'Whole word',
       searchRegex: 'Regular expression',
       searchSearching: 'Searching…',
-      searchResults: '{count} results found',
+      searchResults: { one: '{count} result found', other: '{count} results found' },
       searchNoResults: 'No results',
       searchPrevious: 'Previous result',
       searchNext: 'Next result',
@@ -649,9 +647,15 @@ export const en: Locale = {
       redactionText: 'Text mark',
       redactionRemove: 'Remove mark',
       redactConfirmTitle: 'Apply redactions?',
-      redactConfirmBody:
-        'Permanently remove the content under {count} redaction marks. This cannot be undone.',
-      redactConfirmCollateral: '{count} other annotations will also be removed.',
+      redactConfirmBody: {
+        one: 'Permanently remove the content under {count} redaction mark. This cannot be undone.',
+        other:
+          'Permanently remove the content under {count} redaction marks. This cannot be undone.',
+      },
+      redactConfirmCollateral: {
+        one: '{count} other annotation will also be removed.',
+        other: '{count} other annotations will also be removed.',
+      },
       redactApply: 'Apply',
       redactApplying: 'Applying…',
       formatLabel: 'Format',

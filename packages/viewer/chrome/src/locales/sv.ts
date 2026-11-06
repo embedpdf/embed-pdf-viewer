@@ -504,7 +504,7 @@ export const sv: Locale = {
       lineStart: 'Början',
       lineEnd: 'Slut',
       empty: 'Välj ett ritverktyg eller markera en kommentar för att redigera dess stil.',
-      selected: '{count} valda',
+      selected: { one: '{count} vald', other: '{count} valda' },
       toolDefaults: 'Standardvärden för {tool}',
       defaults: 'Standardvärden',
       fontGroups: {
@@ -536,8 +536,7 @@ export const sv: Locale = {
       dropHint: 'Eller släpp filer här',
       adding: 'Lägger till…',
       onPage: 'Sida {page}',
-      count: '{count} fil',
-      countPlural: '{count} filer',
+      count: { one: '{count} fil', other: '{count} filer' },
     },
     outline: {
       filter: 'Filtrera bokmärken',
@@ -593,8 +592,7 @@ export const sv: Locale = {
       emptyReadOnly: 'Inga kommentarer i det här dokumentet.',
       anonymous: 'Gäst',
       page: 'Sida {page}',
-      count: '{count} kommentar',
-      countPlural: '{count} kommentarer',
+      count: { one: '{count} kommentar', other: '{count} kommentarer' },
       reply: 'Svara',
       replyPlaceholder: 'Svara…',
       addPlaceholder: 'Lägg till en kommentar…',
@@ -621,7 +619,7 @@ export const sv: Locale = {
       searchWholeWord: 'Hela ord',
       searchRegex: 'Reguljärt uttryck',
       searchSearching: 'Söker…',
-      searchResults: '{count} resultat hittades',
+      searchResults: { one: '{count} resultat hittades', other: '{count} resultat hittades' },
       searchNoResults: 'Inga resultat',
       searchPrevious: 'Föregående resultat',
       searchNext: 'Nästa resultat',
@@ -638,9 +636,15 @@ export const sv: Locale = {
       redactionText: 'Textmarkering',
       redactionRemove: 'Ta bort markering',
       redactConfirmTitle: 'Tillämpa maskeringar?',
-      redactConfirmBody:
-        'Ta bort innehållet under {count} maskeringsmarkeringar permanent. Det går inte att ångra.',
-      redactConfirmCollateral: '{count} andra kommentarer tas också bort.',
+      redactConfirmBody: {
+        one: 'Ta bort innehållet under {count} maskeringsmarkering permanent. Det går inte att ångra.',
+        other:
+          'Ta bort innehållet under {count} maskeringsmarkeringar permanent. Det går inte att ångra.',
+      },
+      redactConfirmCollateral: {
+        one: '{count} annan kommentar tas också bort.',
+        other: '{count} andra kommentarer tas också bort.',
+      },
       redactApply: 'Tillämpa',
       redactApplying: 'Tillämpar…',
       formatLabel: 'Format',

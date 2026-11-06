@@ -504,7 +504,7 @@ export const nl: Locale = {
       lineStart: 'Begin',
       lineEnd: 'Einde',
       empty: 'Kies een tekengereedschap of selecteer een annotatie om de stijl ervan te bewerken.',
-      selected: '{count} geselecteerd',
+      selected: { one: '{count} geselecteerd', other: '{count} geselecteerd' },
       toolDefaults: 'Standaardwaarden voor {tool}',
       defaults: 'Standaardwaarden',
       fontGroups: {
@@ -536,8 +536,7 @@ export const nl: Locale = {
       dropHint: 'Of zet bestanden hier neer',
       adding: 'Toevoegen…',
       onPage: 'Pagina {page}',
-      count: '{count} bestand',
-      countPlural: '{count} bestanden',
+      count: { one: '{count} bestand', other: '{count} bestanden' },
     },
     outline: {
       filter: 'Bladwijzers filteren',
@@ -593,8 +592,7 @@ export const nl: Locale = {
       emptyReadOnly: 'Dit document heeft geen opmerkingen.',
       anonymous: 'Gast',
       page: 'Pagina {page}',
-      count: '{count} opmerking',
-      countPlural: '{count} opmerkingen',
+      count: { one: '{count} opmerking', other: '{count} opmerkingen' },
       reply: 'Antwoorden',
       replyPlaceholder: 'Antwoorden…',
       addPlaceholder: 'Opmerking toevoegen…',
@@ -621,7 +619,7 @@ export const nl: Locale = {
       searchWholeWord: 'Hele woorden',
       searchRegex: 'Reguliere expressie',
       searchSearching: 'Zoeken…',
-      searchResults: 'Resultaten gevonden: {count}',
+      searchResults: { one: '{count} resultaat gevonden', other: '{count} resultaten gevonden' },
       searchNoResults: 'Geen resultaten',
       searchPrevious: 'Vorig resultaat',
       searchNext: 'Volgend resultaat',
@@ -638,9 +636,15 @@ export const nl: Locale = {
       redactionText: 'Tekstmarkering',
       redactionRemove: 'Markering verwijderen',
       redactConfirmTitle: 'Redacties toepassen?',
-      redactConfirmBody:
-        'De inhoud onder de redactiemarkeringen ({count}) definitief verwijderen. Dit kan niet ongedaan worden gemaakt.',
-      redactConfirmCollateral: 'Ook andere annotaties worden verwijderd: {count}.',
+      redactConfirmBody: {
+        one: 'De inhoud onder {count} redactiemarkering definitief verwijderen. Dit kan niet ongedaan worden gemaakt.',
+        other:
+          'De inhoud onder {count} redactiemarkeringen definitief verwijderen. Dit kan niet ongedaan worden gemaakt.',
+      },
+      redactConfirmCollateral: {
+        one: 'Ook {count} andere annotatie wordt verwijderd.',
+        other: 'Ook {count} andere annotaties worden verwijderd.',
+      },
       redactApply: 'Toepassen',
       redactApplying: 'Toepassen…',
       formatLabel: 'Opmaak',

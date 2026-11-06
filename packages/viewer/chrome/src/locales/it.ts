@@ -503,7 +503,11 @@ export const it: Locale = {
       lineStart: 'Inizio',
       lineEnd: 'Fine',
       empty: 'Scegli uno strumento di disegno o seleziona un’annotazione per modificarne lo stile.',
-      selected: 'Selezionate: {count}',
+      selected: {
+        one: '{count} selezionata',
+        many: '{count} selezionate',
+        other: '{count} selezionate',
+      },
       toolDefaults: 'Valori predefiniti: {tool}',
       defaults: 'Valori predefiniti',
       fontGroups: {
@@ -535,8 +539,7 @@ export const it: Locale = {
       dropHint: 'Oppure rilascia i file qui',
       adding: 'Aggiunta in corso…',
       onPage: 'Pagina {page}',
-      count: '{count} file',
-      countPlural: '{count} file',
+      count: { one: '{count} file', many: '{count} di file', other: '{count} file' },
     },
     outline: {
       filter: 'Filtra segnalibri',
@@ -592,8 +595,7 @@ export const it: Locale = {
       emptyReadOnly: 'Nessun commento in questo documento.',
       anonymous: 'Ospite',
       page: 'Pagina {page}',
-      count: '{count} commento',
-      countPlural: '{count} commenti',
+      count: { one: '{count} commento', many: '{count} di commenti', other: '{count} commenti' },
       reply: 'Rispondi',
       replyPlaceholder: 'Rispondi…',
       addPlaceholder: 'Aggiungi un commento…',
@@ -620,7 +622,11 @@ export const it: Locale = {
       searchWholeWord: 'Parola intera',
       searchRegex: 'Espressione regolare',
       searchSearching: 'Ricerca in corso…',
-      searchResults: 'Risultati trovati: {count}',
+      searchResults: {
+        one: '{count} risultato trovato',
+        many: '{count} di risultati trovati',
+        other: '{count} risultati trovati',
+      },
       searchNoResults: 'Nessun risultato',
       searchPrevious: 'Risultato precedente',
       searchNext: 'Risultato successivo',
@@ -637,9 +643,17 @@ export const it: Locale = {
       redactionText: 'Contrassegno testo',
       redactionRemove: 'Rimuovi contrassegno',
       redactConfirmTitle: 'Applicare gli oscuramenti?',
-      redactConfirmBody:
-        'Rimuovere definitivamente il contenuto sotto i contrassegni di oscuramento ({count}). L’operazione non può essere annullata.',
-      redactConfirmCollateral: 'Verranno rimosse anche altre annotazioni: {count}.',
+      redactConfirmBody: {
+        one: 'Rimuovere definitivamente il contenuto sotto {count} contrassegno di oscuramento. L’operazione non può essere annullata.',
+        many: 'Rimuovere definitivamente il contenuto sotto {count} di contrassegni di oscuramento. L’operazione non può essere annullata.',
+        other:
+          'Rimuovere definitivamente il contenuto sotto {count} contrassegni di oscuramento. L’operazione non può essere annullata.',
+      },
+      redactConfirmCollateral: {
+        one: 'Verrà rimossa anche {count} altra annotazione.',
+        many: 'Verranno rimosse anche {count} di altre annotazioni.',
+        other: 'Verranno rimosse anche {count} altre annotazioni.',
+      },
       redactApply: 'Applica',
       redactApplying: 'Applicazione…',
       formatLabel: 'Formato',
