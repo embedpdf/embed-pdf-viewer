@@ -8,8 +8,8 @@ import { stateReader } from '../runtime/state.svelte';
 
 /**
  * The attachment API (add, remove, download, reveal) of the nearest `<DocumentScope>`'s document,
- * else the active one. Outside a ready document, every method throws `not-ready`. `canAdd()` is a
- * read, so `disabled={!attachment.canAdd()}` updates by itself.
+ * else the active one. Outside a ready document, every method throws `not-ready`. `canCreate()` is a
+ * read, so `disabled={!attachment.canCreate()}` updates by itself.
  */
 export function useAttachment(): AttachmentCapability {
   return useCapability(AttachmentToken);

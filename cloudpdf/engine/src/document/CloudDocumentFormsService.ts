@@ -18,7 +18,7 @@ import {
   type FormFieldCreateResult,
   type FormFieldDeleteResult,
   type FormFieldDraft,
-  type FormFieldDTO,
+  type FormField,
   type FormFieldPatch,
   type FormFieldRef,
   type FormFieldUpdateResult,
@@ -133,10 +133,10 @@ export class CloudDocumentFormsService implements DocumentFormsService {
     );
   }
 
-  get(ref: FormFieldRef): AbortablePromise<FormFieldDTO> {
-    const rejected = this.rejectIfClosed<FormFieldDTO>();
+  get(ref: FormFieldRef): AbortablePromise<FormField> {
+    const rejected = this.rejectIfClosed<FormField>();
     if (rejected) return rejected;
-    return AbortablePromise.run<FormFieldDTO>((signal) =>
+    return AbortablePromise.run<FormField>((signal) =>
       this.http.getJson(
         wirePaths.layerFormFieldByKey(this.docId, this.layerName, encodeFieldRefKey(ref)),
         (raw) => FormFieldDTOSchema.parse(raw),

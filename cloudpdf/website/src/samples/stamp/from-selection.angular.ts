@@ -165,7 +165,7 @@ export class App {
           .list()
           .filter((each) => each.nm === 'checked-frame' || each.nm === 'checked-text');
         if (found.length === 0) return;
-        this.annotation.selection.set(found.map((each) => each.ref));
+        this.annotation.selection.select(found.map((each) => each.ref));
         stage.reveal(found[0].page, { rect: found[0].rect });
       });
     });

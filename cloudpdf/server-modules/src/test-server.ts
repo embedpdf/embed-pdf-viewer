@@ -193,7 +193,7 @@ export async function launchTestServer(
       })) as AdminDocumentInitResponse;
       const { id } = init.document;
       // The test server stores files on disk, which takes no presigned upload.
-      if (init.tag !== 'deduped' && init.upload.kind === 'proxy') {
+      if (init.status !== 'deduped' && init.upload.kind === 'proxy') {
         const form = new FormData();
         form.set('file', new Blob([bytes], { type: 'application/pdf' }), name ?? `${id}.pdf`);
         await admin(init.upload.url, form);

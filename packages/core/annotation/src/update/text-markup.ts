@@ -124,12 +124,12 @@ export function createCaret(
   anchor: TextEndAnchor,
   flags?: Partial<AnnotationFlags>,
 ): [Model, Effect[]] {
-  const caretGeom = caretFromAnchor(anchor);
-  if (caretGeom.box.width <= 0 || caretGeom.box.height <= 0) return [model, []];
+  const caretGeometry = caretFromAnchor(anchor);
+  if (caretGeometry.box.width <= 0 || caretGeometry.box.height <= 0) return [model, []];
   const created = newRecord(
     model,
     page,
-    draftOf('caret', defaultsFor(model, 'caret'), caretGeom, {}, flags),
+    draftOf('caret', defaultsFor(model, 'caret'), caretGeometry, {}, flags),
   );
   const id = created.record.id;
   return [

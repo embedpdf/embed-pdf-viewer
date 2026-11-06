@@ -150,20 +150,20 @@ describe('undo and redo', () => {
       { undoOf: forward.opId },
     ]);
     // The undo shows what the change said undoing it looks like.
-    const undo = ctx.changes.pending().at(-1)!;
+    const undo = ctx.changes.listPending().at(-1)!;
     expect(undo.undoOf).toBe(forward.opId);
     expect(undo.shows).toEqual([move(10, 0)]);
     expect(history.canUndo()).toBe(false);
     expect(history.getRedoLabel()).toEqual(label('annotation.move'));
 
     history.redo();
-    const redo = ctx.changes.pending().at(-1)!;
+    const redo = ctx.changes.listPending().at(-1)!;
     expect(redo.undoOf).toBe(undo.opId);
     expect(redo.shows).toEqual([move(10, 5)]);
     expect(history.getUndoLabel()).toEqual(label('annotation.move'));
     // The next undo undoes the redo.
     history.undo();
-    expect(ctx.changes.pending().at(-1)!.undoOf).toBe(redo.opId);
+    expect(ctx.changes.listPending().at(-1)!.undoOf).toBe(redo.opId);
   });
 
   it('do nothing when there is nothing to step over', () => {
@@ -349,7 +349,13 @@ describe('answers', () => {
 });
 
 describe('what ends undo', () => {
-  const origin = { kind: 'remote', sessionId: 'other', sub: null, ts: 0, serverId: 1 } as const;
+  const origin = {
+    kind: 'remote',
+    sessionId: 'other',
+    subject: null,
+    at: new Date(0).toISOString(),
+    serverSequence: 1,
+  } as const;
 
   it.each([
     'redaction.applied',

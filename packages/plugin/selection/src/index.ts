@@ -24,7 +24,7 @@ export {
   armSelectionHandle,
   createSelectionHandleDrag,
   selectionHandleEndpointsOf,
-  selectionHandleGeom,
+  selectionHandleGeometry,
   selectionHandleViewOf,
 } from './handles';
 export type {
@@ -32,7 +32,7 @@ export type {
   SelectionHandleDragSession,
   SelectionHandleEndpoint,
   SelectionHandleEndpoints,
-  SelectionHandleGeom,
+  SelectionHandleGeometry,
   SelectionHandleStage,
   SelectionHandleTarget,
   SelectionHandleView,

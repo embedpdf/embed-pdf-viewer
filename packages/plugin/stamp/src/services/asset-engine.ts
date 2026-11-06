@@ -105,7 +105,7 @@ export function createAssetEngine(ctx: StampContext) {
         'the asset engine returned a URL-sourced render; asset engines must be local',
       );
     }
-    return { bytes: image.source.bytes, mimeType: image.contentType };
+    return { bytes: image.source.bytes, mimeType: image.mimeType };
   };
 
   /** Thumbnail render of one library page (the small picker image). */

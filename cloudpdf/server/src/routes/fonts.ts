@@ -183,8 +183,8 @@ async function layerRead(
   resource: 'layer-fonts' | 'layer-font-programs',
 ): Promise<OpenContext> {
   const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-  const pdfBits = await service.getEffectivePdfBits(accessCtx, docId, layerName);
-  return requireLayerResource(req, docId, layerName, resource, pdfBits);
+  const permissionFlags = await service.getEffectivePermissionFlags(accessCtx, docId, layerName);
+  return requireLayerResource(req, docId, layerName, resource, permissionFlags);
 }
 
 /**
@@ -199,14 +199,14 @@ async function mayWriteText(
   layerName: string,
 ): Promise<OpenContext> {
   const ctx = requireLayerDocAccessOnly(req, docId, layerName);
-  const pdfBits = await service.getEffectivePdfBits(ctx, docId, layerName);
+  const permissionFlags = await service.getEffectivePermissionFlags(ctx, docId, layerName);
   const protection = await service.getProtection(ctx, docId, layerName);
   const allowed =
     ctx.mode === 'tenant'
       ? TEXT_WRITING_CAPABILITIES.some(
           (capability) => !protectedCapabilities(protection).has(capability),
         )
-      : checkAnyCapability(TEXT_WRITING_CAPABILITIES, ctx.jwt.scope, pdfBits, protection);
+      : checkAnyCapability(TEXT_WRITING_CAPABILITIES, ctx.jwt.scope, permissionFlags, protection);
   if (!allowed) {
     throw new PermissionDenied(TEXT_WRITING_CAPABILITIES[0], undefined, TEXT_WRITING_CAPABILITIES);
   }

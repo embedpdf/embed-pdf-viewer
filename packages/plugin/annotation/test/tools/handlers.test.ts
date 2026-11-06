@@ -55,10 +55,10 @@ describe('annotation edit handler — page anchoring', () => {
   it('tracks the ORIGIN page through the projection, not the page under the cursor', () => {
     const { anno, calls } = makeAnno();
     const handler = createEditHandler(anno, interaction);
-    expect(handler.onDown(down())).toBe(true);
+    expect(handler.onPointerDown(down())).toBe(true);
     // The cursor is physically over page 2 (its local y ≈ 18); the projection
     // onto page 1 says y = 810 (past its bottom edge — unclamped, as expected).
-    handler.onMove?.(
+    handler.onPointerMove?.(
       sample({
         page: { ref: PAGE_2, point: { x: 300, y: 18 } },
         project: (page) => (pageRefsEqual(page, PAGE_1) ? { x: 300, y: 810 } : null),
@@ -70,9 +70,9 @@ describe('annotation edit handler — page anchoring', () => {
   it('ignores a sample that cannot speak for the origin page (foreign per-page source)', () => {
     const { anno, calls } = makeAnno();
     const handler = createEditHandler(anno, interaction);
-    handler.onDown(down());
+    handler.onPointerDown(down());
     const before = calls.length;
-    handler.onMove?.(
+    handler.onPointerMove?.(
       sample({ page: { ref: PAGE_2, point: { x: 300, y: 18 } }, project: () => null }),
     );
     expect(calls.length).toBe(before);
@@ -81,21 +81,21 @@ describe('annotation edit handler — page anchoring', () => {
   it('ALWAYS dispatches up — release over the page gap must still commit', () => {
     const { anno, calls } = makeAnno();
     const handler = createEditHandler(anno, interaction);
-    handler.onDown(down());
-    handler.onMove?.(
+    handler.onPointerDown(down());
+    handler.onPointerMove?.(
       sample({ project: (page) => (pageRefsEqual(page, PAGE_1) ? { x: 300, y: 780 } : null) }),
     );
     // Over the gap: no page hit, and (worst case) no projection either.
-    handler.onUp?.(sample({ phase: 'up' }));
+    handler.onPointerUp?.(sample({ phase: 'up' }));
     expect(calls.at(-1)).toEqual({ phase: 'up', page: PAGE_1, point: { x: 300, y: 780 } });
   });
 
   it('a gesture that never armed (empty hit) routes nothing on move/up', () => {
     const { anno, calls } = makeAnno('empty');
     const handler = createEditHandler(anno, interaction);
-    expect(handler.onDown(down())).toBe(false);
-    handler.onMove?.(sample({ page: { ref: PAGE_1, point: { x: 10, y: 10 } } }));
-    handler.onUp?.(sample({ phase: 'up', page: { ref: PAGE_1, point: { x: 10, y: 10 } } }));
+    expect(handler.onPointerDown(down())).toBe(false);
+    handler.onPointerMove?.(sample({ page: { ref: PAGE_1, point: { x: 10, y: 10 } } }));
+    handler.onPointerUp?.(sample({ phase: 'up', page: { ref: PAGE_1, point: { x: 10, y: 10 } } }));
     expect(calls.length).toBe(0);
   });
 });
@@ -156,9 +156,9 @@ describe('the tool ghost follows the hover of the handler that takes the click',
   it('the ghost stays through the press, and clears when the click ends', () => {
     const { anno, clears } = makeGhostAnno();
     const handler = createPlaceHandler(anno, ghostInteraction());
-    expect(handler.onDown(down())).toBe(true);
+    expect(handler.onPointerDown(down())).toBe(true);
     expect(clears()).toBe(0);
-    handler.onUp?.(sample({ phase: 'up' }));
+    handler.onPointerUp?.(sample({ phase: 'up' }));
     expect(clears()).toBe(1);
   });
 });
@@ -185,13 +185,13 @@ describe('annotation draw handler — grouped ink', () => {
       const at = (phase: PointerSample['phase'], x: number) =>
         sample({ phase, page: { ref: PAGE_1, point: { x, y: 20 } } });
 
-      handler.onDown(at('down', 10));
-      handler.onMove?.(at('move', 30));
-      handler.onUp?.(at('up', 30));
+      handler.onPointerDown(at('down', 10));
+      handler.onPointerMove?.(at('move', 30));
+      handler.onPointerUp?.(at('up', 30));
       vi.advanceTimersByTime(400);
-      handler.onDown(at('down', 40));
-      handler.onMove?.(at('move', 60));
-      handler.onUp?.(at('up', 60));
+      handler.onPointerDown(at('down', 40));
+      handler.onPointerMove?.(at('move', 60));
+      handler.onPointerUp?.(at('up', 60));
 
       vi.advanceTimersByTime(799);
       expect(calls.filter((call) => call === 'finish')).toHaveLength(0);
@@ -227,12 +227,12 @@ describe('annotation draw handler — grouped ink', () => {
       const at = (phase: PointerSample['phase'], x: number) =>
         sample({ phase, page: { ref: PAGE_1, point: { x, y: 20 } } });
 
-      handler.onDown(at('down', 10));
-      handler.onMove?.(at('move', 30));
+      handler.onPointerDown(at('down', 10));
+      handler.onPointerMove?.(at('move', 30));
       settle(); // mid-stroke: not what the user sees yet
       expect(calls).not.toContain('finish');
 
-      handler.onUp?.(at('up', 30));
+      handler.onPointerUp?.(at('up', 30));
       settle(); // between strokes: finished at once, not after the grouping window
       expect(calls.filter((call) => call === 'finish')).toHaveLength(1);
       vi.advanceTimersByTime(800);
@@ -266,9 +266,9 @@ describe('annotation edit handler — touch consent + cancel', () => {
   it('onCancel REVERTS to the down point and closes there (no half-moved commit)', () => {
     const { anno, calls } = makeAnno();
     const handler = createEditHandler(anno, interaction);
-    handler.onDown(down()); // down at (300, 730)
-    handler.onMove?.(sample({ page: { ref: PAGE_1, point: { x: 350, y: 780 } } }));
-    handler.onCancel?.(sample({ phase: 'cancel' }));
+    handler.onPointerDown(down()); // down at (300, 730)
+    handler.onPointerMove?.(sample({ page: { ref: PAGE_1, point: { x: 350, y: 780 } } }));
+    handler.onPointerCancel?.(sample({ phase: 'cancel' }));
     // the replay: move back to the origin, then up at the origin
     expect(calls.slice(-2)).toEqual([
       { phase: 'move', page: PAGE_1, point: { x: 300, y: 730 } },
@@ -276,7 +276,7 @@ describe('annotation edit handler — touch consent + cancel', () => {
     ]);
     // and the gesture is closed: further moves route nothing
     const callCount = calls.length;
-    handler.onMove?.(sample({ page: { ref: PAGE_1, point: { x: 1, y: 1 } } }));
+    handler.onPointerMove?.(sample({ page: { ref: PAGE_1, point: { x: 1, y: 1 } } }));
     expect(calls.length).toBe(callCount);
   });
 });
@@ -303,18 +303,20 @@ describe('annotation draw handler — cancel discards the draft', () => {
   it('onCancel drops the draft — no up, no commit at the cancelling finger', () => {
     const { anno, calls } = makeDrawAnno();
     const handler = createDrawHandler(anno, drawInteraction, timerClock);
-    expect(handler.onDown(down())).toBe(true);
-    handler.onMove?.(sample({ page: { ref: PAGE_1, point: { x: 350, y: 780 } } }));
+    expect(handler.onPointerDown(down())).toBe(true);
+    handler.onPointerMove?.(sample({ page: { ref: PAGE_1, point: { x: 350, y: 780 } } }));
     // the cancel sample carries the second finger's position — it must never
     // become the shape's final point
-    handler.onCancel?.(sample({ phase: 'cancel', page: { ref: PAGE_1, point: { x: 40, y: 40 } } }));
+    handler.onPointerCancel?.(
+      sample({ phase: 'cancel', page: { ref: PAGE_1, point: { x: 40, y: 40 } } }),
+    );
     expect(calls.at(-1)?.fn).toBe('draft.cancel');
     expect(
       calls.filter((call) => call.fn === 'createPointer' && call.args[1] === 'up'),
     ).toHaveLength(0);
     // gesture is closed: further moves route nothing
     const callCount = calls.length;
-    handler.onMove?.(sample({ page: { ref: PAGE_1, point: { x: 1, y: 1 } } }));
+    handler.onPointerMove?.(sample({ page: { ref: PAGE_1, point: { x: 1, y: 1 } } }));
     expect(calls.length).toBe(callCount);
   });
 });
@@ -341,7 +343,7 @@ describe('annotation edit handler — double-click / long-press routing', () => 
     const { anno, calls } = makeEditAnno(true);
     const handler = createEditHandler(anno, interaction);
     expect(
-      handler.onDown(
+      handler.onPointerDown(
         sample({ phase: 'down', clickCount: 2, page: { ref: PAGE_1, point: { x: 1, y: 2 } } }),
       ),
     ).toBe(true);
@@ -352,7 +354,7 @@ describe('annotation edit handler — double-click / long-press routing', () => 
     const { anno, calls } = makeEditAnno(false);
     const handler = createEditHandler(anno, interaction);
     expect(
-      handler.onDown(
+      handler.onPointerDown(
         sample({ phase: 'down', clickCount: 2, page: { ref: PAGE_1, point: { x: 1, y: 2 } } }),
       ),
     ).toBe(true);
@@ -368,7 +370,7 @@ describe('distance placement — release, hover, click', () => {
       ...GHOST_SEAMS,
       getToolSubtype: () => 'line',
       getResolvedTool: () => undefined,
-      distanceCreationPage: () => placementPage,
+      getDistanceCreationPage: () => placementPage,
       createPointer: (_tool: string, phase: string, page: PageRef, point: Point) => {
         calls.push({ phase, page, point });
         if (phase === 'up') placementPage = page;
@@ -382,8 +384,10 @@ describe('distance placement — release, hover, click', () => {
     } as unknown as InteractionHostCapability;
     const handler = createDrawHandler(anno, drawInteraction, timerClock);
 
-    handler.onDown(down());
-    handler.onUp?.(sample({ phase: 'up', page: { ref: PAGE_1, point: { x: 400, y: 730 } } }));
+    handler.onPointerDown(down());
+    handler.onPointerUp?.(
+      sample({ phase: 'up', page: { ref: PAGE_1, point: { x: 400, y: 730 } } }),
+    );
     handler.onHover?.(
       sample({
         page: { ref: PAGE_2, point: { x: 400, y: 20 } },
@@ -392,18 +396,18 @@ describe('distance placement — release, hover, click', () => {
     );
     expect(calls.at(-1)).toEqual({ phase: 'move', page: PAGE_1, point: { x: 400, y: 820 } });
 
-    handler.onDown(sample({ phase: 'down', project: () => ({ x: 400, y: 800 }) }));
+    handler.onPointerDown(sample({ phase: 'down', project: () => ({ x: 400, y: 800 }) }));
     expect(calls.at(-1)).toEqual({ phase: 'down', page: PAGE_1, point: { x: 400, y: 800 } });
     const committedCalls = calls.length;
-    handler.onUp?.(sample({ phase: 'up' }));
+    handler.onPointerUp?.(sample({ phase: 'up' }));
     expect(calls).toHaveLength(committedCalls);
   });
 
   it('lets the placement click pass through the edit handler over an existing annotation', () => {
     const { anno, calls } = makeAnno();
-    anno.distanceCreationPage = () => PAGE_1;
+    anno.getDistanceCreationPage = () => PAGE_1;
     const handler = createEditHandler(anno, interaction);
-    expect(handler.onDown(down())).toBe(false);
+    expect(handler.onPointerDown(down())).toBe(false);
     expect(calls).toHaveLength(0);
   });
 });
@@ -438,8 +442,12 @@ describe('multi-click placement — hover off the page', () => {
     '%s keeps tracking the home page after the first click',
     (subtype) => {
       const { handler, calls } = draw(subtype);
-      handler.onDown(sample({ phase: 'down', page: { ref: PAGE_1, point: { x: 40, y: 60 } } }));
-      handler.onUp?.(sample({ phase: 'up', page: { ref: PAGE_1, point: { x: 40, y: 60 } } }));
+      handler.onPointerDown(
+        sample({ phase: 'down', page: { ref: PAGE_1, point: { x: 40, y: 60 } } }),
+      );
+      handler.onPointerUp?.(
+        sample({ phase: 'up', page: { ref: PAGE_1, point: { x: 40, y: 60 } } }),
+      );
       handler.onHover?.(offPage);
       expect(calls.at(-1)).toEqual({ phase: 'move', page: PAGE_1, point: { x: -30, y: 80 } });
     },
@@ -447,9 +455,11 @@ describe('multi-click placement — hover off the page', () => {
 
   it('a finished polygon stops following', () => {
     const { handler, calls } = draw('polygon');
-    handler.onDown(sample({ phase: 'down', page: { ref: PAGE_1, point: { x: 40, y: 60 } } }));
-    handler.onUp?.(sample({ phase: 'up' }));
-    handler.onDown(
+    handler.onPointerDown(
+      sample({ phase: 'down', page: { ref: PAGE_1, point: { x: 40, y: 60 } } }),
+    );
+    handler.onPointerUp?.(sample({ phase: 'up' }));
+    handler.onPointerDown(
       sample({
         phase: 'down',
         clickCount: 2,

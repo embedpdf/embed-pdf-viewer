@@ -7,18 +7,18 @@ import { PluginError } from '@embedpdf/core';
 import type { SignerPort } from '@embedpdf/core-signature';
 import type { FormFieldRef } from '@embedpdf/engine-core/runtime';
 
-import type { SignatureKey, SignatureMode } from '../contract';
+import type { SigningKey, SignatureMode } from '../contract';
 import type { SignatureContext } from './context';
 import type { SignatureSiblings } from './siblings';
 
 export function createAuthority(ctx: SignatureContext, { form }: Pick<SignatureSiblings, 'form'>) {
   const settings = ctx.settings();
   const mode = (): SignatureMode => {
-    const { mode: chosen, key } = settings.get();
-    return chosen ?? (key ? 'sign' : 'visual');
+    const { mode: chosen, signingKey } = settings.get();
+    return chosen ?? (signingKey ? 'sign' : 'visual');
   };
-  const resolveKey = async (override?: SignatureKey): Promise<SignerPort> => {
-    const key = override ?? settings.get().key;
+  const resolveKey = async (override?: SigningKey): Promise<SignerPort> => {
+    const key = override ?? settings.get().signingKey;
     if (!key) {
       throw new PluginError(
         'invalid-input',

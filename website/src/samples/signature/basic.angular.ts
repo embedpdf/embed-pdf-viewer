@@ -71,7 +71,7 @@ export class MarkButton {
       withForm(),
       withStamp({ assetEngine }),
       withSignature({
-        key: () => signer,
+        signingKey: () => signer,
         // Trust the demo key itself, so its signatures check out as 'valid'.
         trust: { anchors: async () => [(await signer).certificate] },
       }),
@@ -84,7 +84,12 @@ export class MarkButton {
     <ng-container *epdfDocumentGate="let document; fallback: loading">
       <div class="toolbar">
         @for (asset of person()?.signatures; track asset.id) {
-          <button demoMarkButton [assetId]="asset.id" [label]="asset.label" (pick)="sign(asset.id)"></button>
+          <button
+            demoMarkButton
+            [assetId]="asset.id"
+            [label]="asset.label"
+            (pick)="sign(asset.id)"
+          ></button>
         }
         <output class="readout">{{ status() }}</output>
       </div>
@@ -109,7 +114,7 @@ export class App {
 
   protected readonly person = computed(() => this.signature.signerRows()[0]);
   private readonly field = computed(() =>
-    this.form.fields().find((candidate) => candidate.family === 'signature'),
+    this.form.fields().find((candidate) => candidate.kind === 'signature'),
   );
   private readonly error = signal<string | null>(null);
 

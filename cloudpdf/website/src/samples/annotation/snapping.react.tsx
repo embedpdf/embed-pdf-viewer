@@ -35,7 +35,7 @@ function SelectCircle() {
     done.current = true;
     const circle = annotation.list().find((each) => each.nm === 'circle');
     if (!circle) return;
-    annotation.selection.set([circle.ref]);
+    annotation.selection.select([circle.ref]);
     stage.reveal(circle.page, { rect: circle.rect });
   }, [annotation, stage, ready]);
 

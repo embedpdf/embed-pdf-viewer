@@ -12,7 +12,7 @@
     type PdfActionTree,
   } from '@embedpdf/svelte/actions';
 
-  // A link to a website, as a PDF carries it: what getActionTree() reads from a link.
+  // A link to a website, as a PDF carries it: what readActionTree() reads from a link.
   const websiteLink: PdfActionTree = {
     root: {
       type: 'uri',
@@ -29,14 +29,14 @@
   const STARTS: ReadonlyArray<{ label: string; context: ActionContext }> = [
     {
       label: 'A click',
-      context: { origin: 'user', source: { kind: 'api' }, event: { scope: 'activate' } },
+      context: { origin: 'user', source: { kind: 'api' }, event: { type: 'activate' } },
     },
     {
       label: 'The pointer over it',
       context: {
         origin: 'hover',
         source: { kind: 'api' },
-        event: { scope: 'annotation', name: 'cursorEnter' },
+        event: { type: 'annotation', event: 'cursorEnter' },
       },
     },
     {
@@ -44,7 +44,7 @@
       context: {
         origin: 'lifecycle',
         source: { kind: 'api' },
-        event: { scope: 'document', name: 'open' },
+        event: { type: 'document', event: 'open' },
       },
     },
   ];

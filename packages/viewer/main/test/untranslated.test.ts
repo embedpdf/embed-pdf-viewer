@@ -267,14 +267,14 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('the words the viewer sh
         subtype: 'square',
         box: { x: 120, y: 160, width: 160, height: 100 },
       });
-      annotation.selection.set([made.ref]);
+      annotation.selection.select([made.ref]);
     });
     await visit('a selected annotation', async () => {});
     await visit('its style', () => run(tab, 'panel:style'), 'Stroke width');
     await closeEverything(tab);
     await visit('its link editor', () => run(tab, 'annotation:link'), 'URL');
     await closeEverything(tab);
-    await tab.evaluate(() => window.element.viewer.get('annotation').selection.set([]));
+    await tab.evaluate(() => window.element.viewer.get('annotation').selection.select([]));
     await visit('selected text', () =>
       tab.evaluate(() => window.element.viewer.get('selection').selectPage(0)),
     );
@@ -306,7 +306,7 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('the words the viewer sh
           const { viewer } = window.element;
           const page = viewer.documents.getPage(0);
           const { field } = await viewer.get('form').create({
-            family: 'radio',
+            kind: 'radio',
             name: 'guard-group',
             widgets: [
               {
@@ -316,17 +316,17 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('the words the viewer sh
               },
             ],
           });
-          viewer.get('annotation').selection.set([field.widgets[0].ref]);
+          viewer.get('annotation').selection.select([field.widgets[0].ref]);
         }),
       'Add a button',
     );
-    await tab.evaluate(() => window.element.viewer.get('annotation').selection.set([]));
+    await tab.evaluate(() => window.element.viewer.get('annotation').selection.select([]));
     await run(tab, 'form:design');
     await run(tab, 'mode:view');
     expect(found).toEqual({});
   });
 
-  it("reads every setting of a form field, of each family, in the viewer's language", async () => {
+  it("reads every setting of a form field, of each kind, in the viewer's language", async () => {
     // Read as data: the style panel shows these for a field selected in Form mode.
     const unread = await tab.evaluate(async () => {
       const { viewer } = window.element;
@@ -337,25 +337,25 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('the words the viewer sh
       // The document has text fields, checkboxes and buttons; radio buttons, a list and a
       // dropdown join them.
       const options = [{ label: 'One', value: 'one' }];
-      await form.create({ family: 'combobox', name: 'guard-combo', options, widgets: [box(72)] });
-      await form.create({ family: 'listbox', name: 'guard-list', options, widgets: [box(110)] });
+      await form.create({ kind: 'combobox', name: 'guard-combo', options, widgets: [box(72)] });
+      await form.create({ kind: 'listbox', name: 'guard-list', options, widgets: [box(110)] });
       await form.create({
-        family: 'radio',
+        kind: 'radio',
         name: 'guard-radio',
         widgets: [{ ...box(150), exportValue: 'one' }],
       });
-      const byFamily = new Map<string, unknown>();
+      const byKind = new Map<string, unknown>();
       for (const field of form.list()) {
-        if (!byFamily.has(field.family)) byFamily.set(field.family, field.ref);
+        if (!byKind.has(field.kind)) byKind.set(field.kind, field.ref);
       }
       const unwrapped: string[] = [];
-      for (const [family, ref] of byFamily) {
+      for (const [kind, ref] of byKind) {
         for (const setting of form.getFieldSettings(ref)?.properties ?? []) {
           const text: string = i18n.t(setting.labelKey, { fallback: setting.label });
-          if (!text.includes('⟦')) unwrapped.push(`${family} ${setting.key}: "${text}"`);
+          if (!text.includes('⟦')) unwrapped.push(`${kind} ${setting.key}: "${text}"`);
         }
       }
-      return { families: [...byFamily.keys()].sort(), unwrapped };
+      return { families: [...byKind.keys()].sort(), unwrapped };
     });
     expect(unread.families).toEqual(
       expect.arrayContaining(['checkbox', 'combobox', 'listbox', 'radio', 'text']),

@@ -3,7 +3,7 @@ import type { PageNetworkRenderFormat, PageRaster } from '@embedpdf/engine-core/
 
 export interface EncodedPageImage {
   stream: sharp.Sharp;
-  contentType: `image/${PageNetworkRenderFormat}`;
+  mimeType: `image/${PageNetworkRenderFormat}`;
 }
 
 export class SharpImageEncoder {
@@ -24,13 +24,13 @@ export class SharpImageEncoder {
         stream: image.webp(
           opts.quality === undefined ? {} : { quality: sharpQuality(opts.quality) },
         ),
-        contentType: 'image/webp',
+        mimeType: 'image/webp',
       };
     }
 
     return {
       stream: image.png(),
-      contentType: 'image/png',
+      mimeType: 'image/png',
     };
   }
 
@@ -41,10 +41,10 @@ export class SharpImageEncoder {
   async encodeToBuffer(
     raster: PageRaster,
     opts: { format: PageNetworkRenderFormat; quality?: number },
-  ): Promise<{ bytes: Uint8Array; contentType: string }> {
+  ): Promise<{ bytes: Uint8Array; mimeType: string }> {
     const encoded = this.encode(raster, opts);
     const bytes = new Uint8Array(await encoded.stream.toBuffer());
-    return { bytes, contentType: encoded.contentType };
+    return { bytes, mimeType: encoded.mimeType };
   }
 }
 

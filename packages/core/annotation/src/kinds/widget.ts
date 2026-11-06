@@ -143,8 +143,8 @@ export const widgetMark = defineKind({
   properties: [],
 });
 
-/** The widget kind for a field family. */
-const KIND_BY_FAMILY: Readonly<Record<string, string>> = {
+/** The widget kind for a field kind. */
+const KIND_BY_FIELD_KIND: Readonly<Record<string, string>> = {
   text: widgetText.name,
   combobox: widgetChoice.name,
   listbox: widgetChoice.name,
@@ -153,16 +153,16 @@ const KIND_BY_FAMILY: Readonly<Record<string, string>> = {
   radio: widgetRadio.name,
 };
 
-/** The name of a widget's kind: the one with a mark in it, else its field family's. */
-export const widgetKindOf = (widget: { fieldFamily: string; hasMark: boolean }): string =>
-  widget.hasMark ? widgetMark.name : (KIND_BY_FAMILY[widget.fieldFamily] ?? widgetBox.name);
+/** The name of a widget's kind: the one with a mark in it, else its field kind's. */
+export const widgetKindOf = (widget: { fieldKind: string; hasMark: boolean }): string =>
+  widget.hasMark ? widgetMark.name : (KIND_BY_FIELD_KIND[widget.fieldKind] ?? widgetBox.name);
 
 /**
- * The field family a widget kind stands for, the other way round: what a form
+ * The field kind a widget kind stands for, the other way round: what a form
  * tool's defaults read as, so they read as the tool's own kind (a choice tool
  * as a combo box, the bare box as a signature field).
  */
-const FAMILY_BY_KIND: Readonly<Record<string, string>> = {
+const FIELD_KIND_BY_KIND: Readonly<Record<string, string>> = {
   [widgetText.name]: 'text',
   [widgetChoice.name]: 'combobox',
   [widgetButton.name]: 'pushbutton',
@@ -171,5 +171,5 @@ const FAMILY_BY_KIND: Readonly<Record<string, string>> = {
   [widgetBox.name]: 'signature',
 };
 
-/** The field family a widget kind stands for; `undefined` for a kind that is no widget's. */
-export const fieldFamilyOfKind = (kind: string): string | undefined => FAMILY_BY_KIND[kind];
+/** The field kind a widget kind stands for; `undefined` for a kind that is no widget's. */
+export const fieldKindOf = (kind: string): string | undefined => FIELD_KIND_BY_KIND[kind];

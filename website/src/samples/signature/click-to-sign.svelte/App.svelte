@@ -22,7 +22,7 @@
     annotationPlugin(),
     formPlugin(),
     stampPlugin({ assetEngine }),
-    signaturePlugin({ key: () => signer }),
+    signaturePlugin({ signingKey: () => signer }),
   ];
 
   const agreement = async (): Promise<OpenInput> => {

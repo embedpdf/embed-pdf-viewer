@@ -18,11 +18,11 @@ export interface DocumentEventStream {
     listener: (event: DocumentEventOf<T>) => void,
   ): () => void;
   /**
-   * Highest `origin.serverId` observed so far — the reconnect/backfill
+   * Highest `origin.serverSequence` observed so far — the reconnect/backfill
    * cursor for the remote channel. `null` until a remote-identified event
    * has been seen (always `null` on purely-local engines).
    */
-  lastServerId(): number | null;
+  lastServerSequence(): number | null;
 }
 
 /**

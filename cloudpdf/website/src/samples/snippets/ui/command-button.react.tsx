@@ -9,7 +9,7 @@ export function CommandButton({ id }: { id: string }) {
     <button onClick={command.run} disabled={!command.enabled} aria-pressed={command.active}>
       <Icon name={command.icon} />
       {command.label}
-      {command.shortcut && <kbd>{command.shortcut}</kbd>}
+      {command.shortcutLabel && <kbd>{command.shortcutLabel}</kbd>}
     </button>
   );
 }

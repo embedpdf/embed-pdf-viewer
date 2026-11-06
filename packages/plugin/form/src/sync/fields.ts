@@ -22,7 +22,7 @@ export function createFieldsMirror(ctx: FormContext, events: FormEvents): Mirror
     load: async (doc) => ({ value: indexLoadedFields(fields.get(), await doc.forms.list()) }),
     fold: foldFormEvent,
     predict: predictFormOp,
-    changed: ({ cause, event, next }) => {
+    onChanged: ({ cause, event, next }) => {
       if (cause === 'load') {
         if (next.snapshot) events.resynced.emit({ snapshot: next.snapshot });
         return;

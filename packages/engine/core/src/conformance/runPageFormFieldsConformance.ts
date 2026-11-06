@@ -2,7 +2,7 @@ import { EVERY_PERMISSION } from './fixtureScope';
 import type { ConformanceFixture, ConformanceTestRunner } from './runMetadataConformance';
 import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
-import type { FormFieldDTO } from '../forms/field';
+import type { FormField } from '../forms/field';
 
 /**
  * Form fields through `pages.insert` and `pages.extract`: the pages bring the
@@ -56,15 +56,15 @@ const SECOND_PAGE_FIELDS: Record<string, FieldSummary> = {
 
 export function runPageFormFieldsConformance(
   runner: ConformanceTestRunner,
-  opts: PageFormFieldsConformanceOptions,
+  options: PageFormFieldsConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`page form fields conformance: ${opts.label}`, () => {
+  describe(`page form fields conformance: ${options.label}`, () => {
     let engine: Engine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -72,10 +72,10 @@ export function runPageFormFieldsConformance(
     });
 
     test('an insert brings the form fields of the inserted pages', async () => {
-      const doc = await open(engine, opts, opts.target);
+      const doc = await open(engine, options, options.target);
       try {
         const before = await doc.pages.list();
-        await doc.pages.insert(await opts.form.bytes());
+        await doc.pages.insert(await options.form.bytes());
         expect(await fieldsOf(doc)).toEqual(FORM_FIELDS);
         // Every widget is on an inserted page.
         const pages = new Set(
@@ -91,15 +91,15 @@ export function runPageFormFieldsConformance(
     });
 
     test('the inserted fields read the same after a save in either mode', async () => {
-      if (opts.openKind !== 'bytes') return;
+      if (options.openKind !== 'bytes') return;
       for (const mode of ['rewrite', 'incremental'] as const) {
-        const doc = await open(engine, opts, opts.target);
+        const doc = await open(engine, options, options.target);
         let reopened: DocumentHandle | null = null;
         try {
-          await doc.pages.insert(await opts.form.bytes());
+          await doc.pages.insert(await options.form.bytes());
           const bytes = await doc.download({ mode });
           reopened = await engine.open(
-            { kind: 'bytes', id: `${opts.target.id}-form-insert-${mode}`, bytes },
+            { kind: 'bytes', id: `${options.target.id}-form-insert-${mode}`, bytes },
             EVERY_PERMISSION,
           );
           expect(await fieldsOf(reopened)).toEqual(FORM_FIELDS);
@@ -111,11 +111,11 @@ export function runPageFormFieldsConformance(
     });
 
     test('fields named as the document names its own come in as name_2, kept apart', async () => {
-      const doc = await open(engine, opts, opts.target);
+      const doc = await open(engine, options, options.target);
       let reopened: DocumentHandle | null = null;
       try {
-        await doc.pages.insert(await opts.form.bytes());
-        await doc.pages.insert(await opts.form.bytes());
+        await doc.pages.insert(await options.form.bytes());
+        await doc.pages.insert(await options.form.bytes());
         const fields = await fieldsOf(doc);
         expect(fields).toEqual({
           ...FORM_FIELDS,
@@ -132,9 +132,13 @@ export function runPageFormFieldsConformance(
         expect(after['person.name']!.value).toBe('Bea');
         expect(after['person_2.name']!.value).toBe('Ann');
 
-        if (opts.openKind !== 'bytes') return;
+        if (options.openKind !== 'bytes') return;
         reopened = await engine.open(
-          { kind: 'bytes', id: `${opts.target.id}-form-insert-twice`, bytes: await doc.download() },
+          {
+            kind: 'bytes',
+            id: `${options.target.id}-form-insert-twice`,
+            bytes: await doc.download(),
+          },
           EVERY_PERMISSION,
         );
         expect(await fieldsOf(reopened)).toEqual(after);
@@ -145,8 +149,8 @@ export function runPageFormFieldsConformance(
     });
 
     test('an extract brings only the fields of the extracted pages', async () => {
-      const form = await open(engine, opts, opts.form);
-      const doc = await open(engine, opts, opts.target);
+      const form = await open(engine, options, options.form);
+      const doc = await open(engine, options, options.target);
       try {
         const { pages } = await form.pages.list();
         await doc.pages.insert(await form.pages.extract([pages[1]!.ref]));
@@ -167,8 +171,8 @@ async function fieldsOf(doc: DocumentHandle): Promise<Record<string, FieldSummar
   );
 }
 
-function valueOf(field: FormFieldDTO): string | boolean {
-  switch (field.family) {
+function valueOf(field: FormField): string | boolean {
+  switch (field.kind) {
     case 'text':
     case 'radio':
       return field.value;

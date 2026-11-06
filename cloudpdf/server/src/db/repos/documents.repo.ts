@@ -1,5 +1,5 @@
 import { sql, type Kysely } from 'kysely';
-import { decodePdfBits, type PdfBits } from '@embedpdf/engine-core/runtime';
+import { permissionFlagsOf, type PdfPermissionFlags } from '@embedpdf/engine-core/runtime';
 
 import type {
   Database as Schema,
@@ -227,7 +227,7 @@ export class DocumentsRepo {
 
   /**
    * Cheap accessor for the document's PDF permission bits, decoded into
-   * the typed `PdfBits` view used by the scope resolver.
+   * the typed `PdfPermissionFlags` view used by the scope resolver.
    *
    * Used by route guards that need to evaluate `pdf.permissions`
    * expansion before performing a capability check. Does not materialise
@@ -239,9 +239,9 @@ export class DocumentsRepo {
    * whose `pdf_permissions_bits` column is `null` (unprobed or
    * non-encrypted PDFs without explicit user-access flags).
    */
-  async getPdfBits(id: string, tenantId: string): Promise<PdfBits> {
+  async getPermissionFlags(id: string, tenantId: string): Promise<PdfPermissionFlags> {
     const r = await this.requireOwned(id, tenantId);
-    return decodePdfBits(r.security.pdfPermissionsBits ?? null);
+    return permissionFlagsOf(r.security.pdfPermissionsBits ?? null);
   }
 
   async findByIdempotencyKey(

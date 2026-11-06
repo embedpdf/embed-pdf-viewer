@@ -6,7 +6,7 @@
 import { memo, memoByKey } from '@embedpdf/core';
 import {
   pageRefsEqual,
-  type FormFieldDTO,
+  type FormField,
   type FormFieldValue,
   type FormKind,
   type WidgetAnnotation,
@@ -22,7 +22,7 @@ import type {
 import { canonicalKey, fieldByKey, fieldByRef, fieldForWidget, widgetRowOf } from '../model';
 import type { FormContext, FormServices } from '../services';
 
-const NO_FIELDS: readonly FormFieldDTO[] = Object.freeze([]);
+const NO_FIELDS: readonly FormField[] = Object.freeze([]);
 const NOTHING_SELECTED: readonly { readonly subtype: string; readonly ref: WidgetAddress }[] =
   Object.freeze([]);
 
@@ -35,10 +35,10 @@ export const widgetObjectOf = (widget: WidgetAddress): number =>
     : widget.objectNumber;
 
 /** A field's value in the write vocabulary, or null for a valueless or unsupported entry. */
-export function valueOf(field: FormFieldDTO): FormFieldValue | null {
+export function valueOf(field: FormField): FormFieldValue | null {
   const entry = field.valueEntry;
   if (entry.kind === 'none' || entry.kind === 'unsupported') return null;
-  switch (field.family) {
+  switch (field.kind) {
     case 'text':
       return { value: field.value };
     case 'checkbox':
@@ -55,7 +55,7 @@ export function valueOf(field: FormFieldDTO): FormFieldValue | null {
 }
 
 /** A field's value as plain data: what `exportValues()` gives and `importValues()` takes. */
-export function plainValueOf(field: FormFieldDTO): FormPlainValue | undefined {
+export function plainValueOf(field: FormField): FormPlainValue | undefined {
   const value = valueOf(field);
   if (!value) return undefined;
   if ('checked' in value) return value.checked;
@@ -64,14 +64,11 @@ export function plainValueOf(field: FormFieldDTO): FormPlainValue | undefined {
 }
 
 /**
- * The write a plain value makes for a field of this family, or null when the
- * family can't take it (a list given `true`, a value for a push button).
+ * The write a plain value makes for a field of this kind, or null when the
+ * kind can't take it (a list given `true`, a value for a push button).
  */
-export function writeOfPlainValue(
-  field: FormFieldDTO,
-  value: FormPlainValue,
-): FormFieldValue | null {
-  switch (field.family) {
+export function writeOfPlainValue(field: FormField, value: FormPlainValue): FormFieldValue | null {
+  switch (field.kind) {
     case 'checkbox':
       if (typeof value === 'boolean') return { checked: value };
       return typeof value === 'string' || value === null ? { value } : null;
@@ -89,8 +86,8 @@ export function writeOfPlainValue(
 }
 
 /** Whether a field holds nothing a required check would accept. */
-export function isEmpty(field: FormFieldDTO): boolean {
-  switch (field.family) {
+export function isEmpty(field: FormField): boolean {
+  switch (field.kind) {
     case 'text':
     case 'combobox':
       return field.value === '';
@@ -111,16 +108,16 @@ export function createFieldReads(
   ctx: FormContext,
   { fields, rights, siblings }: Pick<FormServices, 'fields' | 'rights' | 'siblings'>,
 ) {
-  const all = (): readonly FormFieldDTO[] => fields.view().snapshot?.fields ?? NO_FIELDS;
+  const all = (): readonly FormField[] => fields.view().snapshot?.fields ?? NO_FIELDS;
 
-  const list = (filter?: FormFilter): readonly FormFieldDTO[] => {
+  const list = (filter?: FormFilter): readonly FormField[] => {
     if (!filter) return all();
     const page = filter.page === undefined ? undefined : ctx.getPage(filter.page)?.ref;
     // A page that isn't in the document has no fields.
     if (filter.page !== undefined && !page) return NO_FIELDS;
     return all().filter(
       (field) =>
-        (!filter.family || field.family === filter.family) &&
+        (!filter.kind || field.kind === filter.kind) &&
         (filter.name === undefined || field.name === filter.name) &&
         (!page || field.widgets.some((widget) => widget.page && pageRefsEqual(widget.page, page))),
     );
@@ -165,7 +162,7 @@ export function createFieldReads(
   );
 
   /** Where a field first shows: its page's index, then top to bottom, then left to right. */
-  const placeOf = (field: FormFieldDTO): readonly [number, number, number] => {
+  const placeOf = (field: FormField): readonly [number, number, number] => {
     const index = fields.view();
     const row = field.widgets
       .map((widget) => widgetRowOf(index, widget.objectNumber))
@@ -197,8 +194,8 @@ export function createFieldReads(
   // The selection belongs to the annotation plugin: a widget is selected in
   // design mode, where widgets are boxes like any annotation.
   const getSelectedField = memo(
-    () => [fields.view(), siblings.annotation()?.selection.list() ?? NOTHING_SELECTED],
-    (index, selected): FormFieldDTO | null => {
+    () => [fields.view(), siblings.annotation()?.selection.getSelected() ?? NOTHING_SELECTED],
+    (index, selected): FormField | null => {
       const [annotation] = selected;
       if (selected.length !== 1 || !annotation?.subtype.startsWith('widget')) return null;
       return fieldForWidget(index, widgetObjectOf(annotation.ref));

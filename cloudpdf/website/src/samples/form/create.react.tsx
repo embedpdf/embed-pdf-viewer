@@ -5,7 +5,7 @@ import { Stage, stagePlugin, useStage } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
 import { interactionPlugin } from '@embedpdf/react/interaction';
 import { FormLayer, formPlugin, useForm } from '@embedpdf/react/form';
-import type { FormCapability, FormFieldDTO } from '@embedpdf/react/form';
+import type { FormCapability, FormField } from '@embedpdf/react/form';
 import type { PageRef } from '@embedpdf/react/runtime';
 import { cloudEngine } from '@cloudpdf/engine';
 
@@ -26,7 +26,7 @@ const rowTop = (row: number) => 470 + row * 36;
 /** A dropdown in a row's country box. */
 function addDropdown(form: FormCapability, page: PageRef, row: number) {
   return form.create({
-    family: 'combobox',
+    kind: 'combobox',
     name: `country_${row + 1}`,
     options: [
       { label: 'Netherlands', value: 'NL' },
@@ -41,7 +41,7 @@ function addDropdown(form: FormCapability, page: PageRef, row: number) {
 function addRadioGroup(form: FormCapability, page: PageRef, row: number) {
   const y = rowTop(row) + 4;
   return form.create({
-    family: 'radio',
+    kind: 'radio',
     name: `ticket_${row + 1}`,
     widgets: [
       { page, rect: { x: 330, y, width: 16, height: 16 }, exportValue: 'one-day', ...look },
@@ -54,15 +54,14 @@ function BuildToolbar() {
   const form = useForm();
   const stage = useStage();
   const page = usePageList()[0]?.ref; // the printed form
-  const [added, setAdded] = useState<FormFieldDTO[]>([]);
+  const [added, setAdded] = useState<FormField[]>([]);
 
   // Each kind of field fills its column from the top: the next row that hasn't got one.
-  const rowFor = (family: FormFieldDTO['family']) =>
-    added.filter((field) => field.family === family).length;
+  const rowFor = (kind: FormField['kind']) => added.filter((field) => field.kind === kind).length;
 
-  const add = async (addField: typeof addDropdown, family: FormFieldDTO['family']) => {
+  const add = async (addField: typeof addDropdown, kind: FormField['kind']) => {
     if (!page) return;
-    const { field } = await addField(form, page, rowFor(family));
+    const { field } = await addField(form, page, rowFor(kind));
     setAdded((fields) => [...fields, field]);
     stage.reveal(page, { rect: form.getWidget(field.widgets[0])!.rect });
   };

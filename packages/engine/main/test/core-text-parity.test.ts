@@ -213,7 +213,7 @@ afterAll(async () => {
 /** What the engine writes for `value` in a field of `shape`, read back. */
 async function written(shape: Shape, value: string): Promise<Placed[]> {
   const { field } = await doc.forms.create({
-    family: 'text',
+    kind: 'text',
     name: `parity_${(fieldNumber += 1)}`,
     ...shape.field,
     widgets: [
@@ -333,7 +333,7 @@ const WIDGET_CASES: WidgetCase[] = [
         face: 'helvetica',
         draft: (page) =>
           ({
-            family: 'text',
+            kind: 'text',
             name: `painted_${(fieldNumber += 1)}`,
             widgets: [
               {
@@ -356,7 +356,7 @@ const WIDGET_CASES: WidgetCase[] = [
       face: 'helvetica',
       draft: (page) =>
         ({
-          family: 'combobox',
+          kind: 'combobox',
           name: `painted_${(fieldNumber += 1)}`,
           options: [
             { label: 'שלום עולם', value: 'a' },
@@ -372,7 +372,7 @@ const WIDGET_CASES: WidgetCase[] = [
     face: 'times-roman',
     draft: (page) =>
       ({
-        family: 'listbox',
+        kind: 'listbox',
         name: `painted_${(fieldNumber += 1)}`,
         multiSelect: true,
         options: ['שלום', 'Hello مرحبا', '123 עולם', 'A中B'].map((label, index) => ({
@@ -391,7 +391,7 @@ const WIDGET_CASES: WidgetCase[] = [
       face: 'helvetica-bold',
       draft: (page) =>
         ({
-          family: 'pushbutton',
+          kind: 'pushbutton',
           name: `painted_${(fieldNumber += 1)}`,
           widgets: [
             {

@@ -104,8 +104,8 @@ export function createActivation(
           const result = await ctx.cancellable(
             options?.signal,
             actions.dispatch({
-              scope: 'activate',
-              ref: annotationRef,
+              type: 'activate',
+              annotation: annotationRef,
               page: annotationRef.page,
               source: widgetSource(field.ref, annotationRef),
             }),
@@ -114,10 +114,10 @@ export function createActivation(
             result.status === 'inert' &&
             result.steps.length === 0 &&
             result.diagnostics.length === 0;
-          if (!noTree) return { kind: 'dispatched', result };
+          if (!noTree) return { status: 'dispatched', result };
         }
         return {
-          kind: 'form',
+          status: 'form',
           result: await activateThroughScripts(field.ref, annotationRef, options),
         };
       },
@@ -152,9 +152,9 @@ export function createActivation(
         // through the actions events. The dispatcher also applies the rule
         // that /A shadows the up event (ISO 32000-2 Table 197).
         void actions.dispatch({
-          scope: 'annotation',
+          type: 'annotation',
           event,
-          ref: annotationRef,
+          annotation: annotationRef,
           page: annotationRef.page,
           source,
         });

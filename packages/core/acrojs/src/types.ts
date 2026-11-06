@@ -2,7 +2,7 @@ import type {
   AnnotationRef,
   FormEffect,
   FormFieldDisplay,
-  FormFieldFamily,
+  FormFieldKind,
   FormFieldRef,
 } from '@embedpdf/engine-core/runtime';
 
@@ -18,7 +18,7 @@ export interface ScriptFieldOption {
 export interface ScriptFieldInput {
   ref: FormFieldRef;
   name: string;
-  family: FormFieldFamily;
+  kind: FormFieldKind;
   value: ScriptValue;
   defaultValue: ScriptValue;
   display: FormFieldDisplay;
@@ -200,16 +200,16 @@ export interface ScriptInput {
 }
 
 export type ScriptUiEffect =
-  | { kind: 'alert'; message: string; icon: number; title?: string }
-  | { kind: 'print' }
-  | { kind: 'gotoPage'; page: number }
+  | { type: 'alert'; message: string; icon: number; title?: string }
+  | { type: 'print' }
+  | { type: 'goToPage'; pageIndex: number }
   /** `field.setFocus()`: the cursor into that field, by its full name. */
-  | { kind: 'focusField'; field: string }
+  | { type: 'focusField'; field: string }
   /** `doc.submitForm(...)` — a submit intent, resolved and sink-routed
    *  outside the VM (never a network call from here). `fieldNames` are
    *  include-mode (Acrobat's aFields); `null` = the whole eligible form. */
   | {
-      kind: 'submitForm';
+      type: 'submitForm';
       url: string | null;
       fieldNames: string[] | null;
       includeEmpty: boolean;
@@ -241,14 +241,14 @@ export interface ScriptDiagnostic {
 /** One isolated, stateful Acrobat-JavaScript realm for one PDF document. */
 export interface ScriptSandbox {
   /** True after explicit disposal or a resource/runtime fault. */
-  readonly disposed: boolean;
+  readonly destroyed: boolean;
   /** Evaluate document name-tree sources once. Top-level effects are returned
    *  so the orchestrator can include them in the first transaction. */
   boot(sources: string[], input: ScriptInput, budget?: ScriptBudget): ScriptOutput;
   /** Run one event program against the realm's persistent globals. */
   run(source: string, input: ScriptInput, budget?: ScriptBudget): ScriptOutput;
   /** Release the realm. Idempotent. */
-  dispose(): void;
+  destroy(): void;
 }
 
 export type ScriptSandboxFactory = () => Promise<ScriptSandbox>;

@@ -9,7 +9,7 @@ import {
   formWidget,
   toPageRef,
   type AnnotationRef,
-  type FormFieldDTO,
+  type FormField,
   type FormSnapshot,
   type WidgetAnnotation,
 } from '@embedpdf/engine-core/runtime';
@@ -49,7 +49,7 @@ const text = (field: number, name: string, widget: number, page: typeof P1, valu
     ...base,
     ref: fieldRef(field),
     name,
-    family: 'text',
+    kind: 'text',
     valueEntry: { kind: 'scalar', value },
     defaultValueEntry: { kind: 'scalar', value: '' },
     widgets: [formWidget(widget, page)],
@@ -59,17 +59,17 @@ const text = (field: number, name: string, widget: number, page: typeof P1, valu
     multiline: false,
     password: false,
     comb: false,
-  }) as unknown as FormFieldDTO;
+  }) as unknown as FormField;
 
 const NAME = text(1, 'name', 11, P1);
 const EMAIL = text(2, 'email', 12, P1, 'ada@example.com');
-const LOCKED = { ...text(3, 'id', 13, P1), readOnly: true } as FormFieldDTO;
+const LOCKED = { ...text(3, 'id', 13, P1), readOnly: true } as FormField;
 const CITY = text(4, 'city', 14, P2);
 const PLAN = {
   ...base,
   ref: fieldRef(5),
   name: 'plan',
-  family: 'radio',
+  kind: 'radio',
   value: 'yearly',
   radiosInUnison: false,
   noToggleToOff: false,
@@ -79,7 +79,7 @@ const PLAN = {
     { ...formWidget(15, P2), onState: 'monthly', exportValue: 'monthly', checked: false },
     { ...formWidget(16, P2), onState: 'yearly', exportValue: 'yearly', checked: true },
   ],
-} as unknown as FormFieldDTO;
+} as unknown as FormField;
 
 /** A box's row: on `page`, at `y` (page space, y down). */
 const row = (

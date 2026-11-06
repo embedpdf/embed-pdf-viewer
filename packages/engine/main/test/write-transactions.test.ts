@@ -22,7 +22,7 @@ import {
   type AnnotationRef,
   type AttachmentRef,
   type FormBundle,
-  type FormFieldDTO,
+  type FormField,
   type FormFieldRef,
   type PageRef,
 } from '@embedpdf/engine-core';
@@ -74,9 +74,9 @@ function comparable(bytes: Uint8Array): string {
 
 const fqn = (name: string): FormFieldRef => ({ kind: 'fqn', name });
 /** `bundle` with `change` made to each of its fields. */
-const withFields = (bundle: FormBundle, change: Partial<FormFieldDTO>): FormBundle => ({
+const withFields = (bundle: FormBundle, change: Partial<FormField>): FormBundle => ({
   ...bundle,
-  fields: bundle.fields.map(({ data }) => ({ data: { ...data, ...change } as FormFieldDTO })),
+  fields: bundle.fields.map(({ data }) => ({ data: { ...data, ...change } as FormField })),
 });
 const rect = (x: number) => ({ x, y: 40, width: 40, height: 30 });
 
@@ -155,7 +155,7 @@ describe.each(['wasm', 'native'] as const)(
           what: 'forms.create',
           write: () =>
             doc.forms.create({
-              family: 'text',
+              kind: 'text',
               name: 'probe',
               widgets: [{ page: firstPage, rect: rect(160) }],
             }),
@@ -210,7 +210,7 @@ describe.each(['wasm', 'native'] as const)(
           what: 'forms.setSignatureAppearance',
           setup: () =>
             doc.forms.create({
-              family: 'signature',
+              kind: 'signature',
               name: 'sig',
               widgets: [{ page: firstPage, rect: rect(260) }],
             }),

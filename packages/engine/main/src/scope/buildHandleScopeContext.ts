@@ -1,6 +1,6 @@
 import {
   MissingIdentity,
-  decodePdfBits,
+  permissionFlagsOf,
   parseScope,
   validateScopeArray,
   type DocumentProtection,
@@ -39,7 +39,7 @@ export interface BuildHandleScopeContextInput {
   /**
    * Raw PDF permission bits from `FPDF_GetDocPermissions` (or `null`
    * for unencrypted documents with no bits set). Decoded into the
-   * typed `PdfBits` view inside this builder.
+   * typed `PdfPermissionFlags` view inside this builder.
    */
   pdfPermissionsBits: number | null;
   /** What the document's signatures forbid, from the open probe; `null` when unsigned or unknown. */
@@ -77,7 +77,7 @@ export function buildHandleScopeContext(input: BuildHandleScopeContextInput): Ha
   return {
     scope,
     identity,
-    pdfBits: decodePdfBits(input.pdfPermissionsBits),
+    permissionFlags: permissionFlagsOf(input.pdfPermissionsBits),
     protection: input.protection ?? null,
     signedDocumentPolicy: input.signedDocumentPolicy ?? 'protect',
   };

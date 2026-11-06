@@ -30,7 +30,7 @@
 
   function show(each: Annotation) {
     stage.reveal(each.page, { rect: each.rect });
-    annotation.selection.set([each.ref]);
+    annotation.selection.select([each.ref]);
   }
 </script>
 

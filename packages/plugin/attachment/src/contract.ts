@@ -41,7 +41,7 @@ export interface AttachedFile extends Readonly<AttachmentFileInfo> {
  */
 export interface AttachmentsChangedEvent {
   /** `restored`: an undo brought a removed file back. */
-  readonly type: 'added' | 'removed' | 'restored';
+  readonly type: 'created' | 'deleted' | 'restored';
   /** The files it touched; for a removal, as they were. */
   readonly files: readonly AttachedFile[];
   readonly origin: EventOrigin;
@@ -88,9 +88,9 @@ export interface AttachmentCapability {
   /** Whether this session may take files out (`doc.download`): `download()`. */
   canDownload(): boolean;
   /** Whether this session may add and remove attachments (`doc.attachments.modify`). */
-  canAdd(): boolean;
-  /** Whether this session may remove this file: `canAdd()` for an attachment, the annotation plugin's `canDelete()` for a page's file. */
-  canRemove(file: AttachedFile): boolean;
+  canCreate(): boolean;
+  /** Whether this session may remove this file: `canCreate()` for an attachment, the annotation plugin's `canDelete()` for a page's file. */
+  canDelete(file: AttachedFile): boolean;
 
   /**
    * Attach files to the document, as one change: one step of the history.
@@ -101,7 +101,7 @@ export interface AttachmentCapability {
    * `invalid-input` for bytes without a name, `operation-cancelled` or
    * `instance-closed`.
    */
-  add(
+  create(
     files: readonly AttachmentFileSource[],
     options?: OperationOptions,
   ): Promise<readonly AttachedFile[]>;
@@ -112,7 +112,7 @@ export interface AttachmentCapability {
    * for a file the document doesn't have, `operation-cancelled` or
    * `instance-closed`.
    */
-  remove(file: AttachedFile, options?: OperationOptions): Promise<void>;
+  delete(file: AttachedFile, options?: OperationOptions): Promise<void>;
   /**
    * The file's bytes, ready to save: its name cleaned (`displayNameOf`) and
    * its type. A pending add is waited for. Rejects `permission-denied`

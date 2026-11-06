@@ -8,7 +8,7 @@ import { createQuickJsSandbox } from '@embedpdf/core-js-sandbox';
 import { createLocalEngine } from '@embedpdf/engine';
 import type {
   DocumentHandle,
-  FormFieldDTO,
+  FormField,
   FormSnapshot,
   PdfActionTree,
 } from '@embedpdf/engine-core/runtime';
@@ -31,7 +31,7 @@ const fixturePath = resolve(
 
 async function activationFor(
   doc: DocumentHandle,
-  field: FormFieldDTO,
+  field: FormField,
 ): Promise<PdfActionTree<unknown>> {
   const widget = field.widgets[0];
   if (!widget || widget.objectNumber <= 0 || !widget.page) {
@@ -49,31 +49,31 @@ async function activationFor(
 
 function expectAdobeResetState(snapshot: FormSnapshot): void {
   expect(snapshot.fields.find(({ name }) => name === 'package')).toMatchObject({
-    family: 'combobox',
+    kind: 'combobox',
     value: 'Studio - $500',
   });
   expect(snapshot.fields.find(({ name }) => name === 'recording')).toMatchObject({
-    family: 'checkbox',
+    kind: 'checkbox',
     checked: false,
   });
   expect(snapshot.fields.find(({ name }) => name === 'catering')).toMatchObject({
-    family: 'checkbox',
+    kind: 'checkbox',
     checked: false,
   });
   expect(snapshot.fields.find(({ name }) => name === 'base_amount')).toMatchObject({
-    family: 'text',
+    kind: 'text',
     value: '$500.00',
   });
   expect(snapshot.fields.find(({ name }) => name === 'guest_amount')).toMatchObject({
-    family: 'text',
+    kind: 'text',
     value: '$180.00',
   });
   expect(snapshot.fields.find(({ name }) => name === 'extras_amount')).toMatchObject({
-    family: 'text',
+    kind: 'text',
     value: '$0.00',
   });
   expect(snapshot.fields.find(({ name }) => name === 'total_amount')).toMatchObject({
-    family: 'text',
+    kind: 'text',
     value: '$680.00',
   });
 }
@@ -96,7 +96,7 @@ describe('interactive form JavaScript acceptance', () => {
       name: 'interactive_pdf_forms_javascript_demo.pdf',
       pageCount: pages.pageCount,
       pages: pages.pages,
-      revision: 0,
+      pagesSequence: 0,
       hasUnsavedChanges: false,
       renderPolicy: { kind: 'continuous' },
       pageLabels: [],
@@ -126,7 +126,11 @@ describe('interactive form JavaScript acceptance', () => {
       );
 
       expect(summaryResult.status).toBe('applied');
-      expect(summaryResult.uiEffects).toContainEqual({ kind: 'gotoPage', page: 1, phase: 'user' });
+      expect(summaryResult.uiEffects).toContainEqual({
+        type: 'goToPage',
+        pageIndex: 1,
+        phase: 'user',
+      });
       const afterSummary = await doc.forms.list();
       const summary = afterSummary.fields.find(({ name }) => name === 'summary');
       expect(summary?.valueEntry).toMatchObject({ kind: 'scalar' });
@@ -143,12 +147,12 @@ describe('interactive form JavaScript acceptance', () => {
 
       expect(printResult).toMatchObject({
         status: 'unchanged',
-        uiEffects: [{ kind: 'print', phase: 'user' }],
+        uiEffects: [{ type: 'print', phase: 'user' }],
       });
 
       const packageField = afterSummary.fields.find(({ name }) => name === 'package');
       const recording = afterSummary.fields.find(({ name }) => name === 'recording');
-      if (packageField?.family !== 'combobox' || recording?.family !== 'checkbox') {
+      if (packageField?.kind !== 'combobox' || recording?.kind !== 'checkbox') {
         throw new Error('demo package/recording fields are missing');
       }
       const premium = packageField.options.find(({ label }) => label === 'Premium - $900');
@@ -182,7 +186,7 @@ describe('interactive form JavaScript acceptance', () => {
       }
 
       const confirmation = afterReset.fields.find(({ name }) => name === 'confirmation');
-      if (confirmation?.family !== 'text') throw new Error('confirmation field is missing');
+      if (confirmation?.kind !== 'text') throw new Error('confirmation field is missing');
       await controller.commit(confirmation.ref, { value: 'CONFIRM' });
 
       const beforeConfirm = await doc.forms.list();
@@ -193,7 +197,7 @@ describe('interactive form JavaScript acceptance', () => {
         await activationFor(doc, confirmButton),
       );
       expect(confirmResult.uiEffects).toContainEqual({
-        kind: 'alert',
+        type: 'alert',
         message: 'Event confirmed. This alert was launched by embedded PDF JavaScript.',
         icon: 3,
         phase: 'user',
@@ -201,7 +205,7 @@ describe('interactive form JavaScript acceptance', () => {
 
       const afterConfirm = await doc.forms.list();
       expect(afterConfirm.fields.find(({ name }) => name === 'confirmation_result')).toMatchObject({
-        family: 'text',
+        kind: 'text',
         value: expect.stringContaining('Confirmed on '),
       });
     } finally {

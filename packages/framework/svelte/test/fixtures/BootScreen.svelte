@@ -5,7 +5,7 @@
 
   let { statuses }: { statuses: string[] } = $props();
 
-  const status = useKernel().status();
+  const status = useKernel().getStatus();
   untrack(() => statuses.push(status));
 </script>
 

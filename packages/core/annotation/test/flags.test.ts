@@ -15,7 +15,13 @@ import {
   restyle,
   withAnnotation,
 } from './support';
-import { anchoredGeom, anchorModeOf, anchorOf, unanchoredGeom, type ViewEnv } from '../src/anchor';
+import {
+  anchoredGeometry,
+  anchorModeOf,
+  anchorOf,
+  unanchoredGeometry,
+  type ViewEnv,
+} from '../src/anchor';
 import {
   DRAWN_FLAGS,
   NO_ANNOTATION_FLAGS,
@@ -313,7 +319,7 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
 
   it('noZoom: the body scales 1/s about the rect top-left (the spec anchor)', () => {
     const view: ViewEnv = { zoom: 2, rotation: 0 };
-    const geometry = anchoredGeom(geom, { zoom: true, upright: false }, view);
+    const geometry = anchoredGeometry(geom, { zoom: true, upright: false }, view);
     expect(geometry.kind).toBe('box');
     if (geometry.kind !== 'box') return;
     // top-left fixed; size halved (screen size stays 40×20 px at 200%)
@@ -323,7 +329,7 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
 
   it('noRotate: the body counter-rotates about the anchor so it reads upright', () => {
     const view: ViewEnv = { zoom: 1, rotation: 90 };
-    const geometry = anchoredGeom(geom, { zoom: false, upright: true }, view);
+    const geometry = anchoredGeometry(geom, { zoom: false, upright: true }, view);
     if (geometry.kind !== 'box') throw new Error('expected rect');
     expect(geometry.rotation).toBe(270); // -90° normalized
     // the box centre orbited the anchor by -90°: centre (120,110) → (110, 80)
@@ -336,7 +342,7 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
 
   it('both flags compose: scaled about the anchor, then counter-rotated', () => {
     const view: ViewEnv = { zoom: 2, rotation: 180 };
-    const geometry = anchoredGeom(geom, { zoom: true, upright: true }, view);
+    const geometry = anchoredGeometry(geom, { zoom: true, upright: true }, view);
     if (geometry.kind !== 'box') throw new Error('expected rect');
     expect(geometry.box.width).toBe(20);
     expect(geometry.box.height).toBe(10);
@@ -349,27 +355,31 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
   it('Adobe clamp: below 100% the body scales WITH the page (zoom exemption off)', () => {
     // Zoomed out: a screen-constant body would dwarf the page, so noZoom is
     // inert below zoom 1 — the geometry passes through untouched…
-    const out = anchoredGeom(geom, { zoom: true, upright: false }, { zoom: 0.5, rotation: 0 });
+    const out = anchoredGeometry(geom, { zoom: true, upright: false }, { zoom: 0.5, rotation: 0 });
     expect(out).toBe(geom);
     // …while the rotation exemption still applies (it has no baseline).
-    const both = anchoredGeom(geom, { zoom: true, upright: true }, { zoom: 0.5, rotation: 90 });
+    const both = anchoredGeometry(geom, { zoom: true, upright: true }, { zoom: 0.5, rotation: 90 });
     if (both.kind !== 'box') throw new Error('expected rect');
     expect(both.box.width).toBe(40); // size untouched (clamped)
     expect(both.rotation).toBe(270); // counter-rotation applied
     // …and the inverse honours the same clamp (round-trip stays exact).
-    const back = unanchoredGeom(both, { zoom: true, upright: true }, { zoom: 0.5, rotation: 90 });
+    const back = unanchoredGeometry(
+      both,
+      { zoom: true, upright: true },
+      { zoom: 0.5, rotation: 90 },
+    );
     expect(geomBounds(back).x).toBeCloseTo(geomBounds(geom).x, 6);
     expect(geomBounds(back).width).toBeCloseTo(geomBounds(geom).width, 6);
   });
 
   it('no view env / text-anchored geoms pass through untouched', () => {
-    expect(anchoredGeom(geom, { zoom: true, upright: true }, undefined)).toBe(geom);
+    expect(anchoredGeometry(geom, { zoom: true, upright: true }, undefined)).toBe(geom);
     // markup quads are bound to page text — no screen anchoring for them.
     const quads: Shape = {
       kind: 'quads',
       quadPoints: [quadFromRect({ x: 0, y: 0, width: 10, height: 5 })],
     };
-    expect(anchoredGeom(quads, { zoom: true, upright: true }, { zoom: 2, rotation: 0 })).toBe(
+    expect(anchoredGeometry(quads, { zoom: true, upright: true }, { zoom: 2, rotation: 0 })).toBe(
       quads,
     );
   });
@@ -385,14 +395,18 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
       ],
       rotation: 0,
     };
-    const geometry = anchoredGeom(ink, { zoom: true, upright: false }, { zoom: 2, rotation: 0 });
+    const geometry = anchoredGeometry(
+      ink,
+      { zoom: true, upright: false },
+      { zoom: 2, rotation: 0 },
+    );
     if (geometry.kind !== 'ink') throw new Error('expected ink');
     // bounds top-left (100,100) fixed; every point pulled halfway toward it
     expect(geometry.inkList[0][0]).toEqual({ x: 100, y: 100 });
     expect(geometry.inkList[0][1]).toEqual({ x: 120, y: 110 });
   });
 
-  it('unanchoredGeom is the exact inverse: the commit re-projects to the preview', () => {
+  it('unanchoredGeometry is the exact inverse: the commit re-projects to the preview', () => {
     const view: ViewEnv = { zoom: 2, rotation: 90 };
     const mode = { zoom: true, upright: true };
     // Round-trip a plain box, a rotated box, and a polygon.
@@ -412,15 +426,15 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
     ];
     for (const geometry of shapes) {
       // stored → view → stored
-      const there = anchoredGeom(geometry, mode, view);
-      const back = unanchoredGeom(there, mode, view);
+      const there = anchoredGeometry(geometry, mode, view);
+      const back = unanchoredGeometry(there, mode, view);
       expect(geomBounds(back).x).toBeCloseTo(geomBounds(geometry).x, 6);
       expect(geomBounds(back).y).toBeCloseTo(geomBounds(geometry).y, 6);
       expect(geomBounds(back).width).toBeCloseTo(geomBounds(geometry).width, 6);
       // view → stored → view (a gesture result commits, then re-projects):
       // the released preview is what the next render shows — zero jump.
-      const stored = unanchoredGeom(geometry, mode, view);
-      const shown = anchoredGeom(stored, mode, view);
+      const stored = unanchoredGeometry(geometry, mode, view);
+      const shown = anchoredGeometry(stored, mode, view);
       expect(geomBounds(shown).x).toBeCloseTo(geomBounds(geometry).x, 6);
       expect(geomBounds(shown).y).toBeCloseTo(geomBounds(geometry).y, 6);
       expect(geomBounds(shown).width).toBeCloseTo(geomBounds(geometry).width, 6);
@@ -441,11 +455,11 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
     };
     const mode = { zoom: true, upright: false };
     const view: ViewEnv = { zoom: 20, rotation: 0 };
-    const shown = geomBounds(anchoredGeom(note, mode, view));
+    const shown = geomBounds(anchoredGeometry(note, mode, view));
     expect(shown.x).toBe(100);
     expect(shown.width).toBeCloseTo(1.2, 9);
     expect(shown.height).toBeCloseTo(1.2, 9);
-    const stored = geomBounds(unanchoredGeom(anchoredGeom(note, mode, view), mode, view));
+    const stored = geomBounds(unanchoredGeometry(anchoredGeometry(note, mode, view), mode, view));
     expect(stored.width).toBeCloseTo(24, 9);
     expect(stored.height).toBeCloseTo(24, 9);
   });
@@ -605,7 +619,7 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
     // …so the stored /Rect (screen size at zoom 1) becomes 160×120, and its
     // own re-projection is exactly the released preview: {100,100,80,60}.
     expect(geometry.box).toEqual({ x: 100, y: 100, width: 160, height: 120 });
-    const shown = anchoredGeom(geometry, anchorModeOf(model.byId['nz2']), view);
+    const shown = anchoredGeometry(geometry, anchorModeOf(model.byId['nz2']), view);
     expect(shown.kind === 'box' && shown.box).toEqual({ x: 100, y: 100, width: 80, height: 60 });
   });
 

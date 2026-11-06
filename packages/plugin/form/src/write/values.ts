@@ -149,7 +149,7 @@ export function createValueWrites(
       }
       const value = writeOfPlainValue(field, plain);
       if (!value) {
-        skipped.push({ ref: name, reason: `a ${field.family} field can't take this value` });
+        skipped.push({ ref: name, reason: `a ${field.kind} field can't take this value` });
         continue;
       }
       entries.push({ ref: field.ref, value });

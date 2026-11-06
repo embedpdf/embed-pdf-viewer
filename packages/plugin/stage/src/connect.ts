@@ -21,7 +21,7 @@ export function connectStage(ctx: PluginContext<StageModel>, stage: StageHostCap
   // reacts to changes only, never to the initial value, so it cannot race the
   // level-triggered initial placement.
   ctx.watch(
-    () => ctx.document()?.revision ?? 0,
+    () => ctx.document()?.pagesSequence ?? 0,
     () => stage.refit(),
   );
   connectWorkingSet(ctx, stage);

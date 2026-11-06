@@ -33,7 +33,7 @@ export function makeHandle(id: string, pages: PageLayout[] = [page(1, 0)]): Docu
         return () => listeners.delete(listener);
       },
       emit: (event: unknown) => listeners.forEach((listener) => listener(event)),
-      lastServerId: () => null,
+      lastServerSequence: () => null,
     },
     pages: { list: () => Promise.resolve({ pageCount: pages.length, labels: [], pages }) },
     security: { allows: () => true },
@@ -61,6 +61,6 @@ export const bytesInput = (id: string) => ({ kind: 'bytes' as const, id, bytes: 
 
 /** A printer that takes every print and opens no dialog. */
 export const quietPrinter = (): HostPrinter => ({
-  stage: async () => ({ print: async () => {}, dispose: () => {} }),
+  stage: async () => ({ print: async () => {}, destroy: () => {} }),
 });
 export const settle = () => new Promise((resolve) => setTimeout(resolve, 0));

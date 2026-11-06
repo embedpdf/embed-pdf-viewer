@@ -54,7 +54,7 @@ describe('createTestContext', () => {
     ctx.cleanup(() => {
       cleaned = true;
     });
-    await ctx.dispose();
+    await ctx.destroy();
     expect(cleaned).toBe(true);
   });
 
@@ -84,7 +84,7 @@ describe('createTestContext', () => {
     const read = async () => (log.push('read'), new Uint8Array([1]));
     expect(await ctx.download(read)).toEqual(new Uint8Array([1]));
     expect(log).toEqual(['before', 'read', 'after']);
-    await ctx.dispose();
+    await ctx.destroy();
     log.length = 0;
     await ctx.download(read);
     expect(log).toEqual(['read']);

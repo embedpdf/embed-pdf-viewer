@@ -22,7 +22,7 @@ import {
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { annotationKey, type Engine, type Kernel } from '@embedpdf/core';
-import { pageTransform, type PageRotation } from '@embedpdf/core-geometry';
+import { pageTransform, type Rotation } from '@embedpdf/core-geometry';
 import { createLocalEngine } from '@embedpdf/engine';
 import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotation/contract/host';
 import {
@@ -56,7 +56,14 @@ import { kernelOf, mount, viewerHost } from './fixtures';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const packages = resolve(here, '..', '..', '..');
-const fixturePath = resolve(packages, '..', 'examples', 'engine-runtime-demo', 'public', 'annotations.pdf');
+const fixturePath = resolve(
+  packages,
+  '..',
+  'examples',
+  'engine-runtime-demo',
+  'public',
+  'annotations.pdf',
+);
 const wasmPath = resolve(packages, 'engine', 'runtime', 'npm', 'wasm32', 'lib', 'embedpdf.wasm');
 
 // ── a page over a real document ──────────────────────────────────────────────
@@ -111,7 +118,9 @@ function annotationHost(
         ...features,
       ),
     ],
-    template: `@if (ready()) { <test-page>${template}</test-page> }`,
+    template: `@if (ready()) {
+      <test-page>${template}</test-page>
+    }`,
   })
   class Host {
     readonly viewer = inject(EpdfKernelHost);
@@ -145,7 +154,7 @@ async function mountPage(
     members?: Record<string, unknown>;
     features?: EmbedPdfFeature[];
     providers?: Provider[];
-    rotation?: PageRotation;
+    rotation?: Rotation;
     zoom?: number;
   } = {},
 ) {
@@ -244,7 +253,7 @@ describe('<epdf-annotation-layer>', () => {
 
     const square = annotation.list().find(isShape);
     expect(square).toBeDefined();
-    annotation.selection.set([square!.ref]);
+    annotation.selection.select([square!.ref]);
     const handles = await all('.handle');
     expect(handles.some((handle) => handle.dataset['kind'] === 'corner')).toBe(true);
     // No handle of the layer's own: yours draw in their place.
@@ -334,9 +343,9 @@ describe('<epdf-annotation-layer>', () => {
     fixture.debugElement.injector.get(EpdfInteraction).activateTool('pan');
     await vi.waitFor(async () => {
       await fixture.whenStable();
-      expect((fixture.nativeElement as HTMLElement).querySelector('.widget')?.textContent?.trim()).toBe(
-        'live',
-      );
+      expect(
+        (fixture.nativeElement as HTMLElement).querySelector('.widget')?.textContent?.trim(),
+      ).toBe('live');
     });
     expect(asked).toContain('pan');
   }, 30_000);
@@ -434,7 +443,7 @@ describe('<epdf-annotation-layer>', () => {
     await all('.text-box');
 
     target.set(freeText.ref);
-    annotation.selection.set([freeText.ref]);
+    annotation.selection.select([freeText.ref]);
     expect(service.selected()).toHaveLength(1);
     expect(anchor()).toMatchObject({ page: freeText.page });
 
@@ -492,7 +501,7 @@ describe('<epdf-annotation-menu>', () => {
     expect(root.querySelector('.draft')).toBeNull();
 
     const square = annotation.list().find(isShape)!;
-    annotation.selection.set([square.ref]);
+    annotation.selection.select([square.ref]);
     await fixture.whenStable();
     const button = root.querySelector<HTMLElement>('.delete');
     expect(button).not.toBeNull();
@@ -633,7 +642,7 @@ describe('EpdfComments', () => {
     });
     const thread = comments.threadOf(note.ref);
     const changes: string[] = [];
-    comments.threadChanged$.subscribe(({ change }) => changes.push(change));
+    comments.threadChanged$.subscribe(({ type }) => changes.push(type));
     expect(thread()?.root.contents).toBe('A question');
     expect(thread()?.pageLabel).toBe('1');
     expect(comments.canReply(note.ref)).toBe(true);

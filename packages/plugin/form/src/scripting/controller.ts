@@ -46,7 +46,7 @@ import { pageNumberFor, scriptError, utf8Length } from './results';
  * The controller never owns a realm. It rides a realm port — this document's
  * own (the actions plugin's per-document host) or a detached one minted by
  * the actions plugin for a document that is not displayed (stamp's
- * asset documents). Either way the owner disposes the realm; `dispose()`
+ * asset documents). Either way the owner destroys the realm; `destroy()`
  * here only fences further transactions.
  */
 export interface FormScriptingControllerOptions {
@@ -103,7 +103,7 @@ export class FormScriptingController {
 
   /** The realm belongs to its owner (the actions plugin, or the caller that
    *  minted a detached one) — this only fences further transactions. */
-  dispose(): void {
+  destroy(): void {
     this.disposed = true;
   }
 
@@ -324,7 +324,7 @@ export class FormScriptingController {
       }
     }
 
-    if (!activation && hasProposedValue && target.actions?.keystroke && target.family === 'text') {
+    if (!activation && hasProposedValue && target.actions?.keystroke && target.kind === 'text') {
       let program: string;
       try {
         program = javaScriptProgramFromActionTree(target.actions.keystroke);

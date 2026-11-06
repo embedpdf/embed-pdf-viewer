@@ -63,7 +63,7 @@ async function addField() {
   if (!widget) return;
   const { rect } = widget;
   await form.create({
-    family: 'text',
+    kind: 'text',
     name: 'purchase_order',
     widgets: [
       {

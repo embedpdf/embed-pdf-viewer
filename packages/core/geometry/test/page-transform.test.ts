@@ -3,7 +3,7 @@ import {
   deviceHeightForWidth,
   pageTransform,
   samePagePlacement,
-  type PageRotation,
+  type Rotation,
 } from '../src/index';
 
 /**
@@ -133,7 +133,7 @@ describe('pageTransform', () => {
     });
 
     it('viewToPageRect is the exact inverse (the visibility primitive)', () => {
-      const rotations: PageRotation[] = [0, 90, 180, 270];
+      const rotations: Rotation[] = [0, 90, 180, 270];
       for (const rotation of rotations) {
         const transform = pageTransform({
           pageSize: { width: 100, height: 200 },
@@ -166,7 +166,7 @@ describe('pageTransform', () => {
   });
 
   describe('pageToView ∘ viewToPage is identity (every rotation × scale × dpr)', () => {
-    const rotations: PageRotation[] = [0, 90, 180, 270];
+    const rotations: Rotation[] = [0, 90, 180, 270];
     const scales = [1, 2, 0.5, 1.333];
     const dprs = [1, 2];
     const points = [
@@ -240,7 +240,7 @@ describe('pageTransform baseScale/zoom: percent-of-100% semantics', () => {
 });
 
 describe('samePagePlacement', () => {
-  const at = (scale: number, rotation: PageRotation = 0) =>
+  const at = (scale: number, rotation: Rotation = 0) =>
     pageTransform({ pageSize: { width: 100, height: 200 }, rotation, scale, baseScale: 1, dpr: 1 });
 
   it('is the same placement for a new transform of the same page view', () => {

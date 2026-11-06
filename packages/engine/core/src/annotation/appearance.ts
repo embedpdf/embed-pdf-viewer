@@ -123,7 +123,7 @@ const INERT_KEYS: ReadonlySet<string> = new Set([
   'file',
   // The field a widget belongs to, as the form reads it.
   'field',
-  'fieldFamily',
+  'fieldKind',
 ]);
 
 /**

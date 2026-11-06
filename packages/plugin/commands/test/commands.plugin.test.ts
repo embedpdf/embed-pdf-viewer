@@ -5,7 +5,7 @@ import { i18nPlugin } from '@embedpdf/plugin-i18n';
 import { I18nToken } from '@embedpdf/plugin-i18n/contract';
 
 import { commandsPlugin } from '../src/commands.plugin';
-import type { CommandDef } from '../src/contract';
+import type { CommandDefinition } from '../src/contract';
 import { CommandsToken } from '../src/host-contract';
 
 /**
@@ -18,7 +18,7 @@ const engine = {
   open: (input: { id: string }) =>
     Promise.resolve({
       id: input.id,
-      events: { subscribe: () => () => {}, lastServerId: () => null },
+      events: { subscribe: () => () => {}, lastServerSequence: () => null },
       pages: { list: () => Promise.resolve({ pageCount: 0, labels: [], pages: [] }) },
       security: { allows: () => true },
       close: () => Promise.resolve(),
@@ -31,7 +31,7 @@ const openDocument = (id: string) => ({ kind: 'bytes' as const, id, bytes: new U
 /** Documents `a` and `b`, with `b` active, and two commands that show their target. */
 async function twoDocuments() {
   const ran: (string | null)[] = [];
-  const commands: CommandDef[] = [
+  const commands: CommandDefinition[] = [
     { id: 'show', label: 'show', run: (context) => void ran.push(context.documentId) },
     { id: 'only-a', label: 'only a', enabled: (context) => context.documentId === 'a' },
   ];
@@ -91,7 +91,7 @@ describe('a label with values', () => {
   }
 
   /** A command whose label says how many people it sends to, from your app's state. */
-  const send: CommandDef<Outbox> = {
+  const send: CommandDefinition<Outbox> = {
     id: 'acme:send',
     labelKey: 'acme.send',
     label: 'Send ({count})',

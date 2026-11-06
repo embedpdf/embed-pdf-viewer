@@ -66,7 +66,7 @@ export function createDocumentEvents(
       const actionContext: ActionContext = {
         origin: 'lifecycle',
         source: { kind: 'document' },
-        event: { scope: 'document', name: event },
+        event: { type: 'document', event: event },
       };
       return { source: { kind: 'document' }, tree, result: await runAndEmit(tree, actionContext) };
     } catch (error) {

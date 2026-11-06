@@ -7,8 +7,8 @@ import { describe, expect, it } from 'vitest';
 
 import { kindOf, propertiesOf } from '../../src';
 
-const widget = (fieldFamily: string, hasMark: boolean) =>
-  ({ subtype: 'widget', fieldFamily, hasMark }) as unknown as Annotation;
+const widget = (fieldKind: string, hasMark: boolean) =>
+  ({ subtype: 'widget', fieldKind, hasMark }) as unknown as Annotation;
 
 /** A kind's style rows: its properties but the flags every kind has. */
 const styleOf = (annotation: Annotation) =>
@@ -17,7 +17,7 @@ const styleOf = (annotation: Annotation) =>
     .map((property) => property.key);
 
 describe("a widget's kind", () => {
-  it("is its field family's: a signature field's is the box, with the box's style", () => {
+  it("is its field kind's: a signature field's is the box, with the box's style", () => {
     expect(kindOf(widget('text', false)).name).toBe('widget-text');
     expect(kindOf(widget('signature', false)).name).toBe('widget-box');
     expect(styleOf(widget('signature', false))).toEqual([

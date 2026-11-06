@@ -43,14 +43,14 @@ describe('changes faster than the engine answers (local engine)', () => {
         { select: true },
       );
       // The create is in flight: the new annotation is selected under the name it was created with.
-      expect(annotation.selection.list()).toHaveLength(1);
+      expect(annotation.selection.getSelected()).toHaveLength(1);
       const restyled = annotation.selection.update({ color: '#00ff00' });
       const { ref } = (await created).annotation;
       expect((await restyled).failed).toEqual([]);
       await annotation.whenSynced();
 
       expect(ref.kind).toBe('objectNumber');
-      expect(annotation.selection.list().map((entry) => entry.ref)).toEqual([ref]);
+      expect(annotation.selection.getSelected().map((entry) => entry.ref)).toEqual([ref]);
       const shown = annotation.get(ref);
       expect(shown && 'color' in shown ? shown.color : null).toBe('#00ff00');
       const raw = (await doc.page(ref.page).annotations.list()).annotations.find(
@@ -64,7 +64,7 @@ describe('changes faster than the engine answers (local engine)', () => {
           .sort(),
       ).toEqual(await engineKeys(doc));
     } finally {
-      await ctx.dispose();
+      await ctx.destroy();
     }
   });
 
@@ -72,7 +72,7 @@ describe('changes faster than the engine answers (local engine)', () => {
     const { doc, ctx, annotation } = await openFixture('pending-inline-edits');
     try {
       const inline = annotation.list().find((entry) => entry.ref.kind === 'baseIndex')!.ref;
-      annotation.selection.set([inline]);
+      annotation.selection.select([inline]);
       const green = annotation.selection.update({ color: '#00ff00' });
       const faded = annotation.selection.update({ opacity: 0.2 });
       const results = await Promise.all([green, faded]);
@@ -84,7 +84,7 @@ describe('changes faster than the engine answers (local engine)', () => {
         .map((entry) => annotationKey(entry.ref))
         .sort();
       expect(keys).toEqual(await engineKeys(doc));
-      const selected = annotation.selection.list().map((entry) => entry.ref);
+      const selected = annotation.selection.getSelected().map((entry) => entry.ref);
       expect(selected).toEqual([inline]);
       // The engine stores opacity in 1/255 steps.
       const shown = annotation.get(inline);
@@ -96,7 +96,7 @@ describe('changes faster than the engine answers (local engine)', () => {
       expect(raw && 'color' in raw ? raw.color : null).toBe('#00ff00');
       expect(raw && 'opacity' in raw ? raw.opacity : null).toBeCloseTo(0.2, 2);
     } finally {
-      await ctx.dispose();
+      await ctx.destroy();
     }
   });
 });

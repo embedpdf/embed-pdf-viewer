@@ -10,7 +10,7 @@ export function createMarks({ stamp }: Pick<SignatureSiblings, 'stamp'>) {
     new Uint8Array((await resolveBinarySource(source)).bytes);
   const markBytes = async (mark: Mark): Promise<Uint8Array> => {
     if ('assetId' in mark) {
-      const bytes = stamp()?.readAssetBytes(mark.assetId);
+      const bytes = stamp()?.getAssetBytes(mark.assetId);
       if (!bytes) throw new PluginError('not-found', 'signature', `unknown mark '${mark.assetId}'`);
       return bytes;
     }

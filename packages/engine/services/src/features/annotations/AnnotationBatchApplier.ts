@@ -263,10 +263,10 @@ export class AnnotationBatchApplier {
       );
     });
 
-    const readCtx = readContextFor(this.session, this.fonts);
+    const readContext = readContextFor(this.session, this.fonts);
     const created = placed.map((at) =>
       this.withOpen(at, (annotPtr) =>
-        readAnnotationFromPtr(fn, mem, annotPtr, at.pageObjectNumber, at.index, readCtx),
+        readAnnotationFromPtr(fn, mem, annotPtr, at.pageObjectNumber, at.index, readContext),
       ),
     );
     joinWidgetFieldNumbers(this.runtime, this.session, created);

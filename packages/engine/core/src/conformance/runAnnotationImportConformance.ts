@@ -32,15 +32,15 @@ import type { AnnotationImportResult } from '../transfer/annotationImport';
  */
 export function runAnnotationImportConformance(
   runner: ConformanceTestRunner,
-  opts: AnnotationResourceConformanceOptions,
+  options: AnnotationResourceConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`annotation import conformance: ${opts.label}`, () => {
+  describe(`annotation import conformance: ${options.label}`, () => {
     let engine: Engine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -52,8 +52,8 @@ export function runAnnotationImportConformance(
       fixture: AnnotationResourceFixture,
       run: (source: DocumentHandle, target: DocumentHandle, page: PageRef) => Promise<void>,
     ): Promise<void> => {
-      const source = await opts.open(engine, fixture);
-      const target = await opts.open(engine, fixture);
+      const source = await options.open(engine, fixture);
+      const target = await options.open(engine, fixture);
       try {
         const { pages } = await source.pages.list();
         await run(source, target, toPageRef(pages[0]!.ref.objectNumber));
@@ -144,7 +144,7 @@ export function runAnnotationImportConformance(
           if (event.type !== 'annotations.created') return;
           expect(event.annotation).toEqual(result.annotations[index]);
           expect(event.page).toEqual(pageRef);
-          expect(event.origin.tx).toEqual({ id: 'import-1', index, count: 2 });
+          expect(event.origin.transaction).toEqual({ id: 'import-1', index, count: 2 });
         });
       });
     });
@@ -425,7 +425,7 @@ export function runAnnotationImportConformance(
     });
 
     test("undoing a restoring import takes the import's rights, not the per-annotation ones", async () => {
-      if (!opts.openScoped) return;
+      if (!options.openScoped) return;
       // May delete only its own annotations, and may import.
       const scope = [
         'doc.open',
@@ -435,8 +435,8 @@ export function runAnnotationImportConformance(
         'doc.annotate.import',
         'annotations:delete:self',
       ];
-      const source = await opts.open(engine, 'authoring');
-      const target = await opts.openScoped(engine, 'authoring', scope);
+      const source = await options.open(engine, 'authoring');
+      const target = await options.openScoped(engine, 'authoring', scope);
       try {
         const { pages } = await source.pages.list();
         const pageRef = toPageRef(pages[0]!.ref.objectNumber);

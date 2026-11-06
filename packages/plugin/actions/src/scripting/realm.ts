@@ -37,7 +37,7 @@ export function createRealm(
         },
       })
     : null;
-  if (scriptHost) ctx.cleanup(() => scriptHost.dispose());
+  if (scriptHost) ctx.cleanup(() => scriptHost.destroy());
 
   return {
     scriptHost,
@@ -56,7 +56,7 @@ export function createRealm(
                 transaction: <T>(body: (transaction: ScriptTransaction) => Promise<T>) =>
                   host.transaction(body),
                 budget: realms.budget,
-                dispose: () => host.dispose(),
+                destroy: () => host.destroy(),
               };
             },
           }

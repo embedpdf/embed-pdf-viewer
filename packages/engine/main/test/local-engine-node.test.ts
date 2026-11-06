@@ -78,7 +78,7 @@ describe('localEngine() in Node', () => {
 
       const image = await page.render.image({ viewport });
       expect(image.format).toBe('png');
-      expect(image.contentType).toBe('image/png');
+      expect(image.mimeType).toBe('image/png');
       if (image.source.kind !== 'bytes') throw new Error('expected bytes');
 
       const chunks = pngChunks(image.source.bytes);

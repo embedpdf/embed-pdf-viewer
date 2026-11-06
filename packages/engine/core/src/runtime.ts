@@ -40,9 +40,7 @@ export { subscribeToType } from './events/DocumentEventStream';
 export { EventHub, SessionEventPublisher } from './events/EventHub';
 export { changeEvents } from './events/changeEvents';
 export {
-  advisoryFromPdfBits,
   permissionInfoFromProbe,
-  permissionInfoWithAdvisory,
   securityStateFromHead,
   securityStateFromProbe,
 } from './engine/document-security-state';
@@ -58,7 +56,6 @@ export type {
   DocumentSecurityState,
   DocumentUnlockInput,
   DocumentUnlockResult,
-  PdfPermissionAdvisory,
   PdfPermissionInfo,
 } from './engine/DocumentSecurityService';
 export {

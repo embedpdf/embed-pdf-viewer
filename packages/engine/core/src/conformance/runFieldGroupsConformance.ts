@@ -93,15 +93,15 @@ const PLACEHOLDER_CMS = new Uint8Array([0x30, 0x06, 0x02, 0x01, 0x01, 0x02, 0x01
 
 export function runFieldGroupsConformance(
   runner: ConformanceTestRunner,
-  opts: FieldGroupsConformanceOptions,
+  options: FieldGroupsConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`field groups conformance: ${opts.label}`, () => {
+  describe(`field groups conformance: ${options.label}`, () => {
     let engine: Engine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -114,7 +114,7 @@ export function runFieldGroupsConformance(
       bytes?: Uint8Array,
     ) => {
       const { scope, identity } = FIELD_GROUP_TOKENS[token];
-      const doc = await opts.open(engine, scope, identity, bytes);
+      const doc = await options.open(engine, scope, identity, bytes);
       try {
         await body(doc);
       } finally {
@@ -270,7 +270,7 @@ export function runFieldGroupsConformance(
     });
 
     test('signing a grouped field locks the rest of its group, for everyone', async () => {
-      if (opts.completesSignings === false) return;
+      if (options.completesSignings === false) return;
       // The lock follows the field's group, whoever signs: here a token that
       // may do everything, which the lock then refuses too.
       await as('everything', async (doc) => {
@@ -293,13 +293,13 @@ export function runFieldGroupsConformance(
     test('a designer puts fields in her own group, or one she may set', async () => {
       await as('designer', async (doc) => {
         const own = await doc.forms.create({
-          family: 'text',
+          kind: 'text',
           name: 'clause',
           widgets: [{ page: PAGE, rect: { x: 20, y: 200, width: 100, height: 20 } }],
         });
         expect(own.field.groupId).toBe('legal');
         const buyers = await doc.forms.create({
-          family: 'text',
+          kind: 'text',
           name: 'buyer_address',
           groupId: 'buyer',
           widgets: [{ page: PAGE, rect: { x: 140, y: 200, width: 100, height: 20 } }],
@@ -307,7 +307,7 @@ export function runFieldGroupsConformance(
         expect(buyers.field.groupId).toBe('buyer');
         const refused = await refusal(
           doc.forms.create({
-            family: 'text',
+            kind: 'text',
             name: 'seller_address',
             groupId: 'seller',
             widgets: [{ page: PAGE, rect: { x: 260, y: 200, width: 100, height: 20 } }],

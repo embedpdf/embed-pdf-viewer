@@ -7,7 +7,7 @@
  * session's fill, falls back to the value itself.
  */
 import type { Mirror } from '@embedpdf/core';
-import type { ChangeOp, FormFieldDTO } from '@embedpdf/engine-core/runtime';
+import type { ChangeOp, FormField } from '@embedpdf/engine-core/runtime';
 
 import { fieldByRef, fieldKeyOf, type FieldIndex, type FieldKey } from '../model';
 import type { FormContext } from './context';
@@ -17,13 +17,13 @@ const KEPT_PER_FIELD = 8;
 
 export interface FormattedTexts {
   /** The text the field shows for its value, as this session formatted it; `null` when it didn't. */
-  textOf(field: FormFieldDTO): string | null;
+  textOf(field: FormField): string | null;
   /** Moves when a text is remembered. */
   version(): number;
 }
 
-const valueOf = (field: FormFieldDTO): string | null =>
-  field.family === 'text' || field.family === 'combobox' ? field.value : null;
+const valueOf = (field: FormField): string | null =>
+  field.kind === 'text' || field.kind === 'combobox' ? field.value : null;
 
 export function createFormattedTexts(ctx: FormContext, fields: Mirror<FieldIndex>): FormattedTexts {
   const texts = new Map<FieldKey, Map<string, string>>();

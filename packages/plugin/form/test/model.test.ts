@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 import {
   formWidget,
   toPageRef,
-  type FormFieldDTO,
+  type FormField,
   type FormSnapshot,
   type WidgetAnnotation,
 } from '@embedpdf/engine-core/runtime';
@@ -32,10 +32,10 @@ import {
 } from '../src/model';
 import { fillItems, projectWidget } from '../src/read/fill-items';
 
-const text = (over: Partial<Extract<FormFieldDTO, { family: 'text' }>> = {}): FormFieldDTO => ({
+const text = (over: Partial<Extract<FormField, { kind: 'text' }>> = {}): FormField => ({
   ref: { kind: 'objectNumber', objectNumber: 4 },
   name: 'maxlen_text',
-  family: 'text',
+  kind: 'text',
   origin: 'acroform',
   readOnly: false,
   required: false,
@@ -61,7 +61,7 @@ const text = (over: Partial<Extract<FormFieldDTO, { family: 'text' }>> = {}): Fo
   ...over,
 });
 
-const snapshot = (fields: FormFieldDTO[]): FormSnapshot =>
+const snapshot = (fields: FormField[]): FormSnapshot =>
   ({
     formKind: 'acroform',
     needsAppearances: false,
@@ -70,7 +70,13 @@ const snapshot = (fields: FormFieldDTO[]): FormSnapshot =>
     calculationOrder: [],
   }) as FormSnapshot;
 
-const origin = { kind: 'remote', sessionId: 'them', sub: null, ts: 0, serverId: null };
+const origin = {
+  kind: 'remote',
+  sessionId: 'them',
+  subject: null,
+  at: new Date(0).toISOString(),
+  serverSequence: null,
+};
 const event = (value: object) => ({ origin, widgets: [], ...value }) as unknown as DocumentEvent;
 /** A user who may fill in every field. */
 const ALWAYS = () => true;
@@ -302,12 +308,10 @@ describe('fill projection', () => {
   });
 });
 
-const signature = (
-  over: Partial<Extract<FormFieldDTO, { family: 'signature' }>> = {},
-): FormFieldDTO => ({
+const signature = (over: Partial<Extract<FormField, { kind: 'signature' }>> = {}): FormField => ({
   ref: { kind: 'objectNumber', objectNumber: 9 },
   name: 'sig',
-  family: 'signature',
+  kind: 'signature',
   origin: 'acroform',
   readOnly: false,
   required: false,

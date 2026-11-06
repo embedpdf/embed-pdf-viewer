@@ -18,15 +18,9 @@ import type {
   WidgetCheckStyle,
 } from './primitives';
 import { STANDARD_FONTS } from './primitives';
-import { PdfPointSchema, PdfRectSchema } from '../geometry/schemas';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import { PageRefSchema } from '../identity/PageRef.schema';
 import { closed } from '../wire/reading';
-
-/** @deprecated Use `PdfPointSchema` from `../geometry/schemas`. */
-export const PointSchema = PdfPointSchema;
-/** @deprecated Use `PdfRectSchema` from `../geometry/schemas`. */
-export const RectSchema = PdfRectSchema;
 
 export const ColorSchema: z.ZodType<Color> = z
   .string()

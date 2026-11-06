@@ -150,21 +150,21 @@ const DEFAULT_INK_STROKES: InkDraft['inkList'] = [
  */
 export function runAnnotationMutationConformance(
   runner: ConformanceTestRunner,
-  opts: AnnotationMutationConformanceOptions,
+  options: AnnotationMutationConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
-  const fix = opts.fixture;
+  const fix = options.fixture;
   const quad = fix.createQuad ?? DEFAULT_QUAD;
   const shapeRect = fix.createShapeRect ?? DEFAULT_SHAPE_RECT;
   const vertices = fix.createVertices ?? DEFAULT_VERTICES;
   const linePoints = fix.createLinePoints ?? DEFAULT_LINE_POINTS;
   const inkStrokes = fix.createInkList ?? DEFAULT_INK_STROKES;
 
-  describe(`annotation mutation conformance: ${opts.label}`, () => {
+  describe(`annotation mutation conformance: ${options.label}`, () => {
     let engine: Engine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -172,7 +172,7 @@ export function runAnnotationMutationConformance(
     });
 
     test('create appends on top without moving the others', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const before = await page.annotations.list();
@@ -209,7 +209,7 @@ export function runAnnotationMutationConformance(
     });
 
     test('create and update write each annotation flag as its own field', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
 
@@ -241,7 +241,7 @@ export function runAnnotationMutationConformance(
     });
 
     test('create shape annotations (circle + square) round-trip shape fields', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
 
@@ -305,7 +305,7 @@ export function runAnnotationMutationConformance(
     });
 
     test('a cloudy border reaches past the box, and rect takes it in', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
 
@@ -393,7 +393,7 @@ export function runAnnotationMutationConformance(
     });
 
     test('update echoes the appearance verdict: moves preserve /AP, restyles re-bake', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const draft: SquareDraft = {
@@ -446,7 +446,7 @@ export function runAnnotationMutationConformance(
     });
 
     test('a partial /DA patch preserves the unpatched font members', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const draft: FreeTextDraft = {
@@ -492,7 +492,7 @@ export function runAnnotationMutationConformance(
     });
 
     test('a turn stays until changed: a box move keeps it, null straightens', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const draft: SquareDraft = {
@@ -557,7 +557,7 @@ export function runAnnotationMutationConformance(
     });
 
     test('a line, polyline, polygon or ink: rect is what the engine draws', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const contains = (outer: PageBox, inner: PageBox) =>
@@ -615,7 +615,7 @@ export function runAnnotationMutationConformance(
     });
 
     test('points are upright: rotation turns them about the middle of their box', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const expectPoints = (actual: readonly PagePoint[], expected: readonly PagePoint[]) => {
@@ -688,7 +688,7 @@ export function runAnnotationMutationConformance(
     });
 
     test("a note's icon fills its rect, and moves and grows with it", async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const rect = iconRect(shapeRect.x, shapeRect.y);
@@ -718,7 +718,7 @@ export function runAnnotationMutationConformance(
     });
 
     test("a new rect puts a drawing there, as a script's annot.rect does in Acrobat", async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const offset = (r: PageBox, dx: number, dy: number): PageBox => ({
@@ -858,7 +858,7 @@ export function runAnnotationMutationConformance(
     });
 
     test('create vertex + line annotations (polygon/polyline/line) round-trip geometry', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
 
@@ -958,7 +958,7 @@ export function runAnnotationMutationConformance(
     });
 
     test('create free-text + callout round-trip text/colour/intent fields', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
 
@@ -1038,7 +1038,7 @@ export function runAnnotationMutationConformance(
     });
 
     test('update a free-text patches alignment + colours and is non-structural', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const created = await page.annotations.create({
@@ -1086,7 +1086,7 @@ export function runAnnotationMutationConformance(
     // native runtime) and the local WASM engine must agree row for row.
 
     test('rich text: a plain draft reads back body-style paragraphs and a body from its font', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const created = await page.annotations.create({
@@ -1121,7 +1121,7 @@ export function runAnnotationMutationConformance(
     });
 
     test('rich text: a draft with runs round-trips the body, the runs and the plain projection', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const created = await page.annotations.create({
@@ -1185,7 +1185,7 @@ export function runAnnotationMutationConformance(
     });
 
     test('rich text: paragraphs-only patch keeps the body; contents-only rewrites body-style paragraphs', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const created = await page.annotations.create({
@@ -1243,7 +1243,7 @@ export function runAnnotationMutationConformance(
     });
 
     test('rich text: fontSize / fontColor / fontFamily move the body while runs keep their deltas', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const created = await page.annotations.create({
@@ -1283,7 +1283,7 @@ export function runAnnotationMutationConformance(
     });
 
     test('rich text: contents and richText that disagree reject with InvalidArg; agreeing writes the runs', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const created = await page.annotations.create({
@@ -1334,7 +1334,7 @@ export function runAnnotationMutationConformance(
     });
 
     test("a comment as rich text: a note's reads back with its plain projection; a plain one reads null", async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const rich = await page.annotations.create({
@@ -1371,7 +1371,7 @@ export function runAnnotationMutationConformance(
     });
 
     test('a comment as rich text: new contents rewrite a rich comment, and null makes it plain', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const created = await page.annotations.create({
@@ -1407,7 +1407,7 @@ export function runAnnotationMutationConformance(
     });
 
     test("a comment as rich text: a redact's comment in another font leaves its overlay's", async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const created = await page.annotations.create({
@@ -1435,7 +1435,7 @@ export function runAnnotationMutationConformance(
     });
 
     test('create redact (area + text) round-trips label + colour fields', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
 
@@ -1495,7 +1495,7 @@ export function runAnnotationMutationConformance(
     });
 
     test('update a redact patches the label and clears it, non-structurally', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const created = await page.annotations.create({
@@ -1552,7 +1552,7 @@ export function runAnnotationMutationConformance(
     });
 
     test('create + update a caret round-trips color/opacity and its box', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
 
@@ -1603,7 +1603,7 @@ export function runAnnotationMutationConformance(
     });
 
     test('update an ink annotation patches strokes + color and is non-structural', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const created = await page.annotations.create({
@@ -1641,7 +1641,7 @@ export function runAnnotationMutationConformance(
     });
 
     test('ink highlight intent + blend round-trip and unrelated patches preserve blend', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const created = await page.annotations.create({
@@ -1678,7 +1678,7 @@ export function runAnnotationMutationConformance(
     });
 
     test('update a polyline patches vertices + line endings and is non-structural', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const created = await page.annotations.create({
@@ -1716,7 +1716,7 @@ export function runAnnotationMutationConformance(
     });
 
     test('update a shape annotation patches color and is non-structural', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const created = await page.annotations.create({
@@ -1750,7 +1750,7 @@ export function runAnnotationMutationConformance(
     });
 
     test('creating a shape bakes an /AP appearance the reader can rasterize', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const created = await page.annotations.create({
@@ -1775,7 +1775,7 @@ export function runAnnotationMutationConformance(
     });
 
     test("update keeps the annotation's name and never touches /NM", async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const before = await page.annotations.list();
@@ -1805,7 +1805,7 @@ export function runAnnotationMutationConformance(
 
     if (fix.expectsInlineAnnotation) {
       test('update of an annotation born inline keeps its baseIndex name and writes no /NM', async () => {
-        const doc = await openFixture(engine, opts);
+        const doc = await openFixture(engine, options);
         try {
           const page = doc.page(toPageRef(fix.pageObjectNumber));
           const before = await page.annotations.list();
@@ -1839,7 +1839,7 @@ export function runAnnotationMutationConformance(
     // between tests (cloud) loses the fixture's one inline annotation to it.
     if (fix.expectsInlineAnnotation) {
       test('reorder of an annotation born inline keeps its baseIndex name', async () => {
-        const doc = await openFixture(engine, opts);
+        const doc = await openFixture(engine, options);
         try {
           const page = doc.page(toPageRef(fix.pageObjectNumber));
           const before = await page.annotations.list();
@@ -1862,7 +1862,7 @@ export function runAnnotationMutationConformance(
     }
 
     test('delete by objectNumber removes the annotation and reports a stable id', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         // Create one we own so we don't disturb the fixture's other tests.
@@ -1898,7 +1898,7 @@ export function runAnnotationMutationConformance(
 
     if (fix.expectsInlineAnnotation) {
       test('delete of an annotation born inline reports its baseIndex name; the others keep theirs', async () => {
-        const doc = await openFixture(engine, opts);
+        const doc = await openFixture(engine, options);
         try {
           const page = doc.page(toPageRef(fix.pageObjectNumber));
           const before = await page.annotations.list();
@@ -1933,7 +1933,7 @@ export function runAnnotationMutationConformance(
     }
 
     test('abort on create rejects with AbortError', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const draft: HighlightDraft = {
@@ -1960,7 +1960,7 @@ export function runAnnotationMutationConformance(
     // ─────────────────────────────────────────────────────────────────
 
     test('reorder puts annotations right after or before their neighbour', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const seeded: AnnotationRef[] = [];
@@ -1996,7 +1996,7 @@ export function runAnnotationMutationConformance(
     });
 
     test('reorder keeps the order given and goes to the bottom or the top', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const ids = await Promise.all(
@@ -2024,7 +2024,7 @@ export function runAnnotationMutationConformance(
     });
 
     test('reorder refuses a neighbour that moves (InvalidArg) or is not on the page (NotFound)', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const a = await page.annotations.create({
@@ -2065,7 +2065,7 @@ export function runAnnotationMutationConformance(
     });
 
     test('reorder with duplicate refs rejects with InvalidArg', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const a = await page.annotations.create({
@@ -2086,7 +2086,7 @@ export function runAnnotationMutationConformance(
     });
 
     test('abort on reorder rejects with AbortError', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const a = await page.annotations.create({
@@ -2114,7 +2114,7 @@ export function runAnnotationMutationConformance(
     // ─────────────────────────────────────────────────────────────────
 
     test('create a reply links /IRT and defaults /RT to "reply"', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const parent = await page.annotations.create({
@@ -2161,7 +2161,7 @@ export function runAnnotationMutationConformance(
     });
 
     test('create a grouped subordinate writes /RT /Group', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const primary = await page.annotations.create({
@@ -2208,7 +2208,7 @@ export function runAnnotationMutationConformance(
     // ─────────────────────────────────────────────────────────────────
 
     test('create link annotations round-trip uri, goto/xyz, goto/fitH, and dead targets', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
 
@@ -2289,7 +2289,7 @@ export function runAnnotationMutationConformance(
     });
 
     test('a link patch retargets in both directions (uri→goto, goto→uri) and moves the rect', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const created = await page.annotations.create({
@@ -2329,7 +2329,7 @@ export function runAnnotationMutationConformance(
     });
 
     test('a link patch clears the target with null — a dead link on re-read', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const created = await page.annotations.create({
@@ -2376,7 +2376,7 @@ export function runAnnotationMutationConformance(
     });
 
     test('a link grouped to a highlight round-trips /IRT + /RT /Group with its target', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const parent = await page.annotations.create({
@@ -2420,7 +2420,7 @@ export function runAnnotationMutationConformance(
     });
 
     test('replace-text round-trips /IT and groups StrikeOut under its Caret', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const caret = await page.annotations.create({
@@ -2474,7 +2474,7 @@ export function runAnnotationMutationConformance(
     });
 
     test('patch reply: null clears /IRT and /RT (back to top-level)', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const parent = await page.annotations.create({
@@ -2502,7 +2502,7 @@ export function runAnnotationMutationConformance(
     });
 
     test('create with a cross-page /IRT parent throws InvalidArg', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const parent = await page.annotations.create({
@@ -2538,7 +2538,7 @@ export function runAnnotationMutationConformance(
     });
 
     test('create refuses an nm already used on the page, naming the field', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const draft = { subtype: 'highlight', quadPoints: quad, nm: 'taken' } as const;
@@ -2575,7 +2575,7 @@ export function runAnnotationMutationConformance(
     // ─────────────────────────────────────────────────────────────────
 
     test('a review-status reply round-trips /State + /StateModel + /Subj', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const target = await page.annotations.create({
@@ -2620,7 +2620,7 @@ export function runAnnotationMutationConformance(
     });
 
     test('a draft /State without /StateModel takes its standard model, or is refused', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const { annotation } = await page.annotations.create({
@@ -2646,7 +2646,7 @@ export function runAnnotationMutationConformance(
     });
 
     test("a comment's line breaks are `\\n` in `contents` and `\\r` in the saved /Contents", async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const note = await page.annotations.create({
@@ -2672,7 +2672,7 @@ export function runAnnotationMutationConformance(
     });
 
     test('null-clear patches truly remove /State, /StateModel, /Subj and /Contents', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const note = await page.annotations.create({
@@ -2734,7 +2734,7 @@ export function runAnnotationMutationConformance(
     });
 
     test('custom state models round-trip verbatim', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const custom = await page.annotations.create({
@@ -2773,7 +2773,7 @@ export function runAnnotationMutationConformance(
       );
 
     test('a highlight becomes a squiggly line and stays the same annotation', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const mark = (
@@ -2821,7 +2821,7 @@ export function runAnnotationMutationConformance(
     });
 
     test('a square becomes a circle with a new color, and back', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const square = (
@@ -2853,7 +2853,7 @@ export function runAnnotationMutationConformance(
     });
 
     test('a kind outside the group, or over a value the new kind cannot hold, is refused', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const mark = (
@@ -2919,7 +2919,7 @@ export function runAnnotationMutationConformance(
     });
 
     test('undo puts the old kind back, and so does an undo after a later change', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const create = () =>

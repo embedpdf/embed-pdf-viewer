@@ -128,7 +128,7 @@ export function runDocumentFontsConformance(
     async function fieldIn(doc: DocumentHandle, fontFamily: string, value: string, name: string) {
       const page = await firstPage(doc);
       const { field } = await doc.forms.create({
-        family: 'text',
+        kind: 'text',
         name,
         widgets: [{ page, rect: { x: 40, y: 40, width: 200, height: 24 }, fontFamily }],
       });
@@ -205,7 +205,7 @@ export function runDocumentFontsConformance(
       expect(plain.meta.missingCharacters).toBe(undefined);
 
       const { field } = await doc.forms.create({
-        family: 'text',
+        kind: 'text',
         name: 'missing',
         widgets: [
           { page, rect: { x: 40, y: 140, width: 200, height: 24 }, fontFamily: 'helvetica' },
@@ -260,7 +260,9 @@ export function runDocumentFontsConformance(
       const fontsChangedBy = (opId: string) =>
         events.filter(
           (event) =>
-            event.type === 'fonts.changed' && 'tx' in event.origin && event.origin.tx?.id === opId,
+            event.type === 'fonts.changed' &&
+            'transaction' in event.origin &&
+            event.origin.transaction?.id === opId,
         );
 
       const square = await doc.page(page).annotations.create({

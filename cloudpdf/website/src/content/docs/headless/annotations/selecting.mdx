@@ -26,7 +26,7 @@ and a turn snaps to 0°, 90°, 180° and 270°. Hold Shift to move or turn freel
 ## Select with code
 
 ```ts
-annotation.selection.set([ref]); // select these
+annotation.selection.select([ref]); // select these
 annotation.selection.add([otherRef]); // add to the selection
 annotation.selection.selectAll(page.ref); // everything on a page (or leave out the page)
 annotation.selection.selectInRect(page.ref, { x: 50, y: 50, width: 200, height: 100 });
@@ -212,10 +212,10 @@ the viewer still decides where a handle can be grabbed, so what you draw can't b
 annotationPlugin({
   snap: {
     alignment: true, // snap to other annotations and the page while moving
-    alignmentThreshold: 6, // how close, in screen pixels, before it snaps
+    alignmentThresholdPx: 6, // how close, in screen pixels, before it snaps
     rotation: true,
     rotationAngles: [0, 45, 90, 135, 180, 225, 270, 315],
-    rotationThreshold: 4, // degrees
+    rotationThresholdDeg: 4, // degrees
   },
 });
 
@@ -315,7 +315,7 @@ What `useAnnotation()` gives you for selecting, drawing and editing text: its `s
 
 | Method                                                     | What it does                                                                                                                     |
 | :--------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------- |
-| `selection.set(refs)`, `selection.add(refs)`               | Selects these annotations, or adds them to the selection. An annotation in a group brings its group. [Select with code](#select-with-code) |
+| `selection.select(refs)`, `selection.add(refs)`            | Selects these annotations, or adds them to the selection. An annotation in a group brings its group. [Select with code](#select-with-code) |
 | `selection.selectAll(page?)`                               | Selects everything that can be selected, on one page or in the whole document                                                    |
 | `selection.selectInRect(page, rect)`                       | Selects everything a box on a page touches of what it paints, with the rest of each one's group, as dragging on empty space does |
 | `selection.clear()`                                        | Clears the selection                                                                                                             |
@@ -344,7 +344,7 @@ Every method that returns a promise also takes a `signal` in its options, to can
 | Field      | What it is                                                                                                | Read once           |
 | :--------- | :-------------------------------------------------------------------------------------------------------- | :------------------ |
 | `status`   | `'loading'` until every annotation is in, then `'ready'`; `'forbidden'` or `'error'` when they can't load | `getStatus()`       |
-| `selected` | The selected annotations                                                                                  | `selection.list()`  |
+| `selected` | The selected annotations                                                                                  | `selection.getSelected()` |
 | `hovered`  | The annotation under the pointer, or `null`                                                               | `getHovered()`      |
 | `editing`  | The text box being typed in, or `null`                                                                    | `text.getEditing()` |
 

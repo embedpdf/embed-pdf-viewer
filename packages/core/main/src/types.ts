@@ -111,8 +111,8 @@ export type {
   /**
    * Where a confirmed document change came from, on every fact event a plugin
    * emits: `kind` (`'local'` for this engine instance, `'remote'` for another
-   * session), `sessionId`, `sub` (the signed-in user on the cloud, null
-   * locally), `ts`, `serverId` and `tx`. Always the engine event's own
+   * session), `sessionId`, `subject` (the signed-in user on the cloud, null
+   * locally), `at`, `serverSequence` and `transaction`. Always the engine event's own
    * `origin`, passed on as it is, never built by hand.
    */
   EventOrigin,
@@ -221,9 +221,9 @@ export type PromiseMembers<Capability> = { readonly [Path in PromiseMemberOf<Cap
  * it copies (`copy`).
  */
 export type PendingPage =
-  | { readonly look: 'blank' }
-  | { readonly look: 'own' }
-  | { readonly look: 'copy'; readonly of: PageRef };
+  | { readonly kind: 'blank' }
+  | { readonly kind: 'own' }
+  | { readonly kind: 'copy'; readonly of: PageRef };
 
 /**
  * What the kernel knows about an open document: its pages as the user sees
@@ -266,7 +266,7 @@ export interface DocumentMeta {
    * Stage's laid-out scene) keys on it, so a change that keeps the page count
    * (a rotation) still invalidates.
    */
-  readonly revision: number;
+  readonly pagesSequence: number;
   /**
    * The deployment render policy the document's engine advertises — a
    * document fact like `pages`, materialized by the kernel at open (before
@@ -293,7 +293,7 @@ export interface DocumentMeta {
    * The grant asks before the document goes on (a passphrase, or questions on open, it got
    * after the document opened): give it with `documents.retry()`.
    */
-  readonly grantRequest?: GrantOpenRequest;
+  readonly openRequest?: GrantOpenRequest;
 }
 
 /**
@@ -313,7 +313,7 @@ export interface PendingMeta {
   /** `error` only: what the open rejected with. Never carries a password. */
   readonly error?: unknown;
   /** `error` only: the grant's passphrase or questions the open waits for. */
-  readonly grantRequest?: GrantOpenRequest;
+  readonly openRequest?: GrantOpenRequest;
 }
 
 /** The document registry — what document scope is built on. */
@@ -341,7 +341,7 @@ export type PluginScope = 'workspace' | 'document';
  * `S` is the plugin's session state and `T` its settings, `NoSettings` for a
  * plugin that declares none.
  */
-export interface PluginContext<S = unknown, T extends object = NoSettings> {
+export interface PluginContext<State = unknown, PluginSettings extends object = NoSettings> {
   // ── identity ──
   readonly id: string;
   /** Unique per open of this document (workspace plugins: `workspace:<id>`). */
@@ -419,7 +419,7 @@ export interface PluginContext<S = unknown, T extends object = NoSettings> {
 
   // ── state ──
   /** This instance's session state, changed only through pure transitions. */
-  readonly state: StateCell<S>;
+  readonly state: StateCell<State>;
 
   // ── settings ──
   /**
@@ -431,7 +431,7 @@ export interface PluginContext<S = unknown, T extends object = NoSettings> {
    * `onSettingsChanged` listeners go when it closes. The merge rules are in `settings.ts`.
    * A plugin whose definition declares no settings has none to read: calling it throws.
    */
-  readonly settings: () => Settings<T>;
+  readonly settings: () => Settings<PluginSettings>;
 
   // ── reactivity ──
   /**
@@ -472,7 +472,7 @@ export interface PluginContext<S = unknown, T extends object = NoSettings> {
   // ── events ──
   /** Mint a capability event; disposed with the instance. Expose only `.on`. */
   readonly events: {
-    source<T>(): { readonly on: EventHook<T>; emit(event: T): void; dispose(): void };
+    source<T>(): { readonly on: EventHook<T>; emit(event: T): void; destroy(): void };
   };
   /** Subscribe for the instance lifetime; the unsubscribe is owned by the kernel. */
   listen<T>(source: Subscribable<T>, listener: (event: T) => void): void;
@@ -526,7 +526,7 @@ export interface PluginContext<S = unknown, T extends object = NoSettings> {
   /** Acquire a resource whose disposal the instance owns; a late arrival after close is disposed, not returned. */
   acquire<R>(
     get: (lifetime: AbortSignal) => Promise<R>,
-    dispose: (resource: R) => void | Promise<void>,
+    release: (resource: R) => void | Promise<void>,
   ): Promise<R>;
   /**
    * Run an engine call the caller can cancel: when `signal` fires, the call is
@@ -550,11 +550,14 @@ export interface PluginContext<S = unknown, T extends object = NoSettings> {
  * `update` applies a pure transition, and a transition that returns the
  * current value changes nothing.
  */
-export interface StateCell<S> {
-  get(): S;
-  update<Args extends unknown[]>(transition: (state: S, ...args: Args) => S, ...args: Args): void;
+export interface StateCell<State> {
+  get(): State;
+  update<Args extends unknown[]>(
+    transition: (state: State, ...args: Args) => State,
+    ...args: Args
+  ): void;
   /** Fires synchronously after every committed change of this instance's state. */
-  readonly onChange: EventHook<StateChange<S>>;
+  readonly onChange: EventHook<StateChange<State>>;
 }
 
 /** One committed state change: the value before and after. */
@@ -574,9 +577,13 @@ export interface StateChange<S> {
  * controller that returns less than the capability is a type error, not a
  * narrower capability.
  */
-export interface PluginDef<S = unknown, C = unknown, T extends object = NoSettings> {
+export interface PluginDefinition<
+  State = unknown,
+  Capability = unknown,
+  PluginSettings extends object = NoSettings,
+> {
   readonly id: string;
-  readonly token?: CapabilityToken<C>;
+  readonly token?: CapabilityToken<Capability>;
   readonly scope?: PluginScope;
   readonly requires?: ReadonlyArray<CapabilityToken<unknown>>;
   readonly optional?: ReadonlyArray<CapabilityToken<unknown>>;
@@ -588,30 +595,32 @@ export interface PluginDef<S = unknown, C = unknown, T extends object = NoSettin
    */
   readonly resolvesAnyCapability?: true;
   /** Initial session state, built fresh for every instance. Omit for stateless plugins. */
-  readonly state?: () => S;
+  readonly state?: () => State;
   /**
    * The plugin's settings: its defaults, and what the app registered (the factory's config).
    * The kernel builds one store per registration from it when it plans the plugin list, so the
    * settings can be read and changed before any document opens (`kernel.settingsOf(token)`).
    * The plugin reads them with `ctx.settings()`. Omit for a plugin without settings.
    */
-  readonly settings?: SettingsDeclaration<T>;
+  readonly settings?: SettingsDeclaration<PluginSettings>;
   /**
    * Build the instance's API and, optionally, the connections (subscriptions
    * to engine events and sibling capabilities) that start once every
    * dependency is constructed. Runs once per instance.
    */
-  readonly create: NoInfer<(ctx: PluginContext<S, T>) => { api: C; connect?: () => void }>;
+  readonly create: NoInfer<
+    (ctx: PluginContext<State, PluginSettings>) => { api: Capability; connect?: () => void }
+  >;
   /**
    * This capability as seen from inside a document's scope: calls that leave out the document
    * use `documentId` instead of the active one. Workspace plugins only. The kernel builds the
    * view once per document and hands it out whenever that document is named
    * (`kernel.capability(token, documentId)`, `ctx.forDocument`, a `<DocumentScope>`).
    */
-  readonly inScope?: NoInfer<(api: C, documentId: string) => C>;
+  readonly inScope?: NoInfer<(api: Capability, documentId: string) => Capability>;
 }
 
-export type AnyPlugin = PluginDef<any, any, any>;
+export type AnyPlugin = PluginDefinition<any, any, any>;
 
 // ── Built-in: the document registry, exposed as a capability ─────────────────
 
@@ -643,7 +652,7 @@ export interface DocumentInfo {
    * The grant's passphrase or questions the document waits for (`retry` with them): `error`,
    * before it opens; `ready`, when the grant got them after it opened.
    */
-  readonly grantRequest?: GrantOpenRequest;
+  readonly openRequest?: GrantOpenRequest;
   /**
    * `ready` only: a change waits for the visitor's answers to what the grant asks before
    * the first change. Show the questions, then `identify()` or `declineIdentity()`.
@@ -719,7 +728,7 @@ export interface UnlockOptions extends OperationOptions {
   readonly password: string;
 }
 
-/** Options for `retry()`: what a document from a grant waited for (`grantRequest`). */
+/** Options for `retry()`: what a document from a grant waited for (`openRequest`). */
 export interface RetryOptions extends OperationOptions {
   /** The grant's passphrase. */
   readonly passphrase?: string;
@@ -727,7 +736,7 @@ export interface RetryOptions extends OperationOptions {
    * The visitor's answers to what the grant asks, added to who the page said the user is
    * (`identity`); ones given before stay.
    */
-  readonly identity?: VisitorAnswers;
+  readonly visitorIdentity?: VisitorAnswers;
 }
 
 /** Options for `download()`. */
@@ -797,7 +806,7 @@ export interface PreparedPrint {
    */
   print(options?: OperationOptions): Promise<void>;
   /** Free what preparing took. Closing the document does too. */
-  dispose(): void;
+  destroy(): void;
 }
 
 /** One printed sheet: a picture of a page, and the page's size on paper. */
@@ -815,7 +824,7 @@ export interface StagedPrint {
   /** Open the print dialog. Resolves once the printer has the job. */
   print(): Promise<void>;
   /** Free what staging took. */
-  dispose(): void;
+  destroy(): void;
 }
 
 /**
@@ -882,7 +891,7 @@ export interface DocumentActiveChangedEvent {
 }
 export interface DocumentPagesChangedEvent {
   readonly documentId: string;
-  readonly revision: number;
+  readonly pagesSequence: number;
   readonly pages: readonly PageInfo[];
 }
 export interface DocumentUnsavedChangesChangedEvent {
@@ -914,10 +923,10 @@ export interface DocumentsCapability {
    * Open a failed document (`status: 'error'`) again, with the same source and options, in its
    * own tab: it keeps its id and its place, and the active document stays the active one. A
    * document from a grant that waited for its passphrase or the visitor's answers
-   * (`grantRequest`) opens with `passphrase` or `identity`; a ready one the grant asks again
-   * (`grantRequest`) goes on with them, as the same visitor. Resolves like `open()`. Rejects
+   * (`openRequest`) opens with `passphrase` or `identity`; a ready one the grant asks again
+   * (`openRequest`) goes on with them, as the same visitor. Resolves like `open()`. Rejects
    * `invalid-input` for a document that didn't fail and isn't asked, or answers for one not from
-   * a grant; `permission-denied` while the grant still asks, and `grantRequest` says what.
+   * a grant; `permission-denied` while the grant still asks, and `openRequest` says what.
    */
   retry(id: string, options?: RetryOptions): Promise<OpenDocumentResult>;
   /**

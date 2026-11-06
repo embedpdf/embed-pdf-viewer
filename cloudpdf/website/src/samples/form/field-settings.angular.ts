@@ -11,13 +11,9 @@ import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { EpdfInteraction, withInteraction } from '@embedpdf/angular/interaction';
-import {
-  EpdfAnnotation,
-  EpdfAnnotationLayer,
-  withAnnotation,
-} from '@embedpdf/angular/annotation';
+import { EpdfAnnotation, EpdfAnnotationLayer, withAnnotation } from '@embedpdf/angular/annotation';
 import { EpdfForm, EpdfFormLayer, toFieldRef, withForm } from '@embedpdf/angular/form';
-import type { FormFieldDTO } from '@embedpdf/angular/form';
+import type { FormField } from '@embedpdf/angular/form';
 import { cloudEngine } from '@cloudpdf/engine';
 
 const forms: OpenInput = { kind: 'grant', grant: 'shr_eBRW5E3MpolzD8G36Alp30EF' };
@@ -116,12 +112,12 @@ export class App {
       untracked(() => {
         this.interaction.activateTool('form-edit');
         const widget = this.form.get(toFieldRef('name'))?.widgets[0]?.ref;
-        if (widget) this.annotation.selection.set([widget]);
+        if (widget) this.annotation.selection.select([widget]);
       });
     });
   }
 
-  protected rename(field: FormFieldDTO, value: string) {
+  protected rename(field: FormField, value: string) {
     const name = value.trim();
     if (name && name !== field.name) void this.form.update(field.ref, { name });
   }

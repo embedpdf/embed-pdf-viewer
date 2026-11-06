@@ -180,7 +180,7 @@ const ROUND_TRIPS: { readonly [T in ChangeOp['type']]: RoundTrip } = {
       {
         type: 'forms.create',
         draft: {
-          family: 'text',
+          kind: 'text',
           name: 'email',
           // A calculate script also puts it in the calculation order.
           actions: { calculate: CALCULATE },
@@ -234,7 +234,7 @@ const ROUND_TRIPS: { readonly [T in ChangeOp['type']]: RoundTrip } = {
       {
         type: 'forms.create',
         draft: {
-          family: 'text',
+          kind: 'text',
           name: 'email',
           widgets: [
             { page: PAGE, rect: { x: 20, y: 60, width: 140, height: 24 } },
@@ -253,7 +253,7 @@ const ROUND_TRIPS: { readonly [T in ChangeOp['type']]: RoundTrip } = {
       { type: 'forms.update', field: NAME, patch: { actions: { calculate: CALCULATE } } },
       {
         type: 'forms.create',
-        draft: { family: 'text', name: 'total', actions: { calculate: CALCULATE } },
+        draft: { kind: 'text', name: 'total', actions: { calculate: CALCULATE } },
         objectNumber: field,
       },
     ],
@@ -271,7 +271,7 @@ const ROUND_TRIPS: { readonly [T in ChangeOp['type']]: RoundTrip } = {
       {
         type: 'forms.create',
         draft: {
-          family: 'text',
+          kind: 'text',
           name: 'email',
           widgets: [
             { page: PAGE, rect: { x: 20, y: 60, width: 140, height: 24 } },
@@ -305,7 +305,7 @@ const ROUND_TRIPS: { readonly [T in ChangeOp['type']]: RoundTrip } = {
       {
         type: 'forms.create',
         draft: {
-          family: 'signature',
+          kind: 'signature',
           name: 'signature',
           widgets: [{ page: EMPTY_PAGE, rect: { x: 20, y: 100, width: 120, height: 40 } }],
         },
@@ -428,15 +428,15 @@ const ROUND_TRIPS: { readonly [T in ChangeOp['type']]: RoundTrip } = {
  */
 export function runChangeConformance(
   runner: ConformanceTestRunner,
-  opts: ChangeConformanceOptions,
+  options: ChangeConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`change conformance: ${opts.label}`, () => {
+  describe(`change conformance: ${options.label}`, () => {
     let engine: Engine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -444,7 +444,7 @@ export function runChangeConformance(
     });
 
     const withDocument = async (body: (doc: DocumentHandle) => Promise<void>) => {
-      const doc = await opts.open(engine);
+      const doc = await options.open(engine);
       try {
         await body(doc);
       } finally {
@@ -500,7 +500,8 @@ export function runChangeConformance(
       return { events, stop };
     };
 
-    const txOf = (event: DocumentEvent) => ('origin' in event ? event.origin.tx : undefined);
+    const txOf = (event: DocumentEvent) =>
+      'origin' in event ? event.origin.transaction : undefined;
 
     /** The item of `type` a result holds, applied or left alone. */
     const itemOfType = <T extends ChangeItemType>(
@@ -753,14 +754,14 @@ export function runChangeConformance(
         const undone = await doc.forms.get(NAME);
         expect(undone.required).toBe(false);
         expect(undone.noExport).toBe(false);
-        expect(undone.family === 'text' && undone.value).toBe('Bea');
+        expect(undone.kind === 'text' && undone.value).toBe('Bea');
 
         // The undo's undo makes it required again, and leaves the rest.
         await doc.apply({ undoOf: undo.meta.opId });
         const redone = await doc.forms.get(NAME);
         expect(redone.required).toBe(true);
         expect(redone.noExport).toBe(false);
-        expect(redone.family === 'text' && redone.value).toBe('Bea');
+        expect(redone.kind === 'text' && redone.value).toBe('Bea');
       });
     });
 
@@ -1236,12 +1237,12 @@ export function runChangeConformance(
     });
 
     test('only the user who made a change may undo it', async () => {
-      if (!opts.openAsAnotherUser) return;
+      if (!options.openAsAnotherUser) return;
       await withDocument(async (doc) => {
         const mine = await doc.apply({
           ops: [{ type: 'annotations.update', ref: FILE_SQUARE, patch: { color: '#e11d48' } }],
         });
-        const other = await opts.openAsAnotherUser!(engine, doc);
+        const other = await options.openAsAnotherUser!(engine, doc);
         try {
           await expect(other.apply({ undoOf: mine.meta.opId })).rejects.toMatchObject({
             code: EngineErrorCode.Forbidden,

@@ -85,15 +85,15 @@ export interface NoStrokeConformanceOptions {
  */
 export function runNoStrokeConformance(
   runner: ConformanceTestRunner,
-  opts: NoStrokeConformanceOptions,
+  options: NoStrokeConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`no-stroke conformance: ${opts.label}`, () => {
+  describe(`no-stroke conformance: ${options.label}`, () => {
     let engine: Engine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -101,7 +101,7 @@ export function runNoStrokeConformance(
     });
 
     const onPage = async (run: (page: PageHandle, doc: DocumentHandle) => Promise<void>) => {
-      const doc = await opts.open(engine);
+      const doc = await options.open(engine);
       try {
         const { pages } = await doc.pages.list();
         await run(doc.page(toPageRef(pages[0]!.ref.objectNumber)), doc);

@@ -6,7 +6,7 @@ import {
   type Engine,
   type PageLayout,
 } from '@embedpdf/core';
-import type { FormFieldDTO, FormSnapshot, WidgetAnnotation } from '@embedpdf/engine-core/runtime';
+import type { FormField, FormSnapshot, WidgetAnnotation } from '@embedpdf/engine-core/runtime';
 import { interactionPlugin } from '@embedpdf/plugin-interaction';
 
 import { formPlugin } from '../src/form.plugin';
@@ -36,11 +36,11 @@ const page: PageLayout = {
   pdfCropBox: { left: 0, bottom: 0, right: 600, top: 800 },
 } as PageLayout;
 
-const textField = (value: string): FormFieldDTO =>
+const textField = (value: string): FormField =>
   ({
     ref: { kind: 'objectNumber', objectNumber: 5 },
     name: 'name',
-    family: 'text',
+    kind: 'text',
     origin: 'acroform',
     readOnly: false,
     required: false,
@@ -61,7 +61,7 @@ const textField = (value: string): FormFieldDTO =>
     multiline: false,
     password: false,
     comb: false,
-  }) as unknown as FormFieldDTO;
+  }) as unknown as FormField;
 
 const NOTHING_CHANGED = {
   affectedPages: [],
@@ -88,9 +88,9 @@ const snapshot = (value: string): FormSnapshot => ({
 const origin = (kind: 'local' | 'remote') => ({
   kind,
   sessionId: kind === 'local' ? 'me' : 'them',
-  sub: null,
-  ts: 0,
-  serverId: null,
+  subject: null,
+  at: new Date(0).toISOString(),
+  serverSequence: null,
 });
 
 async function boot() {
@@ -105,7 +105,7 @@ async function boot() {
         listeners.add(listener);
         return () => listeners.delete(listener);
       },
-      lastServerId: () => null,
+      lastServerSequence: () => null,
     },
     pages: { list: () => Promise.resolve({ pageCount: 1, labels: [], pages: [page] }) },
     security: { allows: () => true, allowsField: () => true },
@@ -122,7 +122,11 @@ async function boot() {
           };
           // Like both real engines: the event is published before the promise settles.
           const tx = { id: opId, index: 0, count: 1 };
-          emit({ type: 'forms.valueSet', origin: { ...origin('local'), tx }, ...result });
+          emit({
+            type: 'forms.valueSet',
+            origin: { ...origin('local'), transaction: tx },
+            ...result,
+          });
           resolve({ items: [], meta: { ...NOTHING_CHANGED, opId, undoable: true } });
         }),
       ),
@@ -204,8 +208,16 @@ describe('form fields mirror', () => {
     const harness = await boot();
     harness.reads[0]!(snapshot('initial'));
     await settle();
-    harness.emit({ type: 'stream.desynced', reason: 'backlog-overflow', ts: 0 });
-    harness.emit({ type: 'stream.desynced', reason: 'backlog-overflow', ts: 0 });
+    harness.emit({
+      type: 'stream.desynced',
+      reason: 'backlog-overflow',
+      at: new Date(0).toISOString(),
+    });
+    harness.emit({
+      type: 'stream.desynced',
+      reason: 'backlog-overflow',
+      at: new Date(0).toISOString(),
+    });
     expect(harness.reads).toHaveLength(2);
     harness.reads[1]!(snapshot('after desync'));
     await settle();

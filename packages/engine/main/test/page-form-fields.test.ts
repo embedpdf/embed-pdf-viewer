@@ -6,7 +6,7 @@ import {
   runPageFormFieldsConformance,
   type ConformanceTestRunner,
 } from '@embedpdf/engine-core/conformance';
-import type { DocumentHandle, Engine, FormFieldDTO } from '@embedpdf/engine-core/runtime';
+import type { DocumentHandle, Engine, FormField } from '@embedpdf/engine-core/runtime';
 import { createLocalEngine } from '../src/index';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -55,10 +55,10 @@ async function formOf(doc: DocumentHandle) {
   return Object.fromEntries(fields.map((field) => [field.name, summary(field)]));
 }
 
-function summary(field: FormFieldDTO) {
+function summary(field: FormField) {
   const value =
-    field.family === 'checkbox' ? field.checked : 'value' in field ? field.value : undefined;
-  return { family: field.family, value, widgets: field.widgets.length };
+    field.kind === 'checkbox' ? field.checked : 'value' in field ? field.value : undefined;
+  return { family: field.kind, value, widgets: field.widgets.length };
 }
 
 describe('merging form PDFs into a blank one (engine-local, wasm runtime)', () => {

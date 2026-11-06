@@ -134,7 +134,7 @@ export interface TestContext<S, T extends object = NoSettings> extends PluginCon
    */
   print(print: () => Promise<void>): Promise<void>;
   /** Run the registered cleanups and abort the lifetime (the plugin's unmount). */
-  dispose(): Promise<void>;
+  destroy(): Promise<void>;
 }
 
 const layoutOf = (page: TestPage, index: number): PageLayout => {
@@ -192,7 +192,7 @@ function testDocuments(metaOf: () => DocumentMeta): DocumentsCapability {
     listPages: pagesOf,
     getPage: (page, id) => findPage(pagesOf(id), page),
     getPageIndex: (ref, id) => pagesOf(id).findIndex((page) => pageRefsEqual(page.ref, ref)),
-    getRevision: (id) => (known(id) ? metaOf().revision : -1),
+    getRevision: (id) => (known(id) ? metaOf().pagesSequence : -1),
     canDownload: () => true,
     // A test context has no printer.
     canPrint: () => false,
@@ -258,7 +258,7 @@ export function createTestContext<S = void, T extends object = NoSettings>(
               subscribe: documentEvents.on,
               on: (type: DocumentEvent['type'], listener: (event: DocumentEvent) => void) =>
                 subscribeToType(documentEvents.on, type, listener),
-              lastServerId: () => null,
+              lastServerSequence: () => null,
             },
             security: { allows: () => true, allowsAnnotation: () => true, allowsField: () => true },
             ...options.doc,
@@ -307,7 +307,7 @@ export function createTestContext<S = void, T extends object = NoSettings>(
     pages: pageView.current().pages,
     pageLabels: pageView.current().labels,
     pendingPages: NO_PENDING_PAGES,
-    revision: 1,
+    pagesSequence: 1,
     renderPolicy: { kind: 'continuous' },
     hasUnsavedChanges: false,
   };
@@ -322,7 +322,7 @@ export function createTestContext<S = void, T extends object = NoSettings>(
       pages: view.pages,
       pageLabels: view.labels,
       pendingPages: view.pending,
-      revision: moved ? meta.revision + 1 : meta.revision,
+      pagesSequence: moved ? meta.pagesSequence + 1 : meta.pagesSequence,
     };
   }
   if (doc) {
@@ -360,7 +360,7 @@ export function createTestContext<S = void, T extends object = NoSettings>(
   const settingsStore = options.settings
     ? createSettingsStore(options.settings, store.notify, report)
     : null;
-  if (settingsStore) cleanups.push(() => settingsStore.dispose());
+  if (settingsStore) cleanups.push(() => settingsStore.destroy());
   const settings = settingsStore?.forInstance((teardown) => cleanups.push(teardown)) ?? null;
 
   const context: TestContext<S, T> = {
@@ -439,7 +439,7 @@ export function createTestContext<S = void, T extends object = NoSettings>(
         const hook = createEventHook<T>((error) =>
           console.error(`[${id}] listener failed:`, error),
         );
-        cleanups.push(() => hook.dispose());
+        cleanups.push(() => hook.destroy());
         return hook;
       },
     },
@@ -518,7 +518,7 @@ export function createTestContext<S = void, T extends object = NoSettings>(
     settle: (signal) => settle(settleFlushes, [signal, lifetime.signal], report),
     download: (read) => runWrapped(downloadWraps, read),
     print: (print) => runWrapped(printWraps, print),
-    dispose: async () => {
+    destroy: async () => {
       lifetime.abort();
       for (const fn of cleanups.splice(0).reverse()) await fn();
     },

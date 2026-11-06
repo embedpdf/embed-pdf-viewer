@@ -132,7 +132,7 @@ describe('plugin-actions integration (real engine)', () => {
   const user = {
     origin: 'user' as const,
     source: { kind: 'api' as const },
-    event: { scope: 'activate' as const },
+    event: { type: 'activate' as const },
   };
   const lastCallsSince = (mark: number) => calls.slice(mark).map((call) => call.seam);
 
@@ -229,9 +229,9 @@ describe('plugin-actions integration (real engine)', () => {
   it('dispatches by activate trigger: annotation ref → tree → executors', async () => {
     const mark = calls.length;
     const result = await actions.dispatch({
-      scope: 'activate',
+      type: 'activate',
       // The ref a trigger source really passes: the annotation's own (objectNumber).
-      ref: refOf('named-next'),
+      annotation: refOf('named-next'),
       page: toPageRef(firstPage),
     });
     expect(result.status).toBe('executed');

@@ -87,7 +87,7 @@ const page: PageLayout = {
 const handleFor = (id: string) =>
   ({
     id,
-    events: { subscribe: () => () => {}, lastServerId: () => null },
+    events: { subscribe: () => () => {}, lastServerSequence: () => null },
     pages: { list: () => Promise.resolve({ pageCount: 1, labels: [], pages: [page] }) },
     security: { allows: () => true, allowsAnnotation: () => true },
     // The "file" is the document's id, so a test can tell which document was saved.

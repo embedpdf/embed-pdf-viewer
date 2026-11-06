@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   formWidget,
   toPageRef,
-  type FormFieldDTO,
+  type FormField,
   type FormSnapshot,
   type WidgetAnnotation,
 } from '@embedpdf/engine-core/runtime';
@@ -17,11 +17,11 @@ const byObjectNumber = (objectNumber: number) => ({ kind: 'objectNumber' as cons
 
 const field = (
   objectNumber = 5,
-  over: Partial<Extract<FormFieldDTO, { family: 'text' }>> = {},
-): FormFieldDTO => ({
+  over: Partial<Extract<FormField, { kind: 'text' }>> = {},
+): FormField => ({
   ref: { kind: 'objectNumber', objectNumber },
   name: `name-${objectNumber}`,
-  family: 'text',
+  kind: 'text',
   origin: 'acroform',
   readOnly: false,
   required: false,
@@ -48,7 +48,7 @@ const field = (
 });
 
 /** The form of these fields, each with one widget on page 1. */
-const snapshotOf = (fields: readonly FormFieldDTO[]): FormSnapshot => ({
+const snapshotOf = (fields: readonly FormField[]): FormSnapshot => ({
   formKind: 'acroform',
   needsAppearances: false,
   widgets: fields.map(
@@ -73,7 +73,7 @@ const snapshotOf = (fields: readonly FormFieldDTO[]): FormSnapshot => ({
  * a `fields:fill` (`fields:sign`) permission for its group, or
  * `doc.forms.fill` (`doc.sign`) for every field.
  */
-function harness(granted: readonly string[], fields: readonly FormFieldDTO[] = [field()]) {
+function harness(granted: readonly string[], fields: readonly FormField[] = [field()]) {
   const list = vi.fn(async () => snapshotOf(fields));
   // Every fill is one change: `doc.apply` gets its ops.
   const apply = vi.fn(async () => ({ items: [], meta: { undoable: true } }));
@@ -102,7 +102,7 @@ function harness(granted: readonly string[], fields: readonly FormFieldDTO[] = [
 }
 
 /** The harness with its form read. */
-async function loaded(granted: readonly string[], fields?: readonly FormFieldDTO[]) {
+async function loaded(granted: readonly string[], fields?: readonly FormField[]) {
   const fixture = harness(granted, fields);
   await fixture.capability.refresh();
   await vi.waitFor(() => expect(fixture.capability.getSnapshot()).not.toBeNull());
@@ -161,7 +161,7 @@ describe('form authority twins', () => {
 
   it('refuses building the form without doc.forms.modify, before any engine call', async () => {
     const fixture = harness(['doc.forms.read', 'doc.forms.fill']);
-    const draft = { family: 'text' as const, name: 'x' };
+    const draft = { kind: 'text' as const, name: 'x' };
     for (const call of [
       () => fixture.capability.create(draft),
       () => fixture.capability.update(byObjectNumber(5), { required: true }),

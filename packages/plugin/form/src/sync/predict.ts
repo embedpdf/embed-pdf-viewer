@@ -16,7 +16,7 @@ import {
   widgetsAfterDisplay,
   type AnnotationRef,
   type FieldWithWidgets,
-  type FormFieldDTO,
+  type FormField,
   type FormFieldRef,
   type FormWidget,
   type WidgetAnnotation,
@@ -44,7 +44,7 @@ const widgetNumber = (widget: WidgetAnnotation): number =>
   widget.ref.kind === 'objectNumber' ? widget.ref.objectNumber : 0;
 
 /** The rows of a field's widgets, in its widget order. */
-function rowsOfField(index: FieldIndex, field: FormFieldDTO): WidgetAnnotation[] {
+function rowsOfField(index: FieldIndex, field: FormField): WidgetAnnotation[] {
   return field.widgets.flatMap((widget) => {
     const row = widgetRowOf(index, widget.objectNumber);
     return row ? [row] : [];
@@ -52,7 +52,7 @@ function rowsOfField(index: FieldIndex, field: FormFieldDTO): WidgetAnnotation[]
 }
 
 /** A field and the rows of its widgets, as the index holds them. */
-const withRows = (index: FieldIndex, field: FormFieldDTO): FieldWithWidgets => ({
+const withRows = (index: FieldIndex, field: FormField): FieldWithWidgets => ({
   field,
   widgets: rowsOfField(index, field),
 });
@@ -70,8 +70,8 @@ function withFields(index: FieldIndex, parts: readonly FieldWithWidgets[]): Fiel
 }
 
 /** The fields a reset of the whole form puts back: the ones that hold a value. */
-const resetTargets = (index: FieldIndex): FormFieldDTO[] =>
-  (index.snapshot?.fields ?? []).filter((field) => RESET_FAMILIES.has(field.family));
+const resetTargets = (index: FieldIndex): FormField[] =>
+  (index.snapshot?.fields ?? []).filter((field) => RESET_FAMILIES.has(field.kind));
 
 const RESET_FAMILIES = new Set(['text', 'checkbox', 'radio', 'combobox', 'listbox']);
 
@@ -159,7 +159,7 @@ function predictOnce(index: FieldIndex, op: PredictedOp): FieldIndex {
         const gone = removeWidgets(index, [{ objectNumber: number, page: row.page } as FormWidget]);
         if (!field) return gone;
         const widgets = field.widgets.filter((widget) => widget.objectNumber !== number);
-        return upsertFields(gone, [{ ...field, widgets } as FormFieldDTO]);
+        return upsertFields(gone, [{ ...field, widgets } as FormField]);
       }
       case 'forms.reorderWidgets': {
         if (!index.snapshot) return index;
@@ -230,9 +230,9 @@ function createdField(
 }
 
 /** The fields a change's ops write a value or a look to, each once, in op order. */
-export function fieldsNamedBy(index: FieldIndex, ops: readonly PredictedOp[]): FormFieldDTO[] {
-  const named = new Map<FieldKey, FormFieldDTO>();
-  const add = (field: FormFieldDTO | null): void => {
+export function fieldsNamedBy(index: FieldIndex, ops: readonly PredictedOp[]): FormField[] {
+  const named = new Map<FieldKey, FormField>();
+  const add = (field: FormField | null): void => {
     if (field && !named.has(fieldKeyOf(field))) named.set(fieldKeyOf(field), field);
   };
   for (const op of ops) {
@@ -260,7 +260,7 @@ export function fieldsNamedBy(index: FieldIndex, ops: readonly PredictedOp[]): F
 export function withFieldsFrom(
   index: FieldIndex,
   source: FieldIndex,
-  fields: readonly FormFieldDTO[],
+  fields: readonly FormField[],
 ): FieldIndex {
   return withFields(
     index,
@@ -272,7 +272,7 @@ export function withFieldsFrom(
 }
 
 /** A field and its widgets back as `index` holds them. */
-const restoreOf = (index: FieldIndex, field: FormFieldDTO): PredictedOp => ({
+const restoreOf = (index: FieldIndex, field: FormField): PredictedOp => ({
   type: 'forms.restore',
   field,
   widgets: rowsOfField(index, field),

@@ -35,7 +35,10 @@ const originals = measured.map((name) =>
   Object.getOwnPropertyDescriptor(HTMLElement.prototype, name),
 );
 beforeAll(() => {
-  Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, get: () => 800 });
+  Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
+    configurable: true,
+    get: () => 800,
+  });
   Object.defineProperty(HTMLElement.prototype, 'clientHeight', {
     configurable: true,
     get: () => 600,
@@ -85,7 +88,7 @@ function fakeRender() {
     markPainted: () => {},
     markUnpainted: () => {},
     release: vi.fn(),
-    dispose: vi.fn(),
+    destroy: vi.fn(),
   };
   const createViewDemand = vi.fn(() => view);
   const paint = { tiles: true };
@@ -158,7 +161,8 @@ function fakeRender() {
   };
   /** How often the tile's picture has been asked for: once per binding. */
   const pictureAsks = () =>
-    (tile.handle as unknown as { objectUrl: { mock: { calls: unknown[] } } }).objectUrl.mock.calls.length;
+    (tile.handle as unknown as { objectUrl: { mock: { calls: unknown[] } } }).objectUrl.mock.calls
+      .length;
   return {
     feature: { plugins: [plugin], services: [] },
     demands,
@@ -209,7 +213,7 @@ describe('the tile plane', () => {
     expect(after.at(-1)!.width).toBeGreaterThan(before.width); // the zoom asked for more pixels
     expect(new Set(after.map((demand) => demand.visible)).size).toBeGreaterThan(1); // the scroll moved the visible part
     expect(render.view.release).not.toHaveBeenCalled();
-    expect(render.view.dispose).not.toHaveBeenCalled();
+    expect(render.view.destroy).not.toHaveBeenCalled();
     expect(render.createViewDemand).toHaveBeenCalledTimes(1);
     expect(tiles(fixture.nativeElement)).toHaveLength(1);
   });
@@ -284,7 +288,7 @@ describe('the tile plane', () => {
     expect(render.view.release).toHaveBeenCalledTimes(1);
     expect(render.view.release).toHaveBeenCalledWith(toPageRef(1));
     expect(render.demands.at(-1)!.page).toBe(2);
-    expect(render.view.dispose).not.toHaveBeenCalled();
+    expect(render.view.destroy).not.toHaveBeenCalled();
     expect(render.createViewDemand).toHaveBeenCalledTimes(1);
     expect(tiles(fixture.nativeElement)).toHaveLength(1);
 
@@ -292,7 +296,7 @@ describe('the tile plane', () => {
     picker.shown.set(false);
     await fixture.whenStable();
     expect(render.view.release).toHaveBeenLastCalledWith(toPageRef(2));
-    expect(render.view.dispose).toHaveBeenCalledTimes(1);
+    expect(render.view.destroy).toHaveBeenCalledTimes(1);
   });
 });
 

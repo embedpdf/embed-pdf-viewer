@@ -4,7 +4,7 @@
 
   useAnnotationEvent(
     (annotation) => annotation.comments.onThreadChanged,
-    ({ rootRef, change }) => change === 'reply' && notifyThreadAuthor(rootRef),
+    ({ rootRef, type }) => type === 'reply' && notifyThreadAuthor(rootRef),
   );
 </script>
 

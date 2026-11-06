@@ -46,7 +46,7 @@ export {
   type FlagKey,
   type KindCaps,
 } from './define';
-export { fieldFamilyOfKind, widgetKindOf } from './widget';
+export { fieldKindOf, widgetKindOf } from './widget';
 
 /** The kinds, by name. */
 export const KINDS: Readonly<Record<string, AnnotationKind>> = {

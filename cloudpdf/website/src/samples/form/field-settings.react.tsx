@@ -34,7 +34,7 @@ function useDesignForm() {
     started.current = true;
     interaction.activateTool('form-edit');
     const widget = form.get(toFieldRef('name'))?.widgets[0]?.ref;
-    if (widget) annotation.selection.set([widget]);
+    if (widget) annotation.selection.select([widget]);
   }, [form, annotation, interaction, status]);
 }
 

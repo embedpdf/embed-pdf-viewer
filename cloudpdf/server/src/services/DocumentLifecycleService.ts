@@ -77,11 +77,11 @@ export interface ImportInput {
  *              transfer (content dedup or idempotent replay).
  * `accepted` — async: the job is queued; poll the document.
  */
-export type ImportResult = { tag: 'imported' | 'deduped' | 'accepted'; doc: DocumentRow };
+export type ImportResult = { status: 'imported' | 'deduped' | 'accepted'; doc: DocumentRow };
 
 /** What a completed transfer resolved to — the worker's fenced-succeed payload. */
 export interface ImportTransferOutcome extends ImportResult {
-  tag: 'imported';
+  status: 'imported';
   resolvedRevision: string | null;
   sourceKind: string;
   sourceLocation: string;
@@ -123,9 +123,9 @@ export interface InitInput {
 }
 
 export type InitResult =
-  | { tag: 'created'; doc: DocumentRow }
-  | { tag: 'resumed'; doc: DocumentRow }
-  | { tag: 'deduped'; doc: DocumentRow };
+  | { status: 'created'; doc: DocumentRow }
+  | { status: 'resumed'; doc: DocumentRow }
+  | { status: 'deduped'; doc: DocumentRow };
 
 export type InitUpload =
   | {
@@ -218,7 +218,7 @@ export interface DocumentLifecycleOptions {
  * flow plus delete cascade and download.
  *
  * Failure model:
- *   - `init`     - returns `tag: deduped` on a content-sha match (no
+ *   - `init`     - returns `status: 'deduped'` on a content-sha match (no
  *                  upload needed). Throws `EngineError(InvalidArg)`
  *                  if the customer supplied a stale idempotency key
  *                  pointing at a different content sha.
@@ -288,7 +288,7 @@ export class DocumentLifecycleService {
     if (dedupMode === 'reuse-existing' && input.contentSha256) {
       const existing = await this.documents.findByBaseSha(input.tenantId, input.contentSha256);
       if (existing) {
-        return { tag: 'deduped', doc: existing };
+        return { status: 'deduped', doc: existing };
       }
     }
 
@@ -303,7 +303,7 @@ export class DocumentLifecycleService {
         // upload). If pending, return `resumed` so the route hands
         // back a fresh upload URL to finish the half-finished work.
         if (existing.state === 'ready') {
-          return { tag: 'deduped', doc: existing };
+          return { status: 'deduped', doc: existing };
         }
         if (existing.state === 'failed') {
           throw conflict(
@@ -315,7 +315,7 @@ export class DocumentLifecycleService {
             `idempotency key ${input.idempotencyKey} belongs to document ${existing.id} in state ${existing.state}`,
           );
         }
-        return { tag: 'resumed', doc: existing };
+        return { status: 'resumed', doc: existing };
       }
     }
 
@@ -348,7 +348,7 @@ export class DocumentLifecycleService {
     // lookup and createPending. Validate the row returned from that race too.
     if (!created.created) this.assertSameUploadIntent(created.row, input);
 
-    return { tag: created.created ? 'created' : 'resumed', doc: created.row };
+    return { status: created.created ? 'created' : 'resumed', doc: created.row };
   }
 
   /**
@@ -502,7 +502,7 @@ export class DocumentLifecycleService {
     }
     if (pins.expectedSha && dedupMode === 'reuse-existing') {
       const existing = await this.documents.findByBaseSha(input.tenantId, pins.expectedSha);
-      if (existing) return { tag: 'deduped', doc: existing };
+      if (existing) return { status: 'deduped', doc: existing };
     }
     if (!input.idempotencyKey) return this.importResolved(input, pins);
     // Single-flight: concurrent same-key imports share one transfer
@@ -559,7 +559,7 @@ export class DocumentLifecycleService {
     pins: ResolvedImportPins,
   ): Promise<ImportResult> {
     this.assertSameImportIntent(existing, input.idempotencyKey ?? null, pins);
-    if (existing.state === 'ready') return { tag: 'deduped', doc: existing };
+    if (existing.state === 'ready') return { status: 'deduped', doc: existing };
     if (existing.state !== 'pending') {
       throw conflict(
         `idempotency key ${input.idempotencyKey} belongs to document ${existing.id} in state ${existing.state}`,
@@ -572,7 +572,7 @@ export class DocumentLifecycleService {
     }
     if ((input.mode ?? 'sync') === 'async') {
       await this.enqueueJobFor(existing, input, pins);
-      return { tag: 'accepted', doc: existing };
+      return { status: 'accepted', doc: existing };
     }
     // A live async job owns this document's transfer — a concurrent
     // sync re-drive would double-pull the same storage key.
@@ -658,7 +658,7 @@ export class DocumentLifecycleService {
     });
     // Same-key race: fold onto whatever row won, like the sync path.
     if (outcome.kind === 'raced') return this.importOntoExisting(outcome.row, input, pins);
-    return { tag: 'accepted', doc: outcome.row };
+    return { status: 'accepted', doc: outcome.row };
   }
 
   private async enqueueJobFor(
@@ -870,7 +870,7 @@ export class DocumentLifecycleService {
         });
       }
       return {
-        tag: 'imported',
+        status: 'imported',
         doc: committed.doc,
         resolvedRevision: opened.resolvedRevision ?? null,
         sourceKind: source.info.kind,

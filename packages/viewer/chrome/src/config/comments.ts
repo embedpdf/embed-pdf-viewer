@@ -6,9 +6,9 @@
  * the engine's rights (`comments.canSetStatus()`, `comments.canDeleteThread()`).
  */
 import { AnnotationToken, type CommentThread } from '@embedpdf/react/annotation';
-import type { CommandDef } from '@embedpdf/react/commands';
+import type { CommandDefinition } from '@embedpdf/react/commands';
 
-type Ctx = Parameters<NonNullable<CommandDef['run']>>[0];
+type Ctx = Parameters<NonNullable<CommandDefinition['run']>>[0];
 
 /** The menu of a card in the comments panel: the commands below, for that card's thread. */
 export const COMMENT_ITEM_MENU = 'comment-item';
@@ -39,7 +39,7 @@ const commentsOf = (commandContext: Ctx) =>
 /** The thread of the first selected annotation. */
 const selectedThread = (commandContext: Ctx): CommentThread | null => {
   const annotation = commandContext.tryGet(AnnotationToken);
-  const [first] = annotation?.selection.list() ?? [];
+  const [first] = annotation?.selection.getSelected() ?? [];
   return first ? (annotation?.comments.getThread(first.ref) ?? null) : null;
 };
 
@@ -53,7 +53,7 @@ const canSetStatus = (commandContext: Ctx): boolean => {
   );
 };
 
-const statusCommand = (state: (typeof REVIEW_STATES)[number]): CommandDef => ({
+const statusCommand = (state: (typeof REVIEW_STATES)[number]): CommandDefinition => ({
   id: `comment:status-${state}`,
   labelKey: REVIEW_STATE_LABEL_KEYS[state]!,
   categories: ['comments.writing'],
@@ -68,7 +68,7 @@ const statusCommand = (state: (typeof REVIEW_STATES)[number]): CommandDef => ({
   },
 });
 
-export const commentCommands: CommandDef[] = [
+export const commentCommands: CommandDefinition[] = [
   ...REVIEW_STATES.map(statusCommand),
   {
     id: 'comment:delete-thread',

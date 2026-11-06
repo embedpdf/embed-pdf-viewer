@@ -49,7 +49,7 @@ export async function parseAppearanceForm(
         width: entry.width,
         height: entry.height,
         format: entry.format,
-        contentType: entry.contentType,
+        mimeType: entry.mimeType,
         source: { kind: 'bytes', bytes },
       };
       const image = createPageImageHandle(result, {

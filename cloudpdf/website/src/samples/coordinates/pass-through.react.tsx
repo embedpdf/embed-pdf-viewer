@@ -31,7 +31,7 @@ function Hits() {
             <button
               type="button"
               className="hit"
-              onClick={() => stage.reveal(hit.page, { rect: hit.bounds, anchor: { y: 0.35 } })}
+              onClick={() => stage.reveal(hit.page, { rect: hit.bounds, align: { y: 0.35 } })}
             >
               <span className="where">page {hit.pageIndex + 1}</span>
               <code className="rect">

@@ -51,7 +51,22 @@ const ACROFORM_KEYS = new Set(['DR', 'DA', 'Q', 'SigFlags', 'NeedAppearances', '
  */
 const FIELD_KEYS_BY_LEVEL: Record<'annotate' | 'fill', ReadonlySet<string>> = {
   annotate: new Set([
-    'V', 'AS', 'AP', 'I', 'DA', 'Ff', 'RV', 'MK', 'Q', 'TU', 'F', 'Rect', 'BS', 'Opt', 'DV', 'MaxLen',
+    'V',
+    'AS',
+    'AP',
+    'I',
+    'DA',
+    'Ff',
+    'RV',
+    'MK',
+    'Q',
+    'TU',
+    'F',
+    'Rect',
+    'BS',
+    'Opt',
+    'DV',
+    'MaxLen',
   ]),
   fill: new Set(['V', 'AS', 'AP', 'I', 'RV', 'DA', 'Ff']),
 };
@@ -80,7 +95,9 @@ function widgetKeysFor(level: ModificationLevel): ReadonlySet<string> {
   return level === 'annotate' ? WIDGET_KEYS_BY_LEVEL.annotate : WIDGET_KEYS_BY_LEVEL.fill;
 }
 function signedFieldKeysFor(level: ModificationLevel): ReadonlySet<string> {
-  return level === 'annotate' ? SIGNED_FIELD_KEYS_BY_LEVEL.annotate : SIGNED_FIELD_KEYS_BY_LEVEL.fill;
+  return level === 'annotate'
+    ? SIGNED_FIELD_KEYS_BY_LEVEL.annotate
+    : SIGNED_FIELD_KEYS_BY_LEVEL.fill;
 }
 
 /**
@@ -177,7 +194,9 @@ function ruleRevisionHealth(ctx: StepContext): void {
   const base = health.old;
   if (base.sparseXref || base.bareReferences > 0) {
     const why = [
-      base.sparseXref ? 'its cross-reference table has no entry for some object numbers below /Size' : null,
+      base.sparseXref
+        ? 'its cross-reference table has no entry for some object numbers below /Size'
+        : null,
       base.bareReferences > 0
         ? `${base.bareReferences} reachable indirect object(s) consist of a bare reference`
         : null,
@@ -239,13 +258,12 @@ function indexRoles(s: RevisionStructure): RoleIndex {
   const sigFields = new Set<number>();
   for (const f of s.fields) {
     fieldByObj.set(f.objectNumber, f);
-    if (f.family === 'signature') sigFields.add(f.objectNumber);
+    if (f.kind === 'signature') sigFields.add(f.objectNumber);
     for (const w of f.widgets) widgetToField.set(w, f.objectNumber);
   }
   const signedFields = new Set<number>();
   for (const sig of s.signatures) {
-    if (sig.signed && sig.field.kind === 'objectNumber')
-      signedFields.add(sig.field.objectNumber);
+    if (sig.signed && sig.field.kind === 'objectNumber') signedFields.add(sig.field.objectNumber);
   }
   return { fieldByObj, widgetToField, pages: new Set(s.pages), signedFields, sigFields };
 }
@@ -293,7 +311,8 @@ class StepContext {
   }
 
   claimAll(c: ObjectChange, rule: string, allow = true): void {
-    for (const side of SIDES) for (const e of c.usage[side]) this.claimEdge(c, side, e, rule, allow);
+    for (const side of SIDES)
+      for (const e of c.usage[side]) this.claimEdge(c, side, e, rule, allow);
   }
 
   /**
@@ -834,7 +853,7 @@ function ruleFormFill(ctx: StepContext): void {
     ...ctx.after.fieldByObj,
   ]);
   for (const [num, field] of fields) {
-    if (field.family === 'signature') continue;
+    if (field.kind === 'signature') continue;
     const fc = ctx.byNum.get(num);
     const widgetChanges = field.widgets
       .filter((w) => w !== num)
@@ -894,7 +913,9 @@ function ruleFormFill(ctx: StepContext): void {
         ok = false;
       } else {
         ctx.claimStable(fc, rule);
-        const properties = [...changed].filter((k) => k !== 'V' && k !== 'AP' && k !== 'AS' && k !== 'I' && k !== 'RV');
+        const properties = [...changed].filter(
+          (k) => k !== 'V' && k !== 'AP' && k !== 'AS' && k !== 'I' && k !== 'RV',
+        );
         ctx.permitted(
           fc,
           rule,
@@ -1038,9 +1059,7 @@ function ruleFieldLock(ctx: StepContext): void {
     ctx.forbidden(
       c,
       'field-lock',
-      field
-        ? `field "${field.name}" is locked by the signature`
-        : 'part of a locked field changed',
+      field ? `field "${field.name}" is locked by the signature` : 'part of a locked field changed',
     );
   }
 }

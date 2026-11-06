@@ -20,12 +20,15 @@ import type {
   ActionNodeResult,
   ActionNodeStatus,
 } from '../contract';
-import type { AnnotCommitEntry } from '../host-contract';
+import type { AnnotationCommitEntry } from '../host-contract';
 import type { ActionsContext, ActionsServices } from '../services';
 import { DOCUMENT_TYPES, isPrintVerb } from '../services/policy';
 import { intentOfPayload } from '../submit/intent';
 import type { ActionsSubmit } from '../submit/perform';
 import type { ActionsDocumentEvents } from '../lifecycle/document-events';
+
+/** A node's result while the tree runs: its status and detail settle as the node does. */
+type RunningNodeResult = { -readonly [K in keyof ActionNodeResult]: ActionNodeResult[K] };
 
 export function createRunner(
   ctx: ActionsContext,
@@ -60,15 +63,15 @@ export function createRunner(
     }
     if (!tree.root) return { status: 'inert', nodes: [], diagnostics };
 
-    const nodes: ActionNodeResult[] = [];
+    const nodes: RunningNodeResult[] = [];
     // Navigation and external effects are deferred thunks, fired only after
     // every document-lifetime node succeeded, in node order, so navigation
     // never yanks the user away from a failed write.
-    const deferred: Array<{ result: ActionNodeResult; fire: () => Promise<void> | void }> = [];
+    const deferred: Array<{ result: RunningNodeResult; fire: () => Promise<void> | void }> = [];
     let documentFailed = false;
     let cancelled = false;
 
-    const settle = (result: ActionNodeResult, outcome: ActionExecutorResult): void => {
+    const settle = (result: RunningNodeResult, outcome: ActionExecutorResult): void => {
       if (outcome.status === 'executed') result.status = 'executed';
       else if (outcome.status === 'inert') {
         result.status = 'inert';
@@ -99,7 +102,7 @@ export function createRunner(
       const display = node.hide ? ('hidden' as const) : ('visible' as const);
       const diagnoseHide = (diagnostic: ActionDiagnostic): void => diagnose(diagnostic, 'hide');
       const fieldRefs: FormFieldRef[] = [];
-      const annotEntries: AnnotCommitEntry[] = [];
+      const annotEntries: AnnotationCommitEntry[] = [];
       const names: string[] = [];
       const bareObjectNumbers: number[] = [];
       for (const target of node.targets) {
@@ -174,7 +177,7 @@ export function createRunner(
     };
 
     const interpret = async (node: PdfActionNode, path: number[]): Promise<void> => {
-      const result: ActionNodeResult = { path, type: node.type, status: 'blocked' };
+      const result: RunningNodeResult = { path, type: node.type, status: 'blocked' };
       nodes.push(result);
       const decision = decisionFor(node, actionContext.origin);
       const diagnoseNode = (diagnostic: ActionDiagnostic): void => diagnose(diagnostic, node.type);

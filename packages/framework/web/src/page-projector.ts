@@ -69,7 +69,7 @@ export function clientPageProjector(
 /** What a Stage projection reads from the Stage lens; `StageHostCapability` satisfies it. */
 export interface StageProjection {
   pageRectToViewport(page: PageRef, rect: AnchoredRect): AnchoredRect | null;
-  getPageFrame(page: PageRef): { readonly transform: ProjectedTransform } | null;
+  getPageBox(page: PageRef): { readonly transform: ProjectedTransform } | null;
   getViewportSize(): { width: number; height: number };
 }
 
@@ -89,7 +89,7 @@ export function stageViewProjector(stage: () => StageProjection | null): ViewPro
       return rect ? { x: rect.x, y: rect.y } : null;
     },
     viewEnv: (page) => {
-      const transform = stage()?.getPageFrame(page)?.transform;
+      const transform = stage()?.getPageBox(page)?.transform;
       return transform
         ? { scale: transform.viewScale, rotation: transform.rotation, zoom: transform.zoom }
         : null;

@@ -19,7 +19,7 @@ describe('documents · lifecycle events', () => {
       log.push(`active:${event.previousDocumentId}->${event.documentId}`),
     );
     documents.onPagesChanged((event) =>
-      log.push(`pages:${event.documentId}:${event.revision}:${event.pages.length}`),
+      log.push(`pages:${event.documentId}:${event.pagesSequence}:${event.pages.length}`),
     );
     documents.onClosed((event) => log.push(`closed:${event.documentId}`));
 

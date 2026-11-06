@@ -8,7 +8,7 @@
  */
 import { createLayout, type LayoutData } from '@embedpdf/core-ui';
 import { AttachmentToken } from '@embedpdf/plugin-attachment';
-import { CommandsToken, type CommandDef } from '@embedpdf/plugin-commands';
+import { CommandsToken, type CommandDefinition } from '@embedpdf/plugin-commands';
 import { OutlineToken } from '@embedpdf/plugin-outline';
 import { RenderToken } from '@embedpdf/plugin-render';
 import { ShellToken } from '@embedpdf/plugin-shell';
@@ -175,7 +175,7 @@ describe('panelCommandsFor', () => {
         open = true;
       },
     };
-    type Context = Parameters<NonNullable<CommandDef['run']>>[0];
+    type Context = Parameters<NonNullable<CommandDefinition['run']>>[0];
     const context = {
       documentId: 'doc',
       tryGet: (token: unknown) => (token === ShellToken ? shell : null),
@@ -326,7 +326,7 @@ describe('samePanels', () => {
 });
 
 describe('the outline and attachments panels', () => {
-  type Context = Parameters<NonNullable<CommandDef['visible']>>[0];
+  type Context = Parameters<NonNullable<CommandDefinition['visible']>>[0];
   const visibleOf = (id: string) =>
     panelCommandsFor(DEFAULT_LAYOUT.panels, () => false).find(
       (command) => command.id === `panel:${id}`,
@@ -337,7 +337,7 @@ describe('the outline and attachments panels', () => {
     const list = () => Array.from({ length: entries }, (_, index) => ({ id: String(index) }));
     const capabilities = new Map<unknown, unknown>([
       [OutlineToken, { list, canEdit: () => mayAdd }],
-      [AttachmentToken, { list, canAdd: () => mayAdd }],
+      [AttachmentToken, { list, canCreate: () => mayAdd }],
       [CommandsToken, { isCategoryDisabled: (feature: string) => off.includes(feature) }],
     ]);
     const tryGet = (token: unknown) => capabilities.get(token) ?? null;
@@ -367,7 +367,7 @@ describe('the outline and attachments panels', () => {
 });
 
 describe('the thumbnails panel', () => {
-  type Context = Parameters<NonNullable<CommandDef['allowed']>>[0];
+  type Context = Parameters<NonNullable<CommandDefinition['allowed']>>[0];
   const thumbnails = () =>
     panelCommandsFor(DEFAULT_LAYOUT.panels, () => false).find(
       (command) => command.id === 'panel:thumbnails',

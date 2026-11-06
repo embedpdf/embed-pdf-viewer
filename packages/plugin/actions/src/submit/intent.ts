@@ -38,7 +38,7 @@ export const toFormSubmissionRequest = (
 /** Script `doc.submitForm(...)` → the one normalized intent. Script field
  *  names are include-mode by definition (Acrobat's aFields). */
 export const intentOfSubmitEffect = (
-  effect: Extract<ScriptUiEffect, { kind: 'submitForm' }>,
+  effect: Extract<ScriptUiEffect, { type: 'submitForm' }>,
 ): SubmitIntent => {
   const format = effect.format ?? 'fdf';
   return {

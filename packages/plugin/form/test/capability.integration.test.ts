@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 import { createKernel } from '@embedpdf/core';
 import { createLocalEngine } from '@embedpdf/engine';
-import type { FormFieldDTO } from '@embedpdf/engine-core/runtime';
+import type { FormField } from '@embedpdf/engine-core/runtime';
 import { interactionPlugin } from '@embedpdf/plugin-interaction';
 
 import {
@@ -60,19 +60,19 @@ type Harness = Awaited<ReturnType<typeof boot>>;
 async function buildForm({ form, page }: Harness) {
   const box = (y: number, x = 72, width = 160, height = 20) => ({ x, y, width, height });
   await form.create({
-    family: 'text',
+    kind: 'text',
     name: 'customer.name',
     required: true,
     widgets: [{ page, rect: box(100) }],
   });
   await form.create({
-    family: 'checkbox',
+    kind: 'checkbox',
     name: 'agree',
     required: true,
     widgets: [{ page, rect: box(140, 72, 14, 14) }],
   });
   await form.create({
-    family: 'radio',
+    kind: 'radio',
     name: 'plan',
     widgets: [
       { page, rect: box(180, 72, 14, 14), exportValue: 'monthly' },
@@ -80,7 +80,7 @@ async function buildForm({ form, page }: Harness) {
     ],
   });
   await form.create({
-    family: 'combobox',
+    kind: 'combobox',
     name: 'country',
     required: true,
     options: [
@@ -90,7 +90,7 @@ async function buildForm({ form, page }: Harness) {
     widgets: [{ page, rect: box(60) }],
   });
   await form.create({
-    family: 'listbox',
+    kind: 'listbox',
     name: 'toppings',
     multiSelect: true,
     options: [
@@ -100,13 +100,13 @@ async function buildForm({ form, page }: Harness) {
     widgets: [{ page, rect: box(220, 72, 160, 40) }],
   });
   await form.create({
-    family: 'signature',
+    kind: 'signature',
     name: 'approval',
     widgets: [{ page, rect: box(280, 72, 160, 40) }],
   });
 }
 
-const names = (fields: readonly FormFieldDTO[]) => fields.map((field) => field.name);
+const names = (fields: readonly FormField[]) => fields.map((field) => field.name);
 
 describe('the form capability on a real engine', () => {
   it('builds a form from code: create resolves { field }, the state follows, the events fire', async () => {
@@ -117,12 +117,12 @@ describe('the form capability on a real engine', () => {
     form.onFieldCreated((event) => created.push(event));
 
     const { field } = await form.create({
-      family: 'text',
+      kind: 'text',
       name: 'customer.email',
       alternateName: 'Email',
       widgets: [{ page: harness.page, rect: { x: 72, y: 72, width: 160, height: 20 } }],
     });
-    expect(field).toMatchObject({ name: 'customer.email', family: 'text', alternateName: 'Email' });
+    expect(field).toMatchObject({ name: 'customer.email', kind: 'text', alternateName: 'Email' });
     expect(created.map((event) => event.field.name)).toEqual(['customer.email']);
     expect(created[0]!.origin.kind).toBe('local');
     expect(form.getFormKind()).toBe('acroform');
@@ -143,7 +143,7 @@ describe('the form capability on a real engine', () => {
     const { form, page } = harness;
     await form.ensureLoaded(page);
     await form.create({
-      family: 'text',
+      kind: 'text',
       name: 'boxed',
       widgets: [
         {
@@ -156,7 +156,7 @@ describe('the form capability on a real engine', () => {
       ],
     });
     await form.create({
-      family: 'checkbox',
+      kind: 'checkbox',
       name: 'bare',
       widgets: [{ page, rect: { x: 72, y: 140, width: 14, height: 14 } }],
     });
@@ -177,19 +177,19 @@ describe('the form capability on a real engine', () => {
     await using harness = await boot();
     await buildForm(harness);
     const plan = harness.form.get(toFieldRef('plan'))!;
-    expect(plan.family).toBe('radio');
+    expect(plan.kind).toBe('radio');
     expect(plan.widgets.map((widget) => 'exportValue' in widget && widget.exportValue)).toEqual([
       'monthly',
       'yearly',
     ]);
     expect(harness.form.list({ page: 0 })).toHaveLength(6);
-    expect(harness.form.list({ family: 'radio' })).toEqual([plan]);
+    expect(harness.form.list({ kind: 'radio' })).toEqual([plan]);
 
     // Every place the field shows: one row per button, in button order.
     const { form } = harness;
     const rows = form.getWidgets(plan.ref);
     expect(rows).toEqual(plan.widgets.map((widget) => form.getWidget(widget)));
-    expect(rows.map((row) => row.fieldFamily)).toEqual(['radio', 'radio']);
+    expect(rows.map((row) => row.fieldKind)).toEqual(['radio', 'radio']);
     expect(form.getWidgets(toFieldRef('plan'))).toBe(rows);
     expect(form.getWidgets(toFieldRef('no.such.field'))).toEqual([]);
     // A field is never a widget address: a radio group has no one place.

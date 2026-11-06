@@ -1,15 +1,15 @@
 /**
  * Reveals and destinations. A bare reveal is not navigation: minimal
  * visibility, cursor untouched (in paged flow, revealing a page is navigating
- * to it). A positioned reveal (rect, anchor or zoom: a search hit) is an
- * arrival: the cursor is set up front, the camera lands per the anchor
+ * to it). A positioned reveal (rect, align or zoom: a search hit) is an
+ * arrival: the cursor is set up front, the camera lands per the alignment
  * policy, and a resolved zoom becomes the zoom intent. A destination is a
  * positioned reveal of the spot it names.
  */
 import { clampZoom, revealCamera, type Camera, type Rect as StageRect } from '@embedpdf/core-stage';
 import type { PageDestination, PluginContext, PageRef } from '@embedpdf/core';
 
-import type { GoToDestinationOptions, RevealAnchorValue, RevealOptions } from '../contract';
+import type { GoToDestinationOptions, ArrivalAlignValue, RevealOptions } from '../contract';
 import { revealOfDestination } from '../destination';
 import type { StageAnimation } from '../camera/animation';
 import type { StageCameraWrite } from '../camera/write';
@@ -50,7 +50,7 @@ export function createReveal(
    * (center) applies. 'keep' never moves the axis (PDF /XYZ null).
    */
   const revealAxis = (
-    anchor: RevealAnchorValue | undefined,
+    align: ArrivalAlignValue | undefined,
     cameraPosition: number,
     rectPosition: number,
     rectExtent: number,
@@ -60,8 +60,8 @@ export function createReveal(
     before: number,
     after: number,
   ): number => {
-    if (anchor === 'keep') return cameraPosition;
-    if (anchor === undefined) {
+    if (align === 'keep') return cameraPosition;
+    if (align === undefined) {
       if (!zoomChanged) {
         const low = cameraPosition + before / zoom;
         const high = cameraPosition + (viewportExtent - after) / zoom;
@@ -69,11 +69,11 @@ export function createReveal(
         if (rectExtent > high - low || rectPosition < low) return rectPosition - before / zoom;
         return rectPosition + rectExtent - (viewportExtent - after) / zoom;
       }
-      anchor = 'center';
+      align = 'center';
     }
-    if (anchor === 'start') return rectPosition - before / zoom;
-    if (anchor === 'end') return rectPosition + rectExtent - (viewportExtent - after) / zoom;
-    const fraction = anchor === 'center' ? 0.5 : Math.min(1, Math.max(0, anchor));
+    if (align === 'start') return rectPosition - before / zoom;
+    if (align === 'end') return rectPosition + rectExtent - (viewportExtent - after) / zoom;
+    const fraction = align === 'center' ? 0.5 : Math.min(1, Math.max(0, align));
     // Over the viewport moved by half the sides' difference, as `placeCamera` does.
     return (
       rectPosition + rectExtent / 2 - (viewportExtent * fraction + (before - after) / 2) / zoom
@@ -88,7 +88,7 @@ export function createReveal(
     const positioned =
       !!options &&
       (options.rect !== undefined ||
-        options.anchor !== undefined ||
+        options.align !== undefined ||
         (options.zoom !== undefined && options.zoom !== 'keep'));
 
     if (!positioned) {
@@ -155,11 +155,11 @@ export function createReveal(
       // A tiny rect fits at the zoom limit, centered, like any other zoom.
       zoom = clampZoom(zoom, zoomLimits());
       const zoomChanged = zoomDirective !== 'keep';
-      const anchor = options.anchor ?? {};
+      const align = options.align ?? {};
       return {
         camera: {
           x: revealAxis(
-            anchor.x,
+            align.x,
             camera().x,
             world.x,
             world.width,
@@ -170,7 +170,7 @@ export function createReveal(
             inset.right,
           ),
           y: revealAxis(
-            anchor.y,
+            align.y,
             camera().y,
             world.y,
             world.height,

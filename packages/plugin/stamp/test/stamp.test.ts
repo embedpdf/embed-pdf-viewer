@@ -258,7 +258,7 @@ function makeAssetEngine(
       annotations: { create: createAnnotation },
       render: {
         image: async () => ({
-          contentType: 'image/png',
+          mimeType: 'image/png',
           source: { kind: 'bytes', bytes: new TextEncoder().encode(`png-${pageObjectNumber}`) },
         }),
       },
@@ -320,7 +320,7 @@ describe('stamp plugin: library import', () => {
       ['Stamp2=Stamp2', 101],
     ]);
     // Per-asset binaries: the extracted single-page PDF + its preview render.
-    expect(new TextDecoder().decode(stamp.readAssetBytes(assets[0].id)!)).toBe('%PDF-page-100');
+    expect(new TextDecoder().decode(stamp.getAssetBytes(assets[0].id)!)).toBe('%PDF-page-100');
     expect(stamp.getAssetPreview(assets[0].id)).toMatchObject({ mimeType: 'image/png' });
     expect(extract).toHaveBeenCalledTimes(2);
     expect(close).toHaveBeenCalledTimes(1);
@@ -488,7 +488,7 @@ describe('stamp plugin: assets', () => {
     const { engine, deletePages } = makeAssetEngine(0);
     const { stamp } = makeStamp(engine);
     const seen: string[] = [];
-    stamp.onLibraryChanged((change) => seen.push(change.reason));
+    stamp.onLibraryChanged((change) => seen.push(change.type));
     const libraryId = (await stamp.createLibrary('Mine', { id: 'mine', categories: ['custom'] }))
       .library.id;
     expect(libraryId).toBe('mine');
@@ -504,7 +504,7 @@ describe('stamp plugin: assets', () => {
     expect(deletePages).toHaveBeenCalledWith([toPageRef(100)]);
     expect(stamp.getLibrary(libraryId)).toMatchObject({ assetIds: [] });
     expect(await stamp.exportLibrary(libraryId)).not.toBeNull();
-    expect(seen).toEqual(['created', 'asset-added', 'asset-removed']);
+    expect(seen).toEqual(['created', 'asset-created', 'asset-deleted']);
   });
 
   it('appends a PDF page to a canonical library and writes its PieceInfo', async () => {
@@ -627,7 +627,7 @@ describe('stamp plugin: assets', () => {
     await stamp.deleteLibrary(libraryId);
     expect(stamp.listLibraries()).toHaveLength(0);
     expect(stamp.listAssets()).toHaveLength(0);
-    expect(stamp.readAssetBytes(asset.id)).toBeNull();
+    expect(stamp.getAssetBytes(asset.id)).toBeNull();
     await expect(stamp.exportLibrary(libraryId)).rejects.toMatchObject({ code: 'not-found' });
   });
 });
@@ -666,9 +666,7 @@ describe('stamp plugin: authoring', () => {
     const { engine } = makeAssetEngine(2);
     const { stamp } = makeStamp(engine);
     const seen: string[] = [];
-    const off = stamp.onLibraryChanged((change) =>
-      seen.push(`${change.libraryId}:${change.reason}`),
-    );
+    const off = stamp.onLibraryChanged((change) => seen.push(`${change.libraryId}:${change.type}`));
 
     const libraryId = (await stamp.importLibrary(pdfBytes())).library.id;
     const added = (await stamp.createAsset({ libraryId, name: 'New', source: pdfBytes() })).asset
@@ -681,10 +679,10 @@ describe('stamp plugin: authoring', () => {
 
     expect(seen).toEqual([
       `${libraryId}:imported`,
-      `${libraryId}:asset-added`,
+      `${libraryId}:asset-created`,
       `${libraryId}:asset-updated`,
-      `${libraryId}:asset-removed`,
-      `${libraryId}:removed`,
+      `${libraryId}:asset-deleted`,
+      `${libraryId}:deleted`,
     ]);
   });
 });
@@ -885,7 +883,7 @@ describe('stamp plugin: placement', () => {
                         get(targetRender, renderProperty) {
                           if (renderProperty === 'image') {
                             return async () => ({
-                              contentType: 'image/png',
+                              mimeType: 'image/png',
                               source: { kind: 'bytes', bytes: pngBytes() },
                             });
                           }
@@ -943,7 +941,7 @@ describe('stamp plugin: placement', () => {
         return {
           transaction: host.transaction.bind(host),
           budget: realms.budget,
-          dispose: () => host.dispose(),
+          destroy: () => host.destroy(),
         };
       },
       surfaceScriptCommit: (commit: unknown, context: unknown) => {
@@ -965,12 +963,12 @@ describe('stamp plugin: placement', () => {
       const libraryId = (await stamp.importLibrary(fixtureBytes)).library.id;
       const [asset] = stamp.listAssets({ libraryId: libraryId });
       const canonicalBefore = new Uint8Array(await stamp.exportLibrary(libraryId));
-      const baseBefore = new Uint8Array(stamp.readAssetBytes(asset.id)!);
+      const baseBefore = new Uint8Array(stamp.getAssetBytes(asset.id)!);
 
       await stamp.armAsset(asset.id, { documentId: target.id });
 
       expect(await stamp.exportLibrary(libraryId)).toEqual(canonicalBefore);
-      expect(stamp.readAssetBytes(asset.id)).toEqual(baseBefore);
+      expect(stamp.getAssetBytes(asset.id)).toEqual(baseBefore);
       expect(armStamp).toHaveBeenCalledTimes(1);
       const armed = armStamp.mock.calls[0][0] as {
         source: Uint8Array;
@@ -1061,7 +1059,7 @@ describe('stamp plugin: library kinds', () => {
     const { engine, metadata, catalogEntries } = makeAssetEngine(0);
     const { stamp } = makeStamp(engine);
     const seen: string[] = [];
-    stamp.onLibraryChanged((change) => seen.push(change.reason));
+    stamp.onLibraryChanged((change) => seen.push(change.type));
     const id = (await stamp.createLibrary('Bob', { kind: 'signatures' })).library.id;
     await stamp.updateLibrary(id, { name: 'Bob Singor', categories: ['personal'] });
     expect(metadata.update).toHaveBeenLastCalledWith({ title: 'Bob Singor' });
@@ -1116,7 +1114,7 @@ function withFakeRenders(engine: Engine): LocalEngine {
                       get(targetRender, renderProperty) {
                         if (renderProperty === 'image') {
                           return async () => ({
-                            contentType: 'image/png',
+                            mimeType: 'image/png',
                             source: { kind: 'bytes', bytes: pngBytes() },
                           });
                         }
@@ -1456,7 +1454,7 @@ describe('stamp plugin: the shared contract', () => {
     const { stamp, assetEngine } = placing();
     expect(stamp.getSettings()).toEqual(STAMP_DEFAULTS);
     const changes: unknown[] = [];
-    stamp.onSettingsChanged((event) => changes.push(event.changed));
+    stamp.onSettingsChanged((event) => changes.push(event.changedKeys));
 
     stamp.updateSettings({ previewWidth: 64 });
     expect(stamp.getSettings().previewWidth).toBe(64);

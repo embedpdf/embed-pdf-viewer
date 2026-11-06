@@ -30,13 +30,13 @@ const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY
         <aside class="files">
           <header class="files-header">
             <h3 class="files-title">Files</h3>
-            <label class="button primary" [attr.data-disabled]="!attachment.canAdd() || null">
+            <label class="button primary" [attr.data-disabled]="!attachment.canCreate() || null">
               Attach
               <input
                 type="file"
                 multiple
                 hidden
-                [disabled]="!attachment.canAdd()"
+                [disabled]="!attachment.canCreate()"
                 (change)="attach($event)"
               />
             </label>
@@ -60,8 +60,8 @@ const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY
                     type="button"
                     class="row-remove"
                     [attr.aria-label]="'Remove ' + nameOf(file)"
-                    [disabled]="!attachment.canRemove(file)"
-                    (click)="attachment.remove(file)"
+                    [disabled]="!attachment.canDelete(file)"
+                    (click)="attachment.delete(file)"
                   >
                     ×
                   </button>
@@ -100,6 +100,6 @@ export class App {
     const input = event.target as HTMLInputElement;
     const picked = Array.from(input.files ?? []);
     input.value = '';
-    if (picked.length > 0) void this.attachment.add(picked.map((data) => ({ data })));
+    if (picked.length > 0) void this.attachment.create(picked.map((data) => ({ data })));
   }
 }

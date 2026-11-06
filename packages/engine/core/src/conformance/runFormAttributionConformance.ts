@@ -4,7 +4,7 @@ import type { ConformanceTestRunner } from './runMetadataConformance';
 import type { Identity } from '../auth/scope';
 import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
-import type { FormFieldDTO } from '../forms/field';
+import type { FormField } from '../forms/field';
 import type { FormFieldRef } from '../identity/FormFieldRef';
 
 /**
@@ -49,15 +49,15 @@ const WIDGET = 9;
 
 export function runFormAttributionConformance(
   runner: ConformanceTestRunner,
-  opts: FormAttributionConformanceOptions,
+  options: FormAttributionConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`form attribution conformance: ${opts.label}`, () => {
+  describe(`form attribution conformance: ${options.label}`, () => {
     let engine: Engine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -65,7 +65,7 @@ export function runFormAttributionConformance(
     });
 
     const open = (identity: Identity, scope: readonly string[] = FILL, from?: DocumentHandle) =>
-      opts.openAs(engine, { scope, identity }, from);
+      options.openAs(engine, { scope, identity }, from);
 
     /** Continue `from`'s document as `identity`, closing `from`. */
     const continueAs = async (from: DocumentHandle, identity: Identity) => {
@@ -74,7 +74,7 @@ export function runFormAttributionConformance(
       return next;
     };
 
-    const fieldOf = async (doc: DocumentHandle, name: string): Promise<FormFieldDTO> => {
+    const fieldOf = async (doc: DocumentHandle, name: string): Promise<FormField> => {
       const { fields } = await doc.forms.list();
       const field = fields.find((f) => f.name === name);
       if (!field) throw new Error(`no field '${name}'`);
@@ -92,7 +92,7 @@ export function runFormAttributionConformance(
       const doc = await open(ALICE, DESIGN);
       try {
         const before = Date.now();
-        const { field } = await doc.forms.create({ family: 'text', name: 'extra' });
+        const { field } = await doc.forms.create({ kind: 'text', name: 'extra' });
         expect(field.createdBy).toBe('alice');
         expectStampedSince(field.createdAt, before);
         expect(field.filledBy).toBe(null);

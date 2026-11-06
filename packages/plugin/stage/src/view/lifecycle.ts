@@ -100,7 +100,7 @@ export function createViewLifecycle(
         // (camera coordinates are meaningless across the flow boundary).
         const effect = syncResponsive(false);
         if (effect === 'reflow') {
-          goToTarget(state().cursor, { behavior: 'instant' });
+          goToTarget(state().pageIndex, { behavior: 'instant' });
         } else {
           reapply(anchor);
         }
@@ -124,7 +124,7 @@ export function createViewLifecycle(
       getViewState: (): StageViewState => ({
         // A lock is this document's now, not the user's: the saved view keeps what's under it.
         ...viewStateSettings(),
-        cursor: state().cursor,
+        pageIndex: state().pageIndex,
         anchor: currentAnchor(),
       }),
       getLensId: () => ctx.id,

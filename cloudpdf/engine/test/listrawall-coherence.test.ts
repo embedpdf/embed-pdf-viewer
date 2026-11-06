@@ -95,7 +95,16 @@ function headPayload(docVersion: number) {
     encryption: { state: 'none', requiresPassword: false },
     permissions: {
       known: true,
-      bits: 0xffffffff,
+      flags: {
+        print: true,
+        modifyContents: true,
+        copy: true,
+        modifyAnnotations: true,
+        fillForms: true,
+        copyForAccessibility: true,
+        assemble: true,
+        printHighQuality: true,
+      },
       allAllowed: true,
       openedAs: 'none',
       securityHandlerRevision: null,
@@ -348,7 +357,7 @@ describe('stream.desynced — the SSE full-refresh surfaces to subscribers', () 
 
       expect(events).toHaveLength(1);
       expect(events[0]).toMatchObject({ type: 'stream.desynced', reason: 'backlog-overflow' });
-      expect(typeof (events[0] as { ts: number }).ts).toBe('number');
+      expect(typeof (events[0] as { at: string }).at).toBe('string');
     } finally {
       await doc.close();
     }

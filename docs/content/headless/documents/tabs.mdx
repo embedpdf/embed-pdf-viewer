@@ -51,7 +51,7 @@ code editor. Register `viewManagerPlugin()`, then render one Stage per pane:
 views.splitPane(documentId); // the document in a new pane, beside the focused one
 views.setActiveDocument(paneId, documentId); // show another of the pane's tabs
 views.moveDocumentBetween(fromPaneId, toPaneId, documentId); // drag a tab to another pane
-views.removePane(paneId); // its documents move to another pane
+views.deletePane(paneId); // its documents move to another pane
 ```
 
 A document opened with `documents.open()` lands in the focused pane. Every call is listed under
@@ -79,7 +79,7 @@ Everything `useViewManager()` gives you.
 | :-------------------------------------------------------------- | :-------------------------------------------------------------------------------------------------------------- |
 | `splitPane(documentId, { from? })`                              | Moves an open document into a new pane beside the focused one, or beside `from`, and focuses it. Returns the new pane's id. [Side by side](#side-by-side) |
 | `createPane({ documentIds? })`                                  | Adds a pane, empty or with these documents moved into it, and focuses it. Returns its id.                       |
-| `removePane(paneId, { moveDocumentsTo? })`                      | Closes a pane. Its documents move to `moveDocumentsTo`, or else to the focused or the last pane.                |
+| `deletePane(paneId, { moveDocumentsTo? })`                      | Closes a pane. Its documents move to `moveDocumentsTo`, or else to the focused or the last pane.                |
 | `movePane(paneId, index)`                                       | Moves a pane to another place in the order, for reordering panes by dragging                                    |
 | `setFocusedPane(paneId)`                                        | Makes a pane the focused one, where new documents open. `null` focuses none.                                    |
 | `setActiveDocument(paneId, documentId)`                         | Shows another of the pane's documents                                                                           |
@@ -118,7 +118,7 @@ ids. One document's fields come from `get(id)`, on [Opening documents](opening#s
 | :--------------------------- | :-------------------------------------- | :-------------------------------------- |
 | `onActiveChanged`            | Another document became the active one  | `documentId`, `previousDocumentId`      |
 | View manager `onPaneCreated` | A pane was added                        | `paneId`                                |
-| View manager `onPaneRemoved` | A pane was closed                       | `paneId`                                |
+| View manager `onPaneDeleted` | A pane was closed                       | `paneId`                                |
 | View manager `onFocusChanged`| Another pane got the focus              | `paneId`, or `null` when none has it    |
 | View manager `onDocumentMoved` | A document moved between panes        | `documentId`, `fromPaneId`, `toPaneId`  |
 

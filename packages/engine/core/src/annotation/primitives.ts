@@ -11,17 +11,6 @@
  * the lingua franca between local engine, cloud engine, and server.
  */
 
-import type { PdfPoint, PdfRect, PdfRotation, PdfSize } from '../geometry/primitives';
-
-/** @deprecated Use `PdfPoint` from `../geometry`. */
-export type Point = PdfPoint;
-/** @deprecated Use `PdfRect` from `../geometry`. */
-export type Rect = PdfRect;
-/** @deprecated Use `PdfSize` from `../geometry`. */
-export type Size = PdfSize;
-/** @deprecated Use `PdfRotation` from `../geometry`. */
-export type Rotation = PdfRotation;
-
 /**
  * An sRGB color as `'#rrggbb'`: lowercase when the engine gives one, either
  * case when it takes one. A gray or CMYK color in the file reads as its sRGB

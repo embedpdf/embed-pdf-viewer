@@ -9,7 +9,7 @@
  * the tool's ghost all make these two calls, so a ghost shows what a click
  * makes by construction. A form field takes the placed box as its bounds.
  */
-import type { PageRotation } from '@embedpdf/core-geometry';
+import type { Rotation } from '@embedpdf/core-geometry';
 import type { Annotation } from '@embedpdf/engine-core/runtime';
 
 import { uprightAnchoredRect, uprightRotation } from './geometry';
@@ -33,7 +33,7 @@ export interface PlacementFrame {
   /** Lay it out as the person sees the page: the tool's `upright`. */
   upright?: boolean;
   /** How far the page shows turned (document /Rotate + view rotation, degrees clockwise). */
-  displayRotation?: PageRotation;
+  displayRotation?: Rotation;
 }
 
 /** Slide a rect (as a unit) to sit inside `box`; pins at the origin edge when

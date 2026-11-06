@@ -31,7 +31,7 @@ function mayChangeForm(form: FormCapability, signature: SignatureCapability | nu
   return form
     .list()
     .some((field) =>
-      field.family === 'signature'
+      field.kind === 'signature'
         ? (signature?.canSign(field.ref) ?? false)
         : form.canFill(field.ref),
     );

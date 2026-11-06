@@ -16,7 +16,7 @@ import { Toolbar } from '@embedpdf/react/toolbar';
 import type {
   BarSchema,
   CollapsedGroupView,
-  CustomSlotCtx,
+  CustomSlotContext,
   GroupDisclosureView,
   OverflowMenuView,
 } from '@embedpdf/react/toolbar';
@@ -500,7 +500,7 @@ export function AppToolbar({
       .filter((item) => !Object.prototype.hasOwnProperty.call(builtIn, item.slot))
       .map((item) => [
         item.slot,
-        (variant: string, ctx: CustomSlotCtx) =>
+        (variant: string, ctx: CustomSlotContext) =>
           ctx.layer === 'measure' ? null : (
             <ItemSocket
               id={item.slot}

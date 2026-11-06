@@ -29,7 +29,7 @@ export class EpdfViewManager extends pluginService({
     'getFocusedPaneId',
     'getPaneOfDocument',
     'createPane',
-    'removePane',
+    'deletePane',
     'movePane',
     'setFocusedPane',
     'splitPane',
@@ -39,7 +39,7 @@ export class EpdfViewManager extends pluginService({
     'moveDocumentWithin',
     'moveDocumentBetween',
   ],
-  events: ['onPaneCreated', 'onPaneRemoved', 'onFocusChanged', 'onDocumentMoved'],
+  events: ['onPaneCreated', 'onPaneDeleted', 'onFocusChanged', 'onDocumentMoved'],
 }) {}
 
 /** The view manager, for `provideEmbedPdf()`: every document opens in the focused pane. */

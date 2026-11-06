@@ -50,7 +50,7 @@ export interface WidgetAnnotation {
     checkStyle: WidgetAnnotation.CheckStyle | null;
     field: CloudPDF.FormFieldRef | null;
     /** Its field's family. A newer server can add families: read one your client doesn't know as `unknown`. */
-    fieldFamily: WidgetAnnotation.FieldFamily;
+    fieldKind: WidgetAnnotation.FieldKind;
     hasMark: boolean;
 }
 
@@ -131,7 +131,7 @@ export namespace WidgetAnnotation {
     } as const;
     export type CheckStyle = (typeof CheckStyle)[keyof typeof CheckStyle];
     /** Its field's family. A newer server can add families: read one your client doesn't know as `unknown`. */
-    export const FieldFamily = {
+    export const FieldKind = {
         Text: "text",
         Checkbox: "checkbox",
         Radio: "radio",
@@ -141,5 +141,5 @@ export namespace WidgetAnnotation {
         Signature: "signature",
         Unknown: "unknown",
     } as const;
-    export type FieldFamily = (typeof FieldFamily)[keyof typeof FieldFamily];
+    export type FieldKind = (typeof FieldKind)[keyof typeof FieldKind];
 }

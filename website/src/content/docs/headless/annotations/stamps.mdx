@@ -189,7 +189,7 @@ Everything `useStamp()` gives you.
 | `listAssets({ libraryId? })`                                   | Every stamp, or the ones in one library, in the order a picker shows them. In a component, use `useStampAssets({ libraryId })`. [Show a stamp picker](#show-a-stamp-picker)  |
 | `getAsset(assetId)`                                            | One stamp, or `null`                                                                                                                                                          |
 | `getAssetPreview(assetId)`, `renderAssetPreview(assetId, { width })` | A stamp's picture as `{ bytes, mimeType }`, or `null`: the thumbnail at the `previewWidth` setting, or one drawn at any width. In a component, `useStampAssetPreviewUrl(assetId)` gives an image URL. |
-| `readAssetBytes(assetId)`                                      | A copy of the stamp's artwork as a one-page PDF, or `null`                                                                                                                    |
+| `getAssetBytes(assetId)`                                      | A copy of the stamp's artwork as a one-page PDF, or `null`                                                                                                                    |
 | `createLibrary(name, { kind? })`                               | Creates an empty library. Resolves `{ library }`. [Library kinds](#library-kinds)                                                                                             |
 | `updateLibrary(libraryId, changes)`                            | Renames a library, or changes its categories. Resolves `{ library }`.                                                                                                         |
 | `deleteLibrary(libraryId)`                                     | Removes a library and every stamp in it                                                                                                                                       |
@@ -250,14 +250,14 @@ like any annotation.
 
 | Event              | Fires when                                                   | Carries                  |
 | :----------------- | :----------------------------------------------------------- | :----------------------- |
-| `onLibraryChanged` | Anything in a library changed: the one to save it on         | `libraryId`, `reason`    |
+| `onLibraryChanged` | Anything in a library changed: the one to save it on         | `libraryId`, `type`      |
 | `onLibraryCreated`, `onLibraryUpdated`, `onLibraryDeleted` | A library was added, changed or removed | `libraryId`, `library` |
 | `onAssetCreated`, `onAssetUpdated`, `onAssetDeleted` | A stamp was added, changed or removed | `assetId`, `libraryId`, `asset` |
 | `onArmChanged`     | A stamp was armed or disarmed                                | `documentId`, `asset`    |
-| `onSettingsChanged` | The settings changed | `settings`, `changed` |
+| `onSettingsChanged` | The settings changed | `settings`, `changedKeys` |
 
-`reason` is `'created'`, `'imported'`, `'updated'`, `'asset-added'`, `'asset-updated'`,
-`'asset-removed'` or `'removed'`. `library` and `asset` are the new values, and `null` in the
+`type` is `'created'`, `'imported'`, `'updated'`, `'asset-created'`, `'asset-updated'`,
+`'asset-deleted'` or `'deleted'`. `library` and `asset` are the new values, and `null` in the
 deleted events; in the arm event, `asset` is `null` when the stamp was disarmed.
 
 ## Permissions

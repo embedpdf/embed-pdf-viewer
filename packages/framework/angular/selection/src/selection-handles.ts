@@ -9,7 +9,7 @@
  * behave the same. A press on a handle never scrolls the Stage.
  *
  * What's decided is the selection plugin's (`selectionHandleViewOf`, `selectionHandleEndpointsOf`,
- * `selectionHandleGeom`, `armSelectionHandle`) and the listener mechanics are `@embedpdf/web`'s
+ * `selectionHandleGeometry`, `armSelectionHandle`) and the listener mechanics are `@embedpdf/web`'s
  * (`attachSelectionHandle`); this file keeps
  * the markup and the colors: the plugin's `handles` setting, the accent while its color is
  * unset, and the `--epdf-text-selection-handle` and `--epdf-text-selection-handle-shadow` CSS
@@ -36,7 +36,7 @@ import {
   HANDLE_PAD,
   SELECTION_DEFAULTS,
   selectionHandleEndpointsOf,
-  selectionHandleGeom,
+  selectionHandleGeometry,
   selectionHandleViewOf,
   type SelectionHandleEndpoint,
   type SelectionHandleView,
@@ -250,7 +250,7 @@ function layoutOf(
   endpoint: SelectionHandleEndpoint,
   role: Role,
 ): HandleLayout | null {
-  const geometry = selectionHandleGeom(view, endpoint, role);
+  const geometry = selectionHandleGeometry(view, endpoint, role);
   if (!geometry) return null; // its page isn't laid out right now
   const barTop = HANDLE_PAD + (role === 'start' ? HANDLE_HEAD : 0);
   const pivotX = HANDLE_PAD + HANDLE_BAR / 2;

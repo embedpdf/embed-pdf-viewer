@@ -70,7 +70,7 @@ describe('AnnotationLayer', () => {
         .list()
         .find((entry) => entry.subtype === 'square' || entry.subtype === 'circle');
       expect(square).toBeDefined();
-      annotation.selection.set([square!.ref]);
+      annotation.selection.select([square!.ref]);
       await eventually(() => expect(all('[data-testid="handle"]').length).toBeGreaterThan(0));
       expect(handles.some((handle) => handle.kind === 'corner')).toBe(true);
       // The layer draws no handles of its own when the slot draws them.
@@ -86,7 +86,7 @@ describe('AnnotationLayer', () => {
       const square = annotation
         .list()
         .find((entry) => entry.subtype === 'square' || entry.subtype === 'circle')!;
-      annotation.selection.set([square.ref]);
+      annotation.selection.select([square.ref]);
       // The outline is a rectangle with no fill, its paint in `style` (an SVG
       // attribute wouldn't read `var()`), and the layer's own square handles.
       await eventually(() => expect(all('svg rect[fill="none"]').length).toBeGreaterThan(0));
@@ -283,7 +283,7 @@ describe('AnnotationLayer', () => {
     try {
       target.value = annotation.list().find((entry) => entry.subtype === 'free-text')!;
       const ref = target.value.ref;
-      annotation.selection.set([ref]);
+      annotation.selection.select([ref]);
       await eventually(() => expect(selected!.value).toHaveLength(1));
       await eventually(() => expect(anchor!.value).toMatchObject({ page: target.value!.page }));
 

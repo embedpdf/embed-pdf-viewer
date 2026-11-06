@@ -257,7 +257,7 @@ describe('a text box restyled after it was typed in', () => {
     void harness.capability.text.end();
     await flush();
     // The first restyle draws the box live; the second changes only what it shows.
-    harness.capability.selection.set([REF]);
+    harness.capability.selection.select([REF]);
     await harness.capability.selection.update({ fontColor: '#cc0000' });
     await flush();
     expect(harness.item().css.fontFamily).toBe('"epdf-helvetica", sans-serif');

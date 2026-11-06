@@ -9,7 +9,7 @@ import { boot } from './boot';
 import { Component, signal } from '@angular/core';
 import { EpdfPdfViewer } from '@embedpdf/viewer-angular';
 import type {
-  CommandDef,
+  CommandDefinition,
   DocumentSrc,
   PanelResizeEvent,
   ThemePreference,
@@ -49,7 +49,7 @@ const record = checkRecord<LivePropsRecord>({
   newCommands: () => {},
 });
 
-const hello = (): CommandDef[] => [{ id: 'acme:hello', label: 'Hello', run: () => {} }];
+const hello = (): CommandDefinition[] => [{ id: 'acme:hello', label: 'Hello', run: () => {} }];
 
 @Component({
   selector: 'app-root',

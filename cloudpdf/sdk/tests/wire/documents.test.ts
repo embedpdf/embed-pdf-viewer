@@ -414,7 +414,7 @@ describe("DocumentsClient", () => {
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { source: { kind: "url", url: "url" } };
         const rawResponseBody = {
-            tag: "imported",
+            status: "imported",
             document: {
                 id: "id",
                 tenantId: "tenantId",
@@ -536,7 +536,7 @@ describe("DocumentsClient", () => {
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { sizeBytes: 1, contentSha256: "contentSha256" };
         const rawResponseBody = {
-            tag: "created",
+            status: "created",
             document: {
                 id: "id",
                 tenantId: "tenantId",

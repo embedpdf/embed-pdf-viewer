@@ -1,4 +1,4 @@
-import type { FormFieldDTO } from './field';
+import type { FormField } from './field';
 import type { WidgetAnnotation } from '../annotation/kinds/widget';
 import type { FormFieldRef } from '../identity/FormFieldRef';
 import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
@@ -35,7 +35,7 @@ export interface FormSnapshot<C extends Coordinates = PageCoordinates> {
    * `repair({ bakeAppearances: true })` can clear the flag document-wide.
    */
   needsAppearances: boolean;
-  fields: FormFieldDTO<C>[];
+  fields: FormField<C>[];
   /**
    * Every widget the document's pages show, in page order and `/Annots`
    * order within a page: the annotation rows of the form, each with its

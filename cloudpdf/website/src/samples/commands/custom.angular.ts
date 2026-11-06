@@ -16,11 +16,11 @@ import {
   standardCommands,
   withCommands,
 } from '@embedpdf/angular/commands';
-import type { CommandDef } from '@embedpdf/angular/commands';
+import type { CommandDefinition } from '@embedpdf/angular/commands';
 import { cloudEngine } from '@cloudpdf/engine';
 
 // A command of your own: pressed while the pages show two at a time.
-const twoPages: CommandDef = {
+const twoPages: CommandDefinition = {
   id: 'layout:two-pages',
   label: 'Two pages',
   categories: ['layout'],

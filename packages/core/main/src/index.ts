@@ -96,7 +96,7 @@ export type {
 } from '@embedpdf/engine-core/runtime';
 
 import type { NoSettings } from './settings';
-import type { CapabilityToken, PluginDef, PromiseMembers } from './types';
+import type { CapabilityToken, PluginDefinition, PromiseMembers } from './types';
 
 /**
  * Create a typed capability token. `name` is the token's identity (debugging,
@@ -136,6 +136,8 @@ export function definePlugin<
   State = void,
   Capability = unknown,
   Settings extends object = NoSettings,
->(definition: PluginDef<State, Capability, Settings>): PluginDef<State, Capability, Settings> {
+>(
+  definition: PluginDefinition<State, Capability, Settings>,
+): PluginDefinition<State, Capability, Settings> {
   return definition;
 }

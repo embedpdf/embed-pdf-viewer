@@ -3,7 +3,7 @@
  * the engine checks a value against its field, shared by the engine (before
  * it writes) and a viewer (before it shows the write, `predict.ts`).
  */
-import type { FormFieldDTO, FormFieldFamily } from './field';
+import type { FormField, FormFieldKind } from './field';
 import type { FormFieldValue } from './value';
 import type { FormValueEntry } from './value-entry';
 import { EngineError } from '../errors/EngineError';
@@ -11,7 +11,7 @@ import { EngineErrorCode } from '../errors/EngineErrorCode';
 import type { Coordinates } from '../pageSpace/coordinates';
 
 /**
- * A value write, as the field's family takes it: a text field's text, a
+ * A value write, as the field's kind takes it: a text field's text, a
  * toggle's on-state (`null` clears the group), or a choice field's option
  * values (free text for a dropdown that allows editing).
  */
@@ -20,8 +20,8 @@ export type FieldValueWrite =
   | { kind: 'toggle'; state: string | null }
   | { kind: 'choice'; values: string[] };
 
-/** The shapes each family takes, for the message when a value doesn't fit. */
-const TAKES: Partial<Record<FormFieldFamily, string>> = {
+/** The shapes each kind takes, for the message when a value doesn't fit. */
+const TAKES: Partial<Record<FormFieldKind, string>> = {
   text: '{ value }',
   checkbox: '{ checked } or { value }',
   radio: '{ value }',
@@ -31,16 +31,16 @@ const TAKES: Partial<Record<FormFieldFamily, string>> = {
 
 /**
  * The write `value` makes for `field`, checked before anything is written:
- * the shape must be one the family takes, a toggle's value must be the
+ * the shape must be one the kind takes, a toggle's value must be the
  * export value of one of its widgets (a radio group that must keep a choice
  * can't be cleared), and a choice must be option values (free text for a
  * dropdown that allows editing). `InvalidArg` otherwise.
  */
 export function fieldValueWriteOf(
-  field: FormFieldDTO<Coordinates>,
+  field: FormField<Coordinates>,
   value: FormFieldValue,
 ): FieldValueWrite {
-  switch (field.family) {
+  switch (field.kind) {
     case 'text':
       if ('value' in value) return { kind: 'text', value: value.value ?? '' };
       break;
@@ -69,14 +69,14 @@ export function fieldValueWriteOf(
       if ('selectedValues' in value) return choiceOf(field, value.selectedValues);
       break;
     default:
-      throw invalidValue(`${field.family} fields hold no value you can set`);
+      throw invalidValue(`${field.kind} fields hold no value you can set`);
   }
-  throw invalidValue(`a ${field.family} field takes ${TAKES[field.family]}, not ${shapeOf(value)}`);
+  throw invalidValue(`a ${field.kind} field takes ${TAKES[field.kind]}, not ${shapeOf(value)}`);
 }
 
 /** What a choice field's default is checked against: its options and how it takes values. */
 export interface ChoiceDefaultTarget {
-  family: 'combobox' | 'listbox';
+  kind: 'combobox' | 'listbox';
   options: readonly { value: string }[];
   /** A dropdown that allows free text. */
   edit?: boolean;
@@ -93,37 +93,37 @@ export function assertChoiceDefault(target: ChoiceDefaultTarget, values: readonl
   const invalid = (message: string) =>
     new EngineError(EngineErrorCode.InvalidArg, message, { details: { field: 'defaultValue' } });
   if (new Set(values).size !== values.length) throw invalid('the default values must not repeat');
-  if (values.length > 1 && !(target.family === 'listbox' && target.multiSelect)) {
+  if (values.length > 1 && !(target.kind === 'listbox' && target.multiSelect)) {
     throw invalid(
-      `a ${target.family === 'listbox' ? 'list without multiSelect' : 'dropdown'} has one default`,
+      `a ${target.kind === 'listbox' ? 'list without multiSelect' : 'dropdown'} has one default`,
     );
   }
-  const freeText = target.family === 'combobox' && target.edit === true;
+  const freeText = target.kind === 'combobox' && target.edit === true;
   const optionValues = new Set(target.options.map((option) => option.value));
   const unknown = values.find((value) => !optionValues.has(value));
   if (unknown !== undefined && !freeText) {
     throw invalid(
-      `'${unknown}' is not an option value of the ${target.family === 'listbox' ? 'list' : 'dropdown'}`,
+      `'${unknown}' is not an option value of the ${target.kind === 'listbox' ? 'list' : 'dropdown'}`,
     );
   }
 }
 
 /** Whether `write` would leave `field` as it is. */
-export function isNoOpWrite(field: FormFieldDTO<Coordinates>, write: FieldValueWrite): boolean {
+export function isNoOpWrite(field: FormField<Coordinates>, write: FieldValueWrite): boolean {
   switch (write.kind) {
     case 'text':
-      return field.family === 'text' && field.value === write.value;
+      return field.kind === 'text' && field.value === write.value;
     case 'toggle':
       return (
-        (field.family === 'checkbox' || field.family === 'radio') &&
+        (field.kind === 'checkbox' || field.kind === 'radio') &&
         field.widgets.every((widget) => widget.checked === (widget.onState === write.state))
       );
     case 'choice':
-      if (field.family === 'combobox') {
+      if (field.kind === 'combobox') {
         return write.values.length === 0 ? field.value === '' : field.value === write.values[0];
       }
       return (
-        field.family === 'listbox' &&
+        field.kind === 'listbox' &&
         field.selectedValues.length === write.values.length &&
         field.selectedValues.every((value, index) => value === write.values[index])
       );
@@ -134,10 +134,10 @@ export function isNoOpWrite(field: FormFieldDTO<Coordinates>, write: FieldValueW
  * Whether a reset would leave `field` as it is: its value is its default, and
  * a checkbox's or radio group's buttons show that default.
  */
-export function isAtDefault(field: FormFieldDTO<Coordinates>): boolean {
+export function isAtDefault(field: FormField<Coordinates>): boolean {
   if (field.valueEntry.kind === 'unsupported') return false;
   if (!valueEntriesEqual(field.valueEntry, field.defaultValueEntry)) return false;
-  if (field.family !== 'checkbox' && field.family !== 'radio') return true;
+  if (field.kind !== 'checkbox' && field.kind !== 'radio') return true;
   const entry = field.defaultValueEntry;
   const state = entry.kind === 'scalar' ? entry.value : null;
   return field.widgets.every((widget) => widget.checked === (widget.onState === state));
@@ -158,7 +158,7 @@ export function valueEntriesEqual(left: FormValueEntry, right: FormValueEntry): 
 
 /** A checkbox's or radio group's on-state for an export value; `'Off'` and `null` clear it. */
 function toggleStateOf(
-  field: Extract<FormFieldDTO<Coordinates>, { family: 'checkbox' | 'radio' }>,
+  field: Extract<FormField<Coordinates>, { kind: 'checkbox' | 'radio' }>,
   exportValue: string | null,
 ): string | null {
   if (exportValue === null || exportValue === 'Off') return null;
@@ -170,17 +170,17 @@ function toggleStateOf(
 }
 
 function choiceOf(
-  field: Extract<FormFieldDTO<Coordinates>, { family: 'combobox' | 'listbox' }>,
+  field: Extract<FormField<Coordinates>, { kind: 'combobox' | 'listbox' }>,
   values: string[],
 ): FieldValueWrite {
   if (new Set(values).size !== values.length) {
     throw invalidValue('the values must not repeat');
   }
-  if (field.family === 'listbox' && !field.multiSelect && values.length > 1) {
+  if (field.kind === 'listbox' && !field.multiSelect && values.length > 1) {
     throw invalidValue(`'${field.name}' takes one value (it has no multiSelect)`);
   }
   const optionValues = new Set(field.options.map((option) => option.value));
-  const freeText = field.family === 'combobox' && field.edit && values.length === 1;
+  const freeText = field.kind === 'combobox' && field.edit && values.length === 1;
   const unknown = values.find((value) => !optionValues.has(value));
   if (!freeText && unknown !== undefined) {
     throw invalidValue(`'${unknown}' is not an option value of '${field.name}'`);

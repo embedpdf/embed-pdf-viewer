@@ -10,7 +10,7 @@ import {
   useCommands,
   useCommandsSettings,
 } from '@embedpdf/react/commands';
-import type { CommandDef } from '@embedpdf/react/commands';
+import type { CommandDefinition } from '@embedpdf/react/commands';
 import { cloudEngine } from '@cloudpdf/engine';
 
 import './custom.css';
@@ -18,7 +18,7 @@ import './custom.css';
 const engine = cloudEngine();
 
 // A command of your own: pressed while the pages show two at a time.
-const twoPages: CommandDef = {
+const twoPages: CommandDefinition = {
   id: 'layout:two-pages',
   label: 'Two pages',
   categories: ['layout'],

@@ -6,6 +6,6 @@ const { fields } = useFormState();
 
 <template>
   <ul>
-    <li v-for="field in fields" :key="field.name">{{ field.name }}: {{ field.family }}</li>
+    <li v-for="field in fields" :key="field.name">{{ field.name }}: {{ field.kind }}</li>
   </ul>
 </template>

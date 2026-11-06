@@ -30,7 +30,7 @@ import { createDefaultActionsUiAdapter } from '@embedpdf/web';
 
 /**
  * The actions of the document in scope (`[epdfDocumentScope]`), else the active one:
- * `executeNamed()`, `execute()`, `dispatch()`, `getActionTree()`, the checks (`canExecuteNamed()`,
+ * `executeNamed()`, `execute()`, `dispatch()`, `readActionTree()`, the checks (`canExecuteNamed()`,
  * `isScriptingEnabled()`, …), the settings (`settings()`, `updateSettings()`, …, which work with
  * no document) and the streams (`executed$`, `diagnosticReported$`, `scriptFailed$`, …). With
  * no document every other call refuses with `not-ready`.
@@ -44,7 +44,7 @@ export class EpdfActions extends pluginService({
     'executeNamed',
     'execute',
     'dispatch',
-    'getActionTree',
+    'readActionTree',
     'isScriptingEnabled',
     'setUiAdapter',
     'setSubmitHandler',
@@ -69,7 +69,7 @@ export function withActions(config?: ActionsConfig): EmbedPdfFeature {
   return { plugins: [actionsPlugin(config)], services: [EpdfActions] };
 }
 
-/** Your own handlers for any of the adapter's effects: `openUri`, `print`, `alert`, `gotoPage`. */
+/** Your own handlers for any of the adapter's effects: `openUri`, `print`, `alert`, `goToPage`. */
 export type ActionsUiHandlers = Partial<ActionUiAdapter>;
 
 /**
@@ -126,7 +126,7 @@ function installActionsUi(handlers?: ActionsUiHandlers | (() => ActionsUiHandler
       if (!current) return;
       const adapter: ActionUiAdapter = createDefaultActionsUiAdapter({
         overrides: () => overrides,
-        goToPage: (page) => view?.goToPage(page),
+        goToPage: (pageIndex) => view?.goToPage(pageIndex),
       });
       installed = { actions: current, stage: view, remove: current.setUiAdapter(adapter) };
     });

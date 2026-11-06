@@ -17,7 +17,7 @@ export type FormField =
 
 export namespace FormField {
     export interface Text {
-        family: "text";
+        kind: "text";
         ref: CloudPDF.FormFieldRef;
         name: string;
         origin: FormFieldText.Origin;
@@ -54,7 +54,7 @@ export namespace FormField {
     }
 
     export interface Checkbox {
-        family: "checkbox";
+        kind: "checkbox";
         ref: CloudPDF.FormFieldRef;
         name: string;
         origin: FormFieldCheckbox.Origin;
@@ -99,7 +99,7 @@ export namespace FormField {
     }
 
     export interface Radio {
-        family: "radio";
+        kind: "radio";
         ref: CloudPDF.FormFieldRef;
         name: string;
         origin: FormFieldRadio.Origin;
@@ -145,7 +145,7 @@ export namespace FormField {
     }
 
     export interface Combobox {
-        family: "combobox";
+        kind: "combobox";
         ref: CloudPDF.FormFieldRef;
         name: string;
         origin: FormFieldCombobox.Origin;
@@ -189,7 +189,7 @@ export namespace FormField {
     }
 
     export interface Listbox {
-        family: "listbox";
+        kind: "listbox";
         ref: CloudPDF.FormFieldRef;
         name: string;
         origin: FormFieldListbox.Origin;
@@ -234,7 +234,7 @@ export namespace FormField {
     }
 
     export interface Pushbutton {
-        family: "pushbutton";
+        kind: "pushbutton";
         ref: CloudPDF.FormFieldRef;
         name: string;
         origin: FormFieldPushbutton.Origin;
@@ -265,7 +265,7 @@ export namespace FormField {
     }
 
     export interface Signature {
-        family: "signature";
+        kind: "signature";
         ref: CloudPDF.FormFieldRef;
         name: string;
         origin: FormFieldSignature.Origin;
@@ -296,7 +296,7 @@ export namespace FormField {
     }
 
     export interface Unknown {
-        family: "unknown";
+        kind: "unknown";
         ref: CloudPDF.FormFieldRef;
         name: string;
         origin: FormFieldUnknown.Origin;

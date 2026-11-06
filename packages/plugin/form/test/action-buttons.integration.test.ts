@@ -106,9 +106,9 @@ async function boot(scripting: boolean, scope?: string[]) {
   const actions = kernel.capability(ActionsToken);
   const drainActions = () =>
     actions.dispatch({
-      scope: 'annotation',
+      type: 'annotation',
       event: 'cursorEnter',
-      ref: { kind: 'objectNumber', page, objectNumber: 999_999 },
+      annotation: { kind: 'objectNumber', page, objectNumber: 999_999 },
       page,
     });
 
@@ -141,8 +141,8 @@ describe('action buttons e2e (scripting OFF — actions ≠ JavaScript)', () => 
     expect(harness.paintedIds()).toContain(alphaId);
 
     const hide = await harness.press('btn-hide');
-    expect(hide.kind).toBe('dispatched');
-    if (hide.kind !== 'dispatched') throw new Error('unreachable');
+    expect(hide.status).toBe('dispatched');
+    if (hide.status !== 'dispatched') throw new Error('unreachable');
     // A dispatch reports each step; the /A tree is one step.
     expect(hide.result.steps).toHaveLength(1);
     expect(hide.result.steps[0]!.result.nodes).toEqual([
@@ -151,7 +151,7 @@ describe('action buttons e2e (scripting OFF — actions ≠ JavaScript)', () => 
     expect(harness.paintedIds()).not.toContain(alphaId);
 
     const show = await harness.press('btn-show');
-    expect(show.kind).toBe('dispatched');
+    expect(show.status).toBe('dispatched');
     expect(harness.paintedIds()).toContain(alphaId);
   });
 
@@ -166,8 +166,8 @@ describe('action buttons e2e (scripting OFF — actions ≠ JavaScript)', () => 
     expect(harness.paintedIds()).toContain(alphaId);
 
     const pressed = await harness.press('fakeButton');
-    expect(pressed.kind).toBe('dispatched');
-    if (pressed.kind !== 'dispatched') throw new Error('unreachable');
+    expect(pressed.status).toBe('dispatched');
+    if (pressed.status !== 'dispatched') throw new Error('unreachable');
     expect(pressed.result.steps[0]!.result.nodes).toEqual([
       expect.objectContaining({ type: 'hide', status: 'executed' }),
     ]);
@@ -180,8 +180,8 @@ describe('action buttons e2e (scripting OFF — actions ≠ JavaScript)', () => 
     expect(harness.valueOf('beta')).toBe('filled-b');
 
     const reset = await harness.press('btn-reset'); // excludes [alpha, log] → resets beta
-    expect(reset.kind).toBe('dispatched');
-    if (reset.kind !== 'dispatched') throw new Error('unreachable');
+    expect(reset.status).toBe('dispatched');
+    if (reset.status !== 'dispatched') throw new Error('unreachable');
     expect(reset.result.steps[0]!.result.nodes).toEqual([
       expect.objectContaining({ type: 'reset-form', status: 'executed' }),
     ]);
@@ -192,7 +192,7 @@ describe('action buttons e2e (scripting OFF — actions ≠ JavaScript)', () => 
   it('a button made through create() draws, and resets the form when pressed', async () => {
     await using harness = await boot(false);
     const { field } = await harness.form.create({
-      family: 'pushbutton',
+      kind: 'pushbutton',
       name: 'clear',
       widgets: [
         {
@@ -210,8 +210,8 @@ describe('action buttons e2e (scripting OFF — actions ≠ JavaScript)', () => 
     expect(row).toMatchObject({ caption: 'Clear form', hasAppearance: true });
 
     const pressed = await harness.form.activateWidget(widget);
-    expect(pressed.kind).toBe('dispatched');
-    if (pressed.kind !== 'dispatched') throw new Error('unreachable');
+    expect(pressed.status).toBe('dispatched');
+    if (pressed.status !== 'dispatched') throw new Error('unreachable');
     expect(pressed.result.steps[0]!.result.nodes).toEqual([
       expect.objectContaining({ type: 'reset-form', status: 'executed' }),
     ]);
@@ -221,8 +221,8 @@ describe('action buttons e2e (scripting OFF — actions ≠ JavaScript)', () => 
   it('runs the ResetForm in a JS chain while the JS nodes stay inert', async () => {
     await using harness = await boot(false);
     const chain = await harness.press('btn-chain');
-    expect(chain.kind).toBe('dispatched');
-    if (chain.kind !== 'dispatched') throw new Error('unreachable');
+    expect(chain.status).toBe('dispatched');
+    if (chain.status !== 'dispatched') throw new Error('unreachable');
     // JS inert (scripting off), the reset between them still executes.
     expect(chain.result.steps[0]!.result.nodes.map((node) => [node.type, node.status])).toEqual([
       ['javascript', 'inert'],
@@ -239,8 +239,8 @@ describe('action buttons e2e (scripting ON)', () => {
   it('runs JS→ResetForm→JS: each script once, in order, around the reset', async () => {
     await using harness = await boot(true);
     const chain = await harness.press('btn-chain');
-    expect(chain.kind).toBe('dispatched');
-    if (chain.kind !== 'dispatched') throw new Error('unreachable');
+    expect(chain.status).toBe('dispatched');
+    if (chain.status !== 'dispatched') throw new Error('unreachable');
     expect(chain.result.steps[0]!.result.nodes.map((node) => [node.type, node.status])).toEqual([
       ['javascript', 'executed'],
       ['reset-form', 'executed'],
@@ -260,7 +260,7 @@ describe('action buttons e2e (scripting ON)', () => {
     const dispatched = harness.press('btn-chain');
     const committed = harness.form.setValue(harness.fieldOf('beta').ref, { value: 'raced' });
     const [chain] = await Promise.all([dispatched, committed]);
-    expect(chain.kind).toBe('dispatched');
+    expect(chain.status).toBe('dispatched');
     expect(harness.valueOf('log')).toBe('AB');
     expect(harness.valueOf('beta')).toBe('raced');
   }, 20_000);

@@ -295,7 +295,7 @@ export interface PageImageResult {
   /** Image height in pixels. */
   height: number;
   format: PageRenderEncodedFormat;
-  contentType: string;
+  mimeType: string;
   source: PageImageSource;
 }
 

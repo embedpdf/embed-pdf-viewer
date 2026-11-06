@@ -30,7 +30,7 @@ export type { SelectionSegment } from './geometry';
  */
 export interface SelectionSettings {
   /** How far, in viewport pixels, the pointer travels before a press becomes a drag that selects. */
-  readonly dragThreshold: number;
+  readonly dragThresholdPx: number;
   /** The color of selected text: a CSS color, or `null` for the viewer's accent at 35%. */
   readonly color: string | null;
   /** The grips at the selection's ends, on touch screens. */
@@ -44,7 +44,7 @@ export interface SelectionSettings {
 
 /** What the selection settings are when the app registers none. */
 export const SELECTION_DEFAULTS: SelectionSettings = {
-  dragThreshold: 4,
+  dragThresholdPx: 4,
   color: null,
   handles: { color: null, shadow: '0 1px 4px rgb(0 0 0 / 0.35)' },
 };
@@ -62,9 +62,9 @@ export type SelectionConfig = DeepPartial<SelectionSettings>;
  * `text/charmap.ts`), which `readText()` applies for you.
  */
 export interface TextPosition {
-  page: PageRef;
+  readonly page: PageRef;
   /** Character index, 0-based. */
-  index: number;
+  readonly index: number;
 }
 
 /**
@@ -73,8 +73,8 @@ export interface TextPosition {
  * end a range exactly at a page boundary.
  */
 export interface TextRange {
-  start: TextPosition;
-  end: TextPosition;
+  readonly start: TextPosition;
+  readonly end: TextPosition;
 }
 
 /**
@@ -94,17 +94,17 @@ export type SelectionRangeInput = TextRange | { page: PageRef; start: number; co
  * re-deriving bidi from geometry. `rect` is the AABB (scroll targets).
  */
 export interface SelectionEndpoint {
-  page: PageRef;
-  glyphQuad: Quad;
-  advance: 1 | -1;
-  rect: Rect;
+  readonly page: PageRef;
+  readonly glyphQuad: Quad;
+  readonly advance: 1 | -1;
+  readonly rect: Rect;
 }
 
 /** Where selection-scoped floating UI attaches: a page + the selection's
  *  union box on it, in page space. See {@link SelectionCapability.getAnchor}. */
 export interface SelectionAnchor {
-  page: PageRef;
-  bounds: Rect;
+  readonly page: PageRef;
+  readonly bounds: Rect;
 }
 
 export interface SelectionSnapshot {

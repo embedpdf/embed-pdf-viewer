@@ -38,7 +38,7 @@ const attachmentEngine = {
   open: (input: { id?: string }) =>
     Promise.resolve({
       id: input.id ?? 'doc',
-      events: { subscribe: () => () => {}, lastServerId: () => null },
+      events: { subscribe: () => () => {}, lastServerSequence: () => null },
       pages: { list: () => Promise.resolve({ pageCount: 1, labels: [], pages: [testPage] }) },
       security: { allows: () => true, allowsAnnotation: () => true },
       attachments: { list: () => Promise.resolve({ attachments: files }) },
@@ -70,7 +70,7 @@ describe('useAttachmentState', () => {
     flushSync();
     const seen = latest(state.seen) as AttachmentState;
     expect(seen.files.map((file) => file.name)).toEqual(['notes.txt', 'scan.pdf']);
-    expect(seen).toMatchObject({ status: 'ready', canAdd: true, canDownload: true });
+    expect(seen).toMatchObject({ status: 'ready', canCreate: true, canDownload: true });
   });
 
   it('with a selector, gives { current } that follows the value it picks', async () => {
@@ -98,9 +98,9 @@ describe('useAttachment before a document opens', () => {
       () => null,
     );
     await viewerWith(plugins, Probes, { probes: [capture] }, attachmentEngine);
-    expect(() => found.attachment!.canAdd()).toThrow(
+    expect(() => found.attachment!.canCreate()).toThrow(
       expect.objectContaining({ code: 'not-ready' }),
     );
-    await expect(found.attachment!.add([])).rejects.toMatchObject({ code: 'not-ready' });
+    await expect(found.attachment!.create([])).rejects.toMatchObject({ code: 'not-ready' });
   });
 });

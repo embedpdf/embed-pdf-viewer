@@ -6,7 +6,7 @@
  * adds and removes at once.
  *
  *   const attachment = useAttachment();
- *   const { files, canAdd } = useAttachmentState();
+ *   const { files, canCreate } = useAttachmentState();
  *   const { bytes, name, mimeType } = await attachment.download(file);
  */
 

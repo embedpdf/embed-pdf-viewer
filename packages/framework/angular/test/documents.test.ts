@@ -263,7 +263,7 @@ const websiteLink: PdfActionTree = {
 const click: ActionContext = {
   origin: 'user',
   source: { kind: 'api' },
-  event: { scope: 'activate' },
+  event: { type: 'activate' },
 };
 
 /** An app's own service that the handlers of `withActionsUi()` use. */

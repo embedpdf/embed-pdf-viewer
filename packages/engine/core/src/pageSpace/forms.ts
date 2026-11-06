@@ -11,7 +11,7 @@ import type { WidgetAnnotation } from '../annotation/kinds/widget';
 import type { PdfFieldActions } from '../dto/PdfAction';
 import type { PageDestination, PdfDestination } from '../dto/PdfDestination';
 import type { FormFieldDraft, WidgetPlacement } from '../forms/draft';
-import type { FormFieldDTO } from '../forms/field';
+import type { FormField } from '../forms/field';
 import type { FormSnapshot } from '../forms/snapshot';
 import { pdfRectOf } from '../geometry/pageSpace';
 
@@ -57,12 +57,9 @@ export function pageFieldActionsOf(
 }
 
 /** A form field in page space: each destination of its actions on the page it goes to. */
-export function pageFormFieldOf(
-  field: FormFieldDTO<PdfCoordinates>,
-  boxOf: VisibleBoxOf,
-): FormFieldDTO {
-  if (!field.actions) return field as FormFieldDTO;
-  return { ...field, actions: pageFieldActionsOf(field.actions, boxOf) } as FormFieldDTO;
+export function pageFormFieldOf(field: FormField<PdfCoordinates>, boxOf: VisibleBoxOf): FormField {
+  if (!field.actions) return field as FormField;
+  return { ...field, actions: pageFieldActionsOf(field.actions, boxOf) } as FormField;
 }
 
 /** A widget row in page space, measured on its page. */

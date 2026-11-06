@@ -81,7 +81,7 @@ Everything `useFonts()` gives you.
 | `ensureLoaded()`                | Reads the document's fonts unless they're loaded or loading. Resolves once they're there.                    |
 | `refresh()`                     | Reads them again. Rarely needed: the list keeps up by itself.                                                 |
 | `resolve(request)`              | The fonts a write would draw each run in, without writing. [Your own editor](#your-own-editor)                |
-| `getProgram(displaySha256)`     | A font file's facts: the characters it covers and its line metrics.                                          |
+| `readProgram(displaySha256)`    | A font file's facts: the characters it covers and its line metrics.                                          |
 | `getFontCss(font)`              | The CSS text in a font is drawn with, and the programs it names. [Draw text in a font](#draw-text-in-a-font) |
 | `getFaceCss(face)`              | The same for a face, as rich text names one: `{ family, weight, italic }`.                                    |
 | `getRunCss(run)`                | The same for a run as `resolve()` answered it.                                                               |
@@ -89,7 +89,7 @@ Everything `useFonts()` gives you.
 | `getPaintFontsEpoch()`          | A number that moves when any of the answers above may change: ask again when it does.                        |
 | `getFaceOfCssFamily(cssFamily)` | The face a program's CSS family stands for, to read back text the browser drew itself.                       |
 
-`resolve()` and `getProgram()` also take a `signal` in their options, to cancel them.
+`resolve()` and `readProgram()` also take a `signal` in their options, to cancel them.
 
 ## State
 

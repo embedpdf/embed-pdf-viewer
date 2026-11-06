@@ -112,15 +112,15 @@ export {
   type MeasurementIntent,
 } from './editable';
 // Screen-anchored (`noZoom`/`noRotate`) bodies: display-transform exemptions.
-// One projection (`anchoredGeom`) + its exact inverse (`unanchoredGeom`),
+// One projection (`anchoredGeometry`) + its exact inverse (`unanchoredGeometry`),
 // shared by render / hit / chrome / gestures.
 export {
   anchorModeOf,
   anchorOf,
   anchoredBox,
-  anchoredGeom,
+  anchoredGeometry,
   anchoredStrokeWidth,
-  unanchoredGeom,
+  unanchoredGeometry,
   type AnchorMode,
   type ViewEnv,
 } from './anchor';
@@ -162,11 +162,11 @@ export {
   geomRotation,
   geomRotateAbout,
   geomResetRotation,
-  obbFromGeom,
+  obbFromGeometry,
   rotateKnob,
   placeRotateKnob,
   DEFAULT_CHROME_GEOMETRY,
-  isRotatableGeom,
+  isRotatableGeometry,
   // upright placement
   uprightRotation,
   uprightAnchoredRect,

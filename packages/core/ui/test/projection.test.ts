@@ -60,19 +60,19 @@ describe('projectOverflow', () => {
       {
         labelKey: undefined,
         role: undefined,
-        rows: [{ type: 'submenu', command: 'menu:view', menu: 'view' }],
+        rows: [{ kind: 'submenu', command: 'menu:view', menu: 'view' }],
       },
       {
         labelKey: undefined,
         role: undefined,
-        rows: [{ type: 'submenu', command: 'menu:zoom', menu: 'zoom' }],
+        rows: [{ kind: 'submenu', command: 'menu:zoom', menu: 'zoom' }],
       },
       {
         labelKey: undefined,
         role: undefined,
         rows: [
-          { type: 'command', command: 'tool:pan' },
-          { type: 'command', command: 'tool:pointer' },
+          { kind: 'command', command: 'tool:pan' },
+          { kind: 'command', command: 'tool:pointer' },
         ],
       },
     ]);
@@ -92,8 +92,8 @@ describe('projectOverflow', () => {
         labelKey: undefined,
         role: undefined,
         rows: [
-          { type: 'command', command: 'b' },
-          { type: 'command', command: 'c' },
+          { kind: 'command', command: 'b' },
+          { kind: 'command', command: 'c' },
         ],
       },
     ]);
@@ -123,8 +123,8 @@ describe('projectOverflow', () => {
         labelKey: 'toolbar.modes',
         role: 'radio',
         rows: [
-          { type: 'command', command: 'mode:view' },
-          { type: 'command', command: 'mode:annotate' },
+          { kind: 'command', command: 'mode:view' },
+          { kind: 'command', command: 'mode:annotate' },
         ],
       },
     ]);
@@ -144,7 +144,7 @@ describe('projectOverflow', () => {
       {
         labelKey: undefined,
         role: undefined,
-        rows: [{ type: 'submenu', command: 'menu:zoom', menu: 'zoom' }],
+        rows: [{ kind: 'submenu', command: 'menu:zoom', menu: 'zoom' }],
       },
     ]);
   });
@@ -159,8 +159,8 @@ describe('projectOverflow', () => {
     const fit = solve(bar, metrics, 120);
     expect(projectOverflow(bar, fit, () => ({}))).toEqual([]);
     expect(projectShed(bar.sections[0].groups[0], fit, () => ({}))).toEqual([
-      { type: 'command', command: 't2' },
-      { type: 'command', command: 't3' },
+      { kind: 'command', command: 't2' },
+      { kind: 'command', command: 't3' },
     ]);
   });
 
@@ -177,9 +177,9 @@ describe('projectOverflow', () => {
         labelKey: undefined,
         role: 'radio',
         rows: [
-          { type: 'command', command: 't1' },
-          { type: 'command', command: 't2' },
-          { type: 'command', command: 't3' },
+          { kind: 'command', command: 't1' },
+          { kind: 'command', command: 't2' },
+          { kind: 'command', command: 't3' },
         ],
       },
     ]);
@@ -189,7 +189,7 @@ describe('projectOverflow', () => {
     const bar = normalizeBar({ id: 'b', sections: { start: [group('g', ['mystery'])] } });
     const fit = solve(bar, metrics, 0);
     expect(projectOverflow(bar, fit, () => null)).toEqual([
-      { labelKey: undefined, role: undefined, rows: [{ type: 'command', command: 'mystery' }] },
+      { labelKey: undefined, role: undefined, rows: [{ kind: 'command', command: 'mystery' }] },
     ]);
   });
 });

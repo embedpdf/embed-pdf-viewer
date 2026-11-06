@@ -99,7 +99,7 @@ export class EpdfCommands extends pluginService({
 }) {
   /**
    * One command as a signal, for what shows a command and isn't a button (a row of a shortcut
-   * sheet): its label, icon and state, `run()` and `shortcut`. Changes only when what the
+   * sheet): its label, icon and state, `run()` and `shortcutLabel`. Changes only when what the
    * command shows does. Pass a function for an id that changes. A button uses the `epdfCommand`
    * directive instead. Always a command: an id no plugin registered (or one asked for before
    * the commands plugin is there) is labelled with its id, neither visible nor enabled, and an
@@ -248,7 +248,7 @@ export class EpdfCommand {
   /** Your icon's name for it, when the command has one. */
   readonly icon: Signal<string | undefined> = computed(() => this.command().icon);
   /** Its first shortcut, formatted for the platform (`'⌘K'`), or `null`. */
-  readonly shortcut: Signal<string | null> = computed(() => this.command().shortcut);
+  readonly shortcutLabel: Signal<string | null> = computed(() => this.command().shortcutLabel);
   /** Whether it can run now. */
   readonly enabled: Signal<boolean> = computed(() => this.command().enabled);
   /** Whether it shows as pressed, such as the current tool. */

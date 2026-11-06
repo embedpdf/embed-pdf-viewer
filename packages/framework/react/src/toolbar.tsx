@@ -47,7 +47,7 @@ import {
 import type {
   BarSchema,
   CollapsedGroupView as CollapsedGroupViewOf,
-  CustomSlotCtx,
+  CustomSlotContext,
   GroupDisclosureView as GroupDisclosureViewOf,
   LiveSection,
   OverflowMenuView as OverflowMenuViewOf,
@@ -94,7 +94,7 @@ export type OverflowMenuView = OverflowMenuViewOf<ResolvedCommand>;
 export type GroupDisclosureView = GroupDisclosureViewOf<ResolvedCommand>;
 
 /** Passed to custom-slot renderers alongside the variant. */
-export type { CustomSlotCtx };
+export type { CustomSlotContext };
 
 // ── the strip view — a bar projected through the registry, live ──────────────
 
@@ -183,7 +183,7 @@ export interface ToolbarProps {
    * element of an item that takes focus is the item's stop in the toolbar's
    * arrow-key order.
    */
-  renderCustom?: Record<string, (variant: string, ctx: CustomSlotCtx) => React.ReactNode>;
+  renderCustom?: Record<string, (variant: string, ctx: CustomSlotContext) => React.ReactNode>;
   /**
    * A group in its collapsed form. Default: <select> for 'select', menu button for 'menu'; a
    * renderer that returns `undefined` leaves the group to the default.
@@ -441,7 +441,7 @@ function DefaultOverflowMenu({
           {section.rows.map((row) => {
             const cmd = view.resolve(row.command);
             if (!cmd) return null;
-            const isSubmenu = row.type === 'submenu';
+            const isSubmenu = row.kind === 'submenu';
             return (
               <button
                 key={row.command}

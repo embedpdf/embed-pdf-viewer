@@ -16,7 +16,7 @@ export const checkStyleCharacter = (style: WidgetCheckStyle): string =>
 
 /**
  * The symbol a checkbox or radio button names in its `/MK /CA`; `null` when
- * it names none the appearance generator knows, so it shows its family's
+ * it names none the appearance generator knows, so it shows its kind's
  * own (a checkbox's check, a radio button's circle).
  */
 export function checkStyleOfCaption(caption: string | null): WidgetCheckStyle | null {

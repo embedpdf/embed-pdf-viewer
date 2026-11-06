@@ -16,7 +16,7 @@ import {
   withCommands,
   withCommandShortcuts,
 } from '@embedpdf/angular/commands';
-import type { CommandDef } from '@embedpdf/angular/commands';
+import type { CommandDefinition } from '@embedpdf/angular/commands';
 import { EpdfDocumentScope } from '@embedpdf/angular/runtime';
 import { bytesInput, kernelOf, mount, viewerHost } from './fixtures';
 
@@ -28,7 +28,7 @@ const press = (key: string, target: EventTarget = window, init: KeyboardEventIni
 /** A command that can be switched on and off, and pressed, from the test. */
 function toggleable(run = vi.fn()) {
   const state = { enabled: true, active: false };
-  const command: CommandDef = {
+  const command: CommandDefinition = {
     id: 'review:approve',
     label: 'Approve',
     icon: 'check',
@@ -49,7 +49,7 @@ describe('[epdfCommand]', () => {
         features: [withCommands({ commands: [command] })],
         template: `
           <button [epdfCommand]="'review:approve'" #approve="epdfCommand">
-            {{ approve.label() }}|{{ approve.icon() }}|{{ approve.shortcut() }}
+            {{ approve.label() }}|{{ approve.icon() }}|{{ approve.shortcutLabel() }}
           </button>
         `,
       }),

@@ -50,7 +50,7 @@ export function createZoomDrag(
   stage: Pick<
     StageHostCapability,
     | 'getPageAt'
-    | 'getPageFrame'
+    | 'getPageBox'
     | 'listVisiblePages'
     | 'viewportToPage'
     | 'pageToWorld'
@@ -64,7 +64,7 @@ export function createZoomDrag(
   // the exact inverse of `viewportToPage`, so the box sits under the pointer
   // and its middle lands on the point the user saw there.
   const toViewport = (page: PageRef, point: Point): Point | null => {
-    const frame = stage.getPageFrame(page);
+    const frame = stage.getPageBox(page);
     if (!frame) return null;
     const view = frame.transform.pageToView(point);
     return { x: frame.screenX + view.x, y: frame.screenY + view.y };

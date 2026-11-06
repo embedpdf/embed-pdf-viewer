@@ -99,7 +99,7 @@ describe('adding and removing', () => {
     const { kernel, gated, attachment, history } = await boot();
     gated.holding = true;
     const picked = new File([new TextEncoder().encode('again')], '1.txt', { type: 'text/plain' });
-    const adding = attachment.add([{ data: picked }]);
+    const adding = attachment.create([{ data: picked }]);
     await vi.waitFor(() => expect(gated.held).toHaveLength(1));
     // "1 (2).txt" sorts before "1.txt": a space comes before a full stop.
     expect(namesOf(attachment)).toEqual(['1 (2).txt', '1.txt', 'attached.pdf']);
@@ -119,7 +119,7 @@ describe('adding and removing', () => {
 
   it('adds several files as one step of the history', async () => {
     const { kernel, attachment, history } = await boot();
-    await attachment.add([
+    await attachment.create([
       { data: new Uint8Array([1]), name: 'b.bin' },
       { data: new Uint8Array([2]), name: 'b.bin', description: 'the second' },
     ]);
@@ -132,7 +132,7 @@ describe('adding and removing', () => {
 
   it('draws an undone remove back before the engine answers, with its bytes', async () => {
     const { kernel, gated, attachment, history } = await boot();
-    await attachment.remove(named(attachment, '1.txt'));
+    await attachment.delete(named(attachment, '1.txt'));
     expect(namesOf(attachment)).toEqual(['attached.pdf']);
     expect(history.getUndoLabel()).toEqual({ key: 'attachment.remove' });
 
@@ -153,7 +153,7 @@ describe('adding and removing', () => {
   it('takes a refused add away at once', async () => {
     const { kernel, gated, attachment } = await boot();
     gated.holding = true;
-    const adding = attachment.add([{ data: new Uint8Array([1]), name: 'new.bin' }]);
+    const adding = attachment.create([{ data: new Uint8Array([1]), name: 'new.bin' }]);
     await vi.waitFor(() => expect(gated.held).toHaveLength(1));
     expect(namesOf(attachment)).toContain('new.bin');
     gated.refuse(new Error('refused'));
@@ -164,7 +164,7 @@ describe('adding and removing', () => {
 
   it('refuses bytes without a name before anything shows', async () => {
     const { kernel, attachment, history } = await boot();
-    await expect(attachment.add([{ data: new Uint8Array([1]) }])).rejects.toSatisfy(
+    await expect(attachment.create([{ data: new Uint8Array([1]) }])).rejects.toSatisfy(
       (error: unknown) => isPluginError(error, 'invalid-input'),
     );
     expect(namesOf(attachment)).toEqual(['1.txt', 'attached.pdf']);
@@ -175,7 +175,7 @@ describe('adding and removing', () => {
   it('saves a file under its name without the characters that disguise it', async () => {
     const { kernel, attachment } = await boot();
     const rlo = String.fromCharCode(0x202e);
-    const [added] = await attachment.add([
+    const [added] = await attachment.create([
       { data: new Uint8Array([7]), name: `invoice${rlo}fdp.exe`, mimeType: 'application/pdf' },
     ]);
     const content = await attachment.download(added!);
@@ -193,15 +193,15 @@ describe('adding and removing', () => {
     let resyncs = 0;
     attachment.onChanged((event) => changes.push(event));
     attachment.onResynced(() => (resyncs += 1));
-    await attachment.add([{ data: new Uint8Array([1]), name: 'a.bin' }]);
-    await attachment.remove(named(attachment, '1.txt'));
+    await attachment.create([{ data: new Uint8Array([1]), name: 'a.bin' }]);
+    await attachment.delete(named(attachment, '1.txt'));
     await history.undo();
     await attachment.refresh();
     expect(
       changes.map((event) => [event.type, event.files.map((file) => file.name), event.origin.kind]),
     ).toEqual([
-      ['added', ['a.bin'], 'local'],
-      ['removed', ['1.txt'], 'local'],
+      ['created', ['a.bin'], 'local'],
+      ['deleted', ['1.txt'], 'local'],
       ['restored', ['1.txt'], 'local'],
     ]);
     expect(resyncs).toBe(1);
@@ -215,7 +215,7 @@ describe('selection', () => {
     const [one, pdf] = attachment.list();
     attachment.select([pdf!, one!, pdf!]);
     expect(attachment.getSelected().map((file) => file.name)).toEqual(['attached.pdf', '1.txt']);
-    await attachment.remove(one!);
+    await attachment.delete(one!);
     expect(attachment.getSelected().map((file) => file.name)).toEqual(['attached.pdf']);
     attachment.select([]);
     expect(attachment.getSelected()).toEqual([]);
@@ -236,13 +236,15 @@ describe("a page's files", () => {
     expect(namesOf(attachment)).toEqual(['1.txt', 'attached.pdf', 'figures.csv']);
     const file = named(attachment, 'figures.csv');
     expect(file.home).toEqual({ kind: 'page', ref: created.ref });
-    expect(attachment.canRemove(file)).toBe(true);
+    expect(attachment.canDelete(file)).toBe(true);
     expect((await attachment.download(file)).bytes).toEqual(new Uint8Array([1, 2, 3]));
 
     attachment.reveal(file);
-    expect(annotation.selection.list().map((selected) => selected.ref)).toEqual([created.ref]);
+    expect(annotation.selection.getSelected().map((selected) => selected.ref)).toEqual([
+      created.ref,
+    ]);
 
-    await attachment.remove(file);
+    await attachment.delete(file);
     expect(annotation.get(created.ref)).toBeNull();
     expect(namesOf(attachment)).toEqual(['1.txt', 'attached.pdf']);
     await kernel.destroy();
@@ -253,15 +255,15 @@ describe('permissions', () => {
   it('reads without the rights, and refuses every change and save without changing anything', async () => {
     const { kernel, attachment, history } = await boot({ scope: ['doc.open'] });
     expect(namesOf(attachment)).toEqual(['1.txt', 'attached.pdf']);
-    expect(attachment.canAdd()).toBe(false);
+    expect(attachment.canCreate()).toBe(false);
     expect(attachment.canDownload()).toBe(false);
     const file = named(attachment, '1.txt');
-    expect(attachment.canRemove(file)).toBe(false);
+    expect(attachment.canDelete(file)).toBe(false);
     const refused = (error: unknown) => isPluginError(error, 'permission-denied');
-    await expect(attachment.add([{ data: new Uint8Array([1]), name: 'x.bin' }])).rejects.toSatisfy(
-      refused,
-    );
-    await expect(attachment.remove(file)).rejects.toSatisfy(refused);
+    await expect(
+      attachment.create([{ data: new Uint8Array([1]), name: 'x.bin' }]),
+    ).rejects.toSatisfy(refused);
+    await expect(attachment.delete(file)).rejects.toSatisfy(refused);
     await expect(attachment.download(file)).rejects.toSatisfy(refused);
     expect(namesOf(attachment)).toEqual(['1.txt', 'attached.pdf']);
     expect(history.canUndo()).toBe(false);

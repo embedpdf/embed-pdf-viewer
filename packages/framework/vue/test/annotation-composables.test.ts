@@ -17,7 +17,7 @@ import type {
   Annotation,
   AnnotationCapability,
   CommentThreadView,
-  CommentsApi,
+  CommentsCapability,
   FilePickerProvider,
   ToolDefaults,
 } from '../src/annotation';
@@ -77,7 +77,7 @@ describe('the annotation composables', () => {
   }, 30_000);
 
   it('useComments and useAnnotation reach the document; useCommentThreads labels each page', async () => {
-    let comments: CommentsApi | null = null;
+    let comments: CommentsCapability | null = null;
     let api: AnnotationCapability | null = null;
     let threads: Readonly<Ref<readonly CommentThreadView[]>> | null = null;
     const Probe = probe(() => {
@@ -116,9 +116,9 @@ describe('the annotation composables', () => {
     );
     try {
       await settle();
-      expect(warn.mock.calls.some((call) => String(call[0]).includes('useFilePickerProvider'))).toBe(
-        true,
-      );
+      expect(
+        warn.mock.calls.some((call) => String(call[0]).includes('useFilePickerProvider')),
+      ).toBe(true);
       const set = vi.spyOn(annotation, 'setFilePickerProvider');
       shown.value = false;
       await settle();
@@ -153,7 +153,7 @@ describe('the annotation composables', () => {
       const square = annotation
         .list()
         .find((entry) => entry.subtype === 'square' || entry.subtype === 'circle')!;
-      annotation.selection.set([square.ref]);
+      annotation.selection.select([square.ref]);
       await eventually(() => expect(document.querySelector('.menu')).not.toBeNull());
       annotation.selection.clear();
       await eventually(() => expect(document.querySelector('.menu')).toBeNull());
@@ -162,4 +162,3 @@ describe('the annotation composables', () => {
     }
   }, 30_000);
 });
-

@@ -31,7 +31,7 @@ export class KernelBinding {
   }
 
   /** Stop following the kernel; the viewer calls it when it unmounts. */
-  dispose(): void {
+  destroy(): void {
     this.#unsubscribe();
   }
 }

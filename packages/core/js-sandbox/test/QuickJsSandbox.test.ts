@@ -30,7 +30,7 @@ const input = (kind: ScriptInput['event']['kind'] = 'field-format'): ScriptInput
     {
       ref: ref('dynamic-label'),
       name: 'dynamic-label',
-      family: 'text',
+      kind: 'text',
       value: '',
       defaultValue: '',
       display: 'visible',
@@ -62,7 +62,7 @@ async function sandbox(): Promise<ScriptSandbox> {
 }
 
 afterEach(() => {
-  for (const value of sandboxes.splice(0)) value.dispose();
+  for (const value of sandboxes.splice(0)) value.destroy();
 });
 
 describe('QuickJsSandbox', () => {
@@ -131,7 +131,7 @@ describe('QuickJsSandbox', () => {
 
     expect(out.error?.kind).toBe('budget');
     expect(out.formEffects).toEqual([]);
-    expect(vm.disposed).toBe(true);
+    expect(vm.destroyed).toBe(true);
     expect(() => vm.run(`event.value = 'again';`, input())).toThrow(/disposed/);
   });
 
@@ -144,7 +144,7 @@ describe('QuickJsSandbox', () => {
       budget({ maxExecutionMs: 1000, maxMemoryBytes: 2 * 1024 * 1024 }),
     );
     expect(memoryOut.error?.kind).toBe('budget');
-    expect(memoryVm.disposed).toBe(true);
+    expect(memoryVm.destroyed).toBe(true);
 
     const stackVm = await sandbox();
     const stackOut = stackVm.run(
@@ -153,7 +153,7 @@ describe('QuickJsSandbox', () => {
       budget({ maxStackBytes: 32 * 1024 }),
     );
     expect(stackOut.error?.kind).toBe('budget');
-    expect(stackVm.disposed).toBe(true);
+    expect(stackVm.destroyed).toBe(true);
   });
 
   it('rejects oversized output without returning partial effects', async () => {
@@ -166,7 +166,7 @@ describe('QuickJsSandbox', () => {
 
     expect(out.error?.kind).toBe('budget');
     expect(out.formEffects).toEqual([]);
-    expect(vm.disposed).toBe(true);
+    expect(vm.destroyed).toBe(true);
   });
 
   it('releases every QuickJS result handle across repeated runs', async () => {
@@ -175,6 +175,6 @@ describe('QuickJsSandbox', () => {
       expect(vm.run(`event.value = String(${index});`, input()).error).toBeUndefined();
     }
 
-    expect(() => vm.dispose()).not.toThrow();
+    expect(() => vm.destroy()).not.toThrow();
   });
 });

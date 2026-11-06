@@ -31,15 +31,15 @@ const UNKNOWN_PAGE = 999_999;
  */
 export function runPageInsertBlankConformance(
   runner: ConformanceTestRunner,
-  opts: ConformanceOptions,
+  options: ConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`page insert-blank conformance: ${opts.label}`, () => {
+  describe(`page insert-blank conformance: ${options.label}`, () => {
     let engine: Engine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -47,7 +47,7 @@ export function runPageInsertBlankConformance(
     });
 
     test('appends one blank page of the requested size with a fresh PON', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const before = await doc.pages.list();
         const beforePageObjectNumbers = before.pages.map((p) => p.ref.objectNumber);
@@ -72,7 +72,7 @@ export function runPageInsertBlankConformance(
     });
 
     test('a position + count places the blank block after its neighbour', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const before = await doc.pages.list();
         if (before.pages.length < 2) return;
@@ -100,8 +100,8 @@ export function runPageInsertBlankConformance(
     });
 
     test('the blank pages persist through save → re-open', async () => {
-      if (opts.openKind !== 'bytes') return;
-      const doc = await openFixture(engine, opts);
+      if (options.openKind !== 'bytes') return;
+      const doc = await openFixture(engine, options);
       let reopened: DocumentHandle | null = null;
       try {
         const before = await doc.pages.list();
@@ -111,7 +111,7 @@ export function runPageInsertBlankConformance(
         reopened = await engine.open(
           {
             kind: 'bytes',
-            id: `${opts.fixture.id}-insert-blank-reopen`,
+            id: `${options.fixture.id}-insert-blank-reopen`,
             bytes,
           },
           EVERY_PERMISSION,
@@ -128,7 +128,7 @@ export function runPageInsertBlankConformance(
     });
 
     test('non-positive size and bad count reject with InvalidArg; an unknown neighbour with NotFound', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const before = await doc.pages.list();
         const rejects: Array<() => Promise<unknown>> = [

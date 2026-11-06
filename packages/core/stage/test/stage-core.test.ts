@@ -4,8 +4,8 @@ import * as S from '../src';
 const vp = { width: 1000, height: 700 };
 const GAP = 16;
 
-/** Build a PageGeom from intrinsic dimensions (the layout fns take `size`, not bare w/h). */
-const pg = (width: number, height: number, rotation?: S.PageRotation): S.PageGeom => ({
+/** Build a PageGeometry from intrinsic dimensions (the layout fns take `size`, not bare w/h). */
+const pg = (width: number, height: number, rotation?: S.Rotation): S.PageGeometry => ({
   size: { width, height },
   ...(rotation !== undefined ? { rotation } : {}),
 });
@@ -556,11 +556,11 @@ describe('direction: rtl (a layout property, not a navigation one)', () => {
 });
 
 describe('pageFrame: reserved chrome space around each PAGE', () => {
-  const pageGeom = pg(600, 800);
+  const pageGeometry = pg(600, 800);
   const frame = { top: 10, right: 8, bottom: 20, left: 6 };
 
   it('linear vertical: pages sit inside their slots; bands reserved between pages', () => {
-    const scene = S.linearLayout([pageGeom, pageGeom], S.groupPages(2, 'none'), {
+    const scene = S.linearLayout([pageGeometry, pageGeometry], S.groupPages(2, 'none'), {
       axis: 'y',
       gap: 16,
       pageFrame: frame,
@@ -575,7 +575,7 @@ describe('pageFrame: reserved chrome space around each PAGE', () => {
   });
 
   it('SPREADS: each page keeps its OWN flanks — left/right chrome works (the fix)', () => {
-    const scene = S.linearLayout([pageGeom, pageGeom], S.groupPages(2, 'odd'), {
+    const scene = S.linearLayout([pageGeometry, pageGeometry], S.groupPages(2, 'odd'), {
       axis: 'y',
       gap: 16,
       pageFrame: frame,
@@ -587,7 +587,7 @@ describe('pageFrame: reserved chrome space around each PAGE', () => {
   });
 
   it('RTL spread: slots mirror but margins stay PHYSICAL (left room stays mL)', () => {
-    const scene = S.linearLayout([pageGeom, pageGeom], S.groupPages(2, 'odd'), {
+    const scene = S.linearLayout([pageGeometry, pageGeometry], S.groupPages(2, 'odd'), {
       axis: 'y',
       gap: 16,
       pageFrame: frame,

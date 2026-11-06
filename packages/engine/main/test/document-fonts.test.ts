@@ -107,7 +107,7 @@ describe('doc.fonts (local engine)', () => {
   async function fieldIn(fontFamily: string, value: string, name = 'name') {
     const page = (await doc.pages.list()).pages[0]!;
     const { field } = await doc.forms.create({
-      family: 'text',
+      kind: 'text',
       name,
       widgets: [{ page: page.ref, rect: { x: 40, y: 40, width: 200, height: 24 }, fontFamily }],
     });

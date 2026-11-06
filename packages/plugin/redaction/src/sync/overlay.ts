@@ -24,7 +24,7 @@ export function syncOverlay(
   const settings = ctx.settings();
   const write = () => annotation.tools.updateDefaults('redact', toolDefaultsOf(settings.get()));
   write();
-  ctx.listen(settings.api.onSettingsChanged, ({ changed }) => {
-    if (changed.includes('overlay')) write();
+  ctx.listen(settings.api.onSettingsChanged, ({ changedKeys }) => {
+    if (changedKeys.includes('overlay')) write();
   });
 }

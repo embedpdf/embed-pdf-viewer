@@ -48,7 +48,7 @@ export interface StageModel extends StageSettings {
    * panning never moves it (the scene is a one-item slice at this page).
    * An index, so it survives spread and layout regrouping.
    */
-  readonly cursor: number;
+  readonly pageIndex: number;
   /**
    * What last drove the camera or cursor: `'programmatic'` for the arrival
    * and reveal verbs (the ones action executors use), `'user'` for direct
@@ -93,7 +93,7 @@ export const initialStageModel = (config: StageConfig): StageModel => {
     cameraResting: true,
     viewport: { width: 0, height: 0 },
     dpr: 1,
-    cursor: 0,
+    pageIndex: 0,
     motionCause: 'user',
     activeRules: [],
     zoomDrag: null,
@@ -117,8 +117,8 @@ export const setViewport = (state: StageModel, viewport: Size): StageModel =>
 export const setDpr = (state: StageModel, dpr: number): StageModel =>
   state.dpr === dpr ? state : { ...state, dpr };
 
-export const setCursor = (state: StageModel, cursor: number): StageModel =>
-  state.cursor === cursor ? state : { ...state, cursor };
+export const setCursor = (state: StageModel, pageIndex: number): StageModel =>
+  state.pageIndex === pageIndex ? state : { ...state, pageIndex };
 
 export const setMotionCause = (
   state: StageModel,

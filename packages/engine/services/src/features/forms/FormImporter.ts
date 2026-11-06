@@ -5,7 +5,7 @@ import {
   type BundleLimits,
   EngineError,
   fieldValueWriteOf,
-  type FormFieldDTO,
+  type FormField,
   type FormFieldRef,
   type FormImportResult,
   type FormValuesImportDrop,
@@ -66,7 +66,7 @@ export interface FormImportRequest {
 /** What a values import writes, decided before the first write. */
 export interface FormValuesImportPlan {
   /** Each against the field as it is now; a write that changes nothing isn't among them. */
-  readonly writes: readonly PlannedValueWrite<FormFieldDTO<PdfCoordinates>>[];
+  readonly writes: readonly PlannedValueWrite<FormField<PdfCoordinates>>[];
   readonly dropped: readonly FormValuesImportDrop[];
 }
 
@@ -177,7 +177,7 @@ export class FormImporter {
     limits: BundleLimits,
     signal: AbortSignal,
     /** Whether the session may fill the field in; one it may not is left out. */
-    mayFill: (field: FormFieldDTO<PdfCoordinates>) => boolean,
+    mayFill: (field: FormField<PdfCoordinates>) => boolean,
   ): FormValuesImportPlan {
     throwIfAborted(signal);
     checkWireBundle(this.runtime, 'form', bundle, limits, assertFormBundleManifest);
@@ -211,12 +211,12 @@ export class FormImporter {
    * filler, as `setValue` stamps it.
    */
   writeValue(
-    write: PlannedValueWrite<FormFieldDTO<PdfCoordinates>>,
+    write: PlannedValueWrite<FormField<PdfCoordinates>>,
     bundle: WireFormBundle,
     attribution: 'restore' | 'stamp',
     actor: AnnotationActor,
     signal: AbortSignal,
-  ): FormFieldDTO<PdfCoordinates> {
+  ): FormField<PdfCoordinates> {
     new FormMutator(this.runtime, this.session, this.fonts).setValue(
       write.target.ref,
       write.value,
@@ -263,7 +263,7 @@ export class FormImporter {
   }
 
   /** Every field of the form, as it is now. */
-  private readFields(): FormFieldDTO<PdfCoordinates>[] {
+  private readFields(): FormField<PdfCoordinates>[] {
     const model = acquireFormModel(this.runtime, this.session);
     const docPtr = this.session.requireDocPtr();
     const count = this.runtime.fn.EPDFForm_CountFields(model);
@@ -272,7 +272,7 @@ export class FormImporter {
     );
   }
 
-  private readField(objectNumber: number): FormFieldDTO<PdfCoordinates> {
+  private readField(objectNumber: number): FormField<PdfCoordinates> {
     const model = acquireFormModel(this.runtime, this.session);
     const index = this.runtime.fn.EPDFForm_GetFieldIndexByObjNum(model, objectNumber);
     return readFieldAt(this.runtime, model, index, this.session.requireDocPtr());

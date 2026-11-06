@@ -1,10 +1,10 @@
 /**
  * A field's settings, described for a settings panel the way an annotation
- * kind describes its look: which settings the field's family has, how each is
+ * kind describes its look: which settings the field's kind has, how each is
  * edited, and its value. `update()` writes them.
  */
 import { memoByKey } from '@embedpdf/core';
-import type { FormFieldDTO, FormFieldRef } from '@embedpdf/engine-core/runtime';
+import type { FormField, FormFieldRef } from '@embedpdf/engine-core/runtime';
 
 import type { FormCapability, FormFieldSetting, FormFieldSettings } from '../contract';
 import { canonicalKey, fieldByKey } from '../model';
@@ -27,9 +27,9 @@ const OPTIONS: FormFieldSetting = {
   labelKey: 'form.settings.options',
 };
 
-/** What each family adds. */
-function familySettings(field: FormFieldDTO): readonly FormFieldSetting[] {
-  switch (field.family) {
+/** What each kind adds. */
+function familySettings(field: FormField): readonly FormFieldSetting[] {
+  switch (field.kind) {
     case 'text':
       return [
         { key: 'defaultValue', control: 'text', ...DEFAULT_VALUE },
@@ -109,7 +109,7 @@ function familySettings(field: FormFieldDTO): readonly FormFieldSetting[] {
 
 /** Each setting's value, as the field holds it. */
 function valuesOf(
-  field: FormFieldDTO,
+  field: FormField,
   settings: readonly FormFieldSetting[],
 ): Record<string, unknown> {
   const held = field as unknown as Record<string, unknown>;

@@ -262,7 +262,7 @@ const ACTIONS: readonly Action[] = [
     name: 'recolor a selection',
     setup: async (annotation) => [await square(annotation, 100), await square(annotation, 200)],
     act: (annotation, refs) => {
-      annotation.selection.set(refs);
+      annotation.selection.select(refs);
       return annotation.selection.update({ color: '#16a34a' });
     },
   },
@@ -270,7 +270,7 @@ const ACTIONS: readonly Action[] = [
     name: 'delete a selection',
     setup: async (annotation) => [await square(annotation, 100), await square(annotation, 200)],
     act: (annotation, refs) => {
-      annotation.selection.set(refs);
+      annotation.selection.select(refs);
       return annotation.selection.delete();
     },
   },
@@ -278,7 +278,7 @@ const ACTIONS: readonly Action[] = [
     name: 'turn a selection',
     setup: async (annotation) => [await square(annotation)],
     act: (annotation, refs) => {
-      annotation.selection.set(refs);
+      annotation.selection.select(refs);
       return annotation.selection.rotateBy(90);
     },
   },
@@ -286,7 +286,7 @@ const ACTIONS: readonly Action[] = [
     name: 'group a selection',
     setup: async (annotation) => [await square(annotation, 100), await square(annotation, 200)],
     act: (annotation, refs) => {
-      annotation.selection.set(refs);
+      annotation.selection.select(refs);
       return annotation.selection.group();
     },
   },
@@ -294,12 +294,12 @@ const ACTIONS: readonly Action[] = [
     name: 'ungroup',
     setup: async (annotation) => {
       const refs = [await square(annotation, 100), await square(annotation, 200)];
-      annotation.selection.set(refs);
+      annotation.selection.select(refs);
       await annotation.selection.group();
       return refs;
     },
     act: (annotation, refs) => {
-      annotation.selection.set(refs);
+      annotation.selection.select(refs);
       return annotation.selection.ungroup();
     },
   },

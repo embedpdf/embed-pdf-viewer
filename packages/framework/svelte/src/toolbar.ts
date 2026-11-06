@@ -24,7 +24,7 @@ export type {
 
 export { default as Toolbar } from './toolbar/Toolbar.svelte';
 export type { ToolbarProps } from './toolbar/props';
-export type { CustomSlotCtx } from '@embedpdf/core-ui';
+export type { CustomSlotContext } from '@embedpdf/core-ui';
 export type { CollapsedGroupView, GroupDisclosureView, OverflowMenuView } from './toolbar/views';
 export { useStripView } from './toolbar/strip.svelte';
 export type { StripView, StripViewGroup } from './toolbar/strip.svelte';

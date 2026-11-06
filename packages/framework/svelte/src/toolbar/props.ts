@@ -1,6 +1,6 @@
 /** The props of `<Toolbar>`: the bar and how it runs, and a snippet for every part you draw. */
 import type { Snippet } from 'svelte';
-import type { BarSchema, CustomSlotCtx } from '@embedpdf/core-ui';
+import type { BarSchema, CustomSlotContext } from '@embedpdf/core-ui';
 import type { ResolvedCommand } from '@embedpdf/plugin-commands/contract';
 import type { CollapsedGroupView, GroupDisclosureView, OverflowMenuView } from './views';
 
@@ -35,7 +35,7 @@ export interface ToolbarProps {
    * `ctx.measure`. The first element of an item that takes focus is the item's stop in the
    * toolbar's arrow-key order.
    */
-  custom?: Snippet<[name: string, variant: string, ctx: CustomSlotCtx]>;
+  custom?: Snippet<[name: string, variant: string, ctx: CustomSlotContext]>;
   /** A folded group: its button and its menu. Default: a `<select>` for `'select'`, a menu button for `'menu'`. */
   collapsed?: Snippet<[view: CollapsedGroupView]>;
   /** The button of a group that shed items, and its menu. Default: a chevron opening a menu. */

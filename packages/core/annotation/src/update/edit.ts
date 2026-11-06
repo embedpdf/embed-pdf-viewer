@@ -3,7 +3,7 @@
  * do (select, move, resize, rotate, drag a caption or a leader) and the moves
  * that preview it. The release commits it (edit-commit.ts).
  */
-import { anchoredGeom, anchorModeOf } from '../anchor';
+import { anchoredGeometry, anchorModeOf } from '../anchor';
 import {
   DEFAULT_CHROME_GEOMETRY,
   geomDragHandle,
@@ -43,7 +43,7 @@ const arcTo = (from: number, to: number): number => ((to - from + 540) % 360) - 
 
 /**
  * The live rotation of a rotate draft, snapping applied — the one angle rule
- * shared by the preview (`effGeom`), the commit (`editUp`) and the angle chip,
+ * shared by the preview (`effectiveGeometry`), the commit (`editUp`) and the angle chip,
  * so they can never disagree. The selection's absolute angle (a single member's
  * `rot` + the raw pointer delta; a group's raw delta from 0) locks onto the
  * configured angles within the threshold; `free` (shift held) bypasses.
@@ -59,13 +59,13 @@ export function rotateDraftDelta(
   // un-flagged): the chip and the snap targets speak about what the user sees
   // — a noRotate shape's on-screen tilt, not its stored one.
   const base = one
-    ? geomRotation(anchoredGeom(shapeOf(one.annotation), anchorModeOf(one), draft.view))
+    ? geomRotation(anchoredGeometry(shapeOf(one.annotation), anchorModeOf(one), draft.view))
     : 0;
   const angle = normalizeDeg(base + raw);
   if (!model.snap.rotation || draft.free) return { delta: raw, angle, snapped: false };
   for (const target of model.snap.rotationAngles) {
     const adjust = arcTo(angle, normalizeDeg(target));
-    if (Math.abs(adjust) <= model.snap.rotationThreshold)
+    if (Math.abs(adjust) <= model.snap.rotationThresholdDeg)
       return { delta: raw + adjust, angle: normalizeDeg(target), snapped: true };
   }
   return { delta: raw, angle, snapped: false };
@@ -126,10 +126,10 @@ export function editDown(model: Model, input: PointerInput): [Model, Effect[]] {
   if (hit.kind === 'handle') {
     // The handle gesture runs in view space: `base` is the projected geometry
     // the user grabbed (identity for un-flagged annotations), and the commit
-    // maps the result back via `unanchoredGeom` with the same captured view.
+    // maps the result back via `unanchoredGeometry` with the same captured view.
     const record = model.byId[hit.id];
     const view = viewOf(input);
-    const base = anchoredGeom(shapeOf(record.annotation), anchorModeOf(record), view);
+    const base = anchoredGeometry(shapeOf(record.annotation), anchorModeOf(record), view);
     return [
       {
         ...model,
@@ -227,7 +227,7 @@ export function editMove(model: Model, input: PointerInput): [Model, Effect[]] {
       input.page,
       raw,
       // Screen pixels to page units at this sample's view.
-      model.snap.alignmentThreshold / (input.scale || 1),
+      model.snap.alignmentThresholdPx / (input.scale || 1),
       input.pageBox,
     );
     // A snap adjusts by ≤ threshold, but never past the page edge: re-clamp, and

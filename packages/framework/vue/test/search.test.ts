@@ -69,7 +69,7 @@ function searchEngine(): Engine {
   let script = slices();
   const handle = {
     id: 'doc',
-    events: { subscribe: () => () => {}, lastServerId: () => null },
+    events: { subscribe: () => () => {}, lastServerSequence: () => null },
     pages: {
       list: () =>
         Promise.resolve({ pageCount: 2, labels: [], pages: [pageLayout(5, 0), pageLayout(7, 1)] }),
@@ -255,7 +255,7 @@ describe('useSearchSettings', () => {
 
     kernel.settingsOf(SearchToken).updateSettings({ reveal: { behavior: 'instant' } });
     await settle();
-    expect(latest(renders)).toMatchObject({ reveal: { anchor: { y: 0.35 }, behavior: 'instant' } });
+    expect(latest(renders)).toMatchObject({ reveal: { align: { y: 0.35 }, behavior: 'instant' } });
 
     await kernel.documents.open({ kind: 'bytes', id: 'doc', bytes: new Uint8Array() });
     await settle();

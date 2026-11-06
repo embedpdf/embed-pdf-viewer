@@ -8,7 +8,7 @@ import { memo } from '@embedpdf/core';
 import {
   tabOrderOf,
   type AnnotationRef,
-  type FormFieldDTO,
+  type FormField,
   type FormFieldRef,
   type WidgetAnnotation,
 } from '@embedpdf/engine-core/runtime';
@@ -29,13 +29,13 @@ import type { FormContext, FormServices } from '../services';
 /** A place Tab stops at: a box, the field it belongs to, and where it comes in Tab's order. */
 interface Stop {
   readonly row: WidgetAnnotation;
-  readonly field: FormFieldDTO;
+  readonly field: FormField;
   readonly at: number;
 }
 
 /** A radio button as its field lists it: whether it's the checked one, and the value it picks. */
-const radioButtonOf = (field: FormFieldDTO, widget: number) =>
-  field.family === 'radio'
+const radioButtonOf = (field: FormField, widget: number) =>
+  field.kind === 'radio'
     ? (field.widgets.find((candidate) => candidate.objectNumber === widget) ?? null)
     : null;
 
@@ -58,7 +58,7 @@ export function createFocus(
         const field = fieldForWidget(index, widget);
         if (!field || !rights.takesInput(field)) return;
         // A radio group is one stop on each page it shows on, where its first button is.
-        if (field.family === 'radio') {
+        if (field.kind === 'radio') {
           const group = `${fieldKeyOf(field)}@${row.page.objectNumber}`;
           if (groups.has(group)) return;
           groups.add(group);
@@ -70,7 +70,7 @@ export function createFocus(
   );
 
   /** The buttons of a radio group, in Tab's order; on one page, with `page`. */
-  const buttonsOf = (field: FormFieldDTO, page?: number): WidgetAnnotation[] =>
+  const buttonsOf = (field: FormField, page?: number): WidgetAnnotation[] =>
     order().rows.filter(
       (row) =>
         (page === undefined || row.page.objectNumber === page) &&
@@ -82,7 +82,7 @@ export function createFocus(
    * its first, or its last when Shift+Tab comes to it from after it.
    */
   const boxAt = (stop: Stop, backward: boolean): WidgetAnnotation => {
-    if (stop.field.family !== 'radio') return stop.row;
+    if (stop.field.kind !== 'radio') return stop.row;
     const buttons = buttonsOf(stop.field, stop.row.page.objectNumber);
     const checked = buttons.find(
       (button) => radioButtonOf(stop.field, widgetObjectOf(button.ref))?.checked,
@@ -123,7 +123,7 @@ export function createFocus(
       (stop) =>
         (!options.empty || isEmpty(stop.field)) &&
         // A radio group is one stop: from one of its buttons, the group is where the cursor is.
-        !(stop.field === field && field.family === 'radio' && stop.row.page.objectNumber === page),
+        !(stop.field === field && field.kind === 'radio' && stop.row.page.objectNumber === page),
     );
     const ahead = candidates.filter((stop) =>
       at === null ? true : backward ? stop.at < at : stop.at > at,
@@ -138,7 +138,7 @@ export function createFocus(
   const moveInGroup = (ref: AnnotationRef, backward: boolean): boolean => {
     const widget = widgetObjectOf(ref);
     const field = fieldForWidget(fields.view(), widget);
-    if (!field || field.family !== 'radio' || !rights.takesInput(field)) return false;
+    if (!field || field.kind !== 'radio' || !rights.takesInput(field)) return false;
     const buttons = buttonsOf(field);
     const here = buttons.findIndex((row) => widgetObjectOf(row.ref) === widget);
     if (here < 0 || buttons.length < 2) return false;
@@ -155,7 +155,7 @@ export function createFocus(
 
   const getFocusedField = memo(
     () => [fields.view(), cursor.focused()],
-    (index, focused): FormFieldDTO | null => (focused ? fieldByKey(index, focused.field) : null),
+    (index, focused): FormField | null => (focused ? fieldByKey(index, focused.field) : null),
   );
 
   return {

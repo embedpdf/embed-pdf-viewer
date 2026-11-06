@@ -39,7 +39,7 @@ describe('recalculation', () => {
       name: 'demo.pdf',
       pageCount: pages.pageCount,
       pages: pages.pages,
-      revision: 0,
+      pagesSequence: 0,
       hasUnsavedChanges: false,
       renderPolicy: { kind: 'continuous' },
       pageLabels: [],

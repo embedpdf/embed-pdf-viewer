@@ -1,7 +1,7 @@
 import type { BundleImportPages } from './bundle';
 import type { FormBundle } from './FormBundle';
 import type { WidgetAnnotation, WidgetPatch } from '../annotation/kinds/widget';
-import type { FormFieldDTO } from '../forms/field';
+import type { FormField } from '../forms/field';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { FormFieldRef } from '../identity/FormFieldRef';
 import {
@@ -67,8 +67,8 @@ export type FormImportDropReason =
   | 'name-conflict'
   /** A widget whose field isn't in the bundle. */
   | 'no-field'
-  /** A field of a family the engine doesn't model (`family: 'unknown'`). */
-  | 'unsupported-family'
+  /** A field of a kind the engine doesn't model (`kind: 'unknown'`). */
+  | 'unsupported-kind'
   /** A script, submit or link, and the session lacks `doc.forms.script`. */
   | 'script-not-allowed'
   /** Actions a write can't make, or that were read incomplete. */
@@ -88,8 +88,8 @@ export interface FormImportDrop {
 export type FormValuesImportDropReason =
   /** The document has no field of that full name. */
   | 'no-field'
-  /** The document's field of that name is of another family. */
-  | 'wrong-family'
+  /** The document's field of that name is of another kind. */
+  | 'wrong-kind'
   /** The field can't take the value: an option it doesn't have, a button it lacks. */
   | 'value-not-allowed'
   /** A signature locked the field. */
@@ -105,7 +105,7 @@ export interface FormValuesImportDrop {
 
 export interface FormImportResult<C extends Coordinates = PageCoordinates> {
   /** The fields the import made, in bundle order, each as it is now. */
-  fields: FormFieldDTO<C>[];
+  fields: FormField<C>[];
   /** Their widgets' rows. */
   widgets: WidgetAnnotation<C>[];
   /** Each imported field's ref in the bundle, and its ref in this document. */
@@ -119,7 +119,7 @@ export interface FormImportResult<C extends Coordinates = PageCoordinates> {
 
 export interface FormValuesImportResult<C extends Coordinates = PageCoordinates> {
   /** The fields whose value changed, in bundle order, each as it is now. */
-  fields: FormFieldDTO<C>[];
+  fields: FormField<C>[];
   /** The rows of the widgets whose look changed. */
   widgets: WidgetAnnotation<C>[];
   /** What was left out, in bundle order. */

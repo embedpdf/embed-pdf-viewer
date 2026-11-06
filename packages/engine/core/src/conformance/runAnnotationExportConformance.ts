@@ -25,15 +25,15 @@ import { AnnotationTransfer } from '../transfer/AnnotationTransfer';
  */
 export function runAnnotationExportConformance(
   runner: ConformanceTestRunner,
-  opts: AnnotationResourceConformanceOptions,
+  options: AnnotationResourceConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`annotation export conformance: ${opts.label}`, () => {
+  describe(`annotation export conformance: ${options.label}`, () => {
     let engine: Engine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -44,7 +44,7 @@ export function runAnnotationExportConformance(
       fixture: AnnotationResourceFixture,
       run: (page: PageHandle, doc: DocumentHandle, pageRef: PageRef) => Promise<void>,
     ): Promise<void> => {
-      const doc = await opts.open(engine, fixture);
+      const doc = await options.open(engine, fixture);
       try {
         const { pages } = await doc.pages.list();
         const pageRef = toPageRef(pages[0]!.ref.objectNumber);

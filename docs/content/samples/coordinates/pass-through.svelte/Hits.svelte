@@ -20,7 +20,7 @@
         <button
           type="button"
           class="hit"
-          onclick={() => stage.reveal(hit.page, { rect: bounds, anchor: { y: 0.35 } })}
+          onclick={() => stage.reveal(hit.page, { rect: bounds, align: { y: 0.35 } })}
         >
           <span class="where">page {hit.pageIndex + 1}</span>
           <code class="rect">x {Math.round(bounds.x)}, y {Math.round(bounds.y)}</code>

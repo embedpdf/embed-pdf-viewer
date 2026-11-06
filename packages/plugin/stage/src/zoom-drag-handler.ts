@@ -22,14 +22,14 @@ export function createZoomDragHandler(
     id: 'stage-zoom-drag',
     priority: 10, // the stage's own band, as the scroll handler
     enabledFor: (tool) => tool.enables.has('zoom-box'),
-    onDown: (sample) => {
+    onPointerDown: (sample) => {
       if (sample.source !== stage.getLensId()) return false;
       stage.beginZoomDrag(sample.viewport);
       return true;
     },
-    onMove: (sample) => stage.moveZoomDrag(sample.viewport),
-    onUp: (sample) => stage.endZoomDrag({ zoomOut: sample.modifiers.alt }),
-    onCancel: () => stage.cancelZoomDrag(),
+    onPointerMove: (sample) => stage.moveZoomDrag(sample.viewport),
+    onPointerUp: (sample) => stage.endZoomDrag({ zoomOut: sample.modifiers.alt }),
+    onPointerCancel: () => stage.cancelZoomDrag(),
     onHover: (sample) =>
       interaction.claimCursor('stage-zoom-out', sample.modifiers.alt ? 'zoom-out' : null),
   };

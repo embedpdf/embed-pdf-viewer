@@ -19,8 +19,8 @@ import type {
   FieldPosition,
   FormBundle,
   FormFieldDraft,
-  FormFieldDTO,
-  FormFieldFamily,
+  FormField,
+  FormFieldKind,
   FormFieldPatch,
   FormFieldRef,
   FormFieldValue,
@@ -49,8 +49,8 @@ export type { Box, WidgetHit } from './model';
 export type {
   FormBundle,
   FormFieldDraft,
-  FormFieldDTO,
-  FormFieldFamily,
+  FormField,
+  FormFieldKind,
   FormFieldPatch,
   FormFieldRef,
   FormFieldValue,
@@ -95,7 +95,7 @@ export interface FormSettings {
   };
   /**
    * Which fields people may fill in by hand: `true`, every one; `false`,
-   * none; or a list of field families (`'text'`, `'checkbox'`,
+   * none; or a list of field kinds (`'text'`, `'checkbox'`,
    * `'signature'`…). A field left out draws as a read-only one does, and
    * takes no typing, clicks or picks. Only the interface: your code still
    * fills it in (`setValue()`, `importValues()`), and `canFill()` doesn't change.
@@ -103,8 +103,8 @@ export interface FormSettings {
   readonly fillable: FillableFields;
 }
 
-/** Which fields people may fill in by hand: all, none, or those of these families. */
-export type FillableFields = boolean | readonly FormFieldFamily[];
+/** Which fields people may fill in by hand: all, none, or those of these kinds. */
+export type FillableFields = boolean | readonly FormFieldKind[];
 
 /** What the form settings are when the app registers none. */
 export const FORM_DEFAULTS: FormSettings = {
@@ -121,7 +121,7 @@ export type FormConfig = DeepPartial<FormSettings>;
 
 /** Which fields `list()` returns: all of them, or those that match every given part. */
 export interface FormFilter {
-  readonly family?: FormFieldFamily;
+  readonly kind?: FormFieldKind;
   /** Fields with a box on this page: its ref or its index. */
   readonly page?: PageRef | number;
   /** One full name, such as `'billing.name'`. */
@@ -136,7 +136,7 @@ export type FormSetValueStatus = 'applied' | 'unchanged' | 'rejected';
 
 /** What `setValue()` resolves: the field as it is now, and what the write did. */
 export interface FormSetValueResult {
-  readonly field: FormFieldDTO;
+  readonly field: FormField;
   readonly status: FormSetValueStatus;
 }
 
@@ -154,12 +154,12 @@ export interface FormValidation {
    * The required fields you may fill in that are empty, in page order (page,
    * then top to bottom, then left to right).
    */
-  readonly missing: readonly FormFieldDTO[];
+  readonly missing: readonly FormField[];
 }
 
 /** What `reset()` resolves: the fields it changed, as they are now. */
 export interface FormResetResult {
-  readonly fields: readonly FormFieldDTO[];
+  readonly fields: readonly FormField[];
 }
 
 /** A field setting that is on or off. */
@@ -248,12 +248,12 @@ export interface FormFieldSettings {
 
 /** What `create()`, `update()` and `removeWidget()` resolve: the field as it is now. */
 export interface FormFieldResult {
-  readonly field: FormFieldDTO;
+  readonly field: FormField;
 }
 
 /** What `addWidget()` resolves: the field as it is now, and its new widget. */
 export interface FormWidgetAddResult {
-  readonly field: FormFieldDTO;
+  readonly field: FormField;
   readonly widget: WidgetAnnotation;
 }
 
@@ -267,7 +267,7 @@ export interface FormExportSelection {
 /** What `import()` did: the new fields, where each bundle field went, and what was left out. */
 export interface FormImportResult {
   /** The new fields, in bundle order. */
-  readonly fields: readonly FormFieldDTO[];
+  readonly fields: readonly FormField[];
   /** Each imported field's ref in the bundle, and its new ref here. */
   readonly refMap: ReadonlyArray<{ readonly from: FormFieldRef; readonly to: FormFieldRef }>;
   /** What was left out, and why, in bundle order. */
@@ -283,19 +283,19 @@ export type WidgetAddress = AnnotationRef | FormWidget;
 
 /** What one widget activation did: the form's own scripts ran, or the widget's action did. */
 export type WidgetActivationResult =
-  | { kind: 'form'; result: FormCommitResult }
-  | { kind: 'dispatched'; result: ActionTriggerResult };
+  | { status: 'form'; result: FormCommitResult }
+  | { status: 'dispatched'; result: ActionTriggerResult };
 
 /** How a write through the document's scripts ended. */
 export type FormCommitStatus = 'applied' | 'unchanged' | 'rejected' | 'failed';
 
 /** A write through the document's keystroke, validate, calculate and format scripts, and what they asked for. */
 export interface FormCommitResult {
-  status: FormCommitStatus;
-  scripted: boolean;
-  uiEffects: FormUiEffect[];
-  diagnostics: ScriptDiagnostic[];
-  error?: ScriptExecutionError;
+  readonly status: FormCommitStatus;
+  readonly scripted: boolean;
+  readonly uiEffects: FormUiEffect[];
+  readonly diagnostics: ScriptDiagnostic[];
+  readonly error?: ScriptExecutionError;
 }
 
 /**
@@ -338,17 +338,17 @@ export interface FormFocusNextOptions {
 
 /** A field's value changed, whoever changed it: you, the form's scripts, or another session. */
 export interface FormValueChangedEvent {
-  readonly field: FormFieldDTO;
+  readonly field: FormField;
   readonly origin: EventOrigin;
 }
 /** A field was added. */
 export interface FormFieldCreatedEvent {
-  readonly field: FormFieldDTO;
+  readonly field: FormField;
   readonly origin: EventOrigin;
 }
 /** A field's settings or boxes changed. */
 export interface FormFieldUpdatedEvent {
-  readonly field: FormFieldDTO;
+  readonly field: FormField;
   readonly origin: EventOrigin;
 }
 /** A field was removed, with every box it had. */
@@ -358,12 +358,12 @@ export interface FormFieldDeletedEvent {
 }
 /** The form's own validation refused a value: the field kept the one it had. */
 export interface FormValidationRejectedEvent {
-  readonly field: FormFieldDTO;
+  readonly field: FormField;
   readonly issues: readonly ScriptDiagnostic[];
 }
 /** The cursor moved into a field, to another one, or out of the fields (`field` is then `null`). */
 export interface FormFocusChangedEvent {
-  readonly field: FormFieldDTO | null;
+  readonly field: FormField | null;
   /** The box the cursor is in. */
   readonly widget: AnnotationRef | null;
 }
@@ -389,11 +389,11 @@ export interface FormCapability extends SettingsApi<FormSettings> {
   /** What the document has: `'none'`, `'acroform'` or `'xfa'`. */
   getFormKind(): FormKind;
   /** Every field, or the fields that match `filter`. Without a filter, the same array while nothing changes. */
-  list(filter?: FormFilter): readonly FormFieldDTO[];
+  list(filter?: FormFilter): readonly FormField[];
   /** One field, or `null` when the form has no such field. */
-  get(ref: FormFieldRef): FormFieldDTO | null;
+  get(ref: FormFieldRef): FormField | null;
   /** The field a widget belongs to, or `null`. */
-  getFieldForWidget(widget: WidgetAddress): FormFieldDTO | null;
+  getFieldForWidget(widget: WidgetAddress): FormField | null;
   /**
    * A widget's row: where it is (`page`, `rect`), how it looks and its state,
    * or `null` when no page shows it. A field's `widgets` name them.
@@ -418,9 +418,9 @@ export interface FormCapability extends SettingsApi<FormSettings> {
   /** The widget under a point on a page, with its field, or `null`. */
   getWidgetAt(page: PageRef | number, point: { x: number; y: number }): WidgetHit | null;
   /** The field of the selected widget while one widget is selected (in design mode), or `null`. */
-  getSelectedField(): FormFieldDTO | null;
+  getSelectedField(): FormField | null;
   /** The field the cursor is in, or `null`. */
-  getFocusedField(): FormFieldDTO | null;
+  getFocusedField(): FormField | null;
   /**
    * A field's settings, described for a settings panel, which writes them
    * with `update()`; `null` for a field the form doesn't have. Every setting
@@ -580,7 +580,7 @@ export interface FormCapability extends SettingsApi<FormSettings> {
   deleteWidget(
     widget: AnnotationRef,
     options?: OperationOptions,
-  ): Promise<{ readonly field: FormFieldDTO | null }>;
+  ): Promise<{ readonly field: FormField | null }>;
   /**
    * Change the order the fields' calculate scripts run in: the fields go
    * together, in the order given, to `position`, next to a neighbour or at

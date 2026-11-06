@@ -251,7 +251,7 @@ describe('Phase 3 doc routes — GET /v1/docs/:docId/head', () => {
       encryption: { state: 'unknown', requiresPassword: null },
       permissions: {
         known: false,
-        bits: null,
+        flags: null,
         allAllowed: null,
         openedAs: null,
         securityHandlerRevision: null,

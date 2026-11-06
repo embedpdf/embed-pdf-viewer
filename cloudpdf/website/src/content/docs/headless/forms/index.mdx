@@ -36,10 +36,10 @@ leaves them out of the page picture.
 
 <Snippet name="forms/field-list" />
 
-Each field has its full `name` (such as `billing.name`), its `family` (`'text'`, `'checkbox'`,
+Each field has its full `name` (such as `billing.name`), its `kind` (`'text'`, `'checkbox'`,
 `'radio'`, `'combobox'`, `'listbox'`, `'pushbutton'` or `'signature'`), its value, and a `ref`: its
 address for everything else. The fields and their values are the engine's; see
-[Forms](/docs/engine/forms#read-the-form) for every family's value.
+[Forms](/docs/engine/forms#read-the-form) for every kind's value.
 
 For one field, such as a total you show in your own UI, use `useFormValue()`:
 
@@ -227,7 +227,7 @@ Every method that returns a promise also takes a `signal` in its options, to can
 
 | Field           | What it is                                                                                      | Read once                                            |
 | :-------------- | :---------------------------------------------------------------------------------------------- | :--------------------------------------------------- |
-| `fields`        | Every field, with its value                                                                     | `list()`, or `list({ family, page, name })` for some |
+| `fields`        | Every field, with its value                                                                     | `list()`, or `list({ kind, page, name })` for some   |
 | `status`        | Whether the form is read: `'idle'`, `'loading'`, `'ready'`, `'forbidden'` or `'error'`           | `getStatus()`                                        |
 | `formKind`      | What the document has: `'none'`, `'acroform'` (a regular PDF form) or `'xfa'`                   | `getFormKind()`                                      |
 | `selectedField` | In design mode, the field of the selected box, or `null`; see [Building forms](forms/building#change-a-fields-settings) | `getSelectedField()`          |
@@ -248,7 +248,7 @@ Set them when you register the plugin, and change them while the app runs with
 | `fields.border`     | The edge of a field that has no border of its own                          | the viewer's accent at 55%   | `--epdf-form-field-border`     |
 | `fields.background` | Inside a field that has no background of its own                           | `'rgb(255 255 255 / 0.92)'`    | `--epdf-form-field-background` |
 | `fields.color`      | The check mark and text of a field that has no color of its own            | `'#1f2a44'`                    | `--epdf-form-field-color`      |
-| `fillable`          | Which fields people fill in by hand: `true`, `false`, or field families    | `true`                       | —                              |
+| `fillable`          | Which fields people fill in by hand: `true`, `false`, or field kinds       | `true`                       | —                              |
 
 Scripts need JavaScript on in the actions plugin; without it, `'scripts'` accepts every value too,
 and a form with scripts logs a hint once.
@@ -259,11 +259,11 @@ does, and takes no typing, clicks or picks; your code still fills it in with `se
 
 ```ts
 formPlugin({ fillable: false }); // show the values, take no input
-form.updateSettings({ fillable: ['text', 'checkbox'] }); // only these families
+form.updateSettings({ fillable: ['text', 'checkbox'] }); // only these kinds
 form.updateSettings({ fillable: true }); // every field again
 ```
 
-The families are `'text'`, `'checkbox'`, `'radio'`, `'combobox'`, `'listbox'`, `'pushbutton'` and
+The kinds are `'text'`, `'checkbox'`, `'radio'`, `'combobox'`, `'listbox'`, `'pushbutton'` and
 `'signature'` (signing a field is filling it in). To stop your code too, leave `doc.forms.fill` out
 of the scope (see [Permissions](#permissions)).
 
@@ -283,7 +283,7 @@ The colors are what the viewer draws around fields; a field's own colors are sav
 | `onValidationRejected` | The form's validation refused a value                                     | `field`, `issues` |
 | `onFocusChanged`       | The cursor moved into a field, to another one, or out of the fields       | `field`, `widget` |
 | `onResynced`           | The whole form was read, as when it opens, after `refresh()` or a repair  | `snapshot`        |
-| `onSettingsChanged` | The settings changed | `settings`, `changed` |
+| `onSettingsChanged` | The settings changed | `settings`, `changedKeys` |
 
 Fields that are added, changed or removed have their own events; see
 [Building forms](forms/building#events).

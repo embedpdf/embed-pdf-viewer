@@ -24,7 +24,7 @@ await doc.forms.setValue(name.ref, { value: 'Ada Lovelace' });
 const { fields } = await doc.forms.list();
 
 for (const field of fields) {
-  console.log(field.name, field.family);
+  console.log(field.name, field.kind);
 }
 ```
 
@@ -33,7 +33,7 @@ Every field has these:
 | Field           | What it is                                                                                                                          |
 | :-------------- | :---------------------------------------------------------------------------------------------------------------------------------- |
 | `name`          | The full name, with the groups it's in: `billing.name`.                                                                             |
-| `family`        | `'text'`, `'checkbox'`, `'radio'`, `'combobox'`, `'listbox'`, `'pushbutton'`, `'signature'` or `'unknown'`.                         |
+| `kind`          | `'text'`, `'checkbox'`, `'radio'`, `'combobox'`, `'listbox'`, `'pushbutton'`, `'signature'` or `'unknown'`.                         |
 | `ref`           | Its address. Keep it: it's how you fill, reset or change the field.                                                                 |
 | `readOnly`      | `true` when PDF apps don't let the user change the value.                                                                           |
 | `required`      | `true` when PDF apps ask for a value before the form is submitted.                                                                  |
@@ -51,13 +51,13 @@ themselves ([`repair()`](/docs/engine/forms/authoring#repair-a-broken-form) can 
 
 ### Values
 
-Each family has its own value fields. Check `family` first, and TypeScript knows which ones the
+Each kind has its own value fields. Check `kind` first, and TypeScript knows which ones the
 field has:
 
 ```ts
-if (field.family === 'text') console.log(field.value); // string
-if (field.family === 'checkbox') console.log(field.checked); // boolean
-if (field.family === 'listbox') console.log(field.selectedValues); // string[]
+if (field.kind === 'text') console.log(field.value); // string
+if (field.kind === 'checkbox') console.log(field.checked); // boolean
+if (field.kind === 'listbox') console.log(field.selectedValues); // string[]
 ```
 
 | Family       | Its value                                                          | Also                                                                                             |
@@ -168,7 +168,7 @@ the page again to see it.
 The engine checks a value before it writes anything. A call that fails with `InvalidArg` leaves
 the field as it was:
 
-- The value must be the family's own: `{ checked: true }` on a text field fails.
+- The value must be the kind's own: `{ checked: true }` on a text field fails.
 - A dropdown or list takes option values, not labels. A dropdown with `edit: true` also takes
   free text. More than one value needs a list with `multiSelect`.
 - A radio group's `value` must be the export value of one of its buttons.
@@ -232,7 +232,7 @@ doc.events.on('forms.valueSet', ({ field }) => {
 ```
 
 When one call changes several fields, such as `reset()` or `importValues()`, their events share
-`origin.tx`, like an annotation import.
+`origin.transaction`, like an annotation import.
 
 <Engine cloud>
 

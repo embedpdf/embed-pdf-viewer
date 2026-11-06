@@ -28,7 +28,7 @@ export function createScriptingSeam(ctx: FormContext, siblings: FormSiblings) {
       transaction: realm.transaction.bind(realm),
       budget: realm.budget,
     });
-    ctx.cleanup(() => made.dispose());
+    ctx.cleanup(() => made.destroy());
     pipeline = made;
     return made;
   };

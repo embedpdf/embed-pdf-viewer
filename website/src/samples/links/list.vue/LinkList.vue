@@ -15,7 +15,7 @@ onMounted(() => {
 // Every way of following a link ends up here: a click, a key, or code.
 useLinkEvent(
   (link) => link.onActivated,
-  ({ target, activation }) => (last.value = `${target.kind} → ${activation.outcome}`),
+  ({ target, activation }) => (last.value = `${target.kind} → ${activation.status}`),
 );
 </script>
 
@@ -26,7 +26,9 @@ useLinkEvent(
       <li v-for="item in items" :key="item.id" class="link">
         <span class="kind">{{ item.target.kind }}</span>
         <span class="label">{{ link.getLabel(item) }}</span>
-        <span class="where">at {{ Math.round(item.bounds.x) }}, {{ Math.round(item.bounds.y) }}</span>
+        <span class="where"
+          >at {{ Math.round(item.bounds.x) }}, {{ Math.round(item.bounds.y) }}</span
+        >
         <button type="button" class="button" @click="link.activate(item)">Follow</button>
       </li>
     </ul>

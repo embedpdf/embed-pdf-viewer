@@ -130,7 +130,7 @@ imported without it.
 | :------------------- | :----------------------------------------------------------------------------------------------------------------------- |
 | `name-conflict`      | A field whose full name the document has, or an earlier field of the bundle, or that would be a field's parent or child. |
 | `no-field`           | A widget whose field isn't in the bundle.                                                                                |
-| `unsupported-family` | A field of a kind the engine doesn't model.                                                                              |
+| `unsupported-kind`   | A field of a kind the engine doesn't model.                                                                              |
 | `script-not-allowed` | A script, a submit or a link, without `doc.forms.script`.                                                                |
 | `unsupported-action` | Actions the engine can't write, or that were read incomplete.                                                            |
 
@@ -158,7 +158,7 @@ for every value the engine writes.
 | `reason`            | What was left out                                                              |
 | :------------------ | :----------------------------------------------------------------------------- |
 | `no-field`          | The document has no field of that name.                                        |
-| `wrong-family`      | The document's field of that name is of another kind.                          |
+| `wrong-kind`        | The document's field of that name is of another kind.                          |
 | `value-not-allowed` | A value the field can't take: an option it doesn't have, a button it lacks.    |
 | `locked`            | A field a signature locked.                                                    |
 | `fill-not-allowed`  | A field the user may not fill in: its group isn't one their permissions reach. |
@@ -167,10 +167,10 @@ All of this is decided before the first value is written.
 
 ## Events
 
-`import()` fires one `forms.created` event per field, and `importValues()` one `forms.valueSet`
-per field it filled, all with the same `origin.tx`, so you can update your interface once for the
-whole batch. See
-[Which write an event came from](/docs/engine/concepts/events#which-write-an-event-came-from).
+`import()` fires one `forms.created` event per field, and `importValues()` one `forms.valueSet` per
+field it filled, all with the same `origin.transaction`, so you can update your interface once for
+the whole batch. See [Which write an event came
+from](/docs/engine/concepts/events#which-write-an-event-came-from).
 
 ## Undo an import
 

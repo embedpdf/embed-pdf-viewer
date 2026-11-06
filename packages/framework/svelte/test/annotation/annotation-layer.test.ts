@@ -124,7 +124,7 @@ describe('the annotation layer', () => {
         .list()
         .find((entry) => entry.subtype === 'square' || entry.subtype === 'circle');
       expect(square).toBeDefined();
-      annotation.selection.set([square!.ref]);
+      annotation.selection.select([square!.ref]);
       flushSync();
       await waitFor(() => expect(view.getAllByTestId('handle').length).toBeGreaterThan(0));
       expect(annotationRecords.handles.some((handle) => handle.kind === 'corner')).toBe(true);
@@ -268,7 +268,7 @@ describe('the annotation layer', () => {
     try {
       const target = annotation.list().find((entry) => entry.subtype === 'free-text')!;
       annotationRecords.target.value = target.ref;
-      annotation.selection.set([target.ref]);
+      annotation.selection.select([target.ref]);
       flushSync();
       await waitFor(() => expect(latest(annotationRecords.states).selected).toHaveLength(1));
       await waitFor(() =>

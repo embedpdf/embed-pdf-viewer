@@ -3,7 +3,7 @@ import {
   checkCapability,
   checkCollab,
   type Identity,
-  type PdfBits,
+  type PdfPermissionFlags,
 } from '@embedpdf/engine-core';
 
 /**
@@ -27,15 +27,15 @@ import {
  * the Access rail shows the server's canonical `effectiveScope` once the share
  * exists, which is the authoritative answer.
  */
-const ASSUMED_BITS: PdfBits = {
-  bit3: true,
-  bit4: true,
-  bit5: true,
-  bit6: true,
-  bit9: true,
-  bit10: true,
-  bit11: true,
-  bit12: true,
+const ASSUMED_BITS: PdfPermissionFlags = {
+  print: true,
+  modifyContents: true,
+  copy: true,
+  modifyAnnotations: true,
+  fillForms: true,
+  copyForAccessibility: true,
+  assemble: true,
+  printHighQuality: true,
 };
 
 export interface ScopeOption {

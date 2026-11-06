@@ -33,7 +33,7 @@ Package names follow a separate law: [`packages.md`](./packages.md).
 | Units                            | Put the unit in the name when it is not obvious.                                                                                                           | `delayMs`, `thresholdPx`, `sizePt`, `angleDeg`                                 |
 | Unused parameters                | Prefix with `_`. Never use `_` for "private".                                                                                                              | `(_event, page) => …`                                                          |
 | Declarations                     | `const` unless reassigned; `let` otherwise; never `var`.                                                                                                   |                                                                                |
-| Generic parameters               | `T`, `K`, `V` only in fully generic helpers; name them elsewhere.                                                                                          | `memo<Inputs, Result>`, `PluginDef<State, Capability>`                         |
+| Generic parameters               | `T`, `K`, `V` only in fully generic helpers; name them elsewhere.                                                                                          | `memo<Inputs, Result>`, `PluginDefinition<State, Capability>`                         |
 
 ## Glossary
 
@@ -70,6 +70,8 @@ Spell out everything else: `error` (not `err`, `e`), `options` (not `opts`),
 | `XState`                          | a plugin's session state                                                        |
 | `XCapability` / `XHostCapability` | the public / sibling-plugin capability                                          |
 | `XConfig`                         | registration configuration (`xPlugin(config)`)                                  |
+| `XSettings`                       | what a plugin reads with `getSettings()` and changes with `updateSettings()`    |
+| `XDefinition`                     | what a register call takes: `PluginDefinition`, `CommandDefinition`             |
 | `XOptions`                        | per-call options; extends `OperationOptions` when the call does work            |
 | `XInput`                          | the input of a create verb                                                      |
 | `XPatch`                          | a partial update                                                                |
@@ -81,6 +83,7 @@ Spell out everything else: `error` (not `err`, `e`), `options` (not `opts`),
 - Use `interface` for object shapes in contracts, and `type` for unions,
   aliases and mapped types.
 - Contract fields and state fields are `readonly`.
+- No `DTO` in a public name: a read shape is named for what it is (`FormField`, `Signature`).
 - Getters return `T | null` for "absent". Optional inputs and optional data
   fields use `?:`. One API never uses both `undefined` and `null` for the same
   meaning: [Nothing](#nothing-left-out-or-null) says which to use where.
@@ -120,8 +123,13 @@ HTTP contract.
 ## Discriminated unions
 
 - **`type`** tags things that happen: messages, events, effects.
-- **`kind`** tags things that are: geometry, refs, borders, drafts.
+- **`kind`** tags things that are: geometry, refs, borders, drafts, form fields.
+- **`status`** tags what a call did: `{ status: 'executed' }`, `{ status: 'refused', reason }`,
+  and an HTTP answer such as a document init's `{ status: 'deduped' }`.
+- **`subtype`** is the one other tag: an annotation's, which is the PDF's own `/Subtype`.
 - Tag values use one style per union (kebab-case or camelCase), never both.
+
+`cloudpdf/contract/test/consistency.test.ts` checks the HTTP API's unions.
 
 ## The HTTP API
 
@@ -171,10 +179,28 @@ its rules hold in every language:
 | `open` / `close` / `toggle`            | Surfaces, menus, documents.                                                              |
 | `begin*` / `end*`                      | Bracket a gesture or an edit session.                                                    |
 | `register*`                            | Add an extension. Always returns `Unsubscribe`.                                          |
+| `destroy()`                            | End an object's life: free what it holds. Later calls refuse. Never `dispose()`.         |
 | `on*` on a capability                  | An `EventHook`, named `on<Subject?><PastParticiple>`: `onFieldCreated`, `onZoomChanged`. |
-| `on*` on a registration object         | A callback the capability calls, such as `InteractionHandler.onDown`.                    |
+| `on*` on a registration object         | A callback the capability calls, such as `InteractionHandler.onPointerDown`.             |
 
 `i18n.t` is the one single-letter member, following the universal i18n convention.
+
+### Shapes every plugin shares
+
+- A page argument is `PageRef | number` (a ref or a display index); a read returns a `PageRef`.
+- Every engine-backed plugin has `getStatus()`, `ensureLoaded()`, `refresh(): Promise<void>` and
+  `onResynced`. Its confirmed-change events carry `origin: EventOrigin`, and a previous value is
+  `previous<X>`.
+- A create or update resolves a wrapper named after its noun (`{ annotation }`, `{ asset }`); each
+  permission check is a `can<Verb>` twin taking the verb's arguments.
+- `XDraft` is a document object's create input (`AnnotationDraft`, `FormFieldDraft`); `XInput` is
+  any other create verb's.
+- `documentId` is the viewer's open document; `docId` is the stored document.
+- A number that only goes up is a `…Sequence`: `serverSequence`, `pagesSequence`.
+- `src` is the document a viewer element or its config shows, HTML's word (`<img src>`); core and
+  the engine say `source` (`open(source)`).
+- `CommandDefinition`'s predicates are named after the field they compute (`enabled?(context)` gives
+  `enabled`), an exception to "boolean functions are `is*`/`can*`".
 
 ## Files and folders
 

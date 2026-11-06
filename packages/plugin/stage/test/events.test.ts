@@ -30,7 +30,7 @@ function harness(config: StageConfig = {}, clock?: HostClock) {
     ),
   );
   stage.onViewportChanged((event) => log.push(`viewport:${event.size.width}x${event.size.height}`));
-  stage.onSettingsChanged((event) => log.push(`settings:${event.changed.join(',')}`));
+  stage.onSettingsChanged((event) => log.push(`settings:${event.changedKeys.join(',')}`));
   stage.onMotionEnded(() => log.push('motion-ended'));
   return { stage, log };
 }

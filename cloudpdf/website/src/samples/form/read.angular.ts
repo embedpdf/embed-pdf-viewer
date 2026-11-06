@@ -15,14 +15,14 @@ import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage'
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { withInteraction } from '@embedpdf/angular/interaction';
 import { EpdfForm, EpdfFormLayer, toFieldRef, withForm } from '@embedpdf/angular/form';
-import type { FormFieldDTO } from '@embedpdf/angular/form';
+import type { FormField } from '@embedpdf/angular/form';
 import { cloudEngine } from '@cloudpdf/engine';
 
 const forms: OpenInput = { kind: 'grant', grant: 'shr_eBRW5E3MpolzD8G36Alp30EF' };
 
-/** A field's value as text, whatever its family. */
-function valueText(field: FormFieldDTO): string {
-  switch (field.family) {
+/** A field's value as text, whatever its kind. */
+function valueText(field: FormField): string {
+  switch (field.kind) {
     case 'text':
     case 'combobox':
       return field.value || '—';
@@ -71,7 +71,7 @@ function valueText(field: FormFieldDTO): string {
           @for (field of form.fields(); track field.name) {
             <li class="field">
               <span class="field-name">
-                {{ field.name }} <span class="family">{{ field.family }}</span>
+                {{ field.name }} <span class="kind">{{ field.kind }}</span>
               </span>
               <span class="field-value">{{ valueText(field) }}</span>
             </li>

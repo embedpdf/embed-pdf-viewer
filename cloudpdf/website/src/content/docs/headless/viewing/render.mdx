@@ -322,7 +322,7 @@ from CSS: `--epdf-snapshot-box-fill` and `--epdf-snapshot-box-stroke` win over t
 | `onInvalidated` | Pages' pixels changed and they will redraw  | `pages`, `scope`, `origin`   |
 | `onPictureStateChanged` | A page's picture came on screen, failed, went slow, or left its view | `page`, `view`, `status`, `slow` |
 | `onSnapshotChanged` | A snapshot was taken, or let go | `snapshot`: `{ page, rect, image }`, or `null` |
-| `onSettingsChanged` | The settings changed | `settings`, `changed` |
+| `onSettingsChanged` | The settings changed | `settings`, `changedKeys` |
 
 ## Permissions
 

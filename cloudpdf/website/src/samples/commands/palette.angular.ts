@@ -43,7 +43,7 @@ const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY
         <li>
           <button type="button" class="result" [epdfCommand]="result.id" #command="epdfCommand">
             <span>{{ command.label() }}</span>
-            @if (command.shortcut(); as shortcut) {
+            @if (command.shortcutLabel(); as shortcut) {
               <kbd class="shortcut">{{ shortcut }}</kbd>
             }
           </button>

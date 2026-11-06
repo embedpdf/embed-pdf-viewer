@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   formWidget,
   toPageRef,
-  type FormFieldDTO,
+  type FormField,
   type FormSnapshot,
   type WidgetAnnotation,
 } from '@embedpdf/engine-core/runtime';
@@ -21,10 +21,10 @@ import { initialFormModel } from '../src/model';
 const PAGE = toPageRef(1);
 const FIELD = { kind: 'objectNumber' as const, objectNumber: 5 };
 
-const textField: FormFieldDTO = {
+const textField: FormField = {
   ref: FIELD,
   name: 'name',
-  family: 'text',
+  kind: 'text',
   origin: 'acroform',
   readOnly: false,
   required: false,

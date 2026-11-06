@@ -14,7 +14,7 @@ describe("FormsClient", () => {
             needsAppearances: true,
             fields: [
                 {
-                    family: "text",
+                    kind: "text",
                     ref: { kind: "objectNumber", objectNumber: 1 },
                     name: "name",
                     origin: "acroform",
@@ -92,7 +92,7 @@ describe("FormsClient", () => {
                     caption: "caption",
                     checkStyle: "check",
                     field: { kind: "objectNumber", objectNumber: 1 },
-                    fieldFamily: "text",
+                    fieldKind: "text",
                     hasMark: true,
                 },
             ],
@@ -282,7 +282,7 @@ describe("FormsClient", () => {
         const rawRequestBody = { key: "value" };
         const rawResponseBody = {
             field: {
-                family: "text",
+                kind: "text",
                 ref: { kind: "objectNumber", objectNumber: 1 },
                 name: "name",
                 origin: "acroform",
@@ -365,7 +365,7 @@ describe("FormsClient", () => {
                     caption: "caption",
                     checkStyle: "check",
                     field: { kind: "objectNumber", objectNumber: 1 },
-                    fieldFamily: "text",
+                    fieldKind: "text",
                     hasMark: true,
                 },
             ],
@@ -485,7 +485,7 @@ describe("FormsClient", () => {
         const rawResponseBody = {
             fields: [
                 {
-                    family: "text",
+                    kind: "text",
                     ref: { kind: "objectNumber", objectNumber: 1 },
                     name: "name",
                     origin: "acroform",
@@ -563,7 +563,7 @@ describe("FormsClient", () => {
                     caption: "caption",
                     checkStyle: "check",
                     field: { kind: "objectNumber", objectNumber: 1 },
-                    fieldFamily: "text",
+                    fieldKind: "text",
                     hasMark: true,
                 },
             ],
@@ -668,7 +668,7 @@ describe("FormsClient", () => {
             widget: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
             page: { kind: "objectNumber", objectNumber: 1 },
             field: {
-                family: "text",
+                kind: "text",
                 ref: { kind: "objectNumber", objectNumber: 1 },
                 name: "name",
                 origin: "acroform",
@@ -863,7 +863,7 @@ describe("FormsClient", () => {
                 caption: "caption",
                 checkStyle: "check",
                 field: { kind: "objectNumber", objectNumber: 1 },
-                fieldFamily: "text",
+                fieldKind: "text",
                 hasMark: true,
             },
             appearance: { action: "preserved", changed: true },

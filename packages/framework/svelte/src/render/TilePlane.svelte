@@ -39,7 +39,7 @@
     if (!renderer) return;
     const created = untrack(() => renderer.createViewDemand(id));
     view = created;
-    return () => created.dispose();
+    return () => created.destroy();
   });
 
   // Demand in, plan out: setting the demand is the one call that schedules fetches and plans

@@ -38,15 +38,15 @@ const QUAD: HighlightDraft['quadPoints'] = [
  */
 export function runDocumentEventsConformance(
   runner: ConformanceTestRunner,
-  opts: ConformanceOptions,
+  options: ConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`document events conformance: ${opts.label}`, () => {
+  describe(`document events conformance: ${options.label}`, () => {
     let engine: Engine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -54,7 +54,7 @@ export function runDocumentEventsConformance(
     });
 
     test('every confirmed mutation publishes exactly one event, results verbatim', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const events: DocumentEvent[] = [];
         doc.events.subscribe((event) => events.push(event));
@@ -131,7 +131,7 @@ export function runDocumentEventsConformance(
           expect(typeof event.origin.sessionId).toBe('string');
           expect(event.origin.sessionId.length > 0).toBe(true);
           expect(event.origin.sessionId).toBe(first.origin.sessionId);
-          expect(typeof event.origin.ts).toBe('number');
+          expect(Number.isNaN(Date.parse(event.origin.at))).toBe(false);
         }
       } finally {
         await doc.close();
@@ -139,7 +139,7 @@ export function runDocumentEventsConformance(
     });
 
     test('pages.inserted rides verbatim', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         // insertBlank needs no source bytes, so it is the fixture-free way
         // to exercise the event.
@@ -165,7 +165,7 @@ export function runDocumentEventsConformance(
     });
 
     test('a FAILED mutation publishes nothing (events are ground truth)', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const events: DocumentEvent[] = [];
         doc.events.subscribe((event) => events.push(event));
@@ -185,7 +185,7 @@ export function runDocumentEventsConformance(
     });
 
     test('own mutations are published before their promise settles', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const events: DocumentEvent[] = [];
         doc.events.subscribe((event) => events.push(event));
@@ -205,7 +205,7 @@ export function runDocumentEventsConformance(
     });
 
     test('on(type) hears only that type, typed by it; its unsubscriber stops it', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const rotated: number[] = [];
         const stop = doc.events.on('pages.rotated', (event) => rotated.push(event.rotation));
@@ -222,7 +222,7 @@ export function runDocumentEventsConformance(
     });
 
     test('unsubscribe stops delivery', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const events: DocumentEvent[] = [];
         const unsubscribe = doc.events.subscribe((event) => events.push(event));

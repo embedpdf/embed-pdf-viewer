@@ -1,7 +1,7 @@
 import type { WidgetAnnotation } from '../annotation/kinds/widget';
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
-import type { FormFieldDTO } from '../forms/field';
+import type { FormField } from '../forms/field';
 import type { FormSnapshot } from '../forms/snapshot';
 import { annotationKey } from '../identity/annotationKey';
 import { encodeFieldRefKey, type FormFieldRef } from '../identity/FormFieldRef';
@@ -17,7 +17,7 @@ export interface FormExportSelection {
 
 /** What an export of a form takes: its rows, before the page table and resources. */
 export interface FormExportRows<C extends Coordinates> {
-  readonly fields: FormFieldDTO<C>[];
+  readonly fields: FormField<C>[];
   readonly widgets: WidgetAnnotation<C>[];
   readonly calculationOrder: FormFieldRef[];
 }
@@ -36,7 +36,7 @@ export function formExportRowsOf<C extends Coordinates>(
   selection: FormExportSelection,
   pages: readonly PageRef[],
 ): FormExportRows<C> {
-  const chosen = new Set<FormFieldDTO<C>>();
+  const chosen = new Set<FormField<C>>();
   for (const ref of selection.fields ?? []) {
     const field = snapshot.fields.find((candidate) => fieldMatches(candidate, ref));
     if (!field) {
@@ -96,8 +96,8 @@ export function fieldMatches(
  * A field as an export carries it: one the form doesn't export without its
  * value and who filled it, and a signature field without its signature.
  */
-function exportedField<C extends Coordinates>(field: FormFieldDTO<C>): FormFieldDTO<C> {
-  if (field.family === 'signature') return { ...field, valueEntry: { kind: 'none' } };
+function exportedField<C extends Coordinates>(field: FormField<C>): FormField<C> {
+  if (field.kind === 'signature') return { ...field, valueEntry: { kind: 'none' } };
   if (!field.noExport) return field;
   const unfilled = {
     ...field,
@@ -106,32 +106,32 @@ function exportedField<C extends Coordinates>(field: FormFieldDTO<C>): FormField
     filledByName: null,
     filledAt: null,
   } as const;
-  switch (field.family) {
+  switch (field.kind) {
     case 'text':
     case 'combobox':
-      return { ...unfilled, family: field.family, value: '' } as FormFieldDTO<C>;
+      return { ...unfilled, kind: field.kind, value: '' } as FormField<C>;
     case 'checkbox':
       return {
         ...unfilled,
-        family: 'checkbox',
+        kind: 'checkbox',
         checked: false,
         widgets: field.widgets.map((widget) => ({ ...widget, checked: false })),
-      } as FormFieldDTO<C>;
+      } as FormField<C>;
     case 'radio':
       return {
         ...unfilled,
-        family: 'radio',
+        kind: 'radio',
         value: 'Off',
         widgets: field.widgets.map((widget) => ({ ...widget, checked: false })),
-      } as FormFieldDTO<C>;
+      } as FormField<C>;
     case 'listbox':
       return {
         ...unfilled,
-        family: 'listbox',
+        kind: 'listbox',
         selectedValues: [],
         options: field.options.map((option) => ({ ...option, selected: false })),
-      } as FormFieldDTO<C>;
+      } as FormField<C>;
     default:
-      return unfilled as FormFieldDTO<C>;
+      return unfilled as FormField<C>;
   }
 }

@@ -135,7 +135,7 @@ export function createSelectionWrites(
   const selection = {
     // `set([])` selects nothing, as its name says: the reducer leaves an empty `select` alone,
     // so an `add` of nothing stays a no-op.
-    set: (refs: readonly AnnotationRef[]) =>
+    select: (refs: readonly AnnotationRef[]) =>
       refs.length ? select(refs, false) : void store.commit({ type: 'deselect' }),
     add: (refs: readonly AnnotationRef[]) => select(refs, true),
     selectAll: (page?: PageRef | number) => {
@@ -164,7 +164,7 @@ export function createSelectionWrites(
     clear: () => {
       store.commit({ type: 'deselect' });
     },
-    list: () => annotations.listSelected(),
+    getSelected: () => annotations.listSelected(),
     update: (
       changes: AnnotationPatch | ((annotation: Annotation) => AnnotationPatch),
       options: OperationOptions = {},

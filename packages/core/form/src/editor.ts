@@ -9,7 +9,7 @@ import { standardFontOf, standardFontStack, type MountableFontProgram } from '@e
 import type { FieldText, PaintFont, PaintFonts } from '@embedpdf/core-text';
 import {
   type Coordinates,
-  type FormFieldDTO,
+  type FormField,
   type PageCoordinates,
   type WidgetAnnotation,
 } from '@embedpdf/engine-core/runtime';
@@ -79,11 +79,11 @@ function programsOf(fonts: PaintFonts, laid: FieldText<PaintFont>): MountableFon
  */
 export function textEditorLayout<C extends Coordinates = PageCoordinates>(
   widget: WidgetAnnotation<C>,
-  field: FormFieldDTO<C>,
+  field: FormField<C>,
   text: string,
   fonts?: PaintFonts,
 ): TextEditorLayout | null {
-  if (field.family !== 'text') return null;
+  if (field.kind !== 'text') return null;
   const { look } = textLookOf(widget, fonts);
   const facts = {
     multiline: field.multiline,

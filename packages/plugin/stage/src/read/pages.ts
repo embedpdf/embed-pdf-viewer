@@ -193,7 +193,7 @@ export function createPageReads(
   const visiblePages = (): VisiblePage[] =>
     state().placed ? placedVisiblePages() : noVisiblePages;
 
-  const getPageFrame = (page: PageRef | number): VisiblePage | null => {
+  const getPageBox = (page: PageRef | number): VisiblePage | null => {
     if (!state().placed) return null;
     const index = ctx.getPage(page)?.index ?? -1;
     if (index < 0) return null;
@@ -206,7 +206,7 @@ export function createPageReads(
   };
 
   const pageToWorld = (page: PageRef | number, point: Point): Point | null => {
-    const frame = getPageFrame(page);
+    const frame = getPageBox(page);
     if (!frame) return null;
     // Place the page point into the page's display box through the same
     // quarter-turn matrix the layout and renderer use (`rotateScaleMatrix`),
@@ -241,8 +241,8 @@ export function createPageReads(
       getScrollMetrics: scrollMetricsNow,
       listVisiblePages: visiblePages,
       isPageVisible: (page) => visiblePageOf(page) !== null,
-      getCurrentPageIndex: () => state().cursor,
-      getCurrentPage: () => ctx.document()?.pages[state().cursor]?.ref ?? null,
+      getCurrentPageIndex: () => state().pageIndex,
+      getCurrentPage: () => ctx.document()?.pages[state().pageIndex]?.ref ?? null,
       getPageCount: () => ctx.document()?.pageCount ?? 0,
       listCurrentItemPages: () => {
         const item = cursorItem();
@@ -257,7 +257,7 @@ export function createPageReads(
           .map((index) => pages[index])
           .filter((page) => page !== undefined);
       },
-      getPageFrame,
+      getPageBox,
       getPageAt: (point) => {
         // Find the visible page whose device-snapped display box contains the
         // point, then invert that page's transform: the same `viewToPage`
@@ -294,7 +294,7 @@ export function createPageReads(
       },
       pageToWorld,
       pageRectToViewport: (page, rect) => {
-        const frame = getPageFrame(page);
+        const frame = getPageBox(page);
         if (!frame) return null;
         const content = displaySize({ width: frame.width, height: frame.height }, frame.rotation);
         const matrix = rotateScaleMatrix(

@@ -51,7 +51,13 @@ const OUTLINE = treeOf({
 });
 
 const titles = (tree: OutlineTree | null) => (tree ? itemsOf(tree).map((each) => each.title) : []);
-const origin: EventOrigin = { kind: 'remote', sessionId: 'them', sub: null, ts: 0, serverId: null };
+const origin: EventOrigin = {
+  kind: 'remote',
+  sessionId: 'them',
+  subject: null,
+  at: new Date(0).toISOString(),
+  serverSequence: null,
+};
 const meta = { affectedPages: [], cacheDelta: null, opId: 'op', undoable: true, changedRefs: [] };
 
 describe('foldOutline', () => {

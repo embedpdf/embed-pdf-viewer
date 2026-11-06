@@ -79,10 +79,10 @@ export function TabBar({
               {document.status === 'locked' && (
                 <Icon name="lock" size={13} className="text-fg-muted flex-shrink-0" />
               )}
-              {document.status === 'error' && document.grantRequest && (
+              {document.status === 'error' && document.openRequest && (
                 <Icon name="lock" size={13} className="text-fg-muted flex-shrink-0" />
               )}
-              {document.status === 'error' && !document.grantRequest && (
+              {document.status === 'error' && !document.openRequest && (
                 <WithTooltip content={{ label: t(errorReasonKeyOf(document.error)) }}>
                   {(tooltip) => (
                     <span

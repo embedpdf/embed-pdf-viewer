@@ -19,7 +19,7 @@ import { commandsPlugin } from '@embedpdf/plugin-commands';
 import {
   CommandsToken,
   type CommandContext as PluginCommandContext,
-  type CommandDef as PluginCommandDef,
+  type CommandDefinition as PluginCommandDef,
   type ResolvedCommand,
 } from '@embedpdf/plugin-commands/contract/host';
 import { describe, expect, it, vi } from 'vitest';
@@ -32,7 +32,7 @@ import {
   mergeCommand,
   resolveViewerCommands,
   toPluginCommand,
-  type CommandDef as ViewerCommandDef,
+  type CommandDefinition as ViewerCommandDef,
   type CommandScope,
 } from '../../../chrome/src/config/viewer-commands';
 import type { PluginTokens, Viewer } from '../../../chrome/src/handle';

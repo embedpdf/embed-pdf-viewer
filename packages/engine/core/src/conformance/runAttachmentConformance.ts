@@ -34,17 +34,17 @@ import { EVERY_PERMISSION } from './fixtureScope';
  */
 export function runAttachmentConformance(
   runner: ConformanceTestRunner,
-  opts: ConformanceOptions,
+  options: ConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`attachment conformance: ${opts.label}`, () => {
+  describe(`attachment conformance: ${options.label}`, () => {
     let engine: Engine;
     let firstPageObjectNumber: PageObjectNumber;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
-      const probe = await openFixture(engine, opts);
+      engine = await options.makeEngine();
+      const probe = await openFixture(engine, options);
       const pages = await probe.pages.list();
       firstPageObjectNumber = pages.pages[0].ref.objectNumber;
       await probe.close();
@@ -55,7 +55,7 @@ export function runAttachmentConformance(
     });
 
     test('attachments.list() reflects the /EmbeddedFiles name tree and is a stable read', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const list = await doc.attachments.list();
         expect(AttachmentListSchema.safeParse(list).success).toBe(true);
@@ -76,7 +76,7 @@ export function runAttachmentConformance(
     });
 
     test('attachments.download() returns the listed decoded size', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const { attachments } = await doc.attachments.list();
         for (const item of attachments) {
@@ -92,7 +92,7 @@ export function runAttachmentConformance(
     });
 
     test('attachments.download() rejects an unknown key', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         await expect(
           doc.attachments.download(toAttachmentRef('conformance-no-such-key.bin')),
@@ -103,7 +103,7 @@ export function runAttachmentConformance(
     });
 
     test('a File brings its name and type, and a file without a type has none', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const picked = new File([new Uint8Array([1, 2, 3])], '0-picked.csv', { type: 'text/csv' });
         const { attachment: fromFile } = await doc.attachments.create({ data: picked });
@@ -130,7 +130,7 @@ export function runAttachmentConformance(
     });
 
     test('create() and delete() round-trip the name tree; keys survive index shifts', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const { attachments: before } = await doc.attachments.list();
         const data = new Uint8Array(512);
@@ -184,7 +184,7 @@ export function runAttachmentConformance(
     });
 
     test('a file-attachment annotation takes a File as it is, and never guesses a type', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const annotations = doc.page(toPageRef(firstPageObjectNumber)).annotations;
         const rect = { x: 80, y: 40, width: 20, height: 20 };
@@ -223,7 +223,7 @@ export function runAttachmentConformance(
     });
 
     test('a created file-attachment annotation round-trips its file as its file resource', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const annotations = doc.page(toPageRef(firstPageObjectNumber)).annotations;
         const data = new Uint8Array(2048);
@@ -287,7 +287,7 @@ export function runAttachmentConformance(
     });
 
     test('a created text annotation round-trips icon, color, and contents', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const annotations = doc.page(toPageRef(firstPageObjectNumber)).annotations;
         const { annotation: created } = await annotations.create({

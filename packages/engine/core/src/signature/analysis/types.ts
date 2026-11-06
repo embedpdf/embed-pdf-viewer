@@ -1,11 +1,11 @@
-import type { FormFieldFamily } from '../../forms/field';
+import type { FormFieldKind } from '../../forms/field';
 import type {
   BaseVersionInfo,
   DocMdpPermission,
   DocumentFieldLock,
   FieldLockSpec,
   ModificationLevel,
-  SignatureDTO,
+  Signature,
 } from '../types';
 import type { PdfCoordinates } from '../../pageSpace/coordinates';
 
@@ -122,7 +122,7 @@ export interface RevisionField {
   objectNumber: number;
   /** Fully qualified name. */
   name: string;
-  family: FormFieldFamily;
+  kind: FormFieldKind;
   /** Widget annotation object numbers (a merged field-widget lists its own number). */
   widgets: number[];
   /**
@@ -146,7 +146,7 @@ export interface RevisionStructure {
   pages: number[];
   fields: RevisionField[];
   /** In the file's coordinates: a past revision's pages may not be the document's now. */
-  signatures: SignatureDTO[];
+  signatures: Signature[];
 }
 
 export interface ChangeFinding {
