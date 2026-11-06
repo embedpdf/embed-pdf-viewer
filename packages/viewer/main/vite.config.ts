@@ -32,6 +32,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 import tailwindcss from '@tailwindcss/vite';
+import { englishStringsFile } from './build/english-strings';
 import { shadowStylesheet } from './build/shadow-stylesheet';
 import { workerFilesAsAssets } from './build/worker-files';
 
@@ -61,8 +62,9 @@ export default defineConfig(({ mode }) => {
       };
   return {
     // The snippet's folder carries the engine's worker files beside embedpdf.wasm
-    // (build/worker-files.ts); the npm pass leaves them to the consumer's bundler.
-    plugins: [tailwindcss(), ...(snippet ? [workerFilesAsAssets()] : [])],
+    // (build/worker-files.ts); the npm pass leaves them to the consumer's bundler,
+    // and writes the English words for translators (build/english-strings.ts).
+    plugins: [tailwindcss(), ...(snippet ? [workerFilesAsAssets()] : [englishStringsFile()])],
     // Runs on Tailwind's output: the chrome's sheet, made to work inside the
     // element's shadow root (see build/shadow-stylesheet.ts).
     css: { postcss: { plugins: [shadowStylesheet()] } },

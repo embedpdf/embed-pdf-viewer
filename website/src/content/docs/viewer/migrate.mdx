@@ -77,7 +77,9 @@ The 2.x code is the comment at the top. The 3.0 code below it does the same:
 | `disabledCategories` | `disable`, with new names: see [Turn features off](#turn-features-off) |
 | `permissions` | `scope`: see [Permissions](#permissions) |
 | `i18n.defaultLocale` | `locale` |
-| `i18n.locales` | `strings`: words by language code, with a button's label under its command's id |
+| `i18n.locales` | `strings`: words by language code, with a button's label under its command's id, or a function that loads them: see [Translations](customize/translations) |
+| `i18n.fallbackLocale` | `plugins.i18n.fallbackLocale`, which is also the language a browser gets when the viewer has none of its languages |
+| `export.defaultFileName` | The document's `name`: a download is saved under it, as `name` from `documents` or the file's own name |
 | `annotations.annotationAuthor` | `identity: { displayName }` |
 | `wasmUrl` | `engine.wasmUrl`. The file is `embedpdf.wasm` now, from `@embedpdf/engine-runtime-wasm32`, in place of `pdfium.wasm`. |
 | `fontFallback` | `engine.fallbackFonts`: font files, each with a `key` and a `url` |
@@ -354,8 +356,8 @@ What 2.x had that 3.0 doesn't:
 - **Protect.** 2.x's Protect dialog, `setDocumentEncryption()` and `removeEncryption()`: 3.0 can't
   add or remove a document's password.
 - **Theme events:** `themechange`, `activeColorScheme` and `themePreference`.
-- **A few settings:** `export.defaultFileName`, `i18n.fallbackLocale` (English is the fallback)
-  and `i18n.paramResolvers`.
+- **Param resolvers** (`i18n.paramResolvers`). The viewer fills in its own words' values, such as
+  the zoom level and the number of search results.
 
 ## Next steps
 

@@ -25,7 +25,12 @@
  */
 import { panelCommandOf } from '@embedpdf/core-ui';
 import type { AnnotationToolInput } from '@embedpdf/react/annotation';
-import { CommandsToken, type CommandDef, type IconAccent } from '@embedpdf/react/commands';
+import {
+  CommandsToken,
+  standardCommands,
+  type CommandDef,
+  type IconAccent,
+} from '@embedpdf/react/commands';
 import { FormToken } from '@embedpdf/react/form';
 import { HistoryToken } from '@embedpdf/react/history';
 import { DocumentsToken } from '@embedpdf/react/runtime';
@@ -102,6 +107,11 @@ const textSelection = (commandContext: Ctx) => commandContext.tryGet(SelectionTo
 const renderOf = (commandContext: Ctx) => commandContext.tryGet(RenderToken);
 /** The snapshot the snapshot tool holds: the snapshot strip's verbs show while there is one. */
 const snapshotOf = (commandContext: Ctx) => renderOf(commandContext)?.getSnapshot() ?? null;
+
+/** The standard download: the document with every change, saved under the document's name. */
+const standardDownload = standardCommands.find(
+  (command): command is CommandDef => 'id' in command && command.id === 'document:download',
+)!;
 
 /** A snapshot's file name: the document's name and the page's number, as a PNG (`Report p3.png`). */
 const snapshotFileName = (commandContext: Ctx, page: PageRef): string => {
@@ -531,16 +541,13 @@ export const defaultCommands: CommandDef[] = [
     categories: ['documents.download'],
     allowed: (commandContext) => commandContext.tryGet(DocumentsToken)?.canDownload() ?? true,
     notAllowedKey: 'commands.notAllowed.doc-download',
+    // The download runs the document's save actions itself (WillSave → read → DidSave)
+    // when the actions plugin is installed, so the WillSave changes are in the bytes.
     run: (commandContext) => {
-      const id = commandContext.documentId ?? undefined;
-      const documents = commandContext.tryGet(DocumentsToken);
-      if (!documents) return;
-      // The download runs the document's save actions itself (WillSave → read → DidSave)
-      // when the actions plugin is installed, so the WillSave changes are in the bytes.
-      documents
-        .download(id)
-        .then((bytes) => saveFile(bytes, 'document.pdf', 'application/pdf'))
-        .catch((error) => console.warn('[snippet-react] download failed', error));
+      if (!commandContext.tryGet(DocumentsToken)) return;
+      Promise.resolve(standardDownload.run?.(commandContext)).catch((error: unknown) =>
+        console.warn('[embedpdf] download failed', error),
+      );
     },
     enabled: (commandContext) => commandContext.documentId != null,
   },

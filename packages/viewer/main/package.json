@@ -24,6 +24,7 @@
       "types": "./dist/doors/snippet.d.ts",
       "default": "./dist/embedpdf.js"
     },
+    "./strings/en.json": "./dist/strings/en.json",
     "./package.json": "./package.json"
   },
   "files": [

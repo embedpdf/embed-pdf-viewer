@@ -13,7 +13,8 @@ choose one yourself, set `locale`:
 ```
 
 `locale` follows its prop, so a language switch in your app switches the viewer too. Without it,
-or with `'auto'`, the viewer follows the browser.
+or with `'auto'`, the viewer follows the browser, and shows the
+[fallback language](#fall-back-to-another-language) when the browser asks for none of its languages.
 
 ## The languages it speaks
 
@@ -51,11 +52,13 @@ app sets `locale`, and `strings` gives two labels your own words in each languag
 
 ## Translate your own buttons
 
-Give a command a `labelKey` instead of a `label`, and its words per language:
+Give a command a `labelKey`, and its words per language:
 
 ```js
 {
-  commands: [{ id: 'acme:send', labelKey: 'acme.send', icon: 'signature', run: send }],
+  commands: [
+    { id: 'acme:send', labelKey: 'acme.send', label: 'Send for signature', icon: 'signature', run: send },
+  ],
   strings: {
     en: { 'acme.send': 'Send for signature' },
     nl: { 'acme.send': 'Verstuur ter ondertekening' },
@@ -63,7 +66,8 @@ Give a command a `labelKey` instead of a `label`, and its words per language:
 }
 ```
 
-Panels and mode bars take a `titleKey` the same way, for their title. A panel's title is its
+The `label` shows when no language has the word, so give it too. Panels and mode bars take a
+`titleKey` the same way, for their title. A panel's title is its
 button's label too.
 
 The style panel's words have keys too: each property and option by what it says
@@ -96,7 +100,8 @@ into a field to type a page is `{current}`, or `{first}`:
 ## A language of your own
 
 Give `strings` for a language the viewer doesn't have, and it becomes one of its languages. Anything
-you don't translate shows in English:
+you don't translate shows in the [fallback language](#fall-back-to-another-language), English unless
+you set another:
 
 ```js
 {
@@ -107,6 +112,62 @@ you don't translate shows in English:
 
 It reads right to left when its code says so: a right-to-left language such as `fa` or `ur`, or a
 right-to-left script such as `ku-Arab`.
+
+## Load words when they're needed
+
+Give a language's words as a function, and they load the first time the viewer shows that language,
+so a page in Swedish never downloads your Danish:
+
+```js
+{
+  strings: {
+    sv: () => import('./strings/sv.json'),
+    da: () => import('./strings/da.json'),
+  },
+}
+```
+
+The viewer shows the language once its words are in, and English until then. The function returns
+the words, or a module whose `default` export is the words, which is what `import()` of a JSON file
+gives you. Without a bundler, fetch the file instead:
+`sv: () => fetch('/strings/sv.json').then((response) => response.json())`.
+
+## Fall back to another language
+
+The fallback language is the one the viewer shows when the browser asks for none of its languages,
+and the one a word comes from when the current language doesn't have it. It's English unless you
+set another:
+
+```js
+{
+  strings: {
+    sv: { 'acme.send': 'Skicka för signering', 'acme.archive': 'Arkivera' },
+    da: { 'acme.send': 'Send til underskrift' },
+  },
+  plugins: { i18n: { fallbackLocale: 'sv' } },
+}
+```
+
+A reader in Denmark sees your Danish, and Swedish for everything you didn't translate into Danish:
+**Arkivera**, and every word of the viewer's own. A reader in Finland, which the viewer has no
+language for, sees Swedish. The fallback language can be one of the viewer's languages or one of
+yours, and it loads at the start, so no word waits for it.
+
+## Translate the whole viewer
+
+Every word the viewer shows is in English in `@embedpdf/viewer/strings/en.json`, in the shape
+`strings` takes. Copy it, translate it, and give it as a language of your own:
+
+```js
+{
+  locale: 'da',
+  strings: { da: () => import('./strings/da.json') },
+}
+```
+
+Download it from
+[jsDelivr](https://cdn.jsdelivr.net/npm/@embedpdf/viewer@3/dist/strings/en.json), or import it from
+the package. Any word you leave out shows in the fallback language.
 
 ## Good to know
 

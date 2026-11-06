@@ -78,6 +78,23 @@ describe('readPluginsConfig', () => {
     ]);
   });
 
+  it("takes only the fallback language from the i18n plugin's settings", () => {
+    const read = readPluginsConfig({
+      i18n: {
+        fallbackLocale: 'sv',
+        locale: 'da',
+        locales: [],
+        loaders: {},
+      },
+    } as unknown as ViewerConfig['plugins']);
+    expect(read.settings.i18n).toEqual({ fallbackLocale: 'sv' });
+    expect(read.problems).toEqual([
+      "the i18n plugin's locale is the viewer's `locale`",
+      "the i18n plugin's locales are the viewer's `strings`: give your words there",
+      "the i18n plugin's loaders are the viewer's `strings`: give your words there",
+    ]);
+  });
+
   it('leaves out settings for a plugin that takes none, and settings that are no object', () => {
     const read = readPluginsConfig({
       link: {},
@@ -175,4 +192,7 @@ export const pluginsConfigs: ViewerConfig[] = [
   { plugins: { link: { color: 'red' } } },
   // @ts-expect-error -- a value of the wrong type
   { plugins: { form: { fillable: 'text' } } },
+  { plugins: { i18n: { fallbackLocale: 'sv' } } },
+  // @ts-expect-error -- the languages are `strings`
+  { plugins: { i18n: { locales: [] } } },
 ];

@@ -14,7 +14,7 @@ export interface I18nState {
   readonly direction: TextDirection;
   /** Every language you can switch to, loaded or not, in the order they were added. */
   readonly locales: readonly LocaleInfo[];
-  /** The code of the language being loaded, or `null`. */
+  /** The code of the language on its way, or `null`: it shows once it and the fallback language have loaded. */
   readonly loading: string | null;
 }
 
