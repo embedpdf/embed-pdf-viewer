@@ -684,6 +684,30 @@ describe('groupPages', () => {
   });
 });
 
+describe('itemOfPage', () => {
+  const pages = Array.from({ length: 4 }, () => pg(600, 800));
+
+  it('finds the item holding the page when groups are out of page order', () => {
+    const linear = S.linearLayout(pages.slice(0, 3), [[1], [2], [0]]);
+    expect([0, 1, 2].map((pi) => linear.itemOfPage(pi))).toEqual([2, 0, 1]);
+    const grid = S.gridLayout(pages.slice(0, 3), [[1], [2], [0]], { columns: 2 });
+    expect([0, 1, 2].map((pi) => grid.itemOfPage(pi))).toEqual([2, 0, 1]);
+  });
+
+  it('finds either page of a spread out of order', () => {
+    const scene = S.linearLayout(pages, [
+      [2, 3],
+      [0, 1],
+    ]);
+    expect([0, 1, 2, 3].map((pi) => scene.itemOfPage(pi))).toEqual([1, 1, 0, 0]);
+  });
+
+  it('keeps the nearest item before a page the layout leaves out', () => {
+    const scene = S.linearLayout(pages, [[0], [2], [3]]);
+    expect(scene.itemOfPage(1)).toBe(0);
+  });
+});
+
 /*
  * PDF `/UserUnit` (§14.11.6): a userUnit-5 page is physically 5× its point size.
  * It folds into the page's measured layout size and its per-page
