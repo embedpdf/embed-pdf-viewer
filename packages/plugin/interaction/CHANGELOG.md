@@ -1,5 +1,15 @@
 # @embedpdf/plugin-interaction
 
+## 3.0.0-next.23
+
+### Minor Changes
+
+- [#1000](https://github.com/embedpdf/embed-pdf-viewer/pull/1000) by [@bobsingor](https://github.com/bobsingor) – An `InteractionHandler` says `onPointerDown`, `onPointerMove`, `onPointerUp` and `onPointerCancel`, as a `Tool` does (was `onDown`, `onMove`, `onUp`, `onCancel`).
+
+### Patch Changes
+
+- [#1003](https://github.com/embedpdf/embed-pdf-viewer/pull/1003) by [@bobsingor](https://github.com/bobsingor) – Follows core-geometry: `Rotation`.
+
 ## 3.0.0-next.22
 
 ## 3.0.0-next.21

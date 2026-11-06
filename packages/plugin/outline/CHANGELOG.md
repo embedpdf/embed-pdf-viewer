@@ -1,5 +1,13 @@
 # @embedpdf/plugin-outline
 
+## 3.0.0-next.23
+
+### Patch Changes
+
+- [#997](https://github.com/embedpdf/embed-pdf-viewer/pull/997) by [@bobsingor](https://github.com/bobsingor) – Reads a mutation's `changedRefs`.
+
+- [#1000](https://github.com/embedpdf/embed-pdf-viewer/pull/1000) by [@bobsingor](https://github.com/bobsingor) – Activating an item resolves a `LinkActivation` tagged `status`. Follows core's mirror specs (`onChanged`) and `pagesSequence`.
+
 ## 3.0.0-next.22
 
 ## 3.0.0-next.21

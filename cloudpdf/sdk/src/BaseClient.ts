@@ -69,8 +69,8 @@ export function normalizeClientOptions<T extends BaseClientOptions = BaseClientO
         {
             "X-Fern-Language": "JavaScript",
             "X-Fern-SDK-Name": "@cloudpdf/sdk",
-            "X-Fern-SDK-Version": "3.0.0-next.22",
-            "User-Agent": "@cloudpdf/sdk/3.0.0-next.22",
+            "X-Fern-SDK-Version": "3.0.0-next.23",
+            "User-Agent": "@cloudpdf/sdk/3.0.0-next.23",
             "X-Fern-Runtime": core.RUNTIME.type,
             "X-Fern-Runtime-Version": core.RUNTIME.version,
             "EmbedPDF-Version": options?.embedPdfVersion ?? "3.0",

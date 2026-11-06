@@ -1,5 +1,25 @@
 # @embedpdf/engine-services
 
+## 3.0.0-next.23
+
+### Minor Changes
+
+- [#982](https://github.com/embedpdf/embed-pdf-viewer/pull/982) by [@bobsingor](https://github.com/bobsingor) – A signature field draws its box: placing one writes its background and border, and a restyle draws them again, as it does for a widget in no field. Once a mark is in the field (it is signed, or a mark was drawn in), the mark stays: a resize keeps it, and a style change is refused with `InvalidArg`. A mark drawn in records how it fits the widget, as a stamp records its own.
+
+- [#1000](https://github.com/embedpdf/embed-pdf-viewer/pull/1000) by [@bobsingor](https://github.com/bobsingor) – A worker image encoder's result says `mimeType` (was `contentType`), as render results do.
+
+### Patch Changes
+
+- [#997](https://github.com/embedpdf/embed-pdf-viewer/pull/997) by [@bobsingor](https://github.com/bobsingor) – Reads and writes a `submit-form` action's flags by name, and says the renamed fields (`sizeBytes`, `md5`, `displaySha256`, `contentsSizeBytes`, `changedRefs`, the seed value's booleans).
+
+- [#995](https://github.com/embedpdf/embed-pdf-viewer/pull/995) by [@bobsingor](https://github.com/bobsingor) – A stamping import still puts an item in no group in the caller's group, now that an annotation create's `groupId: null` asks for no group, and still gives each copy a fresh name, now that `nm: null` asks for none.
+
+- [#985](https://github.com/embedpdf/embed-pdf-viewer/pull/985) by [@bobsingor](https://github.com/bobsingor) – Page text comes from `toPageText`: lines end in `\n`, and noncharacters such as the U+FFFE PDFium writes for a joined line-end hyphen give no text. An annotation's `/Contents` reads with `\n` line breaks and is written with `\r`, as Acrobat writes it. Hard line breaks in rich text runs read as `\n` and are written as `\r`.
+
+- [#1003](https://github.com/embedpdf/embed-pdf-viewer/pull/1003) by [@bobsingor](https://github.com/bobsingor) – Follows engine-core's names.
+
+- [#1002](https://github.com/embedpdf/embed-pdf-viewer/pull/1002) by [@bobsingor](https://github.com/bobsingor) – Follows engine-core: form fields are tagged `kind`.
+
 ## 3.0.0-next.22
 
 ### Minor Changes

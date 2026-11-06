@@ -1,5 +1,17 @@
 # @embedpdf/plugin-i18n
 
+## 3.0.0-next.23
+
+### Minor Changes
+
+- [#1004](https://github.com/embedpdf/embed-pdf-viewer/pull/1004) by [@bobsingor](https://github.com/bobsingor) – A fallback language in `loaders` now loads at the start, and a language shows once it and the fallback language are in, so a lazy fallback language no longer shows keys in place of its strings. Until then the fallback language shows, or, while that loads too, the first language in `locales`. A language in both `locales` and `loaders` shows its `locales` strings until its loader has run, and the loader's language then replaces them. When the fallback language can't load, `onLocaleLoadFailed` fires and languages show without it.
+
+- [#1006](https://github.com/embedpdf/embed-pdf-viewer/pull/1006) by [@bobsingor](https://github.com/bobsingor) – `interpolate(text, params)` fills a string's `{name}` slots as `t()` does, for text that has no translation. `TranslateOptions.params` takes a readonly record.
+
+### Patch Changes
+
+- [#1000](https://github.com/embedpdf/embed-pdf-viewer/pull/1000) by [@bobsingor](https://github.com/bobsingor) – Follows core's settings events (`changedKeys`).
+
 ## 3.0.0-next.22
 
 ### Minor Changes

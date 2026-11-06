@@ -1,5 +1,15 @@
 # @embedpdf/plugin-attachment
 
+## 3.0.0-next.23
+
+### Minor Changes
+
+- [#1000](https://github.com/embedpdf/embed-pdf-viewer/pull/1000) by [@bobsingor](https://github.com/bobsingor) – Attachments are created and deleted, as the engine's `attachments.create`/`delete` say: `create()`, `delete()`, `canCreate()`, `canDelete()` and the state's `canCreate` (were `add`, `remove`, `canAdd`, `canRemove`). `onChanged` says `'created'` and `'deleted'`.
+
+### Patch Changes
+
+- [#997](https://github.com/embedpdf/embed-pdf-viewer/pull/997) by [@bobsingor](https://github.com/bobsingor) – Reads a file's `sizeBytes` and `md5`.
+
 ## 3.0.0-next.22
 
 ## 3.0.0-next.21

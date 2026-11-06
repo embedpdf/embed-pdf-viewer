@@ -1,5 +1,17 @@
 # @embedpdf/plugin-signature
 
+## 3.0.0-next.23
+
+### Minor Changes
+
+- [#1003](https://github.com/embedpdf/embed-pdf-viewer/pull/1003) by [@bobsingor](https://github.com/bobsingor) – `getSignature()` returns `SignatureInfo`, as `listSignatures()` does: the field's facts and its `verdict` (`null` until checked, or for an unsigned field). The `PreparedSignature` alias is gone: `prepareSignature()` resolves `SignaturePrepared`.
+
+- [#1000](https://github.com/embedpdf/embed-pdf-viewer/pull/1000) by [@bobsingor](https://github.com/bobsingor) – `refresh()` resolves nothing, as every plugin's does. The signing key is `signingKey` (setting and `sign()` option) and its type `SigningKey` (were `key` and `SignatureKey`: in naming.md a key is a lookup key). `PlaceMarkResult` is tagged `status`, as every call result is (was `kind`). `validate()` takes `validationTime` (was `at`).
+
+### Patch Changes
+
+- [#1002](https://github.com/embedpdf/embed-pdf-viewer/pull/1002) by [@bobsingor](https://github.com/bobsingor) – Follows engine-core: form fields are tagged `kind`.
+
 ## 3.0.0-next.22
 
 ## 3.0.0-next.21

@@ -1,5 +1,17 @@
 # @embedpdf/engine
 
+## 3.0.0-next.23
+
+### Patch Changes
+
+- [#997](https://github.com/embedpdf/embed-pdf-viewer/pull/997) by [@bobsingor](https://github.com/bobsingor) – Asks the worker for a font program by its `displaySha256`.
+
+- [#1005](https://github.com/embedpdf/embed-pdf-viewer/pull/1005) by [@bobsingor](https://github.com/bobsingor) – Follows engine-core: permissions are named flags.
+
+- [#1003](https://github.com/embedpdf/embed-pdf-viewer/pull/1003) by [@bobsingor](https://github.com/bobsingor) – Follows engine-core's names. `createLocalEngine(options)` and the other factories take `options`.
+
+- [#1000](https://github.com/embedpdf/embed-pdf-viewer/pull/1000) by [@bobsingor](https://github.com/bobsingor) – Follows engine-core: encoded pictures say `mimeType`.
+
 ## 3.0.0-next.22
 
 ### Minor Changes

@@ -1,5 +1,37 @@
 # @cloudpdf/server
 
+## 3.0.0-next.23
+
+### Minor Changes
+
+- [#991](https://github.com/embedpdf/embed-pdf-viewer/pull/991) by [@bobsingor](https://github.com/bobsingor) – Layers and base versions store `contents_version` (migration 052), raised in the same transaction as a flatten, a redaction or a change to the page set, and published in the manifest. Versioned searches pin it with `layoutVersion` instead of a content epoch, so an annotation write keeps every cached search and a content write refreshes them; the unversioned search form takes the same two pins as optional parameters.
+
+- [#989](https://github.com/embedpdf/embed-pdf-viewer/pull/989) by [@bobsingor](https://github.com/bobsingor) – `/head` carries this server's engine value for each kind of cached read: a digest of the rules and fonts it computes that kind with, never of its release, so a deploy that changes nothing keeps every cached answer. Every versioned read checks the token's engine value and shape: a shape newer than the server answers is refused, and another engine value is answered with this server's own answer, uncached, and its value in `EmbedPDF-Engine` (exposed to browsers), so nothing is cached under a value that doesn't describe it and no request fails during a rolling deploy. Renders are stored by engine value. The manifest no longer carries `serverFonts`.
+
+- [#994](https://github.com/embedpdf/embed-pdf-viewer/pull/994) by [@bobsingor](https://github.com/bobsingor) – Every error response is `{ error: { code, message, details? } }` with a code from `EngineErrorCode`. An engine error no longer carries `name`. A license refusal is `LicenseInvalid` with the license status's code in `details.licenseCode`; a usage limit says its `metric` and `limit` in `details`; a thumbnail that isn't ready says its state in `details.state`; `BadInput` is `InvalidArg`; and an error from Fastify itself carries the code for its status instead of Fastify's own.
+
+- [#996](https://github.com/embedpdf/embed-pdf-viewer/pull/996) by [@bobsingor](https://github.com/bobsingor) – Every point in time the server sends is an ISO 8601 string in UTC, and a grant's and a token revoke's `expiresAt` are taken as one, with its offset. Rows keep their milliseconds. The admin routes' records are typed by the contract's, so a field the contract doesn't say no longer compiles.
+
+- [#997](https://github.com/embedpdf/embed-pdf-viewer/pull/997) by [@bobsingor](https://github.com/bobsingor) – Takes and sends the renamed fields: `sizeBytes` (documents, layers, versions), `baseSha256`, the manifest's `baseSizeBytes`, `uploadTtlSeconds`, `expiresInSeconds` (also the editing session's on `/access`, the event stream and object-number reservations), `docIds` and the camelCase usage metrics (module meters in `moduleMeters`), and names its path parameters `docId`, `annotationKey`, `sha256` and `displaySha256`.
+
+- [#992](https://github.com/embedpdf/embed-pdf-viewer/pull/992) by [@bobsingor](https://github.com/bobsingor) – Every response says which version the server is, in `EmbedPDF-Server-Version`. A request's `EmbedPDF-Version` is answered within the server's major; another major, or a value that isn't `<major>.<minor>`, gets a 400 naming both versions. CORS allows `EmbedPDF-Version` and exposes `EmbedPDF-Server-Version`.
+
+### Patch Changes
+
+- [#995](https://github.com/embedpdf/embed-pdf-viewer/pull/995) by [@bobsingor](https://github.com/bobsingor) – A grant create takes `origins: null` and `expiresAt: null`, as a grant read says them: any origin and no expiry.
+
+- [#1005](https://github.com/embedpdf/embed-pdf-viewer/pull/1005) by [@bobsingor](https://github.com/bobsingor) – The head and `/access` carry named permission flags, not the raw word; `/access` no longer sends the `advisory`.
+
+- [#988](https://github.com/embedpdf/embed-pdf-viewer/pull/988) by [@bobsingor](https://github.com/bobsingor) – Every versioned read (`…@token`) now answers exactly the state its pins name. The pins are checked before the read and again after it, and a read that a layer write began during is refused as no longer current, so a write can no longer end up cached for a year under an older version. Before, page renders, page text and geometry, appearance batches, outline, metadata, fonts, attachments, layout, actions, search, signatures and downloads checked their pins only before reading, and the annotation and form reads could still send an applied but uncommitted write.
+
+- [#990](https://github.com/embedpdf/embed-pdf-viewer/pull/990) by [@bobsingor](https://github.com/bobsingor) – `redactions.apply` parses its body with `RedactionApplyScopeInputSchema`, which still refuses a field it doesn't know, now that the scope a response carries is read tolerantly.
+
+- [#1003](https://github.com/embedpdf/embed-pdf-viewer/pull/1003) by [@bobsingor](https://github.com/bobsingor) – Follows engine-core's names: `FormField`, `Signature`.
+
+- [#1002](https://github.com/embedpdf/embed-pdf-viewer/pull/1002) by [@bobsingor](https://github.com/bobsingor) – The document init and import answers say `status`, not `tag`. Form fields are tagged `kind`.
+
+- [#1000](https://github.com/embedpdf/embed-pdf-viewer/pull/1000) by [@bobsingor](https://github.com/bobsingor) – The image encoder and the appearance batch say `mimeType`, as engine-core's render results do.
+
 ## 3.0.0-next.22
 
 ### Minor Changes

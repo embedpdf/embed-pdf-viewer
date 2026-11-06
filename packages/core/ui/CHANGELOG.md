@@ -1,5 +1,15 @@
 # @embedpdf/core-ui
 
+## 3.0.0-next.23
+
+### Minor Changes
+
+- [#999](https://github.com/embedpdf/embed-pdf-viewer/pull/999) by [@bobsingor](https://github.com/bobsingor) – `resolveLayout(option, defaults, env)` takes `option: LayoutOption | undefined`, no `null`.
+
+- [#1003](https://github.com/embedpdf/embed-pdf-viewer/pull/1003) by [@bobsingor](https://github.com/bobsingor) – `CustomSlotContext` replaces `CustomSlotCtx`.
+
+- [#1000](https://github.com/embedpdf/embed-pdf-viewer/pull/1000) by [@bobsingor](https://github.com/bobsingor) – `OverflowRow` is tagged `kind`, as things that are are.
+
 ## 3.0.0-next.22
 
 ### Minor Changes

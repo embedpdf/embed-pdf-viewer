@@ -1,5 +1,19 @@
 # @embedpdf/plugin-annotation
 
+## 3.0.0-next.23
+
+### Minor Changes
+
+- [#999](https://github.com/embedpdf/embed-pdf-viewer/pull/999) by [@bobsingor](https://github.com/bobsingor) – `chrome.marquee` is one look: a change replaces it whole, and a color it leaves out follows the accent again. The other `chrome` groups still merge per key.
+
+- [#1003](https://github.com/embedpdf/embed-pdf-viewer/pull/1003) by [@bobsingor](https://github.com/bobsingor) – The sub-capabilities are `AnnotationSelectionCapability`, `AnnotationDraftCapability`, `AnnotationTextCapability`, `AnnotationToolsCapability`, `AnnotationStampsCapability`, `AnnotationLinksCapability` and `CommentsCapability` (were `…Api`). `AnnotationToolDefinition` replaces `AnnotationToolDef`. Read shapes are `readonly`.
+
+- [#1000](https://github.com/embedpdf/embed-pdf-viewer/pull/1000) by [@bobsingor](https://github.com/bobsingor) – The selection is `selection.select(refs)` and `selection.getSelected()`, as page-edit, attachment and outline have them (was `set` and `list`). `CommentThreadChangedEvent` is tagged `type` (was `change`). The host contract's functions start with a verb: `getAuthority`, `getPictureEpoch`, `getPictureVersion`, `isPending`, `getDistanceCreationPage`. The snap settings are `alignmentThresholdPx` and `rotationThresholdDeg`.
+
+### Patch Changes
+
+- [#982](https://github.com/embedpdf/embed-pdf-viewer/pull/982) by [@bobsingor](https://github.com/bobsingor) – A lent record with no live drawing keeps its picture while a new look is pending, instead of drawing its bare style in its place.
+
 ## 3.0.0-next.22
 
 ### Minor Changes

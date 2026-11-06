@@ -1,5 +1,11 @@
 # @embedpdf/core-fonts
 
+## 3.0.0-next.23
+
+### Patch Changes
+
+- [#997](https://github.com/embedpdf/embed-pdf-viewer/pull/997) by [@bobsingor](https://github.com/bobsingor) – A built-in program's facts say `displaySha256`.
+
 ## 3.0.0-next.22
 
 ### Minor Changes

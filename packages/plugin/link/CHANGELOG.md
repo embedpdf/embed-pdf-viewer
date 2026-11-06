@@ -1,5 +1,13 @@
 # @embedpdf/plugin-link
 
+## 3.0.0-next.23
+
+### Minor Changes
+
+- [#1003](https://github.com/embedpdf/embed-pdf-viewer/pull/1003) by [@bobsingor](https://github.com/bobsingor) – Read shapes are `readonly`.
+
+- [#1000](https://github.com/embedpdf/embed-pdf-viewer/pull/1000) by [@bobsingor](https://github.com/bobsingor) – `readAllLinks()` replaces `listAllLinks()`: a read from the engine is `read*`. `LinkActivation` is tagged `status`, as every call result is (was `outcome`).
+
 ## 3.0.0-next.22
 
 ## 3.0.0-next.21

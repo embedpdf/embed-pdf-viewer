@@ -1,5 +1,11 @@
 # @embedpdf/core-text
 
+## 3.0.0-next.23
+
+### Minor Changes
+
+- [#999](https://github.com/embedpdf/embed-pdf-viewer/pull/999) by [@bobsingor](https://github.com/bobsingor) – `defaultPaintFonts(fontFamily)` takes `string | null`, no `undefined`.
+
 ## 3.0.0-next.22
 
 ## 3.0.0-next.21

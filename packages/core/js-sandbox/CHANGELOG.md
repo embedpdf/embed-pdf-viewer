@@ -1,5 +1,11 @@
 # @embedpdf/core-js-sandbox
 
+## 3.0.0-next.23
+
+### Minor Changes
+
+- [#1000](https://github.com/embedpdf/embed-pdf-viewer/pull/1000) by [@bobsingor](https://github.com/bobsingor) – The QuickJS sandbox ends with `destroy()` and says `destroyed`, as every other object does.
+
 ## 3.0.0-next.22
 
 ## 3.0.0-next.21

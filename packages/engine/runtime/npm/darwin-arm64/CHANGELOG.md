@@ -1,5 +1,7 @@
 # @embedpdf/engine-runtime-darwin-arm64
 
+## 3.0.0-next.23
+
 ## 3.0.0-next.22
 
 ## 3.0.0-next.21

@@ -1,5 +1,15 @@
 # @embedpdf/plugin-render
 
+## 3.0.0-next.23
+
+### Minor Changes
+
+- [#999](https://github.com/embedpdf/embed-pdf-viewer/pull/999) by [@bobsingor](https://github.com/bobsingor) – The `format` and `quality` settings read `null` while the engine chooses, so `updateSettings({ format: null })` gives the choice back; they used to read `undefined`, which a change could never set. `snapshot.box` is one look: a change replaces it whole, and a color it leaves out follows the accent again.
+
+- [#1003](https://github.com/embedpdf/embed-pdf-viewer/pull/1003) by [@bobsingor](https://github.com/bobsingor) – The full-page and tile settings types are `FullPageSettings` and `TilesSettings` (were `…Options`).
+
+- [#1000](https://github.com/embedpdf/embed-pdf-viewer/pull/1000) by [@bobsingor](https://github.com/bobsingor) – The tile settings name their units: `bleedPx` and `engageRatio` (were `bleed` and `engageAt`). Results say `mimeType`. The host contract's view demand ends with `destroy()`, and `getKeptAppearances()` starts with a verb.
+
 ## 3.0.0-next.22
 
 ### Minor Changes

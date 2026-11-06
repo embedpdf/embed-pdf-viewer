@@ -1,5 +1,15 @@
 # @embedpdf/plugin-commands
 
+## 3.0.0-next.23
+
+### Minor Changes
+
+- [#1006](https://github.com/embedpdf/embed-pdf-viewer/pull/1006) by [@bobsingor](https://github.com/bobsingor) – A command can have `labelParams(context)`: the values for its label's `{name}` slots, such as how many pages are selected. It's asked like `enabled`, again whenever the viewer's state or your app's changes. The values go into `label`, into the translated words under `labelKey` or the command's id, where a number `count` picks the plural form, and into every sentence that names the label. A `labelParams` that throws gives no values. Without the i18n plugin, `label`'s slots are filled too.
+
+- [#1003](https://github.com/embedpdf/embed-pdf-viewer/pull/1003) by [@bobsingor](https://github.com/bobsingor) – `CommandDefinition` replaces `CommandDef`.
+
+- [#1000](https://github.com/embedpdf/embed-pdf-viewer/pull/1000) by [@bobsingor](https://github.com/bobsingor) – A bound command's formatted shortcut is `shortcutLabel`; `shortcut` stays the key a command definition takes.
+
 ## 3.0.0-next.22
 
 ### Minor Changes

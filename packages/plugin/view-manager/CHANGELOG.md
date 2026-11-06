@@ -1,5 +1,11 @@
 # @embedpdf/plugin-view-manager
 
+## 3.0.0-next.23
+
+### Minor Changes
+
+- [#1000](https://github.com/embedpdf/embed-pdf-viewer/pull/1000) by [@bobsingor](https://github.com/bobsingor) – `deletePane()`, `DeletePaneOptions`, `onPaneDeleted` and `PaneDeletedEvent` pair with `createPane()` (were `removePane`, `RemovePaneOptions`, `onPaneRemoved` and `PaneRemovedEvent`).
+
 ## 3.0.0-next.22
 
 ## 3.0.0-next.21

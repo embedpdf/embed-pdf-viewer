@@ -1,5 +1,19 @@
 # @embedpdf/core-signature
 
+## 3.0.0-next.23
+
+### Minor Changes
+
+- [#999](https://github.com/embedpdf/embed-pdf-viewer/pull/999) by [@bobsingor](https://github.com/bobsingor) – `validateChain(cms, trust, at?)` takes `trust: TrustPort | null`, no `undefined`.
+
+- [#1000](https://github.com/embedpdf/embed-pdf-viewer/pull/1000) by [@bobsingor](https://github.com/bobsingor) – `SignatureVerdict.validationTime` replaces `validatedAt`, which wasn't a time, and `validateSignatures()` takes `validationTime` (was `at`). Times are ISO 8601 strings: `ParsedCms.signingTime`, `BuildDetachedCmsInput.signingTime` and a timestamp `ValidationTime`'s `genTime`.
+
+### Patch Changes
+
+- [#997](https://github.com/embedpdf/embed-pdf-viewer/pull/997) by [@bobsingor](https://github.com/bobsingor) – Reads a signature's `contentsSizeBytes`.
+
+- [#1003](https://github.com/embedpdf/embed-pdf-viewer/pull/1003) by [@bobsingor](https://github.com/bobsingor) – Follows engine-core: a signature is `Signature`.
+
 ## 3.0.0-next.22
 
 ## 3.0.0-next.21

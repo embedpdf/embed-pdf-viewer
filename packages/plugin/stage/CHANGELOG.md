@@ -1,5 +1,15 @@
 # @embedpdf/plugin-stage
 
+## 3.0.0-next.23
+
+### Minor Changes
+
+- [#999](https://github.com/embedpdf/embed-pdf-viewer/pull/999) by [@bobsingor](https://github.com/bobsingor) – `reveal()`'s `rect` is `rect?: Rect`: left out is the whole page, and `null` is no longer taken. A `zoomBox` change that gives a color as `undefined` follows the accent, instead of storing `undefined`.
+
+- [#1003](https://github.com/embedpdf/embed-pdf-viewer/pull/1003) by [@bobsingor](https://github.com/bobsingor) – Read shapes are `readonly`, the settings included. Follows core-geometry and core-stage: `Rotation`, `PageGeometry`.
+
+- [#1000](https://github.com/embedpdf/embed-pdf-viewer/pull/1000) by [@bobsingor](https://github.com/bobsingor) – `StageViewState.pageIndex` replaces `cursor`. `getPageBox()` replaces `getPageFrame()`, since `PageFrame` is a setting. A reveal's alignment is `align?: RevealAlignment`, its values `ArrivalAlignValue` (were `anchor`, `RevealAnchor` and `RevealAnchorValue`, a copy of it). Settings events carry `changedKeys`.
+
 ## 3.0.0-next.22
 
 ## 3.0.0-next.21
