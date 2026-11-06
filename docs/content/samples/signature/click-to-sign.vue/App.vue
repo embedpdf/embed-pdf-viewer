@@ -25,7 +25,7 @@ const plugins = [
   annotationPlugin(),
   formPlugin(),
   stampPlugin({ assetEngine }),
-  signaturePlugin({ key: () => signer }),
+  signaturePlugin({ signingKey: () => signer }),
 ];
 
 // [!doc-source agreement]

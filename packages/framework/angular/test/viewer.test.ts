@@ -50,9 +50,9 @@ describe('provideEmbedPdf() in a component’s providers', () => {
     const host = viewerHost({ template: '', config: { engine: () => first.engine } });
     const fixture = await mount(host);
     const kernel = kernelOf(fixture);
-    expect(kernel.status()).toBe('started');
+    expect(kernel.getStatus()).toBe('started');
     fixture.destroy();
-    await vi.waitFor(() => expect(kernel.status()).toBe('destroyed'));
+    await vi.waitFor(() => expect(kernel.getStatus()).toBe('destroyed'));
     // The engine came from a function, so the viewer owned it.
     await vi.waitFor(() => expect(first.destroyedCount()).toBe(1));
   });
@@ -67,7 +67,7 @@ describe('the engine', () => {
     expect(warmup).toHaveBeenCalledTimes(1);
     const kernel = kernelOf(fixture);
     fixture.destroy();
-    await vi.waitFor(() => expect(kernel.status()).toBe('destroyed'));
+    await vi.waitFor(() => expect(kernel.getStatus()).toBe('destroyed'));
     expect(destroyedCount()).toBe(0);
   });
 
@@ -251,7 +251,7 @@ describe('*epdfDocumentGate', () => {
         : input.id === 'a'
           ? Promise.resolve({
               id: 'a',
-              events: { subscribe: () => () => {}, lastServerId: () => null },
+              events: { subscribe: () => () => {}, lastServerSequence: () => null },
               security: {
                 allows: () => true,
                 passwordPrompt: { state: 'required', incorrect: true },

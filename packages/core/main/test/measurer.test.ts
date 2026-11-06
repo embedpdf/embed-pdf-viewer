@@ -81,7 +81,7 @@ describe('ctx.measurer', () => {
     host.load(PROGRAM.family);
     expect(ready).not.toHaveBeenCalled();
     expect(host.listeners.size).toBe(0);
-    await ctx.dispose();
+    await ctx.destroy();
   });
 
   it('is null on a kernel given none', async () => {

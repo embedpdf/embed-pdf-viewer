@@ -59,7 +59,7 @@ describe('stageViewProjector', () => {
   const stage = {
     pageRectToViewport: (target: { objectNumber: number }, box: typeof rect) =>
       target.objectNumber === 4 ? { ...box, x: box.x + 10, y: box.y + 20 } : null,
-    getPageFrame: (target: { objectNumber: number }) =>
+    getPageBox: (target: { objectNumber: number }) =>
       target.objectNumber === 4
         ? { transform: { viewScale: 2, rotation: 180 as const, zoom: 1.5 } }
         : null,

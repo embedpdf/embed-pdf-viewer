@@ -29,7 +29,7 @@ export interface BundleCodec<Bundle> {
   parse(text: string, options?: BundleTransferOptions): Promise<Bundle>;
 }
 
-/** What a family's file is: its kind, its manifest's keys, and their check. */
+/** What a kind's file is: its kind, its manifest's keys, and their check. */
 export interface BundleFileSpec<Bundle> {
   readonly kind: BundleKind;
   /** The bundle's keys besides `resources`, in the order the file writes them. */

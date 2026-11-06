@@ -53,6 +53,6 @@ export function engineScripts({
     activate: (ref: FormFieldRef, action: PdfActionTree<unknown>) =>
       through((scripts, form) => scripts.activate(form, ref, action)),
     recalculate: () => through((scripts, form) => scripts.recalculate(form)),
-    dispose: () => controller.dispose(),
+    dispose: () => controller.destroy(),
   };
 }

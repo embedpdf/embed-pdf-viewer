@@ -104,7 +104,7 @@ export function readWidget(
     // Joined by the caller (joinWidgetFieldNumbers): the /Parent target is
     // a field dictionary, which annotation-plane primitives cannot follow.
     field: null,
-    fieldFamily: 'unknown',
+    fieldKind: 'unknown',
     // A mark drawn in records how it fits; the join adds a signature, and
     // keeps it only for a signature field's widget.
     hasMark: readAppearanceFit(fn, mem, annotPtr) !== null,

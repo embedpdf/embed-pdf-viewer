@@ -47,7 +47,7 @@ function makeHandle(id: string, options: HandleOptions = {}): DocumentHandle {
   const pages = options.pages ?? [page(1, 0)];
   return {
     id,
-    events: { subscribe: () => () => {}, lastServerId: () => null },
+    events: { subscribe: () => () => {}, lastServerSequence: () => null },
     pages: { list: () => Promise.resolve({ pageCount: pages.length, labels: [], pages }) },
     security: options.security,
     close: vi.fn(() => Promise.resolve()),

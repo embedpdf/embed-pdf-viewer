@@ -155,7 +155,7 @@ describe('the annotation layer', () => {
         .list()
         .find((entry) => entry.subtype === 'square' || entry.subtype === 'circle');
       expect(square).toBeDefined();
-      act(() => annotation.selection.set([square!.ref]));
+      act(() => annotation.selection.select([square!.ref]));
       await waitFor(() => expect(view.getAllByTestId('handle').length).toBeGreaterThan(0));
       expect(handles.some((handle) => handle.kind === 'corner')).toBe(true);
       // The outline is painted through its variable, then the accent's.
@@ -334,7 +334,7 @@ describe('the annotation layer', () => {
     ));
     try {
       target = annotation.list().find((entry) => entry.subtype === 'free-text')!;
-      act(() => annotation.selection.set([target!.ref]));
+      act(() => annotation.selection.select([target!.ref]));
       await waitFor(() => expect(states[states.length - 1]!.selected).toHaveLength(1));
       expect(anchors[anchors.length - 1]).toMatchObject({ page: target.page });
 

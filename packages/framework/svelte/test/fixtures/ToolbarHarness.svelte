@@ -6,7 +6,7 @@
   `label` (its `aria-label`) and `style` go to the toolbar.
 -->
 <script lang="ts">
-  import { Toolbar, type BarSchema, type CustomSlotCtx } from '../../src/toolbar';
+  import { Toolbar, type BarSchema, type CustomSlotContext } from '../../src/toolbar';
   import Wide from './Wide.svelte';
 
   let {
@@ -32,7 +32,7 @@
   </button>
 {/snippet}
 
-{#snippet item(name: string, variant: string, ctx: CustomSlotCtx)}
+{#snippet item(name: string, variant: string, ctx: CustomSlotContext)}
   {#if drawCustom === 'measured'}
     {#if ctx.layer === 'live'}<Wide measure={ctx.measure} />{/if}
   {:else if drawCustom === 'field'}

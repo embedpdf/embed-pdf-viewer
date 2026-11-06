@@ -37,10 +37,12 @@ import type { ActionsTriggers } from './triggers';
 
 /** The source a trigger reports for: what its diagnostics carry before a tree is found. */
 const sourceOfTrigger = (trigger: ActionTrigger): ActionSource => {
-  switch (trigger.scope) {
+  switch (trigger.type) {
     case 'activate':
     case 'annotation':
-      return trigger.source ?? { kind: 'annotation', annotation: trigger.ref, page: trigger.page };
+      return (
+        trigger.source ?? { kind: 'annotation', annotation: trigger.annotation, page: trigger.page }
+      );
     case 'page':
       return { kind: 'page', page: trigger.page };
     case 'document':
@@ -139,16 +141,16 @@ export function createDispatcher(
       if (!triggerEnabled(trigger)) {
         diagnose({
           code: 'trigger-disabled',
-          message: `${trigger.scope}: trigger family disabled by config`,
+          message: `${trigger.type}: trigger family disabled by config`,
         });
         return { status: 'inert', steps: [], diagnostics };
       }
       const origin = triggerOriginOf(trigger);
-      switch (trigger.scope) {
+      switch (trigger.type) {
         case 'activate':
         case 'annotation': {
-          const event = trigger.scope === 'activate' ? 'activate' : trigger.event;
-          const annotation = await readAnnotation(ctx, form, trigger.ref, read);
+          const event = trigger.type === 'activate' ? 'activate' : trigger.event;
+          const annotation = await readAnnotation(ctx, form, trigger.annotation, read);
           // ISO 32000-2 Table 197: "the A entry, if present, takes precedence
           // over [the /AA U entry]"; a shadowed U tree is silently inert,
           // exactly like an absent one.
@@ -221,7 +223,7 @@ export function createDispatcher(
   const namedContext = (context?: Partial<ActionContext>): ActionContext => ({
     origin: 'user',
     source: { kind: 'api' },
-    event: { scope: 'activate' },
+    event: { type: 'activate' },
     ...context,
   });
 
@@ -280,14 +282,14 @@ export function createDispatcher(
       canExecute,
       executeNamed,
       canExecuteNamed,
-      getActionTree: (source, options) => ctx.cancellable(options?.signal, readActionTree(source)),
+      readActionTree: (source, options) => ctx.cancellable(options?.signal, readActionTree(source)),
       dispatch,
       // The synchronous twin: the trigger family is enabled. Per-tree truth
       // stays per step in the results; resolution is async and never
       // previewed here.
       canDispatch: (trigger) => triggerEnabled(trigger),
       prepareClose: (options): Promise<ActionTriggerResult> =>
-        dispatch({ scope: 'document', event: 'will-close' }, options),
+        dispatch({ type: 'document', event: 'will-close' }, options),
     } satisfies Partial<ActionsCapability>,
   };
 }

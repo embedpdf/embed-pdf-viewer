@@ -7,7 +7,11 @@
  */
 import { isPluginError, type DocumentEvent } from '@embedpdf/core';
 import { type Message, styleOf } from '@embedpdf/core-annotation';
-import type { AnnotationDraft, AnnotationFlags, AnnotationRef } from '@embedpdf/engine-core/runtime';
+import type {
+  AnnotationDraft,
+  AnnotationFlags,
+  AnnotationRef,
+} from '@embedpdf/engine-core/runtime';
 import { EngineError, EngineErrorCode, toPageRef } from '@embedpdf/engine-core/runtime';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -121,7 +125,13 @@ const remoteUpdate = (dto: FileAnnotation): DocumentEvent =>
   ({
     type: 'annotations.updated',
     page: PAGE,
-    origin: { kind: 'remote', sessionId: 'cloud:bob', sub: 'bob', ts: 0, serverId: 50 },
+    origin: {
+      kind: 'remote',
+      sessionId: 'cloud:bob',
+      subject: 'bob',
+      at: new Date(0).toISOString(),
+      serverSequence: 50,
+    },
     annotation: dto,
     appearance: { changed: false },
     meta: { affectedPages: [], cacheDelta: null, changed: [] },
@@ -148,7 +158,7 @@ describe('a refused change shows the truth', () => {
     const harness = annotationHarness();
     await harness.load([square(20)]);
     harness.remove.mockRejectedValueOnce(new Error('revoked'));
-    harness.capability.selection.set([ref(20)]);
+    harness.capability.selection.select([ref(20)]);
 
     const result = await harness.capability.selection.delete();
 
@@ -161,7 +171,7 @@ describe('a refused change shows the truth', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     await harness.load([square(20)]);
     harness.update.mockRejectedValueOnce(new Error('Forbidden'));
-    harness.capability.selection.set([ref(20)]);
+    harness.capability.selection.select([ref(20)]);
 
     const result = await harness.capability.selection.update({ locked: true });
 
@@ -174,7 +184,7 @@ describe('a refused change shows the truth', () => {
     await harness.load([square(20)]);
     const write = deferred<unknown>();
     harness.update.mockReturnValueOnce(write.promise);
-    harness.capability.selection.set([ref(20)]);
+    harness.capability.selection.select([ref(20)]);
 
     const restyle = harness.capability.selection.update({ color: '#00ff00' });
     expect(dataOf(harness.capability.get(ref(20))).color).toBe('#00ff00');
@@ -196,7 +206,7 @@ describe('a refused change shows the truth', () => {
       }
       return { annotation: square(20, { color: '#00ff00' }) };
     });
-    harness.capability.selection.set([ref(20), ref(21)]);
+    harness.capability.selection.select([ref(20), ref(21)]);
 
     const result = await harness.capability.selection.update({ color: '#00ff00' });
 
@@ -214,7 +224,7 @@ describe('what the capability says about a change', () => {
     const failures = vi.fn();
     harness.capability.onWriteFailed(failures);
     harness.update.mockRejectedValueOnce(new Error('Forbidden'));
-    harness.capability.selection.set([ref(20)]);
+    harness.capability.selection.select([ref(20)]);
 
     await harness.capability.selection.update({ color: '#00ff00' });
 
@@ -227,7 +237,7 @@ describe('what the capability says about a change', () => {
     await harness.load([square(20)]);
     const write = deferred<unknown>();
     harness.update.mockReturnValueOnce(write.promise);
-    harness.capability.selection.set([ref(20)]);
+    harness.capability.selection.select([ref(20)]);
 
     const restyle = harness.capability.selection.update({ color: '#00ff00' });
     expect(harness.capability.isPending(ref(20))).toBe(true);
@@ -270,7 +280,10 @@ describe('what the capability says about a change', () => {
     const created = harness.capability.create(PAGE, draft);
     // The view predicts the create without checking its values: the engine checks them.
     const [id] = harness.model().order;
-    expect(harness.model().byId[id!]!.annotation).toMatchObject({ subtype: 'square', color: 'red' });
+    expect(harness.model().byId[id!]!.annotation).toMatchObject({
+      subtype: 'square',
+      color: 'red',
+    });
     answer.reject(
       new EngineError(EngineErrorCode.InvalidArg, "square create field 'color': not a color", {
         details: { field: 'color' },
@@ -369,7 +382,7 @@ describe('several changes to one record', () => {
     vi.useFakeTimers();
     const harness = annotationHarness();
     await harness.load([freeText('Hello')]);
-    harness.capability.selection.set([ref(30)]);
+    harness.capability.selection.select([ref(30)]);
     const locked = { ...NO_FLAGS, locked: true };
 
     harness.capability.draftContents(ref(30), 'Hello world');
@@ -419,7 +432,7 @@ describe('several changes to one record', () => {
   it('a newer restyle answered after an older one shows the newer value throughout', async () => {
     const harness = annotationHarness();
     await harness.load([square(20)]);
-    harness.capability.selection.set([ref(20)]);
+    harness.capability.selection.select([ref(20)]);
     const older = deferred<unknown>();
     harness.update
       .mockReturnValueOnce(older.promise)
@@ -440,7 +453,7 @@ describe('several changes to one record', () => {
   it('an older change refused leaves the newer one standing', async () => {
     const harness = annotationHarness();
     await harness.load([square(20)]);
-    harness.capability.selection.set([ref(20)]);
+    harness.capability.selection.select([ref(20)]);
     const older = deferred<unknown>();
     harness.update
       .mockReturnValueOnce(older.promise)
@@ -572,10 +585,10 @@ describe('a new record before the engine answered its create', () => {
       origin: {
         kind: 'local',
         sessionId: 'me',
-        sub: null,
-        ts: 0,
-        serverId: null,
-        tx: { id: opId, index: 0, count: 1 },
+        subject: null,
+        at: new Date(0).toISOString(),
+        serverSequence: null,
+        transaction: { id: opId, index: 0, count: 1 },
       },
       annotation: { ...square(60), ref: newRef },
       meta,
@@ -585,7 +598,13 @@ describe('a new record before the engine answered its create', () => {
       type: 'annotations.deleted',
       page: PAGE,
       deleted: [newRef],
-      origin: { kind: 'remote', sessionId: 'cloud:bob', sub: 'bob', ts: 0, serverId: 50 },
+      origin: {
+        kind: 'remote',
+        sessionId: 'cloud:bob',
+        subject: 'bob',
+        at: new Date(0).toISOString(),
+        serverSequence: 50,
+      },
       meta,
     } as unknown as DocumentEvent);
 
@@ -601,7 +620,7 @@ describe('the selection follows undo and redo', () => {
   it('an undo selects what was selected before the change, a redo what was after it', async () => {
     const harness = annotationHarness();
     await harness.load([square(20), square(21)]);
-    harness.capability.selection.set([ref(20)]);
+    harness.capability.selection.select([ref(20)]);
 
     await harness.capability.selection.delete();
     expect(harness.model().selected).toEqual([]);
@@ -630,7 +649,7 @@ describe('the selection follows undo and redo', () => {
     harness.create.mockReturnValue(new Promise(() => {}));
     void drawSquare(harness);
     const [, id] = harness.model().order;
-    harness.capability.selection.set([ref(20)]);
+    harness.capability.selection.select([ref(20)]);
     const remove = harness.capability.delete(ref(20));
     void remove.catch(() => {});
     const deleted = harness.pending().at(-1)!;
@@ -730,7 +749,7 @@ describe('what stays as it is', () => {
   it('a pending edit never brings back a record deleted elsewhere', async () => {
     const harness = annotationHarness();
     await harness.load([square(20)]);
-    harness.capability.selection.set([ref(20)]);
+    harness.capability.selection.select([ref(20)]);
     harness.update.mockReturnValueOnce(deferred<unknown>().promise);
 
     void harness.capability.selection.update({ color: '#00ff00' });
@@ -738,12 +757,20 @@ describe('what stays as it is', () => {
       type: 'annotations.deleted',
       page: PAGE,
       deleted: [{ kind: 'objectNumber', objectNumber: 20 }],
-      origin: { kind: 'remote', sessionId: 'cloud:bob', sub: 'bob', ts: 0, serverId: 51 },
+      origin: {
+        kind: 'remote',
+        sessionId: 'cloud:bob',
+        subject: 'bob',
+        at: new Date(0).toISOString(),
+        serverSequence: 51,
+      },
       meta: { affectedPages: [], cacheDelta: null, changed: [] },
     } as unknown as DocumentEvent);
 
     expect(harness.capability.get(ref(20))).toBeNull();
-    expect(harness.capability.selection.list().map((annotation) => annotation.ref)).toEqual([]);
+    expect(harness.capability.selection.getSelected().map((annotation) => annotation.ref)).toEqual(
+      [],
+    );
   });
 
   it("a change on one page does not rebuild another page's items", async () => {
@@ -751,7 +778,7 @@ describe('what stays as it is', () => {
     await harness.load([square(20), square(21, { ref: { ...ref(21), page: PAGE2 }, page: PAGE2 })]);
     const before = harness.capability.listPageItems(PAGE2);
 
-    harness.capability.selection.set([ref(20)]);
+    harness.capability.selection.select([ref(20)]);
     harness.update.mockReturnValueOnce(deferred<unknown>().promise);
     void harness.capability.selection.update({ color: '#00ff00' });
 
@@ -764,7 +791,7 @@ describe('typing is one change', () => {
     vi.useFakeTimers();
     const harness = annotationHarness();
     await harness.load([freeText('Hello')]);
-    harness.capability.selection.set([ref(30)]);
+    harness.capability.selection.select([ref(30)]);
     const failures = vi.fn();
     harness.capability.onWriteFailed(failures);
     harness.update
@@ -787,7 +814,7 @@ describe('how a record with a pending change renders', () => {
   it("a pending restyle draws live after another session's update resets the preference", async () => {
     const harness = annotationHarness();
     await harness.load([square(20)]);
-    harness.capability.selection.set([ref(20)]);
+    harness.capability.selection.select([ref(20)]);
     harness.update.mockResolvedValueOnce({
       annotation: square(20, { color: '#ff0000' }),
     });

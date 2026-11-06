@@ -64,7 +64,7 @@ export function createFontsController(ctx: PluginContext<void>) {
     initial: () => null,
     load: async (doc) => ({ value: await doc.fonts.list() }),
     fold: foldFontList,
-    changed: ({ previous, next }) => {
+    onChanged: ({ previous, next }) => {
       css = new Map();
       styleFallbacks = new Map();
       // A change can move the fallbacks; what the first read was asked for meanwhile still holds.
@@ -327,7 +327,7 @@ export function createFontsController(ctx: PluginContext<void>) {
     refresh: () => list.refresh(),
     resolve: async (request, options) =>
       ctx.cancellable(options?.signal, ctx.doc.fonts.resolve(request)),
-    getProgram: async (displaySha256, options) =>
+    readProgram: async (displaySha256, options) =>
       // Another caller may share the read: cancelling this one leaves it running.
       ctx.cancellable(
         options?.signal,

@@ -29,15 +29,15 @@ export interface PieceInfoConformanceOptions {
  */
 export function runPieceInfoConformance(
   runner: ConformanceTestRunner,
-  opts: PieceInfoConformanceOptions,
+  options: PieceInfoConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`pieceInfo conformance: ${opts.label}`, () => {
+  describe(`pieceInfo conformance: ${options.label}`, () => {
     let engine: LocalEngine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -45,7 +45,7 @@ export function runPieceInfoConformance(
     });
 
     test('doc-level: the full value vocabulary round-trips with tags intact', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         await doc.pieceInfo.update(APP, {
           name: 'Standard Stamps',
@@ -70,7 +70,7 @@ export function runPieceInfoConformance(
     });
 
     test('page-level: the stamp schema round-trips on a page', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const list = await doc.pages.list();
         const page = doc.page(list.pages[0].ref);
@@ -88,7 +88,7 @@ export function runPieceInfoConformance(
     });
 
     test('writes persist through save → re-open', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       let reopened: LocalDocumentHandle | null = null;
       try {
         const list = await doc.pages.list();
@@ -100,7 +100,7 @@ export function runPieceInfoConformance(
         const bytes = await doc.download();
 
         reopened = await engine.open(
-          { kind: 'bytes', id: `${opts.fixture.id}-pi-reopen`, bytes },
+          { kind: 'bytes', id: `${options.fixture.id}-pi-reopen`, bytes },
           EVERY_PERMISSION,
         );
         const relist = await reopened.pages.list();
@@ -115,7 +115,7 @@ export function runPieceInfoConformance(
     });
 
     test('null deletes a key; clear removes an entry; siblings survive', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         await doc.pieceInfo.update(APP, { name: 'A', keep: 'B' });
         await doc.pieceInfo.update(SIBLING_APP, { other: 'C' });
@@ -139,7 +139,7 @@ export function runPieceInfoConformance(
     });
 
     test('an application that was never written reads as null', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         expect(await doc.pieceInfo.get('EMBD_NeverWritten')).toBe(null);
         const list = await doc.pages.list();

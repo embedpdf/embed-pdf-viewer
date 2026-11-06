@@ -72,7 +72,7 @@ function fakeRender({ tiles }: { tiles: boolean }) {
     markPainted: () => {},
     markUnpainted: () => {},
     release: vi.fn(),
-    dispose: vi.fn(),
+    destroy: vi.fn(),
   };
   const createViewDemand = vi.fn(() => view);
   const rights = { annotations: true, formFields: true };
@@ -154,7 +154,8 @@ function fakeRender({ tiles }: { tiles: boolean }) {
   };
   /** How often the tile's picture has been asked for: once per binding. */
   const pictureAsks = () =>
-    (tile.handle as unknown as { objectUrl: { mock: { calls: unknown[] } } }).objectUrl.mock.calls.length;
+    (tile.handle as unknown as { objectUrl: { mock: { calls: unknown[] } } }).objectUrl.mock.calls
+      .length;
   return {
     plugin,
     asked,
@@ -177,7 +178,7 @@ const engineWith = (pageCount: number) =>
     open: (input: { id?: string }) =>
       Promise.resolve({
         id: input.id ?? 'doc',
-        events: { subscribe: () => () => {}, lastServerId: () => null },
+        events: { subscribe: () => () => {}, lastServerSequence: () => null },
         pages: {
           list: () =>
             Promise.resolve({
@@ -290,7 +291,7 @@ describe('RenderLayer', () => {
     expect(render.demands.length).toBeGreaterThan(0);
     wrapper.unmount();
     expect(render.view.release).toHaveBeenCalledWith(toPageRef(1));
-    expect(render.view.dispose).toHaveBeenCalledTimes(1);
+    expect(render.view.destroy).toHaveBeenCalledTimes(1);
   });
 
   it('follows a zoom and a scroll with new demands, keeping the page and the view', async () => {
@@ -310,7 +311,7 @@ describe('RenderLayer', () => {
     expect(after.at(-1)!.width).toBeGreaterThan(before.width); // the zoom asked for more pixels
     expect(new Set(after.map((demand) => demand.visible)).size).toBeGreaterThan(1); // the scroll moved the visible part
     expect(render.view.release).not.toHaveBeenCalled();
-    expect(render.view.dispose).not.toHaveBeenCalled();
+    expect(render.view.destroy).not.toHaveBeenCalled();
     expect(render.createViewDemand).toHaveBeenCalledTimes(1);
     expect(wrapper.findAll('img')).toHaveLength(2); // the tile is still there
   });
@@ -351,7 +352,7 @@ describe('RenderLayer', () => {
     expect(render.view.release).toHaveBeenCalledTimes(1);
     expect(render.view.release).toHaveBeenCalledWith(toPageRef(1));
     expect(render.demands.at(-1)!.page).toBe(2);
-    expect(render.view.dispose).not.toHaveBeenCalled();
+    expect(render.view.destroy).not.toHaveBeenCalled();
     expect(render.createViewDemand).toHaveBeenCalledTimes(1);
     expect(wrapper.findAll('img')).toHaveLength(2);
   });

@@ -30,7 +30,7 @@ const plugins = [
   formPlugin(),
   stampPlugin({ assetEngine }),
   signaturePlugin({
-    key: () => signer,
+    signingKey: () => signer,
     // Trust the demo key itself, so its signatures check out as 'valid'.
     trust: { anchors: async () => [(await signer).certificate] },
   }),
@@ -67,7 +67,15 @@ function useSetUp() {
   }, [form, stamp, stage, status]);
 }
 
-function MarkButton({ assetId, label, onPick }: { assetId: string; label: string; onPick: () => void }) {
+function MarkButton({
+  assetId,
+  label,
+  onPick,
+}: {
+  assetId: string;
+  label: string;
+  onPick: () => void;
+}) {
   const url = useStampAssetPreviewUrl(assetId);
   return (
     <button type="button" className="button" title={label} onClick={onPick}>
@@ -81,7 +89,9 @@ function SignBar() {
   const signature = useSignature();
   const [person] = useSignerRows();
   const { signatures, target, busy } = useSignatureState();
-  const field = useFormState((state) => state.fields.find((candidate) => candidate.family === 'signature'));
+  const field = useFormState((state) =>
+    state.fields.find((candidate) => candidate.kind === 'signature'),
+  );
   const [error, setError] = useState<string | null>(null);
   // Ada's signature, once she signs: the agreement already carries Lanternfield's.
   const signed = signatures.find((each) => each.fieldName === 'approval');
@@ -100,13 +110,19 @@ function SignBar() {
   if (!person || !field) status = 'Getting ready…';
   else if (error) status = error;
   else if (busy) status = 'Signing…';
-  else if (signed) status = `Signed by ${signed.signer.name}: ${signed.verdict?.summary ?? 'checking…'}`;
+  else if (signed)
+    status = `Signed by ${signed.signer.name}: ${signed.verdict?.summary ?? 'checking…'}`;
   else if (target) status = 'Now pick the signature';
 
   return (
     <div className="toolbar">
       {person?.signatures.map((asset) => (
-        <MarkButton key={asset.id} assetId={asset.id} label={asset.label} onPick={() => sign(asset.id)} />
+        <MarkButton
+          key={asset.id}
+          assetId={asset.id}
+          label={asset.label}
+          onPick={() => sign(asset.id)}
+        />
       ))}
       <output className="readout">{status}</output>
     </div>

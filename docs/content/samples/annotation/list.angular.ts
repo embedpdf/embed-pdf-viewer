@@ -96,7 +96,7 @@ export class AnnotationList {
 
   protected show(each: Annotation) {
     this.stage().reveal(each.page, { rect: each.rect });
-    this.annotation.selection.set([each.ref]);
+    this.annotation.selection.select([each.ref]);
   }
 }
 

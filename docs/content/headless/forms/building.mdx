@@ -81,7 +81,7 @@ lent: the fields stay fillable boxes the annotation tools leave alone.
 | `maxLength`, `multiline`, `password`, `comb` | For a text box                                        |
 
 `getFieldSettings(ref)` describes a field's settings for a panel you draw without knowing the
-field's family: `{ properties, values }`, each property a `key` (what `update()` takes), a `control`
+field's kind: `{ properties, values }`, each property a `key` (what `update()` takes), a `control`
 (`text`, `flag`, `number`, `choice`, `choices` or `options`), and a `label` in English with its
 translation key, `labelKey` (`form.settings.tooltip`), in display order. A `choice`'s options are
 the field's own values, shown as they are.
@@ -99,7 +99,7 @@ field shows:
 
 ```ts
 const { field } = await form.create({
-  family: 'combobox',
+  kind: 'combobox',
   name: 'country',
   options: [
     { label: 'Netherlands', value: 'NL' },
@@ -113,7 +113,7 @@ A radio group is one field with a box per button, each with the value it stands 
 
 ```ts
 await form.create({
-  family: 'radio',
+  kind: 'radio',
   name: 'plan',
   widgets: [
     { page: page.ref, rect: { x: 72, y: 136, width: 16, height: 16 }, exportValue: 'monthly' },
@@ -123,7 +123,7 @@ await form.create({
 ```
 
 A field placed with a tool gets a name like `text_1`; rename it in your settings panel. Every
-family's settings are on [Creating form fields](/docs/engine/forms/authoring).
+kind's settings are on [Creating form fields](/docs/engine/forms/authoring).
 
 <Example name="form/create" />
 
@@ -136,7 +136,7 @@ box that checks together with the others.
 
 ```ts
 const { widget } = await form.addWidget(plan.ref);
-annotation.selection.set([widget.ref]); // in design mode, so it can be dragged
+annotation.selection.select([widget.ref]); // in design mode, so it can be dragged
 ```
 
 Without a place, it goes next in line: below the last button if they stand in a column, beside it
@@ -169,7 +169,7 @@ A calculate script puts the field at the end of the order calculations run in;
 A box can do something when it's clicked, too, such as reset the form: give its entry of
 `widgets` in `create()` its `actions`. A script, a submit or a web link there needs
 `canWriteScripts()` as well. See [Widget actions](/docs/engine/forms/authoring#widget-actions).
-A push button (`family: 'pushbutton'`) is a box that only does that, with a `caption`; see
+A push button (`kind: 'pushbutton'`) is a box that only does that, with a `caption`; see
 [A push button](/docs/engine/forms/authoring#a-push-button).
 
 ## Remove a field

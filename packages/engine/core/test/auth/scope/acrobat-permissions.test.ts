@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { decodePdfBits, expandRawScope, type DocCapability } from '../../../src/auth/scope';
+import { permissionFlagsOf, expandRawScope, type DocCapability } from '../../../src/auth/scope';
 
 /**
  * `pdf.permissions` grants what Acrobat allows on a file with these
@@ -33,7 +33,7 @@ const ACROBAT: ReadonlyArray<{
 
 describe('pdf.permissions grants what Acrobat allows', () => {
   it.each(ACROBAT)('bits $bits', (row) => {
-    const granted = expandRawScope(['pdf.permissions'], decodePdfBits(row.p));
+    const granted = expandRawScope(['pdf.permissions'], permissionFlagsOf(row.p));
     const has = (capability: DocCapability) => granted.has(capability);
     expect({
       change: has('doc.pages.modify') && has('doc.metadata.modify'),
@@ -60,7 +60,7 @@ describe('pdf.permissions grants what Acrobat allows', () => {
  * text, don't.
  */
 describe('a file that forbids copying text', () => {
-  const granted = expandRawScope(['pdf.permissions'], decodePdfBits(-1052 >>> 0));
+  const granted = expandRawScope(['pdf.permissions'], permissionFlagsOf(-1052 >>> 0));
 
   it('finds and selects text, as Acrobat does', () => {
     expect(granted.has('doc.text.search')).toBe(true);

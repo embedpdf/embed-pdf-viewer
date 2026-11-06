@@ -6,7 +6,7 @@ import { SelectionToken } from '@embedpdf/plugin-selection/contract';
 import { StageToken } from '@embedpdf/plugin-stage/contract';
 import { describe, expect, it, vi } from 'vitest';
 
-import type { CommandContext, CommandDef, CommandFamily } from '../src/contract';
+import type { CommandContext, CommandDefinition, CommandFamily } from '../src/contract';
 import { createStandardCommands } from '../src/standard';
 
 /** A command context over stand-in capabilities, for the document `doc`. */
@@ -34,7 +34,7 @@ const platform = () => ({
 function standard(platformImpl = platform()) {
   const items = createStandardCommands(platformImpl);
   const command = (id: string) =>
-    items.find((item): item is CommandDef => 'id' in item && item.id === id)!;
+    items.find((item): item is CommandDefinition => 'id' in item && item.id === id)!;
   const family = items.find((item): item is CommandFamily => 'prefix' in item)!;
   return { items, command, family, platform: platformImpl };
 }
@@ -42,7 +42,7 @@ function standard(platformImpl = platform()) {
 describe('standard commands', () => {
   it('has the commands the commands page lists, with their shortcuts', () => {
     const { items } = standard();
-    const defined = items.filter((item): item is CommandDef => 'id' in item);
+    const defined = items.filter((item): item is CommandDefinition => 'id' in item);
     expect(Object.fromEntries(defined.map((item) => [item.id, item.shortcut ?? null]))).toEqual({
       'zoom:in': ['Mod+=', 'Mod+NumpadAdd'],
       'zoom:out': ['Mod+-', 'Mod+NumpadSubtract'],
@@ -140,7 +140,7 @@ describe('standard commands', () => {
     const { command } = standard();
     const refs = [{ id: 1 }, { id: 2 }];
     const annotation = {
-      selection: { list: () => refs.map((ref) => ({ ref })), delete: vi.fn() },
+      selection: { getSelected: () => refs.map((ref) => ({ ref })), delete: vi.fn() },
       canDelete: (ref: { id: number }) => ref.id === 1,
       isEditable: (_ref: { id: number }) => true,
     };

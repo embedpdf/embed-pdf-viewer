@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { useFormState, type FormFieldDTO } from '@embedpdf/svelte/form';
+  import { useFormState, type FormField } from '@embedpdf/svelte/form';
 
   const formState = useFormState();
 
-  /** A field's value as text, whatever its family. */
-  function valueText(field: FormFieldDTO): string {
-    switch (field.family) {
+  /** A field's value as text, whatever its kind. */
+  function valueText(field: FormField): string {
+    switch (field.kind) {
       case 'text':
       case 'combobox':
         return field.value || '—';
@@ -25,7 +25,7 @@
   {#each formState.fields as field (field.name)}
     <li class="field">
       <span class="field-name">
-        {field.name} <span class="family">{field.family}</span>
+        {field.name} <span class="kind">{field.kind}</span>
       </span>
       <span class="field-value">{valueText(field)}</span>
     </li>

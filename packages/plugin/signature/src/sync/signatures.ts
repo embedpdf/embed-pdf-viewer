@@ -61,7 +61,7 @@ export function createSignaturesMirror(
       };
     },
     fold: foldSignatureEvent,
-    changed: ({ cause, event, previous, next }) => {
+    onChanged: ({ cause, event, previous, next }) => {
       const protection = next.snapshot?.protection ?? null;
       if (protection && !sameProtection(previous.snapshot?.protection ?? null, protection)) {
         protectionChanged.emit({ protection });

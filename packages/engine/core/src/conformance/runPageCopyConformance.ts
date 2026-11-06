@@ -29,16 +29,16 @@ const SECOND = toPageRef(4);
  */
 export function runPageCopyConformance(
   runner: ConformanceTestRunner,
-  opts: PageCopyConformanceOptions,
+  options: PageCopyConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`page copy conformance: ${opts.label}`, () => {
+  describe(`page copy conformance: ${options.label}`, () => {
     let engine: Engine;
     let opened = 0;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -46,7 +46,7 @@ export function runPageCopyConformance(
     });
 
     const withDocument = async (run: (doc: DocumentHandle) => Promise<void>): Promise<void> => {
-      const doc = await opts.open(engine, `page-copy-${++opened}`);
+      const doc = await options.open(engine, `page-copy-${++opened}`);
       try {
         await run(doc);
       } finally {

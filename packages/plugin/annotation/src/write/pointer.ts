@@ -4,7 +4,7 @@ import {
   type KindName,
   type Point,
 } from '@embedpdf/core-annotation';
-import type { PageRotation } from '@embedpdf/core-geometry';
+import type { Rotation } from '@embedpdf/core-geometry';
 import {
   isDimension,
   isReadout,
@@ -57,7 +57,7 @@ export function createPointer(
       point: Point,
       shift: boolean,
       scale?: number,
-      rotation?: PageRotation,
+      rotation?: Rotation,
       zoom?: number,
       touch?: boolean,
     ) => {
@@ -87,7 +87,7 @@ export function createPointer(
       point: Point,
       shift: boolean,
       _scale?: number,
-      rotation?: PageRotation,
+      rotation?: Rotation,
       zoom?: number,
     ) => {
       store.commit({
@@ -110,7 +110,7 @@ export function createPointer(
       page: PageRef,
       point: Point,
       finish = false,
-      displayRotation?: PageRotation,
+      displayRotation?: Rotation,
     ) => {
       const pageObjectNumber = page.objectNumber;
       // No create authority → creation gestures are inert: no ghost, no

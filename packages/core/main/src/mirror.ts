@@ -55,7 +55,7 @@ export function reload(options?: { pages?: readonly PageRef[] }): MirrorReload {
 const isReload = (value: unknown): value is MirrorReload =>
   typeof value === 'object' && value !== null && RELOAD in value;
 
-/** One applied change of a mirror, handed to the spec's `changed` callback. */
+/** One applied change of a mirror, handed to the spec's `onChanged` callback. */
 export interface MirrorChange<V> {
   /** `load` for loads and reloads, `event` for a folded event. */
   readonly cause: 'load' | 'event';
@@ -113,7 +113,7 @@ export interface MirrorSpec<V> {
    * that changed the value: the one place a plugin emits the events this
    * data drives.
    */
-  readonly changed?: (change: MirrorChange<V>) => void;
+  readonly onChanged?: (change: MirrorChange<V>) => void;
 }
 
 export interface Mirror<V> {
@@ -168,11 +168,11 @@ export const statusOfFailure = (error: unknown): ResourceStatus =>
 
 /** The `opId` of the change an event belongs to, or null for an event of none. */
 export const changeIdOf = (event: DocumentEvent): string | null =>
-  'origin' in event ? (event.origin.tx?.id ?? null) : null;
+  'origin' in event ? (event.origin.transaction?.id ?? null) : null;
 
 /** The `opId` of the change whose last event this is, or null. */
 export const lastEventOf = (event: DocumentEvent): string | null => {
-  const tx = 'origin' in event ? event.origin.tx : undefined;
+  const tx = 'origin' in event ? event.origin.transaction : undefined;
   return tx && tx.index === tx.count - 1 ? tx.id : null;
 };
 
@@ -314,7 +314,7 @@ export function createMirror<V>(spec: MirrorSpec<V>, env: MirrorEnvironment): Mi
 
   const announce = (change: MirrorChange<V>): void => {
     try {
-      spec.changed?.(change);
+      spec.onChanged?.(change);
     } catch (error) {
       env.report(error);
     }
@@ -418,7 +418,7 @@ export function createMirror<V>(spec: MirrorSpec<V>, env: MirrorEnvironment): Mi
     announce({ cause: 'load', event: null, pages: 'all', previous, next: loaded.value });
     const cursor = loaded.cursor ?? null;
     for (const event of pending) {
-      const serverId = 'origin' in event ? event.origin.serverId : null;
+      const serverId = 'origin' in event ? event.origin.serverSequence : null;
       if (cursor !== null && serverId !== null && serverId <= cursor) continue;
       applyEvent(event);
     }

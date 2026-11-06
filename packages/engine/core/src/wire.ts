@@ -351,8 +351,6 @@ export {
 export {
   AnnotationRefSchema,
   ColorSchema,
-  PointSchema,
-  RectSchema,
   LineEndingSchema,
   LineEndingsSchema,
   AnnotationBorderStyleSchema,

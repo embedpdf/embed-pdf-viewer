@@ -48,7 +48,7 @@ describe('detached CMS: build → parse → verify', () => {
 
   test('a PKCS#7 CMS carries signing-time and no ESS attribute', async () => {
     const signer = await createTestSigner();
-    const when = new Date('2026-09-11T00:00:00Z');
+    const when = '2026-09-11T00:00:00.000Z';
     const cms = await buildDetachedCms({
       digest,
       hash: 'sha256',
@@ -57,7 +57,7 @@ describe('detached CMS: build → parse → verify', () => {
       signingTime: when,
     });
     const parsed = parseDetachedCms(cms);
-    expect(parsed.signingTime?.toISOString()).toBe(when.toISOString());
+    expect(parsed.signingTime).toBe(when);
     expect(parsed.signingCertificateV2).toBe(false);
     expect(parsed.signatureAlgorithm).toBe('1.2.840.113549.1.1.11');
     expect(await verifyCmsSignature(cms)).toBe('valid');
@@ -157,7 +157,7 @@ describe('detached CMS: build → parse → verify', () => {
       { anchors: async () => [signer.certificate] },
       {
         kind: 'timestamp',
-        genTime: new Date('2000-01-01T00:00:00Z'),
+        genTime: '2000-01-01T00:00:00.000Z',
         tokenVerified: true,
       },
     );

@@ -4,11 +4,7 @@
   import { useStage } from '@embedpdf/svelte/stage';
   import { useAnnotation } from '@embedpdf/svelte/annotation';
   import { toFieldRef, useForm, useFormState } from '@embedpdf/svelte/form';
-  import {
-    useSignature,
-    useSignatureEvent,
-    useSignatureState,
-  } from '@embedpdf/svelte/signature';
+  import { useSignature, useSignatureEvent, useSignatureState } from '@embedpdf/svelte/signature';
 
   // Lanternfield's signature field, signed before the agreement was sent.
   const PROVIDER = toFieldRef('provider');
@@ -65,7 +61,7 @@
     if (!widget) return;
     const { rect } = widget;
     await form.create({
-      family: 'text',
+      kind: 'text',
       name: 'purchase_order',
       widgets: [
         {

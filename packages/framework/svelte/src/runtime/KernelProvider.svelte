@@ -17,7 +17,7 @@
   const binding = new KernelBinding(untrack(() => kernel));
   setKernelHolder({ binding });
   // The provider stops following the kernel; the kernel keeps running for its owner.
-  onDestroy(() => binding.dispose());
+  onDestroy(() => binding.destroy());
 
   $effect(() => {
     if (kernel !== binding.kernel) {

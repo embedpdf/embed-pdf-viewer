@@ -211,7 +211,7 @@ import { createEventLoopYield } from '../shared/yield';
  *  buffer (a fresh allocation, not a pooled `Buffer` slab view) — it is
  *  placed on the transfer manifest and moved zero-copy. */
 export interface WorkerEncodedImage {
-  contentType: string;
+  mimeType: string;
   bytes: Uint8Array;
 }
 
@@ -2026,13 +2026,13 @@ export class WorkerHost {
     if (!encoder) {
       throw new EngineError(EngineErrorCode.NotImplemented, NO_ENCODER_MESSAGE);
     }
-    const { bytes, contentType } = await encoder.encode(raster, encode);
+    const { bytes, mimeType } = await encoder.encode(raster, encode);
     // The encoder is not abortable; honor a cancellation that arrived
     // while it ran by rejecting instead of resolving a dead job.
     if (signal.aborted) {
       throw new EngineError(EngineErrorCode.Aborted, 'aborted during image encode');
     }
-    return { contentType, width: raster.width, height: raster.height, bytes };
+    return { mimeType, width: raster.width, height: raster.height, bytes };
   }
 
   /** The encoded reply of a page render's raw one. */

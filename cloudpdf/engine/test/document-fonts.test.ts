@@ -150,8 +150,8 @@ describe('remote fonts.changed', () => {
       ]);
       const [created, changed] = heardByEditor;
       expect(changed.origin.kind).toBe('remote');
-      expect('tx' in changed.origin && changed.origin.tx?.id).toBe(
-        'tx' in created.origin && created.origin.tx?.id,
+      expect('transaction' in changed.origin && changed.origin.transaction?.id).toBe(
+        'transaction' in created.origin && created.origin.transaction?.id,
       );
       await waitFor(() => heardByReader.length > 0, 'the reader');
       expect(heardByReader.map((event) => event.type)).toEqual(['fonts.changed']);

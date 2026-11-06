@@ -67,7 +67,7 @@ describe('corpus acceptance (skips without the local JS tests folder)', () => {
           // with their origin.
           alert: (message, options) =>
             uiEffects.push({
-              kind: 'alert',
+              type: 'alert',
               message,
               icon: options.icon,
               phase: options.phase,
@@ -76,9 +76,9 @@ describe('corpus acceptance (skips without the local JS tests folder)', () => {
         }); // fires the latch
         // Drain the open sequence (the queued script transaction included).
         await actions.dispatch({
-          scope: 'annotation',
+          type: 'annotation',
           event: 'cursorEnter',
-          ref: { kind: 'objectNumber', page: toPageRef(999), objectNumber: 1 },
+          annotation: { kind: 'objectNumber', page: toPageRef(999), objectNumber: 1 },
           page: toPageRef(999),
         });
         await settle();
@@ -91,7 +91,7 @@ describe('corpus acceptance (skips without the local JS tests folder)', () => {
         );
         // Its app.alert carries the origin axis — the provider's default
         // matrix suppresses it; embedder handlers (like this one) see it.
-        const alert = uiEffects.find((effect) => effect.kind === 'alert');
+        const alert = uiEffects.find((effect) => effect.type === 'alert');
         expect(alert?.origin).toBe('lifecycle');
       } finally {
         await kernel.destroy();
@@ -138,9 +138,9 @@ describe('corpus acceptance (skips without the local JS tests folder)', () => {
         const before = hoverSquare()?.style.color;
         const drain = () =>
           actions.dispatch({
-            scope: 'annotation',
+            type: 'annotation',
             event: 'cursorEnter',
-            ref: { kind: 'objectNumber', page: toPageRef(999), objectNumber: 1 },
+            annotation: { kind: 'objectNumber', page: toPageRef(999), objectNumber: 1 },
             page: toPageRef(999),
           });
         // The first field in 02 is `hoverTarget`'s trigger (obj:5, /AA E/X JS).
@@ -197,9 +197,9 @@ describe('corpus acceptance (skips without the local JS tests folder)', () => {
         const painted = () => annotation.listPageItems(page).map((item) => item.id);
         const drain = () =>
           actions.dispatch({
-            scope: 'annotation',
+            type: 'annotation',
             event: 'cursorEnter',
-            ref: { kind: 'objectNumber', page: toPageRef(999), objectNumber: 1 },
+            annotation: { kind: 'objectNumber', page: toPageRef(999), objectNumber: 1 },
             page: toPageRef(999),
           });
         const notify = (event: 'cursorEnter' | 'cursorExit') =>

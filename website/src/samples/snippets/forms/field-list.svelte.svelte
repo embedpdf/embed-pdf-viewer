@@ -6,6 +6,6 @@
 
 <ul>
   {#each state.fields as field (field.name)}
-    <li>{field.name}: {field.family}</li>
+    <li>{field.name}: {field.kind}</li>
   {/each}
 </ul>

@@ -10,7 +10,7 @@ import {
   type WidgetAppearance,
 } from '@embedpdf/engine-core/runtime';
 
-import { fieldFamilyOfKind } from '../kinds';
+import { fieldKindOf } from '../kinds';
 import type { FieldValues } from '../types';
 
 /** The engine subtype a client kind creates: a callout is a free text, a form tool's kind a widget. */
@@ -24,15 +24,15 @@ export const engineSubtypeOf = (kind: string): AnnotationSubtype =>
 /**
  * A tool's `defaults` over the engine's defaults for `kind`: what a create
  * from the tool starts from. A form tool's reads as a widget of its field
- * family, so it reads as the tool's own kind (a radio tool's is round).
+ * kind, so it reads as the tool's own kind (a radio tool's is round).
  */
 export function readOfDefaults(kind: string, defaults: FieldValues): Annotation {
   const subtype = engineSubtypeOf(kind);
-  const fieldFamily = subtype === 'widget' ? fieldFamilyOfKind(kind) : undefined;
+  const fieldKind = subtype === 'widget' ? fieldKindOf(kind) : undefined;
   return {
     subtype,
     ...annotationDefaultsOf(subtype),
-    ...(fieldFamily ? { fieldFamily } : {}),
+    ...(fieldKind ? { fieldKind } : {}),
     ...defaults,
   } as unknown as Annotation;
 }

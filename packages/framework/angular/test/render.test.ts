@@ -139,12 +139,14 @@ describe('<epdf-render-layer>', () => {
     const handedRevoked: string[] = [];
     let render: EpdfRender | undefined;
     const setAttribute = Element.prototype.setAttribute;
-    const spy = vi
-      .spyOn(Element.prototype, 'setAttribute')
-      .mockImplementation(function (this: Element, name: string, value: string) {
-        if (name === 'src' && revoked.has(value)) handedRevoked.push(value);
-        setAttribute.call(this, name, value);
-      });
+    const spy = vi.spyOn(Element.prototype, 'setAttribute').mockImplementation(function (
+      this: Element,
+      name: string,
+      value: string,
+    ) {
+      if (name === 'src' && revoked.has(value)) handedRevoked.push(value);
+      setAttribute.call(this, name, value);
+    });
     try {
       const fixture = await mount(
         viewerHost({

@@ -1,4 +1,4 @@
-import type { DocCapability, PdfBits } from './types';
+import type { DocCapability, PdfPermissionFlags } from './types';
 
 /**
  * Typed capability constants for customer-side JWT minting.
@@ -156,22 +156,22 @@ export const pdfPermissions = (): 'pdf.permissions' => 'pdf.permissions';
  * subtract specific capabilities — easier to build the JWT scope array
  * by filtering an explicit list than by composing virtual + denials.
  *
- *   const defaults = materializePdfPermissions(pdfBits);
+ *   const defaults = materializePdfPermissions(permissionFlags);
  *   const scope = [
  *     ...defaults.filter(s => s !== 'doc.text.copy'),
  *     'doc.download',
  *   ];
  *
- * This is the one reading of the bits: the scope resolver and the
- * permission advisory both use it. It follows what Acrobat allows on a
- * file with these bits, which is broader than ISO 32000 in two places:
- * bit 4 ("changing the document") also allows filling in and signing, and
- * bit 5 ("copying text and graphics") governs taking the text out, not
+ * This is the one reading of the flags: the scope resolver uses it. It
+ * follows what Acrobat allows on a file with these flags, which is broader
+ * than ISO 32000 in two places: `modifyContents` (bit 4, "changing the
+ * document") also allows filling in and signing, and `copy` (bit 5,
+ * "copying text and graphics") governs taking the text out, not
  * finding or selecting it: Acrobat finds and selects text in a file that
  * forbids copying. A search's snippets reproduce the text, so they need
  * `doc.text.copy`.
  */
-export function materializePdfPermissions(b: PdfBits): DocCapability[] {
+export function materializePdfPermissions(flags: PdfPermissionFlags): DocCapability[] {
   const out = new Set<DocCapability>();
 
   // Always — pdf.permissions means "give me a working session"
@@ -185,13 +185,13 @@ export function materializePdfPermissions(b: PdfBits): DocCapability[] {
   out.add('doc.text.search');
   out.add('doc.text.select');
 
-  if (b.bit5) {
+  if (flags.copy) {
     out.add('doc.text.copy');
     out.add('doc.content.copy');
   }
-  if (b.bit3) out.add('doc.print');
-  if (b.bit12 && b.bit3) out.add('doc.print.high');
-  if (b.bit4) {
+  if (flags.print) out.add('doc.print');
+  if (flags.printHighQuality && flags.print) out.add('doc.print.high');
+  if (flags.modifyContents) {
     out.add('doc.pages.modify');
     out.add('doc.redact');
     out.add('doc.metadata.modify');
@@ -199,20 +199,20 @@ export function materializePdfPermissions(b: PdfBits): DocCapability[] {
   }
   // Bit 11 assembles pages, and creates outline items, even when bit 4 is
   // clear; bit 4 includes it.
-  if (b.bit4 || b.bit11) {
+  if (flags.modifyContents || flags.assemble) {
     out.add('doc.pages.assemble');
     out.add('doc.outline.modify');
   }
-  if (b.bit6) out.add('doc.annotate.modify');
+  if (flags.modifyAnnotations) out.add('doc.annotate.modify');
   // Signing a signature field is filling it in. Acrobat (and PDFium's form
   // filler) let any of the three bits fill in.
-  if (b.bit4 || b.bit6 || b.bit9) {
+  if (flags.modifyContents || flags.modifyAnnotations || flags.fillForms) {
     out.add('doc.forms.fill');
     out.add('doc.sign');
   }
   // Changing existing fields takes both: Acrobat keeps them in fill mode
   // under bit 4 alone, and offers no form tools under bit 6 or 9 alone.
-  if (b.bit6 && b.bit4) out.add('doc.forms.modify');
+  if (flags.modifyAnnotations && flags.modifyContents) out.add('doc.forms.modify');
 
   return [...out];
 }

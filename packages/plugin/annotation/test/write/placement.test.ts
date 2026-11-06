@@ -1,5 +1,5 @@
 import {
-  anchoredGeom,
+  anchoredGeometry,
   anchorModeOf,
   initialModel,
   type BoxShape,
@@ -45,7 +45,7 @@ describe('placing an icon', () => {
       expect(middleOf(shown.box).x).toBeCloseTo(point.x, 9);
       expect(middleOf(shown.box).y).toBeCloseTo(point.y, 9);
       expect(shown.rotation).toBe((360 - view.rotation) % 360);
-      const placed = anchoredGeom(
+      const placed = anchoredGeometry(
         { kind: 'box', box: rect, rotation: 0, ellipse: false },
         anchorModeOf({ annotation: NOTE }),
         view,

@@ -98,7 +98,7 @@ export function createOutlineController(ctx: PluginContext<OutlineModel>) {
     load: async (doc) => ({ value: treeOf(await doc.outline.get()) }),
     fold: foldOutline,
     predict: predictOutline,
-    changed: ({ cause, event, next }) => {
+    onChanged: ({ cause, event, next }) => {
       if (!next) return;
       if (cause === 'load') {
         ctx.state.update(seeded, next);
@@ -146,7 +146,7 @@ export function createOutlineController(ctx: PluginContext<OutlineModel>) {
 
   // The items in reading order, again when the outline or the page order changes.
   const spots = memo(
-    () => [list(), ctx.document()?.revision ?? 0] as const,
+    () => [list(), ctx.document()?.pagesSequence ?? 0] as const,
     (items) => spotsOf(items, (page) => ctx.getPage(page)?.index ?? null),
   );
   const currentSpot = memo(
@@ -198,11 +198,11 @@ export function createOutlineController(ctx: PluginContext<OutlineModel>) {
       const dispatch = actions.execute(item.action, {
         origin: 'user',
         source: { kind: 'outline', item: item.ref },
-        event: { scope: 'activate' },
+        event: { type: 'activate' },
       });
-      return { outcome: 'dispatched', dispatch };
+      return { status: 'dispatched', dispatch };
     }
-    if (!item.target) return { outcome: 'none' };
+    if (!item.target) return { status: 'none' };
     // The link plugin opens websites through the framework; without it the
     // caller is handed what it can't do itself.
     const link = ctx.tryGet(LinkToken);
@@ -211,16 +211,16 @@ export function createOutlineController(ctx: PluginContext<OutlineModel>) {
     switch (resolution.kind) {
       case 'destination': {
         const main = stage();
-        if (!main) return { outcome: 'destination', destination: resolution.destination };
+        if (!main) return { status: 'destination', destination: resolution.destination };
         main.goToDestination(resolution.destination);
-        return { outcome: 'revealed' };
+        return { status: 'revealed' };
       }
       case 'uri':
-        return { outcome: 'uri', uri: resolution.uri };
+        return { status: 'uri', uri: resolution.uri };
       case 'named':
-        return { outcome: 'named', name: resolution.name };
+        return { status: 'named', name: resolution.name };
       default:
-        return { outcome: 'reported', target: resolution.target };
+        return { status: 'reported', target: resolution.target };
     }
   };
 

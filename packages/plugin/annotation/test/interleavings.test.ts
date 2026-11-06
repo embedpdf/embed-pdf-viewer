@@ -110,7 +110,7 @@ async function play(seed: number, steps: number) {
   const harness = annotationHarness();
   const engine: EngineState = { color: '#000000', print: true };
   await harness.load([squareOf(engine)]);
-  harness.capability.selection.set([REF]);
+  harness.capability.selection.select([REF]);
 
   // The engine works on one change at a time: the oldest unanswered one.
   const held: HeldWrite[] = [];
@@ -185,7 +185,13 @@ async function play(seed: number, steps: number) {
       harness.emit({
         type: 'annotations.updated',
         page: PAGE,
-        origin: { kind: 'remote', sessionId: 'cloud:bob', sub: 'bob', ts: 0, serverId: step + 100 },
+        origin: {
+          kind: 'remote',
+          sessionId: 'cloud:bob',
+          subject: 'bob',
+          at: new Date(0).toISOString(),
+          serverSequence: step + 100,
+        },
         annotation: squareOf(engine),
         appearance: { changed: false },
         meta: { affectedPages: [], cacheDelta: null, changed: [] },

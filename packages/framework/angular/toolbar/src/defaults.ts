@@ -104,7 +104,7 @@ export class EpdfToolbarMoreButton {
                   >{{ command.active && section.role === 'radio' ? '• ' : ''
                   }}{{ command.label }}</span
                 >
-                @if (row.type === 'submenu') {
+                @if (row.kind === 'submenu') {
                   <span>▸</span>
                 }
               </button>
@@ -167,7 +167,7 @@ export class EpdfToolbarMenu {
   protected choose(row: OverflowRow): void {
     const view = this.view();
     view.execute(row.command);
-    if (row.type !== 'submenu') view.close();
+    if (row.kind !== 'submenu') view.close();
   }
 }
 

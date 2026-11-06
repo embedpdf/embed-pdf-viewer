@@ -304,7 +304,11 @@ describe('unsaved changes', () => {
     const handle = localHandle('a');
     const kernel = await openLocal(handle);
     handle.events.emit({ type: 'signatures.prepared', origin: { kind: 'local' } });
-    handle.events.emit({ type: 'stream.desynced', reason: 'backlog-overflow', ts: 0 });
+    handle.events.emit({
+      type: 'stream.desynced',
+      reason: 'backlog-overflow',
+      at: new Date(0).toISOString(),
+    });
     expect(kernel.documents.get('a')?.hasUnsavedChanges).toBe(false);
   });
 });

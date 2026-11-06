@@ -161,8 +161,8 @@ export function createI18nController(ctx: PluginContext<I18nModel, I18nSettings>
    */
   const followSettings = (): void => {
     let previous = settings.get();
-    ctx.listen(settings.api.onSettingsChanged, ({ settings: next, changed }) => {
-      if (changed.includes('locales')) {
+    ctx.listen(settings.api.onSettingsChanged, ({ settings: next, changedKeys }) => {
+      if (changedKeys.includes('locales')) {
         for (const locale of previous.locales) {
           if (!next.locales.some((other) => other.code === locale.code)) {
             ctx.state.update(unregisterLocale, locale.code);
@@ -172,10 +172,10 @@ export function createI18nController(ctx: PluginContext<I18nModel, I18nSettings>
           if (!previous.locales.includes(locale)) ctx.state.update(registerLocale, locale);
         }
       }
-      if (changed.includes('fallbackLocale') || changed.includes('loaders')) {
+      if (changedKeys.includes('fallbackLocale') || changedKeys.includes('loaders')) {
         ctx.state.update(followFallback, next);
       }
-      if (changed.includes('locale')) {
+      if (changedKeys.includes('locale')) {
         const code = next.locale ?? next.fallbackLocale;
         // A failed load fires onLocaleLoadFailed; only a code nothing knows needs saying here.
         setLocale(code).catch((error: unknown) => {

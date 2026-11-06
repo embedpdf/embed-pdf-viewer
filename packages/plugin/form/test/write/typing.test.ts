@@ -8,7 +8,7 @@ import {
 } from '@embedpdf/core';
 import {
   pageSpaceBoxesOf,
-  type FormFieldDTO,
+  type FormField,
   type FormFieldRef,
   type FormSnapshot,
 } from '@embedpdf/engine-core/runtime';
@@ -36,11 +36,11 @@ const page = {
 
 const NAME: FormFieldRef = { kind: 'objectNumber', objectNumber: 5 };
 
-const textField = (value: string): FormFieldDTO =>
+const textField = (value: string): FormField =>
   ({
     ref: NAME,
     name: 'name',
-    family: 'text',
+    kind: 'text',
     origin: 'acroform',
     readOnly: false,
     required: false,
@@ -61,7 +61,7 @@ const textField = (value: string): FormFieldDTO =>
     multiline: false,
     password: false,
     comb: false,
-  }) as unknown as FormFieldDTO;
+  }) as unknown as FormField;
 
 const snapshot: FormSnapshot = {
   formKind: 'acroform',
@@ -83,7 +83,7 @@ async function boot() {
         listeners.add(listener);
         return () => listeners.delete(listener);
       },
-      lastServerId: () => null,
+      lastServerSequence: () => null,
     },
     pages: { list: () => Promise.resolve({ pageCount: 1, labels: [], pages: [page] }) },
     security: { allows: () => true, allowsField: () => true },
@@ -104,7 +104,7 @@ async function boot() {
           // Like both real engines: the event is published before the promise settles.
           const event = {
             type: 'forms.valueSet',
-            origin: { kind: 'local', tx: { id: opId, index: 0, count: 1 } },
+            origin: { kind: 'local', transaction: { id: opId, index: 0, count: 1 } },
             field: textField(value),
             widgets: [],
             meta,

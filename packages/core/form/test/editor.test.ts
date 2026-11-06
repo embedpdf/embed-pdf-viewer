@@ -9,7 +9,7 @@ import {
   type PaintFont,
   type PaintFonts,
 } from '@embedpdf/core-text';
-import type { FormFieldDTO, StandardFont, WidgetAnnotation } from '@embedpdf/engine-core/runtime';
+import type { FormField, StandardFont, WidgetAnnotation } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
 import { textEditorLayout, widgetDrawing, widgetText, type DrawOp, type TextRun } from '../src';
@@ -35,19 +35,19 @@ const widget = (patch: Partial<WidgetAnnotation> = {}): WidgetAnnotation =>
     ...patch,
   }) as WidgetAnnotation;
 
-const textField = (patch: Partial<FormFieldDTO & { family: 'text' }> = {}): FormFieldDTO =>
+const textField = (patch: Partial<FormField & { kind: 'text' }> = {}): FormField =>
   ({
-    family: 'text',
+    kind: 'text',
     value: '',
     multiline: false,
     password: false,
     comb: false,
     maxLength: null,
     ...patch,
-  }) as FormFieldDTO;
+  }) as FormField;
 
 /** The painter's text: its size and runs. */
-function paintedText(row: WidgetAnnotation, field: FormFieldDTO) {
+function paintedText(row: WidgetAnnotation, field: FormField) {
   const walk = (ops: readonly DrawOp[]): Extract<DrawOp, { kind: 'text' }>[] =>
     ops.flatMap((op) => (op.kind === 'text' ? [op] : op.kind === 'clip' ? walk(op.ops) : []));
   const [text] = walk(widgetDrawing(row, field)!.ops);
@@ -55,12 +55,12 @@ function paintedText(row: WidgetAnnotation, field: FormFieldDTO) {
 }
 
 /** Where the CSS line box puts the first baseline, from the box's top. */
-function cssBaseline(row: WidgetAnnotation, field: FormFieldDTO, text: string): number {
+function cssBaseline(row: WidgetAnnotation, field: FormField, text: string): number {
   const layout = textEditorLayout(row, field, text)!;
   const ascent =
     (standardPaintFont(row.fontFamily as StandardFont).ascent * layout.fontSize) / 1000;
   const content = row.box!.height - layout.padding.top - layout.padding.bottom;
-  const multiline = field.family === 'text' && field.multiline;
+  const multiline = field.kind === 'text' && field.multiline;
   const lineTop = layout.padding.top + (multiline ? 0 : (content - layout.lineHeight) / 2);
   return lineTop + ascent;
 }
@@ -124,7 +124,7 @@ describe('textEditorLayout', () => {
   });
 
   it('is only for text fields', () => {
-    expect(textEditorLayout(widget(), { family: 'checkbox' } as FormFieldDTO, '')).toBeNull();
+    expect(textEditorLayout(widget(), { kind: 'checkbox' } as FormField, '')).toBeNull();
   });
 
   it('names the programs its text is drawn in: the face, the fallbacks it needs, the last resort', () => {
@@ -176,17 +176,15 @@ describe('widgetText', () => {
     expect(widgetText(widget(), textField({ password: true }))).toBe('');
     expect(
       widgetText(widget(), {
-        family: 'listbox',
+        kind: 'listbox',
         options: [
           { label: 'One', selected: false },
           { label: 'שתיים', selected: true },
         ],
         topIndex: 0,
-      } as unknown as FormFieldDTO),
+      } as unknown as FormField),
     ).toBe('One\nשתיים');
-    expect(widgetText(widget({ caption: 'שלח' }), { family: 'pushbutton' } as FormFieldDTO)).toBe(
-      'שלח',
-    );
-    expect(widgetText(widget(), { family: 'checkbox' } as FormFieldDTO)).toBe('');
+    expect(widgetText(widget({ caption: 'שלח' }), { kind: 'pushbutton' } as FormField)).toBe('שלח');
+    expect(widgetText(widget(), { kind: 'checkbox' } as FormField)).toBe('');
   });
 });

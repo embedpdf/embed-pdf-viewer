@@ -147,15 +147,15 @@ const linkTargetOf = async (doc: DocumentHandle) => {
  */
 export function runOutlineConformance(
   runner: ConformanceTestRunner,
-  opts: OutlineConformanceOptions,
+  options: OutlineConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`outline conformance: ${opts.label}`, () => {
+  describe(`outline conformance: ${options.label}`, () => {
     let engine: Engine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -166,7 +166,7 @@ export function runOutlineConformance(
       body: (doc: DocumentHandle) => Promise<void>,
       bytes = OUTLINE_FIXTURE_PDF,
     ) => {
-      const doc = await opts.open(engine, bytes.slice());
+      const doc = await options.open(engine, bytes.slice());
       try {
         await body(doc);
       } finally {
@@ -500,7 +500,7 @@ export function runOutlineConformance(
     });
 
     test('without doc.outline.modify every write is refused; reading still works', async () => {
-      const doc = await opts.openReadOnly(engine, OUTLINE_FIXTURE_PDF.slice());
+      const doc = await options.openReadOnly(engine, OUTLINE_FIXTURE_PDF.slice());
       try {
         expect(titles(await doc.outline.get())).toEqual(['A', 'A1', 'B', 'C', 'C1', 'D']);
         const denied = { code: EngineErrorCode.Forbidden };

@@ -18,7 +18,7 @@ import {
   type DocumentProtection,
   type FieldWriteAction,
   type Identity,
-  type PdfBits,
+  type PdfPermissionFlags,
   type ProtectableCapability,
   PermissionDenied,
   scopeNotCovered,
@@ -385,7 +385,7 @@ export async function requireTenantContentAccess(
   req: FastifyRequest,
   tenantId: string,
   capability: UnprotectableCapability,
-  pdfBitsOf: () => Promise<PdfBits>,
+  permissionFlagsOfDocument: () => Promise<PdfPermissionFlags>,
 ): Promise<TenantAccessContext> {
   if (req.apiAuth) {
     return { tenantId, sub: 'api-token', via: 'api-token' };
@@ -408,7 +408,9 @@ export async function requireTenantContentAccess(
   if (t.id !== tenantId) {
     throw forbidden(`token is for tenant "${t.id}", path names tenant "${tenantId}"`);
   }
-  if (!checkCapability(capability, documentScopeOf(t.claims.scope), await pdfBitsOf())) {
+  if (
+    !checkCapability(capability, documentScopeOf(t.claims.scope), await permissionFlagsOfDocument())
+  ) {
     throw forbidden(`document permission required: ${capability}`);
   }
   return { tenantId, sub: t.sub, via: 'tenant-jwt' };
@@ -594,7 +596,7 @@ export function requireLayerDocAccess(
 //
 // These replace the `requireDocAccess(req, docId, ['doc.read'])` style.
 // Route handlers migrate to them in two stages:
-//   1. Read routes call `requireResource(req, docId, '<id>', pdfBits)` — the
+//   1. Read routes call `requireResource(req, docId, '<id>', permissionFlags)` — the
 //      DOC_RESOURCES table is the source of truth for capability checks
 //      and CDN coverage.
 //   2. Mutation routes that have collab semantics call `requireCollab(...)`
@@ -704,12 +706,12 @@ export function requireCapability<C extends DocCapability>(
   req: FastifyRequest,
   docId: string,
   capability: C,
-  pdfBits: PdfBits,
+  permissionFlags: PdfPermissionFlags,
   ...protection: ProtectionArg<C>
 ): { tenantId: string; sub: string; mode: DocAccessMode; jwt: RequestJwtContext } {
   const ctx = requireDocAccessOnly(req, docId);
   refuseProtected(capability, protectionOf(protection));
-  if (!checkCapability(capability, ctx.jwt.scope, pdfBits)) {
+  if (!checkCapability(capability, ctx.jwt.scope, permissionFlags)) {
     throw new PermissionDenied(capability);
   }
   return ctx;
@@ -724,10 +726,10 @@ export function requireAnyCapability(
   req: FastifyRequest,
   docId: string,
   capabilities: ReadonlyArray<UnprotectableCapability>,
-  pdfBits: PdfBits,
+  permissionFlags: PdfPermissionFlags,
 ): { tenantId: string; sub: string; mode: DocAccessMode; jwt: RequestJwtContext } {
   const ctx = requireDocAccessOnly(req, docId);
-  if (!checkAnyCapability(capabilities, ctx.jwt.scope, pdfBits)) {
+  if (!checkAnyCapability(capabilities, ctx.jwt.scope, permissionFlags)) {
     throw new PermissionDenied(capabilities[0] ?? 'doc.open', undefined, capabilities);
   }
   return ctx;
@@ -743,11 +745,11 @@ export function requireResource(
   req: FastifyRequest,
   docId: string,
   resourceId: DocResourceId,
-  pdfBits: PdfBits,
+  permissionFlags: PdfPermissionFlags,
 ): { tenantId: string; sub: string; mode: DocAccessMode; jwt: RequestJwtContext } {
   const ctx = requireDocAccessOnly(req, docId);
-  if (!checkResourceAccess(resourceId, ctx.jwt.scope, pdfBits)) {
-    throwResourceDenied(resourceId, ctx.jwt.scope, pdfBits);
+  if (!checkResourceAccess(resourceId, ctx.jwt.scope, permissionFlags)) {
+    throwResourceDenied(resourceId, ctx.jwt.scope, permissionFlags);
   }
   return ctx;
 }
@@ -765,12 +767,12 @@ export function requireCollabAction(
   docId: string,
   action: CollabAction,
   target: CollabTarget,
-  pdfBits: PdfBits,
+  permissionFlags: PdfPermissionFlags,
   protection: DocumentProtection | null,
 ): { tenantId: string; sub: string; mode: DocAccessMode; jwt: RequestJwtContext } {
   const ctx = requireDocAccessOnly(req, docId);
   refuseProtected('doc.annotate.modify', protection);
-  if (!checkCollab(action, target, ctx.jwt.scope, ctx.jwt.identity, pdfBits)) {
+  if (!checkCollab(action, target, ctx.jwt.scope, ctx.jwt.identity, permissionFlags)) {
     throw new PermissionDenied(`annotations:${action}`, 'target');
   }
   return ctx;
@@ -784,7 +786,7 @@ export function requireCollabAction(
  */
 export function mayCreateObjects(
   ctx: { mode: DocAccessMode; jwt: RequestJwtContext },
-  pdfBits: PdfBits,
+  permissionFlags: PdfPermissionFlags,
   protection: DocumentProtection | null,
 ): boolean {
   const { scope, identity } = ctx.jwt;
@@ -792,7 +794,7 @@ export function mayCreateObjects(
     checkAnyCapability(
       ['doc.pages.assemble', 'doc.forms.modify', 'doc.outline.modify'],
       scope,
-      pdfBits,
+      permissionFlags,
       protection,
     )
   ) {
@@ -803,7 +805,7 @@ export function mayCreateObjects(
     ...(identity.userId !== undefined ? { userId: identity.userId } : {}),
     ...(identity.groupId !== undefined ? { groupId: identity.groupId } : {}),
   };
-  return checkCollab('create', self, scope, identity, pdfBits);
+  return checkCollab('create', self, scope, identity, permissionFlags);
 }
 
 /**
@@ -814,11 +816,11 @@ export function mayCreateObjects(
 export function holdsCapability(
   ctx: { mode: DocAccessMode; jwt: RequestJwtContext },
   capability: DocCapability,
-  pdfBits: PdfBits,
+  permissionFlags: PdfPermissionFlags,
   protection: DocumentProtection | null,
 ): boolean {
   if (protection && protectedCapabilities(protection).has(capability)) return false;
-  return checkCapability(capability, ctx.jwt.scope, pdfBits);
+  return checkCapability(capability, ctx.jwt.scope, permissionFlags);
 }
 
 // Layer-scoped variants — wrap the doc-only versions with the existing
@@ -857,14 +859,14 @@ export function requireLayerCapability<C extends DocCapability>(
   docId: string,
   layerName: string,
   capability: C,
-  pdfBits: PdfBits,
+  permissionFlags: PdfPermissionFlags,
   ...protection: ProtectionArg<C>
 ): LayerGuardContext {
   const ctx = requireCapability(
     req,
     docId,
     capability as ProtectableCapability,
-    pdfBits,
+    permissionFlags,
     protectionOf(protection),
   );
   enforceLayerPin(req, layerName);
@@ -935,9 +937,9 @@ export function requireLayerAnyCapability(
   docId: string,
   layerName: string,
   capabilities: ReadonlyArray<UnprotectableCapability>,
-  pdfBits: PdfBits,
+  permissionFlags: PdfPermissionFlags,
 ): LayerGuardContext {
-  const ctx = requireAnyCapability(req, docId, capabilities, pdfBits);
+  const ctx = requireAnyCapability(req, docId, capabilities, permissionFlags);
   enforceLayerPin(req, layerName);
   return { ...ctx, ...writeRequestOf(req) };
 }
@@ -947,9 +949,9 @@ export function requireLayerResource(
   docId: string,
   layerName: string,
   resourceId: DocResourceId,
-  pdfBits: PdfBits,
+  permissionFlags: PdfPermissionFlags,
 ): LayerGuardContext {
-  const ctx = requireResource(req, docId, resourceId, pdfBits);
+  const ctx = requireResource(req, docId, resourceId, permissionFlags);
   enforceLayerPin(req, layerName);
   return { ...ctx, ...writeRequestOf(req) };
 }
@@ -960,10 +962,10 @@ export function requireLayerCollabAction(
   layerName: string,
   action: CollabAction,
   target: CollabTarget,
-  pdfBits: PdfBits,
+  permissionFlags: PdfPermissionFlags,
   protection: DocumentProtection | null,
 ): LayerGuardContext {
-  const ctx = requireCollabAction(req, docId, action, target, pdfBits, protection);
+  const ctx = requireCollabAction(req, docId, action, target, permissionFlags, protection);
   enforceLayerPin(req, layerName);
   return { ...ctx, ...writeRequestOf(req) };
 }
@@ -978,7 +980,7 @@ export function requireLayerAnnotationWrite(
   req: FastifyRequest,
   docId: string,
   layerName: string,
-  pdfBits: PdfBits,
+  permissionFlags: PdfPermissionFlags,
   protection: DocumentProtection | null,
 ): LayerGuardContext & { authority: AnnotationAuthority } {
   const ctx = requireLayerDocAccessOnly(req, docId, layerName);
@@ -988,7 +990,7 @@ export function requireLayerAnnotationWrite(
     ...writeRequestOf(req),
     authority: {
       identity: ctx.jwt.identity,
-      grants: { scope: ctx.jwt.scope, pdfBits },
+      grants: { scope: ctx.jwt.scope, permissionFlags },
     },
   };
 }
@@ -1003,11 +1005,15 @@ export function requireLayerChangeWrite(
   req: FastifyRequest,
   docId: string,
   layerName: string,
-  pdfBits: PdfBits,
+  permissionFlags: PdfPermissionFlags,
   protection: DocumentProtection | null,
 ): LayerGuardContext & { authority: ChangeAuthority } {
   const ctx = requireLayerDocAccessOnly(req, docId, layerName);
-  return { ...ctx, ...writeRequestOf(req), authority: changeAuthorityOf(ctx, pdfBits, protection) };
+  return {
+    ...ctx,
+    ...writeRequestOf(req),
+    authority: changeAuthorityOf(ctx, permissionFlags, protection),
+  };
 }
 
 /**
@@ -1016,12 +1022,12 @@ export function requireLayerChangeWrite(
  */
 export function changeAuthorityOf(
   ctx: { mode: DocAccessMode; jwt: RequestJwtContext },
-  pdfBits: PdfBits,
+  permissionFlags: PdfPermissionFlags,
   protection: DocumentProtection | null,
 ): ChangeAuthority {
   return {
     identity: ctx.jwt.identity,
-    grants: { scope: ctx.jwt.scope, pdfBits },
+    grants: { scope: ctx.jwt.scope, permissionFlags },
     protection,
   };
 }
@@ -1037,10 +1043,10 @@ export function requireLayerFieldWrite(
   docId: string,
   layerName: string,
   action: FieldWriteAction,
-  pdfBits: PdfBits,
+  permissionFlags: PdfPermissionFlags,
   protection: DocumentProtection | null,
 ): LayerGuardContext & { authority: ChangeAuthority } {
-  const ctx = requireLayerChangeWrite(req, docId, layerName, pdfBits, protection);
+  const ctx = requireLayerChangeWrite(req, docId, layerName, permissionFlags, protection);
   if (!allowsSomeFieldWrite(ctx.authority, action)) {
     const capability = action === 'fill' ? 'doc.forms.fill' : 'doc.sign';
     refuseProtected(capability, protection);
@@ -1086,7 +1092,7 @@ function enforceLayerPin(req: FastifyRequest, layerName: string): void {
 function throwResourceDenied(
   resourceId: DocResourceId,
   scope: ReadonlyArray<string>,
-  pdfBits: PdfBits,
+  permissionFlags: PdfPermissionFlags,
 ): never {
   const { requirement } = DOC_RESOURCES[resourceId];
   if (requirement.kind === 'single') throw new PermissionDenied(requirement.capability, resourceId);
@@ -1095,7 +1101,7 @@ function throwResourceDenied(
     throw new PermissionDenied(capabilities[0] ?? 'doc.open', resourceId, capabilities);
   }
   // All of them: name the first one the scope lacks.
-  const missing = capabilities.find((cap) => !checkCapability(cap, scope, pdfBits));
+  const missing = capabilities.find((cap) => !checkCapability(cap, scope, permissionFlags));
   throw new PermissionDenied(missing ?? capabilities[0] ?? 'doc.open', resourceId);
 }
 

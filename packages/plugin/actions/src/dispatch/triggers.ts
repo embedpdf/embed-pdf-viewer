@@ -64,7 +64,7 @@ export function createTriggers(
 ) {
   const triggerEnabled = (trigger: ActionTrigger): boolean => {
     const { triggers } = settings.get();
-    switch (trigger.scope) {
+    switch (trigger.type) {
       case 'activate':
         return true; // the click door is never gated
       case 'annotation':

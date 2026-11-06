@@ -178,7 +178,7 @@ describe('dynamic stamp real-PDF vertical slice', () => {
       expect((await flattened.forms.list()).fields).toEqual([]);
       expect((await flattened.page(flattenedPage.ref).annotations.list()).annotations).toEqual([]);
     } finally {
-      sandbox.dispose();
+      sandbox.destroy();
       await close(flattened);
       await close(reopened);
       await close(document);

@@ -72,15 +72,15 @@ const swapped = (box: PageBox): PageBox => ({
 
 export function runWidgetRotationConformance(
   runner: ConformanceTestRunner,
-  opts: WidgetRotationConformanceOptions,
+  options: WidgetRotationConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`widget rotation conformance: ${opts.label}`, () => {
+  describe(`widget rotation conformance: ${options.label}`, () => {
     let engine: Engine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -91,7 +91,7 @@ export function runWidgetRotationConformance(
       body: (doc: DocumentHandle) => Promise<void>,
       bytes: Uint8Array = TURNED_FIELDS_PDF,
     ) => {
-      const doc = await opts.open(engine, bytes.slice());
+      const doc = await options.open(engine, bytes.slice());
       try {
         await body(doc);
       } finally {
@@ -165,7 +165,7 @@ export function runWidgetRotationConformance(
       await withDoc(async (doc) => {
         const rect = { x: 100, y: 40, width: 24, height: 160 };
         const { field } = await doc.forms.create({
-          family: 'text',
+          kind: 'text',
           name: 'side',
           widgets: [{ page: FIRST, rect, rotation: 270 }],
         });
@@ -176,7 +176,7 @@ export function runWidgetRotationConformance(
 
         const refused = await refusalOf(
           doc.forms.create({
-            family: 'text',
+            kind: 'text',
             name: 'tilted',
             widgets: [{ page: FIRST, rect, rotation: 45 as never }],
           }),
@@ -189,7 +189,7 @@ export function runWidgetRotationConformance(
       await withDoc(async (doc) => {
         const rect = { x: 150, y: 40, width: 24, height: 160 };
         const { field } = await doc.forms.create({
-          family: 'text',
+          kind: 'text',
           name: 'by-box',
           widgets: [{ page: FIRST, box: swapped(rect), rotation: 270 }],
         });
@@ -199,7 +199,7 @@ export function runWidgetRotationConformance(
         expectBox(row.box, swapped(rect));
 
         const neither = await refusalOf(
-          doc.forms.create({ family: 'text', name: 'nowhere', widgets: [{ page: FIRST }] }),
+          doc.forms.create({ kind: 'text', name: 'nowhere', widgets: [{ page: FIRST }] }),
         );
         expect(EngineError.is(neither, EngineErrorCode.InvalidArg)).toBe(true);
       });

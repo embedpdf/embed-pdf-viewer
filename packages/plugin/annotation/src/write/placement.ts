@@ -1,9 +1,9 @@
 import {
-  anchoredGeom,
+  anchoredGeometry,
   anchorModeOf,
   fitStampBox,
   toolAnnotation,
-  unanchoredGeom,
+  unanchoredGeometry,
   type BoxShape,
   type FieldValues,
   type KindName,
@@ -57,7 +57,7 @@ export const annotationOfTool = (
  * size, hanging from its rect's upper-left corner. So the placement starts
  * from how it shows, the icon centred on the pointer and kept on the page
  * (`shown`, what the ghost draws), and stores the rect whose own display is
- * exactly that (`rect`, through `unanchoredGeom`, the inverse gestures use).
+ * exactly that (`rect`, through `unanchoredGeometry`, the inverse gestures use).
  * `annotation` is what the tool creates, read for its flags. Without a view
  * the two are the same box.
  */
@@ -75,14 +75,14 @@ export function iconPlaceAt(
     rotation: 0,
     ellipse: false,
   };
-  const { box: size, rotation } = anchoredGeom(usual, mode, view) as BoxShape;
+  const { box: size, rotation } = anchoredGeometry(usual, mode, view) as BoxShape;
   const shown: BoxShape = {
     kind: 'box',
     box: fitStampBox(point, { width: size.width, height: size.height }, page, rotation),
     rotation,
     ellipse: false,
   };
-  return { shown, rect: (unanchoredGeom(shown, mode, view) as BoxShape).box };
+  return { shown, rect: (unanchoredGeometry(shown, mode, view) as BoxShape).box };
 }
 
 /**

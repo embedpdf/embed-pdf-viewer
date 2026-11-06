@@ -28,7 +28,7 @@ import type { AnnotationToolInput } from '@embedpdf/react/annotation';
 import {
   CommandsToken,
   standardCommands,
-  type CommandDef,
+  type CommandDefinition,
   type IconAccent,
 } from '@embedpdf/react/commands';
 import { FormToken } from '@embedpdf/react/form';
@@ -59,7 +59,7 @@ import { outlineCommands } from './outline';
 import { pageCommands } from './page-commands';
 
 // ── helpers ────────────────────────────────────────────────────────────────
-type Ctx = Parameters<NonNullable<CommandDef['run']>>[0];
+type Ctx = Parameters<NonNullable<CommandDefinition['run']>>[0];
 
 /** The dialog the Go to Page command opens without a page to go to (ui/go-to-page.tsx). */
 export const GO_TO_PAGE_DIALOG = 'go-to-page';
@@ -110,7 +110,7 @@ const snapshotOf = (commandContext: Ctx) => renderOf(commandContext)?.getSnapsho
 
 /** The standard download: the document with every change, saved under the document's name. */
 const standardDownload = standardCommands.find(
-  (command): command is CommandDef => 'id' in command && command.id === 'document:download',
+  (command): command is CommandDefinition => 'id' in command && command.id === 'document:download',
 )!;
 
 /** A snapshot's file name: the document's name and the page's number, as a PNG (`Report p3.png`). */
@@ -128,7 +128,7 @@ const snapshotFileName = (commandContext: Ctx, page: PageRef): string => {
  * sentence for when it may not (docs/conventions/permissions.md). Without the plugin there is
  * nothing to ask, and the command's own `enabled` or `visible` says it can't run.
  */
-type Check = Pick<CommandDef, 'allowed' | 'notAllowedKey'>;
+type Check = Pick<CommandDefinition, 'allowed' | 'notAllowedKey'>;
 
 /** Drawing an annotation of any kind: `annotation.canCreate()`. */
 const CREATES_ANNOTATIONS: Check = {
@@ -179,16 +179,20 @@ const canMeasureNow = (commandContext: Ctx): boolean => {
 
 // ── annotation-selection predicates (drive the floating strip's contents) ────
 const hasAnnotationSelection = (commandContext: Ctx) =>
-  (anno(commandContext)?.selection.list().length ?? 0) > 0;
+  (anno(commandContext)?.selection.getSelected().length ?? 0) > 0;
 /** Whether people may change every selected annotation by hand (no turned-off feature froze it). */
 const selectionEditable = (commandContext: Ctx): boolean => {
   const annotation = anno(commandContext);
-  return (annotation?.selection.list() ?? []).every(({ ref }) => annotation!.isEditable(ref));
+  return (annotation?.selection.getSelected() ?? []).every(({ ref }) =>
+    annotation!.isEditable(ref),
+  );
 };
 /** Strip items gate per subtype (comment hidden on links/widgets) through
  *  one derivation over the selected DTOs, not per-command lookups. */
 const selectionSubtypes = (commandContext: Ctx) =>
-  new Set((anno(commandContext)?.selection.list() ?? []).map((annotation) => annotation.subtype));
+  new Set(
+    (anno(commandContext)?.selection.getSelected() ?? []).map((annotation) => annotation.subtype),
+  );
 /**
  * The selection's `link` value: a target, `null` (linkable but none set), or
  * `undefined` when the selection cannot carry a link at all (widgets, mixed
@@ -268,7 +272,7 @@ const toolCommand = (
   toolId: string,
   icon: string | undefined,
   { feature, check, accent }: ToolOptions,
-): Omit<CommandDef, 'labelKey'> => {
+): Omit<CommandDefinition, 'labelKey'> => {
   if (icon) TOOL_ICONS[toolId] = { icon, ...(accent ? { accent } : {}) };
   TOOL_FEATURES[toolId] = feature;
   return {
@@ -289,7 +293,7 @@ const tool = (
   labelKey: string,
   icon: string,
   options: ToolOptions,
-): CommandDef => ({ ...toolCommand(id, toolId, icon, options), labelKey });
+): CommandDefinition => ({ ...toolCommand(id, toolId, icon, options), labelKey });
 
 /**
  * Selected text made into a highlight, an underline or a strikeout, with the colors of the
@@ -301,7 +305,7 @@ const markupSelection = (
   labelKey: string,
   icon: string,
   feature: Feature,
-): CommandDef => ({
+): CommandDefinition => ({
   id,
   labelKey,
   icon,
@@ -319,14 +323,19 @@ const pageArgOf = (args: unknown): number | null => {
 };
 
 /** A fixed zoom level (fraction), e.g. 1 = 100%. */
-const zoomLevel = (id: string, level: number, label: string): CommandDef => ({
+const zoomLevel = (id: string, level: number, label: string): CommandDefinition => ({
   id,
   labelKey: label,
   run: (commandContext) => stage(commandContext)?.zoomTo({ level }),
   enabled: (commandContext) => stage(commandContext) != null,
 });
 
-const spread = (id: string, mode: SpreadMode, labelKey: string, icon: string): CommandDef => ({
+const spread = (
+  id: string,
+  mode: SpreadMode,
+  labelKey: string,
+  icon: string,
+): CommandDefinition => ({
   id,
   labelKey,
   icon,
@@ -341,7 +350,7 @@ const scroll = (
   layout: Exclude<LayoutKind, 'grid'>,
   labelKey: string,
   icon: string,
-): CommandDef => ({
+): CommandDefinition => ({
   id,
   labelKey,
   icon,
@@ -355,7 +364,7 @@ const scroll = (
     stage(commandContext)?.getLock('flow') ?? stage(commandContext)?.getLock('layout') ?? null,
 });
 
-export const defaultCommands: CommandDef[] = [
+export const defaultCommands: CommandDefinition[] = [
   // ── zoom ───────────────────────────────────────────────────────────────
   {
     id: 'zoom:in',
@@ -917,7 +926,7 @@ export const defaultCommands: CommandDef[] = [
     // turned-off feature froze (`isEditable`).
     enabled: (commandContext) => {
       const annotation = anno(commandContext);
-      const selected = annotation?.selection.list() ?? [];
+      const selected = annotation?.selection.getSelected() ?? [];
       return (
         selected.length > 0 &&
         selected.every(({ ref }) => annotation!.canDelete(ref) && annotation!.isEditable(ref))
@@ -968,7 +977,7 @@ export const defaultCommands: CommandDef[] = [
       const stamp = commandContext.tryGet(StampToken);
       const documentId = commandContext.documentId;
       if (!annotation || !stamp || documentId == null) return;
-      const dtos = annotation.selection.list();
+      const dtos = annotation.selection.getSelected();
       const page = dtos[0]?.ref.page;
       if (page === undefined) return;
       const i18n = commandContext.tryGet(I18nToken);
@@ -1013,7 +1022,7 @@ export const defaultCommands: CommandDef[] = [
       !selectionSubtypes(commandContext).has('widget') &&
       !selectionSubtypes(commandContext).has('redact') &&
       new Set(
-        (anno(commandContext)?.selection.list() ?? []).map(
+        (anno(commandContext)?.selection.getSelected() ?? []).map(
           (annotation) => annotation.ref.page.objectNumber,
         ),
       ).size === 1,
@@ -1219,7 +1228,7 @@ function modeCommand(
   id: (typeof MODE_SURFACES)[number],
   labelKey: string,
   { feature }: { feature?: Feature } = {},
-): CommandDef {
+): CommandDefinition {
   return {
     id,
     labelKey,
@@ -1247,8 +1256,8 @@ function modeCommand(
 export function toolCommandsFor(
   tools: readonly AnnotationToolInput[],
   isTaken: (id: string) => boolean,
-): CommandDef[] {
-  return tools.flatMap((input): CommandDef[] => {
+): CommandDefinition[] {
+  return tools.flatMap((input): CommandDefinition[] => {
     const id = `tool:${input.id}`;
     if (isTaken(id)) return [];
     const base = input.extends;

@@ -11,6 +11,6 @@ export const FontsToken = createCapabilityToken<FontsCapability>('fonts', {
     ensureLoaded: true,
     refresh: true,
     resolve: true,
-    getProgram: true,
+    readProgram: true,
   },
 });

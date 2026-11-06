@@ -24,10 +24,10 @@ export type {
   ParsedScope,
   ParsedVirtual,
   ParsedWildcard,
-  PdfBits,
+  PdfPermissionFlags,
 } from './types';
 
-export { PDF_BITS, decodePdfBits } from './pdf-bits';
+export { PDF_BITS, permissionFlagsOf } from './permission-flags';
 
 export {
   CORE_NAMESPACES,

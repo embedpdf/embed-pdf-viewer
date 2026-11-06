@@ -40,7 +40,7 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
         const page = pages[0];
         const pageObjectNumber = page.ref.objectNumber;
         const { ctx, annotation } = await annotationShell(doc, pages);
-        cleanups.push(() => ctx.dispose());
+        cleanups.push(() => ctx.destroy());
         const scale = measureFromKnownLength(100, { value: 5, unit: 'm' });
         await doc.page(toPageRef(pageObjectNumber)).measure!.setScale(scale);
         annotation.setPageViewports(
@@ -62,9 +62,9 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
         const finished = annotation.draft.finish();
         // Written and confirmed: its ref is the engine's.
         await vi.waitFor(() =>
-          expect(annotation.selection.list()[0]?.ref.kind).toBe('objectNumber'),
+          expect(annotation.selection.getSelected()[0]?.ref.kind).toBe('objectNumber'),
         );
-        const created = annotation.selection.list()[0]!;
+        const created = annotation.selection.getSelected()[0]!;
         expect((await finished)?.annotation.ref).toEqual(created.ref);
         if (created.subtype !== 'polygon' && created.subtype !== 'polyline')
           throw new Error('Expected shape');

@@ -4,7 +4,7 @@ import type { OpenInput } from '@embedpdf/vue/runtime';
 import { Stage, StageToken, stagePlugin } from '@embedpdf/vue/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/vue/render';
 import { commandsPlugin, standardCommands } from '@embedpdf/vue/commands';
-import type { CommandDef } from '@embedpdf/vue/commands';
+import type { CommandDefinition } from '@embedpdf/vue/commands';
 import { cloudEngine } from '@cloudpdf/engine';
 import Toolbar from './Toolbar.vue';
 
@@ -13,7 +13,7 @@ import '../custom.css';
 const engine = cloudEngine();
 
 // A command of your own: pressed while the pages show two at a time.
-const twoPages: CommandDef = {
+const twoPages: CommandDefinition = {
   id: 'layout:two-pages',
   label: 'Two pages',
   categories: ['layout'],

@@ -29,15 +29,15 @@ import {
   type Annotation,
   type AnnotationAnchor,
   type AnnotationConfig,
-  type AnnotationDraftApi,
+  type AnnotationDraftCapability,
   type AnnotationFilter,
-  type AnnotationLinksApi,
+  type AnnotationLinksCapability,
   type AnnotationProperties,
   type AnnotationRef,
-  type AnnotationSelectionApi,
-  type AnnotationStampsApi,
-  type AnnotationTextApi,
-  type AnnotationToolsApi,
+  type AnnotationSelectionCapability,
+  type AnnotationStampsCapability,
+  type AnnotationTextCapability,
+  type AnnotationToolsCapability,
   type ToolDefaults,
   type ToolDefaultsChangedEvent,
 } from '@embedpdf/plugin-annotation';
@@ -58,7 +58,7 @@ const NO_PROPERTIES: AnnotationProperties = Object.freeze({
 });
 
 /** `annotation.selection`: what is selected, the verbs that change it as one, and its style panel. */
-export interface EpdfAnnotationSelection extends AnnotationSelectionApi {
+export interface EpdfAnnotationSelection extends AnnotationSelectionCapability {
   /**
    * What a style panel shows for the selection: `{ properties, values, mixed }`, the same as
    * `getProperties()` but as a signal, so the panel follows the selection and its changes.
@@ -68,7 +68,7 @@ export interface EpdfAnnotationSelection extends AnnotationSelectionApi {
 }
 
 /** `annotation.tools`: the tools and their defaults, with the reads a picker follows. */
-export interface EpdfAnnotationTools extends Omit<AnnotationToolsApi, 'onDefaultsChanged'> {
+export interface EpdfAnnotationTools extends Omit<AnnotationToolsCapability, 'onDefaultsChanged'> {
   /**
    * A tool's defaults, the fields its next annotation starts with, as a signal: a color picker
    * bound to it always shows the current color. Pass the id, or a function that reads it.
@@ -87,7 +87,7 @@ export interface EpdfAnnotationTools extends Omit<AnnotationToolsApi, 'onDefault
 /**
  * Annotations: `create()`, `update()`, `delete()` and the rest of the Methods tables, the
  * selecting page's State table as signals (`annotation.selected()`), the parts the capability
- * has (`annotation.selection.set(refs)`, `annotation.tools.updateDefaults(id, changes)`), its
+ * has (`annotation.selection.select(refs)`, `annotation.tools.updateDefaults(id, changes)`), its
  * events as streams (`annotation.created$`), and its settings (`annotation.settings()`,
  * `annotation.updateSettings({ chrome })`). Comments have their own service, `EpdfComments`.
  *
@@ -144,14 +144,14 @@ export class EpdfAnnotation extends pluginService({
     injectDocumentScope(),
   );
 
-  /** The selection: `set(refs)`, `update(changes)`, `delete()`, … and `properties()`. */
+  /** The selection: `select(refs)`, `update(changes)`, `delete()`, … and `properties()`. */
   readonly selection: EpdfAnnotationSelection = {
-    set: this.binding.namespaceMethod('selection', 'set'),
+    select: this.binding.namespaceMethod('selection', 'select'),
     add: this.binding.namespaceMethod('selection', 'add'),
     selectAll: this.binding.namespaceMethod('selection', 'selectAll'),
     selectInRect: this.binding.namespaceMethod('selection', 'selectInRect'),
     clear: this.binding.namespaceMethod('selection', 'clear'),
-    list: this.binding.namespaceMethod('selection', 'list'),
+    getSelected: this.binding.namespaceMethod('selection', 'getSelected'),
     update: this.binding.namespaceMethod('selection', 'update'),
     updateLink: this.binding.namespaceMethod('selection', 'updateLink'),
     getProperties: this.binding.namespaceMethod('selection', 'getProperties'),
@@ -173,14 +173,14 @@ export class EpdfAnnotation extends pluginService({
   };
 
   /** A polygon or polyline being drawn: `get()`, `finish()`, `cancel()`. */
-  readonly draft: AnnotationDraftApi = {
+  readonly draft: AnnotationDraftCapability = {
     get: this.binding.namespaceMethod('draft', 'get'),
     finish: this.binding.namespaceMethod('draft', 'finish'),
     cancel: this.binding.namespaceMethod('draft', 'cancel'),
   };
 
   /** Typing in a text box: `begin(ref)`, `end()`, `getEditing()`, `toggleFormat(format)`. */
-  readonly text: AnnotationTextApi = {
+  readonly text: AnnotationTextCapability = {
     begin: this.binding.namespaceMethod('text', 'begin'),
     end: this.binding.namespaceMethod('text', 'end'),
     getEditing: this.binding.namespaceMethod('text', 'getEditing'),
@@ -215,7 +215,7 @@ export class EpdfAnnotation extends pluginService({
   };
 
   /** Stamps from bytes: `arm(stamp)`, `disarm()`, `isArmed()`, `place(stamp, placement)`. */
-  readonly stamps: AnnotationStampsApi = {
+  readonly stamps: AnnotationStampsCapability = {
     arm: this.binding.namespaceMethod('stamps', 'arm'),
     disarm: this.binding.namespaceMethod('stamps', 'disarm'),
     isArmed: this.binding.namespaceMethod('stamps', 'isArmed'),
@@ -223,7 +223,7 @@ export class EpdfAnnotation extends pluginService({
   };
 
   /** An annotation's link: `get(ref)`, `set(ref, target)`, `clear(ref)`. */
-  readonly links: AnnotationLinksApi = {
+  readonly links: AnnotationLinksCapability = {
     get: this.binding.namespaceMethod('links', 'get'),
     set: this.binding.namespaceMethod('links', 'set'),
     clear: this.binding.namespaceMethod('links', 'clear'),

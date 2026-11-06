@@ -116,7 +116,7 @@ export type {
   BarEdge,
   BarPlace,
   CommandContext,
-  CommandDef,
+  CommandDefinition,
   Feature,
   FloatPosition,
   IconDef,

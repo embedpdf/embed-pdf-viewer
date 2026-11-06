@@ -10,7 +10,7 @@ import type { StageCapability, StageConfig, StageHostCapability } from '../src/h
 
 /** The registry fields a test mutates to simulate a page mutation. */
 interface MutableRegistry {
-  revision: number;
+  pagesSequence: number;
   pages: Array<{ index: number; ref: ReturnType<typeof toPageRef>; rotation: number }>;
 }
 
@@ -38,7 +38,7 @@ function harness(
     })),
   });
   // The live registry the controller reads through `document()`. Changing a
-  // page's rotation and bumping `revision` simulates a rotate, move or delete
+  // page's rotation and bumping `pagesSequence` simulates a rotate, move or delete
   // event, as the kernel's registry update would.
   const meta = ctx.document() as unknown as MutableRegistry;
   // Typed as the declared host lens: the composed slices' inferred signatures
@@ -54,7 +54,7 @@ function harness(
     transitions.push({
       placed: !previous.placed && next.placed,
       pages: stage.listVisiblePages(),
-      pageScreenX: stage.getPageFrame(toPageRef(1))?.screenX ?? null,
+      pageScreenX: stage.getPageBox(toPageRef(1))?.screenX ?? null,
       metrics: stage.getScrollMetrics(),
     });
   });
@@ -74,7 +74,7 @@ describe('initial placement is level-triggered', () => {
 
     expect(pendingPages).toEqual([]);
     expect(stage.listVisiblePages()).toBe(pendingPages); // stable empty selector value
-    expect(stage.getPageFrame(toPageRef(1))).toBeNull();
+    expect(stage.getPageBox(toPageRef(1))).toBeNull();
     expect(stage.getScrollMetrics()).toEqual({
       scrollLeft: 0,
       scrollTop: 0,
@@ -107,7 +107,7 @@ describe('initial placement is level-triggered', () => {
     const { stage } = harness(PORTRAIT); // the harness never calls placeInitial
     expect(stage.getCamera()).not.toEqual({ x: 0, y: 0, zoom: 1 }); // not the untouched camera
     // page 1 is properly placed: horizontally centered, top a padding down
-    const box = stage.getPageFrame(toPageRef(1))!;
+    const box = stage.getPageBox(toPageRef(1))!;
     const center = stage.worldToViewport({ x: box.x + box.width / 2, y: box.y });
     expect(center.x).toBeCloseTo(500, 0);
     expect(center.y).toBeCloseTo(PAD, 0);
@@ -119,15 +119,15 @@ describe('initial placement is level-triggered', () => {
     stage.setViewportSize({ width: 1000, height: 0 }); // mid-layout flex collapse
     expect(stage.getCamera()).toEqual({ x: 0, y: 0, zoom: 1 }); // not placed yet
     expect(stage.listVisiblePages()).toBe(pendingPages);
-    expect(stage.getPageFrame(toPageRef(1))).toBeNull();
+    expect(stage.getPageBox(toPageRef(1))).toBeNull();
     expect(transitions.some((transition) => transition.placed)).toBe(false);
     stage.setViewportSize({ width: 1000, height: 700 }); // the real report
     expect(stage.getCamera()).not.toEqual({ x: 0, y: 0, zoom: 1 }); // placed now
     expect(stage.listVisiblePages()).not.toBe(pendingPages);
     expect(
       stage.worldToViewport({
-        x: stage.getPageFrame(toPageRef(1))!.x,
-        y: stage.getPageFrame(toPageRef(1))!.y,
+        x: stage.getPageBox(toPageRef(1))!.x,
+        y: stage.getPageBox(toPageRef(1))!.y,
       }).y,
     ).toBeCloseTo(PAD, 0);
   });
@@ -138,8 +138,8 @@ describe('initial placement is level-triggered', () => {
     // open, plugins connect synchronously; the report is a later macrotask).
     stage.provideInitialView(50, () => ({
       ...stage.getSettings(),
-      cursor: 3,
-      anchor: { pageIndex: 3, fx: 0.5, fy: 0.5 },
+      pageIndex: 3,
+      anchor: { pageIndex: 3, fractionX: 0.5, fractionY: 0.5 },
     }));
     stage.setViewportSize({ width: 1000, height: 700 });
     expect(stage.getCurrentPageIndex()).toBe(3); // restored, not reset to page 0
@@ -151,7 +151,7 @@ describe('initial placement is level-triggered', () => {
     expect(stage.getCamera()).toEqual({ x: 0, y: 0, zoom: 1 }); // nothing to move yet
     stage.setViewportSize({ width: 1000, height: 700 });
     expect(stage.getCurrentPageIndex()).toBe(3); // not reset to page 0
-    const box = stage.getPageFrame(toPageRef(4))!;
+    const box = stage.getPageBox(toPageRef(4))!;
     expect(stage.worldToViewport({ x: box.x, y: box.y }).y).toBeCloseTo(PAD, 0);
     // instant even when the call asked for nothing: the placed commit is already there
     const commit = transitions.find((transition) => transition.placed)!;
@@ -165,7 +165,7 @@ describe('initial placement is level-triggered', () => {
     stage.reveal(0, { rect: { x: 96, y: 700, width: 178, height: 54 }, behavior: 'smooth' });
     stage.setViewportSize({ width: 1000, height: 700 });
     expect(stage.getCurrentPageIndex()).toBe(0);
-    const page = stage.getPageFrame(toPageRef(1))!;
+    const page = stage.getPageBox(toPageRef(1))!;
     const bottom = stage.worldToViewport({ x: page.x, y: page.y + 754 }).y;
     // in view now: 'smooth' became instant (no frame has ticked), no tween from the reset
     expect(bottom).toBeLessThanOrEqual(700 - PAD + 0.5);
@@ -175,8 +175,8 @@ describe('initial placement is level-triggered', () => {
     const { stage } = harness(PORTRAIT, undefined, { skipViewport: true });
     stage.provideInitialView(50, () => ({
       ...stage.getSettings(),
-      cursor: 3,
-      anchor: { pageIndex: 3, fx: 0.5, fy: 0.5 },
+      pageIndex: 3,
+      anchor: { pageIndex: 3, fractionX: 0.5, fractionY: 0.5 },
     }));
     stage.goToPage(1);
     stage.setViewportSize({ width: 1000, height: 700 });
@@ -189,7 +189,7 @@ describe('goToPage', () => {
     const { stage } = harness(PORTRAIT);
     stage.goToPage(2, { behavior: 'instant' });
     expect(stage.getCurrentPageIndex()).toBe(2);
-    const box = stage.getPageFrame(toPageRef(3))!; // page object number = index + 1
+    const box = stage.getPageBox(toPageRef(3))!; // page object number = index + 1
     // the page's top edge sits ~margin px below the viewport top
     expect(stage.worldToViewport({ x: box.x, y: box.y }).y).toBeCloseTo(24, 0);
   });
@@ -226,7 +226,7 @@ describe('goToDestination', () => {
     expect(stage.getCurrentPageIndex()).toBe(3);
     expect(stage.getZoomLevel()).toBe(2);
     // the point sits at the viewport's top-left, a padding in
-    const box = stage.getPageFrame(toPageRef(4))!;
+    const box = stage.getPageBox(toPageRef(4))!;
     const point = stage.worldToViewport({ x: box.x + 100, y: box.y + 200 });
     expect(point.x).toBeCloseTo(PAD, 4);
     expect(point.y).toBeCloseTo(PAD, 4);
@@ -367,13 +367,13 @@ describe('sizing: uniform + fit-width = flush per-page fit', () => {
     const zoom = stage.getZoomLevel();
     // all items are uniform width ⇒ same on-screen width = pane width minus gaps
     const onScreenWidth = (pageObjectNumber: number) =>
-      stage.getPageFrame(toPageRef(pageObjectNumber))!.width * zoom;
+      stage.getPageBox(toPageRef(pageObjectNumber))!.width * zoom;
     expect(onScreenWidth(1)).toBeCloseTo(1000 - 2 * PAD, 4);
     expect(onScreenWidth(2)).toBeCloseTo(1000 - 2 * PAD, 4);
     expect(onScreenWidth(3)).toBeCloseTo(1000 - 2 * PAD, 4);
     // effective per-page scale = contentScale × zoom = pane width / intrinsic width
     const effective = (pageObjectNumber: number) =>
-      stage.getPageFrame(toPageRef(pageObjectNumber))!.contentScale * zoom;
+      stage.getPageBox(toPageRef(pageObjectNumber))!.contentScale * zoom;
     expect(effective(1)).toBeCloseTo((1000 - 2 * PAD) / 600, 4); // page 1 intrinsic width 600
     expect(effective(2)).toBeCloseTo((1000 - 2 * PAD) / 1000, 4);
     expect(effective(3)).toBeCloseTo((1000 - 2 * PAD) / 500, 4);
@@ -391,7 +391,7 @@ describe('pageToWorld: page space → world space (the sizing-policy transform)'
     const { stage } = harness(MIXED, { sizing: 'uniform' });
     // uniform's reference is the widest page (object 2, scale 1); page 1 is
     // rescaled to match it, so a 1:1 mapping would be wrong
-    const frame = stage.getPageFrame(toPageRef(1))!;
+    const frame = stage.getPageBox(toPageRef(1))!;
     expect(frame.contentScale).toBeCloseTo(1000 / 600, 4);
     // the page's intrinsic far corner must land on its world box corner
     const corner = stage.pageToWorld(toPageRef(1), { x: 600, y: 800 })!;
@@ -404,7 +404,7 @@ describe('pageToWorld: page space → world space (the sizing-policy transform)'
   it('the menu sits on the dot: toScreen∘pageToWorld ≡ the page-surface math', () => {
     const { stage } = harness(MIXED, { sizing: 'uniform' });
     const marker = { x: 250, y: 333 }; // page-space, like a stored marker
-    const frame = stage.getPageFrame(toPageRef(1))!;
+    const frame = stage.getPageBox(toPageRef(1))!;
     const camera = stage.getCamera();
     // what the page surface does: surface origin + point·(contentScale·zoom)
     const dot = {
@@ -428,7 +428,7 @@ describe('pageToWorld: page space → world space (the sizing-policy transform)'
 describe('document rotation: the stage honors PageLayout.rotation', () => {
   it('a rotated page reports a swapped display box via pageRect', () => {
     const { stage } = harness([{ width: 600, height: 800, rotation: 90 }]);
-    const frame = stage.getPageFrame(toPageRef(1))!;
+    const frame = stage.getPageBox(toPageRef(1))!;
     expect(frame.rotation).toBe(90);
     expect(frame.width).toBe(800); // portrait → landscape footprint
     expect(frame.height).toBe(600);
@@ -437,7 +437,7 @@ describe('document rotation: the stage honors PageLayout.rotation', () => {
   it('pageToWorld maps a content corner into the rotated display box', () => {
     // 90° clockwise: the content top-left (0,0) lands at the display box top-right.
     const { stage } = harness([{ width: 600, height: 800, rotation: 90 }]);
-    const frame = stage.getPageFrame(toPageRef(1))!; // intrinsic sizing → contentScale 1, display 800×600
+    const frame = stage.getPageBox(toPageRef(1))!; // intrinsic sizing → contentScale 1, display 800×600
     const topLeft = stage.pageToWorld(toPageRef(1), { x: 0, y: 0 })!;
     expect(topLeft.x).toBeCloseTo(frame.x + frame.width, 4); // top-right corner
     expect(topLeft.y).toBeCloseTo(frame.y, 4);
@@ -447,7 +447,7 @@ describe('document rotation: the stage honors PageLayout.rotation', () => {
     expect(bottomLeft.y).toBeCloseTo(frame.y, 4);
     // an unrotated page maps 1:1
     const flat = harness([{ width: 600, height: 800 }]).stage;
-    const flatFrame = flat.getPageFrame(toPageRef(1))!;
+    const flatFrame = flat.getPageBox(toPageRef(1))!;
     expect(flat.pageToWorld(toPageRef(1), { x: 10, y: 20 })).toEqual({
       x: flatFrame.x + 10,
       y: flatFrame.y + 20,
@@ -477,7 +477,7 @@ describe('document rotation: the stage honors PageLayout.rotation', () => {
     // a lone portrait rotated 90° fills the pane by its 800 (was height) edge
     const { stage } = harness([{ width: 600, height: 800, rotation: 90 }]);
     stage.fitWidth();
-    expect(stage.getPageFrame(toPageRef(1))!.width * stage.getZoomLevel()).toBeCloseTo(
+    expect(stage.getPageBox(toPageRef(1))!.width * stage.getZoomLevel()).toBeCloseTo(
       1000 - 2 * PAD,
       4,
     );
@@ -487,7 +487,7 @@ describe('document rotation: the stage honors PageLayout.rotation', () => {
 describe('refit: a runtime registry change (rotate/move/delete) re-resolves the zoom', () => {
   // The on-screen width of page 1: its display width × the resolved camera zoom.
   const widthPx = (stage: ReturnType<typeof harness>['stage']) =>
-    stage.getPageFrame(toPageRef(1))!.width * stage.getZoomLevel();
+    stage.getPageBox(toPageRef(1))!.width * stage.getZoomLevel();
 
   it('keeps `pageWidth: 110` exactly 110px wide across a 90° rotation', () => {
     const { stage, meta } = harness([{ width: 600, height: 800 }], {
@@ -497,9 +497,9 @@ describe('refit: a runtime registry change (rotate/move/delete) re-resolves the 
     expect(widthPx(stage)).toBeCloseTo(110, 4); // portrait: 600 × (110/600)
 
     // Rotate the page 90°: display width swaps 600 → 800, exactly as a rotate
-    // event would, and bump the registry revision.
+    // event would, and bump `pagesSequence`.
     meta.pages[0].rotation = 90;
-    meta.revision += 1;
+    meta.pagesSequence += 1;
     stage.refit();
 
     // The zoom re-resolved against the 800-wide footprint, so width stays 110.
@@ -512,7 +512,7 @@ describe('refit: a runtime registry change (rotate/move/delete) re-resolves the 
       zoom: { pageWidth: 110 },
     });
     meta.pages[0].rotation = 90;
-    meta.revision += 1;
+    meta.pagesSequence += 1;
     // No refit(): the scene re-keys (display width is now 800) but the camera zoom still
     // targets the old 600 width → 800 × (110/600) ≈ 146.7px, not 110.
     expect(widthPx(stage)).toBeCloseTo((800 * 110) / 600, 4);
@@ -525,11 +525,11 @@ describe('refit: a runtime registry change (rotate/move/delete) re-resolves the 
     const before = stage.getZoomLevel();
 
     meta.pages[0].rotation = 90; // → landscape 800×600
-    meta.revision += 1;
+    meta.pagesSequence += 1;
     stage.refit();
 
     // Still fits, now bound by the rotated height (600) against the viewport.
-    expect(stage.getPageFrame(toPageRef(1))!.height * stage.getZoomLevel()).toBeCloseTo(
+    expect(stage.getPageBox(toPageRef(1))!.height * stage.getZoomLevel()).toBeCloseTo(
       700 - 2 * PAD,
       4,
     );
@@ -541,13 +541,13 @@ describe('refit: a runtime registry change (rotate/move/delete) re-resolves the 
     expect(() => stage.refit()).not.toThrow();
   });
 
-  it('refits by itself when the registry revision changes (wired in connect)', () => {
+  it('refits by itself when `pagesSequence` moves (wired in connect)', () => {
     const { ctx, stage, meta } = harness([{ width: 600, height: 800 }], {
       layout: 'vertical',
       zoom: { pageWidth: 110 },
     });
     meta.pages[0].rotation = 90;
-    meta.revision += 1;
+    meta.pagesSequence += 1;
     ctx.notify(); // the kernel's registry update wakes every watcher
     expect(widthPx(stage)).toBeCloseTo(110, 4);
   });
@@ -642,7 +642,7 @@ describe('flow: paged (same scene, smaller clamp rect — no index state)', () =
     const { stage } = harness(PORTRAIT, { flow: 'paged' });
     stage.goToPage(3, { behavior: 'instant' });
     const viewState = stage.getViewState();
-    expect(viewState.cursor).toBe(3);
+    expect(viewState.pageIndex).toBe(3);
     const { stage: restored } = harness(PORTRAIT, { flow: 'paged' });
     restored.applyViewState(viewState);
     expect(restored.getCurrentPageIndex()).toBe(3);
@@ -675,7 +675,7 @@ describe('smooth scroll over a clock the test steps', () => {
     time.frame(120);
     time.frame(240);
     // The box is on screen, not the zoom alone at the top of page 1.
-    const page = stage.getPageFrame(toPageRef(4))!;
+    const page = stage.getPageBox(toPageRef(4))!;
     const top = stage.worldToViewport({ x: page.x, y: page.y + 72 }).y;
     expect(top).toBeGreaterThan(0);
     expect(top).toBeLessThan(700);
@@ -691,7 +691,7 @@ describe('the instance owns its frames and its viewport', () => {
     expect(time.pending).toEqual({ timers: 1, frames: 1 });
 
     // The document closes mid-flight (a page left in the docs tears its demos down this way).
-    await ctx.dispose();
+    await ctx.destroy();
     expect(time.pending).toEqual({ timers: 0, frames: 0 });
     stage.goToPage(1);
     expect(time.pending).toEqual({ timers: 0, frames: 0 });
@@ -850,7 +850,7 @@ describe('arrival is ZOOM-INVARIANT: the landing rule never depends on magnifica
     const { stage } = harness(PORTRAIT);
     stage.zoomTo({ level: 0.5 }); // page = 300x400, fits — but page 2 is off-screen
     stage.goToPage(2, { behavior: 'instant' });
-    const box = stage.getPageFrame(toPageRef(3))!;
+    const box = stage.getPageBox(toPageRef(3))!;
     expect(stage.worldToViewport({ x: 0, y: box.y }).y).toBeCloseTo(PAD, 0);
     // x has no real freedom (the scene fits) → the fitAlign rest keeps it centered
     expect(stage.worldToViewport({ x: box.x + box.width / 2, y: 0 }).x).toBeCloseTo(500, 0);
@@ -860,7 +860,7 @@ describe('arrival is ZOOM-INVARIANT: the landing rule never depends on magnifica
     const { stage } = harness(PORTRAIT);
     stage.zoomTo({ level: 2 }); // page = 1200x1600, overflows both axes
     stage.goToPage(2, { behavior: 'instant' });
-    const box = stage.getPageFrame(toPageRef(3))!;
+    const box = stage.getPageBox(toPageRef(3))!;
     const topLeft = stage.worldToViewport({ x: box.x, y: box.y });
     expect(topLeft.x).toBeCloseTo(PAD, 0);
     expect(topLeft.y).toBeCloseTo(PAD, 0);
@@ -874,7 +874,7 @@ describe('arrival is ZOOM-INVARIANT: the landing rule never depends on magnifica
     for (const level of [0.5, 2]) {
       stage.zoomTo({ level });
       stage.goToPage(2, { behavior: 'instant' });
-      const box = stage.getPageFrame(toPageRef(3))!;
+      const box = stage.getPageBox(toPageRef(3))!;
       const center = stage.worldToViewport({ x: box.x + box.width / 2, y: box.y + box.height / 2 });
       expect(center.x).toBeCloseTo(500, 0);
       expect(center.y).toBeCloseTo(350, 0);
@@ -888,7 +888,7 @@ describe('arrival is ZOOM-INVARIANT: the landing rule never depends on magnifica
       zoom: { level: 0.5 },
     });
     stage.goToPage(2, { behavior: 'instant' });
-    const box = stage.getPageFrame(toPageRef(3))!;
+    const box = stage.getPageBox(toPageRef(3))!;
     expect(stage.worldToViewport({ x: 0, y: box.y + box.height / 2 }).y).toBeCloseTo(700 * 0.35, 0);
   });
 
@@ -903,17 +903,17 @@ describe('arrival is ZOOM-INVARIANT: the landing rule never depends on magnifica
     stage.nextPage({ behavior: 'instant' });
     expect(stage.getCurrentPageIndex()).toBe(1);
     expect(stage.getCamera().x).toBeCloseTo(x, 4); // the pan survived the page turn
-    const box = stage.getPageFrame(toPageRef(2))!;
+    const box = stage.getPageBox(toPageRef(2))!;
     expect(stage.worldToViewport({ x: 0, y: box.y }).y).toBeCloseTo(PAD, 0); // y landed fresh
   });
 
   it('a per-call arrivalAlign overrides the setting for THIS arrival only', () => {
     const { stage } = harness(PORTRAIT, { zoom: { level: 0.5 }, bounded: false });
     stage.goToPage(2, { behavior: 'instant', arrivalAlign: { y: 'center' } });
-    const box = stage.getPageFrame(toPageRef(3))!;
+    const box = stage.getPageBox(toPageRef(3))!;
     expect(stage.worldToViewport({ x: 0, y: box.y + box.height / 2 }).y).toBeCloseTo(350, 0);
     stage.goToPage(3, { behavior: 'instant' }); // back to the setting: top
-    const nextBox = stage.getPageFrame(toPageRef(4))!;
+    const nextBox = stage.getPageBox(toPageRef(4))!;
     expect(stage.worldToViewport({ x: 0, y: nextBox.y }).y).toBeCloseTo(PAD, 0);
   });
 });
@@ -939,7 +939,7 @@ describe('navigation units: spread when it fits, page when zoomed in', () => {
     stage.nextPage({ behavior: 'instant' });
     expect(stage.getCurrentPageIndex()).toBe(1);
     // landed at page 1's start, not the spread's horizontal center
-    const box = stage.getPageFrame(toPageRef(2))!; // object 2 = page index 1
+    const box = stage.getPageBox(toPageRef(2))!; // object 2 = page index 1
     expect(stage.worldToViewport({ x: box.x, y: box.y }).x).toBeCloseTo(PAD, 0);
     stage.nextPage({ behavior: 'instant' });
     expect(stage.getCurrentPageIndex()).toBe(2); // walks into the spread
@@ -1116,7 +1116,7 @@ describe('cursor is INTENT: a clamped camera never revokes navigation', () => {
     stage.goToPage(3, { behavior: 'instant' }); // camera clamps at the right edge
     stage.previousPage({ behavior: 'instant' }); // page 3 (index 2) is visible but off-position
     expect(stage.getCurrentPageIndex()).toBe(2);
-    const box = stage.getPageFrame(toPageRef(3))!; // object 3 = page index 2
+    const box = stage.getPageBox(toPageRef(3))!; // object 3 = page index 2
     // canonical landing: reading edge at the gutter (the scene overflows x, so
     // the arrival policy — not the clamp — decides)
     expect(stage.worldToViewport({ x: box.x, y: box.y }).x).toBeCloseTo(PAD, 0);
@@ -1166,7 +1166,7 @@ describe('arrivalAlign: where navigation lands', () => {
       zoom: { level: 2 },
     });
     stage.goToPage(2, { behavior: 'instant' });
-    const box = stage.getPageFrame(toPageRef(3))!;
+    const box = stage.getPageBox(toPageRef(3))!;
     // page right edge sits a padding in from the viewport right edge; top a padding down
     expect(stage.worldToViewport({ x: box.x + box.width, y: box.y }).x).toBeCloseTo(1000 - PAD, 0);
     expect(stage.worldToViewport({ x: box.x, y: box.y }).y).toBeCloseTo(PAD, 0);
@@ -1179,7 +1179,7 @@ describe('arrivalAlign: where navigation lands', () => {
       bounded: false, // construction feel — and proves placement needs no real clamp
     });
     stage.goToPage(2, { behavior: 'instant' });
-    const box = stage.getPageFrame(toPageRef(3))!;
+    const box = stage.getPageBox(toPageRef(3))!;
     const center = stage.worldToViewport({ x: box.x + box.width / 2, y: box.y + box.height / 2 });
     expect(center.x).toBeCloseTo(500, 0);
     expect(center.y).toBeCloseTo(350, 0);
@@ -1192,7 +1192,7 @@ describe('arrivalAlign: where navigation lands', () => {
     stage.updateSettings({ arrivalAlign: { x: 'end', y: 'start' } });
     expect(stage.getCamera()).toEqual(before); // no camera jump on the setting change
     stage.goToPage(2, { behavior: 'instant' });
-    const box = stage.getPageFrame(toPageRef(3))!;
+    const box = stage.getPageBox(toPageRef(3))!;
     expect(stage.worldToViewport({ x: box.x + box.width, y: box.y }).x).toBeCloseTo(1000 - PAD, 0);
   });
 });
@@ -1249,7 +1249,7 @@ describe('anchorAlign: which viewport point survives a reframe', () => {
   it('default start/start: a growing container never shoves the document down', () => {
     const { stage } = harness(PORTRAIT); // automatic zoom resolves to 1
     stage.goToPage(1, { behavior: 'instant' });
-    const box = stage.getPageFrame(toPageRef(2))!;
+    const box = stage.getPageBox(toPageRef(2))!;
     expect(stage.worldToViewport({ x: box.x, y: box.y }).y).toBeCloseTo(PAD, 0);
     stage.setViewportSize({ width: 1000, height: 900 }); // the div finishes laying out
     // the top of the view is pinned; the extra height reveals more below
@@ -1269,10 +1269,10 @@ describe('anchorAlign: which viewport point survives a reframe', () => {
   it('scene reframes (gap change) hold the anchorAlign point too', () => {
     const { stage } = harness(PORTRAIT, { zoom: { level: 2 } });
     stage.goToPage(2, { behavior: 'instant' });
-    const box = stage.getPageFrame(toPageRef(3))!;
+    const box = stage.getPageBox(toPageRef(3))!;
     expect(stage.worldToViewport({ x: box.x, y: box.y }).y).toBeCloseTo(PAD, 0);
     stage.updateSettings({ gap: 64 }); // pages move in world space…
-    const after = stage.getPageFrame(toPageRef(3))!;
+    const after = stage.getPageBox(toPageRef(3))!;
     // …but the page-point at the top of the view stays at the top of the view
     expect(stage.worldToViewport({ x: after.x, y: after.y }).y).toBeCloseTo(PAD, 0);
   });
@@ -1284,7 +1284,7 @@ describe('fitAlign: where content RESTS on a fitting axis', () => {
 
   it('default {center,center}: a fitting document rests centered', () => {
     const { stage } = harness(FEW, { zoom: { level: 0.25 } });
-    const box = stage.getPageFrame(toPageRef(1))!;
+    const box = stage.getPageBox(toPageRef(1))!;
     // content cross extent centered: page 1 center x at viewport center
     expect(stage.worldToViewport({ x: box.x + box.width / 2, y: 0 }).x).toBeCloseTo(500, 0);
   });
@@ -1294,7 +1294,7 @@ describe('fitAlign: where content RESTS on a fitting axis', () => {
       zoom: { level: 0.25 },
       fitAlign: { x: 'center', y: 'start' },
     });
-    const box = stage.getPageFrame(toPageRef(1))!;
+    const box = stage.getPageBox(toPageRef(1))!;
     expect(stage.worldToViewport({ x: 0, y: box.y }).y).toBeCloseTo(PAD, 4); // top edge at the gutter
     expect(stage.worldToViewport({ x: box.x + box.width / 2, y: 0 }).x).toBeCloseTo(500, 0); // x stays centered
   });
@@ -1305,7 +1305,7 @@ describe('fitAlign: where content RESTS on a fitting axis', () => {
       direction: 'rtl',
       fitAlign: { x: 'start', y: 'start' },
     });
-    const box = stage.getPageFrame(toPageRef(1))!;
+    const box = stage.getPageBox(toPageRef(1))!;
     expect(stage.worldToViewport({ x: box.x + box.width, y: 0 }).x).toBeCloseTo(1000 - PAD, 4);
   });
 
@@ -1314,7 +1314,7 @@ describe('fitAlign: where content RESTS on a fitting axis', () => {
     const centered = stage.getCamera();
     stage.updateSettings({ fitAlign: { x: 'center', y: 'start' } });
     expect(stage.getCamera().y).not.toBeCloseTo(centered.y, 4); // moved up immediately
-    const box = stage.getPageFrame(toPageRef(1))!;
+    const box = stage.getPageBox(toPageRef(1))!;
     expect(stage.worldToViewport({ x: 0, y: box.y }).y).toBeCloseTo(PAD, 4);
   });
 
@@ -1333,14 +1333,14 @@ describe('fitAlign: where content RESTS on a fitting axis', () => {
 describe('gap: one value between items, every layout', () => {
   it('vertical layout: page 2 starts page-height + gap below page 1', () => {
     const { stage } = harness(PORTRAIT, { gap: 40 });
-    expect(stage.getPageFrame(toPageRef(1))!.y).toBe(0);
-    expect(stage.getPageFrame(toPageRef(2))!.y).toBeCloseTo(800 + 40, 6);
+    expect(stage.getPageBox(toPageRef(1))!.y).toBe(0);
+    expect(stage.getPageBox(toPageRef(2))!.y).toBeCloseTo(800 + 40, 6);
   });
 
   it('grid layout uses the SAME gap (no hidden 56)', () => {
     const { stage } = harness(PORTRAIT, { layout: 'grid', gap: 40 });
-    const first = stage.getPageFrame(toPageRef(1))!;
-    const second = stage.getPageFrame(toPageRef(2))!; // next column, same row
+    const first = stage.getPageBox(toPageRef(1))!;
+    const second = stage.getPageBox(toPageRef(2))!; // next column, same row
     expect(second.x - (first.x + first.width)).toBeCloseTo(40, 6);
   });
 
@@ -1349,7 +1349,7 @@ describe('gap: one value between items, every layout', () => {
     stage.goToPage(3, { behavior: 'instant' });
     stage.updateSettings({ gap: 64 });
     expect(stage.getCurrentPageIndex()).toBe(3);
-    expect(stage.getPageFrame(toPageRef(2))!.y).toBeCloseTo(800 + 64, 6); // scene rebuilt with the new gap
+    expect(stage.getPageBox(toPageRef(2))!.y).toBeCloseTo(800 + 64, 6); // scene rebuilt with the new gap
   });
 });
 
@@ -1362,8 +1362,8 @@ describe('direction: rtl — layout flips, navigation does not', () => {
     });
     expect(stage.getCurrentPageIndex()).toBe(0);
     // page 1 is the rightmost item in the scene
-    const first = stage.getPageFrame(toPageRef(1))!;
-    const last = stage.getPageFrame(toPageRef(5))!;
+    const first = stage.getPageBox(toPageRef(1))!;
+    const last = stage.getPageBox(toPageRef(5))!;
     expect(first.x).toBeGreaterThan(last.x);
     const startX = stage.getCamera().x;
     stage.nextPage({ behavior: 'instant' });
@@ -1375,20 +1375,16 @@ describe('direction: rtl — layout flips, navigation does not', () => {
 
   it('vertical rtl + spread: page 1 binds on the right (all flows)', () => {
     const { stage } = harness(PORTRAIT, { spread: 'odd', direction: 'rtl' });
-    expect(stage.getPageFrame(toPageRef(1))!.x).toBeGreaterThan(
-      stage.getPageFrame(toPageRef(2))!.x,
-    );
+    expect(stage.getPageBox(toPageRef(1))!.x).toBeGreaterThan(stage.getPageBox(toPageRef(2))!.x);
     // paged too: the slice inherits the swap
     stage.updateSettings({ flow: 'paged' });
-    expect(stage.getPageFrame(toPageRef(1))!.x).toBeGreaterThan(
-      stage.getPageFrame(toPageRef(2))!.x,
-    );
+    expect(stage.getPageBox(toPageRef(1))!.x).toBeGreaterThan(stage.getPageBox(toPageRef(2))!.x);
   });
 
   it('logical align: the default start/start lands top-RIGHT in rtl (no auto needed)', () => {
     const { stage } = harness(PORTRAIT, { direction: 'rtl', zoom: { level: 2 } });
     stage.goToPage(2, { behavior: 'instant' });
-    const box = stage.getPageFrame(toPageRef(3))!;
+    const box = stage.getPageBox(toPageRef(3))!;
     expect(stage.worldToViewport({ x: box.x + box.width, y: box.y }).x).toBeCloseTo(1000 - PAD, 0);
     expect(stage.worldToViewport({ x: box.x, y: box.y }).y).toBeCloseTo(PAD, 0);
   });
@@ -1426,19 +1422,15 @@ describe("columns: 'auto' — the wrapped grid (thumbnail sidebar)", () => {
   it('narrow viewport → one column; wider → re-wraps to more', () => {
     const { stage } = harness(PORTRAIT, THUMBS, { skipViewport: true });
     stage.setViewportSize({ width: 160, height: 700 }); // line = 700 world → 1 column
-    expect(stage.getPageFrame(toPageRef(2))!.x).toBeCloseTo(stage.getPageFrame(toPageRef(1))!.x, 6); // stacked
-    expect(stage.getPageFrame(toPageRef(2))!.y).toBeGreaterThan(
-      stage.getPageFrame(toPageRef(1))!.y,
-    );
+    expect(stage.getPageBox(toPageRef(2))!.x).toBeCloseTo(stage.getPageBox(toPageRef(1))!.x, 6); // stacked
+    expect(stage.getPageBox(toPageRef(2))!.y).toBeGreaterThan(stage.getPageBox(toPageRef(1))!.y);
 
     stage.setViewportSize({ width: 270, height: 700 }); // line = 1250 → 2 columns
-    expect(stage.getPageFrame(toPageRef(2))!.y).toBeCloseTo(stage.getPageFrame(toPageRef(1))!.y, 6); // side by side
-    expect(stage.getPageFrame(toPageRef(3))!.y).toBeGreaterThan(
-      stage.getPageFrame(toPageRef(1))!.y,
-    ); // row 2
+    expect(stage.getPageBox(toPageRef(2))!.y).toBeCloseTo(stage.getPageBox(toPageRef(1))!.y, 6); // side by side
+    expect(stage.getPageBox(toPageRef(3))!.y).toBeGreaterThan(stage.getPageBox(toPageRef(1))!.y); // row 2
 
     stage.setViewportSize({ width: 400, height: 700 }); // line = 1900 → 3 columns
-    expect(stage.getPageFrame(toPageRef(3))!.y).toBeCloseTo(stage.getPageFrame(toPageRef(1))!.y, 6);
+    expect(stage.getPageBox(toPageRef(3))!.y).toBeCloseTo(stage.getPageBox(toPageRef(1))!.y, 6);
   });
 
   it('re-wrapping keeps the current page (anchor-preserving resize)', () => {
@@ -1464,12 +1456,10 @@ describe('wrapped + discrete zoom: the scene re-wraps and the camera follows', (
   it('zoomIn across a column boundary leaves the camera already clamped', () => {
     const { stage } = harness(PORTRAIT, WRAPPED);
     // 4 columns: page 4 (index 3) sits in row 0
-    expect(stage.getPageFrame(toPageRef(4))!.y).toBeCloseTo(stage.getPageFrame(toPageRef(1))!.y, 6);
+    expect(stage.getPageBox(toPageRef(4))!.y).toBeCloseTo(stage.getPageBox(toPageRef(1))!.y, 6);
     stage.zoomIn();
     // re-wrapped to 3 columns: page 4 moved to row 1
-    expect(stage.getPageFrame(toPageRef(4))!.y).toBeGreaterThan(
-      stage.getPageFrame(toPageRef(1))!.y,
-    );
+    expect(stage.getPageBox(toPageRef(4))!.y).toBeGreaterThan(stage.getPageBox(toPageRef(1))!.y);
     // the camera must satisfy the new scene's clamp immediately: a no-op pan
     // (which clamps) must not move it
     const settled = stage.getCamera();
@@ -1482,9 +1472,7 @@ describe('wrapped + discrete zoom: the scene re-wraps and the camera follows', (
     stage.goToPage(2, { behavior: 'instant' });
     stage.fitWidth(); // resolves to ~1.59 → re-wraps to a single column
     expect(stage.getCurrentPageIndex()).toBe(2); // the reapply never touches the cursor
-    expect(stage.getPageFrame(toPageRef(2))!.y).toBeGreaterThan(
-      stage.getPageFrame(toPageRef(1))!.y,
-    ); // 1 column now
+    expect(stage.getPageBox(toPageRef(2))!.y).toBeGreaterThan(stage.getPageBox(toPageRef(1))!.y); // 1 column now
     // the camera must already satisfy the new scene's clamp: a no-op pan (which
     // clamps) must not move it
     const settled = stage.getCamera();
@@ -1505,13 +1493,13 @@ describe('wrapped + discrete zoom: the scene re-wraps and the camera follows', (
     // re-pin property is exact on both axes. Under bounds, the clamp wins wherever
     // the camera has no freedom — covered by the no-op-pan test above.
     const { stage } = harness(PORTRAIT, { ...WRAPPED, bounded: false });
-    const before = stage.getPageFrame(toPageRef(2))!;
+    const before = stage.getPageBox(toPageRef(2))!;
     const screenPoint = stage.worldToViewport({
       x: before.x + before.width * 0.25,
       y: before.y + before.height * 0.4,
     });
     stage.zoomAround(screenPoint, 1.2); // crosses the 4→3 column boundary
-    const after = stage.getPageFrame(toPageRef(2))!; // page 2 has moved in the new wrap…
+    const after = stage.getPageBox(toPageRef(2))!; // page 2 has moved in the new wrap…
     const world = stage.viewportToWorld(screenPoint); // …but its page-point is back under the cursor
     expect((world.x - after.x) / after.width).toBeCloseTo(0.25, 3);
     expect((world.y - after.y) / after.height).toBeCloseTo(0.4, 3);
@@ -1580,9 +1568,9 @@ describe('zoom { pageWidth }: pixel-target thumbnails for ANY document', () => {
   it('uniform + pageWidth: EVERY page renders exactly N screen px wide', () => {
     const { stage } = harness(MIXED, { sizing: 'uniform', zoom: { pageWidth: 200 } });
     const zoom = stage.getZoomLevel();
-    expect(stage.getPageFrame(toPageRef(1))!.width * zoom).toBeCloseTo(200, 4);
-    expect(stage.getPageFrame(toPageRef(2))!.width * zoom).toBeCloseTo(200, 4);
-    expect(stage.getPageFrame(toPageRef(3))!.width * zoom).toBeCloseTo(200, 4);
+    expect(stage.getPageBox(toPageRef(1))!.width * zoom).toBeCloseTo(200, 4);
+    expect(stage.getPageBox(toPageRef(2))!.width * zoom).toBeCloseTo(200, 4);
+    expect(stage.getPageBox(toPageRef(3))!.width * zoom).toBeCloseTo(200, 4);
   });
 
   it('the same config gives the same pixels for a totally different document', () => {
@@ -1591,22 +1579,22 @@ describe('zoom { pageWidth }: pixel-target thumbnails for ANY document', () => {
       { width: 2880, height: 2000 },
     ];
     const { stage } = harness(HUGE, { sizing: 'uniform', zoom: { pageWidth: 200 } });
-    expect(stage.getPageFrame(toPageRef(1))!.width * stage.getZoomLevel()).toBeCloseTo(200, 4);
+    expect(stage.getPageBox(toPageRef(1))!.width * stage.getZoomLevel()).toBeCloseTo(200, 4);
   });
 
   it('intrinsic + pageWidth: the WIDEST page is N px, narrower ones proportional', () => {
     const { stage } = harness(MIXED, { zoom: { pageWidth: 200 } }); // sizing intrinsic
     const zoom = stage.getZoomLevel();
-    expect(stage.getPageFrame(toPageRef(2))!.width * zoom).toBeCloseTo(200, 4); // widest = 200
-    expect(stage.getPageFrame(toPageRef(1))!.width * zoom).toBeCloseTo(120, 4); // 600/1000 of it
-    expect(stage.getPageFrame(toPageRef(3))!.width * zoom).toBeCloseTo(100, 4);
+    expect(stage.getPageBox(toPageRef(2))!.width * zoom).toBeCloseTo(200, 4); // widest = 200
+    expect(stage.getPageBox(toPageRef(1))!.width * zoom).toBeCloseTo(120, 4); // 600/1000 of it
+    expect(stage.getPageBox(toPageRef(3))!.width * zoom).toBeCloseTo(100, 4);
   });
 
   it('paged + pageWidth: the CURRENT page is N px (per-page exact)', () => {
     const { stage } = harness(MIXED, { flow: 'paged', zoom: { pageWidth: 200 } });
-    expect(stage.getPageFrame(toPageRef(1))!.width * stage.getZoomLevel()).toBeCloseTo(200, 4);
+    expect(stage.getPageBox(toPageRef(1))!.width * stage.getZoomLevel()).toBeCloseTo(200, 4);
     stage.goToPage(1, { behavior: 'instant' }); // the 1000-wide page
-    expect(stage.getPageFrame(toPageRef(2))!.width * stage.getZoomLevel()).toBeCloseTo(200, 4);
+    expect(stage.getPageBox(toPageRef(2))!.width * stage.getZoomLevel()).toBeCloseTo(200, 4);
   });
 
   it('wrapped + pageWidth converges (the thumbnail-sidebar config)', () => {
@@ -1618,7 +1606,7 @@ describe('zoom { pageWidth }: pixel-target thumbnails for ANY document', () => {
       padding: 10,
       gap: 12,
     });
-    expect(stage.getPageFrame(toPageRef(1))!.width * stage.getZoomLevel()).toBeCloseTo(200, 4);
+    expect(stage.getPageBox(toPageRef(1))!.width * stage.getZoomLevel()).toBeCloseTo(200, 4);
     const settled = stage.getCamera();
     stage.panBy(0, 0); // a no-op pan clamps — the camera must already be legal
     expect(stage.getCamera()).toEqual(settled);
@@ -1627,8 +1615,8 @@ describe('zoom { pageWidth }: pixel-target thumbnails for ANY document', () => {
 
 describe('gap: the value carries the unit — world (canvas) vs { px } (UI-stable)', () => {
   const screenGap = (stage: ReturnType<typeof harness>['stage']) => {
-    const first = stage.getPageFrame(toPageRef(1))!;
-    return (stage.getPageFrame(toPageRef(2))!.y - (first.y + first.height)) * stage.getZoomLevel();
+    const first = stage.getPageBox(toPageRef(1))!;
+    return (stage.getPageBox(toPageRef(2))!.y - (first.y + first.height)) * stage.getZoomLevel();
   };
 
   it('a world gap scales with zoom — the whole canvas zooms as one rigid object', () => {
@@ -1672,8 +1660,8 @@ describe('pageFrame (screen px): reserved chrome bands at the lens zoom', () => 
       zoom: { level: 0.5 },
       pageFrame: { top: 10, right: 0, bottom: 30, left: 0 },
     });
-    const first = stage.getPageFrame(toPageRef(1))!;
-    const second = stage.getPageFrame(toPageRef(2))!;
+    const first = stage.getPageBox(toPageRef(1))!;
+    const second = stage.getPageBox(toPageRef(2))!;
     // world distance between pages = bottom/zoom + gap + top/zoom
     expect(second.y - (first.y + first.height)).toBeCloseTo(30 / 0.5 + 16 + 10 / 0.5, 4);
     // on screen that is exactly 30px + scaled gap + 10px: the bands are px-true
@@ -1714,8 +1702,8 @@ describe('pageFrame (screen px): reserved chrome bands at the lens zoom', () => 
     // band plus the world gap
     const zoom = stage.getZoomLevel();
     expect(110 / zoom).toBeCloseTo(600, 0); // pageWidth target hit (110px wide thumbs)
-    const first = stage.getPageFrame(toPageRef(1))!;
-    const below = stage.getPageFrame(toPageRef(2))!.y - (first.y + first.height);
+    const first = stage.getPageBox(toPageRef(1))!;
+    const below = stage.getPageBox(toPageRef(2))!.y - (first.y + first.height);
     expect(below * zoom).toBeCloseTo(16 + 12 * zoom, 1); // band(px) + gap(world→px)
   });
 
@@ -1725,7 +1713,7 @@ describe('pageFrame (screen px): reserved chrome bands at the lens zoom', () => 
       pageFrame: { top: 0, right: 0, bottom: 30, left: 0 },
     });
     stage.reveal(3, { behavior: 'instant' });
-    const rect = stage.getPageFrame(toPageRef(4))!; // object 4 = page index 3
+    const rect = stage.getPageBox(toPageRef(4))!; // object 4 = page index 3
     const outerBottom = rect.y + rect.height + 30 / 0.5; // page + its band
     // coming from above, reveal pins the outer bottom at the padded view edge
     expect(outerBottom).toBeCloseTo(stage.getCamera().y + (700 - PAD) / 0.5, 4);
@@ -1749,7 +1737,7 @@ describe('reveal: make-visible without navigating (the sidebar follower verb)', 
     const revealed = stage.getCamera();
     expect(revealed).not.toEqual(start);
     // minimal: page 5's bottom edge sits a padding above the viewport bottom
-    const box = stage.getPageFrame(toPageRef(5))!;
+    const box = stage.getPageBox(toPageRef(5))!;
     expect(stage.worldToViewport({ x: box.x, y: box.y + box.height }).y).toBeCloseTo(700 - 10, 0);
     // revealing it again — or a neighbour that's now visible — moves nothing
     stage.reveal(4, { behavior: 'instant' });
@@ -1796,18 +1784,18 @@ describe('viewpoint: per-page view memory (construction worksheets)', () => {
 describe('viewRotation: the NON-persistent view rotation (Adobe "Rotate View")', () => {
   it('rotates every page footprint and never touches the document', () => {
     const { stage, meta } = harness(PORTRAIT);
-    const revisionBefore = meta.revision;
+    const pagesSequenceBefore = meta.pagesSequence;
     stage.setViewRotation(90);
-    const box = stage.getPageFrame(toPageRef(1))!;
+    const box = stage.getPageBox(toPageRef(1))!;
     // 600×800 portrait displays landscape…
     expect(box.rotation).toBe(90);
     expect(box.width).toBeCloseTo(800, 0);
     expect(box.height).toBeCloseTo(600, 0);
     expect(box.transform.rotation).toBe(90);
-    // …while the document stays exactly as it was: no /Rotate write, no revision
+    // …while the document stays exactly as it was: no /Rotate write, no `pagesSequence` move
     // bump — this is a display setting of the lens, not an edit.
     expect(meta.pages[0].rotation).toBe(0);
-    expect(meta.revision).toBe(revisionBefore);
+    expect(meta.pagesSequence).toBe(pagesSequenceBefore);
     expect(stage.getSettings().viewRotation).toBe(90);
     expect(stage.getSettings().viewRotation).toBe(90); // in the settings snapshot (presets/persist)
   });
@@ -1819,11 +1807,11 @@ describe('viewRotation: the NON-persistent view rotation (Adobe "Rotate View")',
     ]);
     stage.setViewRotation(90);
     // page 1: 90 (/Rotate) + 90 (view) = 180 → footprint back to portrait
-    const first = stage.getPageFrame(toPageRef(1))!;
+    const first = stage.getPageBox(toPageRef(1))!;
     expect(first.rotation).toBe(180);
     expect(first.width).toBeCloseTo(600, 0);
     // page 2: 0 + 90 → landscape
-    const second = stage.getPageFrame(toPageRef(2))!;
+    const second = stage.getPageBox(toPageRef(2))!;
     expect(second.rotation).toBe(90);
     expect(second.width).toBeCloseTo(800, 0);
   });

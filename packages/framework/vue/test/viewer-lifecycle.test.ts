@@ -32,7 +32,7 @@ const page: PageLayout = {
 function makeHandle(id: string) {
   const handle = {
     id,
-    events: { subscribe: () => () => {}, lastServerId: () => null },
+    events: { subscribe: () => () => {}, lastServerSequence: () => null },
     pages: { list: () => Promise.resolve({ pageCount: 1, labels: [], pages: [page] }) },
     close: vi.fn(() => Promise.resolve()),
   };
@@ -100,7 +100,7 @@ describe('<Viewer> lifecycle', () => {
     const BootScreen = defineComponent({
       setup() {
         const kernel = useKernel(); // usable before the start completes
-        statuses.push(kernel.status());
+        statuses.push(kernel.getStatus());
         return () => h('div', { 'data-testid': 'boot' }, 'booting');
       },
     });
@@ -165,7 +165,7 @@ describe('<Viewer> lifecycle', () => {
     });
     const wrapper = mount(Host);
     await until(() => wrapper.find('[data-testid="shell"]').exists());
-    expect(viewer.value?.kernel).toMatchObject({ status: expect.any(Function) });
+    expect(viewer.value?.kernel).toMatchObject({ getStatus: expect.any(Function) });
   });
 });
 

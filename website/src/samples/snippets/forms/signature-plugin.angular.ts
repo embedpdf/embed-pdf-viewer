@@ -15,7 +15,8 @@ import { engine } from './pdf';
       withForm(),
       withStamp(),
       withSignature({
-        key: () => personalSigner({ subject: 'Ada Lovelace', store: indexedDbKeyStore('my-app-keys') }),
+        signingKey: () =>
+          personalSigner({ subject: 'Ada Lovelace', store: indexedDbKeyStore('my-app-keys') }),
         trust: { anchors: async () => [rootCertificate] }, // the certificates you trust
       }),
     ),

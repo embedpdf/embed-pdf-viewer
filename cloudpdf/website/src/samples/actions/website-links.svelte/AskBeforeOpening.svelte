@@ -8,7 +8,7 @@
     type PdfActionTree,
   } from '@embedpdf/svelte/actions';
 
-  // A link to a website, as a PDF carries it: what getActionTree() reads from a link.
+  // A link to a website, as a PDF carries it: what readActionTree() reads from a link.
   const websiteLink: PdfActionTree = {
     root: {
       type: 'uri',
@@ -23,7 +23,7 @@
   const click: ActionContext = {
     origin: 'user',
     source: { kind: 'api' },
-    event: { scope: 'activate' },
+    event: { type: 'activate' },
   };
 
   const actions = useActions();
@@ -56,9 +56,7 @@
       </p>
       <div class="prompt-actions">
         <button type="button" class="button" onclick={() => (asking = null)}>Stay here</button>
-        <button type="button" class="button primary" onclick={openSite}>
-          Open in a new tab
-        </button>
+        <button type="button" class="button primary" onclick={openSite}> Open in a new tab </button>
       </div>
     </div>
   {/if}

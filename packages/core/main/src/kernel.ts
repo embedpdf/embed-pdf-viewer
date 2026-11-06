@@ -108,7 +108,7 @@ export interface Kernel extends SettingsApi<ViewerSettings> {
   /**
    * Resolve a capability. For document-scoped tokens, `documentId` defaults to the active doc.
    * For a workspace token, a `documentId` gives the capability as seen from that document's
-   * scope (`PluginDef.inScope`; the documents capability too): the same object on every call
+   * scope (`PluginDefinition.inScope`; the documents capability too): the same object on every call
    * while the document is open.
    */
   capability<T>(token: CapabilityToken<T>, documentId?: string): T;
@@ -134,7 +134,7 @@ export interface Kernel extends SettingsApi<ViewerSettings> {
   settingsOf<C>(token: CapabilityToken<C>): SettingsApi<SettingsOf<C>>;
   subscribe(listener: () => void): Unsubscribe;
   getState(): GlobalState;
-  status(): KernelStatus;
+  getStatus(): KernelStatus;
   /** Idempotent: a second call joins the first. Throws after destroy(). */
   start(): Promise<void>;
   /**
@@ -168,7 +168,7 @@ const readyInfo = (meta: DocumentMeta): DocumentInfo =>
     pageCount: meta.pageCount,
     hasUnsavedChanges: meta.hasUnsavedChanges,
     ...(meta.identityRequest ? { identityRequest: meta.identityRequest } : {}),
-    ...(meta.grantRequest ? { grantRequest: meta.grantRequest } : {}),
+    ...(meta.openRequest ? { openRequest: meta.openRequest } : {}),
   });
 const pendingInfo = (meta: PendingMeta): DocumentInfo =>
   Object.freeze({
@@ -181,17 +181,14 @@ const pendingInfo = (meta: PendingMeta): DocumentInfo =>
     ...(meta.status === 'error' && meta.error !== undefined
       ? { error: toPluginErrorInfo(toPluginError('documents', meta.error)) }
       : {}),
-    ...(meta.grantRequest ? { grantRequest: meta.grantRequest } : {}),
+    ...(meta.openRequest ? { openRequest: meta.openRequest } : {}),
   });
 
 /**
  * What an open from a grant (`grant`) that failed with `error` waits for: the grant's
  * passphrase, or the visitor's answers. `share` says whether a passphrase was tried.
  */
-function grantRequestOf(
-  error: unknown,
-  grant: OpenInputGrant | null,
-): GrantOpenRequest | undefined {
+function openRequestOf(error: unknown, grant: OpenInputGrant | null): GrantOpenRequest | undefined {
   if (!grant) return undefined;
   return grantOpenRequestOf(error, grant.passphrase !== undefined) ?? undefined;
 }
@@ -205,8 +202,8 @@ function retrySourceOf(
   grant: OpenInputGrant | null,
   options: RetryOptions | undefined,
 ): OpenSource {
-  const { passphrase, identity } = options ?? {};
-  if (passphrase === undefined && identity === undefined) return source;
+  const { passphrase, visitorIdentity } = options ?? {};
+  if (passphrase === undefined && visitorIdentity === undefined) return source;
   if (!grant) {
     throw new PluginError(
       'invalid-input',
@@ -348,7 +345,7 @@ interface DocumentSession extends SessionRef {
    * store holds its notifications while a document's plugins are built.)
    */
   building: Set<AnyPlugin>;
-  /** Workspace capabilities as seen from this document's scope (`PluginDef.inScope`), by token. */
+  /** Workspace capabilities as seen from this document's scope (`PluginDefinition.inScope`), by token. */
   views: Map<CapabilityToken<unknown>, unknown>;
   /** `connect` halves of `create()`, run once every instance of the document is built. */
   connectors: Map<AnyPlugin, () => void>;
@@ -454,7 +451,7 @@ export function createKernel(config: {
       pagesChanged,
       unsavedChangesChanged,
     ])
-      hook.dispose();
+      hook.destroy();
   });
   /** Every core write goes through here so an active-tab change is observed exactly once. */
   const setCore = (patch: Partial<CoreState>): void => {
@@ -626,7 +623,7 @@ export function createKernel(config: {
       await session.operation?.catch((error) => {
         if (!isCancelled(error) && !isAbortLike(error)) report(error);
       });
-      await session.scope.dispose();
+      await session.scope.destroy();
       if (sessions.get(session.id) === session) sessions.delete(session.id);
       session.views.clear();
       closed.emit({ documentId: session.id });
@@ -670,7 +667,7 @@ export function createKernel(config: {
 
   function publishError(session: DocumentSession, error: unknown): void {
     const core = store.getCore();
-    const grantRequest = grantRequestOf(error, session.grantInput);
+    const openRequest = openRequestOf(error, session.grantInput);
     setCore({
       pending: {
         ...core.pending,
@@ -679,7 +676,7 @@ export function createKernel(config: {
           name: session.name,
           status: 'error',
           error,
-          ...(grantRequest ? { grantRequest } : {}),
+          ...(openRequest ? { openRequest } : {}),
         },
       },
     });
@@ -718,9 +715,9 @@ export function createKernel(config: {
     const grant = session.handle?.grant;
     if (grant) {
       session.scope.defer(
-        grant.onIdentityRequest((request) => setIdentityRequest(session, request)),
+        grant.onIdentityRequested((request) => setIdentityRequest(session, request)),
       );
-      session.scope.defer(grant.onOpenRequest((request) => setGrantRequest(session, request)));
+      session.scope.defer(grant.onOpenRequested((request) => setOpenRequest(session, request)));
     }
     opened.emit({ documentId: session.id, info: documentInfoOf(meta) });
   }
@@ -737,7 +734,7 @@ export function createKernel(config: {
       pages,
       pageLabels: labels,
       pendingPages: pending,
-      revision: meta.pages === pages ? meta.revision : meta.revision + 1,
+      pagesSequence: meta.pages === pages ? meta.pagesSequence : meta.pagesSequence + 1,
     };
   }
 
@@ -757,38 +754,42 @@ export function createKernel(config: {
     if (updated === existing) return;
     setCore({ documents: { ...now.documents, [session.id]: updated } });
     if (updated.pages === existing.pages) return;
-    pagesChanged.emit({ documentId: session.id, revision: updated.revision, pages: updated.pages });
+    pagesChanged.emit({
+      documentId: session.id,
+      pagesSequence: updated.pagesSequence,
+      pages: updated.pages,
+    });
   }
 
   /** Show, or stop showing, that the grant asks before the document goes on. */
-  function setGrantRequest(session: DocumentSession, request: GrantOpenRequest | null): void {
+  function setOpenRequest(session: DocumentSession, request: GrantOpenRequest | null): void {
     const core = store.getCore();
     const published = core.documents[session.id];
-    if (!published || (published.grantRequest ?? null) === request) return;
-    const { grantRequest: _shown, ...rest } = published;
+    if (!published || (published.openRequest ?? null) === request) return;
+    const { openRequest: _shown, ...rest } = published;
     setCore({
       documents: {
         ...core.documents,
-        [session.id]: request ? { ...rest, grantRequest: request } : rest,
+        [session.id]: request ? { ...rest, openRequest: request } : rest,
       },
     });
   }
 
-  /** Give a ready document's grant what it asks (`grantRequest`): it goes on as the same visitor. */
+  /** Give a ready document's grant what it asks (`openRequest`): it goes on as the same visitor. */
   async function resumeGrant(session: DocumentSession, options: RetryOptions | undefined) {
     const grant = session.handle!.grant!;
-    const { passphrase, identity } = options ?? {};
+    const { passphrase, visitorIdentity } = options ?? {};
     try {
       await grant.resume({
         ...(passphrase !== undefined ? { passphrase } : {}),
-        ...(identity !== undefined ? { identity } : {}),
+        ...(visitorIdentity !== undefined ? { visitorIdentity } : {}),
       });
     } catch (error) {
       // Still asked: the request shows what's wrong or missing.
-      setGrantRequest(session, grant.openRequest);
+      setOpenRequest(session, grant.openRequest);
       throw toPluginError('documents', error);
     }
-    setGrantRequest(session, grant.openRequest);
+    setOpenRequest(session, grant.openRequest);
     return { document: getDocument(session.id)! };
   }
 
@@ -1092,12 +1093,12 @@ export function createKernel(config: {
         quality: printed,
       } = await stagePrint(session, printer, quality, options);
       let disposed = false;
-      const dispose = () => {
+      const destroy = () => {
         if (disposed) return;
         disposed = true;
-        staged.dispose();
+        staged.destroy();
       };
-      session.scope.defer(dispose);
+      session.scope.defer(destroy);
       /** Stage the print again, as `as`, in place of what was staged. */
       const restage = async (as: PrintQuality, signal: AbortSignal | undefined) => {
         const fresh = await stagePrint(session, printer, as, {
@@ -1107,7 +1108,7 @@ export function createKernel(config: {
             : {}),
           ...(signal ? { signal } : {}),
         });
-        staged.dispose();
+        staged.destroy();
         ({ staged, changesSeen, quality: printed } = fresh);
       };
       return {
@@ -1142,7 +1143,7 @@ export function createKernel(config: {
             throw toPluginError('documents', error);
           }
         },
-        dispose,
+        destroy,
       };
     } catch (error) {
       throw toPluginError('documents', error);
@@ -1262,7 +1263,7 @@ export function createKernel(config: {
     store.notify,
     report,
   );
-  workspaceScope.defer(() => viewerSettings.dispose());
+  workspaceScope.defer(() => viewerSettings.destroy());
 
   // A plugin's settings belong to the plugin as the app registered it, not to one document.
   // Each registration's store is built here, before any plugin is created, so the settings
@@ -1277,7 +1278,7 @@ export function createKernel(config: {
   }
   // Destroy ends the listeners; the values stay readable, so a reader unmounting late never throws.
   workspaceScope.defer(() => {
-    for (const settings of settingsStores.values()) settings.dispose();
+    for (const settings of settingsStores.values()) settings.destroy();
   });
 
   function settingsOf<C>(token: CapabilityToken<C>): SettingsApi<SettingsOf<C>> {
@@ -1347,7 +1348,7 @@ export function createKernel(config: {
       pages: session.pageView.current().pages,
       pageLabels: session.pageView.current().labels,
       pendingPages: NO_PENDING_PAGES,
-      revision: 0,
+      pagesSequence: 0,
       renderPolicy,
       hasUnsavedChanges: false,
     };
@@ -1539,7 +1540,7 @@ export function createKernel(config: {
         // 3. Real failure: Rollback (scope releases exactly what was acquired,
         //    however far we got), then park the tab as `error` — closable, and
         //    reopenable after close. The document was never `ready`.
-        await session.scope.dispose();
+        await session.scope.destroy();
         session.phase = 'error';
         publishError(session, error);
         throw error;
@@ -1585,7 +1586,7 @@ export function createKernel(config: {
         if (session.phase === 'closing' || isAbortLike(error)) {
           throw new CancelledError(`closed while opening: ${session.id}`);
         }
-        await session.scope.dispose();
+        await session.scope.destroy();
         session.phase = 'error';
         publishError(session, error);
         throw error;
@@ -1659,8 +1660,8 @@ export function createKernel(config: {
       // The visitor's answers join who the page said the user is: the document's own, else the
       // viewer's.
       const identity =
-        options?.identity !== undefined
-          ? { ...engineOptionsOf(openOptions).identity, ...options.identity }
+        options?.visitorIdentity !== undefined
+          ? { ...engineOptionsOf(openOptions).identity, ...options.visitorIdentity }
           : undefined;
       sessions.delete(id);
       return openDocument(
@@ -1786,7 +1787,7 @@ export function createKernel(config: {
       try {
         await prepared.print(options.signal ? { signal: options.signal } : undefined);
       } finally {
-        prepared.dispose();
+        prepared.destroy();
       }
     },
     getPrintQuality: (id) => printQualityOf(id),
@@ -1798,7 +1799,7 @@ export function createKernel(config: {
     getPage: (page, id) => findPage(metaOf(id)?.pages ?? EMPTY_PAGES, page),
     getPageIndex: (ref, id) =>
       metaOf(id)?.pages.findIndex((pageInfo) => pageRefsEqual(pageInfo.ref, ref)) ?? -1,
-    getRevision: (id) => metaOf(id)?.revision ?? -1,
+    getRevision: (id) => metaOf(id)?.pagesSequence ?? -1,
     onOpened: opened.on,
     onOpenFailed: openFailed.on,
     onLocked: locked.on,
@@ -1842,7 +1843,7 @@ export function createKernel(config: {
     settingsOf,
     subscribe: store.subscribe,
     getState: store.getState,
-    status: () => status,
+    getStatus: () => status,
     start: () => {
       if (status === 'destroying' || status === 'destroyed' || status === 'failed') {
         return Promise.reject(new Error(`[kernel] start() on a ${status} kernel`));
@@ -1859,7 +1860,7 @@ export function createKernel(config: {
           // Startup failure unwinds everything construction + start registered;
           // the kernel is terminally failed (destroy() remains legal, and idle).
           status = 'failed';
-          await workspaceScope.dispose();
+          await workspaceScope.destroy();
           workspaceCapabilities.clear();
           throw error;
         }
@@ -1877,7 +1878,7 @@ export function createKernel(config: {
         // session mid-close is already unpublished but still needs joining.
         await Promise.allSettled([...sessions.values()].map((session) => session.close()));
         sessions.clear();
-        await workspaceScope.dispose();
+        await workspaceScope.destroy();
         workspaceCapabilities.clear();
         store.destroy();
         status = 'destroyed';

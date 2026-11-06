@@ -18,7 +18,7 @@ describe('scope', () => {
       order.push('third-registered');
     });
 
-    await scope.dispose();
+    await scope.destroy();
     expect(order).toEqual(['third-registered', 'second-registered', 'first-registered']);
   });
 
@@ -37,7 +37,7 @@ describe('scope', () => {
       ran.push('b');
     });
 
-    await scope.dispose();
+    await scope.destroy();
     expect(ran).toEqual(['b', 'a']);
     expect(report).toHaveBeenCalledTimes(2);
   });
@@ -47,20 +47,20 @@ describe('scope', () => {
     const scope = createScope(() => {});
     scope.defer(teardown);
 
-    const first = scope.dispose();
-    const second = scope.dispose();
+    const first = scope.destroy();
+    const second = scope.destroy();
     expect(first).toBe(second);
     await first;
     expect(teardown).toHaveBeenCalledTimes(1);
-    await scope.dispose(); // post-completion call: still the same settled promise
+    await scope.destroy(); // post-completion call: still the same settled promise
     expect(teardown).toHaveBeenCalledTimes(1);
   });
 
   it('a disposed scope never swallows a teardown — late defer runs immediately', async () => {
     const late = vi.fn();
     const scope = createScope(() => {});
-    await scope.dispose();
-    expect(scope.disposed).toBe(true);
+    await scope.destroy();
+    expect(scope.destroyed).toBe(true);
 
     scope.defer(late); // e.g. an in-flight init registering cleanup after close
     expect(late).not.toHaveBeenCalled(); // async, but...
@@ -79,7 +79,7 @@ describe('scope', () => {
         }),
     );
 
-    const disposal = scope.dispose();
+    const disposal = scope.destroy();
     scope.defer(() => {
       order.push('late');
     });
@@ -93,7 +93,7 @@ describe('scope', () => {
   it('a throwing late defer is reported, not unhandled', async () => {
     const report = vi.fn();
     const scope = createScope(report);
-    await scope.dispose();
+    await scope.destroy();
     scope.defer(() => {
       throw new Error('late boom');
     });

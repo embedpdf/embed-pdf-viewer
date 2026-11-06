@@ -12,7 +12,7 @@ import {
   type Shape,
   type ViewEnv,
 } from '@embedpdf/core-annotation';
-import type { PageRotation } from '@embedpdf/core-geometry';
+import type { Rotation } from '@embedpdf/core-geometry';
 import type { PageRef } from '@embedpdf/engine-core/runtime';
 
 import type { ImageGhost } from '../contract';
@@ -82,7 +82,7 @@ export function createGhost(
     toolId: string,
     page: PageRef,
     point: Point,
-    displayRotation?: PageRotation,
+    displayRotation?: Rotation,
     zoom?: number,
   ): void => {
     const tool = tools.get(toolId);

@@ -1,4 +1,4 @@
-import type { PdfCoordinates, SignatureDTO } from '@embedpdf/engine-core/runtime';
+import type { PdfCoordinates, Signature } from '@embedpdf/engine-core/runtime';
 import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
@@ -29,7 +29,7 @@ export function assertSealedSignature(
   docPtr: Ptr,
   model: Ptr,
   expected: SealExpectation,
-): SignatureDTO {
+): Signature {
   const refuse = (why: string) =>
     new EngineError(EngineErrorCode.SignatureRefused, `the sealed bytes ${why}`);
   const signatures = readSignaturesFromModel(runtime, model);

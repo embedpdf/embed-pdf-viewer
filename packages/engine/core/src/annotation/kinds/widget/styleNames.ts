@@ -1,4 +1,4 @@
-/** A widget's style: what `/MK`, `/BS`, `/DA` and `/Q` hold, the look its family draws. */
+/** A widget's style: what `/MK`, `/BS`, `/DA` and `/Q` hold, the look its kind draws. */
 export const WIDGET_STYLE_NAMES = [
   'color',
   'interiorColor',

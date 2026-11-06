@@ -61,7 +61,7 @@ const textLayout = {
 function selectionEngine(): Engine {
   const handle = {
     id: 'doc',
-    events: { subscribe: () => () => {}, lastServerId: () => null },
+    events: { subscribe: () => () => {}, lastServerSequence: () => null },
     pages: {
       list: () =>
         Promise.resolve({ pageCount: 2, labels: [], pages: [pageLayout(5, 0), pageLayout(7, 1)] }),
@@ -158,8 +158,8 @@ describe('EpdfSelection', () => {
       handles: { ...SELECTION_DEFAULTS.handles, color: '#e91e63' },
     });
 
-    selection.updateSettings({ dragThreshold: 8 });
-    expect(selection.settings()).toMatchObject({ dragThreshold: 8 });
+    selection.updateSettings({ dragThresholdPx: 8 });
+    expect(selection.settings()).toMatchObject({ dragThresholdPx: 8 });
 
     await kernel.documents.open(bytesInput('doc'));
     expect(kernel.capability(SelectionToken).getSettings()).toBe(selection.settings());

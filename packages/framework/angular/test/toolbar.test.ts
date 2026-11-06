@@ -14,7 +14,7 @@ import { ChangeDetectionStrategy, Component, input, type OnInit, type Type } fro
 import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { withCommands } from '@embedpdf/angular/commands';
-import type { CommandDef } from '@embedpdf/angular/commands';
+import type { CommandDefinition } from '@embedpdf/angular/commands';
 import {
   custom,
   EpdfToolbar,
@@ -67,7 +67,7 @@ beforeEach(() => {
 afterEach(() => TestBed.resetTestingModule());
 
 const ran: string[] = [];
-const command = (id: string, extra: Partial<CommandDef> = {}): CommandDef => ({
+const command = (id: string, extra: Partial<CommandDefinition> = {}): CommandDefinition => ({
   id: `test:${id}`,
   label: id.toUpperCase(),
   run: () => void ran.push(id),

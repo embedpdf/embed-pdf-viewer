@@ -37,7 +37,7 @@ const welcome = async (): Promise<OpenInput> => {
         @for (id of commands; track id) {
           <button type="button" class="button" [epdfCommand]="id" #command="epdfCommand">
             {{ command.label() }}
-            @if (command.shortcut(); as shortcut) {
+            @if (command.shortcutLabel(); as shortcut) {
               <kbd class="shortcut">{{ shortcut }}</kbd>
             }
           </button>

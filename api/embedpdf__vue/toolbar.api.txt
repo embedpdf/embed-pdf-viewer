@@ -7,12 +7,12 @@ BarSchema [InterfaceDeclaration] (from packages/core/ui/src/schema.ts): export i
 BarSections [InterfaceDeclaration] (from packages/core/ui/src/schema.ts): export interface BarSections{ readonly start?: readonly BarGroup[]; readonly center?: readonly BarGroup[]; readonly end?: readonly BarGroup[]; }
 CollapsedGroupView [TypeAliasDeclaration] (from packages/framework/vue/src/toolbar/views.ts): export type CollapsedGroupView = CollapsedGroupViewOf<ResolvedCommand>;
 CustomItem [InterfaceDeclaration] (from packages/core/ui/src/schema.ts): export interface CustomItem{ readonly slot: string; readonly variants?: readonly string[]; readonly terminal?: string; readonly importance?: Importance; readonly grow?: boolean; }
-CustomSlotCtx [InterfaceDeclaration] (from packages/core/ui/src/toolbar-layout.ts): export interface CustomSlotCtx{ layer: 'live' | 'measure'; measure: (length: number) => void; }
+CustomSlotContext [InterfaceDeclaration] (from packages/core/ui/src/toolbar-layout.ts): export interface CustomSlotContext{ layer: 'live' | 'measure'; measure: (length: number) => void; }
 DEFAULT_IMPORTANCE [VariableDeclaration] (from packages/core/ui/src/schema.ts): DEFAULT_IMPORTANCE: Importance = 3
 GroupDisclosureView [TypeAliasDeclaration] (from packages/framework/vue/src/toolbar/views.ts): export type GroupDisclosureView = GroupDisclosureViewOf<ResolvedCommand>;
 Importance [TypeAliasDeclaration] (from packages/core/ui/src/schema.ts): export type Importance = 1 | 2 | 3 | 4 | 5;
 OverflowMenuView [TypeAliasDeclaration] (from packages/framework/vue/src/toolbar/views.ts): export type OverflowMenuView = OverflowMenuViewOf<ResolvedCommand>;
-OverflowRow [TypeAliasDeclaration] (from packages/core/ui/src/projection.ts): export type OverflowRow = |{ readonly type: 'command'; readonly command: string} |{ readonly type: 'submenu'; readonly command: string; readonly menu: string} ;
+OverflowRow [TypeAliasDeclaration] (from packages/core/ui/src/projection.ts): export type OverflowRow = |{ readonly kind: 'command'; readonly command: string} |{ readonly kind: 'submenu'; readonly command: string; readonly menu: string} ;
 OverflowSection [InterfaceDeclaration] (from packages/core/ui/src/projection.ts): export interface OverflowSection{ readonly labelKey?: string; readonly role?: 'radio'; readonly rows: readonly OverflowRow[]; }
 PINNED [VariableDeclaration] (from packages/core/ui/src/schema.ts): PINNED: Importance = 5
 StripView [TypeAliasDeclaration] (from packages/framework/vue/src/toolbar/strip.ts): export type StripView = StripViewOf<ResolvedCommand>;

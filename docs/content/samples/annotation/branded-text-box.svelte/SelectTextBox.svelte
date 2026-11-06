@@ -15,7 +15,7 @@
     untrack(() => {
       const textBox = annotation.list().find((each) => each.nm === 'text-box');
       if (!textBox) return;
-      annotation.selection.set([textBox.ref]);
+      annotation.selection.select([textBox.ref]);
       stage.reveal(textBox.page, { rect: textBox.rect });
     });
   });

@@ -12,24 +12,24 @@ import { EVERY_PERMISSION } from './fixtureScope';
 /** Shared numerical, persistence and calibration contract for local and HTTP engines. */
 export function runMeasurementConformance(
   runner: ConformanceTestRunner,
-  opts: ConformanceOptions,
+  options: ConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
-  describe(`measurement conformance: ${opts.label}`, () => {
+  describe(`measurement conformance: ${options.label}`, () => {
     let engine: Engine;
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
     afterAll(async () => {
       await engine?.destroy();
     });
     const open = async () =>
-      opts.openKind === 'bytes'
+      options.openKind === 'bytes'
         ? engine.open(
-            { kind: 'bytes', id: opts.fixture.id, bytes: await opts.fixture.bytes() },
+            { kind: 'bytes', id: options.fixture.id, bytes: await options.fixture.bytes() },
             EVERY_PERMISSION,
           )
-        : engine.open({ kind: 'id', id: opts.fixture.cloudId ?? opts.fixture.id });
+        : engine.open({ kind: 'id', id: options.fixture.cloudId ?? options.fixture.id });
     const scale = measureFromKnownLength(100, { value: 3, unit: 'm' });
     const vertices = [
       { x: 0, y: 0 },
@@ -131,11 +131,11 @@ export function runMeasurementConformance(
           expect(a.contents).toBe('label' in preview ? preview.label : undefined);
           saved.push(a);
         }
-        const bytes = opts.openKind === 'bytes' ? await doc.download() : undefined;
+        const bytes = options.openKind === 'bytes' ? await doc.download() : undefined;
         await doc.close();
         doc = bytes
           ? await engine.open(
-              { kind: 'bytes', id: `${opts.fixture.id}-saved`, bytes },
+              { kind: 'bytes', id: `${options.fixture.id}-saved`, bytes },
               EVERY_PERMISSION,
             )
           : await open();

@@ -5,25 +5,25 @@
  * field changes.
  */
 import { defineState, type ResourceStatus } from '@embedpdf/core';
-import type { FormFieldDTO, FormKind } from '@embedpdf/engine-core/runtime';
+import type { FormField, FormKind } from '@embedpdf/engine-core/runtime';
 
 import { FormToken } from './contract';
 
 /** Every field, whether the form is read, what kind of form it is, the selected widget's field, and the field the cursor is in. */
 export interface FormState {
   /** Every field. The same array while nothing changes. */
-  readonly fields: readonly FormFieldDTO[];
+  readonly fields: readonly FormField[];
   /** Whether the form is read. */
   readonly status: ResourceStatus;
   /** What the document has: `'none'`, `'acroform'` or `'xfa'`. */
   readonly formKind: FormKind;
   /** The field of the selected widget while one widget is selected (in design mode), or `null`. */
-  readonly selectedField: FormFieldDTO | null;
+  readonly selectedField: FormField | null;
   /** The field the cursor is in, or `null`. */
-  readonly focusedField: FormFieldDTO | null;
+  readonly focusedField: FormField | null;
 }
 
-const NO_FIELDS: readonly FormFieldDTO[] = Object.freeze([]);
+const NO_FIELDS: readonly FormField[] = Object.freeze([]);
 
 export const formState = defineState(FormToken, {
   read: (form): FormState => ({

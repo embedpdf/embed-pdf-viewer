@@ -4,8 +4,8 @@ import type { FieldActionsPatch } from '../dto/PdfAction';
 /**
  * Patch-field semantics follow the annotation patches: `undefined` leaves
  * a member untouched, `null` clears it, a value sets it. The engine knows
- * the field's family from its ref, so `family` is optional; when given it
- * must match. A member the field's family doesn't have (`multiline` on a
+ * the field's kind from its ref, so `kind` is optional; when given it
+ * must match. A member the field's kind doesn't have (`multiline` on a
  * checkbox) fails with `InvalidArg`.
  */
 interface FormFieldPatchBase {
@@ -35,7 +35,7 @@ interface FormFieldPatchBase {
 }
 
 export interface TextFieldPatch extends FormFieldPatchBase {
-  family?: 'text';
+  kind?: 'text';
   defaultValue?: string | null;
   /** `null` clears the limit. Fails when the current value exceeds it. */
   maxLength?: number | null;
@@ -45,17 +45,17 @@ export interface TextFieldPatch extends FormFieldPatchBase {
 }
 
 export interface CheckboxFieldPatch extends FormFieldPatchBase {
-  family?: 'checkbox';
+  kind?: 'checkbox';
 }
 
 export interface RadioFieldPatch extends FormFieldPatchBase {
-  family?: 'radio';
+  kind?: 'radio';
   radiosInUnison?: boolean;
   noToggleToOff?: boolean;
 }
 
 export interface ComboBoxFieldPatch extends FormFieldPatchBase {
-  family?: 'combobox';
+  kind?: 'combobox';
   edit?: boolean;
   defaultValue?: string | null;
   /**
@@ -66,7 +66,7 @@ export interface ComboBoxFieldPatch extends FormFieldPatchBase {
 }
 
 export interface ListBoxFieldPatch extends FormFieldPatchBase {
-  family?: 'listbox';
+  kind?: 'listbox';
   multiSelect?: boolean;
   options?: FormFieldOptionInput[];
   /** Option values `reset()` selects; `null` removes the default. */
@@ -75,12 +75,12 @@ export interface ListBoxFieldPatch extends FormFieldPatchBase {
 
 /** A push button: only the settings every field has. Its captions are its widgets'. */
 export interface PushButtonFieldPatch extends FormFieldPatchBase {
-  family?: 'pushbutton';
+  kind?: 'pushbutton';
 }
 
 /** A signature field: only the settings every field has. Signing is `doc.signatures`'. */
 export interface SignatureFieldPatch extends FormFieldPatchBase {
-  family?: 'signature';
+  kind?: 'signature';
 }
 
 /** What `doc.forms.update` takes. */

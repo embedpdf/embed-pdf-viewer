@@ -21,7 +21,7 @@ const field = (
 ): ScriptFieldInput => ({
   ref: ref(name),
   name,
-  family: 'text',
+  kind: 'text',
   value,
   defaultValue: value,
   display: 'visible',
@@ -108,7 +108,7 @@ describe('AcroJS prelude', () => {
     expect(out.event.rc).toBe(false);
     expect(out.formEffects).toEqual([]);
     expect(out.uiEffects).toEqual([
-      { kind: 'alert', message: 'Please enter a valid email.', icon: 1 },
+      { type: 'alert', message: 'Please enter a valid email.', icon: 1 },
     ]);
   });
 
@@ -124,7 +124,7 @@ describe('AcroJS prelude', () => {
         }),
       ),
     );
-    expect(out.uiEffects).toEqual([{ kind: 'focusField', field: 'email' }]);
+    expect(out.uiEffects).toEqual([{ type: 'focusField', field: 'email' }]);
     expect(out.diagnostics).toEqual([]);
   });
 
@@ -297,7 +297,7 @@ describe('AcroJS prelude', () => {
     expect(out.diagnostics).toEqual([]);
     expect(out.uiEffects).toEqual([
       {
-        kind: 'submitForm',
+        type: 'submitForm',
         url: 'https://example.com/collect',
         fieldNames: ['a', 'b'],
         includeEmpty: true,
@@ -306,14 +306,14 @@ describe('AcroJS prelude', () => {
       },
       // Positional default: FDF via POST, whole eligible form.
       {
-        kind: 'submitForm',
+        type: 'submitForm',
         url: 'https://example.com/plain',
         fieldNames: null,
         includeEmpty: false,
       },
       // bFDF === false is Acrobat's HTML-format switch.
       {
-        kind: 'submitForm',
+        type: 'submitForm',
         url: 'https://example.com/html',
         fieldNames: ['c'],
         includeEmpty: false,

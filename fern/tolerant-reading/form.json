@@ -21,7 +21,7 @@
         "objectNumber": 20
       },
       "name": "Comments",
-      "family": "text",
+      "kind": "text",
       "valueEntry": {
         "kind": "rich-text",
         "html": "<p>Hello</p>"
@@ -72,7 +72,7 @@
         "objectNumber": 22
       },
       "name": "Ticket",
-      "family": "barcode",
+      "kind": "barcode",
       "valueEntry": {
         "kind": "scalar",
         "value": "ABC123"

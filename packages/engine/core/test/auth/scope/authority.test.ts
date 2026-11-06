@@ -5,7 +5,7 @@ import {
   authorizeAnnotationCreate,
   authorizeAnnotationDelete,
   authorizeAnnotationUpdate,
-  decodePdfBits,
+  permissionFlagsOf,
   PermissionDenied,
   type AnnotationAuthority,
   type Identity,
@@ -17,7 +17,7 @@ import type { AnnotationRef } from '../../../src/identity/AnnotationRef';
 const BOB: Identity = { userId: 'bob', displayName: 'Bob', groupId: '5' };
 const bob = (scope: string[]): AnnotationAuthority => ({
   identity: BOB,
-  grants: { scope, pdfBits: decodePdfBits(null) },
+  grants: { scope, permissionFlags: permissionFlagsOf(null) },
 });
 const SELF_ONLY = bob([
   'doc.annotate.modify',
@@ -105,7 +105,7 @@ describe('authorizeAnnotationCreate', () => {
   it('puts a create in no group for a caller without one', () => {
     const alone: AnnotationAuthority = {
       identity: { userId: 'ann', displayName: 'Ann' },
-      grants: { scope: ['doc.annotate.modify'], pdfBits: decodePdfBits(null) },
+      grants: { scope: ['doc.annotate.modify'], permissionFlags: permissionFlagsOf(null) },
     };
     expect(authorizeAnnotationCreate(alone, 'square', null)).toEqual({
       userId: 'ann',

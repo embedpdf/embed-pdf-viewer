@@ -91,7 +91,7 @@ export function createArrival(
    * when unbounded).
    */
   const reapply = (anchor: Anchor, align?: AlignmentValue) => {
-    if (isFitAll()) goToTarget(state().cursor, { behavior: 'instant' });
+    if (isFitAll()) goToTarget(state().pageIndex, { behavior: 'instant' });
     else applyAnchor(anchor, align);
   };
 

@@ -107,19 +107,19 @@ export interface PrintRenderConformanceOptions {
  */
 export function runPrintRenderConformance(
   runner: ConformanceTestRunner,
-  opts: PrintRenderConformanceOptions,
+  options: PrintRenderConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`print render conformance: ${opts.label}`, () => {
+  describe(`print render conformance: ${options.label}`, () => {
     let engine: Engine;
     let doc: DocumentHandle;
     let small: PageLayout;
     let large: PageLayout;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
-      doc = await opts.open(engine, PRINT_SCOPES.everything);
+      engine = await options.makeEngine();
+      doc = await options.open(engine, PRINT_SCOPES.everything);
       const { pages } = await doc.pages.list();
       small = pages[0]!;
       large = pages[1]!;
@@ -134,7 +134,7 @@ export function runPrintRenderConformance(
       scope: readonly string[],
       body: (doc: DocumentHandle) => Promise<void>,
     ): Promise<void> => {
-      const restricted = await opts.open(engine, scope);
+      const restricted = await options.open(engine, scope);
       try {
         await body(restricted);
       } finally {
@@ -302,18 +302,18 @@ export interface PrintCopyConformanceOptions extends PrintRenderConformanceOptio
 
 export function runPrintCopyConformance(
   runner: ConformanceTestRunner,
-  opts: PrintCopyConformanceOptions,
+  options: PrintCopyConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`print copy conformance: ${opts.label}`, () => {
+  describe(`print copy conformance: ${options.label}`, () => {
     let engine: Engine;
     let doc: DocumentHandle;
     let small: PageLayout;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
-      doc = await opts.open(engine, PRINT_SCOPES.everything);
+      engine = await options.makeEngine();
+      doc = await options.open(engine, PRINT_SCOPES.everything);
       small = (await doc.pages.list()).pages[0]!;
     });
 
@@ -326,7 +326,7 @@ export function runPrintCopyConformance(
       scope: readonly string[],
       body: (doc: DocumentHandle) => Promise<void>,
     ): Promise<void> => {
-      const restricted = await opts.open(engine, scope);
+      const restricted = await options.open(engine, scope);
       try {
         await body(restricted);
       } finally {
@@ -334,14 +334,14 @@ export function runPrintCopyConformance(
       }
     };
 
-    /** The spots dark in a picture (made with `picture`) of the copy `options` makes. */
+    /** The spots dark in a picture (made with `picture`) of the copy `extractOptions` makes. */
     const copySpots = async (
       source: DocumentHandle,
-      options: PageExtractOptions,
+      extractOptions: PageExtractOptions,
       picture: PageImageOptions,
     ): Promise<{ dark: Record<Spot, boolean>; annotations: number }> => {
-      const bytes = await source.pages.extract([small.ref], options);
-      const copy = await opts.openCopy(engine, bytes);
+      const bytes = await source.pages.extract([small.ref], extractOptions);
+      const copy = await options.openCopy(engine, bytes);
       try {
         const { pages } = await copy.pages.list();
         expect(pages).toHaveLength(1);

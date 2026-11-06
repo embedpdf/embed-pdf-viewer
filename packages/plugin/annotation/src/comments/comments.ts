@@ -11,7 +11,7 @@ import {
   type PageBox,
 } from '@embedpdf/engine-core/runtime';
 
-import type { CommentsApi, ThreadDeleteResult } from '../contract';
+import type { CommentsCapability, ThreadDeleteResult } from '../contract';
 import type { AnnotationContext, AnnotationServices } from '../services';
 import type { ThreadIndex } from './threads';
 import type { Crud } from '../write/crud';
@@ -59,10 +59,10 @@ export function createComments(
 
   const announce = (
     root: AnnotationRef,
-    change: 'reply' | 'text' | 'status' | 'marked' | 'deleted',
-  ) => events.threadChanged.emit({ rootRef: root, change });
+    type: 'reply' | 'text' | 'status' | 'marked' | 'deleted',
+  ) => events.threadChanged.emit({ rootRef: root, type: type });
 
-  const comments: CommentsApi = {
+  const comments: CommentsCapability = {
     listThreads: () => threads.index().threads,
     getThread: (ref) => threads.index().byMember.get(annotationKey(ref)) ?? null,
     onThreadChanged: events.threadChanged.on,

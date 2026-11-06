@@ -1,5 +1,5 @@
 import type {
-  FormFieldFamily,
+  FormFieldKind,
   FormFieldRef,
   FormMutationMeta,
   FormWidget,
@@ -40,7 +40,7 @@ export function formMutationMeta(
  * has.
  */
 export function redrawnByValue(
-  family: FormFieldFamily,
+  family: FormFieldKind,
   widgets: readonly FormWidget[],
 ): FormWidget[] {
   return family === 'checkbox' || family === 'radio' ? [] : [...widgets];

@@ -73,7 +73,7 @@ export interface ScriptHostOptions {
  */
 export interface ScriptHost {
   transaction<T>(body: (txn: ScriptTransaction) => Promise<T>): Promise<T>;
-  dispose(): void;
+  destroy(): void;
 }
 
 /** FNV-1a over `documentId:sequence` — the deterministic default random seed
@@ -150,7 +150,7 @@ export function createScriptHost(options: ScriptHostOptions): ScriptHost {
 
   /** A resource fault poisons the realm: rebuild + re-boot lazily next time. */
   const noteFault = (sandbox: ScriptSandbox): void => {
-    if (!sandbox.disposed) return;
+    if (!sandbox.destroyed) return;
     sandboxPromise = null;
     booted = false;
     pendingBoot = null;
@@ -228,13 +228,13 @@ export function createScriptHost(options: ScriptHostOptions): ScriptHost {
         }),
       );
     },
-    dispose() {
+    destroy() {
       disposed = true;
       const dying = sandboxPromise;
       sandboxPromise = null;
       booted = false;
       pendingBoot = null;
-      void dying?.then((sandbox) => sandbox.dispose()).catch(() => undefined);
+      void dying?.then((sandbox) => sandbox.destroy()).catch(() => undefined);
     },
   };
 }

@@ -39,7 +39,7 @@ export function createMetadataController(ctx: PluginContext<void>) {
     initial: () => null,
     load: async (doc) => ({ value: await doc.metadata.get() }),
     fold: (value, event) => (event.type === 'metadata.updated' ? event.metadata : value),
-    changed: ({ cause, event, previous, next }) => {
+    onChanged: ({ cause, event, previous, next }) => {
       if (!next) return;
       if (cause === 'load') {
         resynced.emit({ metadata: next });
@@ -60,7 +60,7 @@ export function createMetadataController(ctx: PluginContext<void>) {
     initial: () => null,
     load: async (doc) => ({ value: await doc.metadata.custom.get() }),
     fold: (value, event) => (event.type === 'metadata.customUpdated' ? event.custom : value),
-    changed: ({ cause, event, previous, next }) => {
+    onChanged: ({ cause, event, previous, next }) => {
       if (!next) return;
       if (cause === 'load') {
         customResynced.emit({ custom: next });

@@ -9,7 +9,7 @@ export const LinkToken = createCapabilityToken<LinkCapability>('link', {
   // Without a document, an adapter's stand-in rejects these with `not-ready`, as the
   // capability would; the type asks for every member that returns a promise.
   promises: {
-    listAllLinks: true,
+    readAllLinks: true,
     ensureLoaded: true,
   },
 });

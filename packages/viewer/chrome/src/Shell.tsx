@@ -148,7 +148,7 @@ function OpeningDocuments() {
 function DocumentArea({ children }: { children: ReactNode }) {
   const docId = useDocumentId();
   const status = useDocument((document) => document.status);
-  const grantAsks = useDocument((document) => document.grantRequest !== undefined);
+  const grantAsks = useDocument((document) => document.openRequest !== undefined);
   if (docId === null) {
     return (
       <div className="min-w-0 flex-1 overflow-auto">

@@ -59,7 +59,9 @@ describe('selectInRect', () => {
     ]);
     const { capability } = harness;
     const selectedKeys = () =>
-      new Set(capability.selection.list().map((annotation) => annotationKey(annotation.ref)));
+      new Set(
+        capability.selection.getSelected().map((annotation) => annotationKey(annotation.ref)),
+      );
 
     // The empty middle of the unfilled square: nothing.
     const middle = { x: 130, y: 120, width: 40, height: 20 };

@@ -86,7 +86,13 @@ const LIST: FontList = {
   lastResort: program(LAST_RESORT_HASH),
 };
 
-const origin = { kind: 'local' as const, sessionId: 's', sub: null, ts: 0, serverId: null };
+const origin = {
+  kind: 'local' as const,
+  sessionId: 's',
+  subject: null,
+  at: new Date(0).toISOString(),
+  serverSequence: null,
+};
 const fontsChanged = { type: 'fonts.changed', origin } as DocumentEvent;
 
 /** The Hebrew letters: what the fallback in the list covers. */
@@ -362,8 +368,8 @@ describe('the fonts controller', () => {
   it('reads a program once for every caller', async () => {
     const { fonts, api } = harness();
     const [first, second] = await Promise.all([
-      api.getProgram(hashOf('a')),
-      api.getProgram(hashOf('a')),
+      api.readProgram(hashOf('a')),
+      api.readProgram(hashOf('a')),
     ]);
     expect(first).toEqual(second);
     expect(fonts.getProgram).toHaveBeenCalledTimes(1);

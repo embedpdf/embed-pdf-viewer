@@ -5,7 +5,7 @@ import { displayNameOf, useAttachment, useAttachmentState } from '@embedpdf/vue/
 import type { AttachedFile } from '@embedpdf/vue/attachment';
 
 const attachment = useAttachment();
-const { files, canAdd, canDownload } = useAttachmentState();
+const { files, canCreate, canDownload } = useAttachmentState();
 
 /** A file's size, as people read it. */
 const sizeOf = (bytes: number | null) =>
@@ -20,7 +20,7 @@ function attach(event: Event) {
   const input = event.currentTarget as HTMLInputElement;
   const picked = Array.from(input.files ?? []);
   input.value = '';
-  if (picked.length > 0) void attachment.add(picked.map((data) => ({ data })));
+  if (picked.length > 0) void attachment.create(picked.map((data) => ({ data })));
 }
 </script>
 
@@ -28,9 +28,9 @@ function attach(event: Event) {
   <aside class="files">
     <header class="files-header">
       <h3 class="files-title">Files</h3>
-      <label class="button primary" :data-disabled="!canAdd || undefined">
+      <label class="button primary" :data-disabled="!canCreate || undefined">
         Attach
-        <input type="file" multiple hidden :disabled="!canAdd" @change="attach" />
+        <input type="file" multiple hidden :disabled="!canCreate" @change="attach" />
       </label>
     </header>
     <p v-if="files.length === 0" class="empty">Attach a file to carry it inside the document.</p>
@@ -49,8 +49,8 @@ function attach(event: Event) {
           type="button"
           class="row-remove"
           :aria-label="`Remove ${displayNameOf(file)}`"
-          :disabled="!attachment.canRemove(file)"
-          @click="attachment.remove(file)"
+          :disabled="!attachment.canDelete(file)"
+          @click="attachment.delete(file)"
         >
           ×
         </button>

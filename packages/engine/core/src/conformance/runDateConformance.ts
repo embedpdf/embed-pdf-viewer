@@ -24,15 +24,15 @@ export interface DateConformanceOptions {
  */
 export function runDateConformance(
   runner: ConformanceTestRunner,
-  opts: DateConformanceOptions,
+  options: DateConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`date conformance: ${opts.label}`, () => {
+  describe(`date conformance: ${options.label}`, () => {
     let engine: Engine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -40,7 +40,7 @@ export function runDateConformance(
     });
 
     const withDocument = async (run: (doc: DocumentHandle) => Promise<void>) => {
-      const doc = await opts.open(engine);
+      const doc = await options.open(engine);
       try {
         await run(doc);
       } finally {

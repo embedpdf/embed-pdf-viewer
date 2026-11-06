@@ -1,7 +1,7 @@
 /** Result shaping for the scripting transaction: errors, budgets, page numbers. */
 import type { DocumentMeta } from '@embedpdf/core';
 import type { ScriptExecutionError } from '@embedpdf/core-acrojs';
-import type { FormFieldDTO } from '@embedpdf/engine-core/runtime';
+import type { FormField } from '@embedpdf/engine-core/runtime';
 
 export function scriptError(message: string): ScriptExecutionError {
   return { kind: 'invalid-output', message };
@@ -21,10 +21,7 @@ export function utf8Length(value: string): number {
   return length;
 }
 
-export function pageNumberFor(
-  meta: Pick<DocumentMeta, 'pages'> | null,
-  field: FormFieldDTO,
-): number {
+export function pageNumberFor(meta: Pick<DocumentMeta, 'pages'> | null, field: FormField): number {
   const placed = field.widgets.find((widget) => widget.page !== null)?.page;
   if (!meta || !placed) return 0;
   const index = meta.pages.findIndex((page) => page.ref.objectNumber === placed.objectNumber);

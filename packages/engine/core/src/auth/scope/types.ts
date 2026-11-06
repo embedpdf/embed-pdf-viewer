@@ -166,21 +166,27 @@ export type ParsedScope =
   | ParsedPluginPermission;
 
 /**
- * Typed boolean view of the PDF user-access permission word.
- *
- * Names mirror ISO 32000 bit positions (bit3 = print, bit4 = modify, etc.).
- * Use {@link DecodePdfBits} (in pdf-bits.ts) to build this from the integer
- * stored in the documents row.
+ * What a PDF's permissions (the encryption dictionary's `/P` word) allow, one flag per bit
+ * ISO 32000 defines, named as pdf.js names them. `pdf.permissions` reads them as Acrobat
+ * does: see `materializePdfPermissions`. Build one from the word with `permissionFlagsOf`.
  */
-export interface PdfBits {
-  bit3: boolean; // print
-  bit4: boolean; // modify
-  bit5: boolean; // copy/extract
-  bit6: boolean; // annotate + fill forms
-  bit9: boolean; // fill existing forms
-  bit10: boolean; // accessibility (deprecated in PDF 2.0)
-  bit11: boolean; // assemble
-  bit12: boolean; // high-quality print
+export interface PdfPermissionFlags {
+  /** Bit 3: print the document. */
+  readonly print: boolean;
+  /** Bit 4: modify the contents (Acrobat lets it fill in forms and sign too). */
+  readonly modifyContents: boolean;
+  /** Bit 5: copy or otherwise take out text and graphics. */
+  readonly copy: boolean;
+  /** Bit 6: add or modify annotations and fill in forms; with bit 4, create or modify form fields. */
+  readonly modifyAnnotations: boolean;
+  /** Bit 9: fill in existing form fields, signature fields included. */
+  readonly fillForms: boolean;
+  /** Bit 10: take out text and graphics for accessibility (deprecated in PDF 2.0). */
+  readonly copyForAccessibility: boolean;
+  /** Bit 11: assemble the document: insert, rotate and delete pages, and build the outline. */
+  readonly assemble: boolean;
+  /** Bit 12: print at full quality (without it, only a degraded print with bit 3). */
+  readonly printHighQuality: boolean;
 }
 
 /**

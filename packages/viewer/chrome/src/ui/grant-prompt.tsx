@@ -2,9 +2,9 @@
  * What a grant asks for before its document opens or changes: its passphrase, or who the
  * visitor is.
  *
- *   an `error` tab with a `grantRequest` → <GrantPrompt/>, which opens it again with the answer
+ *   an `error` tab with a `openRequest` → <GrantPrompt/>, which opens it again with the answer
  *     (`documents.retry(id, { passphrase })` or `{ identity }`)
- *   a ready document with a `grantRequest` (the grant got it after the document opened) → the
+ *   a ready document with a `openRequest` (the grant got it after the document opened) → the
  *     same <GrantPrompt/> over it, and `retry` with the answer lets it go on
  *   a ready document with an `identityRequest` (a change waits) → <VisitorIdentityDialog/>, which
  *     answers for the changes waiting (`documents.identify`) or lets them go (`declineIdentity`)
@@ -166,7 +166,7 @@ export function GrantPrompt() {
   const docId = useDocumentId();
   const docs = useDocumentsState((state) => state.documents);
   const doc = docs.find((documentInfo) => documentInfo.id === docId);
-  const request = doc?.grantRequest;
+  const request = doc?.openRequest;
   if (!docId || !doc || !request) return null;
   return (
     <div className="bg-app flex h-full w-full items-center justify-center overflow-auto p-8">
@@ -269,7 +269,7 @@ function IdentityForm({
     event.preventDefault();
     setChecked(true);
     if (!complete(request, answers) || invalidAnswers(answers).length > 0) return;
-    void retry(docId, { identity: given(answers) }).catch(() => {});
+    void retry(docId, { visitorIdentity: given(answers) }).catch(() => {});
   };
   return (
     <form onSubmit={submit} noValidate>

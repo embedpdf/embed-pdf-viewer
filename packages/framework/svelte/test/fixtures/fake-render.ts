@@ -24,7 +24,8 @@ const tile = {
   } as never,
 };
 
-const task = <T>(value: T) => Object.assign(Promise.resolve(value), { abortWith: () => Promise.resolve(value) });
+const task = <T>(value: T) =>
+  Object.assign(Promise.resolve(value), { abortWith: () => Promise.resolve(value) });
 
 const IDLE: PictureState = Object.freeze({ status: 'idle', slow: false });
 
@@ -57,7 +58,7 @@ export function fakeRender() {
     markPainted: () => {},
     markUnpainted: () => {},
     release: vi.fn(),
-    dispose: vi.fn(),
+    destroy: vi.fn(),
   };
   const createViewDemand = vi.fn(() => view);
   const paint = { tiles: true };
@@ -130,7 +131,8 @@ export function fakeRender() {
   };
   /** How often the tile's picture has been asked for: once per binding. */
   const pictureAsks = () =>
-    (tile.handle as unknown as { objectUrl: { mock: { calls: unknown[] } } }).objectUrl.mock.calls.length;
+    (tile.handle as unknown as { objectUrl: { mock: { calls: unknown[] } } }).objectUrl.mock.calls
+      .length;
   return {
     plugin,
     demands,

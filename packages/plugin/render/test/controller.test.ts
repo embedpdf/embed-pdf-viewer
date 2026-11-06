@@ -35,7 +35,13 @@ describe('the ledger — confirmed events and the invalidate verb', () => {
       documentEvent({
         type: 'annotations.reordered',
         page: toPageRef(11),
-        origin: { kind: 'remote', sessionId: 'other', sub: 'alice', ts: 1, serverId: 7 },
+        origin: {
+          kind: 'remote',
+          sessionId: 'other',
+          subject: 'alice',
+          at: new Date(1).toISOString(),
+          serverSequence: 7,
+        },
       }),
     );
     fixture.emit(documentEvent({ type: 'forms.repaired', origin: { kind: 'local' } }));
@@ -71,7 +77,13 @@ describe('the ledger — confirmed events and the invalidate verb', () => {
     const fixture = await boot();
     const seen: { scope: string; origin: unknown }[] = [];
     fixture.render.onInvalidated((event) => seen.push(event));
-    fixture.emit(documentEvent({ type: 'stream.desynced', reason: 'backlog-overflow', ts: 1 }));
+    fixture.emit(
+      documentEvent({
+        type: 'stream.desynced',
+        reason: 'backlog-overflow',
+        at: new Date(0).toISOString(),
+      }),
+    );
     expect(seen).toHaveLength(1);
     expect(seen[0]).toMatchObject({ scope: 'content', origin: null });
     expect(fixture.render.getRenderEpoch(toPageRef(11), { includeAnnotations: false })).toBe(1);
@@ -90,7 +102,7 @@ describe('the ledger — confirmed events and the invalidate verb', () => {
     fixture.emit(
       documentEvent({
         type: 'fonts.changed',
-        origin: { kind: 'local', tx: { id: 'op-1', index: 1, count: 2 } },
+        origin: { kind: 'local', transaction: { id: 'op-1', index: 1, count: 2 } },
       }),
     );
     expect(contentEpochs()).toEqual([1, 1, 1]);
@@ -441,7 +453,7 @@ describe('the tile surface — pure reads, page-space regions', () => {
   const deep = { desiredDeviceWidth: 612 * 8, visibleRect: { x: 0, y: 0, width: 80, height: 80 } };
 
   it('createViewDemand is stable per view and reference-counted; getPlan is pure', async () => {
-    const fixture = await boot({ config: { tiles: { settleMs: 0, bleed: 0 } } });
+    const fixture = await boot({ config: { tiles: { settleMs: 0, bleedPx: 0 } } });
     const main = fixture.render.createViewDemand('stage');
     expect(fixture.render.createViewDemand('stage')).toBe(main);
     expect(fixture.render.createViewDemand('stage-thumbs')).not.toBe(main);
@@ -458,15 +470,15 @@ describe('the tile surface — pure reads, page-space regions', () => {
     const before = fixture.imageCalls.length;
     expect(main.getPlan(toPageRef(11))).toBe(main.getPlan(toPageRef(11)));
     expect(fixture.imageCalls.length).toBe(before); // reads never fetch
-    main.dispose();
-    main.dispose();
-    main.dispose(); // the last reference releases the view's pages
+    main.destroy();
+    main.destroy();
+    main.destroy(); // the last reference releases the view's pages
     await fixture.kernel.destroy();
   });
 
   it('tile regions are asked for in page space — a crop offset changes nothing', async () => {
     const crop = { left: 10, bottom: 20, right: 622, top: 812 };
-    const fixture = await boot({ config: { tiles: { settleMs: 0, bleed: 0 } }, crop });
+    const fixture = await boot({ config: { tiles: { settleMs: 0, bleedPx: 0 } }, crop });
     const view = fixture.render.createViewDemand('stage');
     view.setDemand(toPageRef(11), deep);
     const first = fixture.imageCalls[0]!.options.target as {
@@ -478,12 +490,12 @@ describe('the tile surface — pure reads, page-space regions', () => {
     expect(first.rect.x).toBe(0);
     expect(first.rect.y).toBe(0);
     expect(fixture.imageCalls[0]!.options.viewport).toEqual({ kind: 'scale', scale: 8 });
-    view.dispose();
+    view.destroy();
     await fixture.kernel.destroy();
   });
 
   it('a tile arrival re-plans outside any read and wakes subscribers', async () => {
-    const fixture = await boot({ config: { tiles: { settleMs: 0, bleed: 0 } } });
+    const fixture = await boot({ config: { tiles: { settleMs: 0, bleedPx: 0 } } });
     const view = fixture.render.createViewDemand('stage');
     view.setDemand(toPageRef(11), deep);
     const planned = view.getPlan(toPageRef(11));
@@ -494,7 +506,7 @@ describe('the tile surface — pure reads, page-space regions', () => {
     await vi.waitFor(() => expect(view.getPlan(toPageRef(11)).paint.length).toBeGreaterThan(0));
     expect(view.getPlan(toPageRef(11))).not.toBe(planned);
     expect(wakes).toBeGreaterThan(0);
-    view.dispose();
+    view.destroy();
     await fixture.kernel.destroy();
   });
 });
@@ -536,7 +548,7 @@ describe('settings', () => {
   it('apply at once: a new budget changes the conformed width, and reset goes back', async () => {
     const fixture = await boot();
     const changed: string[][] = [];
-    fixture.render.onSettingsChanged((event) => changed.push([...event.changed]));
+    fixture.render.onSettingsChanged((event) => changed.push([...event.changedKeys]));
     expect(fixture.render.getSourceKey(toPageRef(11), { scale: 8 })).toBe('11|w640|a1f1|e0');
 
     fixture.render.updateSettings({ fullPage: { maxWidth: 1000 } });
@@ -593,7 +605,7 @@ describe('page arguments and cancelling', () => {
 
 describe('the view a render is for, and its priority', () => {
   it('a layer’s base and tiles name its view, an app’s render names none; every render asks high', async () => {
-    const fixture = await boot({ config: { tiles: { settleMs: 0, bleed: 0 } } });
+    const fixture = await boot({ config: { tiles: { settleMs: 0, bleedPx: 0 } } });
     const sources = [
       fixture.render.renderSource(toPageRef(11), { scale: 1, view: 'stage' }),
       fixture.render.renderPage(toPageRef(22), { width: 300 }),
@@ -620,7 +632,7 @@ describe('the view a render is for, and its priority', () => {
 
     fixture.tasks.forEach((pending) => pending.resolve(image()));
     await Promise.all(sources);
-    view.dispose();
+    view.destroy();
     await fixture.kernel.destroy();
   });
 });
@@ -808,11 +820,11 @@ describe('appearance pictures', () => {
     });
     fixture.appearanceTasks[0]!.resolve({ appearances: [drawn(5, 'Off'), drawn(5, 'Yes')] });
     await asked;
-    expect(fixture.render.keptAppearances('widgets', ref(5))).toEqual([
+    expect(fixture.render.getKeptAppearances('widgets', ref(5))).toEqual([
       { ...drawn(5, 'Off'), version: 1 },
       { ...drawn(5, 'Yes'), version: 1 },
     ]);
-    expect(fixture.render.keptAppearances('annotations', ref(5))).toEqual([]);
+    expect(fixture.render.getKeptAppearances('annotations', ref(5))).toEqual([]);
     await fixture.kernel.destroy();
   });
 

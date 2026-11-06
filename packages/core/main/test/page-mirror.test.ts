@@ -14,7 +14,13 @@ const pageRef = (pageObjectNumber: number): PageRef => ({
   objectNumber: pageObjectNumber,
 });
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
-const origin = { kind: 'remote', sessionId: 'them', sub: null, ts: 0, serverId: null };
+const origin = {
+  kind: 'remote',
+  sessionId: 'them',
+  subject: null,
+  at: new Date(0).toISOString(),
+  serverSequence: null,
+};
 const touched = (pageObjectNumber: number) =>
   ({
     type: 'annotations.updated',
@@ -92,7 +98,7 @@ describe('ctx.pageMirror', () => {
 
   it('drops deleted pages and re-reads loaded pages on a resync', async () => {
     const changed = vi.fn();
-    const { ctx, mirror, load, reads } = setup({ changed });
+    const { ctx, mirror, load, reads } = setup({ onChanged: changed });
     void mirror.ensureLoaded(pageRef(1));
     void mirror.ensureLoaded(pageRef(2));
     reads[0].resolve('one');
@@ -110,7 +116,7 @@ describe('ctx.pageMirror', () => {
     ctx.emitDocumentEvent({
       type: 'stream.desynced',
       reason: 'backlog-overflow',
-      ts: 0,
+      at: new Date(0).toISOString(),
     } as DocumentEvent);
     expect(load).toHaveBeenCalledTimes(3);
     expect(load.mock.calls[2][1]).toEqual(pageRef(1));

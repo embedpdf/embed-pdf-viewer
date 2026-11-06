@@ -4,7 +4,7 @@ import { onMounted, ref } from 'vue';
 import { useActions, useActionsUiAdapter } from '@embedpdf/vue/actions';
 import type { ActionContext, PdfActionTree } from '@embedpdf/vue/actions';
 
-// A link to a website, as a PDF carries it: what getActionTree() reads from a link.
+// A link to a website, as a PDF carries it: what readActionTree() reads from a link.
 const websiteLink: PdfActionTree = {
   root: {
     type: 'uri',
@@ -19,7 +19,7 @@ const websiteLink: PdfActionTree = {
 const click: ActionContext = {
   origin: 'user',
   source: { kind: 'api' },
-  event: { scope: 'activate' },
+  event: { type: 'activate' },
 };
 
 const actions = useActions();
@@ -50,7 +50,8 @@ function openInNewTab(uri: string) {
     </button>
     <div v-if="asking" class="prompt" role="alertdialog" aria-label="Open a website">
       <p class="prompt-text">
-        This document wants to open <strong>{{ asking }}</strong>.
+        This document wants to open <strong>{{ asking }}</strong
+        >.
       </p>
       <div class="prompt-actions">
         <button type="button" class="button" @click="asking = null">Stay here</button>

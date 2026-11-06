@@ -153,7 +153,7 @@ describe('DocumentGate', () => {
         ? Promise.reject(new Error('corrupt file'))
         : Promise.resolve({
             id: input.id,
-            events: { subscribe: () => () => {}, lastServerId: () => null },
+            events: { subscribe: () => () => {}, lastServerSequence: () => null },
             security: {
               allows: () => true,
               passwordPrompt: { state: 'required', incorrect: true },
@@ -205,7 +205,7 @@ describe('the Viewer’s own settings', () => {
       open: vi.fn((input: { id: string }, _options?: object) =>
         Promise.resolve({
           id: input.id,
-          events: { subscribe: () => () => {}, lastServerId: () => null },
+          events: { subscribe: () => () => {}, lastServerSequence: () => null },
           pages: { list: () => Promise.resolve({ pageCount: 0, labels: [], pages: [] }) },
           security: { allows: () => true },
           // Calls' facts and working sets change nothing here: the same document.

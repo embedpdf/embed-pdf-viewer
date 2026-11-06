@@ -4,7 +4,7 @@
  * the engine opens files (`documents.canOpenFiles()`), so a viewer on the cloud engine never
  * offers it, and turning off `documents.open` turns off both ways.
  */
-import type { CommandDef } from '@embedpdf/react/commands';
+import type { CommandDefinition } from '@embedpdf/react/commands';
 import { DocumentsToken, type DocumentsCapability, type OpenInput } from '@embedpdf/react/runtime';
 import { pickFile } from '@embedpdf/web';
 
@@ -58,7 +58,7 @@ function openFiles(documents: DocumentsCapability, files: readonly File[]): void
   );
 }
 
-export const openFileCommand: CommandDef = {
+export const openFileCommand: CommandDefinition = {
   id: OPEN_COMMAND_ID,
   labelKey: 'commands.open',
   icon: 'fileImport',

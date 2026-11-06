@@ -13,7 +13,7 @@ import {
   ZoomMode,
   type ZoomLimits,
 } from '@embedpdf/core-stage';
-import { addRotations, type PageRotation } from '@embedpdf/core-geometry';
+import { addRotations, type Rotation } from '@embedpdf/core-geometry';
 import type { PluginContext } from '@embedpdf/core';
 
 import type { StageAnimation } from '../camera/animation';
@@ -100,7 +100,7 @@ export function createZoom(
     if (target !== camera().zoom) gestures.zoomAround(around, target / camera().zoom);
   };
 
-  const setViewRotation = (viewRotation: PageRotation): void =>
+  const setViewRotation = (viewRotation: Rotation): void =>
     settings.updateSettings({ viewRotation });
 
   return {
@@ -109,7 +109,7 @@ export function createZoom(
         cancelAnimation();
         const before = buildScene();
         if (!before.itemCount) return;
-        const item = paged() ? before.items[0] : before.items[itemIndexOfPage(state().cursor)];
+        const item = paged() ? before.items[0] : before.items[itemIndexOfPage(state().pageIndex)];
         // The ladder (the platform convention) ascends reading postures, each
         // derived from a zoom intent: see the page (automatic), read the text
         // (fit-width), inspect (2.5× the automatic fit). Stops within 10% of

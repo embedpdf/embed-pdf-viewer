@@ -97,11 +97,11 @@ export function pixelChangeOf(
     // The engine's own fonts changed, with no write behind it (a font
     // registered after the first pages were drawn): a page's text draws a
     // glyph its font lacks from a fallback, so any page may be stale. A
-    // write's `fonts.changed` carries its `tx`; that write's own events
+    // write's `fonts.changed` carries its `transaction`; that write's own events
     // repaint what it changed.
     case 'fonts.changed':
-      return event.origin.tx ? null : changeOf(allPageObjectNumbers(), 'content');
-    // pages.* replace the page registry: the kernel's `revision` bump already
+      return event.origin.transaction ? null : changeOf(allPageObjectNumbers(), 'content');
+    // pages.* replace the page registry: the kernel's `pagesSequence` bump already
     // re-keys every layout, and metadata never touches pixels. A new saved
     // version changes no pixels beyond the signature it seals. The
     // calculation order changes no pixels.

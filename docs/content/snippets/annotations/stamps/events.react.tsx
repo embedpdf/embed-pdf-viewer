@@ -6,7 +6,7 @@ export function LibraryStatus() {
 
   useStampEvent(
     (stamp) => stamp.onLibraryChanged,
-    ({ libraryId, reason }) => setMessage(`${libraryId}: ${reason}`),
+    ({ libraryId, type }) => setMessage(`${libraryId}: ${type}`),
   );
 
   return <p aria-live="polite">{message}</p>;

@@ -16,7 +16,7 @@ import {
   formWidget,
   toPageRef,
   type FormFieldDraft,
-  type FormFieldDTO,
+  type FormField,
   type PageRef,
 } from '@embedpdf/engine-core/runtime';
 
@@ -30,7 +30,7 @@ const PAGE = { x: 0, y: 0, width: 300, height: 400 };
 const created = {
   name: 'text_1',
   widgets: [{ ...formWidget(42, PAGE_REF), rect: null }],
-} as unknown as FormFieldDTO;
+} as unknown as FormField;
 
 function makeForm(over: Partial<FormHostCapability> = {}) {
   const placed: FormFieldDraft[] = [];
@@ -71,7 +71,7 @@ function makeAnnotation(afterCreate = { select: true, tool: 'stay', editText: tr
     clearGhost: () => {
       ghostClears++;
     },
-    selection: { set: ([ref]: unknown[]) => selects.push(ref) },
+    selection: { select: ([ref]: unknown[]) => selects.push(ref) },
     getSettings: () => ({ afterCreate }),
     tools: {
       getDefaults: () => ({ interiorColor: '#ffffff', color: '#6b7280', strokeWidth: 1 }),
@@ -114,12 +114,12 @@ describe('form place handler', () => {
     const { form, placed } = makeForm();
     const { annotation } = makeAnnotation();
     const handler = createPlaceHandler(form, interactionFor('form-text'), annotation);
-    expect(handler.onDown(at('down', 100, 100))).toBe(true);
-    handler.onUp?.(at('up', 101, 101)); // sub-threshold in both axes
+    expect(handler.onPointerDown(at('down', 100, 100))).toBe(true);
+    handler.onPointerUp?.(at('up', 101, 101)); // sub-threshold in both axes
     await flush();
     expect(placed).toHaveLength(1);
     // The next free name: the form already has `text_1`.
-    expect(placed[0]).toMatchObject({ family: 'text', name: 'text_2' });
+    expect(placed[0]).toMatchObject({ kind: 'text', name: 'text_2' });
     expect(widgetOf(placed[0])).toMatchObject({
       page: PAGE_REF,
       // 160×24 centred on the down point (the core's `d.from` rule).
@@ -131,8 +131,8 @@ describe('form place handler', () => {
   it('a THIN drag is a DRAG, never a click placement (width AND height rule)', async () => {
     const { form, placed } = makeForm();
     const handler = createPlaceHandler(form, interactionFor('form-text'), null);
-    handler.onDown(at('down', 50, 50));
-    handler.onUp?.(at('up', 150, 52)); // 100×2 — one axis under threshold
+    handler.onPointerDown(at('down', 50, 50));
+    handler.onPointerUp?.(at('up', 150, 52)); // 100×2 — one axis under threshold
     await flush();
     expect(widgetOf(placed[0]).rect).toEqual({ x: 50, y: 50, width: 100, height: 2 });
   });
@@ -140,15 +140,15 @@ describe('form place handler', () => {
   it('tracks the HOME page through the projection; the UP sample is final', async () => {
     const { form, placed } = makeForm();
     const handler = createPlaceHandler(form, interactionFor('form-text'), null);
-    handler.onDown(at('down', 10, 10));
+    handler.onPointerDown(at('down', 10, 10));
     // Cursor physically over another page; projection speaks for the home page.
-    handler.onMove?.(
+    handler.onPointerMove?.(
       sample({
         page: { ref: toPageRef(99), point: { x: 1, y: 1 } },
         project: (page) => (page.objectNumber === PON ? { x: 90, y: 40 } : null),
       }),
     );
-    handler.onUp?.(
+    handler.onPointerUp?.(
       sample({
         phase: 'up',
         project: (page) => (page.objectNumber === PON ? { x: 110, y: 60 } : null),
@@ -161,23 +161,23 @@ describe('form place handler', () => {
   it('declines the gesture without write permission (edit/pan still route)', () => {
     const { form } = makeForm({ canDesign: () => false } as Partial<FormHostCapability>);
     const handler = createPlaceHandler(form, interactionFor('form-text'), null);
-    expect(handler.onDown(at('down', 10, 10))).toBe(false);
+    expect(handler.onPointerDown(at('down', 10, 10))).toBe(false);
   });
 
   it('reports the gesture to the placement preview while it moves, and clears it on up', async () => {
     const { form } = makeForm();
     const { annotation, previews, clears, ghostClears } = makeAnnotation();
     const handler = createPlaceHandler(form, interactionFor('form-checkbox'), annotation);
-    handler.onDown(at('down', 10, 10));
+    handler.onPointerDown(at('down', 10, 10));
     // The annotation plugin paints it once it is a drag; under that, the ghost shows the click.
-    handler.onMove?.(at('move', 60, 40));
+    handler.onPointerMove?.(at('move', 60, 40));
     expect(previews.at(-1)).toEqual({
       toolId: 'form-checkbox',
       page: PAGE_REF,
       from: { x: 10, y: 10 },
       to: { x: 60, y: 40 },
     });
-    handler.onUp?.(at('up', 60, 40));
+    handler.onPointerUp?.(at('up', 60, 40));
     // Every completion path drops the preview and the ghost.
     expect(clears()).toBe(1);
     expect(ghostClears()).toBe(1);
@@ -188,9 +188,9 @@ describe('form place handler', () => {
     const { form, placed } = makeForm();
     const { annotation, clears, ghostClears } = makeAnnotation();
     const handler = createPlaceHandler(form, interactionFor('form-text'), annotation);
-    handler.onDown(at('down', 10, 10));
-    handler.onMove?.(at('move', 60, 40));
-    handler.onCancel?.(sample({ phase: 'cancel' }));
+    handler.onPointerDown(at('down', 10, 10));
+    handler.onPointerMove?.(at('move', 60, 40));
+    handler.onPointerCancel?.(sample({ phase: 'cancel' }));
     await flush();
     expect(placed).toHaveLength(0);
     expect(clears()).toBe(1);
@@ -228,8 +228,8 @@ describe('form place handler', () => {
     const { form } = makeForm();
     const { annotation, selects } = makeAnnotation();
     const handler = createPlaceHandler(form, interactionFor('form-text'), annotation);
-    handler.onDown(at('down', 100, 100));
-    handler.onUp?.(at('up', 100, 100));
+    handler.onPointerDown(at('down', 100, 100));
+    handler.onPointerUp?.(at('up', 100, 100));
     await flush();
     expect(selects).toEqual([{ kind: 'objectNumber', objectNumber: 42, page: PAGE_REF }]);
 
@@ -241,8 +241,8 @@ describe('form place handler', () => {
     } as unknown as InteractionHostCapability;
     const second = makeAnnotation();
     const h2 = createPlaceHandler(form, interaction, second.annotation);
-    h2.onDown(at('down', 100, 100));
-    h2.onUp?.(at('up', 100, 100));
+    h2.onPointerDown(at('down', 100, 100));
+    h2.onPointerUp?.(at('up', 100, 100));
     live = 'pointer';
     await flush();
     expect(second.selects).toHaveLength(0);
@@ -252,8 +252,8 @@ describe('form place handler', () => {
     const { form } = makeForm({ get: () => created });
     const { annotation, selects } = makeAnnotation();
     const handler = createPlaceHandler(form, interactionFor('form-text'), annotation);
-    handler.onDown(at('down', 100, 100));
-    handler.onUp?.(at('up', 100, 100));
+    handler.onPointerDown(at('down', 100, 100));
+    handler.onPointerUp?.(at('up', 100, 100));
     expect(selects).toEqual([{ kind: 'objectNumber', objectNumber: 42, page: PAGE_REF }]);
   });
 
@@ -270,8 +270,8 @@ describe('form place handler', () => {
       interactionFor('form-text', false, activateTool),
       annotation,
     );
-    handler.onDown(at('down', 100, 100));
-    handler.onUp?.(at('up', 100, 100));
+    handler.onPointerDown(at('down', 100, 100));
+    handler.onPointerUp?.(at('up', 100, 100));
     await flush();
     expect(selects).toHaveLength(0);
     // Design's resting tool, not the default pointer, which fills and would end design.
@@ -282,12 +282,12 @@ describe('form place handler', () => {
     const { form, placed } = makeForm();
     for (const tool of ['form-radio', 'form-combobox']) {
       const handler = createPlaceHandler(form, interactionFor(tool), null);
-      handler.onDown(at('down', 100, 100));
-      handler.onUp?.(at('up', 100, 100));
+      handler.onPointerDown(at('down', 100, 100));
+      handler.onPointerUp?.(at('up', 100, 100));
     }
     await flush();
     expect(widgetOf(placed[0])).toMatchObject({ exportValue: 'Choice1' });
-    expect(placed[1]).toMatchObject({ family: 'combobox', name: 'combobox_1' });
+    expect(placed[1]).toMatchObject({ kind: 'combobox', name: 'combobox_1' });
     expect((placed[1] as { options: unknown[] }).options).toHaveLength(2);
   });
 
@@ -300,8 +300,8 @@ describe('form place handler', () => {
         }),
       } as Partial<FormHostCapability>);
       const handler = createPlaceHandler(form, interactionFor('form-text'), null);
-      handler.onDown(at('down', 100, 100));
-      handler.onUp?.(at('up', 100, 100));
+      handler.onPointerDown(at('down', 100, 100));
+      handler.onPointerUp?.(at('up', 100, 100));
       await flush();
       expect(spy).toHaveBeenCalled();
     } finally {

@@ -72,7 +72,7 @@ of them with your own UI:
 | `openUri` | An action opens a website or an email address             |
 | `print`   | An action or a script asks to print                       |
 | `alert`   | A script shows a message                                  |
-| `gotoPage`| A script moves to a page                                  |
+| `goToPage`| A script moves to a page                                  |
 
 ## Change the rules
 
@@ -121,9 +121,9 @@ Everything `useActions()` gives you.
 | Method                                                       | What it does                                                                                                                                  |
 | :----------------------------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------- |
 | `executeNamed(name, context?)`                               | Runs a viewer action by its name, such as `'NextPage'`, as if the user clicked it. [Run an action from code](#run-an-action-from-code)         |
-| `execute(tree, context)`                                     | Runs actions you already have, such as a tree from `getActionTree()`, under the rules. Resolves `{ status, nodes, diagnostics }`: an action that fails is reported there, not thrown. |
+| `execute(tree, context)`                                     | Runs actions you already have, such as a tree from `readActionTree()`, under the rules. Resolves `{ status, nodes, diagnostics }`: an action that fails is reported there, not thrown. |
 | `dispatch(trigger)`                                          | Reports that something happened, such as a click on a link or a page opening, and runs the actions behind it. The viewer does this for its own clicks and pages. Never rejects: problems come back in the result. |
-| `getActionTree(source)`                                      | Reads the actions behind a link or button, a form field, a page, the document or an outline item, without running them. Resolves `null` when there are none. |
+| `readActionTree(source)`                                      | Reads the actions behind a link or button, a form field, a page, the document or an outline item, without running them. Resolves `null` when there are none. |
 | `isScriptingEnabled()`                                       | Whether this document's JavaScript runs: it's turned on and the script engine started. [Turn on JavaScript](#turn-on-javascript)               |
 | `setUiAdapter(adapter)`                                      | Installs your handlers for websites, printing and alerts in place of the ones before, and returns a function that removes them. `useActionsUiAdapter()` does this for you. [How websites open, printing and alerts](#how-websites-open-printing-and-alerts) |
 | `setSubmitHandler(handler)`                                  | Sets the function a form's Submit button hands its values to, with the address the PDF names. The viewer never sends them anywhere itself. Returns a function that removes it. |
@@ -164,7 +164,7 @@ Set them when you register the plugin, and change them while the app runs with
 | `onScriptFailed`             | A script threw an error                                                    | `error`, `source`           |
 | `onScriptDiagnosticReported` | A script was stopped from doing something, such as reaching the network, or used something the viewer doesn't support | `code`, `message` |
 | `onOpenSequenceCompleted`    | The document's opening actions ran                                         | `result`                    |
-| `onSettingsChanged`          | A setting changed                                                          | `settings`, `changed`       |
+| `onSettingsChanged`          | A setting changed                                                          | `settings`, `changedKeys`   |
 
 ## Permissions
 

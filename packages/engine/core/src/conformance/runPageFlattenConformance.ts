@@ -10,15 +10,15 @@ import { EVERY_PERMISSION } from './fixtureScope';
 /** Transport-neutral coverage for the content + annotation flatten rail. */
 export function runPageFlattenConformance(
   runner: ConformanceTestRunner,
-  opts: ConformanceOptions,
+  options: ConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`page flatten conformance: ${opts.label}`, () => {
+  describe(`page flatten conformance: ${options.label}`, () => {
     let engine: Engine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -26,7 +26,7 @@ export function runPageFlattenConformance(
     });
 
     test('flattens eligible appearances once without changing layout', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         if (!doc.pages.flatten) return;
         const layoutBefore = await doc.pages.list();

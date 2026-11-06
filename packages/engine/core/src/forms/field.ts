@@ -5,11 +5,11 @@ import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 import type { FormValueEntry } from './value-entry';
 
 /**
- * The field family — the discriminant of {@link FormFieldDTO}. Narrowing on
- * it reveals exactly the members that are meaningful for that family, the
+ * The field kind — the discriminant of {@link FormField}. Narrowing on
+ * it reveals exactly the members that are meaningful for that kind, the
  * same way annotation DTOs narrow on `subtype`.
  */
-export type FormFieldFamily =
+export type FormFieldKind =
   | 'text'
   | 'checkbox'
   | 'radio'
@@ -67,7 +67,7 @@ export interface FormFieldOption {
 }
 
 /**
- * The trunk every field family shares: identity, provenance, universal
+ * The trunk every field kind shares: identity, provenance, universal
  * flags, and widget placement. A logical field is the document-scoped
  * record that holds the value; its widgets are page-scoped views — join
  * them to the annotation subsystem via each widget's `ref`.
@@ -80,7 +80,7 @@ export interface FormFieldBase<C extends Coordinates = PageCoordinates> {
   ref: FormFieldRef;
   /** Fully qualified name, e.g. `"billing.name"`. */
   name: string;
-  family: FormFieldFamily;
+  kind: FormFieldKind;
   origin: FormFieldOrigin;
   /**
    * The user must not change the value. The engine's write transactions
@@ -97,7 +97,7 @@ export interface FormFieldBase<C extends Coordinates = PageCoordinates> {
   alternateName: string | null;
   /** /TM — the export mapping name. */
   mappingName: string | null;
-  /** Exact effective `/V` object shape; family conveniences below are derived. */
+  /** Exact effective `/V` object shape; kind conveniences below are derived. */
   valueEntry: FormValueEntry;
   /** Exact effective `/DV` object shape, including absent and malformed values. */
   defaultValueEntry: FormValueEntry;
@@ -135,8 +135,8 @@ export interface FormFieldBase<C extends Coordinates = PageCoordinates> {
 }
 
 /** A text field. Write with `{ value }`. */
-export interface TextFieldDTO<C extends Coordinates = PageCoordinates> extends FormFieldBase<C> {
-  family: 'text';
+export interface TextField<C extends Coordinates = PageCoordinates> extends FormFieldBase<C> {
+  kind: 'text';
   value: string;
   /** /DV — restored by `reset()`. */
   defaultValue: string;
@@ -149,10 +149,8 @@ export interface TextFieldDTO<C extends Coordinates = PageCoordinates> extends F
 }
 
 /** A checkbox. Write with `{ checked }`, or `{ value }` naming a widget's export value. */
-export interface CheckboxFieldDTO<
-  C extends Coordinates = PageCoordinates,
-> extends FormFieldBase<C> {
-  family: 'checkbox';
+export interface CheckboxField<C extends Coordinates = PageCoordinates> extends FormFieldBase<C> {
+  kind: 'checkbox';
   checked: boolean;
   /** The export value reported while checked ("Off" is never exported). */
   exportValue: string;
@@ -160,8 +158,8 @@ export interface CheckboxFieldDTO<
 }
 
 /** A radio group: One field, N widgets. Write with `{ value }`, a button's export value. */
-export interface RadioFieldDTO<C extends Coordinates = PageCoordinates> extends FormFieldBase<C> {
-  family: 'radio';
+export interface RadioField<C extends Coordinates = PageCoordinates> extends FormFieldBase<C> {
+  kind: 'radio';
   /** The checked widget's export value, or `"Off"` when the group is clear. */
   value: string;
   /** Widgets sharing an export value check together. */
@@ -172,10 +170,8 @@ export interface RadioFieldDTO<C extends Coordinates = PageCoordinates> extends 
 }
 
 /** A combo box (dropdown). Write with `{ value }`. */
-export interface ComboBoxFieldDTO<
-  C extends Coordinates = PageCoordinates,
-> extends FormFieldBase<C> {
-  family: 'combobox';
+export interface ComboBoxField<C extends Coordinates = PageCoordinates> extends FormFieldBase<C> {
+  kind: 'combobox';
   /** An option export value — or free text when `edit` is set. */
   value: string;
   /** /DV — restored by `reset()`. */
@@ -186,8 +182,8 @@ export interface ComboBoxFieldDTO<
 }
 
 /** A list box. Write with `{ selectedValues }`. */
-export interface ListBoxFieldDTO<C extends Coordinates = PageCoordinates> extends FormFieldBase<C> {
-  family: 'listbox';
+export interface ListBoxField<C extends Coordinates = PageCoordinates> extends FormFieldBase<C> {
+  kind: 'listbox';
   /** Selected option export values, in option order. */
   selectedValues: string[];
   /** /DV — the option values `reset()` selects. */
@@ -200,47 +196,43 @@ export interface ListBoxFieldDTO<C extends Coordinates = PageCoordinates> extend
 }
 
 /** A push button: pure trigger, holds no value. Never written or exported. */
-export interface PushButtonFieldDTO<
-  C extends Coordinates = PageCoordinates,
-> extends FormFieldBase<C> {
-  family: 'pushbutton';
+export interface PushButtonField<C extends Coordinates = PageCoordinates> extends FormFieldBase<C> {
+  kind: 'pushbutton';
 }
 
 /**
  * A signature field: identity and placement only. Form writes never set a
  * signature value; signing goes through the signatures API.
  */
-export interface SignatureFieldDTO<
-  C extends Coordinates = PageCoordinates,
-> extends FormFieldBase<C> {
-  family: 'signature';
+export interface SignatureField<C extends Coordinates = PageCoordinates> extends FormFieldBase<C> {
+  kind: 'signature';
 }
 
 /**
  * Forward-compat placeholder for field types the engine does not model,
  * mirroring the `unsupported` annotation kind. Round-trips safely.
  */
-export interface UnknownFieldDTO<C extends Coordinates = PageCoordinates> extends FormFieldBase<C> {
-  family: 'unknown';
+export interface UnknownField<C extends Coordinates = PageCoordinates> extends FormFieldBase<C> {
+  kind: 'unknown';
   /** The raw /V value as text, for diagnostics. */
   rawValue: string;
 }
 
 /**
- * A logical form field. Discriminated on `family`:
+ * A logical form field. Discriminated on `kind`:
  *
  * ```ts
- * if (field.family === 'listbox') {
+ * if (field.kind === 'listbox') {
  *   field.selectedValues; // string[]
  * }
  * ```
  */
-export type FormFieldDTO<C extends Coordinates = PageCoordinates> =
-  | TextFieldDTO<C>
-  | CheckboxFieldDTO<C>
-  | RadioFieldDTO<C>
-  | ComboBoxFieldDTO<C>
-  | ListBoxFieldDTO<C>
-  | PushButtonFieldDTO<C>
-  | SignatureFieldDTO<C>
-  | UnknownFieldDTO<C>;
+export type FormField<C extends Coordinates = PageCoordinates> =
+  | TextField<C>
+  | CheckboxField<C>
+  | RadioField<C>
+  | ComboBoxField<C>
+  | ListBoxField<C>
+  | PushButtonField<C>
+  | SignatureField<C>
+  | UnknownField<C>;

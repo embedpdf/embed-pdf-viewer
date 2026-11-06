@@ -105,7 +105,7 @@ export const HANDLE_PAD = 14; // px — grab padding
  *  and the dominant case stays pixel-identical to an axis-aligned box). */
 const HANDLE_ROT_EPSILON = 0.05;
 
-export interface SelectionHandleGeom {
+export interface SelectionHandleGeometry {
   /** The projected edge, ascent corner first, overlay px. */
   bar: { from: Point; to: Point };
   /** The glyph's ink height on screen — zoom scaling comes free. */
@@ -127,11 +127,11 @@ const midpoint = (from: Point, to: Point): Point => ({
  * The handle's geometry for one endpoint, in overlay space. Null when the
  * endpoint's page isn't laid out (or the cell is degenerate) — render nothing.
  */
-export function selectionHandleGeom(
+export function selectionHandleGeometry(
   view: SelectionHandleView,
   endpoint: SelectionHandleEndpoint,
   role: 'start' | 'end',
-): SelectionHandleGeom | null {
+): SelectionHandleGeometry | null {
   // Which side of the cell is this selection's edge is a reading-order
   // question (`advance`), never a geometric one.
   const leading = role === 'start' ? endpoint.advance > 0 : endpoint.advance < 0;
@@ -227,7 +227,7 @@ export function armSelectionHandle(
   endpoints: SelectionHandleEndpoints,
   role: 'start' | 'end',
 ): ArmedSelectionHandle | null {
-  const geometry = selectionHandleGeom(view, endpoints[role], role);
+  const geometry = selectionHandleGeometry(view, endpoints[role], role);
   if (!geometry) return null;
   const opposite = endpoints[role === 'start' ? 'end' : 'start'];
   return {

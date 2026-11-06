@@ -1,7 +1,7 @@
 import type {
   FormFieldBase,
-  FormFieldDTO,
-  FormFieldFamily,
+  FormField,
+  FormFieldKind,
   FormFieldOption,
   FormFieldWidget,
   FormKind,
@@ -21,7 +21,7 @@ import { ActionReadBudgetTracker, readActionModel } from '../../actions/ActionMo
 import { readFieldAttribution, readFieldGroup } from './fieldAttribution';
 
 // Mirrors EPDF_FORMFIELD_FAMILY_* in public/epdf_form.h.
-export const FAMILY_BY_CODE: Record<number, FormFieldFamily> = {
+export const FAMILY_BY_CODE: Record<number, FormFieldKind> = {
   0: 'unknown',
   1: 'pushbutton',
   2: 'checkbox',
@@ -129,14 +129,14 @@ function readOptions(runtime: PdfRuntimeModule, model: Ptr, fieldIndex: number):
   return options;
 }
 
-/** Read one field of the native model into its per-family DTO. */
+/** Read one field of the native model into its per-kind DTO. */
 export function readFieldAt(
   runtime: PdfRuntimeModule,
   model: Ptr,
   fieldIndex: number,
   docPtr: Ptr,
   actionBudget = new ActionReadBudgetTracker(),
-): FormFieldDTO<PdfCoordinates> {
+): FormField<PdfCoordinates> {
   const { fn } = runtime;
   const fieldObjectNumber = fn.EPDFForm_GetFieldObjNum(model, fieldIndex);
   const name = readWide(runtime, (buf, cap) =>
@@ -154,7 +154,7 @@ export function readFieldAt(
         ? { kind: 'objectNumber', objectNumber: fieldObjectNumber }
         : { kind: 'fqn', name },
     name,
-    family,
+    kind: family,
     origin: fn.EPDFForm_GetFieldOrigin(model, fieldIndex) === 1 ? 'recovered' : 'acroform',
     readOnly: (rawFlags & FF_READ_ONLY) !== 0,
     required: (rawFlags & FF_REQUIRED) !== 0,
@@ -180,7 +180,7 @@ export function readFieldAt(
       const maxLen = fn.EPDFForm_GetFieldMaxLen(model, fieldIndex);
       return {
         ...base,
-        family,
+        kind: family,
         value: scalarValue,
         defaultValue: scalarDefault,
         maxLength: maxLen > 0 ? maxLen : null,
@@ -194,7 +194,7 @@ export function readFieldAt(
       const widgets = readToggleWidgets(runtime, model, fieldIndex);
       return {
         ...base,
-        family,
+        kind: family,
         checked: widgets.some((w) => w.checked),
         exportValue: widgets[0]?.exportValue ?? 'Yes',
         widgets,
@@ -204,7 +204,7 @@ export function readFieldAt(
       const widgets = readToggleWidgets(runtime, model, fieldIndex);
       return {
         ...base,
-        family,
+        kind: family,
         value: widgets.find((widget) => widget.checked)?.exportValue ?? 'Off',
         radiosInUnison: (rawFlags & FF_RADIOS_IN_UNISON) !== 0,
         noToggleToOff: (rawFlags & FF_NO_TOGGLE_TO_OFF) !== 0,
@@ -214,7 +214,7 @@ export function readFieldAt(
     case 'combobox': {
       return {
         ...base,
-        family,
+        kind: family,
         value: scalarValue,
         defaultValue: scalarDefault,
         edit: (rawFlags & FF_EDIT) !== 0,
@@ -226,7 +226,7 @@ export function readFieldAt(
       const options = readOptions(runtime, model, fieldIndex);
       return {
         ...base,
-        family,
+        kind: family,
         selectedValues: options.filter((o) => o.selected).map((o) => o.value),
         defaultValue: entryValues(defaultValueEntry),
         multiSelect: (rawFlags & FF_MULTI_SELECT) !== 0,
@@ -237,12 +237,12 @@ export function readFieldAt(
     }
     case 'pushbutton':
     case 'signature': {
-      return { ...base, family, widgets: readPlainWidgets(runtime, model, fieldIndex) };
+      return { ...base, kind: family, widgets: readPlainWidgets(runtime, model, fieldIndex) };
     }
     default: {
       return {
         ...base,
-        family: 'unknown',
+        kind: 'unknown',
         rawValue:
           valueEntry.kind === 'array' ? valueEntry.values.join(',') : entryScalar(valueEntry),
         widgets: readPlainWidgets(runtime, model, fieldIndex),
@@ -263,7 +263,7 @@ export function readFormFields(
 ): Omit<FormSnapshot<PdfCoordinates>, 'widgets'> {
   const { fn } = runtime;
   const count = fn.EPDFForm_CountFields(model);
-  const fields: FormFieldDTO<PdfCoordinates>[] = [];
+  const fields: FormField<PdfCoordinates>[] = [];
   const actionBudget = new ActionReadBudgetTracker();
   for (let i = 0; i < count; i++) {
     fields.push(readFieldAt(runtime, model, i, docPtr, actionBudget));

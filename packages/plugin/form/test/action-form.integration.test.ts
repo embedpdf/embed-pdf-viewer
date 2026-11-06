@@ -43,7 +43,7 @@ describe('synthetic action form AF library acceptance', () => {
       name: 'action_form_fixture.pdf',
       pageCount: pages.pageCount,
       pages: pages.pages,
-      revision: 0,
+      pagesSequence: 0,
       hasUnsavedChanges: false,
       renderPolicy: { kind: 'continuous' },
       pageLabels: [],
@@ -92,7 +92,7 @@ describe('synthetic action form AF library acceptance', () => {
       expect(rejected.status).toBe('rejected');
       expect(rejected.uiEffects).toContainEqual(
         expect.objectContaining({
-          kind: 'alert',
+          type: 'alert',
           message: 'The value entered does not match the format of the field [ calc1 ]',
           phase: 'user',
         }),
@@ -110,7 +110,7 @@ describe('synthetic action form AF library acceptance', () => {
       expect(emailResult.error).toBeUndefined();
       expect(emailResult.uiEffects).toContainEqual(
         expect.objectContaining({
-          kind: 'alert',
+          type: 'alert',
           message: 'Please enter a valid email address. Received: "not-an-email".',
           phase: 'user',
         }),

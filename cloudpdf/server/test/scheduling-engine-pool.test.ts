@@ -177,7 +177,7 @@ describe('SchedulingEnginePool', () => {
         },
       } as never,
       encoder: {
-        encodeToBuffer: async () => ({ bytes: new Uint8Array(), contentType: 'image/webp' }),
+        encodeToBuffer: async () => ({ bytes: new Uint8Array(), mimeType: 'image/webp' }),
       } as never,
       documents: {
         setThumbnail: async (_d: string, _t: string, state: string) => {

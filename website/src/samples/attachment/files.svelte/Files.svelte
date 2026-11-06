@@ -23,16 +23,16 @@
   function attach(event: Event & { currentTarget: HTMLInputElement }) {
     const picked = Array.from(event.currentTarget.files ?? []);
     event.currentTarget.value = '';
-    if (picked.length > 0) void attachment.add(picked.map((data) => ({ data })));
+    if (picked.length > 0) void attachment.create(picked.map((data) => ({ data })));
   }
 </script>
 
 <aside class="files">
   <header class="files-header">
     <h3 class="files-title">Files</h3>
-    <label class="button primary" data-disabled={!state.canAdd || undefined}>
+    <label class="button primary" data-disabled={!state.canCreate || undefined}>
       Attach
-      <input type="file" multiple hidden disabled={!state.canAdd} onchange={attach} />
+      <input type="file" multiple hidden disabled={!state.canCreate} onchange={attach} />
     </label>
   </header>
   {#if state.files.length === 0}
@@ -54,8 +54,8 @@
             type="button"
             class="row-remove"
             aria-label={`Remove ${displayNameOf(file)}`}
-            disabled={!attachment.canRemove(file)}
-            onclick={() => attachment.remove(file)}
+            disabled={!attachment.canDelete(file)}
+            onclick={() => attachment.delete(file)}
           >
             ×
           </button>

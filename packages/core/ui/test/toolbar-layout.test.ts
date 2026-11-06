@@ -367,8 +367,8 @@ describe('groupMenuView', () => {
         labelKey: undefined,
         role: 'radio',
         rows: [
-          { type: 'command', command: 'tool:pen' },
-          { type: 'command', command: 'tool:ink' },
+          { kind: 'command', command: 'tool:pen' },
+          { kind: 'command', command: 'tool:ink' },
         ],
       },
     ]);

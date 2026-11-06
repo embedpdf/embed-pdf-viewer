@@ -110,7 +110,7 @@ const selectedRefs = (tab: Page): Promise<Ref[]> =>
   tab.evaluate(() =>
     window.element.viewer
       .get('annotation')
-      .selection.list()
+      .selection.getSelected()
       .map((annotation: { ref: Ref }) => annotation.ref),
   );
 
@@ -238,7 +238,7 @@ describe('what a turned-off feature made stays, frozen', () => {
     // With writing back, the selected card offers its reply box.
     await tab.evaluate(() => (window.element.readOnly = false));
     await tab.evaluate((ref) => {
-      window.element.viewer.get('annotation').selection.set([ref]);
+      window.element.viewer.get('annotation').selection.select([ref]);
     }, square);
     await tab.waitForFunction(
       () => window.element.shadowRoot!.querySelectorAll('li input').length > 0,
@@ -287,7 +287,7 @@ describe('what a turned-off feature made stays, frozen', () => {
 
     // The highlight: restyled and deleted by hand as ever.
     await tab.evaluate(
-      (ref) => window.element.viewer.get('annotation').selection.set([ref]),
+      (ref) => window.element.viewer.get('annotation').selection.select([ref]),
       highlight,
     );
     await frames(tab);

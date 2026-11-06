@@ -17,7 +17,7 @@ import {
   type BundleLimits,
 } from './bundleLimits';
 import type { WidgetAnnotation } from '../annotation/kinds/widget';
-import type { FormFieldDTO } from '../forms/field';
+import type { FormField } from '../forms/field';
 import type { FormFieldRef } from '../identity/FormFieldRef';
 import { encodePageKey } from '../identity/PageRef';
 import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
@@ -50,7 +50,7 @@ export interface FormBundleField<C extends Coordinates = PageCoordinates> {
    * (`noExport`) comes without its value or who filled it, and a signed
    * signature field without its signature: a signature never travels.
    */
-  readonly data: FormFieldDTO<C>;
+  readonly data: FormField<C>;
 }
 
 export interface FormBundleWidget<C extends Coordinates = PageCoordinates> {
@@ -150,7 +150,7 @@ export function assertFormBundleManifest(
     if (
       !isRecord(row) ||
       !isRecord(row.data) ||
-      typeof row.data.family !== 'string' ||
+      typeof row.data.kind !== 'string' ||
       typeof row.data.name !== 'string' ||
       !isRecord(row.data.ref)
     ) {

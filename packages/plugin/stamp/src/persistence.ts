@@ -100,9 +100,9 @@ export function persistStampLibraries(
     });
   };
 
-  return stamp.onLibraryChanged(({ libraryId, reason }) => {
+  return stamp.onLibraryChanged(({ libraryId, type }) => {
     if (except.has(libraryId)) return;
-    run(libraryId, reason === 'removed' ? 'delete' : 'save');
+    run(libraryId, type === 'deleted' ? 'delete' : 'save');
   });
 }
 

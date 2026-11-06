@@ -26,13 +26,20 @@ async function bytesOf(engine: Engine): Promise<Uint8Array> {
   );
   const page = (await doc.pages.list()).pages[1]!.ref;
   await doc.forms.create({
-    family: 'text',
+    kind: 'text',
     name: 'amount',
-    widgets: [{ page, rect: { x: 20, y: 20, width: 120, height: 20 }, fontFamily: 'helvetica', fontSize: 10 }],
+    widgets: [
+      {
+        page,
+        rect: { x: 20, y: 20, width: 120, height: 20 },
+        fontFamily: 'helvetica',
+        fontSize: 10,
+      },
+    ],
     actions: { format: { type: 'javascript', script: 'event.value = "$" + event.value;' } },
   });
   await doc.forms.create({
-    family: 'text',
+    kind: 'text',
     name: 'greeting',
     widgets: [
       {
@@ -44,7 +51,7 @@ async function bytesOf(engine: Engine): Promise<Uint8Array> {
     ],
   });
   await doc.forms.create({
-    family: 'checkbox',
+    kind: 'checkbox',
     name: 'agree',
     widgets: [{ page, rect: { x: 20, y: 60, width: 16, height: 16 } }],
   });
@@ -62,7 +69,12 @@ describe('a filled widget looks', () => {
     let holding = false;
     let inner: DocumentHandle | null = null;
     const kernel = createKernel({
-      engine: gated(real, held, (doc) => (inner = doc), () => holding),
+      engine: gated(
+        real,
+        held,
+        (doc) => (inner = doc),
+        () => holding,
+      ),
       plugins: [
         interactionPlugin(),
         actionsPlugin({ javascript: { enabled: true, sandboxFactory: createQuickJsSandbox } }),
@@ -80,9 +92,13 @@ describe('a filled widget looks', () => {
       };
       const page = fieldNamed('amount').widgets[0]!.page as PageRef;
       const shownOf = (name: string) =>
-        form.listShownWidgets(page).find(
-          (widget) => widget.ref.kind === 'objectNumber' && widget.ref.objectNumber === fieldNamed(name).widgets[0]!.objectNumber,
-        )!;
+        form
+          .listShownWidgets(page)
+          .find(
+            (widget) =>
+              widget.ref.kind === 'objectNumber' &&
+              widget.ref.objectNumber === fieldNamed(name).widgets[0]!.objectNumber,
+          )!;
       const paintedText = (name: string) =>
         (form.getWidgetPainting(widgetOf(name))?.scene ?? [])
           .flatMap((node) => (node.kind === 'textRun' ? [node.text] : []))

@@ -13,7 +13,13 @@ import { foldRecords, NO_RECORDS, type AnnotationRecords } from '../../src/sync/
  */
 const event = (partial: Record<string, unknown>): DocumentEvent =>
   ({
-    origin: { kind: 'remote', sessionId: 'them', sub: null, ts: 0, serverId: 45 },
+    origin: {
+      kind: 'remote',
+      sessionId: 'them',
+      subject: null,
+      at: new Date(0).toISOString(),
+      serverSequence: 45,
+    },
     meta: { changedRefs: [], shouldRefetch: null, weakRefsInvalidated: false },
     ...partial,
   }) as unknown as DocumentEvent;

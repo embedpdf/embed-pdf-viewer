@@ -1,6 +1,6 @@
 import type {
   FormFieldDisplay,
-  FormFieldDTO,
+  FormField,
   FormSnapshot,
   FormValueEntry,
   WidgetAnnotation,
@@ -24,8 +24,8 @@ function valueFromEntry(entry: FormValueEntry): ScriptValue {
  * A field value as scripts see it. A checkbox or radio group shows the export
  * value of its checked widget, as Acrobat's `field.value` does, or `'Off'`.
  */
-function fieldValueFromEntry(field: FormFieldDTO, entry: FormValueEntry): ScriptValue {
-  if (field.family !== 'checkbox' && field.family !== 'radio') return valueFromEntry(entry);
+function fieldValueFromEntry(field: FormField, entry: FormValueEntry): ScriptValue {
+  if (field.kind !== 'checkbox' && field.kind !== 'radio') return valueFromEntry(entry);
   if (entry.kind !== 'scalar') return 'Off';
   const checked = field.widgets.find((widget) => widget.onState === entry.value);
   return checked?.exportValue ?? entry.value;
@@ -50,10 +50,10 @@ export function scriptFieldsFromSnapshot(snapshot: FormSnapshot): ScriptFieldInp
       row,
     ]),
   );
-  return snapshot.fields.map((field: FormFieldDTO) => ({
+  return snapshot.fields.map((field: FormField) => ({
     ref: field.ref,
     name: field.name,
-    family: field.family,
+    kind: field.kind,
     value: fieldValueFromEntry(field, field.valueEntry),
     defaultValue: fieldValueFromEntry(field, field.defaultValueEntry),
     // A field shows as its first widget does.
@@ -63,7 +63,7 @@ export function scriptFieldsFromSnapshot(snapshot: FormSnapshot): ScriptFieldInp
     ...('options' in field
       ? { options: field.options.map((option) => ({ label: option.label, value: option.value })) }
       : {}),
-    ...(field.family === 'checkbox' || field.family === 'radio'
+    ...(field.kind === 'checkbox' || field.kind === 'radio'
       ? { exportValues: field.widgets.map((widget) => widget.exportValue) }
       : {}),
   }));

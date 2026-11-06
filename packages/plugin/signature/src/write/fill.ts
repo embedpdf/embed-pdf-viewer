@@ -16,7 +16,7 @@ export function createFills(
     marks,
     authority,
   }: Pick<SignatureServices, 'events' | 'store' | 'marks' | 'authority'>,
-  { getSignature }: Pick<SignatureReads, 'getSignature'>,
+  { findSignature }: Pick<SignatureReads, 'findSignature'>,
   target: { clearIfTarget(field: FormFieldRef): void },
 ) {
   const { filled, cleared } = events;
@@ -36,7 +36,7 @@ export function createFills(
         'this engine cannot draw into a signature field',
       );
     }
-    const signature = getSignature(field);
+    const signature = findSignature(field);
     if (signature?.signed) {
       throw new PluginError('conflict', 'signature', `'${signature.fieldName}' is signed`);
     }

@@ -16,7 +16,7 @@
 import { panelCommandOf, type LayoutData, type LayoutPanel } from '@embedpdf/core-ui';
 import { AnnotationToken } from '@embedpdf/react/annotation';
 import { AttachmentToken } from '@embedpdf/react/attachment';
-import { CommandsToken, type CommandDef } from '@embedpdf/react/commands';
+import { CommandsToken, type CommandDefinition } from '@embedpdf/react/commands';
 import { FormToken } from '@embedpdf/react/form';
 import { MeasurementToken } from '@embedpdf/react/measurement';
 import { OutlineToken } from '@embedpdf/react/outline';
@@ -89,7 +89,7 @@ export function panelOpeningOnSide(
 }
 
 /** What a built-in panel brings to the layout's panel: its words, icon and command's needs. */
-type BuiltInPanel = Pick<CommandDef, 'allowed' | 'notAllowedKey' | 'visible'> & {
+type BuiltInPanel = Pick<CommandDefinition, 'allowed' | 'notAllowedKey' | 'visible'> & {
   /** Its title's key, in its header and on its button, unless the layout gives its own title. */
   readonly titleKey: string;
   /** Its button's icon, unless the layout gives one. */
@@ -105,7 +105,7 @@ type BuiltInPanel = Pick<CommandDef, 'allowed' | 'notAllowedKey' | 'visible'> & 
  * shows no outline button to a session that can't add items; the same for attachments.
  */
 const hasJob = (
-  commandContext: Parameters<NonNullable<CommandDef['visible']>>[0],
+  commandContext: Parameters<NonNullable<CommandDefinition['visible']>>[0],
   entries: number,
   mayAdd: boolean,
   adding: Feature,
@@ -117,7 +117,7 @@ const hasJob = (
 const SEARCH_PANEL = 'search';
 
 /** Searching, which the search panel and Find need: without it every query is refused. */
-const SEARCHES: Pick<CommandDef, 'allowed' | 'notAllowedKey'> & {
+const SEARCHES: Pick<CommandDefinition, 'allowed' | 'notAllowedKey'> & {
   readonly categories: readonly Feature[];
 } = {
   categories: ['search'],
@@ -130,7 +130,7 @@ const SEARCHES: Pick<CommandDef, 'allowed' | 'notAllowedKey'> & {
  * It opens search, or keeps it open, and never closes it, and Ctrl/Cmd+F runs it from a text
  * field in the viewer too (the search field itself among them).
  */
-const FIND_COMMAND: CommandDef = {
+const FIND_COMMAND: CommandDefinition = {
   id: 'search:find',
   labelKey: 'commands.find',
   icon: 'search',
@@ -183,7 +183,7 @@ const BUILT_IN_PANELS: ReadonlyMap<string, BuiltInPanel> = new Map<string, Built
           hasJob(
             commandContext,
             attachment.list().length,
-            attachment.canAdd(),
+            attachment.canCreate(),
             'attachments.adding',
           )
         );
@@ -279,7 +279,7 @@ const openingOf = (
   id: string,
   focus: boolean | undefined,
   closable: boolean,
-): Pick<CommandDef, 'panel' | 'run' | 'active'> =>
+): Pick<CommandDefinition, 'panel' | 'run' | 'active'> =>
   closable
     ? { panel: focus ? { id, focus } : id }
     : {
@@ -297,8 +297,8 @@ const openingOf = (
 export function panelCommandsFor(
   panels: LayoutData['panels'],
   isTaken: (id: string) => boolean,
-): CommandDef[] {
-  return Object.entries(panels ?? {}).flatMap(([id, panel]): CommandDef[] => {
+): CommandDefinition[] {
+  return Object.entries(panels ?? {}).flatMap(([id, panel]): CommandDefinition[] => {
     const commandId = panelCommandOf(id);
     if (!isPanel(panel)) return [];
     const find = id === SEARCH_PANEL && !isTaken(FIND_COMMAND.id) ? [FIND_COMMAND] : [];

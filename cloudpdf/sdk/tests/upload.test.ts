@@ -36,7 +36,7 @@ function stubCloudPDF(initStatus = 200): Call[] {
                     );
                 }
                 return Response.json({
-                    tag: "created",
+                    status: "created",
                     document: { id: "doc-1" },
                     upload: {
                         kind: "presigned",
@@ -67,7 +67,7 @@ describe("upload() from the browser", () => {
         const result = await upload(file, { token });
 
         expect(result).toEqual({
-            tag: "created",
+            status: "created",
             document: { id: "doc-1", state: "ready", name: "Support agreement.pdf" },
         });
         expect(calls.map((call) => call.url)).toEqual([

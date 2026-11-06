@@ -37,7 +37,7 @@ const script = (code: string): PdfActionTree => ({
 const click: ActionContext = {
   origin: 'user',
   source: { kind: 'api' },
-  event: { scope: 'activate' },
+  event: { type: 'activate' },
 };
 
 const GREETING = "app.alert('Hello, ' + identity.name + ' from ' + identity.corporation + '!');";

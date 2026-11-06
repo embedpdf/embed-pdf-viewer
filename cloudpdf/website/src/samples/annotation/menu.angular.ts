@@ -110,7 +110,7 @@ export class App {
       untracked(() => {
         const textBox = this.annotation.list().find((each) => each.nm === 'text-box');
         if (!textBox) return;
-        this.annotation.selection.set([textBox.ref]);
+        this.annotation.selection.select([textBox.ref]);
         stage.reveal(textBox.page, { rect: textBox.rect });
       });
     });

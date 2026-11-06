@@ -19,10 +19,10 @@ export const initialSession: Session = {
   editing: null,
   snap: {
     alignment: true,
-    alignmentThreshold: 6,
+    alignmentThresholdPx: 6,
     rotation: true,
     rotationAngles: [0, 90, 180, 270],
-    rotationThreshold: 4,
+    rotationThresholdDeg: 4,
   },
   editable: true,
 };

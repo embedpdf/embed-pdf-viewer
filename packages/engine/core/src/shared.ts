@@ -291,10 +291,6 @@ export { encodeAnnotKey, decodeAnnotKey } from './identity/AnnotationRef';
 export { colorOf, rgbOf, sameColor } from './annotation/color';
 export type {
   Color,
-  Point,
-  Rect,
-  Size,
-  Rotation,
   LineEnding,
   LineEndings,
   AnnotationFlags,
@@ -639,21 +635,21 @@ export type { FormFieldRef, FormWidget } from './identity/FormFieldRef';
 export { formWidget, toFieldRef } from './identity/FormFieldRef';
 export { encodeFieldRefKey, decodeFieldRefKey } from './identity/FormFieldRef';
 export type {
-  FormFieldFamily,
+  FormFieldKind,
   FormFieldOrigin,
   ToggleFieldWidget,
   FormFieldWidget,
   FormFieldOption,
   FormFieldBase,
-  TextFieldDTO,
-  CheckboxFieldDTO,
-  RadioFieldDTO,
-  ComboBoxFieldDTO,
-  ListBoxFieldDTO,
-  PushButtonFieldDTO,
-  SignatureFieldDTO,
-  UnknownFieldDTO,
-  FormFieldDTO,
+  TextField,
+  CheckboxField,
+  RadioField,
+  ComboBoxField,
+  ListBoxField,
+  PushButtonField,
+  SignatureField,
+  UnknownField,
+  FormField,
 } from './forms/field';
 export type { FormValueEntry } from './forms/value-entry';
 export type {
@@ -735,7 +731,7 @@ export type {
   SignatureCompleteInput,
   SignatureCompleteResult,
   SignatureCoverage,
-  SignatureDTO,
+  Signature,
   SignatureKind,
   SignaturePrepareInput,
   SignaturePrepared,
@@ -966,9 +962,9 @@ export type {
   ParsedScope,
   ParsedVirtual,
   ParsedWildcard,
-  PdfBits,
+  PdfPermissionFlags,
 } from './auth/scope';
-export { PDF_BITS, decodePdfBits } from './auth/scope';
+export { PDF_BITS, permissionFlagsOf } from './auth/scope';
 export {
   CORE_NAMESPACES,
   isPluginId,

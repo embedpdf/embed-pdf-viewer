@@ -80,7 +80,7 @@ const article = async (): Promise<OpenInput> => {
               type="button"
               class="button"
               [disabled]="views.panes().length < 2"
-              (click)="views.removePane(pane.id)"
+              (click)="views.deletePane(pane.id)"
             >
               Close pane
             </button>

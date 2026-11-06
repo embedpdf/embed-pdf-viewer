@@ -58,15 +58,15 @@ const box = (x: number) => ({ x, y: 120, width: 40, height: 30 });
 
 export function runPermissionConformance(
   runner: ConformanceTestRunner,
-  opts: PermissionConformanceOptions,
+  options: PermissionConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`permission conformance: ${opts.label}`, () => {
+  describe(`permission conformance: ${options.label}`, () => {
     let engine: Engine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -74,7 +74,7 @@ export function runPermissionConformance(
     });
 
     const as = async (token: PermissionToken, body: (doc: DocumentHandle) => Promise<void>) => {
-      const doc = await opts.open(engine, PERMISSION_TOKENS[token]);
+      const doc = await options.open(engine, PERMISSION_TOKENS[token]);
       try {
         await body(doc);
       } finally {
@@ -185,7 +185,7 @@ export function runPermissionConformance(
           EngineErrorCode.Forbidden,
         );
         expectRefused(
-          await refusal(doc.forms.create({ family: 'text', name: 'extra' })),
+          await refusal(doc.forms.create({ kind: 'text', name: 'extra' })),
           EngineErrorCode.Forbidden,
         );
       });
@@ -203,7 +203,7 @@ export function runPermissionConformance(
       });
 
       // A widget is the form's: the annotation verbs refuse one as the wrong
-      // family, before any right is looked at, whatever the token.
+      // kind, before any right is looked at, whatever the token.
       for (const token of ['everything', 'comment', 'fill'] as const) {
         await as(token, async (doc) => {
           const page = doc.page(PAGE);
@@ -222,10 +222,10 @@ export function runPermissionConformance(
       }
     });
 
-    if (opts.openSameDocument) {
-      const openSameDocument = opts.openSameDocument;
+    if (options.openSameDocument) {
+      const openSameDocument = options.openSameDocument;
       test("events: a token hears its own family of another session's writes, never the other", async () => {
-        const writer = await opts.open(engine, PERMISSION_TOKENS.everything);
+        const writer = await options.open(engine, PERMISSION_TOKENS.everything);
         const filler = await openSameDocument(engine, writer, PERMISSION_TOKENS.fill);
         const commenter = await openSameDocument(engine, writer, PERMISSION_TOKENS.comment);
         try {

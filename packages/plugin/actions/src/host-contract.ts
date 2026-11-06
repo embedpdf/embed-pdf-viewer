@@ -62,19 +62,21 @@ export interface PageStateReport {
 /** One annotation-effect commit entry. `page` may be absent for bare Hide
  *  object-number targets: the sink resolves it from its model (`obj:N` is a
  *  cross-page key there), and entries it cannot resolve fail. */
-export interface AnnotCommitEntry {
+export interface AnnotationCommitEntry {
   annotObjectNumber: number;
   page?: PageRef;
   patch: ScriptAnnotEffect['patch'];
 }
-export interface AnnotCommitResult {
+export interface AnnotationCommitResult {
   results: Array<{
     annotObjectNumber: number;
     status: 'applied' | 'failed' | 'skipped';
     error?: string;
   }>;
 }
-export type AnnotCommitSink = (entries: AnnotCommitEntry[]) => Promise<AnnotCommitResult>;
+export type AnnotationCommitSink = (
+  entries: AnnotationCommitEntry[],
+) => Promise<AnnotationCommitResult>;
 
 /**
  * What the form plugin's commit did: `applied`, the effects are one change on its way (shown at
@@ -162,7 +164,7 @@ export interface ScriptRealmPort {
 
 /** A detached realm: the caller owns its lifetime. */
 export interface DetachedScriptRealm extends ScriptRealmPort {
-  dispose(): void;
+  destroy(): void;
 }
 
 /** The form plugin's dataset resolver, registered on the host lens.
@@ -179,7 +181,7 @@ export type SubmitResolver = (
  *  `@embedpdf/plugin-actions/contract/host`, never from application code. */
 export interface ActionsHostCapability extends ActionsCapability {
   /** The annotation plugin's commit sink for script and Hide annotation effects. Identity-safe. */
-  registerAnnotCommitSink(sink: AnnotCommitSink): Unsubscribe;
+  registerAnnotCommitSink(sink: AnnotationCommitSink): Unsubscribe;
   /** The form plugin's commit sink for script and Hide form effects. Identity-safe. */
   registerFormCommitSink(sink: FormCommitSink): Unsubscribe;
   /** The form plugin's form, which scripts and dispatch read; without one they read the engine. Identity-safe. */

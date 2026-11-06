@@ -55,16 +55,16 @@ export interface PageReorderConformanceOptions extends Omit<ConformanceOptions, 
  */
 export function runPageReorderConformance(
   runner: ConformanceTestRunner,
-  opts: PageReorderConformanceOptions,
+  options: PageReorderConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
-  const fix = opts.fixture;
+  const fix = options.fixture;
 
-  describe(`page reorder conformance: ${opts.label}`, () => {
+  describe(`page reorder conformance: ${options.label}`, () => {
     let engine: Engine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -72,7 +72,7 @@ export function runPageReorderConformance(
     });
 
     test('pages.list() returns every page in display order, durable PONs only', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const list = await doc.pages.list();
         expect(PageListSnapshotSchema.safeParse(list).success).toBe(true);
@@ -97,7 +97,7 @@ export function runPageReorderConformance(
     });
 
     test('pages.reorder() moves pages to a position and returns the full new order', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const before = await doc.pages.list();
         if (before.pages.length < 3) return;
@@ -141,7 +141,7 @@ export function runPageReorderConformance(
     });
 
     test('an annotation born inline keeps its baseIndex name across a page reorder', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const list = await doc.pages.list();
         const inline = (await doc.annotations.list()).annotations.find(
@@ -163,7 +163,7 @@ export function runPageReorderConformance(
     });
 
     test('pages.reorder() puts the pages right before or after their neighbour, in the order given', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const before = await doc.pages.list();
         if (before.pages.length < 3) return;
@@ -198,7 +198,7 @@ export function runPageReorderConformance(
     });
 
     test('pages.reorder() rejects duplicate PONs with InvalidArg', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const list = await doc.pages.list();
         if (list.pages.length < 1) return;
@@ -216,7 +216,7 @@ export function runPageReorderConformance(
     });
 
     test('pages.reorder() rejects a neighbour that is one of the moved pages with InvalidArg', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const list = await doc.pages.list();
         if (list.pages.length < 2) return;
@@ -234,7 +234,7 @@ export function runPageReorderConformance(
     });
 
     test('pages.reorder() rejects an unknown page or neighbour with NotFound', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const list = await doc.pages.list();
         // Pick a page object number that is guaranteed to not exist.
@@ -265,7 +265,7 @@ export function runPageReorderConformance(
     });
 
     test('abort on pages.reorder() rejects with AbortError', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const list = await doc.pages.list();
         if (list.pages.length < 1) return;

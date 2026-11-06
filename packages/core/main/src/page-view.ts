@@ -13,8 +13,8 @@
  * answer the prediction got right changes nothing.
  *
  * Pages a pending change makes (a blank insert, a copy, a deleted page coming
- * back) are in the list before the engine has them: `pending` names them,
- * with where their look comes from until it does. The page label sections
+ * back) are in the list before the engine has them: `getPending` names them,
+ * with what they show until it does. The page label sections
  * move with the pages, as the engine moves them, so each page's `label` is
  * the one the engine will give it.
  */
@@ -46,7 +46,7 @@ export interface PageView {
 /** What a page mirror reads of the page view: which pages the engine has yet. */
 export interface PageViewReads {
   /** Where a page's look comes from until the engine has it; null when it has it, or no such page. */
-  pending(page: PageRef): PendingPage | null;
+  getPending(page: PageRef): PendingPage | null;
   /** Whether the page is one the user sees. */
   has(page: PageRef): boolean;
   /** The view changed. */
@@ -67,8 +67,8 @@ export interface PageViewController extends PageViewReads {
 
 export const NO_PENDING_PAGES: ReadonlyMap<PageObjectNumber, PendingPage> = new Map();
 
-const BLANK: PendingPage = Object.freeze({ look: 'blank' });
-const OWN: PendingPage = Object.freeze({ look: 'own' });
+const BLANK: PendingPage = Object.freeze({ kind: 'blank' });
+const OWN: PendingPage = Object.freeze({ kind: 'own' });
 
 /**
  * The engine's pages a document event carries, or null for an event that
@@ -149,7 +149,7 @@ export function createPageView(options: {
     },
     refresh,
     current: () => view,
-    pending: (page) => view.pending.get(page.objectNumber) ?? null,
+    getPending: (page) => view.pending.get(page.objectNumber) ?? null,
     has: (page) => view.pages.some((each) => each.ref.objectNumber === page.objectNumber),
     onChange(listener) {
       listeners.add(listener);
@@ -204,7 +204,7 @@ function pendingOf(
       } else if (op.type === 'pages.copy') {
         (op.objectNumbers ?? []).forEach((number, at) => {
           const of = op.pages[at];
-          if (of) looks.set(number, { look: 'copy', of });
+          if (of) looks.set(number, { kind: 'copy', of });
         });
       } else if (op.type === 'pages.restore') {
         for (const { page } of op.pages) looks.set(page.ref.objectNumber, OWN);

@@ -7,7 +7,7 @@
 import { resolveBinarySource } from '@embedpdf/engine-core/runtime';
 
 import { blankLibraryPdf } from '../blank-library';
-import type { AddAssetInput, MarkSource } from '../contract';
+import type { CreateAssetInput, MarkSource } from '../contract';
 import type { StampServices } from '../services';
 import { stampError } from '../services/errors';
 
@@ -117,7 +117,7 @@ export function createMarks({ assetEngine }: Pick<StampServices, 'assetEngine'>)
 
   /** The bytes an asset is made from: the caller's `source`, or its `mark` authored into one. */
   const resolveAssetSource = async (
-    input: AddAssetInput,
+    input: CreateAssetInput,
   ): Promise<{ bytes: ArrayBuffer; mimeType?: string }> => {
     if ((input.source === undefined) === (input.mark === undefined)) {
       throw stampError('invalid-input', 'createAsset takes exactly one of `source` / `mark`');

@@ -1,4 +1,4 @@
-import type { FormFieldDTO } from './field';
+import type { FormField } from './field';
 import type { Coordinates } from '../pageSpace/coordinates';
 
 /**
@@ -11,7 +11,7 @@ import type { Coordinates } from '../pageSpace/coordinates';
  * - `{ checked }`: a checkbox. `true` checks its first widget.
  * - `{ selectedValues }`: a list's option values; `[]` clears it.
  *
- * A shape the field's family doesn't take fails with `InvalidArg`.
+ * A shape the field's kind doesn't take fails with `InvalidArg`.
  */
 export type FormFieldValue =
   | { value: string | null }
@@ -21,10 +21,10 @@ export type FormFieldValue =
 /**
  * The value `field` holds, as a value write takes it: writing it to the
  * same field changes nothing. `null` for a field whose value a write can't
- * set (a push button, a signature, a family the engine doesn't know).
+ * set (a push button, a signature, a kind the engine doesn't know).
  */
-export function fieldValueOf(field: FormFieldDTO<Coordinates>): FormFieldValue | null {
-  switch (field.family) {
+export function fieldValueOf(field: FormField<Coordinates>): FormFieldValue | null {
+  switch (field.kind) {
     case 'checkbox':
       return { checked: field.checked };
     case 'listbox':

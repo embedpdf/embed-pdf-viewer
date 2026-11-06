@@ -21,7 +21,7 @@ import {
   type Coordinates,
   type FormImportOp,
   isSkippedItem,
-  type FormFieldDTO,
+  type FormField,
   type FormFieldPatch,
   type FormFieldRef,
   type FormFieldValue,
@@ -89,7 +89,7 @@ type Op<T extends ChangeOp['type']> = Extract<
 /** What a value write may write in a widget: its appearance and its look. */
 const WIDGET_KEYS = ['AP', 'MK'];
 
-/** The families that hold a value: the ones a reset puts back. */
+/** The kinds that hold a value: the ones a reset puts back. */
 const VALUE_FAMILIES = new Set(['text', 'checkbox', 'radio', 'combobox', 'listbox']);
 
 /** The ops that fill a form; the rest change its design. */
@@ -142,7 +142,7 @@ export function reset(ctx: ChangeContext, op: Op<'forms.reset'>): Done {
   authorizeSomeFill(ctx);
   const targets = op.fields
     ? op.fields.map((ref) => readField(ctx, ref))
-    : allFields(ctx).filter(({ field }) => VALUE_FAMILIES.has(field.family));
+    : allFields(ctx).filter(({ field }) => VALUE_FAMILIES.has(field.kind));
   // A reset fills in every field it puts back: each must be the caller's to fill.
   for (const target of targets) authorizeFieldWrite(ctx.authority, target.field.groupId, 'fill');
   const pending = captureBefore(ctx.runtime, ctx.session, targets.flatMap(objectsOf));
@@ -530,7 +530,7 @@ export function importFormValues(ctx: ChangeContext, op: FormImportOp): Done {
   const plan = importer.planValues(op.bundle, op.limits, ctx.signal, (field) =>
     allowsFieldWrite(ctx.authority, field.groupId, 'fill'),
   );
-  const fields: FormFieldDTO<PdfCoordinates>[] = [];
+  const fields: FormField<PdfCoordinates>[] = [];
   const reverse: ReverseStep[] = [];
   for (const write of plan.writes) {
     const before = { objectNumber: numberOf(write.target.ref), field: write.target };
@@ -720,7 +720,7 @@ export function revertForm(
   }
   if (written.length === 0) return leftAlone(ctx, step.reports);
   if (step.reports === 'forms.setValue' && written.length === 1) return written[0]!;
-  const fields = written.map(({ item }) => (item as { field: FormFieldDTO<PdfCoordinates> }).field);
+  const fields = written.map(({ item }) => (item as { field: FormField<PdfCoordinates> }).field);
   return {
     item: { ...resetResult(ctx, fields), ...(skipped.length > 0 ? { skipped } : {}) },
     reverse: written.flatMap((done) => done.reverse),
@@ -947,7 +947,7 @@ function writeUpdate(ctx: ChangeContext, before: ReadField, patch: FormFieldPatc
       const was = propertiesOf(before.field) as Record<string, unknown>;
       const is = propertiesOf(after) as Record<string, unknown>;
       const keys = Object.keys(patch).filter(
-        (key) => key !== 'family' && !valuesEqual(was[key], is[key]),
+        (key) => key !== 'kind' && !valuesEqual(was[key], is[key]),
       );
       return {
         kind: 'properties',
@@ -995,8 +995,8 @@ function recordRevert(
   ctx: ChangeContext,
   before: ReadField,
   type: ChangeItemType,
-  write: () => { field: FormFieldDTO<PdfCoordinates> },
-  fallbackOf?: (after: FormFieldDTO<PdfCoordinates>) => RevertFallback,
+  write: () => { field: FormField<PdfCoordinates> },
+  fallbackOf?: (after: FormField<PdfCoordinates>) => RevertFallback,
 ): Done {
   const pending = captureBefore(ctx.runtime, ctx.session, objectsOf(before));
   const { field } = write();
@@ -1106,7 +1106,7 @@ function swapFallback(fallback: RevertFallback | undefined): Pick<ObjectsRevertS
 
 interface ReadField {
   readonly objectNumber: number;
-  readonly field: FormFieldDTO<PdfCoordinates>;
+  readonly field: FormField<PdfCoordinates>;
 }
 
 function readField(ctx: ChangeContext, ref: FormFieldRef): ReadField {
@@ -1189,7 +1189,7 @@ function numberOf(ref: FormFieldRef): number {
  * options as label and value. A field update's `expect` and its undo compare
  * these.
  */
-function propertiesOf(field: FormFieldDTO<PdfCoordinates>): FormFieldPatch {
+function propertiesOf(field: FormField<PdfCoordinates>): FormFieldPatch {
   const base = {
     name: field.name.slice(field.name.lastIndexOf('.') + 1),
     readOnly: field.readOnly,
@@ -1204,7 +1204,7 @@ function propertiesOf(field: FormFieldDTO<PdfCoordinates>): FormFieldPatch {
   const hasDefault = field.defaultValueEntry.kind !== 'none';
   const options = (list: readonly { label: string; value: string }[]) =>
     list.map(({ label, value }) => ({ label, value }));
-  switch (field.family) {
+  switch (field.kind) {
     case 'text':
       return {
         ...base,
@@ -1244,7 +1244,7 @@ function propertiesOf(field: FormFieldDTO<PdfCoordinates>): FormFieldPatch {
  * one. An event whose actions a write can't make (not JavaScript all
  * through) is left out, so putting the patch back never removes it.
  */
-function scriptsOf(field: FormFieldDTO<PdfCoordinates>): FieldActionsPatch {
+function scriptsOf(field: FormField<PdfCoordinates>): FieldActionsPatch {
   const scripts: FieldActionsPatch = {};
   for (const event of ['keystroke', 'format', 'validate', 'calculate'] as FieldScriptEvent[]) {
     const tree = field.actions?.[event];
@@ -1263,13 +1263,13 @@ function pick(values: Record<string, unknown>, keys: readonly string[]): Record<
 }
 
 /** The value a field holds, in the shape a value write takes. */
-function valueOf(field: FormFieldDTO<PdfCoordinates>): FormFieldValue {
+function valueOf(field: FormField<PdfCoordinates>): FormFieldValue {
   return fieldValueOf(field) ?? { value: null };
 }
 
 function fieldResult(
   ctx: ChangeContext,
-  field: FormFieldDTO<PdfCoordinates>,
+  field: FormField<PdfCoordinates>,
   redrawn: FormWidget[] = field.widgets as FormWidget[],
 ) {
   return rows(ctx, {
@@ -1288,11 +1288,11 @@ function fieldResult(
  * redraws a text or choice field's, and only switches a checkbox's or radio
  * group's state; showing or hiding draws nothing.
  */
-function redrawnBy(type: ChangeItemType, field: FormFieldDTO<PdfCoordinates>): FormWidget[] {
+function redrawnBy(type: ChangeItemType, field: FormField<PdfCoordinates>): FormWidget[] {
   const widgets = field.widgets as FormWidget[];
   if (type === 'forms.setDisplay') return [];
   if (type === 'forms.setValue' || type === 'forms.reset') {
-    return redrawnByValue(field.family, widgets);
+    return redrawnByValue(field.kind, widgets);
   }
   return widgets;
 }
@@ -1305,7 +1305,7 @@ function rows<T extends { meta: FormMutationMeta }>(ctx: ChangeContext, result: 
 /** A reset's item: the fields it wrote, read back. */
 function resetResult(
   ctx: ChangeContext,
-  fields: readonly FormFieldDTO<PdfCoordinates>[],
+  fields: readonly FormField<PdfCoordinates>[],
 ): Extract<ChangeItem<PdfCoordinates>, { type: 'forms.reset' }> {
   return {
     type: 'forms.reset',
@@ -1325,7 +1325,7 @@ function resetResult(
 function formItem(
   ctx: ChangeContext,
   type: ChangeItemType,
-  fields: readonly FormFieldDTO<PdfCoordinates>[],
+  fields: readonly FormField<PdfCoordinates>[],
 ): ChangeItem<PdfCoordinates> {
   if (type === 'forms.reset') return resetResult(ctx, fields);
   const field = fields[0]!;

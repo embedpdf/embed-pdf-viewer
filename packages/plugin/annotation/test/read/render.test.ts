@@ -337,7 +337,7 @@ describe('an annotation an undo brings back', () => {
     const deleting = harness.capability.delete(ref);
     harness.renderAppearances.mockResolvedValueOnce({ appearances: [] });
     expect(await harness.capability.renderAppearances(PAGE, 1)).toEqual([]);
-    const deleted = harness.ctx.changes.pending().at(-1)!;
+    const deleted = harness.ctx.changes.listPending().at(-1)!;
     harness.ctx.changes.stage({
       label: { key: 'history.undo' },
       undoOf: deleted.opId,

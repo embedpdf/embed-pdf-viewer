@@ -105,7 +105,7 @@ export function themeTokenCss(theme: ThemePreference | ThemeConfig | undefined, 
   );
 }
 
-const ThemeCtx = createContext<{ mode: ThemeMode } | null>(null);
+const ThemeReactContext = createContext<{ mode: ThemeMode } | null>(null);
 
 const DARK_QUERY = '(prefers-color-scheme: dark)';
 
@@ -138,12 +138,12 @@ export function ThemeProvider({
     (target ?? document.documentElement).classList.toggle('dark', mode === 'dark');
   }, [mode, target]);
   const value = useMemo(() => ({ mode }), [mode]);
-  return <ThemeCtx.Provider value={value}>{children}</ThemeCtx.Provider>;
+  return <ThemeReactContext.Provider value={value}>{children}</ThemeReactContext.Provider>;
 }
 
 /** The mode the viewer shows now. */
 export function useTheme() {
-  const ctx = useContext(ThemeCtx);
+  const ctx = useContext(ThemeReactContext);
   if (!ctx) throw new Error('useTheme must be used within <ThemeProvider>');
   return ctx;
 }

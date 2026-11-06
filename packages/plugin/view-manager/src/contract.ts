@@ -25,7 +25,7 @@ export interface PaneInfo {
 export interface PaneCreatedEvent {
   readonly paneId: PaneId;
 }
-export interface PaneRemovedEvent {
+export interface PaneDeletedEvent {
   readonly paneId: PaneId;
 }
 export interface PaneFocusChangedEvent {
@@ -52,8 +52,8 @@ export interface CreatePaneOptions {
   readonly documentIds?: readonly string[];
 }
 
-/** Options for `removePane()`. */
-export interface RemovePaneOptions {
+/** Options for `deletePane()`. */
+export interface DeletePaneOptions {
   /** The pane that takes the removed pane's documents; the focused or the last pane when left out. */
   readonly moveDocumentsTo?: PaneId;
 }
@@ -79,9 +79,9 @@ export interface ViewManagerCapability {
   createPane(options?: CreatePaneOptions): PaneId;
   /**
    * Close a pane. Its documents move to `moveDocumentsTo`, or else to the focused or the last
-   * pane. Fires `onPaneRemoved`.
+   * pane. Fires `onPaneDeleted`.
    */
-  removePane(id: PaneId, options?: RemovePaneOptions): void;
+  deletePane(id: PaneId, options?: DeletePaneOptions): void;
   /** Move a pane to another place in the order, for reordering panes by dragging. */
   movePane(id: PaneId, toIndex: number): void;
   /** Make a pane the focused one, where new documents open; `null` focuses none. Fires `onFocusChanged`. */
@@ -116,7 +116,7 @@ export interface ViewManagerCapability {
   /** A pane was added. */
   readonly onPaneCreated: EventHook<PaneCreatedEvent>;
   /** A pane was closed. */
-  readonly onPaneRemoved: EventHook<PaneRemovedEvent>;
+  readonly onPaneDeleted: EventHook<PaneDeletedEvent>;
   /** Another pane got the focus, or none has it. */
   readonly onFocusChanged: EventHook<PaneFocusChangedEvent>;
   /** A document moved between panes, or into or out of every pane. */

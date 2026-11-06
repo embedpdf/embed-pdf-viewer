@@ -11,7 +11,7 @@ import type { PdfActionType } from '@embedpdf/engine-core/runtime';
 import type { ActionExecutor, ActionSubmitHandler, ActionUiAdapter } from '../contract';
 import type {
   ActionsHostCapability,
-  AnnotCommitSink,
+  AnnotationCommitSink,
   FormCommitSink,
   FormFocus,
   FormReader,
@@ -21,7 +21,7 @@ import type { ActionsEvents } from './events';
 
 export interface ActionPorts {
   readonly executors: Map<PdfActionType, ActionExecutor>;
-  annotCommitSink: AnnotCommitSink | null;
+  annotCommitSink: AnnotationCommitSink | null;
   formCommitSink: FormCommitSink | null;
   /** The form plugin's form, as the user sees it. */
   formReader: FormReader | null;

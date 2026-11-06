@@ -1,8 +1,4 @@
-import type {
-  BaseVersionInfo,
-  DocumentProtection,
-  SignatureDTO,
-} from '@embedpdf/engine-core/runtime';
+import type { BaseVersionInfo, DocumentProtection, Signature } from '@embedpdf/engine-core/runtime';
 import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
@@ -27,7 +23,7 @@ export interface FinalizeCandidateInput {
 
 export interface FinalizedCandidate {
   /** In page space: no session outlives the finalize to measure it later. */
-  signature: SignatureDTO;
+  signature: Signature;
   protection: DocumentProtection;
   version: BaseVersionInfo;
   /** The sealed file's last object number: every object it has is at or below it. */

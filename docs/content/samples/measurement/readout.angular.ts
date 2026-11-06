@@ -63,7 +63,7 @@ export class Readout {
   });
 
   protected select() {
-    this.selection.set([this.annotation().ref]);
+    this.selection.select([this.annotation().ref]);
   }
 }
 

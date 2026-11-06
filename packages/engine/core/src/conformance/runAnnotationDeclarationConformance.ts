@@ -45,15 +45,15 @@ export interface AnnotationDeclarationConformanceOptions {
  */
 export function runAnnotationDeclarationConformance(
   runner: ConformanceTestRunner,
-  opts: AnnotationDeclarationConformanceOptions,
+  options: AnnotationDeclarationConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`annotation declaration conformance: ${opts.label}`, () => {
+  describe(`annotation declaration conformance: ${options.label}`, () => {
     let engine: Engine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -62,8 +62,8 @@ export function runAnnotationDeclarationConformance(
 
     test('every read matches its kind declaration', async () => {
       const reads: unknown[] = [];
-      for (const fixture of opts.documents) {
-        const doc = await openFixture(engine, opts, fixture);
+      for (const fixture of options.documents) {
+        const doc = await openFixture(engine, options, fixture);
         try {
           reads.push(...(await doc.annotations.list()).annotations);
         } finally {
@@ -71,7 +71,7 @@ export function runAnnotationDeclarationConformance(
         }
       }
 
-      const doc = await openFixture(engine, opts, opts.authoring);
+      const doc = await openFixture(engine, options, options.authoring);
       try {
         const first = (await doc.annotations.list()).pages[0];
         expect(first !== undefined).toBe(true);
@@ -94,7 +94,7 @@ export function runAnnotationDeclarationConformance(
     const onAuthoringPage = async (
       run: (page: PageHandle, doc: DocumentHandle) => Promise<void>,
     ): Promise<void> => {
-      const doc = await openFixture(engine, opts, opts.authoring);
+      const doc = await openFixture(engine, options, options.authoring);
       try {
         const first = (await doc.annotations.list()).pages[0]!;
         await run(doc.page(first), doc);
@@ -475,8 +475,8 @@ export function runAnnotationDeclarationConformance(
     });
 
     test('an annotation born inline exports by its baseIndex name', async () => {
-      for (const fixture of opts.documents) {
-        const doc = await openFixture(engine, opts, fixture);
+      for (const fixture of options.documents) {
+        const doc = await openFixture(engine, options, fixture);
         try {
           const inline = (await doc.annotations.list()).annotations.find(
             (annotation) => annotation.ref.kind === 'baseIndex',
@@ -493,7 +493,7 @@ export function runAnnotationDeclarationConformance(
     });
 
     test('a link read back can be sent back; its read-only target is kept', async () => {
-      const doc = await openFixture(engine, opts, opts.readOnlyLink);
+      const doc = await openFixture(engine, options, options.readOnlyLink);
       try {
         const link = (await doc.annotations.list()).annotations.find(
           (annotation) =>

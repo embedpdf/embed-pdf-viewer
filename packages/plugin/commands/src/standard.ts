@@ -15,7 +15,7 @@ import { RenderToken, SNAPSHOT_TOOL, type PageImage } from '@embedpdf/plugin-ren
 import { SelectionToken, type SelectionCapability } from '@embedpdf/plugin-selection/contract';
 import { StageToken } from '@embedpdf/plugin-stage/contract';
 
-import type { CommandContext, CommandDef, CommandFamily } from './contract';
+import type { CommandContext, CommandDefinition, CommandFamily } from './contract';
 
 /** What the standard commands need from the browser. */
 export interface StandardCommandsPlatform {
@@ -58,7 +58,7 @@ const mayUseTool = (context: CommandContext, toolId: string): boolean => {
 };
 
 /** Switching to a tool: active while it's the tool, there only when the document has it. */
-const toolCommand = (toolId: string): Omit<CommandDef, 'id' | 'shortcut'> => ({
+const toolCommand = (toolId: string): Omit<CommandDefinition, 'id' | 'shortcut'> => ({
   labelKey: `commands.tool.${toolId}`,
   label: toolId,
   icon: toolId,
@@ -82,7 +82,7 @@ const toolCommands: CommandFamily = {
 /** The standard commands, with the browser's part from `platform`. */
 export function createStandardCommands(
   platform: StandardCommandsPlatform,
-): readonly (CommandDef | CommandFamily)[] {
+): readonly (CommandDefinition | CommandFamily)[] {
   return [
     // ── zoom ──
     {
@@ -228,7 +228,7 @@ export function createStandardCommands(
       enabled: (context) => {
         const annotation = context.tryGet(AnnotationToken);
         if (!annotation) return false;
-        const selected = annotation.selection.list();
+        const selected = annotation.selection.getSelected();
         // `isEditable`: the annotation plugin's `editable` setting lets people change it by hand.
         return (
           selected.length > 0 &&

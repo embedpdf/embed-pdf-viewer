@@ -15,7 +15,7 @@ import {
   type AdminDocumentRecord,
   type AdminInitUpload,
 } from '@cloudpdf/contract';
-import { decodePdfBits, type PdfBits } from '@embedpdf/engine-core/runtime';
+import { permissionFlagsOf, type PdfPermissionFlags } from '@embedpdf/engine-core/runtime';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
 import { decodeSortedListCursor, encodeSortedListCursor } from './_cursor';
@@ -45,7 +45,7 @@ export interface AdminDocumentsRouteDeps {
  * The flow customers walk through:
  *   1. POST /v1/tenants/:tenantId/documents/init
  *      body: { sizeBytes, contentSha256, name?, metadata?, idempotencyKey?, dedupMode?, docId? }
- *      -> { id, state, tag: 'created'|'resumed'|'deduped', upload?: { ... } }
+ *      -> { id, state, status: 'created'|'resumed'|'deduped', upload?: { ... } }
  *
  *   2. (If not deduped:) PUT the bytes to `upload.url` (presigned) or
  *      POST multipart to `.../documents/:docId/upload-proxy` when the
@@ -59,7 +59,7 @@ export interface AdminDocumentsRouteDeps {
  * customer's own storage — the server-side pull:
  *      POST /v1/tenants/:tenantId/documents/import
  *      body: { source: { kind: 'url', url }, expected?, ... }
- *      -> { tag: 'imported'|'deduped', document }
+ *      -> { status: 'imported'|'deduped'|'accepted', document }
  *
  * Listing / deleting / downloading are flat REST against the tenant documents collection.
  */
@@ -120,9 +120,9 @@ export async function registerAdminDocumentsRoutes(
         : {}),
     });
 
-    if (result.tag === 'deduped') {
+    if (result.status === 'deduped') {
       return reply.send({
-        tag: result.tag,
+        status: result.status,
         document: docPublic(result.doc),
       });
     }
@@ -137,7 +137,7 @@ export async function registerAdminDocumentsRoutes(
       { ttlSec: body.uploadTtlSeconds, preference: body.uploadPreference },
     );
     return reply.send({
-      tag: result.tag,
+      status: result.status,
       document: docPublic(result.doc),
       upload: uploadPublic(upload),
     });
@@ -212,8 +212,8 @@ export async function registerAdminDocumentsRoutes(
       mode: body.mode,
     });
     return reply
-      .code(result.tag === 'accepted' ? 202 : 200)
-      .send({ tag: result.tag, document: docPublic(result.doc) });
+      .code(result.status === 'accepted' ? 202 : 200)
+      .send({ status: result.status, document: docPublic(result.doc) });
   });
 
   const listOp = adminOperations['documents.list'];
@@ -275,7 +275,7 @@ export async function registerAdminDocumentsRoutes(
   mount(downloadOp, async (req, reply) => {
     const { tenantId, docId: id } = req.params as { tenantId: string; docId: string };
     const ctx = await requireTenantContentAccess(req, tenantId, 'doc.download', () =>
-      pdfBitsOf(lifecycle, tenantId, id),
+      permissionFlagsOfDocument(lifecycle, tenantId, id),
     );
     const bytes = await lifecycle.download(ctx.tenantId, id);
     return reply
@@ -302,7 +302,7 @@ export async function registerAdminDocumentsRoutes(
   mount(thumbnailOp, async (req, reply) => {
     const { tenantId, docId: id } = req.params as { tenantId: string; docId: string };
     const ctx = await requireTenantContentAccess(req, tenantId, 'doc.render', () =>
-      pdfBitsOf(lifecycle, tenantId, id),
+      permissionFlagsOfDocument(lifecycle, tenantId, id),
     );
     const doc = await lifecycle.get(ctx.tenantId, id);
     if (!storage || doc.thumbnailState !== 'ready' || !doc.thumbnailKey) {
@@ -380,13 +380,13 @@ function parseCommitBody(req: FastifyRequest): AdminDocumentCommitRequest {
 }
 
 /** The document's PDF permission bits, which `pdf.permissions` in a scope expands against. */
-async function pdfBitsOf(
+async function permissionFlagsOfDocument(
   lifecycle: DocumentLifecycleService,
   tenantId: string,
   docId: string,
-): Promise<PdfBits> {
+): Promise<PdfPermissionFlags> {
   const doc = await lifecycle.get(tenantId, docId);
-  return decodePdfBits(doc.security.pdfPermissionsBits ?? null);
+  return permissionFlagsOf(doc.security.pdfPermissionsBits ?? null);
 }
 
 function parseUpdateBody(req: FastifyRequest): AdminDocumentUpdateRequest {

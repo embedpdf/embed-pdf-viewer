@@ -7,8 +7,13 @@ import {
   type SettingsApi,
 } from '@embedpdf/core';
 import type { Rect } from '@embedpdf/core-geometry';
-import type { RevealAnchor, ScrollBehaviorKind } from '@embedpdf/plugin-stage/contract';
-import type { PdfTextSegment, SearchQuery, SearchSnippet } from '@embedpdf/engine-core/runtime';
+import type { RevealAlignment, ScrollBehaviorKind } from '@embedpdf/plugin-stage/contract';
+import type {
+  BlendMode,
+  PdfTextSegment,
+  SearchQuery,
+  SearchSnippet,
+} from '@embedpdf/engine-core/runtime';
 
 export { validateSearchQuery, validateSearchRegex } from '@embedpdf/engine-core/runtime';
 export type {
@@ -61,32 +66,13 @@ export interface SearchProgress {
 /** How a match arrives in view when you move to it: forwarded to the Stage's positioned reveal. */
 export interface SearchReveal {
   /** Where the match lands in the view: `{ y: 0.35 }` puts it 35% of the way down, like a browser's find bar. */
-  readonly anchor: RevealAnchor;
+  readonly align: RevealAlignment;
   /** Glide there (`'smooth'`) or jump (`'instant'`). */
   readonly behavior: ScrollBehaviorKind;
 }
 
 /** The `reveal` setting for one call: what the call leaves out comes from the setting. */
 export type SearchRevealOptions = Partial<SearchReveal>;
-
-/** How the highlights mix with the page: a CSS `mix-blend-mode` keyword. */
-export type SearchBlendMode =
-  | 'normal'
-  | 'multiply'
-  | 'screen'
-  | 'overlay'
-  | 'darken'
-  | 'lighten'
-  | 'color-dodge'
-  | 'color-burn'
-  | 'hard-light'
-  | 'soft-light'
-  | 'difference'
-  | 'exclusion'
-  | 'hue'
-  | 'saturation'
-  | 'color'
-  | 'luminosity';
 
 /**
  * The search plugin's settings. `searchPlugin(config)` registers them over
@@ -108,13 +94,13 @@ export interface SearchSettings {
      * color and only the paper tints. On dark or scanned pages, where a
      * multiplied highlight disappears, use `'normal'` with translucent colors.
      */
-    readonly blendMode: SearchBlendMode;
+    readonly blendMode: BlendMode;
   };
 }
 
 /** What the search settings are when the app registers none. */
 export const SEARCH_DEFAULTS: SearchSettings = {
-  reveal: { anchor: { y: 0.35 }, behavior: 'smooth' },
+  reveal: { align: { y: 0.35 }, behavior: 'smooth' },
   highlight: { color: '#ffd500', activeColor: '#ff9632', blendMode: 'multiply' },
 };
 
@@ -211,9 +197,10 @@ export interface SearchCapability extends SettingsApi<SearchSettings> {
   search(query: SearchQuery, options?: SearchOptions): Promise<SearchResult>;
   /**
    * Re-run the current query from scratch (the plugin does this itself after
-   * document mutations). Resolves and rejects as `search()` does.
+   * document mutations). Rejects as `search()` does; the result is in the
+   * state and the events.
    */
-  refresh(options?: OperationOptions): Promise<SearchResult>;
+  refresh(options?: OperationOptions): Promise<void>;
   /** Stop the scan and keep the hits found so far. */
   cancel(): void;
   /** Stop the scan and drop the session. */

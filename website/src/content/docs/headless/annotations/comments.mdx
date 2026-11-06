@@ -113,9 +113,9 @@ Every method that returns a promise also takes a `signal` in its options, to can
 
 | Event                      | Fires when                                         | Carries              |
 | :------------------------- | :------------------------------------------------- | :------------------- |
-| `comments.onThreadChanged` | A thread changed through this viewer               | `rootRef`, `change`  |
+| `comments.onThreadChanged` | A thread changed through this viewer               | `rootRef`, `type`    |
 
-`change` is `'reply'`, `'text'`, `'status'`, `'marked'` or `'deleted'`. For every change, including
+`type` is `'reply'`, `'text'`, `'status'`, `'marked'` or `'deleted'`. For every change, including
 other people's, use the annotation events; see [Events, saving & sharing](saving#events).
 
 ## Permissions

@@ -2,7 +2,7 @@
  * The form-tool table — the single source of truth for the palette. Every
  * derivation reads this one list: interaction registration (annotation-less),
  * annotation tool/style registration (full viewer), active-tool → field
- * family lookup, click placement, and default appearance. With the
+ * kind lookup, click placement, and default appearance. With the
  * annotation plugin each tool shows a ghost: the field a click places, drawn
  * with the tool's defaults where it will land.
  *
@@ -13,16 +13,16 @@
  * that structural: these tools enable `form-place`, never `annotation-draw`,
  * so the annotation draw handler can't wake up for them.
  */
-import type { FormFieldFamily, WidgetAppearance } from '@embedpdf/engine-core/runtime';
+import type { FormFieldKind, WidgetAppearance } from '@embedpdf/engine-core/runtime';
 import type { ClickCreate } from '@embedpdf/plugin-annotation/contract';
 
-/** The families the palette places. */
-export type AuthorableFormFamily = Exclude<FormFieldFamily, 'unknown'>;
+/** The kinds the palette places. */
+export type AuthorableFormKind = Exclude<FormFieldKind, 'unknown'>;
 
-export interface FormToolDef {
+export interface FormToolDefinition {
   id: string;
-  /** The field family the tool places (the form plane's vocabulary). */
-  family: AuthorableFormFamily;
+  /** The field kind the tool places (the form plane's vocabulary). */
+  fieldKind: AuthorableFormKind;
   /** The client kind the annotation registry routes on (props panel).
    *  Not a PDF subtype — every widget is PDF `widget`; this is the view. */
   visualKind:
@@ -50,10 +50,10 @@ const FIELD_CHROME: WidgetAppearance = {
   strokeWidth: 1,
 };
 
-export const FORM_TOOLS: readonly FormToolDef[] = [
+export const FORM_TOOLS: readonly FormToolDefinition[] = [
   {
     id: 'form-text',
-    family: 'text',
+    fieldKind: 'text',
     visualKind: 'widget-text',
     clickCreate: { width: 160, height: 24 },
     defaults: { ...FIELD_CHROME, fontSize: 12 },
@@ -61,7 +61,7 @@ export const FORM_TOOLS: readonly FormToolDef[] = [
   },
   {
     id: 'form-checkbox',
-    family: 'checkbox',
+    fieldKind: 'checkbox',
     visualKind: 'widget-toggle',
     clickCreate: { width: 18, height: 18 },
     defaults: FIELD_CHROME,
@@ -69,7 +69,7 @@ export const FORM_TOOLS: readonly FormToolDef[] = [
   },
   {
     id: 'form-radio',
-    family: 'radio',
+    fieldKind: 'radio',
     // Round, as the engine draws a radio button: its ghost and its placement too.
     visualKind: 'widget-radio',
     clickCreate: { width: 18, height: 18 },
@@ -78,7 +78,7 @@ export const FORM_TOOLS: readonly FormToolDef[] = [
   },
   {
     id: 'form-combobox',
-    family: 'combobox',
+    fieldKind: 'combobox',
     visualKind: 'widget-choice',
     clickCreate: { width: 140, height: 24 },
     defaults: { ...FIELD_CHROME, fontSize: 12 },
@@ -86,7 +86,7 @@ export const FORM_TOOLS: readonly FormToolDef[] = [
   },
   {
     id: 'form-listbox',
-    family: 'listbox',
+    fieldKind: 'listbox',
     visualKind: 'widget-choice',
     clickCreate: { width: 140, height: 72 },
     defaults: { ...FIELD_CHROME, fontSize: 12 },
@@ -95,18 +95,18 @@ export const FORM_TOOLS: readonly FormToolDef[] = [
   // A push button: its caption is its text; what it does is its actions.
   {
     id: 'form-button',
-    family: 'pushbutton',
+    fieldKind: 'pushbutton',
     visualKind: 'widget-button',
     clickCreate: { width: 100, height: 28 },
     defaults: { ...FIELD_CHROME, interiorColor: '#e5e7eb', fontSize: 12 },
     cursor: 'crosshair',
   },
-  // A signature field: the bare widget box every non-text family ingests
+  // A signature field: the bare widget box every non-text kind ingests
   // as (`widget-box`). It has no value of its own to style — the signing
   // act (the signature plugin) draws the mark into it later.
   {
     id: 'form-signature',
-    family: 'signature',
+    fieldKind: 'signature',
     visualKind: 'widget-box',
     clickCreate: { width: 160, height: 48 },
     defaults: FIELD_CHROME,
@@ -114,6 +114,6 @@ export const FORM_TOOLS: readonly FormToolDef[] = [
   },
 ];
 
-export const FORM_TOOL_BY_ID: ReadonlyMap<string, FormToolDef> = new Map(
+export const FORM_TOOL_BY_ID: ReadonlyMap<string, FormToolDefinition> = new Map(
   FORM_TOOLS.map((tool) => [tool.id, tool]),
 );

@@ -202,18 +202,18 @@ export function createScene(ctx: PluginContext<StageModel>) {
   // unbounded pan is free, and coordinates stay local.
   let sceneCache: { key: string; scene: Scene } | null = null;
   // The registry signature: page count plus the kernel's monotonic
-  // `revision`. The revision changes on every page mutation (rotate, move,
+  // `pagesSequence`. It changes on every page mutation (rotate, move,
   // delete), so a change that keeps the page count (a rotation) still re-keys
   // the scene instead of rendering the page in its stale box.
   const documentKey = (): string => {
     const document = ctx.document();
-    return document ? `${document.pageCount}.${document.revision}` : '0.0';
+    return document ? `${document.pageCount}.${document.pagesSequence}` : '0.0';
   };
   const buildScene = (): Scene => {
     const { grouping: groups } = grouping();
     if (state().flow === 'paged') {
       const index = groups.length
-        ? Math.min(itemIndexOfPage(state().cursor), groups.length - 1)
+        ? Math.min(itemIndexOfPage(state().pageIndex), groups.length - 1)
         : 0;
       const key = `paged|${documentKey()}|${settingsKey()}|${index}`;
       if (sceneCache && sceneCache.key === key) return sceneCache.scene;
@@ -252,7 +252,7 @@ export function createScene(ctx: PluginContext<StageModel>) {
   /** The item shown for the cursor: the slice's only item (paged) or the full-scene item. */
   const cursorItem = (): SceneItem => {
     const scene = buildScene();
-    return paged() ? scene.items[0] : scene.items[itemIndexOfPage(state().cursor)];
+    return paged() ? scene.items[0] : scene.items[itemIndexOfPage(state().pageIndex)];
   };
 
   /** Whether an item is one navigation unit now: it fits across the view, or fit-all shows all. */
@@ -267,7 +267,7 @@ export function createScene(ctx: PluginContext<StageModel>) {
   const currentPages = (): readonly number[] => {
     const item = cursorItem();
     if (!item) return [];
-    return isWhole(item) ? item.pageIndexes : [state().cursor];
+    return isWhole(item) ? item.pageIndexes : [state().pageIndex];
   };
 
   /**
@@ -354,7 +354,7 @@ export function createScene(ctx: PluginContext<StageModel>) {
     const scene = buildScene();
     return scene.itemCount
       ? anchorFromCamera(camera(), scene, viewport(), at)
-      : { pageIndex: state().cursor, fx: 0.5, fy: 0 };
+      : { pageIndex: state().pageIndex, fractionX: 0.5, fractionY: 0 };
   };
   const currentAnchor = (): Anchor => anchorAt(anchorPoint());
 

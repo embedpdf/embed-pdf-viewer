@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { FormFieldDTO, FormSnapshot } from '@embedpdf/engine-core/runtime';
+import type { FormField, FormSnapshot } from '@embedpdf/engine-core/runtime';
 
 import { scriptFieldsFromSnapshot } from '../src/input';
 
-function snapshotWith(field: FormFieldDTO): FormSnapshot {
+function snapshotWith(field: FormField): FormSnapshot {
   return {
     formKind: 'acroform',
     needsAppearances: false,
@@ -16,17 +16,17 @@ function snapshotWith(field: FormFieldDTO): FormSnapshot {
 describe('scriptFieldsFromSnapshot', () => {
   it.each(['checkbox', 'radio'] as const)(
     'exposes an absent %s value and default as Acrobat Off tokens',
-    (family) => {
+    (kind) => {
       const field = {
         ref: { kind: 'objectNumber', objectNumber: 5 },
         name: 'toggle',
-        family,
+        kind,
         valueEntry: { kind: 'none' },
         defaultValueEntry: { kind: 'none' },
         readOnly: false,
         required: false,
         widgets: [],
-      } as unknown as FormFieldDTO;
+      } as unknown as FormField;
 
       expect(scriptFieldsFromSnapshot(snapshotWith(field))[0]).toMatchObject({
         value: 'Off',
@@ -40,13 +40,13 @@ describe('scriptFieldsFromSnapshot', () => {
     const field = {
       ref: { kind: 'objectNumber', objectNumber: 7 },
       name: 'size',
-      family: 'radio',
+      kind: 'radio',
       valueEntry: { kind: 'scalar', value: '1' },
       defaultValueEntry: { kind: 'scalar', value: '0' },
       readOnly: false,
       required: false,
       widgets: [widget('0', 'Small'), widget('1', 'Large')],
-    } as unknown as FormFieldDTO;
+    } as unknown as FormField;
 
     expect(scriptFieldsFromSnapshot(snapshotWith(field))[0]).toMatchObject({
       value: 'Large',
@@ -59,12 +59,12 @@ describe('scriptFieldsFromSnapshot', () => {
     const field = {
       ref: { kind: 'objectNumber', objectNumber: 6 },
       name: 'text',
-      family: 'text',
+      kind: 'text',
       valueEntry: { kind: 'none' },
       defaultValueEntry: { kind: 'none' },
       readOnly: false,
       required: false,
-    } as FormFieldDTO;
+    } as FormField;
 
     expect(scriptFieldsFromSnapshot(snapshotWith(field))[0]).toMatchObject({
       value: null,
@@ -76,13 +76,13 @@ describe('scriptFieldsFromSnapshot', () => {
     const field = {
       ref: { kind: 'objectNumber', objectNumber: 8 },
       name: 'vip',
-      family: 'text',
+      kind: 'text',
       valueEntry: { kind: 'none' },
       defaultValueEntry: { kind: 'none' },
       readOnly: false,
       required: false,
       widgets: [{ objectNumber: 9 }, { objectNumber: 10 }],
-    } as unknown as FormFieldDTO;
+    } as unknown as FormField;
     const row = (objectNumber: number, flags: object) => ({
       ref: { kind: 'objectNumber', objectNumber },
       hidden: false,

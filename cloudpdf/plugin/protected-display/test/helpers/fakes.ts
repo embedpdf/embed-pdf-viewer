@@ -2,7 +2,7 @@
  * Fakes for the display: pages with real transforms, a player's screen that records what it's
  * told, frame fetches the test lets through, and a plugin clock over a manual one.
  */
-import { pageTransform, type PageRotation } from '@embedpdf/core-geometry';
+import { pageTransform, type Rotation } from '@embedpdf/core-geometry';
 import { encodePageKey, toPageRef, type PageRef, type PluginClock } from '@embedpdf/core';
 import type { ManualClock } from '@embedpdf/core/testing';
 import type { PicturePage } from '@embedpdf/plugin-render/contract';
@@ -16,11 +16,7 @@ const VIEW_UNITS_PER_POINT = 96 / 72;
 /** Page `pageNumber` of a 600 × 800 pt document, at `zoom` on a screen of `dpr`. */
 export function pictureOf(
   pageNumber: number,
-  {
-    zoom = 1,
-    rotation = 0,
-    dpr = 2,
-  }: { zoom?: number; rotation?: PageRotation; dpr?: number } = {},
+  { zoom = 1, rotation = 0, dpr = 2 }: { zoom?: number; rotation?: Rotation; dpr?: number } = {},
 ): PicturePage {
   return {
     ref: toPageRef(pageNumber),

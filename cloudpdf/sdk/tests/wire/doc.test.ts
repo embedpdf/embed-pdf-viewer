@@ -18,7 +18,16 @@ describe("DocClient", () => {
             encryption: { state: "unknown", requiresPassword: true },
             permissions: {
                 known: true,
-                bits: 1,
+                flags: {
+                    print: true,
+                    modifyContents: true,
+                    copy: true,
+                    modifyAnnotations: true,
+                    fillForms: true,
+                    copyForAccessibility: true,
+                    assemble: true,
+                    printHighQuality: true,
+                },
                 allAllowed: true,
                 openedAs: "none",
                 securityHandlerRevision: 1,

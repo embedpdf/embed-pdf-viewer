@@ -38,7 +38,7 @@ import { isSelectable, paintOrder } from './hit';
 import { isTransformableByHand } from './editable';
 import { viewable } from './flags';
 import {
-  anchoredGeom,
+  anchoredGeometry,
   anchoredScale,
   anchoredStrokeWidth,
   anchorModeOf,
@@ -123,12 +123,12 @@ function effMeasure(model: Model, id: Id) {
  * pointer, the drafts' pivots/boxes, and a `handle` draft's geometry all live
  * there already, so one code path serves flagged and unflagged annotations —
  * and the commit (`editUp`) maps the same composition back through
- * `unanchoredGeom`, so preview ≡ commit by construction. The geometry every
+ * `unanchoredGeometry`, so preview ≡ commit by construction. The geometry every
  * selector below hands out, so render/chrome/bounds agree with hit.
  */
-function effGeom(model: Model, id: Id, view: ViewEnv | undefined): Shape {
+function effectiveGeometry(model: Model, id: Id, view: ViewEnv | undefined): Shape {
   const record = model.byId[id];
-  const geometry = anchoredGeom(shapeOf(record.annotation), anchorModeOf(record), view);
+  const geometry = anchoredGeometry(shapeOf(record.annotation), anchorModeOf(record), view);
   const draft = model.draft;
   if (draft) {
     if (draft.kind === 'move' && draft.ids.includes(id))
@@ -178,7 +178,7 @@ export function unmadeItem(
   view?: ViewEnv,
   measure?: MeasurementAppearance,
 ): RenderItem {
-  const geometry = anchoredGeom(shape, anchorModeOf({ annotation }), view);
+  const geometry = anchoredGeometry(shape, anchorModeOf({ annotation }), view);
   const style = effStyle(annotation, view);
   const distance = measure && measurementLayout(geometry, measure, style);
   const text = textOf(annotation);
@@ -232,7 +232,7 @@ export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderIt
     // the vector scene, while only its text is the framework's editable element
     // (see `textBoxes`). Dropping the live plain box here would lose its border
     // and background the moment it is touched.
-    const geometry = effGeom(model, id, view);
+    const geometry = effectiveGeometry(model, id, view);
     const style = effStyle(record.annotation, view);
     // Where the baked raster is drawn (appearance.ts): a stamp's where its
     // shape is, everyone else's at its raster box, carried along by a move.
@@ -418,7 +418,7 @@ export function textBoxes(model: Model, page: PageRef, view?: ViewEnv): TextBox[
 export function textBoxOf(model: Model, id: Id, view?: ViewEnv): TextBox | null {
   const record = model.byId[id];
   if (!record || shapeOf(record.annotation).kind !== 'text-box') return null;
-  const geometry = effGeom(model, id, view);
+  const geometry = effectiveGeometry(model, id, view);
   if (geometry.kind !== 'text-box') return null;
   return {
     id,
@@ -435,7 +435,7 @@ export function selectedItems(model: Model, view?: ViewEnv): RenderItem[] {
   for (const id of model.selected) {
     const record = model.byId[id];
     if (!record) continue;
-    const geometry = effGeom(model, id, view);
+    const geometry = effectiveGeometry(model, id, view);
     const style = effStyle(record.annotation, view);
     items.push(
       placed(
@@ -493,7 +493,7 @@ function unionBoundsOf(
 }
 
 /** The page-bound knob placement for the selection on `page`, reading each
- *  member's geometry through `geomOf` — `effGeom` for the live view, the
+ *  member's geometry through `geomOf` — `effectiveGeometry` for the live view, the
  *  committed geometry for a rotate gesture's rest anchor (see `selectionKnob`). */
 function placeSelectionKnob(
   model: Model,
@@ -561,7 +561,8 @@ export function selectionKnob(
       page,
       pageBox,
       knobOffset,
-      (id) => anchoredGeom(shapeOf(model.byId[id].annotation), anchorModeOf(model.byId[id]), view),
+      (id) =>
+        anchoredGeometry(shapeOf(model.byId[id].annotation), anchorModeOf(model.byId[id]), view),
       view,
     );
     if (!rest) return null;
@@ -576,7 +577,7 @@ export function selectionKnob(
     page,
     pageBox,
     knobOffset,
-    (id) => effGeom(model, id, view),
+    (id) => effectiveGeometry(model, id, view),
     view,
   );
 }
@@ -646,7 +647,7 @@ export function chrome(
   );
   if (selection.length === 1) {
     const record = model.byId[selection[0]];
-    const geometry = effGeom(model, selection[0], view);
+    const geometry = effectiveGeometry(model, selection[0], view);
     const style = effStyle(record.annotation, view);
     const caps = kindOf(record.annotation).caps;
     const rot = geomRotation(geometry);
@@ -686,7 +687,7 @@ export function chrome(
     // ride a group move/scale exactly like single-selection chrome. During a
     // live rotate the members spin away from any axis-aligned box, so the
     // whole block is suppressed — the guides own that mode.
-    const union = unionBoundsOf(model, page, (id) => effGeom(model, id, view), view);
+    const union = unionBoundsOf(model, page, (id) => effectiveGeometry(model, id, view), view);
     if (union) {
       nodes.push({ kind: 'outline', rect: union });
       const gc = groupCaps(model, selection);
@@ -728,7 +729,7 @@ export function selectionBoundsOnPage(model: Model, page: PageRef, view?: ViewEn
   // quad. For a tilted shape this tracks the live `rot`, so the upright floating
   // menu floats above the whole tilted shape instead of the (fixed) unrotated box.
   const corners = selection.flatMap(
-    (id) => effectiveSelectionFrame(model, id, effGeom(model, id, view), view).corners,
+    (id) => effectiveSelectionFrame(model, id, effectiveGeometry(model, id, view), view).corners,
   );
   return unionRect(corners);
 }
@@ -832,6 +833,6 @@ export function annotationAnchor(
 ): { page: PageRef; bounds: Rect } | null {
   const record = model.byId[id];
   if (!record) return null;
-  const frame = effectiveSelectionFrame(model, id, effGeom(model, id, view), view);
+  const frame = effectiveSelectionFrame(model, id, effectiveGeometry(model, id, view), view);
   return { page: record.annotation.page, bounds: unionRect(frame.corners) };
 }

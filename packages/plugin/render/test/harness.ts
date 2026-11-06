@@ -161,7 +161,7 @@ export async function boot(
         listeners.add(listener);
         return () => listeners.delete(listener);
       },
-      lastServerId: () => null,
+      lastServerSequence: () => null,
     },
     pages: { list: () => Promise.resolve({ pageCount: pages.length, labels: [], pages }) },
     security: {

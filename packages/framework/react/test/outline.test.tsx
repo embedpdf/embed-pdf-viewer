@@ -53,7 +53,7 @@ const engine = {
   open: () =>
     Promise.resolve({
       id: 'doc',
-      events: { subscribe: () => () => {}, lastServerId: () => null },
+      events: { subscribe: () => () => {}, lastServerSequence: () => null },
       pages: { list: () => Promise.resolve({ pageCount: 1, labels: [], pages: [page] }) },
       security: { allows: () => true, allowsAnnotation: () => true },
       outline: { get: () => Promise.resolve({ items: ITEMS, incomplete: false }) },

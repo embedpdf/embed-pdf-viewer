@@ -61,15 +61,15 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
   // capability check (they drive `pdf.permissions` expansion). For
   // encrypted documents the DB row is stale (populated by an anonymous
   // probe at ingest); the authoritative bits live in the caller's
-  // active password session. `getEffectivePdfBits` encapsulates the
+  // active password session. `getEffectivePermissionFlags` encapsulates the
   // precedence so route handlers don't have to think about it.
   const bitsForDoc = async (accessCtx: ReturnType<typeof requireDocAccessOnly>, docId: string) =>
-    service.getEffectivePdfBits(accessCtx, docId);
+    service.getEffectivePermissionFlags(accessCtx, docId);
   const bitsForLayer = async (
     accessCtx: ReturnType<typeof requireLayerDocAccessOnly>,
     docId: string,
     layerName: string,
-  ) => service.getEffectivePdfBits(accessCtx, docId, layerName);
+  ) => service.getEffectivePermissionFlags(accessCtx, docId, layerName);
   /** Reads at one of the manifest's counters (see `readAtPins`). */
   const atVersion = <T>(input: {
     reply: FastifyReply;
@@ -107,8 +107,8 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
   app.get('/v1/docs/:docId/head', async (req, reply) => {
     const { docId } = req.params as { docId: string };
     const accessCtx = requireDocAccessOnly(req, docId);
-    const pdfBits = await bitsForDoc(accessCtx, docId);
-    const ctx = requireResource(req, docId, 'head', pdfBits);
+    const permissionFlags = await bitsForDoc(accessCtx, docId);
+    const ctx = requireResource(req, docId, 'head', permissionFlags);
     const head = await service.getHead(ctx, docId);
     setNoStore(reply);
     return head;
@@ -117,8 +117,8 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
   app.get('/v1/docs/:docId/manifest@:token', async (req, reply) => {
     const { docId, token } = req.params as { docId: string; token: string };
     const accessCtx = requireDocAccessOnly(req, docId);
-    const pdfBits = await bitsForDoc(accessCtx, docId);
-    const ctx = requireResource(req, docId, 'manifest', pdfBits);
+    const permissionFlags = await bitsForDoc(accessCtx, docId);
+    const ctx = requireResource(req, docId, 'manifest', permissionFlags);
     const requested = parseTokenOrInvalidArg(decodeDocToken, token, 'docVersion token');
     // The check and the answer are one read of the manifest.
     const manifest = await readAtPins({
@@ -146,8 +146,8 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
   app.get('/v1/docs/:docId/manifest', async (req, reply) => {
     const { docId } = req.params as { docId: string };
     const accessCtx = requireDocAccessOnly(req, docId);
-    const pdfBits = await bitsForDoc(accessCtx, docId);
-    const ctx = requireResource(req, docId, 'manifest', pdfBits);
+    const permissionFlags = await bitsForDoc(accessCtx, docId);
+    const ctx = requireResource(req, docId, 'manifest', permissionFlags);
     const manifest = await service.getManifest(ctx, docId);
     setNoStore(reply);
     return manifest;
@@ -201,8 +201,8 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
   app.get('/v1/docs/:docId/layers/:layerName/head', async (req, reply) => {
     const { docId, layerName } = req.params as { docId: string; layerName: string };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
-    const ctx = requireLayerResource(req, docId, layerName, 'head', pdfBits);
+    const permissionFlags = await bitsForLayer(accessCtx, docId, layerName);
+    const ctx = requireLayerResource(req, docId, layerName, 'head', permissionFlags);
     const head = await service.getLayerHead(ctx, docId, layerName);
     setNoStore(reply);
     return head;
@@ -215,8 +215,8 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
       token: string;
     };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
-    const ctx = requireLayerResource(req, docId, layerName, 'layer-manifest', pdfBits);
+    const permissionFlags = await bitsForLayer(accessCtx, docId, layerName);
+    const ctx = requireLayerResource(req, docId, layerName, 'layer-manifest', permissionFlags);
     const requested = parseTokenOrInvalidArg(decodeDocToken, token, 'layerDocVersion token');
     // The check and the answer are one read of the manifest.
     const manifest = await readAtPins({
@@ -244,8 +244,8 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
   app.get('/v1/docs/:docId/layers/:layerName/manifest', async (req, reply) => {
     const { docId, layerName } = req.params as { docId: string; layerName: string };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
-    const ctx = requireLayerResource(req, docId, layerName, 'layer-manifest', pdfBits);
+    const permissionFlags = await bitsForLayer(accessCtx, docId, layerName);
+    const ctx = requireLayerResource(req, docId, layerName, 'layer-manifest', permissionFlags);
     const manifest = await service.getLayerManifest(ctx, docId, layerName);
     setNoStore(reply);
     return manifest;
@@ -258,8 +258,8 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
       token: string;
     };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
-    const ctx = requireLayerResource(req, docId, layerName, 'layer-layout', pdfBits);
+    const permissionFlags = await bitsForLayer(accessCtx, docId, layerName);
+    const ctx = requireLayerResource(req, docId, layerName, 'layer-layout', permissionFlags);
     const requested = parseTokenOrInvalidArg(decodeLayoutToken, token, 'layoutVersion token');
     const snapshot = await atVersion({
       reply,
@@ -280,8 +280,8 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
   app.get('/v1/docs/:docId/layers/:layerName/layout', async (req, reply) => {
     const { docId, layerName } = req.params as { docId: string; layerName: string };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
-    const ctx = requireLayerResource(req, docId, layerName, 'layer-layout', pdfBits);
+    const permissionFlags = await bitsForLayer(accessCtx, docId, layerName);
+    const ctx = requireLayerResource(req, docId, layerName, 'layer-layout', permissionFlags);
     const snapshot = await service.getLayerLayout(ctx, docId, layerName, abortSignalOf(reply));
     setNoStore(reply);
     return snapshot;
@@ -294,8 +294,8 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
       token: string;
     };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
-    const ctx = requireLayerResource(req, docId, layerName, 'layer-actions', pdfBits);
+    const permissionFlags = await bitsForLayer(accessCtx, docId, layerName);
+    const ctx = requireLayerResource(req, docId, layerName, 'layer-actions', permissionFlags);
     const requested = parseTokenOrInvalidArg(decodeActionsToken, token, 'actionsVersion token');
     const snapshot = await atVersion({
       reply,
@@ -343,8 +343,8 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
     const link = req.downloadLink;
     rejectQueryParamsOnTokenUrl(req.query, link ? ['link'] : []);
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
-    const ctx = requireLayerResource(req, docId, layerName, 'download-versioned', pdfBits);
+    const permissionFlags = await bitsForLayer(accessCtx, docId, layerName);
+    const ctx = requireLayerResource(req, docId, layerName, 'download-versioned', permissionFlags);
     const requested = parseTokenOrInvalidArg(decodeDownloadToken, token, 'download token');
     if (link && (link.docVersion !== requested.docVersion || link.mode !== requested.mode)) {
       throw new EngineError(
@@ -401,8 +401,8 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
   app.post('/v1/docs/:docId/layers/:layerName/download-link', async (req, reply) => {
     const { docId, layerName } = req.params as { docId: string; layerName: string };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
-    const ctx = requireLayerResource(req, docId, layerName, 'download-current', pdfBits);
+    const permissionFlags = await bitsForLayer(accessCtx, docId, layerName);
+    const ctx = requireLayerResource(req, docId, layerName, 'download-current', permissionFlags);
     const parsed = DownloadLinkRequestSchema.safeParse(req.body ?? {});
     if (!parsed.success) {
       throw new EngineError(
@@ -444,8 +444,8 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
   app.get('/v1/docs/:docId/layers/:layerName/download', async (req, reply) => {
     const { docId, layerName } = req.params as { docId: string; layerName: string };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
-    const ctx = requireLayerResource(req, docId, layerName, 'download-current', pdfBits);
+    const permissionFlags = await bitsForLayer(accessCtx, docId, layerName);
+    const ctx = requireLayerResource(req, docId, layerName, 'download-current', permissionFlags);
     const mode = parseDownloadMode(req.query);
     const file = await layerDownload(ctx, docId, layerName, mode);
     return sendDownload(reply, file, docId, layerName, mode, 'no-store');
@@ -458,8 +458,8 @@ export async function registerDocsRoutes(app: FastifyInstance, deps: DocsRouteDe
     }
     const docId = body.docId;
     const accessCtx = requireDocAccessOnly(req, docId);
-    const pdfBits = await bitsForDoc(accessCtx, docId);
-    const ctx = requireResource(req, docId, 'head', pdfBits);
+    const permissionFlags = await bitsForDoc(accessCtx, docId);
+    const ctx = requireResource(req, docId, 'head', permissionFlags);
     const head = await service.warm(ctx, docId);
     return { warmed: true, head };
   });

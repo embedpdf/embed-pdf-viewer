@@ -60,8 +60,8 @@ import { CloudEngine, type CloudEngineOptions } from './CloudEngine';
  * <Viewer engine={engine} plugins={[stagePlugin(), renderPlugin()]} />
  * ```
  */
-export function cloudEngine(opts: CloudEngineOptions = {}): CloudEngine {
-  return CloudEngine.fromOptions(opts);
+export function cloudEngine(options: CloudEngineOptions = {}): CloudEngine {
+  return CloudEngine.fromOptions(options);
 }
 
 // The developer-facing surface both engine packages share: errors, refs,

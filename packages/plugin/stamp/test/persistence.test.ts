@@ -71,19 +71,19 @@ describe('stamp persistence helper', () => {
     bytes.set('embedpdf-standard', new TextEncoder().encode('%PDF-std'));
     const stop = persistStampLibraries(stamp, store, { except: ['embedpdf-standard'] });
 
-    emit({ libraryId: 'mine', reason: 'created' });
-    emit({ libraryId: 'mine', reason: 'asset-added' });
-    emit({ libraryId: 'embedpdf-standard', reason: 'imported' });
+    emit({ libraryId: 'mine', type: 'created' });
+    emit({ libraryId: 'mine', type: 'asset-created' });
+    emit({ libraryId: 'embedpdf-standard', type: 'imported' });
     await idle();
     expect(store.puts).toEqual(['mine']);
     expect(await store.contents()).toEqual([['mine', '%PDF-mine-v1']]);
 
     bytes.set('mine', new TextEncoder().encode('%PDF-mine-v2'));
-    emit({ libraryId: 'mine', reason: 'asset-updated' });
+    emit({ libraryId: 'mine', type: 'asset-updated' });
     await idle();
     expect(await store.contents()).toEqual([['mine', '%PDF-mine-v2']]);
 
-    emit({ libraryId: 'mine', reason: 'removed' });
+    emit({ libraryId: 'mine', type: 'deleted' });
     await idle();
     expect(await store.contents()).toEqual([]);
     stop();
@@ -96,11 +96,11 @@ describe('stamp persistence helper', () => {
     persistStampLibraries(stamp, store);
     const firstPut = store.holdNextPut();
 
-    emit({ libraryId: 'mine', reason: 'created' });
+    emit({ libraryId: 'mine', type: 'created' });
     await firstPut.started;
     bytes.set('mine', new TextEncoder().encode('%PDF-mine-v2'));
-    emit({ libraryId: 'mine', reason: 'asset-added' });
-    emit({ libraryId: 'mine', reason: 'asset-updated' });
+    emit({ libraryId: 'mine', type: 'asset-created' });
+    emit({ libraryId: 'mine', type: 'asset-updated' });
     firstPut.release();
     await idle();
     expect(store.puts).toEqual(['mine', 'mine']);
@@ -114,10 +114,10 @@ describe('stamp persistence helper', () => {
     persistStampLibraries(stamp, store);
     const firstPut = store.holdNextPut();
 
-    emit({ libraryId: 'mine', reason: 'created' });
+    emit({ libraryId: 'mine', type: 'created' });
     await firstPut.started;
-    emit({ libraryId: 'mine', reason: 'asset-added' });
-    emit({ libraryId: 'mine', reason: 'removed' }); // the latest wish wins
+    emit({ libraryId: 'mine', type: 'asset-created' });
+    emit({ libraryId: 'mine', type: 'deleted' }); // the latest wish wins
     firstPut.release();
     await idle();
     expect(store.puts).toEqual(['mine']);
@@ -129,9 +129,9 @@ describe('stamp persistence helper', () => {
     const store = countingStore();
     bytes.set('mine', new TextEncoder().encode('%PDF-mine'));
     const stop = persistStampLibraries(stamp, store);
-    emit({ libraryId: 'mine', reason: 'created' });
+    emit({ libraryId: 'mine', type: 'created' });
     stop();
-    emit({ libraryId: 'mine', reason: 'asset-added' }); // after the stop: not heard
+    emit({ libraryId: 'mine', type: 'asset-created' }); // after the stop: not heard
     await idle();
     expect(store.puts).toEqual(['mine']);
   });

@@ -211,7 +211,7 @@ export interface AnnotationAppearanceBatchEntry<C extends Coordinates = PageCoor
   width: number;
   height: number;
   format: PageNetworkRenderFormat;
-  contentType: string;
+  mimeType: string;
 }
 
 /**

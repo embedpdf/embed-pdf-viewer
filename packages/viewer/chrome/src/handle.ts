@@ -180,7 +180,7 @@ export interface ViewerLifetime {
    * The viewer it reaches is gone: every listener added through the `viewer` stops, and every
    * call refuses with `instance-closed`. Idempotent.
    */
-  dispose(): void;
+  destroy(): void;
 }
 
 const GONE =
@@ -201,7 +201,7 @@ const isPlainObject = (value: unknown): value is object => {
  *
  * Every API the `viewer` hands out (`get()`, `documents`, `commands`) is the plugin's own
  * capability seen through a lens that ends with the viewer: while it lives, every member is the
- * capability's; once {@link ViewerLifetime.dispose} runs, the listeners and registrations made
+ * capability's; once {@link ViewerLifetime.destroy} runs, the listeners and registrations made
  * through it are removed, a read (`get*`, `list*`, `is*`, `has*`, `can*`) throws
  * `instance-closed`, every other call returns a promise that rejects with it, and a new
  * subscription does nothing.
@@ -364,12 +364,12 @@ export function createViewer(kernel: Kernel, plugins: PluginTokens): ViewerLifet
   // by a registered symbol so a wrapper reads it without importing this package.
   Object.defineProperty(viewer, VIEWER_KERNEL, { value: kernel });
 
-  const dispose = () => {
+  const destroy = () => {
     if (disposed) return;
     disposed = true;
     for (const end of [...subscriptions]) end();
   };
-  return { viewer, dispose };
+  return { viewer, destroy };
 }
 
 /**
@@ -391,7 +391,7 @@ export function createViewerSlot(plugins: PluginTokens): ViewerSlot {
   return {
     attach: (kernel) => {
       if (held?.kernel !== kernel) {
-        held?.lifetime.dispose();
+        held?.lifetime.destroy();
         held = { kernel, lifetime: createViewer(kernel, plugins) };
       }
       return held.lifetime.viewer;
@@ -399,7 +399,7 @@ export function createViewerSlot(plugins: PluginTokens): ViewerSlot {
     current: () => held?.lifetime.viewer ?? null,
     release: (kernel) => {
       if (held?.kernel !== kernel) return;
-      held.lifetime.dispose();
+      held.lifetime.destroy();
       held = null;
     },
   };

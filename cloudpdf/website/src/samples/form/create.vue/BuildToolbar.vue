@@ -4,7 +4,7 @@ import { usePageList } from '@embedpdf/vue/runtime';
 import type { PageRef } from '@embedpdf/vue/runtime';
 import { useStage } from '@embedpdf/vue/stage';
 import { useForm } from '@embedpdf/vue/form';
-import type { FormCapability, FormFieldDTO } from '@embedpdf/vue/form';
+import type { FormCapability, FormField } from '@embedpdf/vue/form';
 
 // The printed boxes are the fields' look: a new field only sets its text size.
 const look = { fontSize: 11 };
@@ -16,7 +16,7 @@ const rowTop = (row: number) => 470 + row * 36;
 /** A dropdown in a row's country box. */
 function addDropdown(form: FormCapability, page: PageRef, row: number) {
   return form.create({
-    family: 'combobox',
+    kind: 'combobox',
     name: `country_${row + 1}`,
     options: [
       { label: 'Netherlands', value: 'NL' },
@@ -31,7 +31,7 @@ function addDropdown(form: FormCapability, page: PageRef, row: number) {
 function addRadioGroup(form: FormCapability, page: PageRef, row: number) {
   const y = rowTop(row) + 4;
   return form.create({
-    family: 'radio',
+    kind: 'radio',
     name: `ticket_${row + 1}`,
     widgets: [
       { page, rect: { x: 330, y, width: 16, height: 16 }, exportValue: 'one-day', ...look },
@@ -44,16 +44,16 @@ const form = useForm();
 const stage = useStage();
 const pages = usePageList();
 const page = computed(() => pages.value[0]?.ref); // the printed form
-const added = shallowRef<FormFieldDTO[]>([]);
+const added = shallowRef<FormField[]>([]);
 
 // Each kind of field fills its column from the top: the next row that hasn't got one.
-function rowFor(family: FormFieldDTO['family']) {
-  return added.value.filter((field) => field.family === family).length;
+function rowFor(kind: FormField['kind']) {
+  return added.value.filter((field) => field.kind === kind).length;
 }
 
-async function add(addField: typeof addDropdown, family: FormFieldDTO['family']) {
+async function add(addField: typeof addDropdown, kind: FormField['kind']) {
   if (!page.value) return;
-  const { field } = await addField(form, page.value, rowFor(family));
+  const { field } = await addField(form, page.value, rowFor(kind));
   added.value = [...added.value, field];
   stage.reveal(page.value, { rect: form.getWidget(field.widgets[0])!.rect });
 }

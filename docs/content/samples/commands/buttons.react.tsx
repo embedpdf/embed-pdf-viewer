@@ -32,7 +32,7 @@ function CommandButton({ id }: { id: string }) {
       onClick={command.run}
     >
       {command.label}
-      {command.shortcut && <kbd className="shortcut">{command.shortcut}</kbd>}
+      {command.shortcutLabel && <kbd className="shortcut">{command.shortcutLabel}</kbd>}
     </button>
   );
 }

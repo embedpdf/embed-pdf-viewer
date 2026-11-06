@@ -185,7 +185,7 @@ Everything `useSignature()` gives you.
 
 | Method                                                    | What it does                                                                                                                              |
 | :-------------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------- |
-| `sign({ field, mark })`                                   | Signs a field: the mark becomes what it shows, and the key seals the document. Also takes `signer`, a per-call `key`, `certify` and `lock`, and resolves `{ signature, version, protection }`. [Sign a field](#sign-a-field) |
+| `sign({ field, mark })`                                   | Signs a field: the mark becomes what it shows, and the key seals the document. Also takes `signer`, a per-call `signingKey`, `certify` and `lock`, and resolves `{ signature, version, protection }`. [Sign a field](#sign-a-field) |
 | `placeMark(mark, { field })`, `placeMark(mark, { page, center })` | Does what a click with an armed mark does: in a field, signs, fills or asks, by `mode`; anywhere else, places a stamp. Resolves what it did as `kind`: `'signed'`, `'filled'`, `'requested'` or `'placed'`. [Let people click to sign](#let-people-click-to-sign) |
 | `fillField(field, mark)`, `clearField(field)`             | Draws a mark into a field without signing, or takes it out again. Refused on a signed field. [Fill a field without signing](#fill-a-field-without-signing) |
 | `prepareSignature({ field, mark })`, `completeSignature(signingId, cms)` | Signs in two steps: the first resolves `{ signingId, digest }` for your key to sign, the second seals the document with what the key returned. [Signing in two steps](#signing-in-two-steps) |
@@ -230,7 +230,7 @@ Set them when you register the plugin, and change them while the app runs with
 
 | Setting        | What it does                                                           | Default                         |
 | :------------- | :--------------------------------------------------------------------- | :------------------------------ |
-| `key`          | The signer, or a function that returns one when someone signs          | none                            |
+| `signingKey`   | The signer, or a function that returns one when someone signs          | none                            |
 | `mode`         | What a mark does in a field: `'sign'`, `'visual'` or `'ask'`           | `'sign'` with a key, else `'visual'` |
 | `trust`        | The certificates you trust, for checking signatures                    | none                            |
 | `allowCertify` | Let a first signature be a certification, which sets what stays allowed | `false`                        |
@@ -249,7 +249,7 @@ Set them when you register the plugin, and change them while the app runs with
 | `onTargetChanged`         | A field became the target, or the target was cleared | `field` (`null` when cleared) |
 | `onSignRequested`         | In `'ask'` mode, a mark was dropped on a field       | `field`, `mark`             |
 | `onInspectionRequested`   | A signed field was clicked                           | `field`                     |
-| `onSettingsChanged` | The settings changed | `settings`, `changed` |
+| `onSettingsChanged` | The settings changed | `settings`, `changedKeys` |
 
 `result` is what `sign()` resolves. ["Sign here" in a form](#sign-here-in-a-form) says what to show
 for the last three.

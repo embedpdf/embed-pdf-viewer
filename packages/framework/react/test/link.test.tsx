@@ -42,7 +42,7 @@ const engine = {
   open: () =>
     Promise.resolve({
       id: 'doc',
-      events: { subscribe: () => () => {}, lastServerId: () => null },
+      events: { subscribe: () => () => {}, lastServerSequence: () => null },
       pages: { list: () => Promise.resolve({ pageCount: 1, labels: [], pages: [page] }) },
       security: { allows: () => true },
       page: () => ({
@@ -117,8 +117,8 @@ describe('LinkLayer', () => {
       engine,
     );
     await act(() => kernel.documents.open(bytesInput('doc')));
-    const outcomes: LinkActivation['outcome'][] = [];
-    kernel.capability(LinkToken).onActivated((event) => outcomes.push(event.activation.outcome));
+    const outcomes: LinkActivation['status'][] = [];
+    kernel.capability(LinkToken).onActivated((event) => outcomes.push(event.activation.status));
     rerender(
       <PageProvider value={context}>
         <LinkLayer />
@@ -174,7 +174,7 @@ describe('LinkLayer', () => {
     }
     const { kernel } = await viewerWith([interactionPlugin(), linkPlugin()], <Probe />, engine);
     await act(() => kernel.documents.open(bytesInput('doc')));
-    expect(link!.activate({ kind: 'uri', uri: 'https://example.com/a' }).outcome).toBe('uri');
+    expect(link!.activate({ kind: 'uri', uri: 'https://example.com/a' }).status).toBe('uri');
     expect(open).toHaveBeenCalledWith('https://example.com/a', '_blank', 'noopener,noreferrer');
   });
 });

@@ -26,7 +26,7 @@ import {
   useSignatureState,
   useSignatureEvent,
   useSignerRows,
-  type SignatureDTO,
+  type Signature,
   type SignatureVerdict,
   type SignerRow,
 } from '@embedpdf/react/signature';
@@ -307,7 +307,7 @@ function DocumentSignatures() {
   const target = useSignatureState((state) => state.target);
   const [validating, setValidating] = useState(false);
   const fields = snapshot?.signatures ?? [];
-  const verdictOf = (dto: SignatureDTO) =>
+  const verdictOf = (dto: Signature) =>
     signed.find((entry) => entry.index === dto.index)?.verdict ?? null;
   // Three honest states: valid; valid on disk but unsaved edits would
   // invalidate it (the verdict judged the working copy); invalid on disk.
@@ -333,7 +333,7 @@ function DocumentSignatures() {
         : verdict.summary === 'valid-untrusted'
           ? 'text-amber-600'
           : 'text-green-600';
-  const isTarget = (dto: SignatureDTO) =>
+  const isTarget = (dto: Signature) =>
     !!target &&
     (target.kind === 'fqn'
       ? target.name === dto.fieldName

@@ -62,7 +62,7 @@ export interface RenderSourceOptions extends PageLayerOptions {
  * same object until the demand, an epoch, or a tile arrival changes it, so
  * layers subscribe with plain `Object.is`). Handles are reference-stable per
  * view id and reference-counted: every `createViewDemand` pairs with one
- * `dispose`.
+ * `destroy`.
  */
 export interface ViewDemand {
   /** What this view wants for a page right now. Idempotent; schedules the want set. */
@@ -77,7 +77,7 @@ export interface ViewDemand {
    *  fetches, drop its own bookkeeping (resolved bytes stay cached). */
   release(page: PageRef): void;
   /** Release every page of this view and drop the handle's reference. */
-  dispose(): void;
+  destroy(): void;
 }
 
 /** Whose pictures: a page's annotations, or its form widgets. */
@@ -145,7 +145,7 @@ export interface RenderHostCapability extends RenderCapability {
    * ask for the other. The same object until a right changes.
    */
   getLayerRights(): PageLayerRights;
-  /** This view's tile surface. Stable per view id; pair with `dispose`. */
+  /** This view's tile surface. Stable per view id; pair with `destroy`. */
   createViewDemand(viewId: string): ViewDemand;
   /**
    * Report on a page's picture in a view: the page is `loading` from now until `shown()`, and
@@ -171,7 +171,7 @@ export interface RenderHostCapability extends RenderCapability {
    * An item's last pictures, every state, kept a while after it left its page:
    * an undo that brings it back shows them at once. Empty for one never drawn.
    */
-  keptAppearances(family: AppearanceFamily, item: AnnotationRef): readonly AppearancePicture[];
+  getKeptAppearances(family: AppearanceFamily, item: AnnotationRef): readonly AppearancePicture[];
   /** The appearance scale a render scale conforms to under the deployment's policy. */
   getAppearanceScale(renderScale: number): number;
   /** A base raster resolved / failed (the conforming and exact doors alike). */

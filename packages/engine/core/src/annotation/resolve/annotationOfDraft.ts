@@ -104,7 +104,7 @@ export function annotationOfResolvedDraft<C extends Coordinates>(
   }
   if (subtype === 'widget') {
     // A widget created on its own belongs to no field (`field: null`) until a form adopts it.
-    read.fieldFamily = 'unknown';
+    read.fieldKind = 'unknown';
     read.hasMark = false;
   }
   return read as unknown as Annotation<C>;

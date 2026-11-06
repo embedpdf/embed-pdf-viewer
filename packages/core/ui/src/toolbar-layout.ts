@@ -64,7 +64,7 @@ export interface OverflowMenuView<Command extends ToolbarCommand = ToolbarComman
 }
 
 /** What a custom item's renderer receives besides the item's variant. */
-export interface CustomSlotCtx {
+export interface CustomSlotContext {
   /** `'live'` in the visible row, `'measure'` in the hidden measurement layer. */
   layer: 'live' | 'measure';
   /**
@@ -400,7 +400,7 @@ export function groupMenuView<Command extends ToolbarCommand>(
       {
         labelKey: view.labelKey,
         role: view.role === 'tabs' ? 'radio' : undefined,
-        rows: view.commands.map((command) => ({ type: 'command' as const, command: command.id })),
+        rows: view.commands.map((command) => ({ kind: 'command' as const, command: command.id })),
       },
     ],
     isOpen,

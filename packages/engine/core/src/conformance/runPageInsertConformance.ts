@@ -26,15 +26,15 @@ const UNKNOWN_PAGE = 999_999;
 
 export function runPageInsertConformance(
   runner: ConformanceTestRunner,
-  opts: ConformanceOptions,
+  options: ConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`page insert conformance: ${opts.label}`, () => {
+  describe(`page insert conformance: ${options.label}`, () => {
     let engine: Engine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -42,7 +42,7 @@ export function runPageInsertConformance(
     });
 
     test('appends every source page with fresh PONs; existing pages keep identity', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const before = await doc.pages.list();
         const beforePageObjectNumbers = before.pages.map((p) => p.ref.objectNumber);
@@ -68,7 +68,7 @@ export function runPageInsertConformance(
     });
 
     test('a position places the block after its neighbour, in source order', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const before = await doc.pages.list();
         if (before.pages.length < 2) return;
@@ -92,8 +92,8 @@ export function runPageInsertConformance(
     });
 
     test('the inserted pages persist through save → re-open', async () => {
-      if (opts.openKind !== 'bytes') return;
-      const doc = await openFixture(engine, opts);
+      if (options.openKind !== 'bytes') return;
+      const doc = await openFixture(engine, options);
       let reopened: DocumentHandle | null = null;
       try {
         const before = await doc.pages.list();
@@ -104,7 +104,7 @@ export function runPageInsertConformance(
         reopened = await engine.open(
           {
             kind: 'bytes',
-            id: `${opts.fixture.id}-insert-reopen`,
+            id: `${options.fixture.id}-insert-reopen`,
             bytes,
           },
           EVERY_PERMISSION,
@@ -118,7 +118,7 @@ export function runPageInsertConformance(
     });
 
     test('empty bytes reject with InvalidArg; garbage rejects with MalformedPdf', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         let caught: unknown;
         try {
@@ -145,7 +145,7 @@ export function runPageInsertConformance(
     });
 
     test('a neighbour that is not a page of the document rejects with NotFound', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const before = await doc.pages.list();
         const single = await doc.pages.extract([before.pages[0].ref]);

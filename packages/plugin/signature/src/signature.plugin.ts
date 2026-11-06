@@ -28,7 +28,7 @@ export const signaturePlugin = (config?: SignatureConfig) =>
     requires: [FormToken],
     optional: [InteractionToken, StampToken, AnnotationToken],
     state: initialSignatureModel,
-    // A key and a trust port are one value each: a change replaces them, never merges into them.
-    settings: { defaults: SIGNATURE_DEFAULTS, registered: config, whole: ['key', 'trust'] },
+    // A signing key and a trust port are one value each: a change replaces them, never merges into them.
+    settings: { defaults: SIGNATURE_DEFAULTS, registered: config, whole: ['signingKey', 'trust'] },
     create: createSignatureController,
   });

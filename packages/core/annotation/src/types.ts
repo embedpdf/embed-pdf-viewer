@@ -1,4 +1,4 @@
-import type { PageRotation, Point, Rect as GeometryRect, Quad } from '@embedpdf/core-geometry';
+import type { Rotation, Point, Rect as GeometryRect, Quad } from '@embedpdf/core-geometry';
 import type { PaintFonts } from '@embedpdf/core-text';
 import type {
   AnnotationBorderStyle,
@@ -64,7 +64,7 @@ export type PolySubtype = 'polygon' | 'polyline';
  */
 export interface ViewEnv {
   zoom: number;
-  rotation: PageRotation;
+  rotation: Rotation;
 }
 
 /**
@@ -286,13 +286,13 @@ export interface SnapSettings {
    * How close a move comes before it snaps, in screen pixels: each pointer
    * sample converts it by its `scale`. Without one it is in page units.
    */
-  readonly alignmentThreshold: number;
+  readonly alignmentThresholdPx: number;
   /** Snap a turn onto `rotationAngles`. */
   readonly rotation: boolean;
   /** The angles a turn snaps to, in degrees clockwise. */
   readonly rotationAngles: readonly number[];
   /** How close a turn comes before it snaps, in degrees. */
-  readonly rotationThreshold: number;
+  readonly rotationThresholdDeg: number;
 }
 
 /**
@@ -314,7 +314,7 @@ export type Draft =
       /** Display rotation + upright policy captured at down (the gesture's home
        *  page), so the commit counter-rotates against what the author saw even
        *  if the up sample resolves elsewhere. See {@link PointerInput}. */
-      displayRotation?: PageRotation;
+      displayRotation?: Rotation;
       upright?: boolean;
       /** The tool's click-create policy, captured at down like `upright`. */
       clickCreate?: ClickCreate | false;
@@ -344,7 +344,7 @@ export type Draft =
       to: Point;
       /** Display rotation + upright policy captured at down (see the rect
        *  draft): an upright tool's click lays its line as the author saw the page. */
-      displayRotation?: PageRotation;
+      displayRotation?: Rotation;
       upright?: boolean;
       /** The tool's click-create policy, captured at down like `upright`. */
       clickCreate?: ClickCreate | false;
@@ -395,7 +395,7 @@ export type Draft =
        *  gesture's home page) — the text box commits counter-rotated so it
        *  reads upright; the leader (tip/knee) is page-space and never turns.
        *  Same capture rule as the rect draft. */
-      displayRotation?: PageRotation;
+      displayRotation?: Rotation;
       upright?: boolean;
       /** The tool's `/F` seed, captured at down (see the rect draft). */
       flags?: Partial<AnnotationFlags>;
@@ -406,7 +406,7 @@ export type Draft =
   // Single-shape resize / vertex drag. For a screen-anchored (`noZoom`/
   // `noRotate`) target, `base`/`cur` live in view space — the projected
   // geometry the user actually grabbed — and the commit maps `cur` back to
-  // stored space through `unanchoredGeom` with the captured `view`. For every
+  // stored space through `unanchoredGeometry` with the captured `view`. For every
   // other target the projection is the identity and `base` Is the stored geom.
   | {
       kind: 'handle';
@@ -421,7 +421,7 @@ export type Draft =
   // centre for a group); `ids` are the members being turned; `start`/`cur` are
   // the pointer at grab and now, so the live angle is
   // `angle(cur - pivot) - angle(start - pivot)`. The base geometry stays in
-  // `m.byId` until commit, so `effGeom` rotates from there. `free` (shift
+  // `m.byId` until commit, so `effectiveGeometry` rotates from there. `free` (shift
   // held) bypasses rotation snapping for this sample. `view` (captured at
   // Down) projects screen-anchored members for preview + commit.
   | {
@@ -611,10 +611,10 @@ export interface PointerInput {
    * `scale`, so screen-anchored (`noZoom`/`noRotate`) annotations hit-test and
    * clamp at their effective geometry. Page space itself never rotates.
    */
-  displayRotation?: PageRotation;
+  displayRotation?: Rotation;
   /**
    * Screen pixels per page unit at the event: the page's view scale. A
-   * setting in screen pixels (`snap.alignmentThreshold`) is converted by it,
+   * setting in screen pixels (`snap.alignmentThresholdPx`) is converted by it,
    * so snapping feels the same at every zoom. Absent → 1.
    */
   scale?: number;

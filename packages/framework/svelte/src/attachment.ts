@@ -6,7 +6,7 @@
  * at once:
  *
  *   const attachment = useAttachment();
- *   const state = useAttachmentState(); // state.files, state.canAdd
+ *   const state = useAttachmentState(); // state.files, state.canCreate
  *   const { bytes, name, mimeType } = await attachment.download(file);
  */
 

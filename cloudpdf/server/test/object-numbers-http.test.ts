@@ -388,7 +388,7 @@ describe('creates at numbers', () => {
         layer,
         session,
         body: {
-          family: 'text',
+          kind: 'text',
           name: 'billing.name',
           widgets: [
             { page: { kind: 'objectNumber', objectNumber: page }, rect: square(20).box },
@@ -465,7 +465,7 @@ describe('idempotent writes', () => {
         'POST',
         '/form/fields',
         {
-          family: 'text',
+          kind: 'text',
           name: 'once',
           widgets: [
             { page: { kind: 'objectNumber', objectNumber: SECOND_PAGE }, rect: square(80).box },

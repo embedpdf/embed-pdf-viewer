@@ -162,7 +162,7 @@ export class CloudPageRenderService implements PageRenderService {
           width: transform.width,
           height: transform.height,
           format,
-          contentType: `image/${format}`,
+          mimeType: `image/${format}`,
           source: { kind: 'url', url: this.http.absoluteUrl(requestPath) },
         },
         this.http,

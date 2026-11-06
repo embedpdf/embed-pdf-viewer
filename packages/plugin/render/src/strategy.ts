@@ -36,7 +36,7 @@ export interface ResolvedStrategy {
   /** Sharpness deficit above which tiles engage. Resolved default: 1.0 when
    *  the base is exact (nothing may rest stretched), 1.25 under a lattice
    *  (rungs make the band cheap and CSS ≤1.25× upscale reads fine). */
-  readonly engageAt: number;
+  readonly engageRatio: number;
   /** Exact-mode tile-level safety clamp (device px per point). */
   readonly tileMaxScale: number;
   /** Encode format for both planes, policy-conformed. Undefined = engine default. */
@@ -89,7 +89,7 @@ export function resolveStrategy(
         : policy.tiles.tileSizes[0]!
       : options.tiles.size;
 
-  const engageAt = options.tiles.engageAt ?? (widths === null ? 1.0 : 1.25);
+  const engageRatio = options.tiles.engageRatio ?? (widths === null ? 1.0 : 1.25);
 
   // Format conforms like everything else: valid under this policy or the
   // deployment's preferred one. (BMP is local-only by the wire contract.)
@@ -106,7 +106,7 @@ export function resolveStrategy(
     maxWidth: options.fullPage.maxWidth,
     pyramid,
     tileSize,
-    engageAt,
+    engageRatio,
     tileMaxScale: options.tiles.maxScale,
     format,
     quality: options.quality,

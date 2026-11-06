@@ -72,8 +72,8 @@ export class CloudObjectNumberPool implements ObjectNumberPool {
   /** The newest version a `versioned` call named. */
   private version: string | null = null;
 
-  constructor(private readonly opts: CloudObjectNumberPoolOptions) {
-    this.now = opts.now ?? Date.now;
+  constructor(private readonly options: CloudObjectNumberPoolOptions) {
+    this.now = options.now ?? Date.now;
   }
 
   get held(): number {
@@ -93,7 +93,7 @@ export class CloudObjectNumberPool implements ObjectNumberPool {
       const turn = this.reserving.then(async () => {
         while (this.held < count) {
           const wanted = Math.min(count - this.held, MAX_RESERVATION);
-          const reserved = await this.opts.reserve(wanted, signal);
+          const reserved = await this.options.reserve(wanted, signal);
           this.receive(reserved.objectNumbers, reserved.expiresInSeconds);
         }
       });

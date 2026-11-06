@@ -8,7 +8,8 @@ export const plugins = [
   formPlugin(),
   stampPlugin(),
   signaturePlugin({
-    key: () => personalSigner({ subject: 'Ada Lovelace', store: indexedDbKeyStore('my-app-keys') }),
+    signingKey: () =>
+      personalSigner({ subject: 'Ada Lovelace', store: indexedDbKeyStore('my-app-keys') }),
     trust: { anchors: async () => [rootCertificate] }, // the certificates you trust
   }),
 ];

@@ -116,7 +116,7 @@ export function createLibraryWrites(
     };
     libraryBinaries.set(id, bytes);
     ctx.state.update(addLibrary, library);
-    libraryChanged.emit({ libraryId: id, reason: 'created' });
+    libraryChanged.emit({ libraryId: id, type: 'created' });
     libraryCreated.emit({ libraryId: id, library });
     return { library };
   };
@@ -255,7 +255,7 @@ export function createLibraryWrites(
       for (const descriptor of descriptors) {
         const handle = doc.page(descriptor.page);
         const entries = (await handle.pieceInfo.get(STAMP_PIECEINFO_APP))?.entries ?? {};
-        const kind = options?.kind ?? kindFromPdfName(entryName(entries, 'Kind')) ?? 'stamp';
+        const kind = options?.assetKind ?? kindFromPdfName(entryName(entries, 'Kind')) ?? 'stamp';
         const subject = entryString(entries, 'SubjectOverride');
         const categories = entryStringArray(entries, 'Categories');
         const page = pagesByObjectNumber.get(descriptor.page.objectNumber)!;
@@ -302,7 +302,7 @@ export function createLibraryWrites(
       assetBinaries.set(asset.id, { bytes, preview });
       ctx.state.update(addAsset, asset);
     }
-    libraryChanged.emit({ libraryId: imported.library.id, reason: 'imported' });
+    libraryChanged.emit({ libraryId: imported.library.id, type: 'imported' });
     libraryCreated.emit({ libraryId: imported.library.id, library: imported.library });
     for (const { asset } of imported.assets) {
       assetCreated.emit({ assetId: asset.id, libraryId: imported.library.id, asset });
@@ -329,7 +329,7 @@ export function createLibraryWrites(
         const existed = ctx.state.get().libraries[id] !== undefined;
         dropLibrary(id);
         if (existed) {
-          libraryChanged.emit({ libraryId: id, reason: 'removed' });
+          libraryChanged.emit({ libraryId: id, type: 'deleted' });
           libraryDeleted.emit({ libraryId: id, library: null });
         }
       },
@@ -378,7 +378,7 @@ export function createLibraryWrites(
         throwIfCancelled(signal);
         libraryBinaries.set(id, rewritten);
         ctx.state.update(setLibrary, next);
-        libraryChanged.emit({ libraryId: id, reason: 'updated' });
+        libraryChanged.emit({ libraryId: id, type: 'updated' });
         libraryUpdated.emit({ libraryId: id, library: next });
         return { library: next };
       },

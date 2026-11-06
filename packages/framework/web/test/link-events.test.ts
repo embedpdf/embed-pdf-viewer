@@ -33,9 +33,9 @@ describe('link events', () => {
     const actions = { dispatch: vi.fn() };
     sendLinkEvent(actions, annotationLink, page, 'mouseDown');
     expect(actions.dispatch).toHaveBeenCalledWith({
-      scope: 'annotation',
+      type: 'annotation',
       event: 'mouseDown',
-      ref,
+      annotation: ref,
       page,
       source: { kind: 'link', annotation: ref, page },
     });

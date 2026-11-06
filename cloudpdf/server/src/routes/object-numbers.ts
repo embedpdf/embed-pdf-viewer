@@ -49,9 +49,13 @@ export async function registerObjectNumberRoutes(
         `invalid object number reservation: ${parsed.error.message}`,
       );
     }
-    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+    const permissionFlags = await documentService.getEffectivePermissionFlags(
+      accessCtx,
+      docId,
+      layerName,
+    );
     const protection = await documentService.getProtection(accessCtx, docId, layerName);
-    if (!mayCreateObjects(accessCtx, pdfBits, protection)) {
+    if (!mayCreateObjects(accessCtx, permissionFlags, protection)) {
       throw new EngineError(
         EngineErrorCode.Forbidden,
         'object numbers are for callers that may create objects',

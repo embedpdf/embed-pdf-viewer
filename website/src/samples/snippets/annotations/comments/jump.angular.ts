@@ -33,6 +33,6 @@ export class Review {
 
   protected show(thread: CommentThread) {
     this.stage().reveal(thread.page, { rect: thread.root.rect });
-    this.annotation.selection.set([thread.root.ref]); // and select it
+    this.annotation.selection.select([thread.root.ref]); // and select it
   }
 }

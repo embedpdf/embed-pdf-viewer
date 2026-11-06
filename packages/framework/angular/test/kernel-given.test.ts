@@ -84,7 +84,7 @@ describe('provideEmbedPdf({ kernel })', () => {
     }
     const fixture = await mount(Given);
     // Its maker hasn't started it yet: the injector waits, and says so.
-    expect(waiting.status()).toBe('created');
+    expect(waiting.getStatus()).toBe('created');
     expect(text(fixture.nativeElement)).toBe('starting');
 
     await waiting.start();
@@ -96,7 +96,7 @@ describe('provideEmbedPdf({ kernel })', () => {
 
     fixture.destroy();
     await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(waiting.status()).toBe('started');
+    expect(waiting.getStatus()).toBe('started');
     expect(destroyedCount()).toBe(0);
   });
 
@@ -153,6 +153,6 @@ describe('provideEmbedPdf({ kernel })', () => {
     // Destroying that injector lets the kernel go on.
     fixture.componentInstance.viewerInjector.destroy();
     fixture.destroy();
-    expect(kernel.status()).toBe('started');
+    expect(kernel.getStatus()).toBe('started');
   });
 });

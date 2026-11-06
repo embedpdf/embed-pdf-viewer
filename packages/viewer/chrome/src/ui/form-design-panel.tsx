@@ -8,8 +8,8 @@
 import { AnnotationToken, useAnnotationState } from '@embedpdf/react/annotation';
 import {
   FormToken,
-  type FormFieldDTO,
-  type FormFieldFamily,
+  type FormField,
+  type FormFieldKind,
   type WidgetAnnotation,
 } from '@embedpdf/react/form';
 import { useT } from '@embedpdf/react/i18n';
@@ -22,8 +22,8 @@ import { FORM_DESIGN_TOOL, isFormDesignTool } from '../config/commands';
 import { FieldSettings } from './field-settings';
 import { Icon } from './icons';
 
-/** Each family's icon and name, as its field tool shows them. */
-const FAMILIES: Readonly<Partial<Record<FormFieldFamily, { icon: string; labelKey: string }>>> = {
+/** Each kind's icon and name, as its field tool shows them. */
+const FAMILIES: Readonly<Partial<Record<FormFieldKind, { icon: string; labelKey: string }>>> = {
   text: { icon: 'formTextfield', labelKey: 'commands.form.textfield' },
   checkbox: { icon: 'formCheckbox', labelKey: 'commands.form.checkbox' },
   radio: { icon: 'formRadio', labelKey: 'commands.form.radio' },
@@ -33,7 +33,7 @@ const FAMILIES: Readonly<Partial<Record<FormFieldFamily, { icon: string; labelKe
   signature: { icon: 'signature', labelKey: 'commands.form.signature' },
 };
 
-const NO_FIELDS: readonly FormFieldDTO[] = [];
+const NO_FIELDS: readonly FormField[] = [];
 const NO_WIDGETS: readonly WidgetAnnotation[] = [];
 
 /** A widget's object number, the key its rows and its selection share. */
@@ -54,11 +54,11 @@ function useFormDesign() {
     select(widget: WidgetAnnotation) {
       // The widgets are lent only while a form is designed.
       if (!isFormDesignTool(activeTool)) interaction?.activateTool(FORM_DESIGN_TOOL);
-      annotation?.selection.set([widget.ref]);
+      annotation?.selection.select([widget.ref]);
       stage.reveal(widget.page, { rect: widget.box });
     },
     clear() {
-      annotation?.selection.set([]);
+      annotation?.selection.select([]);
     },
   };
 }
@@ -116,7 +116,7 @@ function FieldList() {
           </h3>
           <ul className="flex flex-col">
             {rows.map(({ field, place }) => {
-              const family = FAMILIES[field.family];
+              const family = FAMILIES[field.kind];
               return (
                 <li key={field.name}>
                   <button
@@ -143,10 +143,10 @@ function FieldList() {
 }
 
 /** The selected field: its settings and, for a radio group or a checkbox, its buttons. */
-function SelectedField({ field }: { field: FormFieldDTO }) {
+function SelectedField({ field }: { field: FormField }) {
   const t = useT();
   const design = useFormDesign();
-  const family = FAMILIES[field.family];
+  const family = FAMILIES[field.kind];
   return (
     <div className="min-h-0 flex-1 overflow-y-auto p-4">
       <button
@@ -165,13 +165,13 @@ function SelectedField({ field }: { field: FormFieldDTO }) {
         {t('demo.fieldSettingsTitle')}
       </p>
       <FieldSettings field={field} />
-      {(field.family === 'radio' || field.family === 'checkbox') && <Buttons field={field} />}
+      {(field.kind === 'radio' || field.kind === 'checkbox') && <Buttons field={field} />}
     </div>
   );
 }
 
 /** A radio group's or a checkbox's buttons, each selectable, and a + for one more. */
-function Buttons({ field }: { field: FormFieldDTO & { family: 'radio' | 'checkbox' } }) {
+function Buttons({ field }: { field: FormField & { kind: 'radio' | 'checkbox' } }) {
   const t = useT();
   const design = useFormDesign();
   const form = useOptionalCapability(FormToken);
@@ -185,7 +185,7 @@ function Buttons({ field }: { field: FormFieldDTO & { family: 'radio' | 'checkbo
     chosen.some(
       (record) => record.ref.kind === 'objectNumber' && record.ref.objectNumber === numberOf(place),
     );
-  const radio = field.family === 'radio';
+  const radio = field.kind === 'radio';
   const add = async () => {
     if (!form) return;
     const { widget } = await form.addWidget(field.ref);

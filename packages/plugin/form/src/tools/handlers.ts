@@ -9,7 +9,7 @@ import {
 
 import type { FormHostCapability } from '../host-contract';
 import type { Box } from '../model';
-import { FORM_TOOL_BY_ID, type FormToolDef } from './definitions';
+import { FORM_TOOL_BY_ID, type FormToolDefinition } from './definitions';
 
 type Vec = { x: number; y: number };
 
@@ -40,17 +40,17 @@ export function clampToPage(box: Box, page: Box): Box | null {
  * settings panel.
  */
 export function toolDraft(
-  tool: FormToolDef,
+  tool: FormToolDefinition,
   name: string,
   widget: WidgetPlacement,
 ): FormFieldDraft {
-  switch (tool.family) {
+  switch (tool.fieldKind) {
     case 'radio':
-      return { family: 'radio', name, widgets: [{ ...widget, exportValue: 'Choice1' }] };
+      return { kind: 'radio', name, widgets: [{ ...widget, exportValue: 'Choice1' }] };
     case 'combobox':
     case 'listbox':
       return {
-        family: tool.family,
+        kind: tool.fieldKind,
         name,
         widgets: [widget],
         options: [
@@ -59,9 +59,9 @@ export function toolDraft(
         ],
       };
     case 'pushbutton':
-      return { family: 'pushbutton', name, widgets: [{ ...widget, caption: 'Button' }] };
+      return { kind: 'pushbutton', name, widgets: [{ ...widget, caption: 'Button' }] };
     default:
-      return { family: tool.family, name, widgets: [widget] };
+      return { kind: tool.fieldKind, name, widgets: [widget] };
   }
 }
 
@@ -98,7 +98,7 @@ export function createPlaceHandler(
     annotation?.clearGhost();
   };
 
-  const place = async (tool: FormToolDef, page: PageRef, box: Box): Promise<void> => {
+  const place = async (tool: FormToolDefinition, page: PageRef, box: Box): Promise<void> => {
     const pageBox = form.getPageBox(page);
     const rect = pageBox ? clampToPage(box, pageBox) : null;
     if (!rect) return;
@@ -108,7 +108,7 @@ export function createPlaceHandler(
     const look = widgetAppearanceOf(
       annotation ? annotation.tools.getDefaults(tool.id) : tool.defaults,
     );
-    const name = nextFieldName(tool.family, new Set(form.list().map((field) => field.name)));
+    const name = nextFieldName(tool.fieldKind, new Set(form.list().map((field) => field.name)));
     // The new field shows at once, when the document holds the numbers it
     // takes: then it is selected in the same frame. Otherwise once it shows.
     const created = form.create(toolDraft(tool, name, { page, rect, ...look }));
@@ -119,7 +119,7 @@ export function createPlaceHandler(
     const widget = field.widgets.find(
       (candidate) => candidate.page?.objectNumber === page.objectNumber,
     );
-    if (policy.select && widget?.ref) annotation.selection.set([widget.ref]);
+    if (policy.select && widget?.ref) annotation.selection.select([widget.ref]);
     // Back to design's resting tool, not the default pointer: that one fills, which would end
     // design and drop the new field's selection.
     if (policy.tool === 'default') interaction.activateTool('form-edit');
@@ -152,7 +152,7 @@ export function createPlaceHandler(
         annotation.clearGhost();
       }
     },
-    onDown: (sample) => {
+    onPointerDown: (sample) => {
       // No capture without a page, a known palette tool, or design permission:
       // declining lets editing, panning or text selection take the gesture.
       if (!sample.page || !FORM_TOOL_BY_ID.has(interaction.getActiveToolId())) return false;
@@ -160,14 +160,14 @@ export function createPlaceHandler(
       origin = { page: sample.page.ref, start: sample.page.point, last: sample.page.point };
       return true;
     },
-    onMove: (sample) => {
+    onPointerMove: (sample) => {
       if (!origin) return;
       const point = samplePointOn(sample, origin.page);
       if (!point) return;
       origin.last = point;
       annotation?.previewPlacement(interaction.getActiveToolId(), origin.page, origin.start, point);
     },
-    onUp: (sample) => {
+    onPointerUp: (sample) => {
       if (!origin) return;
       const gesture = origin;
       endGesture();
@@ -186,6 +186,6 @@ export function createPlaceHandler(
       });
     },
     // Aborted (a second finger, a system cancel): nothing is placed.
-    onCancel: endGesture,
+    onPointerCancel: endGesture,
   };
 }

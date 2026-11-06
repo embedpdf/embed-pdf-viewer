@@ -12,7 +12,7 @@ const annotations = useAnnotation();
 
 <template>
   <li>
-    <button type="button" class="row" @click="annotations.selection.set([annotation.ref])">
+    <button type="button" class="row" @click="annotations.selection.select([annotation.ref])">
       <span class="kind">{{ 'unavailable' in readout ? 'No scale' : readout.kind }}</span>
       <span class="value">{{ 'unavailable' in readout ? '—' : readout.label }}</span>
     </button>

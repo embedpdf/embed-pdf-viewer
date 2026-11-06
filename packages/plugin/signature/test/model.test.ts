@@ -4,7 +4,7 @@ import type { SignatureVerdict } from '@embedpdf/core-signature';
 import type {
   DocumentEvent,
   EventOrigin,
-  SignatureDTO,
+  Signature,
   SignaturePrepared,
   SignatureSnapshot,
 } from '@embedpdf/engine-core/runtime';
@@ -23,14 +23,14 @@ import {
 const origin: EventOrigin = {
   kind: 'local',
   sessionId: 'session',
-  sub: null,
-  ts: 0,
-  serverId: null,
+  subject: null,
+  at: new Date(0).toISOString(),
+  serverSequence: null,
 };
 const field = { kind: 'objectNumber', objectNumber: 9 } as const;
 /** A prepared signing; the fold reads only its id. */
 const prepared = (signingId: string) => ({ signingId }) as SignaturePrepared;
-const unsigned = { index: 0, field, fieldName: 'sig', signed: false } as unknown as SignatureDTO;
+const unsigned = { index: 0, field, fieldName: 'sig', signed: false } as unknown as Signature;
 const snapshot = {
   chainValid: true,
   revisions: [],
@@ -96,7 +96,7 @@ describe('foldSignatureEvent', () => {
   });
 
   it('applies a completed signing: the sealed field, the protection, no parked signing', () => {
-    const sealed = { ...unsigned, signed: true } as SignatureDTO;
+    const sealed = { ...unsigned, signed: true } as Signature;
     const protection = { ...snapshot.protection, judged: 'annotate' };
     const next = foldSignatureEvent({ snapshot, pending: { signingId: 'one', field } }, {
       type: 'signatures.completed',
