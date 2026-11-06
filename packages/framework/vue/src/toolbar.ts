@@ -24,5 +24,5 @@ export type {
 export { default as Toolbar } from './toolbar/Toolbar.vue';
 export { useStripView } from './toolbar/strip';
 export type { StripView, StripViewGroup } from './toolbar/strip';
-export type { CustomSlotCtx } from '@embedpdf/core-ui';
+export type { CustomSlotContext } from '@embedpdf/core-ui';
 export type { CollapsedGroupView, GroupDisclosureView, OverflowMenuView } from './toolbar/views';

@@ -4,7 +4,7 @@ import type {
   DocumentProtection,
   FormFieldRef,
   FormWidget,
-  SignatureDTO,
+  Signature,
   SignatureSnapshot,
 } from '@embedpdf/engine-core/runtime';
 import { formWidget } from '@embedpdf/engine-core/runtime';
@@ -128,7 +128,7 @@ export class SignatureReader {
   }
 
   /** One signature by field object number, from the current model. */
-  readSignatureByObjectNumber(fieldObjectNumber: number): SignatureDTO {
+  readSignatureByObjectNumber(fieldObjectNumber: number): Signature {
     const snapshot = this.readSnapshot();
     const found = snapshot.signatures.find(
       (s) => s.field.kind === 'objectNumber' && s.field.objectNumber === fieldObjectNumber,

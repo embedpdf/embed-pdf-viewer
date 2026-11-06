@@ -119,9 +119,9 @@ export interface OpenSequenceCompletedEvent {
 }
 
 export interface ActionContext {
-  origin: ActionOrigin;
-  source: ActionSource;
-  event: ActionTriggerEvent;
+  readonly origin: ActionOrigin;
+  readonly source: ActionSource;
+  readonly event: ActionTriggerEvent;
 }
 
 /** The six annotation /AA pointer and focus events (ISO 32000-2 Table 197:
@@ -194,14 +194,14 @@ export type ActionNodeStatus =
 
 export interface ActionNodeResult {
   /** Node address as child indexes from the root ([] = root, [0] = root.next[0]…). */
-  path: number[];
-  type: PdfActionType;
-  status: ActionNodeStatus;
-  detail?: string;
+  readonly path: number[];
+  readonly type: PdfActionType;
+  readonly status: ActionNodeStatus;
+  readonly detail?: string;
 }
 
 export interface ActionDiagnostic {
-  code:
+  readonly code:
     | 'incomplete-tree'
     | 'blocked'
     | 'no-executor'
@@ -221,7 +221,7 @@ export interface ActionDiagnostic {
     | 'submit-payload-unavailable' // older-runtime extraction: node stays inert
     | 'submit-entry-unsupported' // an explicitly included entry has no representable value
     | 'reentrant-print'; // a print request during a document print event — suppressed
-  message: string;
+  readonly message: string;
 }
 
 /**
@@ -233,9 +233,9 @@ export interface ActionDiagnostic {
  * fired.
  */
 export interface ActionDispatchResult {
-  status: 'executed' | 'partial' | 'inert' | 'refused' | 'cancelled';
-  nodes: ActionNodeResult[];
-  diagnostics: ActionDiagnostic[];
+  readonly status: 'executed' | 'partial' | 'inert' | 'refused' | 'cancelled';
+  readonly nodes: ActionNodeResult[];
+  readonly diagnostics: ActionDiagnostic[];
 }
 
 /**
@@ -245,9 +245,9 @@ export interface ActionDispatchResult {
  * built from this source, so fan-out never merges trees in the event.
  */
 export interface ActionStepResult {
-  source: ActionSource;
-  tree: PdfActionTree;
-  result: ActionDispatchResult;
+  readonly source: ActionSource;
+  readonly tree: PdfActionTree;
+  readonly result: ActionDispatchResult;
 }
 
 /**
@@ -258,11 +258,11 @@ export interface ActionStepResult {
  */
 export interface ActionTriggerResult {
   /** `'cancelled'`: the caller's signal fired before or while the trigger ran. */
-  status: 'executed' | 'partial' | 'inert' | 'refused' | 'cancelled';
-  steps: ActionStepResult[];
+  readonly status: 'executed' | 'partial' | 'inert' | 'refused' | 'cancelled';
+  readonly steps: ActionStepResult[];
   /** Trigger-level diagnostics (disabled family, resolution failure);
    *  per-node diagnostics live inside each step's `result`. */
-  diagnostics: ActionDiagnostic[];
+  readonly diagnostics: ActionDiagnostic[];
 }
 
 // ── events ─────────────────────────────────────────────────────────────────
@@ -438,9 +438,9 @@ export type ActionExecutor = (
  *  default adapter's visibility matrix keys on it; embedder adapters receive
  *  everything and decide for themselves. */
 export interface ActionUiContext {
-  origin: ActionOrigin;
+  readonly origin: ActionOrigin;
   /** Script-model axis: `'boot'` = name-tree/document-open boot scripts. */
-  phase: 'boot' | 'user';
+  readonly phase: 'boot' | 'user';
 }
 
 export interface ActionUiAdapter {
@@ -451,8 +451,8 @@ export interface ActionUiAdapter {
   print(uiContext?: ActionUiContext): void;
   /** Script `app.alert`: the one alert port for every script origin. */
   alert?(message: string, options: ActionUiContext & { icon: number; title?: string }): void;
-  /** Script `this.pageNum = n` navigation requests. */
-  gotoPage?(page: number, uiContext: ActionUiContext): void;
+  /** Script `this.pageNum = n` navigation requests: `n` is the zero-based page index. */
+  goToPage?(pageIndex: number, uiContext: ActionUiContext): void;
 }
 
 // ── the submit pipeline: one intent, one resolver, one sink chain ──
@@ -465,15 +465,15 @@ export interface ActionUiAdapter {
  * resolver.
  */
 export interface SubmitIntent {
-  url: string | null;
+  readonly url: string | null;
   /** ISO 32000-2 Table 239 targets (names and object numbers mixed); `null`
    *  is the whole eligible form. */
-  fields: PdfActionTargetRef[] | null;
-  exclude: boolean;
-  includeNoValueFields: boolean;
-  format: 'fdf' | 'html' | 'xfdf' | 'pdf';
-  method: 'post' | 'get';
-  charSet?: string;
+  readonly fields: PdfActionTargetRef[] | null;
+  readonly exclude: boolean;
+  readonly includeNoValueFields: boolean;
+  readonly format: 'fdf' | 'html' | 'xfdf' | 'pdf';
+  readonly method: 'post' | 'get';
+  readonly charSet?: string;
 }
 
 /**

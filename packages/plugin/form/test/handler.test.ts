@@ -16,7 +16,7 @@ import {
   formWidget,
   toPageRef,
   type FormFieldDraft,
-  type FormFieldDTO,
+  type FormField,
   type PageRef,
 } from '@embedpdf/engine-core/runtime';
 
@@ -30,7 +30,7 @@ const PAGE = { x: 0, y: 0, width: 300, height: 400 };
 const created = {
   name: 'text_1',
   widgets: [{ ...formWidget(42, PAGE_REF), rect: null }],
-} as unknown as FormFieldDTO;
+} as unknown as FormField;
 
 function makeForm(over: Partial<FormHostCapability> = {}) {
   const placed: FormFieldDraft[] = [];

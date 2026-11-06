@@ -28,7 +28,7 @@ import type {
   FormFieldRef,
   FormWidget,
   SignatureCompleteResult,
-  SignatureDTO,
+  Signature,
   SignaturePrepared,
   SignatureSignerInput,
   SignatureSnapshot,
@@ -46,7 +46,7 @@ export type {
   FieldLockSpec,
   FormFieldRef,
   SignatureCompleteResult,
-  SignatureDTO,
+  Signature,
   SignaturePrepared,
   SignatureSnapshot,
 } from '@embedpdf/engine-core/runtime';
@@ -101,7 +101,7 @@ export type Mark = { assetId: string } | { source: BinarySource };
 
 /**
  * How a signature field is addressed: its field ref, or its widget, by
- * annotation ref or as a signature names it (`SignatureDTO.widget`).
+ * annotation ref or as a signature names it (`Signature.widget`).
  */
 export type SignatureFieldAddress = FormFieldRef | AnnotationRef | FormWidget;
 
@@ -129,9 +129,6 @@ export interface PrepareSignatureInput {
   subFilter?: SignatureSubFilter;
   digest?: Exclude<DigestAlgorithm, 'sha1'>;
 }
-
-/** The parked half of a two-phase signing (`prepareSignature` → `completeSignature`). */
-export type PreparedSignature = SignaturePrepared;
 
 /** The stamp-library kind that holds people's marks: one library per person. */
 export const SIGNATURES_LIBRARY_KIND = 'signatures';
@@ -185,8 +182,8 @@ export interface SignaturePending {
   readonly field: FormFieldRef;
 }
 
-/** A signed field's facts, with its verdict from the last check (`null` until one ran). */
-export interface SignatureInfo extends SignatureDTO {
+/** A signature field's facts, with its verdict from the last check (`null` until one ran, or for an unsigned field). */
+export interface SignatureInfo extends Signature {
   readonly verdict: SignatureVerdict | null;
 }
 
@@ -260,8 +257,8 @@ export interface SignatureCapability extends SettingsApi<SignatureSettings> {
   listSignatures(): readonly SignatureInfo[];
   /** Signature fields still to sign, in document order. The same array until one changes. */
   listUnsignedFields(): readonly FormFieldRef[];
-  /** One signature field's facts, signed or not, by its ref or its widget's, or `null`. */
-  getSignature(field: SignatureFieldAddress): SignatureDTO | null;
+  /** One signature field's facts and verdict, signed or not, by its ref or its widget's, or `null`. */
+  getSignature(field: SignatureFieldAddress): SignatureInfo | null;
   /** Every verdict from the last check; `null` before the first. */
   listVerdicts(): readonly SignatureVerdict[] | null;
   /** One signed field's verdict from the last check, or `null`. */
@@ -295,7 +292,7 @@ export interface SignatureCapability extends SettingsApi<SignatureSettings> {
   prepareSignature(
     input: PrepareSignatureInput,
     options?: OperationOptions,
-  ): Promise<PreparedSignature>;
+  ): Promise<SignaturePrepared>;
   /** Signing in two steps, the second: the key's CMS seals the document. Fires `onSigned`. Rejects `not-found` for a signing this session didn't prepare. */
   completeSignature(
     signingId: string,

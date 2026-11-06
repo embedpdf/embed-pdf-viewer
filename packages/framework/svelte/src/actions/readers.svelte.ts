@@ -36,7 +36,7 @@ export function useActionsEvent<T>(
   useCapabilityEvent(ActionsToken, select, handler);
 }
 
-/** Your own handlers for any of the adapter's effects: `openUri`, `print`, `alert`, `gotoPage`. */
+/** Your own handlers for any of the adapter's effects: `openUri`, `print`, `alert`, `goToPage`. */
 export type ActionsUiHandlers = Partial<ActionUiAdapter>;
 
 /**
@@ -62,7 +62,7 @@ export function useActionsUiAdapter(handlers?: MaybeGetter<ActionsUiHandlers | u
     return untrack(() => {
       const adapter: ActionUiAdapter = createDefaultActionsUiAdapter({
         overrides: () => valueOf(handlers),
-        goToPage: (page) => view?.goToPage(page),
+        goToPage: (pageIndex) => view?.goToPage(pageIndex),
       });
       return current.setUiAdapter(adapter);
     });

@@ -1,21 +1,21 @@
 /** A command definition with its shortcuts parsed once, and how the registry tells a family apart. */
 import { parseShortcut, type ParsedShortcut } from '@embedpdf/core-ui';
 
-import type { CommandDef, CommandFamily } from './contract';
+import type { CommandDefinition, CommandFamily } from './contract';
 
 export interface RegisteredCommand {
-  readonly definition: CommandDef;
+  readonly definition: CommandDefinition;
   readonly shortcuts: readonly string[];
   readonly parsed: readonly ParsedShortcut[];
 }
 
-export const registeredCommand = (definition: CommandDef): RegisteredCommand => {
+export const registeredCommand = (definition: CommandDefinition): RegisteredCommand => {
   const shortcuts =
     definition.shortcut === undefined ? [] : ([] as string[]).concat(definition.shortcut);
   return { definition, shortcuts, parsed: shortcuts.map(parseShortcut) };
 };
 
-export const isCommandFamily = (item: CommandDef | CommandFamily): item is CommandFamily =>
+export const isCommandFamily = (item: CommandDefinition | CommandFamily): item is CommandFamily =>
   'prefix' in item;
 
 /** The commands the settings define, by id (a later id replaces an earlier one), and their families. */
@@ -25,7 +25,7 @@ export interface ConfiguredCommands {
 }
 
 export function configuredCommands(
-  items: readonly (CommandDef | CommandFamily)[],
+  items: readonly (CommandDefinition | CommandFamily)[],
 ): ConfiguredCommands {
   const commands = new Map<string, RegisteredCommand>();
   const families: CommandFamily[] = [];

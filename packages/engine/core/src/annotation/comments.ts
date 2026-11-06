@@ -136,7 +136,7 @@ export function isStateAnnotation(a: Annotation): boolean {
 
 export function buildCommentThreads(
   annotations: readonly Annotation[],
-  opts: BuildCommentThreadsOptions = {},
+  options: BuildCommentThreadsOptions = {},
 ): CommentThread[] {
   const eligible = annotations.filter((a) => !EXCLUDED_SUBTYPES.has(a.subtype));
 
@@ -186,7 +186,7 @@ export function buildCommentThreads(
       page: root.page,
       replies,
       groupedParts,
-      review: computeReview(states, opts),
+      review: computeReview(states, options),
     });
   };
 

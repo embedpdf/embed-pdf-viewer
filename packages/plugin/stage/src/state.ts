@@ -4,7 +4,7 @@
  * own token reads the same fields through its own capability.
  */
 import { defineState, type PageRef } from '@embedpdf/core';
-import type { PageRotation } from '@embedpdf/core-geometry';
+import type { Rotation } from '@embedpdf/core-geometry';
 import type { ZoomModeValue } from '@embedpdf/core-stage';
 
 import { StageToken, ZoomMode } from './contract';
@@ -22,7 +22,7 @@ export interface StageState {
   /** How many pages the document has. */
   readonly pageCount: number;
   /** The view's clockwise rotation, on top of each page's own; never written to the document. */
-  readonly viewRotation: PageRotation;
+  readonly viewRotation: Rotation;
   /** The names of the responsive rules matching the current box, in source order. */
   readonly activeRules: readonly string[];
 }

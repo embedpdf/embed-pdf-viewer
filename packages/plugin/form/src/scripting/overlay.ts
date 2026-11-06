@@ -6,7 +6,7 @@
 import type { ScriptFieldInput, ScriptValue } from '@embedpdf/core-acrojs';
 import type {
   FormEffect,
-  FormFieldDTO,
+  FormField,
   FormFieldRef,
   FormFieldValue,
   FormSnapshot,
@@ -51,7 +51,7 @@ export function fieldByRef<T extends { ref: FormFieldRef }>(
 }
 
 /** The field a ref names: by its own ref, or by full name for `toFieldRef(name)`. */
-export function snapshotField(snapshot: FormSnapshot, ref: FormFieldRef): FormFieldDTO | undefined {
+export function snapshotField(snapshot: FormSnapshot, ref: FormFieldRef): FormField | undefined {
   return snapshot.fields.find(
     (field) => sameRef(field.ref, ref) || (ref.kind === 'fqn' && field.name === ref.name),
   );

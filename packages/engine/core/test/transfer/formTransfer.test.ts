@@ -3,7 +3,7 @@ import type { WidgetAnnotation } from '../../src/annotation/kinds/widget';
 import type { PdfActionNode, PdfActionTree } from '../../src/dto/PdfAction';
 import { EngineError } from '../../src/errors/EngineError';
 import { EngineErrorCode } from '../../src/errors/EngineErrorCode';
-import type { FormFieldDTO } from '../../src/forms/field';
+import type { FormField } from '../../src/forms/field';
 import type { FormSnapshot } from '../../src/forms/snapshot';
 import type { FormFieldRef } from '../../src/identity/FormFieldRef';
 import { toPageRef } from '../../src/identity/PageRef';
@@ -38,7 +38,7 @@ function textField(
   objectNumber: number,
   widgets: number[],
   fields: Record<string, unknown> = {},
-): FormFieldDTO {
+): FormField {
   return {
     ref: refOf(objectNumber),
     name,
@@ -65,7 +65,7 @@ function textField(
     comb: false,
     widgets: widgets.map((number) => ({ ref: widgetRef(number), objectNumber: number, page })),
     ...fields,
-  } as unknown as FormFieldDTO;
+  } as unknown as FormField;
 }
 
 /** A widget row as a read returns it. */
@@ -105,7 +105,7 @@ function widgetRow(
 }
 
 function bundleOf(
-  fields: FormFieldDTO[],
+  fields: FormField[],
   widgets: WidgetAnnotation[],
   calculationOrder: FormFieldRef[] = [],
 ): FormBundle {
@@ -161,7 +161,7 @@ describe('planFormImport', () => {
     const a = textField('a', 10, [11]);
     const again = textField('a', 20, [21]);
     const taken = textField('taken', 30, []);
-    const unknown = { ...textField('odd', 40, []), kind: 'unknown' } as FormFieldDTO;
+    const unknown = { ...textField('odd', 40, []), kind: 'unknown' } as FormField;
     const { creates, dropped } = plan(
       bundleOf(
         [a, again, taken, unknown],
@@ -246,7 +246,7 @@ describe('planFormValuesImport', () => {
 });
 
 describe('formExportRowsOf', () => {
-  const snapshotOf = (fields: FormFieldDTO[], widgets: WidgetAnnotation[]): FormSnapshot =>
+  const snapshotOf = (fields: FormField[], widgets: WidgetAnnotation[]): FormSnapshot =>
     ({
       fields,
       widgets,
@@ -258,7 +258,7 @@ describe('formExportRowsOf', () => {
       ...textField('sign', 10, []),
       kind: 'signature',
       valueEntry: { kind: 'scalar', value: '12 0 R' },
-    } as unknown as FormFieldDTO;
+    } as unknown as FormField;
     const quiet = textField('quiet', 20, [], { noExport: true });
     const { fields, calculationOrder } = formExportRowsOf(snapshotOf([signed, quiet], []), {}, [
       page,

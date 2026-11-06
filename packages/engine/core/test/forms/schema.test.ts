@@ -6,7 +6,7 @@ import {
   FormSnapshotSchema,
   WidgetPlacementSchema,
 } from '../../src/forms/schema';
-import type { FormFieldDTO, FormSnapshot } from '../../src/shared';
+import type { FormField, FormSnapshot } from '../../src/shared';
 
 const BASE = {
   origin: 'acroform',
@@ -24,7 +24,7 @@ const BASE = {
   importedBy: null,
 } as const;
 
-const RADIO: FormFieldDTO = {
+const RADIO: FormField = {
   ...BASE,
   ref: { kind: 'objectNumber', objectNumber: 6 },
   name: 'gender',
@@ -62,7 +62,7 @@ const RADIO: FormFieldDTO = {
   ],
 };
 
-const LISTBOX: FormFieldDTO = {
+const LISTBOX: FormField = {
   ...BASE,
   ref: { kind: 'objectNumber', objectNumber: 9 },
   name: 'fruits',

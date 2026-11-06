@@ -26,7 +26,7 @@ import {
   isStandardFontName,
   type AnnotationRef,
   type FontName,
-  type FormFieldDTO,
+  type FormField,
   type WidgetAnnotation,
 } from '@embedpdf/engine-core/runtime';
 import type { FontCss, FontsCapability, PaintFonts } from '@embedpdf/plugin-fonts/contract';
@@ -81,7 +81,7 @@ export function createWidgetLooks({
     fonts()?.getPaintFonts(row.fontFamily ?? 'helvetica', text);
 
   /** What the widget's picture depends on, as one string. */
-  const lookKeyOf = (row: WidgetAnnotation, field: FormFieldDTO | null): string => {
+  const lookKeyOf = (row: WidgetAnnotation, field: FormField | null): string => {
     const box = row.box ?? row.rect;
     const content = (() => {
       switch (field?.kind) {

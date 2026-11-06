@@ -281,17 +281,17 @@ function undoneOf(before: PageList, after: PageList, op: PredictablePageOp): Pag
 
 export function runPagePredictionConformance(
   runner: ConformanceTestRunner,
-  opts: PagePredictionConformanceOptions,
+  options: PagePredictionConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`page prediction conformance: ${opts.label}`, () => {
+  describe(`page prediction conformance: ${options.label}`, () => {
     let engine: Engine;
     let doc: DocumentHandle;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
-      doc = await opts.open(engine);
+      engine = await options.makeEngine();
+      doc = await options.open(engine);
     });
 
     afterAll(async () => {

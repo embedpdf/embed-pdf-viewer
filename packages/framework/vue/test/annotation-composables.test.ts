@@ -17,7 +17,7 @@ import type {
   Annotation,
   AnnotationCapability,
   CommentThreadView,
-  CommentsApi,
+  CommentsCapability,
   FilePickerProvider,
   ToolDefaults,
 } from '../src/annotation';
@@ -77,7 +77,7 @@ describe('the annotation composables', () => {
   }, 30_000);
 
   it('useComments and useAnnotation reach the document; useCommentThreads labels each page', async () => {
-    let comments: CommentsApi | null = null;
+    let comments: CommentsCapability | null = null;
     let api: AnnotationCapability | null = null;
     let threads: Readonly<Ref<readonly CommentThreadView[]>> | null = null;
     const Probe = probe(() => {

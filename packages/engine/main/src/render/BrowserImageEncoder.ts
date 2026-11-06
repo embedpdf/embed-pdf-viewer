@@ -76,10 +76,10 @@ export class BrowserImageEncoder implements LocalImageEncoder {
    *  is still intact. */
   private poolVerified = false;
 
-  constructor(private readonly opts: BrowserImageEncoderOptions = {}) {
+  constructor(private readonly options: BrowserImageEncoderOptions = {}) {
     // The literal 'inline' is a string too, and must never be fetched as the
     // URL "/inline" (HTML: a SyntaxError that silently kills the pool).
-    const source = opts.worker;
+    const source = options.worker;
     this.configuredUrl =
       typeof source === 'string' && source !== 'inline' ? toAbsoluteUrl(source) : null;
     if (this.configuredUrl !== null) allowWorkerUrl(this.configuredUrl);
@@ -156,7 +156,7 @@ export class BrowserImageEncoder implements LocalImageEncoder {
   }
 
   private canUseWorkerPath(): boolean {
-    if (this.opts.worker === false) return false;
+    if (this.options.worker === false) return false;
     return typeof Worker !== 'undefined' && typeof OffscreenCanvas !== 'undefined';
   }
 
@@ -212,7 +212,7 @@ export class BrowserImageEncoder implements LocalImageEncoder {
 
   private ensureWorkers(): void {
     if (this.workers.length > 0) return;
-    const count = Math.max(1, this.opts.workerCount ?? 2);
+    const count = Math.max(1, this.options.workerCount ?? 2);
     for (let i = 0; i < count; i++) {
       const worker = this.createWorker();
       worker.onmessage = (event: MessageEvent<EncodeWorkerMessage>) => {
@@ -233,7 +233,7 @@ export class BrowserImageEncoder implements LocalImageEncoder {
   }
 
   private createWorker(): Worker {
-    const source = this.opts.worker;
+    const source = this.options.worker;
     if (typeof source === 'function') return source();
     if (this.configuredUrl !== null) return startWorker(this.configuredUrl, MODULE_WORKER);
     const file = source === undefined ? findEncoderWorkerFile() : null;

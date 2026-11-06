@@ -12,7 +12,7 @@ import { refOf, type Effect, type Model } from '@embedpdf/core-annotation';
 import {
   type AnnotationRef,
   type ChangeOp,
-  type FormFieldDTO,
+  type FormField,
   type PageRef,
   type WidgetAnnotation,
   type WidgetPatch,
@@ -49,7 +49,7 @@ export function createWidgetLender(
   const deleteOps = (deleted: readonly WidgetAnnotation[]): ChangeOp[] => {
     const index = fields.view();
     const ops: ChangeOp[] = [];
-    const byField = new Map<string, { field: FormFieldDTO; widgets: WidgetAnnotation[] }>();
+    const byField = new Map<string, { field: FormField; widgets: WidgetAnnotation[] }>();
     for (const row of deleted) {
       const field = fieldForWidget(index, objectNumberOf(row.ref));
       if (!field) {

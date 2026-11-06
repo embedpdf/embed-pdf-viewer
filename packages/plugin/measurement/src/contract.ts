@@ -37,11 +37,11 @@ export type {
 export type PageTarget = PageRef | number | readonly (PageRef | number)[] | 'all';
 
 export interface ScalePreset {
-  id: string;
-  label: string;
-  paper: number;
-  real: number;
-  unit: LengthUnit;
+  readonly id: string;
+  readonly label: string;
+  readonly paper: number;
+  readonly real: number;
+  readonly unit: LengthUnit;
 }
 
 /**
@@ -74,14 +74,14 @@ export interface ScaleChangeOptions extends OperationOptions {
 }
 
 export interface PageScale {
-  measure: PdfMeasurement | null;
-  source: 'owned' | 'foreign' | 'default';
+  readonly measure: PdfMeasurement | null;
+  readonly source: 'owned' | 'foreign' | 'default';
   /** The page's viewports are known. */
-  ready: boolean;
+  readonly ready: boolean;
   /** The engine can persist a scale into the document. */
-  persistent: boolean;
+  readonly persistent: boolean;
   /** Why the last read of the page's viewports failed; the last known viewports stay in effect. */
-  error?: SerializedEngineError;
+  readonly error?: SerializedEngineError;
 }
 
 /**

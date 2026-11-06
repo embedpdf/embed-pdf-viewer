@@ -9,7 +9,7 @@ import { resolveBinarySource, sniffBinaryMetadata } from '@embedpdf/engine-core/
 import type { AnnotationRef, PageRef } from '@embedpdf/engine-core/runtime';
 
 import type {
-  AddAssetInput,
+  CreateAssetInput,
   AssetFromAnnotationsInput,
   StampAsset,
   StampAssetPatch,
@@ -49,7 +49,7 @@ export function createAssetWrites(
   const { targetOf, pageOf } = targets;
 
   const createAsset = async (
-    input: AddAssetInput,
+    input: CreateAssetInput,
     options?: OperationOptions,
   ): Promise<{ asset: StampAsset }> => {
     const signal = options?.signal;
@@ -281,13 +281,15 @@ export function createAssetWrites(
         const asset = ctx.state.get().assets[id];
         const library = asset ? ctx.state.get().libraries[asset.libraryId] : undefined;
         if (!asset || !library) throw notFound('asset', id);
+        const { subject: _subject, ...withoutSubject } = asset;
         const next: StampAsset = {
-          ...asset,
+          ...(patch.subject === null ? withoutSubject : asset),
           ...(patch.label !== undefined ? { label: patch.label } : {}),
           ...(patch.categories !== undefined ? { categories: patch.categories } : {}),
+          ...(patch.subject !== undefined && patch.subject !== null
+            ? { subject: patch.subject }
+            : {}),
         };
-        if (patch.subject === null) delete next.subject;
-        else if (patch.subject !== undefined) next.subject = patch.subject;
 
         const canonicalBytes = libraryBinaries.get(library.id);
         if (!canonicalBytes) {

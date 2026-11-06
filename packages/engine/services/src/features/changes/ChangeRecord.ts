@@ -6,7 +6,7 @@ import type {
   AttachmentRef,
   ChangeItemType,
   CustomMetadataPatch,
-  FormFieldDTO,
+  FormField,
   FormFieldPatch,
   FormFieldValue,
   MetadataPatch,
@@ -227,7 +227,7 @@ export interface FieldRemoveStep {
   readonly kind: 'field.remove';
   readonly objectNumber: number;
   /** The field as the change left it. */
-  readonly left: FormFieldDTO<PdfCoordinates>;
+  readonly left: FormField<PdfCoordinates>;
   /** The rights it takes beside `doc.forms.modify`: an import's (see {@link StepRights}). */
   readonly rights?: StepRights;
 }

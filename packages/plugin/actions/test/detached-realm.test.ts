@@ -20,16 +20,16 @@ describe('detached-realm script surfaces', () => {
   it('forwards only alerts from a detached realm; document-targeting effects are suppressed observably', () => {
     const capability = harness();
     const alert = vi.fn();
-    const gotoPage = vi.fn();
+    const goToPage = vi.fn();
     const print = vi.fn();
-    capability.setUiAdapter({ openUri: vi.fn(), print, alert, gotoPage });
+    capability.setUiAdapter({ openUri: vi.fn(), print, alert, goToPage });
     const diagnostics: ScriptDiagnostic[] = [];
     capability.onScriptDiagnosticReported((diagnostic) => diagnostics.push(diagnostic));
 
     capability.surfaceScriptResult({
       uiEffects: [
         { type: 'alert', message: 'Approved', icon: 3 },
-        { type: 'gotoPage', page: 4 },
+        { type: 'goToPage', pageIndex: 4 },
         { type: 'print' },
         { type: 'submitForm', url: 'https://example.test', fieldNames: null, includeEmpty: false },
       ],
@@ -40,7 +40,7 @@ describe('detached-realm script surfaces', () => {
     });
 
     expect(alert).toHaveBeenCalledWith('Approved', { origin: 'user', phase: 'user', icon: 3 });
-    expect(gotoPage).not.toHaveBeenCalled();
+    expect(goToPage).not.toHaveBeenCalled();
     expect(print).not.toHaveBeenCalled();
     expect(diagnostics.map(({ code }) => code)).toEqual([
       'ui-effect-suppressed',
@@ -48,24 +48,24 @@ describe('detached-realm script surfaces', () => {
       'ui-effect-suppressed',
     ]);
     expect(diagnostics.map(({ message }) => message)).toEqual([
-      expect.stringContaining('gotoPage'),
+      expect.stringContaining('goToPage'),
       expect.stringContaining('print'),
       expect.stringContaining('submitForm'),
     ]);
   });
 
-  it("a document realm's gotoPage still reaches the adapter (the suppression is realm-keyed)", () => {
+  it("a document realm's goToPage still reaches the adapter (the suppression is realm-keyed)", () => {
     const capability = harness();
-    const gotoPage = vi.fn();
-    capability.setUiAdapter({ openUri: vi.fn(), print: vi.fn(), gotoPage });
+    const goToPage = vi.fn();
+    capability.setUiAdapter({ openUri: vi.fn(), print: vi.fn(), goToPage });
     capability.surfaceScriptResult({
-      uiEffects: [{ type: 'gotoPage', page: 4 }],
+      uiEffects: [{ type: 'goToPage', pageIndex: 4 }],
       diagnostics: [],
       origin: 'user',
       phase: 'user',
       realm: 'document',
     });
-    expect(gotoPage).toHaveBeenCalledWith(4, { origin: 'user', phase: 'user' });
+    expect(goToPage).toHaveBeenCalledWith(4, { origin: 'user', phase: 'user' });
   });
 
   it("sends a script's setFocus to the form plugin's cursor, and says when it can't", () => {

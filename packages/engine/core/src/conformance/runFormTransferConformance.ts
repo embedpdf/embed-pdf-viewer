@@ -9,7 +9,7 @@ import type { Engine } from '../engine/Engine';
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import type { DocumentEvent } from '../events/DocumentEvent';
-import type { FormFieldDTO } from '../forms/field';
+import type { FormField } from '../forms/field';
 import type { PageBox } from '../geometry/pageSpace';
 import { encodeFieldRefKey, type FormFieldRef } from '../identity/FormFieldRef';
 import { toPageRef } from '../identity/PageRef';
@@ -108,15 +108,15 @@ const ATTRIBUTION_KEYS = new Set([
 
 export function runFormTransferConformance(
   runner: ConformanceTestRunner,
-  opts: FormTransferConformanceOptions,
+  options: FormTransferConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`form transfer conformance: ${opts.label}`, () => {
+  describe(`form transfer conformance: ${options.label}`, () => {
     let engine: Engine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -127,7 +127,7 @@ export function runFormTransferConformance(
       identity: Identity,
       scope: readonly string[] = EVERYTHING,
       bytes: Uint8Array = TWO_PAGES_PDF,
-    ) => opts.openAs(engine, { scope, identity }, bytes.slice());
+    ) => options.openAs(engine, { scope, identity }, bytes.slice());
 
     /** Run `body` with the documents it opens, closing them after. */
     const using = async (
@@ -238,7 +238,7 @@ export function runFormTransferConformance(
       return source.forms.export();
     };
 
-    const fieldOf = async (doc: DocumentHandle, name: string): Promise<FormFieldDTO> => {
+    const fieldOf = async (doc: DocumentHandle, name: string): Promise<FormField> => {
       const field = (await doc.forms.list()).fields.find((f) => f.name === name);
       if (!field) throw new Error(`no field '${name}'`);
       return field;

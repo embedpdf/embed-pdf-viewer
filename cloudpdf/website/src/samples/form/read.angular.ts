@@ -15,13 +15,13 @@ import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage'
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { withInteraction } from '@embedpdf/angular/interaction';
 import { EpdfForm, EpdfFormLayer, toFieldRef, withForm } from '@embedpdf/angular/form';
-import type { FormFieldDTO } from '@embedpdf/angular/form';
+import type { FormField } from '@embedpdf/angular/form';
 import { cloudEngine } from '@cloudpdf/engine';
 
 const forms: OpenInput = { kind: 'grant', grant: 'shr_eBRW5E3MpolzD8G36Alp30EF' };
 
 /** A field's value as text, whatever its kind. */
-function valueText(field: FormFieldDTO): string {
+function valueText(field: FormField): string {
   switch (field.kind) {
     case 'text':
     case 'combobox':

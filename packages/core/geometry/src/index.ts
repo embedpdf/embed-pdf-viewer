@@ -114,10 +114,10 @@ export function containedRect(content: Size, box: Rect): Rect {
  * Quarter-turn display rotation, degrees clockwise. The viewer-side notion of a
  * page's on-screen rotation — the total = (document /Rotate + any view
  * rotation), resolved by the shell. Structurally identical to the engine's
- * `PageRotation`, so the two interoperate without this package depending on the
+ * `Rotation`, so the two interoperate without this package depending on the
  * engine.
  */
-export type PageRotation = 0 | 90 | 180 | 270;
+export type Rotation = 0 | 90 | 180 | 270;
 
 /**
  * Reserved chrome real estate around a page, one thickness per side (screen px
@@ -134,7 +134,7 @@ export interface PageFrame {
 export const NO_FRAME: PageFrame = { top: 0, right: 0, bottom: 0, left: 0 };
 
 /** True for the quarter-turns that swap a page's width and height. */
-export function isQuarterTurn(rotation: PageRotation): boolean {
+export function isQuarterTurn(rotation: Rotation): boolean {
   return rotation === 90 || rotation === 270;
 }
 
@@ -143,8 +143,8 @@ export function isQuarterTurn(rotation: PageRotation): boolean {
  * page's total display rotation — `addRotations(page /Rotate, view rotation)`
  * — so the wrap arithmetic is never hand-written (and drift) per call site.
  */
-export function addRotations(left: PageRotation, right: PageRotation): PageRotation {
-  return ((left + right) % 360) as PageRotation;
+export function addRotations(left: Rotation, right: Rotation): Rotation {
+  return ((left + right) % 360) as Rotation;
 }
 
 /**
@@ -157,7 +157,7 @@ export function snapToDevice(value: number, dpr: number): number {
 }
 
 /** A page's on-screen footprint: width and height swapped for quarter-turns. */
-export function displaySize(content: Size, rotation: PageRotation): Size {
+export function displaySize(content: Size, rotation: Rotation): Size {
   return isQuarterTurn(rotation)
     ? { width: content.height, height: content.width }
     : { width: content.width, height: content.height };
@@ -204,7 +204,7 @@ export interface PageTransform {
    * consumers that need the quarter-turn itself (an upright-placement rule, a
    * pointer sample) read it here instead of re-deriving it from the matrix.
    */
-  readonly rotation: PageRotation;
+  readonly rotation: Rotation;
   /** Display footprint in view px (device-snapped) — the page container's size.
    *  Width↔height already swapped for quarter-turns. */
   readonly viewWidth: number;
@@ -272,7 +272,7 @@ export interface PageTransform {
 export function pageTransform(input: {
   /** Un-rotated page size in PDF points. */
   pageSize: Size;
-  rotation: PageRotation;
+  rotation: Rotation;
   /** View px per PDF point = viewUnitsPerPoint × contentScale × zoom. */
   scale: number;
   /**
@@ -612,7 +612,7 @@ export function rotateScaleMatrix(
   scale: number,
   boxW: number,
   boxH: number,
-  rotation: PageRotation,
+  rotation: Rotation,
 ): Mat2D {
   switch (rotation) {
     case 90:

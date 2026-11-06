@@ -124,8 +124,8 @@ export function createScriptSurface(
           icon: effect.icon,
           ...(effect.title !== undefined ? { title: effect.title } : {}),
         });
-      } else if (effect.type === 'gotoPage') {
-        ports.uiAdapter.gotoPage?.(effect.page, uiContext);
+      } else if (effect.type === 'goToPage') {
+        ports.uiAdapter.goToPage?.(effect.pageIndex, uiContext);
       } else {
         ports.uiAdapter.print(uiContext);
       }

@@ -34,7 +34,7 @@ import {
   geomRotation,
   geomRotateAbout,
   geomResetRotation,
-  obbFromGeom,
+  obbFromGeometry,
   placeRotateKnob,
   DEFAULT_CHROME_GEOMETRY,
   rotateKnob,
@@ -136,7 +136,7 @@ const createPtr = (
 });
 const run = (model: Model, msgs: Message[]): Model =>
   msgs.reduce((acc, message) => step(acc, message)[0], model);
-const rectGeom = (geometry: Shape) => (geometry.kind === 'box' ? geometry.box : null);
+const rectGeometry = (geometry: Shape) => (geometry.kind === 'box' ? geometry.box : null);
 /** The write a committed edit asks for: one `patch` effect stating at least `fields`. */
 const writes = (id: string, fields: Record<string, unknown>) => ({
   type: 'patch',
@@ -377,7 +377,7 @@ describe('click-create (a bare click places the tool default)', () => {
       clickMsg('square', 'down', 100, 100, { width: 80, height: 60 }),
       clickMsg('square', 'up', 100, 100, { width: 80, height: 60 }),
     ]);
-    expect(rectGeom(shapeOf(model.byId[model.order[0]].annotation))).toMatchObject({
+    expect(rectGeometry(shapeOf(model.byId[model.order[0]].annotation))).toMatchObject({
       x: 60,
       y: 70,
       width: 80,
@@ -391,7 +391,7 @@ describe('click-create (a bare click places the tool default)', () => {
       clickMsg('square', 'down', 295, 5, { width: 80, height: 60 }, page),
       clickMsg('square', 'up', 295, 5, { width: 80, height: 60 }, page),
     ]);
-    expect(rectGeom(shapeOf(model.byId[model.order[0]].annotation))).toMatchObject({
+    expect(rectGeometry(shapeOf(model.byId[model.order[0]].annotation))).toMatchObject({
       x: 220,
       y: 0,
     });
@@ -413,7 +413,7 @@ describe('click-create (a bare click places the tool default)', () => {
         in: { page: PAGE, point: { x: 90, y: 50 }, shift: false },
       },
     ]);
-    expect(rectGeom(shapeOf(model.byId[model.order[0]].annotation))).toMatchObject({
+    expect(rectGeometry(shapeOf(model.byId[model.order[0]].annotation))).toMatchObject({
       width: 80,
       height: 40,
     });
@@ -456,7 +456,7 @@ describe('annotation-core', () => {
     ]);
     const record = sq.byId[sq.order[0]];
     expect(shapeOf(record.annotation)).toMatchObject({ kind: 'box', ellipse: false });
-    expect(rectGeom(shapeOf(record.annotation))).toMatchObject({
+    expect(rectGeometry(shapeOf(record.annotation))).toMatchObject({
       x: 100,
       y: 100,
       width: 100,
@@ -629,9 +629,9 @@ describe('annotation-core', () => {
 
     // RTL anchors place at the start corner; the tilt still follows the text.
     const rtl = { glyphQuad: rotated.glyphQuad, advance: -1 as const };
-    const rtlGeom = caretFromAnchor(rtl);
-    expect(rtlGeom.rotation).toBeCloseTo(270, 5);
-    expect(rtlGeom.box.y).toBeCloseTo(77, 5); // centred off lowerLeft (100,80)
+    const rtlGeometry = caretFromAnchor(rtl);
+    expect(rtlGeometry.rotation).toBeCloseTo(270, 5);
+    expect(rtlGeometry.box.y).toBeCloseTo(77, 5); // centred off lowerLeft (100,80)
   });
 
   it('a tilted caret draws oriented chrome (obb) with no rotate knob or handles', () => {
@@ -676,13 +676,13 @@ describe('annotation-core', () => {
     expect(chromeNodes.find((node) => node.kind === 'outline')).toBeDefined();
   });
 
-  it('obbFromGeom/geomResetRotation treat the caret as a box-family geom', () => {
+  it('obbFromGeometry/geomResetRotation treat the caret as a box-family geom', () => {
     const geometry: Shape = {
       kind: 'caret',
       box: { x: 94, y: 53, width: 6, height: 6 },
       rotation: 270,
     };
-    const obb = obbFromGeom(geometry, { strokeWidth: 0 })!;
+    const obb = obbFromGeometry(geometry, { strokeWidth: 0 })!;
     expect(obb.angle).toBe(270);
     // A square box under a quarter turn about its own centre lands on the same
     // four corner positions (relabeled) — an order-insensitive, convention-free
@@ -859,7 +859,7 @@ describe('annotation-core', () => {
       editPtr('move', 180, 170),
       editPtr('up', 180, 170),
     ]);
-    expect(rectGeom(shapeOf(model.byId[id].annotation))).toMatchObject({ x: 130, y: 120 });
+    expect(rectGeometry(shapeOf(model.byId[id].annotation))).toMatchObject({ x: 130, y: 120 });
   });
 
   it('a selected arrow is grabbable anywhere inside its outline box, not just on the thin stroke', () => {
@@ -1027,7 +1027,7 @@ describe('annotation-core', () => {
       editPtr('move', 260, 240),
       editPtr('up', 260, 240),
     ]);
-    expect(rectGeom(shapeOf(model.byId[id].annotation))).toMatchObject({
+    expect(rectGeometry(shapeOf(model.byId[id].annotation))).toMatchObject({
       x: 100,
       y: 100,
       width: 160,
@@ -1716,8 +1716,8 @@ describe('annotation-core', () => {
     // strokeWidth applies to both; endings only to the line (the square ignores it)
     expect(styleOf(next.byId[sq].annotation).strokeWidth).toBe(7);
     expect(styleOf(next.byId[ln].annotation).strokeWidth).toBe(7);
-    const lnGeom = shapeOf(next.byId[ln].annotation);
-    expect(lnGeom.kind === 'line' && lnGeom.lineEndings?.end).toBe('closed-arrow');
+    const lineGeometry = shapeOf(next.byId[ln].annotation);
+    expect(lineGeometry.kind === 'line' && lineGeometry.lineEndings?.end).toBe('closed-arrow');
     expect(fx).toEqual([
       writes(sq, { subtype: 'square', strokeWidth: 7 }),
       writes(ln, {
@@ -1880,9 +1880,9 @@ describe('annotation-core', () => {
       editPtr('up', 135, 145),
     ]);
     // all three translate by the same delta (+20, +30)
-    expect(rectGeom(shapeOf(model.byId[P].annotation))).toMatchObject({ x: 120, y: 130 });
-    expect(rectGeom(shapeOf(model.byId[C1].annotation))).toMatchObject({ x: 220, y: 230 });
-    expect(rectGeom(shapeOf(model.byId[C2].annotation))).toMatchObject({ x: 320, y: 330 });
+    expect(rectGeometry(shapeOf(model.byId[P].annotation))).toMatchObject({ x: 120, y: 130 });
+    expect(rectGeometry(shapeOf(model.byId[C1].annotation))).toMatchObject({ x: 220, y: 230 });
+    expect(rectGeometry(shapeOf(model.byId[C2].annotation))).toMatchObject({ x: 320, y: 330 });
   });
 
   it('deleting with a member selected removes the whole group', () => {
@@ -1932,9 +1932,9 @@ describe('annotation-core', () => {
       editPtr('up', 190, 200),
     ]);
     // every member translated by the same delta (+20, +30)
-    expect(rectGeom(shapeOf(model.byId[P].annotation))).toMatchObject({ x: 120, y: 130 });
-    expect(rectGeom(shapeOf(model.byId[C1].annotation))).toMatchObject({ x: 220, y: 230 });
-    expect(rectGeom(shapeOf(model.byId[C2].annotation))).toMatchObject({ x: 320, y: 330 });
+    expect(rectGeometry(shapeOf(model.byId[P].annotation))).toMatchObject({ x: 120, y: 130 });
+    expect(rectGeometry(shapeOf(model.byId[C1].annotation))).toMatchObject({ x: 220, y: 230 });
+    expect(rectGeometry(shapeOf(model.byId[C2].annotation))).toMatchObject({ x: 320, y: 330 });
   });
 
   it('the gap inside a multi-selection shows the move cursor; outside the union still clears', () => {
@@ -2024,7 +2024,7 @@ describe('annotation-core callout', () => {
   });
   // A committed callout geom for the pure-geometry tests: box to the right of an
   // off-box tip, with an elbow between them.
-  const calloutGeom = (): Extract<Shape, { kind: 'text-box' }> =>
+  const calloutGeometry = (): Extract<Shape, { kind: 'text-box' }> =>
     calloutShape(
       { x: 200, y: 100, width: 120, height: 40 },
       0,
@@ -2046,7 +2046,7 @@ describe('annotation-core callout', () => {
   });
 
   it("a new callout's line is [tip, knee, end]; the end is on the side the knee faces", () => {
-    const points = calloutGeom().calloutLine!;
+    const points = calloutGeometry().calloutLine!;
     expect(points).toHaveLength(3);
     expect(points[0]).toEqual({ x: 40, y: 60 }); // tip
     expect(points[1]).toEqual({ x: 120, y: 120 }); // knee
@@ -2084,7 +2084,7 @@ describe('annotation-core callout', () => {
     const tilted = geomScene({ ...plain, rotation: 90 }, { strokeWidth: 2 });
     expect(tilted).toEqual([{ kind: 'rect', rect: { x: 101, y: 101, width: 198, height: 58 } }]);
     // A callout: leader + arrow first, then the same box.
-    const callout = geomScene(calloutGeom(), { strokeWidth: 2 });
+    const callout = geomScene(calloutGeometry(), { strokeWidth: 2 });
     expect(callout[0]).toMatchObject({ kind: 'poly', closed: false });
     expect(callout[callout.length - 1]).toEqual({
       kind: 'rect',
@@ -2127,7 +2127,7 @@ describe('annotation-core callout', () => {
   });
 
   it('geomVisualBounds wraps the box, the leader, AND the arrow at the tip', () => {
-    const geometry = calloutGeom();
+    const geometry = calloutGeometry();
     const rect = geomVisualBounds(geometry, { strokeWidth: 2 });
     // the tip (x=40) sits far left of the box (x=200): the overall bounds reach it
     expect(rect.x).toBeLessThanOrEqual(40);
@@ -2155,7 +2155,7 @@ describe('annotation-core callout', () => {
   });
 
   it('geomHandles returns the 8 box handles PLUS the leader tip + knee', () => {
-    const ids = geomHandles(calloutGeom()).map((handle) => handle.id);
+    const ids = geomHandles(calloutGeometry()).map((handle) => handle.id);
     expect(ids).toContain('nw');
     expect(ids).toContain('se');
     expect(ids).toContain('callout-tip');
@@ -2176,7 +2176,7 @@ describe('annotation-core callout', () => {
   });
 
   it('geomTranslate shifts the box, the tip, AND the knee together', () => {
-    const geometry = geomTranslate(calloutGeom(), { x: 10, y: -5 });
+    const geometry = geomTranslate(calloutGeometry(), { x: 10, y: -5 });
     if (geometry.kind !== 'text-box' || !geometry.calloutLine) throw new Error('expected callout');
     expect(geometry.box).toMatchObject({ x: 210, y: 95 });
     expect(geometry.calloutLine[0]).toEqual({ x: 50, y: 55 });
@@ -2184,13 +2184,13 @@ describe('annotation-core callout', () => {
   });
 
   it('geomDragHandle edits the tip / knee / box independently (conn re-derives)', () => {
-    const tip = geomDragHandle(calloutGeom(), 'callout-tip', { x: 5, y: 5 });
+    const tip = geomDragHandle(calloutGeometry(), 'callout-tip', { x: 5, y: 5 });
     expect(tip.kind === 'text-box' && tip.calloutLine?.[0]).toEqual({ x: 5, y: 5 });
-    const knee = geomDragHandle(calloutGeom(), 'callout-knee', { x: 90, y: 90 });
+    const knee = geomDragHandle(calloutGeometry(), 'callout-knee', { x: 90, y: 90 });
     expect(knee.kind === 'text-box' && knee.calloutLine?.[1]).toEqual({ x: 90, y: 90 });
     // a rect handle resizes the box; the leader's connection point is never stored,
     // so it simply re-derives off the new box on the next read.
-    const box = geomDragHandle(calloutGeom(), 'se', { x: 400, y: 300 });
+    const box = geomDragHandle(calloutGeometry(), 'se', { x: 400, y: 300 });
     expect(box.kind === 'text-box' && box.box).toMatchObject({
       x: 200,
       y: 100,
@@ -2200,7 +2200,7 @@ describe('annotation-core callout', () => {
   });
 
   it('geomScene emits the leader polyline, the arrow node, and a stroke-only box border', () => {
-    const nodes = geomScene(calloutGeom(), { strokeWidth: 1 });
+    const nodes = geomScene(calloutGeometry(), { strokeWidth: 1 });
     const leader = nodes.find((node) => node.kind === 'poly' && !node.closed);
     expect(leader).toBeDefined();
     // the open leader carries [tip, knee, conn]
@@ -2426,7 +2426,7 @@ describe('annotation-core callout — upright on a rotated page', () => {
   });
   // A committed upright callout: box {200,100,120,40} tilted 270° about its
   // centre (260,120) — its page-space footprint is the transposed {240,60,40,120}.
-  const rotCalloutGeom = (): Extract<Shape, { kind: 'text-box' }> =>
+  const rotatedCalloutGeometry = (): Extract<Shape, { kind: 'text-box' }> =>
     calloutShape(
       { x: 200, y: 100, width: 120, height: 40 },
       270,
@@ -2449,7 +2449,7 @@ describe('annotation-core callout — upright on a rotated page', () => {
   });
 
   it("a turned callout's line ends on the turned footprint", () => {
-    const points = rotCalloutGeom().calloutLine!;
+    const points = rotatedCalloutGeometry().calloutLine!;
     expect(points).toHaveLength(3);
     // knee (120,120) sits left of the footprint (x∈[240,280]) → left edge midpoint
     expect(points[2]!.x).toBeCloseTo(240);
@@ -2577,7 +2577,7 @@ describe('annotation-core callout — upright on a rotated page', () => {
   });
 
   it('geomHit tests the box by its FOOTPRINT and the leader in page space', () => {
-    const geometry = rotCalloutGeom();
+    const geometry = rotatedCalloutGeometry();
     // inside the footprint (x∈[240,280], y∈[60,180]) but outside the logical rect
     expect(geomHit(geometry, { x: 260, y: 70 }, 0, true, { strokeWidth: 1 })).toBe(true);
     // inside the logical rect but outside the footprint and off the leader
@@ -2587,7 +2587,7 @@ describe('annotation-core callout — upright on a rotated page', () => {
   });
 
   it('geomVisualBounds and selectionBounds wrap the rotated footprint and the leader', () => {
-    const geometry = rotCalloutGeom();
+    const geometry = rotatedCalloutGeometry();
     const vb = geomVisualBounds(geometry, { strokeWidth: 0 });
     // reaches the footprint's top (y=60) and right (x=280) — not just the logical box
     expect(vb.y).toBeLessThanOrEqual(60);
@@ -2603,7 +2603,7 @@ describe('annotation-core callout — upright on a rotated page', () => {
   });
 
   it('geomScene draws the tilted box as a CLOSED corner ring; the leader stays open', () => {
-    const nodes = geomScene(rotCalloutGeom(), { strokeWidth: 1 });
+    const nodes = geomScene(rotatedCalloutGeometry(), { strokeWidth: 1 });
     const ring = nodes.find((node) => node.kind === 'poly' && node.closed);
     expect(ring).toBeDefined();
     if (!ring || ring.kind !== 'poly') throw new Error('expected ring');
@@ -2622,7 +2622,7 @@ describe('annotation-core callout — upright on a rotated page', () => {
   });
 
   it('geomHandles rides the rotated box; the tip/knee handles stay page-space', () => {
-    const handles = geomHandles(rotCalloutGeom());
+    const handles = geomHandles(rotatedCalloutGeometry());
     const nw = handles.find((handle) => handle.id === 'nw')!;
     // the logical nw corner (200,100) spun 270° about (260,120) → (240,180)
     expect(nw.at.x).toBeCloseTo(240);
@@ -2695,14 +2695,14 @@ describe('annotation-core — rotation', () => {
     });
   });
 
-  it('obbFromGeom reconstructs an oriented box from θ for both families', () => {
+  it('obbFromGeometry reconstructs an oriented box from θ for both families', () => {
     const box: Shape = {
       kind: 'box',
       box: { x: 0, y: 0, width: 100, height: 100 },
       ellipse: false,
       rotation: 90,
     };
-    const obbBox = obbFromGeom(box, { strokeWidth: 0 });
+    const obbBox = obbFromGeometry(box, { strokeWidth: 0 });
     expect(obbBox?.angle).toBe(90);
     expect(obbBox?.corners).toHaveLength(4);
 
@@ -2719,7 +2719,7 @@ describe('annotation-core — rotation', () => {
       rotation: 0,
     };
     const turned = geomRotateAbout(base, turnPivotOf(base), 45);
-    const obbV = obbFromGeom(turned, { strokeWidth: 0 });
+    const obbV = obbFromGeometry(turned, { strokeWidth: 0 });
     expect(obbV?.angle).toBe(45);
     expect(obbV?.corners).toHaveLength(4);
   });
@@ -2966,7 +2966,7 @@ describe('annotation-core — rotation pivots about the rect centre', () => {
     const centre = turnPivotOf(geometry);
 
     // find the rotate knob, then start + drag the gesture there.
-    const obb = obbFromGeom(geometry, styleOf(poly.annotation))!;
+    const obb = obbFromGeometry(geometry, styleOf(poly.annotation))!;
     const corners = obb.corners;
     const fromMid = { x: (corners[0].x + corners[1].x) / 2, y: (corners[0].y + corners[1].y) / 2 };
     const down = { x: corners[3].x - corners[0].x, y: corners[3].y - corners[0].y };
@@ -3401,7 +3401,7 @@ describe('page-bound gestures', () => {
     expect(draft.delta.y).toBeGreaterThan(0);
     expect(draft.delta.y).toBeLessThan(40); // pinned at the edge, not 190
     const [done, fx] = step(model, edit('up', 320, 900));
-    const rect = rectGeom(shapeOf(done.byId[done.selected[0]].annotation))!;
+    const rect = rectGeometry(shapeOf(done.byId[done.selected[0]].annotation))!;
     expect(fx).toEqual([writes(done.selected[0], { box: rect })]);
     expect(rect.x).toBe(300); // slid right by the full 50
     // Bottom rests on the page edge (± the stroke's visual inflation).
@@ -3417,7 +3417,7 @@ describe('page-bound gestures', () => {
       edit('up', 270, 900),
     );
     expect(done.draft).toBeNull();
-    const rect = rectGeom(shapeOf(done.byId[done.selected[0]].annotation))!;
+    const rect = rectGeometry(shapeOf(done.byId[done.selected[0]].annotation))!;
     expect(fx).toEqual([writes(done.selected[0], { box: rect })]);
     expect(rect.y).toBeGreaterThan(700); // it moved…
     expect(rect.y + rect.height).toBeLessThanOrEqual(792); // …but stayed on the page
@@ -3441,7 +3441,7 @@ describe('page-bound gestures', () => {
       create('move', 700, 900),
       create('up', 700, 900),
     ]);
-    const rect = rectGeom(shapeOf(model.byId[model.order[0]].annotation))!;
+    const rect = rectGeometry(shapeOf(model.byId[model.order[0]].annotation))!;
     expect(rect.x + rect.width).toBe(612);
     expect(rect.y + rect.height).toBe(792);
   });
@@ -3576,7 +3576,7 @@ describe('annotation-core — snapping', () => {
     expect(moveDraft(dragging)!.guides).toHaveLength(1);
     expect(chrome(dragging, PAGE).some((node) => node.kind === 'guide')).toBe(true);
     const model = run(dragging, [editPtr('up', 203, 325)]);
-    expect(rectGeom(shapeOf(model.byId['s2'].annotation))).toMatchObject({ x: 200, y: 300 });
+    expect(rectGeometry(shapeOf(model.byId['s2'].annotation))).toMatchObject({ x: 200, y: 300 });
     expect(chrome(model, PAGE).some((node) => node.kind === 'guide')).toBe(false); // cleared
   });
 
@@ -3921,7 +3921,7 @@ describe('page-bound rotate knob', () => {
     inside(selectionKnob(model, PAGE, BOX)!.at);
   });
 
-  it('ChromeGeom: knob and handle grab zones are independent; the offset is configurable', () => {
+  it('ChromeGeometry: knob and handle grab zones are independent; the offset is configurable', () => {
     const model = loadSelect({ x: 100, y: 100, width: 100, height: 50 });
     // knob at (150, ~75.5); a point ~10 above it hits with knobTol 12, not 6
     const knob = selectionKnob(model, PAGE, BOX)!;
@@ -4267,7 +4267,7 @@ describe('upright creation (counter-rotating the display rotation)', () => {
     ...(subtype === 'free-text' ? { clickCreate: FREE_TEXT_CLICK } : {}),
     in: { page: PAGE, point: { x, y }, shift: false, ...extra },
   });
-  const textGeom = (geometry: Shape) => (geometry.kind === 'text-box' ? geometry : null);
+  const textGeometry = (geometry: Shape) => (geometry.kind === 'text-box' ? geometry : null);
 
   it('helpers: a quarter-turn about the centre lands exactly back on the source box', () => {
     const dragged = { x: 50, y: 60, width: 120, height: 40 };
@@ -4310,7 +4310,7 @@ describe('upright creation (counter-rotating the display rotation)', () => {
       uprightPtr('free-text', 'down', 100, 200, { displayRotation: 90, upright: true }),
       uprightPtr('free-text', 'up', 100, 200),
     ]);
-    const geometry = textGeom(shapeOf(model.byId[model.order[0]].annotation))!;
+    const geometry = textGeometry(shapeOf(model.byId[model.order[0]].annotation))!;
     expect(geometry.rotation).toBe(270); // -90 → reads horizontally on the 90°-rotated page
     expect(geometry.box).toEqual({ x: 30, y: 90, width: 180, height: 40 }); // display-frame anchor
     // its rotated footprint hangs off the click exactly like the 0° box does on screen
@@ -4328,7 +4328,7 @@ describe('upright creation (counter-rotating the display rotation)', () => {
       uprightPtr('free-text', 'move', 170, 100),
       uprightPtr('free-text', 'up', 170, 100),
     ]);
-    const geometry = textGeom(shapeOf(model.byId[model.order[0]].annotation))!;
+    const geometry = textGeometry(shapeOf(model.byId[model.order[0]].annotation))!;
     expect(geometry.rotation).toBe(270);
     expect(geometry.box).toEqual({ x: 90, y: 20, width: 40, height: 120 }); // transposed about centre
     expectRectClose(rotatedAabb(geometry.box, geometry.rotation!), {
@@ -4345,7 +4345,7 @@ describe('upright creation (counter-rotating the display rotation)', () => {
       uprightPtr('free-text', 'move', 170, 100),
       uprightPtr('free-text', 'up', 170, 100),
     ]);
-    const geometry = textGeom(shapeOf(model.byId[model.order[0]].annotation))!;
+    const geometry = textGeometry(shapeOf(model.byId[model.order[0]].annotation))!;
     expect(geometry.rotation).toBe(180);
     expect(geometry.box).toEqual({ x: 50, y: 60, width: 120, height: 40 });
   });
@@ -4359,7 +4359,7 @@ describe('upright creation (counter-rotating the display rotation)', () => {
     const geometry = shapeOf(model.byId[model.order[0]].annotation);
     expect(geometry.kind).toBe('box');
     expect(geomRotation(geometry)).toBe(0); // a square reads no way: nothing turned to store
-    expect(rectGeom(geometry)).toEqual({ x: 10, y: 10, width: 100, height: 40 });
+    expect(rectGeometry(geometry)).toEqual({ x: 10, y: 10, width: 100, height: 40 });
   });
 
   it('an upright square or circle CLICK shows its size as seen: its sides swap, nothing turns', () => {
@@ -4375,7 +4375,7 @@ describe('upright creation (counter-rotating the display rotation)', () => {
       const geometry = shapeOf(model.byId[model.order[0]].annotation);
       expect(geomRotation(geometry)).toBe(0);
       // 60 wide, 80 tall on the page: 80 wide, 60 tall on a page shown turned 90°.
-      expect(rectGeom(geometry)).toEqual({ x: 70, y: 160, width: 60, height: 80 });
+      expect(rectGeometry(geometry)).toEqual({ x: 70, y: 160, width: 60, height: 80 });
     }
   });
 
@@ -4398,13 +4398,13 @@ describe('upright creation (counter-rotating the display rotation)', () => {
       uprightPtr('free-text', 'down', 100, 200, { displayRotation: 90 }),
       uprightPtr('free-text', 'up', 100, 200),
     ]);
-    expect(textGeom(shapeOf(noPolicy.byId[noPolicy.order[0]].annotation))!.rotation).toBe(0);
+    expect(textGeometry(shapeOf(noPolicy.byId[noPolicy.order[0]].annotation))!.rotation).toBe(0);
     // upright at rotation 0 → plain commit (no stored draft noise)
     const flat = run(initialModel, [
       uprightPtr('free-text', 'down', 100, 200, { displayRotation: 0, upright: true }),
       uprightPtr('free-text', 'up', 100, 200),
     ]);
-    expect(textGeom(shapeOf(flat.byId[flat.order[0]].annotation))!.box).toEqual({
+    expect(textGeometry(shapeOf(flat.byId[flat.order[0]].annotation))!.box).toEqual({
       x: 100,
       y: 200,
       width: 180,
@@ -4415,7 +4415,7 @@ describe('upright creation (counter-rotating the display rotation)', () => {
       uprightPtr('free-text', 'down', 100, 200),
       uprightPtr('free-text', 'up', 100, 200, { displayRotation: 90, upright: true }),
     ]);
-    expect(textGeom(shapeOf(lateUp.byId[lateUp.order[0]].annotation))!.rotation).toBe(0);
+    expect(textGeometry(shapeOf(lateUp.byId[lateUp.order[0]].annotation))!.rotation).toBe(0);
   });
 });
 
@@ -4905,7 +4905,7 @@ describe('conversation plane — replies, review states and popups never reach t
 describe('callout ↔ AP-generator mirror', () => {
   // Box (200,100)+120×40; tip far left; knee below-left of the box centre →
   // conn = left-edge midpoint (200,120). Same fixture as the callout describe.
-  const calloutGeom = (): Extract<Shape, { kind: 'text-box' }> =>
+  const calloutGeometry = (): Extract<Shape, { kind: 'text-box' }> =>
     calloutShape(
       { x: 200, y: 100, width: 120, height: 40 },
       0,
@@ -4915,7 +4915,7 @@ describe('callout ↔ AP-generator mirror', () => {
     );
 
   it('the box border insets by half the stroke — ink INSIDE the rect, like squares', () => {
-    const nodes = geomScene(calloutGeom(), { strokeWidth: 6 });
+    const nodes = geomScene(calloutGeometry(), { strokeWidth: 6 });
     const box = nodes.find((node) => node.kind === 'rect');
     if (box?.kind !== 'rect') throw new Error('expected a rect border node');
     // rect (200,100,120,40) inset by 3: outer edge of the 6-wide stroke lands
@@ -4925,7 +4925,7 @@ describe('callout ↔ AP-generator mirror', () => {
   });
 
   it("the leader's connection point extends under the border by half the stroke", () => {
-    const nodes = geomScene(calloutGeom(), { strokeWidth: 6 });
+    const nodes = geomScene(calloutGeometry(), { strokeWidth: 6 });
     const leader = nodes[0];
     if (leader?.kind !== 'poly' || leader.closed) throw new Error('expected the open leader poly');
     // conn (200,120), incoming direction +x → adjusted to (203,120): the line
@@ -4943,7 +4943,7 @@ describe('callout ↔ AP-generator mirror', () => {
       ref: null,
       page: PAGE,
       subtype: 'free-text',
-      geometry: calloutGeom(),
+      geometry: calloutGeometry(),
       style: {
         color: '#e07b39',
         interiorColor: '#ffffff',

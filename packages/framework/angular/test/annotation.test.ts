@@ -22,7 +22,7 @@ import {
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { annotationKey, type Engine, type Kernel } from '@embedpdf/core';
-import { pageTransform, type PageRotation } from '@embedpdf/core-geometry';
+import { pageTransform, type Rotation } from '@embedpdf/core-geometry';
 import { createLocalEngine } from '@embedpdf/engine';
 import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotation/contract/host';
 import {
@@ -154,7 +154,7 @@ async function mountPage(
     members?: Record<string, unknown>;
     features?: EmbedPdfFeature[];
     providers?: Provider[];
-    rotation?: PageRotation;
+    rotation?: Rotation;
     zoom?: number;
   } = {},
 ) {

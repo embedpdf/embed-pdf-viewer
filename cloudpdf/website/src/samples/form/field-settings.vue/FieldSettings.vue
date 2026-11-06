@@ -4,7 +4,7 @@ import { watch } from 'vue';
 import { useInteraction } from '@embedpdf/vue/interaction';
 import { useAnnotation } from '@embedpdf/vue/annotation';
 import { toFieldRef, useForm, useFormState } from '@embedpdf/vue/form';
-import type { FormFieldDTO } from '@embedpdf/vue/form';
+import type { FormField } from '@embedpdf/vue/form';
 
 /** On load: design mode, with the name field selected. */
 function useDesignForm() {
@@ -31,7 +31,7 @@ useDesignForm();
 const form = useForm();
 const { selectedField: field } = useFormState();
 
-function rename(field: FormFieldDTO, event: FocusEvent) {
+function rename(field: FormField, event: FocusEvent) {
   const name = (event.target as HTMLInputElement).value.trim();
   if (name && name !== field.name) void form.update(field.ref, { name });
 }

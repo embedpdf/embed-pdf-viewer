@@ -1,7 +1,7 @@
 import type { WidgetPatch } from '../annotation/kinds/widget';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { FormFieldDraft, WidgetPlacement } from '../forms/draft';
-import type { FormFieldDTO } from '../forms/field';
+import type { FormField } from '../forms/field';
 import type { FormFieldPatch } from '../forms/patch';
 import type { FormSnapshot } from '../forms/snapshot';
 import type { FormFieldValue } from '../forms/value';
@@ -74,7 +74,7 @@ export interface DocumentFormsService {
    * resolve against the current field tree. Fails with `NotFound` when
    * the ref matches nothing.
    */
-  get(ref: FormFieldRef): AbortablePromise<FormFieldDTO>;
+  get(ref: FormFieldRef): AbortablePromise<FormField>;
 
   /**
    * Write one field's value, in the fields a read of it returns (see

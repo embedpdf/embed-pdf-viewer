@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { FormFieldDTO, FormSnapshot } from '@embedpdf/engine-core/runtime';
+import type { FormField, FormSnapshot } from '@embedpdf/engine-core/runtime';
 
 import { scriptFieldsFromSnapshot } from '../src/input';
 
-function snapshotWith(field: FormFieldDTO): FormSnapshot {
+function snapshotWith(field: FormField): FormSnapshot {
   return {
     formKind: 'acroform',
     needsAppearances: false,
@@ -26,7 +26,7 @@ describe('scriptFieldsFromSnapshot', () => {
         readOnly: false,
         required: false,
         widgets: [],
-      } as unknown as FormFieldDTO;
+      } as unknown as FormField;
 
       expect(scriptFieldsFromSnapshot(snapshotWith(field))[0]).toMatchObject({
         value: 'Off',
@@ -46,7 +46,7 @@ describe('scriptFieldsFromSnapshot', () => {
       readOnly: false,
       required: false,
       widgets: [widget('0', 'Small'), widget('1', 'Large')],
-    } as unknown as FormFieldDTO;
+    } as unknown as FormField;
 
     expect(scriptFieldsFromSnapshot(snapshotWith(field))[0]).toMatchObject({
       value: 'Large',
@@ -64,7 +64,7 @@ describe('scriptFieldsFromSnapshot', () => {
       defaultValueEntry: { kind: 'none' },
       readOnly: false,
       required: false,
-    } as FormFieldDTO;
+    } as FormField;
 
     expect(scriptFieldsFromSnapshot(snapshotWith(field))[0]).toMatchObject({
       value: null,
@@ -82,7 +82,7 @@ describe('scriptFieldsFromSnapshot', () => {
       readOnly: false,
       required: false,
       widgets: [{ objectNumber: 9 }, { objectNumber: 10 }],
-    } as unknown as FormFieldDTO;
+    } as unknown as FormField;
     const row = (objectNumber: number, flags: object) => ({
       ref: { kind: 'objectNumber', objectNumber },
       hidden: false,

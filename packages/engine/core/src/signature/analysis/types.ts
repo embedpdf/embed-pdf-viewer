@@ -5,7 +5,7 @@ import type {
   DocumentFieldLock,
   FieldLockSpec,
   ModificationLevel,
-  SignatureDTO,
+  Signature,
 } from '../types';
 import type { PdfCoordinates } from '../../pageSpace/coordinates';
 
@@ -146,7 +146,7 @@ export interface RevisionStructure {
   pages: number[];
   fields: RevisionField[];
   /** In the file's coordinates: a past revision's pages may not be the document's now. */
-  signatures: SignatureDTO[];
+  signatures: Signature[];
 }
 
 export interface ChangeFinding {

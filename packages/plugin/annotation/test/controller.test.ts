@@ -4,7 +4,7 @@ import type { AnnotationFlags, AnnotationRef, PdfQuad } from '@embedpdf/engine-c
 import { annotationKey, toPageRef } from '@embedpdf/engine-core/runtime';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import type { CommentsApi } from '../src/contract';
+import type { CommentsCapability } from '../src/contract';
 import { annotationHarness, type FileAnnotation } from './harness';
 import { groupOf, irtOf, styleOf } from '@embedpdf/core-annotation';
 
@@ -101,7 +101,7 @@ const createHarness = annotationHarness;
 afterEach(() => vi.restoreAllMocks());
 
 /** Every comment check for one comment, read at once. */
-const commentChecks = (comments: CommentsApi, target: AnnotationRef) => ({
+const commentChecks = (comments: CommentsCapability, target: AnnotationRef) => ({
   canReply: comments.canReply(target),
   canEditText: comments.canSetText(target),
   canSetStatus: comments.canSetStatus(target),

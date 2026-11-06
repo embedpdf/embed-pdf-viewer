@@ -17,10 +17,10 @@ export class EngineError extends Error {
   readonly code: EngineErrorCode;
   readonly details?: Record<string, unknown>;
 
-  constructor(code: EngineErrorCode, message?: string, opts: EngineErrorOptions = {}) {
-    super(message ?? code, opts.cause === undefined ? undefined : { cause: opts.cause });
+  constructor(code: EngineErrorCode, message?: string, options: EngineErrorOptions = {}) {
+    super(message ?? code, options.cause === undefined ? undefined : { cause: options.cause });
     this.code = code;
-    this.details = opts.details;
+    this.details = options.details;
   }
 
   static is(value: unknown, code?: EngineErrorCode): value is EngineError {

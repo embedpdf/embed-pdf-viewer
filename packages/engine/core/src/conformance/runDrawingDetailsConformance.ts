@@ -45,15 +45,15 @@ const BOX: PageBox = { x: 40, y: 40, width: 160, height: 60 };
  */
 export function runDrawingDetailsConformance(
   runner: ConformanceTestRunner,
-  opts: DrawingDetailsConformanceOptions,
+  options: DrawingDetailsConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`drawing details conformance: ${opts.label}`, () => {
+  describe(`drawing details conformance: ${options.label}`, () => {
     let engine: Engine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -75,7 +75,7 @@ export function runDrawingDetailsConformance(
     const invalid = { code: EngineErrorCode.InvalidArg };
 
     test("Acrobat's text box: the text is its rich text's color, the border its /DA color", async () => {
-      const doc = await opts.open(engine, 'acrobat-freetext');
+      const doc = await options.open(engine, 'acrobat-freetext');
       try {
         const { page } = await firstPage(doc);
         const box = await byNm(doc, ACROBAT_TEXT_BOX);
@@ -104,7 +104,7 @@ export function runDrawingDetailsConformance(
     });
 
     test('a free text create takes defaults, and prints', async () => {
-      const doc = await opts.open(engine, 'drawing');
+      const doc = await options.open(engine, 'drawing');
       try {
         const { page } = await firstPage(doc);
         const { annotation } = await page.annotations.create({
@@ -129,7 +129,7 @@ export function runDrawingDetailsConformance(
     });
 
     test('a callout line makes a callout; another box refuses one', async () => {
-      const doc = await opts.open(engine, 'drawing');
+      const doc = await options.open(engine, 'drawing');
       try {
         const { page } = await firstPage(doc);
         const calloutLine: [{ x: number; y: number }, { x: number; y: number }] = [
@@ -170,7 +170,7 @@ export function runDrawingDetailsConformance(
     });
 
     test('the text style given by itself wins over the rich body; a given body is replaced whole', async () => {
-      const doc = await opts.open(engine, 'drawing');
+      const doc = await options.open(engine, 'drawing');
       try {
         const { page } = await firstPage(doc);
         const created = await page.annotations.create({
@@ -208,7 +208,7 @@ export function runDrawingDetailsConformance(
     });
 
     test('free text justifies, sits in its box, and takes a cloudy border', async () => {
-      const doc = await opts.open(engine, 'drawing');
+      const doc = await options.open(engine, 'drawing');
       try {
         const { page } = await firstPage(doc);
         const created = await page.annotations.create({
@@ -237,7 +237,7 @@ export function runDrawingDetailsConformance(
     });
 
     test("another app's typewriter box is read and kept, not created", async () => {
-      const doc = await opts.open(engine, 'drawing');
+      const doc = await options.open(engine, 'drawing');
       try {
         const { page } = await firstPage(doc);
         const typewriter = await byNm(doc, 'typewriter');
@@ -264,7 +264,7 @@ export function runDrawingDetailsConformance(
     });
 
     test('borders: only a widget writes beveled or inset; a pattern alone keeps a border solid; dashed states its pattern, never an empty one', async () => {
-      const doc = await opts.open(engine, 'drawing');
+      const doc = await options.open(engine, 'drawing');
       try {
         const { page } = await firstPage(doc);
         await expect(
@@ -354,7 +354,7 @@ export function runDrawingDetailsConformance(
     });
 
     test('too few points to draw is InvalidArg', async () => {
-      const doc = await opts.open(engine, 'drawing');
+      const doc = await options.open(engine, 'drawing');
       try {
         const { page } = await firstPage(doc);
         const point = { x: 50, y: 50 };
@@ -374,7 +374,7 @@ export function runDrawingDetailsConformance(
     });
 
     test('a new annotation prints, a popup does not', async () => {
-      const doc = await opts.open(engine, 'drawing');
+      const doc = await options.open(engine, 'drawing');
       try {
         const { page } = await firstPage(doc);
         const square = await page.annotations.create({ subtype: 'square', box: BOX });
@@ -397,7 +397,7 @@ export function runDrawingDetailsConformance(
     });
 
     test('a note and its popup share one open; a second popup is refused', async () => {
-      const doc = await opts.open(engine, 'drawing');
+      const doc = await options.open(engine, 'drawing');
       try {
         const { page } = await firstPage(doc);
         const note = await page.annotations.create({
@@ -448,7 +448,7 @@ export function runDrawingDetailsConformance(
     });
 
     test('links: page verbs are written, a missing fit coordinate stays missing, no border', async () => {
-      const doc = await opts.open(engine, 'drawing');
+      const doc = await options.open(engine, 'drawing');
       try {
         const { page, pageRef } = await firstPage(doc);
         const next = await page.annotations.create({

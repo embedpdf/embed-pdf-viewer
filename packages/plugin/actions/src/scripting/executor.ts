@@ -12,7 +12,7 @@ import type {
   ActionOrigin,
   ActionsScriptEnvironment,
 } from '../contract';
-import type { AnnotCommitEntry } from '../host-contract';
+import type { AnnotationCommitEntry } from '../host-contract';
 import type { ActionsContext, ActionsServices } from '../services';
 import { intentOfSubmitEffect } from '../submit/intent';
 import type { ActionsSubmit } from '../submit/perform';
@@ -74,7 +74,7 @@ export function registerScriptExecutor(
           message: `script annot effects dropped: no annotation commit sink registered (${output.annotEffects.length})`,
         });
       } else {
-        const entries: AnnotCommitEntry[] = output.annotEffects.map((effect) => ({
+        const entries: AnnotationCommitEntry[] = output.annotEffects.map((effect) => ({
           annotObjectNumber: effect.ref.kind === 'objectNumber' ? effect.ref.objectNumber : -1,
           ...(effect.ref.kind === 'objectNumber' ? { page: effect.ref.page } : {}),
           patch: effect.patch,

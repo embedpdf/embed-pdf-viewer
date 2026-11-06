@@ -15,7 +15,7 @@ import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage'
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { withInteraction } from '@embedpdf/angular/interaction';
 import { EpdfForm, EpdfFormLayer, toFieldRef, withForm } from '@embedpdf/angular/form';
-import type { FormFieldDTO } from '@embedpdf/angular/form';
+import type { FormField } from '@embedpdf/angular/form';
 import { localEngine } from '@embedpdf/engine';
 
 const forms = async (): Promise<OpenInput> => {
@@ -24,7 +24,7 @@ const forms = async (): Promise<OpenInput> => {
 };
 
 /** A field's value as text, whatever its kind. */
-function valueText(field: FormFieldDTO): string {
+function valueText(field: FormField): string {
   switch (field.kind) {
     case 'text':
     case 'combobox':

@@ -11,7 +11,7 @@
 import { sameShortcut } from '@embedpdf/core-ui';
 import type {
   CommandContext as PluginCommandContext,
-  CommandDef as PluginCommandDef,
+  CommandDefinition as PluginCommandDef,
   IconAccent,
 } from '@embedpdf/react/commands';
 import type { CapabilityToken } from '@embedpdf/react/runtime';
@@ -39,10 +39,10 @@ export interface CommandContext<AppState = any> extends ScopedViewer {
 /**
  * A command, as the `commands` config takes it: the headless command, its functions getting
  * {@link CommandContext}. With a built-in command's id it changes that one, field by field. Its
- * functions are methods, so a command typed for your app's state (`CommandDef<Review>`) goes
+ * functions are methods, so a command typed for your app's state (`CommandDefinition<Review>`) goes
  * wherever a command does.
  */
-export interface CommandDef<AppState = any> extends Omit<
+export interface CommandDefinition<AppState = any> extends Omit<
   PluginCommandDef<AppState>,
   'icon' | 'iconAccent' | 'allowed' | 'enabled' | 'active' | 'visible' | 'run'
 > {
@@ -115,7 +115,7 @@ function viewerContextOf(context: PluginCommandContext, scope: CommandScope): Co
 }
 
 /** A command of yours as the commands plugin takes it: each function gets the viewer's words. */
-export function toPluginCommand(command: CommandDef, scope: CommandScope): PluginCommandDef {
+export function toPluginCommand(command: CommandDefinition, scope: CommandScope): PluginCommandDef {
   // One context per resolution: a command's functions are all asked with the same one.
   const contexts = new WeakMap<PluginCommandContext, CommandContext>();
   const contextOf = (context: PluginCommandContext): CommandContext => {
@@ -176,7 +176,7 @@ export const NO_VIEWER_COMMANDS: ViewerCommands = {
  */
 export function resolveViewerCommands(
   builtIns: readonly PluginCommandDef[],
-  given: readonly CommandDef[],
+  given: readonly CommandDefinition[],
   scope: CommandScope,
   options: { readonly isMac: boolean },
 ): ViewerCommands {

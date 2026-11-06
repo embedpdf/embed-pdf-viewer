@@ -82,7 +82,7 @@ import type {
   SignatureCancelResult,
   SignatureCompleteInput,
   SignatureCompleteResult,
-  SignatureDTO,
+  Signature,
   SignaturePrepareInput,
   SignaturePrepared,
   SignatureSnapshot,
@@ -1717,7 +1717,7 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
        * The installed signature as the sealed file reports it, in page space:
        * the finalizer measures it while its own session is open.
        */
-      signature: SignatureDTO;
+      signature: Signature;
       /** The sealed file's last object number: every object it has is at or below it. */
       lastObjectNumber: number;
       /** What the sealed file's signatures forbid from now on. */

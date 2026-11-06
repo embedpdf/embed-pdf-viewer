@@ -8,7 +8,7 @@
 import { AnnotationToken, useAnnotationState } from '@embedpdf/react/annotation';
 import {
   FormToken,
-  type FormFieldDTO,
+  type FormField,
   type FormFieldKind,
   type WidgetAnnotation,
 } from '@embedpdf/react/form';
@@ -33,7 +33,7 @@ const FAMILIES: Readonly<Partial<Record<FormFieldKind, { icon: string; labelKey:
   signature: { icon: 'signature', labelKey: 'commands.form.signature' },
 };
 
-const NO_FIELDS: readonly FormFieldDTO[] = [];
+const NO_FIELDS: readonly FormField[] = [];
 const NO_WIDGETS: readonly WidgetAnnotation[] = [];
 
 /** A widget's object number, the key its rows and its selection share. */
@@ -143,7 +143,7 @@ function FieldList() {
 }
 
 /** The selected field: its settings and, for a radio group or a checkbox, its buttons. */
-function SelectedField({ field }: { field: FormFieldDTO }) {
+function SelectedField({ field }: { field: FormField }) {
   const t = useT();
   const design = useFormDesign();
   const family = FAMILIES[field.kind];
@@ -171,7 +171,7 @@ function SelectedField({ field }: { field: FormFieldDTO }) {
 }
 
 /** A radio group's or a checkbox's buttons, each selectable, and a + for one more. */
-function Buttons({ field }: { field: FormFieldDTO & { kind: 'radio' | 'checkbox' } }) {
+function Buttons({ field }: { field: FormField & { kind: 'radio' | 'checkbox' } }) {
   const t = useT();
   const design = useFormDesign();
   const form = useOptionalCapability(FormToken);

@@ -122,7 +122,7 @@ export interface SignatureSeedValue {
   unsupportedRequired: boolean;
 }
 
-export interface SignatureDTO {
+export interface Signature {
   /** Position in `SignatureSnapshot.signatures` (field order). */
   index: number;
   /** Always an `objectNumber` ref: the durable identity. */
@@ -194,7 +194,7 @@ export interface SignatureSnapshot {
   chainValid: boolean;
   /** Oldest first. Empty when `chainValid` is false. */
   revisions: PdfRevision[];
-  signatures: SignatureDTO[];
+  signatures: Signature[];
   protection: DocumentProtection;
 }
 
@@ -275,7 +275,7 @@ export interface SignatureCompleteInput {
 export interface SignatureCompleteResult {
   /** `already-completed` on an idempotent replay with the same CMS. */
   status: 'completed' | 'already-completed';
-  signature: SignatureDTO;
+  signature: Signature;
   /** The version the sealed bytes became. */
   version: BaseVersionInfo;
   /** What it was built on. */

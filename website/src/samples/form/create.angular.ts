@@ -13,7 +13,7 @@ import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage'
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { withInteraction } from '@embedpdf/angular/interaction';
 import { EpdfForm, EpdfFormLayer, withForm } from '@embedpdf/angular/form';
-import type { FormFieldDTO } from '@embedpdf/angular/form';
+import type { FormField } from '@embedpdf/angular/form';
 import { localEngine } from '@embedpdf/engine';
 
 const registration = async (): Promise<OpenInput> => {
@@ -113,7 +113,7 @@ export class App {
   protected readonly addDropdown = addDropdown;
   protected readonly addRadioGroup = addRadioGroup;
   protected readonly page = computed(() => this.document.pages()[0]?.ref); // the printed form
-  private readonly added = signal<FormFieldDTO[]>([]);
+  private readonly added = signal<FormField[]>([]);
   protected readonly last = computed(() => this.added().at(-1));
   protected readonly names = computed(() =>
     this.added()
@@ -122,11 +122,11 @@ export class App {
   );
 
   /** Each kind of field fills its column from the top: the next row that hasn't got one. */
-  protected rowFor(kind: FormFieldDTO['kind']) {
+  protected rowFor(kind: FormField['kind']) {
     return this.added().filter((field) => field.kind === kind).length;
   }
 
-  protected async add(addField: typeof addDropdown, kind: FormFieldDTO['kind']) {
+  protected async add(addField: typeof addDropdown, kind: FormField['kind']) {
     const page = this.page();
     if (!page) return;
     const { field } = await addField(this.form, page, this.rowFor(kind));

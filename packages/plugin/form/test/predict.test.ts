@@ -2,7 +2,7 @@ import type { PredictedOp } from '@embedpdf/core';
 import {
   formWidget,
   toPageRef,
-  type FormFieldDTO,
+  type FormField,
   type FormSnapshot,
   type WidgetAnnotation,
 } from '@embedpdf/engine-core/runtime';
@@ -29,7 +29,7 @@ const base = {
   importedBy: null,
 } as const;
 
-const name: FormFieldDTO = {
+const name: FormField = {
   ...base,
   ref: { kind: 'objectNumber', objectNumber: 4 },
   name: 'name',
@@ -53,7 +53,7 @@ const toggle = (objectNumber: number, onState: string) => ({
 });
 
 /** One checkbox shown twice: both widgets check together. */
-const agree: FormFieldDTO = {
+const agree: FormField = {
   ...base,
   ref: { kind: 'objectNumber', objectNumber: 10 },
   name: 'agree',
@@ -65,7 +65,7 @@ const agree: FormFieldDTO = {
   widgets: [toggle(11, 'Yes'), toggle(12, 'Yes')],
 };
 
-const size: FormFieldDTO = {
+const size: FormField = {
   ...base,
   ref: { kind: 'objectNumber', objectNumber: 20 },
   name: 'size',
@@ -78,7 +78,7 @@ const size: FormFieldDTO = {
   widgets: [toggle(21, 'S'), toggle(22, 'L')],
 };
 
-const send: FormFieldDTO = {
+const send: FormField = {
   ...base,
   ref: { kind: 'objectNumber', objectNumber: 30 },
   name: 'send',
@@ -123,8 +123,7 @@ const form = (): FieldIndex =>
   } as unknown as FormSnapshot);
 
 const field = (index: FieldIndex, objectNumber: number) =>
-  fieldByRef(index, { kind: 'objectNumber', objectNumber }) as FormFieldDTO &
-    Record<string, unknown>;
+  fieldByRef(index, { kind: 'objectNumber', objectNumber }) as FormField & Record<string, unknown>;
 
 describe('predictFormOp', () => {
   test('a value shows on its field and draws its widgets', () => {

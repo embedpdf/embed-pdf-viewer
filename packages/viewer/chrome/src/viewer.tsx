@@ -57,7 +57,7 @@ import { shellPlugin } from '@embedpdf/react/shell';
 import type { LayoutOption, ViewerSize } from '@embedpdf/core-ui';
 import { ThumbsStageToken } from './config/stage';
 import { defaultCommands, toolCommandsFor } from './config/commands';
-import { resolveViewerCommands, type CommandDef } from './config/viewer-commands';
+import { resolveViewerCommands, type CommandDefinition } from './config/viewer-commands';
 import { localeCodeOf, localesOf } from './locales';
 import {
   ViewerConfigProvider,
@@ -107,7 +107,7 @@ export interface ViewerCustomization<AppState = any> {
    * field: what it leaves out stays. A shortcut of yours wins over a built-in one with the same
    * keys.
    */
-  commands?: readonly CommandDef<AppState>[];
+  commands?: readonly CommandDefinition<AppState>[];
   /**
    * Your app's state, which your commands' functions get as `appState`: values, and functions
    * that change them. Follows its prop: a new value, and every button asks its command again.

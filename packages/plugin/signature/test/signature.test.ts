@@ -25,9 +25,9 @@ import {
   type DocumentEvent,
   type DocumentHandle,
   type EventOrigin,
-  type FormFieldDTO,
+  type FormField,
   type FormFieldRef,
-  type SignatureDTO,
+  type Signature,
   type SignaturePrepared,
 } from '@embedpdf/engine-core/runtime';
 import { createLocalEngine } from '@embedpdf/engine';
@@ -96,7 +96,7 @@ afterAll(async () => {
 
 const SIG: FormFieldRef = { kind: 'fqn', name: 'sig' };
 
-function signatureField(overrides: Partial<FormFieldDTO> = {}): FormFieldDTO {
+function signatureField(overrides: Partial<FormField> = {}): FormField {
   return {
     ref: { kind: 'objectNumber', objectNumber: 9 },
     name: 'sig',
@@ -117,7 +117,7 @@ function signatureField(overrides: Partial<FormFieldDTO> = {}): FormFieldDTO {
     defaultValueEntry: { kind: 'none' },
     widgets: [{ objectNumber: 9, page: toPageRef(3) }],
     ...overrides,
-  } as FormFieldDTO;
+  } as FormField;
 }
 
 /** Contexts a case opened; disposed after it, so no re-judgement timer outlives its case. */
@@ -538,7 +538,7 @@ describe('facts from every session', () => {
     const unsigned = await doc.signatures.list();
     await doc.close();
     const field = unsigned.signatures[0]!;
-    const sealed: SignatureDTO = {
+    const sealed: Signature = {
       ...field,
       signed: true,
       coverage: 'whole-revision',
@@ -650,7 +650,7 @@ describe('the armed mark over a field', () => {
     const stamp = stampStub(artwork);
     const hits: Record<string, ReturnType<typeof signatureField> | null> = {
       sig: signatureField(),
-      text: signatureField({ kind: 'text', name: 'name' } as Partial<FormFieldDTO>),
+      text: signatureField({ kind: 'text', name: 'name' } as Partial<FormField>),
       signed: signatureField({ valueEntry: { kind: 'unsupported' } }),
     };
     let where: keyof typeof hits | 'nothing' = 'sig';

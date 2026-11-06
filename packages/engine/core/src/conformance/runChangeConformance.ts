@@ -428,15 +428,15 @@ const ROUND_TRIPS: { readonly [T in ChangeOp['type']]: RoundTrip } = {
  */
 export function runChangeConformance(
   runner: ConformanceTestRunner,
-  opts: ChangeConformanceOptions,
+  options: ChangeConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`change conformance: ${opts.label}`, () => {
+  describe(`change conformance: ${options.label}`, () => {
     let engine: Engine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -444,7 +444,7 @@ export function runChangeConformance(
     });
 
     const withDocument = async (body: (doc: DocumentHandle) => Promise<void>) => {
-      const doc = await opts.open(engine);
+      const doc = await options.open(engine);
       try {
         await body(doc);
       } finally {
@@ -1237,12 +1237,12 @@ export function runChangeConformance(
     });
 
     test('only the user who made a change may undo it', async () => {
-      if (!opts.openAsAnotherUser) return;
+      if (!options.openAsAnotherUser) return;
       await withDocument(async (doc) => {
         const mine = await doc.apply({
           ops: [{ type: 'annotations.update', ref: FILE_SQUARE, patch: { color: '#e11d48' } }],
         });
-        const other = await opts.openAsAnotherUser!(engine, doc);
+        const other = await options.openAsAnotherUser!(engine, doc);
         try {
           await expect(other.apply({ undoOf: mine.meta.opId })).rejects.toMatchObject({
             code: EngineErrorCode.Forbidden,

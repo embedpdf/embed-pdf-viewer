@@ -73,14 +73,14 @@ export function resolveLinkTarget(
 
 export interface LinkActivateContext {
   /** The link's `/A` tree when it has one; the actions plugin runs it instead of the target. */
-  activate?: PdfActionTree;
-  ref?: AnnotationRef;
-  page?: PageRef;
+  readonly activate?: PdfActionTree;
+  readonly ref?: AnnotationRef;
+  readonly page?: PageRef;
   /**
    * The view the link was followed in: a page destination moves this Stage.
    * Defaults to the main view.
    */
-  stage?: StageCapability;
+  readonly stage?: StageCapability;
 }
 
 /** A link target was activated through this capability. */

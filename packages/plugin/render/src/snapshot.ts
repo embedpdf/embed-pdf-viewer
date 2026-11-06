@@ -14,7 +14,7 @@ import {
   type PageRef,
   type PluginContext,
 } from '@embedpdf/core';
-import { rectFromCorners, type PageRotation, type Point, type Rect } from '@embedpdf/core-geometry';
+import { rectFromCorners, type Rotation, type Point, type Rect } from '@embedpdf/core-geometry';
 import {
   InteractionToken,
   samplePointOn,
@@ -135,7 +135,7 @@ export function createSnapshots(
 
   // ── the gesture, in page space on the page the press was on ──
 
-  function begin(page: PageRef, point: Point, scale: number, rotation: PageRotation): boolean {
+  function begin(page: PageRef, point: Point, scale: number, rotation: Rotation): boolean {
     if (!canSnapshot() || !ctx.getPage(page)) return false;
     clearSnapshot();
     ctx.state.update(setSnapshotBox, {

@@ -8,7 +8,7 @@ import { createQuickJsSandbox } from '@embedpdf/core-js-sandbox';
 import { createLocalEngine } from '@embedpdf/engine';
 import type {
   DocumentHandle,
-  FormFieldDTO,
+  FormField,
   FormSnapshot,
   PdfActionTree,
 } from '@embedpdf/engine-core/runtime';
@@ -31,7 +31,7 @@ const fixturePath = resolve(
 
 async function activationFor(
   doc: DocumentHandle,
-  field: FormFieldDTO,
+  field: FormField,
 ): Promise<PdfActionTree<unknown>> {
   const widget = field.widgets[0];
   if (!widget || widget.objectNumber <= 0 || !widget.page) {
@@ -126,7 +126,11 @@ describe('interactive form JavaScript acceptance', () => {
       );
 
       expect(summaryResult.status).toBe('applied');
-      expect(summaryResult.uiEffects).toContainEqual({ type: 'gotoPage', page: 1, phase: 'user' });
+      expect(summaryResult.uiEffects).toContainEqual({
+        type: 'goToPage',
+        pageIndex: 1,
+        phase: 'user',
+      });
       const afterSummary = await doc.forms.list();
       const summary = afterSummary.fields.find(({ name }) => name === 'summary');
       expect(summary?.valueEntry).toMatchObject({ kind: 'scalar' });

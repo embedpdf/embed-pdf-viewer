@@ -33,7 +33,7 @@ export interface RedactionApplyConformanceOptions extends ConformanceOptions {
  */
 export function runRedactionApplyConformance(
   runner: ConformanceTestRunner,
-  opts: RedactionApplyConformanceOptions,
+  options: RedactionApplyConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
@@ -50,11 +50,11 @@ export function runRedactionApplyConformance(
     },
   ];
 
-  describe(`redaction apply conformance: ${opts.label}`, () => {
+  describe(`redaction apply conformance: ${options.label}`, () => {
     let engine: Engine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -62,7 +62,7 @@ export function runRedactionApplyConformance(
     });
 
     test('annotations scope applies the marked redaction and counts collateral', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         if (!doc.redaction) return;
         const layoutBefore = await doc.pages.list();
@@ -121,7 +121,7 @@ export function runRedactionApplyConformance(
     });
 
     test('annotations scope applies several marks of a page together and leaves its others', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         if (!doc.redaction) return;
         const pageObjectNumber = (await doc.pages.list()).pages[0].ref.objectNumber;
@@ -163,7 +163,7 @@ export function runRedactionApplyConformance(
     });
 
     test('a label fitted to its region (fontSize 0) is burned in', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         if (!doc.redaction) return;
         const layout = await doc.pages.list();
@@ -189,7 +189,7 @@ export function runRedactionApplyConformance(
     });
 
     test('pages scope applies everything once and validates its input', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         if (!doc.redaction) return;
         const layout = await doc.pages.list();
@@ -240,7 +240,7 @@ export function runRedactionApplyConformance(
     });
 
     test('applies on a page without /Contents or /Resources', async () => {
-      const doc = await opts.openBarePage(engine);
+      const doc = await options.openBarePage(engine);
       try {
         if (!doc.redaction) return;
         const layout = await doc.pages.list();

@@ -1,5 +1,5 @@
 import type { ConformanceFixture, ConformanceTestRunner } from './runMetadataConformance';
-import type { FormFieldDTO } from '../forms/field';
+import type { FormField } from '../forms/field';
 import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import { isLocalDocument, type LocalDocumentHandle } from '../engine/LocalDocumentHandle';
@@ -64,21 +64,21 @@ export interface SignatureConformanceOptions {
  */
 export function runSignatureConformance(
   runner: ConformanceTestRunner,
-  opts: SignatureConformanceOptions,
+  options: SignatureConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`signatures conformance: ${opts.label}`, () => {
+  describe(`signatures conformance: ${options.label}`, () => {
     let engine: Engine;
     let permitEngine: Engine | null = null;
     let supported = false;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
-      const probe = await open(engine, opts, opts.fixtures.unsignedForm);
+      engine = await options.makeEngine();
+      const probe = await open(engine, options, options.fixtures.unsignedForm);
       supported = probe.signatures !== undefined;
       await probe.close();
-      if (supported && opts.makePermitEngine) permitEngine = await opts.makePermitEngine();
+      if (supported && options.makePermitEngine) permitEngine = await options.makePermitEngine();
     });
 
     afterAll(async () => {
@@ -88,8 +88,8 @@ export function runSignatureConformance(
 
     test('an unsigned form has no signatures and no protection; version() hashes the loaded bytes', async () => {
       if (!supported) return;
-      const bytes = await opts.fixtures.unsignedForm.bytes();
-      const doc = await open(engine, opts, opts.fixtures.unsignedForm);
+      const bytes = await options.fixtures.unsignedForm.bytes();
+      const doc = await open(engine, options, options.fixtures.unsignedForm);
       try {
         const snapshot = await doc.signatures.list();
         expect(snapshot.chainValid).toBe(true);
@@ -119,9 +119,9 @@ export function runSignatureConformance(
 
     test('two approval signatures: revisions, coverage, digests, contents, revision bytes', async () => {
       if (!supported) return;
-      const fixture = opts.fixtures.twoApprovals;
+      const fixture = options.fixtures.twoApprovals;
       const bytes = await fixture.bytes();
-      const doc = await open(engine, opts, fixture);
+      const doc = await open(engine, options, fixture);
       try {
         const snapshot = await doc.signatures.list();
         expect(snapshot.chainValid).toBe(true);
@@ -198,8 +198,8 @@ export function runSignatureConformance(
 
     test('a certification takes structural capabilities away; permit lifts it', async () => {
       if (!supported) return;
-      const fixture = opts.fixtures.certified;
-      const doc = await open(engine, opts, fixture);
+      const fixture = options.fixtures.certified;
+      const doc = await open(engine, options, fixture);
       try {
         const snapshot = await doc.signatures.list();
         const signed = snapshot.signatures.filter((s) => s.signed);
@@ -246,7 +246,7 @@ export function runSignatureConformance(
       }
 
       if (!permitEngine) return;
-      const permitted = await open(permitEngine, opts, fixture);
+      const permitted = await open(permitEngine, options, fixture);
       try {
         // Analysis is policy-independent; enforcement is not.
         const snapshot = await permitted.signatures.list();
@@ -262,8 +262,8 @@ export function runSignatureConformance(
 
     test('a FieldMDP freezes the fields it names; permit lifts it', async () => {
       if (!supported) return;
-      const fixture = opts.fixtures.fieldMdp;
-      const doc = await open(engine, opts, fixture);
+      const fixture = options.fixtures.fieldMdp;
+      const doc = await open(engine, options, fixture);
       const lockedRef = { kind: 'fqn', name: fixture.lockedField } as const;
       try {
         const snapshot = await doc.signatures.list();
@@ -313,7 +313,7 @@ export function runSignatureConformance(
                 ...row!.data,
                 valueEntry: { kind: 'scalar', value: 'changed' },
                 value: 'changed',
-              } as FormFieldDTO,
+              } as FormField,
             },
           ],
         };
@@ -328,7 +328,7 @@ export function runSignatureConformance(
       }
 
       if (!permitEngine) return;
-      const permitted = await open(permitEngine, opts, fixture);
+      const permitted = await open(permitEngine, options, fixture);
       try {
         const result = await permitted.forms.setValue(lockedRef, {
           value: 'changed',
@@ -341,7 +341,7 @@ export function runSignatureConformance(
 
     test('well-formed ranges that seal no revision are partial, with no revision index', async () => {
       if (!supported) return;
-      const doc = await open(engine, opts, opts.fixtures.partialChain);
+      const doc = await open(engine, options, options.fixtures.partialChain);
       try {
         const snapshot = await doc.signatures.list();
         expect(snapshot.chainValid).toBe(true);
@@ -371,16 +371,16 @@ export function runSignatureConformance(
       }
     });
 
-    if (opts.openKind !== 'id') {
+    if (options.openKind !== 'id') {
       runSigningTests(
         runner,
-        opts,
+        options,
         () => engine,
         () => supported,
       );
       runAnalysisTests(
         runner,
-        opts,
+        options,
         () => engine,
         () => permitEngine,
         () => supported,

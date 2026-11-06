@@ -4,7 +4,7 @@
  * row's menu. Changing the outline needs `doc.outline.modify` (`outline.canEdit()`) and the
  * `outline.editing` feature; expanding and collapsing changes only the view.
  */
-import type { CommandDef } from '@embedpdf/react/commands';
+import type { CommandDefinition } from '@embedpdf/react/commands';
 import {
   OutlineToken,
   type OutlineCapability,
@@ -13,7 +13,7 @@ import {
 } from '@embedpdf/react/outline';
 import { ShellToken } from '@embedpdf/react/shell';
 
-type Ctx = Parameters<NonNullable<CommandDef['run']>>[0];
+type Ctx = Parameters<NonNullable<CommandDefinition['run']>>[0];
 
 /** The outline panel's id in the layout. */
 export const OUTLINE_PANEL = 'outline';
@@ -44,7 +44,7 @@ const EDITS = {
   categories: ['outline.editing'],
   allowed: (commandContext: Ctx) => outlineOf(commandContext)?.canEdit() ?? true,
   notAllowedKey: 'commands.notAllowed.doc-outline-modify',
-} satisfies Partial<CommandDef>;
+} satisfies Partial<CommandDefinition>;
 
 /**
  * Add an item and rename it in its row, as Acrobat's New Bookmark does: it goes to where the
@@ -68,7 +68,7 @@ async function addItem(
   }
 }
 
-export const outlineCommands: CommandDef[] = [
+export const outlineCommands: CommandDefinition[] = [
   {
     id: 'outline:add',
     labelKey: 'commands.outline.add',

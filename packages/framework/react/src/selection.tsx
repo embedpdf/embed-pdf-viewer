@@ -28,7 +28,7 @@ import {
   SelectionToken,
   armSelectionHandle,
   selectionHandleEndpointsOf,
-  selectionHandleGeom,
+  selectionHandleGeometry,
   selectionHandleViewOf,
   selectionState,
   type SelectionHandleEndpoints,
@@ -291,7 +291,7 @@ export function SelectionHandles({ token: explicitToken }: SelectionHandlesProps
   const shadow = paint('text-selection-handle-shadow', handles.shadow);
 
   const renderHandle = (role: 'start' | 'end') => {
-    const geometry = selectionHandleGeom(view, endpoints[role], role);
+    const geometry = selectionHandleGeometry(view, endpoints[role], role);
     if (!geometry) return null; // endpoint page not laid out right now
     // The shell is laid out upright in its own frame — bar of the edge's
     // length, head stacked above (start) or below (end) — then rotated onto

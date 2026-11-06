@@ -216,7 +216,7 @@ export type ToolDefaultsFor<K extends ToolAuthoringKind> = ToolDraftOf<K> &
  * optional: the common cases are "configure a built-in" (`{ id, defaults }`) and
  * "add a preset" (`{ id, extends, defaults }`).
  */
-export interface AnnotationToolDef<K extends ToolAuthoringKind = ToolAuthoringKind> {
+export interface AnnotationToolDefinition<K extends ToolAuthoringKind = ToolAuthoringKind> {
   /** Stable tool id — the value passed to `activateTool` and the `defaults` key. */
   id: string;
   /** Inherit `subtype` / `fieldsKind` / `cursor` / `enables` / `source` /
@@ -335,14 +335,14 @@ export interface BuiltinToolKindMap {
 }
 
 type DirectToolDef = {
-  [K in ToolAuthoringKind]: Omit<AnnotationToolDef<K>, 'subtype'> & { subtype: K };
+  [K in ToolAuthoringKind]: Omit<AnnotationToolDefinition<K>, 'subtype'> & { subtype: K };
 }[ToolAuthoringKind];
 // A key a shape doesn't take is `?: undefined`, not `?: never`: without `strictNullChecks` (plain
 // JavaScript, a non-strict app) a missing `never` key can't tell the shapes apart, so the union is
 // read as one, `id: 'highlight'` widens to `string` and no shape takes it.
 type BuiltinToolOverride = {
   [I in keyof BuiltinToolKindMap]: Omit<
-    AnnotationToolDef<BuiltinToolKindMap[I]>,
+    AnnotationToolDefinition<BuiltinToolKindMap[I]>,
     'id' | 'extends' | 'subtype'
   > & {
     id: I;
@@ -352,7 +352,7 @@ type BuiltinToolOverride = {
 }[keyof BuiltinToolKindMap];
 type ExtendedBuiltinToolDef = {
   [I in keyof BuiltinToolKindMap]: Omit<
-    AnnotationToolDef<BuiltinToolKindMap[I]>,
+    AnnotationToolDefinition<BuiltinToolKindMap[I]>,
     'extends' | 'subtype'
   > & {
     extends: I;
@@ -375,19 +375,19 @@ export interface ResolvedTool {
   cursor: string;
   enables: ReadonlySet<string>;
   defaults?: FieldValues;
-  /** `/F` seed for created annotations (see {@link AnnotationToolDef.flags}). */
+  /** `/F` seed for created annotations (see {@link AnnotationToolDefinition.flags}). */
   flags?: Partial<AnnotationFlags>;
   source?: StampSourceSpec;
   selection?: SelectionAuthoring;
   ink?: InkAuthoringOptions;
   /** Counter-rotate creations against the page's display rotation (see
-   *  {@link AnnotationToolDef.upright}). */
+   *  {@link AnnotationToolDefinition.upright}). */
   upright: boolean;
   /** What a bare click creates, or `false` for drag-only. */
   clickCreate: ClickCreate | false;
   /** The tool's ghost ({@link GhostPolicy}): how opaque it paints, or `false` for none. */
   ghost: ResolvedGhost;
-  /** Its own `afterCreate` (see {@link AnnotationToolDef.afterCreate}), over the setting. */
+  /** Its own `afterCreate` (see {@link AnnotationToolDefinition.afterCreate}), over the setting. */
   afterCreate?: Partial<AfterCreateSettings>;
   /** A line gesture is captured, not created ({@link CAPTURE_TOOLS}). */
   capture: boolean;
@@ -685,13 +685,16 @@ function mergeDefaults(left?: FieldValues, right?: FieldValues): FieldValues | u
 }
 
 /** Overlay a same-id override onto a base definition (configure a built-in). */
-function mergeDef(base: AnnotationToolDef, over: AnnotationToolDef): AnnotationToolDef {
+function mergeDef(
+  base: AnnotationToolDefinition,
+  over: AnnotationToolDefinition,
+): AnnotationToolDefinition {
   return {
     ...base,
     ...over,
     enables: over.enables ?? base.enables,
     meta: base.meta || over.meta ? { ...base.meta, ...over.meta } : undefined,
-    defaults: mergeDefaults(base.defaults, over.defaults) as AnnotationToolDef['defaults'],
+    defaults: mergeDefaults(base.defaults, over.defaults) as AnnotationToolDefinition['defaults'],
     flags: base.flags || over.flags ? { ...base.flags, ...over.flags } : undefined,
     ink: base.ink || over.ink ? { ...base.ink, ...over.ink } : undefined,
     afterCreate:
@@ -724,7 +727,7 @@ function validateDefaults(tool: ResolvedTool): void {
 export function buildToolRegistry(
   overrides: AnnotationToolInput[] = [],
 ): Map<string, ResolvedTool> {
-  const defs = new Map<string, AnnotationToolDef>();
+  const defs = new Map<string, AnnotationToolDefinition>();
   for (const definition of DEFAULT_TOOLS) defs.set(definition.id, definition);
   for (const override of overrides) {
     const previous = defs.get(override.id);

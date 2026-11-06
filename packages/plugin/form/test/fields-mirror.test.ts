@@ -6,7 +6,7 @@ import {
   type Engine,
   type PageLayout,
 } from '@embedpdf/core';
-import type { FormFieldDTO, FormSnapshot, WidgetAnnotation } from '@embedpdf/engine-core/runtime';
+import type { FormField, FormSnapshot, WidgetAnnotation } from '@embedpdf/engine-core/runtime';
 import { interactionPlugin } from '@embedpdf/plugin-interaction';
 
 import { formPlugin } from '../src/form.plugin';
@@ -36,7 +36,7 @@ const page: PageLayout = {
   pdfCropBox: { left: 0, bottom: 0, right: 600, top: 800 },
 } as PageLayout;
 
-const textField = (value: string): FormFieldDTO =>
+const textField = (value: string): FormField =>
   ({
     ref: { kind: 'objectNumber', objectNumber: 5 },
     name: 'name',
@@ -61,7 +61,7 @@ const textField = (value: string): FormFieldDTO =>
     multiline: false,
     password: false,
     comb: false,
-  }) as unknown as FormFieldDTO;
+  }) as unknown as FormField;
 
 const NOTHING_CHANGED = {
   affectedPages: [],

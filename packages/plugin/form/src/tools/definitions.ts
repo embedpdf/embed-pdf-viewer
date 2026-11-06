@@ -19,7 +19,7 @@ import type { ClickCreate } from '@embedpdf/plugin-annotation/contract';
 /** The kinds the palette places. */
 export type AuthorableFormKind = Exclude<FormFieldKind, 'unknown'>;
 
-export interface FormToolDef {
+export interface FormToolDefinition {
   id: string;
   /** The field kind the tool places (the form plane's vocabulary). */
   fieldKind: AuthorableFormKind;
@@ -50,7 +50,7 @@ const FIELD_CHROME: WidgetAppearance = {
   strokeWidth: 1,
 };
 
-export const FORM_TOOLS: readonly FormToolDef[] = [
+export const FORM_TOOLS: readonly FormToolDefinition[] = [
   {
     id: 'form-text',
     fieldKind: 'text',
@@ -114,6 +114,6 @@ export const FORM_TOOLS: readonly FormToolDef[] = [
   },
 ];
 
-export const FORM_TOOL_BY_ID: ReadonlyMap<string, FormToolDef> = new Map(
+export const FORM_TOOL_BY_ID: ReadonlyMap<string, FormToolDefinition> = new Map(
   FORM_TOOLS.map((tool) => [tool.id, tool]),
 );

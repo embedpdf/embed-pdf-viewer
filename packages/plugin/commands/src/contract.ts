@@ -56,9 +56,9 @@ export interface IconAccent {
 
 /**
  * One command, as you define it. Its functions get your app's state as `AppState`; they're
- * methods, so a command typed for your state (`CommandDef<Review>`) goes wherever a command does.
+ * methods, so a command typed for your state (`CommandDefinition<Review>`) goes wherever a command does.
  */
-export interface CommandDef<AppState = any> {
+export interface CommandDefinition<AppState = any> {
   /** A unique name, by convention `area:action`: `'zoom:in'`, `'review:approve'`. */
   readonly id: string;
   /** What the user sees. With `labelKey` too, it's what shows when no language has the key. */
@@ -154,7 +154,7 @@ export interface CommandFamily {
   /** The names the command's document has, in order. Return the same array while nothing changed. */
   readonly names: (context: CommandContext) => readonly string[];
   /** The command for one name. A family's commands have no shortcuts. */
-  readonly command: (name: string) => Omit<CommandDef, 'id' | 'shortcut'>;
+  readonly command: (name: string) => Omit<CommandDefinition, 'id' | 'shortcut'>;
 }
 
 /** A command as a button shows it: everything read for its document. */
@@ -264,7 +264,7 @@ export function boundCommandOf(
  */
 export interface CommandsSettings {
   /** The commands your viewer has. A later definition with an id that's taken replaces the earlier one. */
-  readonly commands: readonly (CommandDef | CommandFamily)[];
+  readonly commands: readonly (CommandDefinition | CommandFamily)[];
   /**
    * Your app's state, which every command's functions get as `appState`: values, and functions
    * that change them. A new value replaces the old one whole, and every command is asked again.
@@ -301,7 +301,7 @@ export type CommandsConfig<AppState = any> = Omit<
   DeepPartial<CommandsSettings>,
   'commands' | 'appState'
 > & {
-  readonly commands?: readonly (CommandDef<AppState> | CommandFamily)[];
+  readonly commands?: readonly (CommandDefinition<AppState> | CommandFamily)[];
   readonly appState?: AppState;
 };
 
@@ -345,16 +345,16 @@ export interface CommandsCapability extends SettingsApi<CommandsSettings> {
    * Add a command while the app runs, and get a function that removes it. A taken id throws
    * `conflict` unless `replace`.
    */
-  registerCommand(definition: CommandDef, options?: RegisterCommandOptions): Unsubscribe;
+  registerCommand(definition: CommandDefinition, options?: RegisterCommandOptions): Unsubscribe;
   /** `registerCommand` for several definitions; the function removes all of them. */
   registerCommands(
-    definitions: readonly CommandDef[],
+    definitions: readonly CommandDefinition[],
     options?: RegisterCommandOptions,
   ): Unsubscribe;
   /** Whether a command has this id; with a family, every id that starts with its prefix does. */
   hasCommand(id: CommandId): boolean;
   /** A command as you defined it, or `null`. */
-  getCommand(id: CommandId): CommandDef | null;
+  getCommand(id: CommandId): CommandDefinition | null;
   /** Every command's id for the active document, in the order they were added. The same array until one changes. */
   listCommandIds(): readonly CommandId[];
 

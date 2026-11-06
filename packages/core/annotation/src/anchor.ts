@@ -14,7 +14,7 @@
  * Edit restrictions come from kind caps (a note kind declares
  * `resizable: false`) and `locked`, never from here.
  *
- * Everything derives from one projection, {@link anchoredGeom}: the effective
+ * Everything derives from one projection, {@link anchoredGeometry}: the effective
  * page-space geometry of the body at the current view — a similarity
  * (uniform scale `1/s` + rotation `-r`) about the anchor. Rendering,
  * hit-testing, chrome, marquee, and clamping all read it, so what you see,
@@ -25,7 +25,7 @@
  * the projected geometry — for un-flagged annotations the projection is the
  * identity, so this is the ordinary pipeline. A pointer-driven commit maps
  * the final view-space geometry back to stored space through
- * {@link unanchoredGeom}, the exact closed-form inverse — chosen so that the
+ * {@link unanchoredGeometry}, the exact closed-form inverse — chosen so that the
  * committed geometry's own re-projection reproduces the released preview
  * (zero release-jump, any zoom, any rotation).
  *
@@ -121,7 +121,7 @@ export function anchoredScale(mode: AnchorMode | null, view: ViewEnv | undefined
  * Returns `geometry` unchanged when there is nothing to do — callers apply it
  * unconditionally.
  */
-export function anchoredGeom(
+export function anchoredGeometry(
   geometry: Shape,
   mode: AnchorMode | null,
   view: ViewEnv | undefined,
@@ -136,17 +136,17 @@ export function anchoredGeom(
 }
 
 /**
- * The exact inverse of {@link anchoredGeom} for a view-space geometry a
+ * The exact inverse of {@link anchoredGeometry} for a view-space geometry a
  * gesture produced: the stored geometry whose own projection is `target`.
  *
- * Solving `anchoredGeom(stored) = target` where the projection anchors at
+ * Solving `anchoredGeometry(stored) = target` where the projection anchors at
  * `stored`'s (unknown) bounds top-left `a` gives a closed form: map `target`
  * through the pure linear part (scale `s` + rotate `r` about the origin),
  * then translate so the result's bounds top-left `b` lands where the
  * projection needs it — at `a = R(-r)·b / s`, the unique fixed point. This is
  * what makes a released gesture commit exactly what its preview showed.
  */
-export function unanchoredGeom(
+export function unanchoredGeometry(
   target: Shape,
   mode: AnchorMode | null,
   view: ViewEnv | undefined,

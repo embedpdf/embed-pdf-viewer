@@ -1,6 +1,6 @@
 import type { PluginClock } from '@embedpdf/core';
 import type { KindName, Point } from '@embedpdf/core-annotation';
-import type { PageRotation } from '@embedpdf/core-geometry';
+import type { Rotation } from '@embedpdf/core-geometry';
 import type { PageRef } from '@embedpdf/engine-core/runtime';
 import type {
   InteractionHostCapability,
@@ -293,7 +293,7 @@ export function createMarqueeHandler(anno: AnnotationHostCapability): Interactio
 
   // The marquee page's view env at the down sample — the `up` intersects
   // screen-anchored annotations at their effective footprint with it.
-  let view: { scale?: number; rotation?: PageRotation; zoom?: number } = {};
+  let view: { scale?: number; rotation?: Rotation; zoom?: number } = {};
   return {
     id: 'annotation-marquee',
     priority: ANNOTATION_MARQUEE_PRIORITY,

@@ -62,7 +62,7 @@ const sameContext = (left: ToolbarItemContext, right: ToolbarItemContext): boole
   left.variant === right.variant &&
   left.size === right.size;
 
-const ToolbarItemCtx = createContext<ToolbarItemContext | null>(null);
+const ToolbarItemReactContext = createContext<ToolbarItemContext | null>(null);
 
 export interface ToolbarItemProps {
   /** The item's id: `{ custom: id }` in the layout. */
@@ -98,7 +98,7 @@ export function ToolbarItem({ id, children }: ToolbarItemProps) {
   const [store] = useState(() => contextStoreOf(element));
   const context = useSyncExternalStore(store.subscribe, store.read, atTheTop);
   return createElement(
-    ToolbarItemCtx.Provider,
+    ToolbarItemReactContext.Provider,
     { value: context },
     createElement('div', { ref: element, slot: `item:${id}`, style: CONTENTS }, children),
   );
@@ -110,7 +110,7 @@ export function ToolbarItem({ id, children }: ToolbarItemProps) {
  * viewer's size (`size`). Works inside a `ToolbarItem`.
  */
 export function useToolbarItem(): ToolbarItemContext {
-  const context = useContext(ToolbarItemCtx);
+  const context = useContext(ToolbarItemReactContext);
   if (!context) {
     throw new Error(
       '[embedpdf] useToolbarItem() works inside a <ToolbarItem>: it says where that item sits.',

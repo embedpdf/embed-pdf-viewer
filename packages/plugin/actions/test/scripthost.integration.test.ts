@@ -10,7 +10,7 @@ import { toPageRef, type PdfActionNode, type PdfActionTree } from '@embedpdf/eng
 
 import { actionsPlugin } from '../src/actions.plugin';
 import { ActionsToken } from '../src/host-contract';
-import type { ActionsHostCapability, AnnotCommitEntry } from '../src/host-contract';
+import type { ActionsHostCapability, AnnotationCommitEntry } from '../src/host-contract';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixturePath = resolve(
@@ -59,7 +59,7 @@ async function boot(identity?: { name: string; corporation?: string }) {
   const bytes = new Uint8Array(await readFile(fixturePath));
   await kernel.documents.open({ kind: 'bytes', id: 'scripthost', bytes });
   const actions = kernel.capability(ActionsToken) as ActionsHostCapability;
-  const committed: AnnotCommitEntry[] = [];
+  const committed: AnnotationCommitEntry[] = [];
   actions.registerAnnotCommitSink(async (entries) => {
     committed.push(...entries);
     return {

@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 import {
   formWidget,
   toPageRef,
-  type FormFieldDTO,
+  type FormField,
   type FormSnapshot,
   type WidgetAnnotation,
 } from '@embedpdf/engine-core/runtime';
@@ -32,7 +32,7 @@ import {
 } from '../src/model';
 import { fillItems, projectWidget } from '../src/read/fill-items';
 
-const text = (over: Partial<Extract<FormFieldDTO, { kind: 'text' }>> = {}): FormFieldDTO => ({
+const text = (over: Partial<Extract<FormField, { kind: 'text' }>> = {}): FormField => ({
   ref: { kind: 'objectNumber', objectNumber: 4 },
   name: 'maxlen_text',
   kind: 'text',
@@ -61,7 +61,7 @@ const text = (over: Partial<Extract<FormFieldDTO, { kind: 'text' }>> = {}): Form
   ...over,
 });
 
-const snapshot = (fields: FormFieldDTO[]): FormSnapshot =>
+const snapshot = (fields: FormField[]): FormSnapshot =>
   ({
     formKind: 'acroform',
     needsAppearances: false,
@@ -308,9 +308,7 @@ describe('fill projection', () => {
   });
 });
 
-const signature = (
-  over: Partial<Extract<FormFieldDTO, { kind: 'signature' }>> = {},
-): FormFieldDTO => ({
+const signature = (over: Partial<Extract<FormField, { kind: 'signature' }>> = {}): FormField => ({
   ref: { kind: 'objectNumber', objectNumber: 9 },
   name: 'sig',
   kind: 'signature',

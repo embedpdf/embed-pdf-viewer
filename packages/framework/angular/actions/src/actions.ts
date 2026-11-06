@@ -69,7 +69,7 @@ export function withActions(config?: ActionsConfig): EmbedPdfFeature {
   return { plugins: [actionsPlugin(config)], services: [EpdfActions] };
 }
 
-/** Your own handlers for any of the adapter's effects: `openUri`, `print`, `alert`, `gotoPage`. */
+/** Your own handlers for any of the adapter's effects: `openUri`, `print`, `alert`, `goToPage`. */
 export type ActionsUiHandlers = Partial<ActionUiAdapter>;
 
 /**
@@ -126,7 +126,7 @@ function installActionsUi(handlers?: ActionsUiHandlers | (() => ActionsUiHandler
       if (!current) return;
       const adapter: ActionUiAdapter = createDefaultActionsUiAdapter({
         overrides: () => overrides,
-        goToPage: (page) => view?.goToPage(page),
+        goToPage: (pageIndex) => view?.goToPage(pageIndex),
       });
       installed = { actions: current, stage: view, remove: current.setUiAdapter(adapter) };
     });

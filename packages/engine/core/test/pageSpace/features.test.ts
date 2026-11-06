@@ -5,7 +5,7 @@ import { pdfRectOf } from '../../src/geometry/pageSpace';
 import type { PdfRect } from '../../src/geometry/primitives';
 import { toPageRef } from '../../src/identity/PageRef';
 import type { PdfCoordinates } from '../../src/pageSpace/coordinates';
-import type { FormFieldDTO } from '../../src/forms/field';
+import type { FormField } from '../../src/forms/field';
 import type { WidgetAnnotation } from '../../src/annotation/kinds/widget';
 import { pageFormFieldOf, pageWidgetOf, pdfWidgetPlacementOf } from '../../src/pageSpace/forms';
 import { pageViewportsOf, pdfMeasureOf } from '../../src/pageSpace/measure';
@@ -134,7 +134,7 @@ describe('render, form and measure values', () => {
           },
         },
       },
-    } as unknown as FormFieldDTO<PdfCoordinates>;
+    } as unknown as FormField<PdfCoordinates>;
     expect(pageFormFieldOf(field, boxOf)).toEqual({
       ...field,
       actions: {
@@ -153,7 +153,7 @@ describe('render, form and measure values', () => {
       kind: 'pushbutton',
       name: 'plain',
       widgets: [],
-    } as unknown as FormFieldDTO<PdfCoordinates>;
+    } as unknown as FormField<PdfCoordinates>;
     expect(pageFormFieldOf(plain, boxOf)).toEqual(plain);
   });
 

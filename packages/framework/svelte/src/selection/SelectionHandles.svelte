@@ -25,9 +25,9 @@
     HANDLE_PAD,
     armSelectionHandle,
     selectionHandleEndpointsOf,
-    selectionHandleGeom,
+    selectionHandleGeometry,
     selectionHandleViewOf,
-    type SelectionHandleGeom,
+    type SelectionHandleGeometry,
   } from '@embedpdf/plugin-selection';
   import { SelectionToken } from '@embedpdf/plugin-selection/contract/host';
   import { attachSelectionHandle, paint, sameSelectionEndpoints } from '@embedpdf/web';
@@ -77,15 +77,15 @@
   // move on, so handle and highlight move in one frame.
   const camera = useKernelValue(() => stage.current?.listVisiblePages() ?? null);
 
-  const geometry = $derived.by((): Record<Role, SelectionHandleGeom | null> | null => {
+  const geometry = $derived.by((): Record<Role, SelectionHandleGeometry | null> | null => {
     void camera.current;
     const lens = stage.current;
     const ends = endpoints.current;
     if (!lens || !ends) return null;
     const view = selectionHandleViewOf(lens);
     return {
-      start: selectionHandleGeom(view, ends.start, 'start'),
-      end: selectionHandleGeom(view, ends.end, 'end'),
+      start: selectionHandleGeometry(view, ends.start, 'start'),
+      end: selectionHandleGeometry(view, ends.end, 'end'),
     };
   });
 
@@ -140,7 +140,7 @@
   ascent-side tip, the one point that must land exactly on the glyph's corner. Upright text
   carries no transform.
 -->
-{#snippet handle(role: Role, at: SelectionHandleGeom)}
+{#snippet handle(role: Role, at: SelectionHandleGeometry)}
   {@const barTop = HANDLE_PAD + (role === 'start' ? HANDLE_HEAD : 0)}
   {@const pivotX = HANDLE_PAD + HANDLE_BAR / 2}
   <div

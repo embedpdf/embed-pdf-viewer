@@ -141,20 +141,20 @@ export class GrantExchangeError extends Error {
 export async function exchangeGrant(
   baseUrl: string,
   grant: string,
-  opts: GrantExchangeOptions = {},
+  options: GrantExchangeOptions = {},
 ): Promise<GrantSession> {
-  const doFetch = opts.fetch ?? globalThis.fetch;
+  const doFetch = options.fetch ?? globalThis.fetch;
   const res = await doFetch(`${baseUrl.replace(/\/$/, '')}/v1/grant-sessions`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'EmbedPDF-Version': API_VERSION },
     body: JSON.stringify({
       grant,
-      ...(opts.passphrase !== undefined ? { passphrase: opts.passphrase } : {}),
-      ...(opts.visitorHandle !== undefined ? { visitorHandle: opts.visitorHandle } : {}),
-      ...(opts.restart ? { restart: true } : {}),
-      ...(opts.visitorIdentity ? { visitorIdentity: opts.visitorIdentity } : {}),
+      ...(options.passphrase !== undefined ? { passphrase: options.passphrase } : {}),
+      ...(options.visitorHandle !== undefined ? { visitorHandle: options.visitorHandle } : {}),
+      ...(options.restart ? { restart: true } : {}),
+      ...(options.visitorIdentity ? { visitorIdentity: options.visitorIdentity } : {}),
     }),
-    ...(opts.signal ? { signal: opts.signal } : {}),
+    ...(options.signal ? { signal: options.signal } : {}),
   });
   if (!res.ok) {
     let code = 'Unknown';
@@ -284,11 +284,11 @@ export class GrantSessionSource {
   constructor(
     private readonly baseUrl: string,
     private readonly grantId: string,
-    private readonly opts: GrantSessionOptions = {},
+    private readonly options: GrantSessionOptions = {},
   ) {
-    this.restart = opts.restart === true;
-    this.answers = opts.identity;
-    this.passphrase = opts.passphrase;
+    this.restart = options.restart === true;
+    this.answers = options.identity;
+    this.passphrase = options.passphrase;
   }
 
   /**
@@ -516,7 +516,7 @@ export class GrantSessionSource {
   }
 
   private async exchange(answers?: VisitorAnswers, signal?: AbortSignal): Promise<GrantSession> {
-    const store = this.opts.visitorStore ?? null;
+    const store = this.options.visitorStore ?? null;
     if (this.handle === undefined) {
       this.handle = store ? await store.get(this.grantId) : null;
     }
@@ -526,7 +526,7 @@ export class GrantSessionSource {
       ...(this.handle ? { visitorHandle: this.handle } : {}),
       ...(this.restart ? { restart: true } : {}),
       ...(visitorIdentity ? { visitorIdentity } : {}),
-      ...(this.opts.fetch ? { fetch: this.opts.fetch } : {}),
+      ...(this.options.fetch ? { fetch: this.options.fetch } : {}),
       ...(signal ? { signal } : {}),
     });
     this.restart = false;
@@ -659,8 +659,8 @@ function untilAbort<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
 export function grantSessionSource(
   baseUrl: string,
   grant: string,
-  opts: GrantSessionOptions = {},
+  options: GrantSessionOptions = {},
 ): () => Promise<string> {
-  const source = new GrantSessionSource(baseUrl, grant, opts);
+  const source = new GrantSessionSource(baseUrl, grant, options);
   return () => source.token();
 }

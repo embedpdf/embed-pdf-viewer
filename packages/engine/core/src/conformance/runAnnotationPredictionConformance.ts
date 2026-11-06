@@ -550,18 +550,18 @@ function fieldDifferences(predicted: Annotation, actual: Annotation) {
  */
 export function runAnnotationPredictionConformance(
   runner: ConformanceTestRunner,
-  opts: AnnotationPredictionConformanceOptions,
+  options: AnnotationPredictionConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`annotation prediction conformance: ${opts.label}`, () => {
+  describe(`annotation prediction conformance: ${options.label}`, () => {
     let engine: Engine;
     let doc: DocumentHandle;
     let page: PageHandle;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
-      doc = await opts.open(engine);
+      engine = await options.makeEngine();
+      doc = await options.open(engine);
       const { pages } = await doc.pages.list();
       page = doc.page(toPageRef(pages[0]!.ref.objectNumber));
     });

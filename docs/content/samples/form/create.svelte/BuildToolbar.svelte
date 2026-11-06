@@ -1,7 +1,7 @@
 <script lang="ts">
   import { usePageList, type PageRef } from '@embedpdf/svelte/runtime';
   import { useStage } from '@embedpdf/svelte/stage';
-  import { useForm, type FormCapability, type FormFieldDTO } from '@embedpdf/svelte/form';
+  import { useForm, type FormCapability, type FormField } from '@embedpdf/svelte/form';
 
   // The printed boxes are the fields' look: a new field only sets its text size.
   const look = { fontSize: 11 };
@@ -41,14 +41,14 @@
   const stage = useStage();
   const pages = usePageList();
   const page = $derived(pages.current[0]?.ref); // the printed form
-  let added = $state.raw<FormFieldDTO[]>([]);
+  let added = $state.raw<FormField[]>([]);
 
   // Each kind of field fills its column from the top: the next row that hasn't got one.
-  function rowFor(kind: FormFieldDTO['kind']) {
+  function rowFor(kind: FormField['kind']) {
     return added.filter((field) => field.kind === kind).length;
   }
 
-  async function add(addField: typeof addDropdown, kind: FormFieldDTO['kind']) {
+  async function add(addField: typeof addDropdown, kind: FormField['kind']) {
     if (!page) return;
     const { field } = await addField(form, page, rowFor(kind));
     added = [...added, field];

@@ -48,15 +48,15 @@ const box = (x: number): PageBox => ({ x, y: 120, width: 40, height: 30 });
  */
 export function runObjectNumberConformance(
   runner: ConformanceTestRunner,
-  opts: ObjectNumberConformanceOptions,
+  options: ObjectNumberConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`object number conformance: ${opts.label}`, () => {
+  describe(`object number conformance: ${options.label}`, () => {
     let engine: Engine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -66,7 +66,7 @@ export function runObjectNumberConformance(
     const withDocument = async (
       body: (doc: DocumentHandle, pages: readonly PageRef[]) => Promise<void>,
     ) => {
-      const doc = await opts.open(engine);
+      const doc = await options.open(engine);
       try {
         const { pages } = await doc.pages.list();
         await body(

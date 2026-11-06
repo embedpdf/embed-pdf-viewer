@@ -139,7 +139,7 @@ describe('initial placement is level-triggered', () => {
     stage.provideInitialView(50, () => ({
       ...stage.getSettings(),
       pageIndex: 3,
-      anchor: { pageIndex: 3, fx: 0.5, fy: 0.5 },
+      anchor: { pageIndex: 3, fractionX: 0.5, fractionY: 0.5 },
     }));
     stage.setViewportSize({ width: 1000, height: 700 });
     expect(stage.getCurrentPageIndex()).toBe(3); // restored, not reset to page 0
@@ -176,7 +176,7 @@ describe('initial placement is level-triggered', () => {
     stage.provideInitialView(50, () => ({
       ...stage.getSettings(),
       pageIndex: 3,
-      anchor: { pageIndex: 3, fx: 0.5, fy: 0.5 },
+      anchor: { pageIndex: 3, fractionX: 0.5, fractionY: 0.5 },
     }));
     stage.goToPage(1);
     stage.setViewportSize({ width: 1000, height: 700 });

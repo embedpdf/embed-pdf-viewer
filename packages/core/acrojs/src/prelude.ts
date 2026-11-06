@@ -15,7 +15,7 @@ export function installAcroJs(globalObject: Record<string, unknown>): void {
     display: string;
     wrapper: AnyRecord;
   };
-  type AnnotRecord = {
+  type AnnotationRecord = {
     input: AnyRecord;
     /** Writable-key snapshots: original vs current — effects are the diff. */
     original: AnyRecord;
@@ -27,8 +27,8 @@ export function installAcroJs(globalObject: Record<string, unknown>): void {
     fields: FieldRecord[];
     fieldsByName: Map<string, FieldRecord>;
     fieldsByRef: Map<string, FieldRecord>;
-    annots: AnnotRecord[];
-    annotsByPage: Map<number, AnnotRecord[]>;
+    annots: AnnotationRecord[];
+    annotsByPage: Map<number, AnnotationRecord[]>;
     annotPages: Set<number>;
     annotsCoverDocument: boolean;
     event: AnyRecord;
@@ -217,7 +217,7 @@ export function installAcroJs(globalObject: Record<string, unknown>): void {
   };
   const cloneAnnotValue = (value: unknown): unknown => (Array.isArray(value) ? [...value] : value);
 
-  const makeAnnot = (record: AnnotRecord): AnyRecord => {
+  const makeAnnot = (record: AnnotationRecord): AnyRecord => {
     const input = record.input;
     const subtype = String(input.subtype);
     const writable = ANNOT_WRITABLE[subtype] ?? [];
@@ -338,8 +338,8 @@ export function installAcroJs(globalObject: Record<string, unknown>): void {
       enumerable: true,
       get: () => Number((state?.input.document as AnyRecord | undefined)?.pageNumber ?? 0),
       set: (value: unknown) => {
-        const page = Math.trunc(Number(value));
-        if (Number.isFinite(page)) state?.uiEffects.push({ type: 'gotoPage', page });
+        const pageIndex = Math.trunc(Number(value));
+        if (Number.isFinite(pageIndex)) state?.uiEffects.push({ type: 'goToPage', pageIndex });
       },
     },
   });
@@ -540,7 +540,7 @@ export function installAcroJs(globalObject: Record<string, unknown>): void {
     });
     const fieldsByName = new Map(fields.map((field) => [String(field.input.name), field]));
     const fieldsByRef = new Map(fields.map((field) => [refKey(field.input.ref), field]));
-    const annots: AnnotRecord[] = ((input.annots as AnyRecord[] | undefined) ?? []).map(
+    const annots: AnnotationRecord[] = ((input.annots as AnyRecord[] | undefined) ?? []).map(
       (annotation) => {
         const writableSnapshot = (): AnyRecord => ({
           strokeColor: cloneAnnotValue(annotation.strokeColor ?? ['T']),
@@ -558,7 +558,7 @@ export function installAcroJs(globalObject: Record<string, unknown>): void {
           noView: Boolean(annotation.noView),
           toggleNoView: Boolean(annotation.toggleNoView),
         });
-        const record: AnnotRecord = {
+        const record: AnnotationRecord = {
           input: annotation,
           original: writableSnapshot(),
           current: writableSnapshot(),
@@ -568,7 +568,7 @@ export function installAcroJs(globalObject: Record<string, unknown>): void {
         return record;
       },
     );
-    const annotsByPage = new Map<number, AnnotRecord[]>();
+    const annotsByPage = new Map<number, AnnotationRecord[]>();
     for (const record of annots) {
       const page = Number(record.input.page ?? 0);
       const bucket = annotsByPage.get(page);

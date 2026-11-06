@@ -255,15 +255,15 @@ function charactersOutside(layout: TextLayout, box: PageBox): string[] {
  */
 export function runMixedScriptConformance(
   runner: ConformanceTestRunner,
-  opts: ConformanceOptions,
+  options: ConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`mixed-script conformance: ${opts.label}`, () => {
+  describe(`mixed-script conformance: ${options.label}`, () => {
     let engine: Engine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -273,7 +273,7 @@ export function runMixedScriptConformance(
     for (const writer of WRITERS) {
       for (const scriptCase of CASES) {
         test(`${writer.name}: ${scriptCase.name}`, async () => {
-          const doc = await openFixture(engine, opts);
+          const doc = await openFixture(engine, options);
           try {
             // A page of its own: what earlier cases flattened stays on theirs.
             const [page] = (await doc.pages.insertBlank({ size: PAGE_SIZE })).insertedPages;
@@ -310,7 +310,7 @@ export function runMixedScriptConformance(
     }
 
     test('a change says what each op drew with no font, and what all of them did', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = (await doc.pages.list()).pages[0]!;
         const freeText = (y: number, contents: string) =>

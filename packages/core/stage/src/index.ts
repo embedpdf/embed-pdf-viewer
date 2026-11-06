@@ -17,11 +17,11 @@ import {
   displaySize,
   NO_FRAME,
   type PageFrame,
-  type PageRotation,
+  type Rotation,
   type Point,
   type Size,
 } from '@embedpdf/core-geometry';
-export type { Point, Size, PageRotation, PageFrame } from '@embedpdf/core-geometry';
+export type { Point, Size, Rotation, PageFrame } from '@embedpdf/core-geometry';
 
 export interface Rect {
   x: number;
@@ -35,12 +35,12 @@ export interface Camera {
   zoom: number;
 }
 
-export interface PageGeom {
+export interface PageGeometry {
   /** Un-rotated (intrinsic) page size — the content's own dimensions before rotation. */
   size: Size;
   /** Total display rotation. Layout swaps w↔h for 90/270 so the box is the
    *  on-screen footprint; the renderer rotates the content into it. */
-  rotation?: PageRotation;
+  rotation?: Rotation;
   /**
    * PDF `/UserUnit` (§14.11.6): how many 1/72" units one point of this page
    * spans — the page is physically `userUnit ×` larger than its point size
@@ -60,7 +60,7 @@ export interface PageBox {
   height: number;
   /** The page's total display rotation; the renderer rotates the (normalized,
    *  un-rotated) content bitmap by this to fill the display box. */
-  rotation: PageRotation;
+  rotation: Rotation;
   /**
    * World size ÷ intrinsic size for this page (1 for `intrinsic` sizing). The shell
    * multiplies it by the camera zoom to get device-px-per-PDF-point, so render
@@ -75,7 +75,7 @@ export interface PageBox {
  *  userUnit-5 page measures 5× its point size). Everything the layout packs uses
  *  these display dims; the content scale (isotropic) and the renderer's
  *  transform recover the content. */
-function displayDims(pg: PageGeom): Size {
+function displayDims(pg: PageGeometry): Size {
   const userUnit = pg.userUnit ?? 1;
   const size = displaySize(pg.size, pg.rotation ?? 0);
   return userUnit === 1 ? size : { width: size.width * userUnit, height: size.height * userUnit };
@@ -151,8 +151,8 @@ export type ZoomSpec =
   | { pageHeight: number };
 export interface Anchor {
   pageIndex: number;
-  fx: number;
-  fy: number;
+  fractionX: number;
+  fractionY: number;
 }
 export type SpreadMode = 'none' | 'odd' | 'even';
 /**
@@ -580,8 +580,8 @@ export function anchorAtPoint(scene: Scene, worldPt: Point): Anchor {
   }
   return {
     pageIndex: page.pageIndex,
-    fx: (worldPt.x - page.x) / page.width,
-    fy: (worldPt.y - page.y) / page.height,
+    fractionX: (worldPt.x - page.x) / page.width,
+    fractionY: (worldPt.y - page.y) / page.height,
   };
 }
 
@@ -596,7 +596,10 @@ export function cameraForAnchorAtScreen(
   let page = item.pages[0];
   for (const candidate of item.pages)
     if (candidate.pageIndex === anchor.pageIndex) page = candidate;
-  const world = { x: page.x + anchor.fx * page.width, y: page.y + anchor.fy * page.height };
+  const world = {
+    x: page.x + anchor.fractionX * page.width,
+    y: page.y + anchor.fractionY * page.height,
+  };
   return { zoom, x: world.x - screenPt.x / zoom, y: world.y - screenPt.y / zoom };
 }
 
@@ -653,7 +656,7 @@ interface LocalBox {
   ly: number;
   w: number;
   h: number;
-  rotation: PageRotation;
+  rotation: Rotation;
   /** The page's `/UserUnit` — folded into its `contentScale` at placement, so
    *  "world units per page point" stays true for every page of a spread. */
   userUnit: number;
@@ -663,7 +666,7 @@ interface LocalBox {
  *  Uses display dims, so `uniform` equalizes the rotated footprint and a rotated
  *  page sizes to match its neighbours as it actually appears. */
 function measureItem(
-  pages: readonly PageGeom[],
+  pages: readonly PageGeometry[],
   group: number[],
   gap: number,
 ): { width: number; height: number } {
@@ -683,7 +686,7 @@ function measureItem(
  * they are screen-px-derived chrome bands and stay constant in world space.
  */
 function packScaledItem(
-  pages: readonly PageGeom[],
+  pages: readonly PageGeometry[],
   group: number[],
   scale: number,
   gap: number,
@@ -760,7 +763,7 @@ export interface LinearOptions {
   viewUnitsPerPoint?: number;
 }
 export function linearLayout(
-  pages: readonly PageGeom[],
+  pages: readonly PageGeometry[],
   grouping: number[][],
   options: LinearOptions = {},
 ): Scene {
@@ -888,7 +891,7 @@ export interface GridOptions {
   viewUnitsPerPoint?: number;
 }
 export function gridLayout(
-  pages: readonly PageGeom[],
+  pages: readonly PageGeometry[],
   grouping: number[][],
   options: GridOptions = {},
 ): Scene {

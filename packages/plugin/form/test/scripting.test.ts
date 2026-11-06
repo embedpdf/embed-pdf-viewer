@@ -15,7 +15,7 @@ import {
   toPageRef,
   type DocumentHandle,
   type ChangeOp,
-  type FormFieldDTO,
+  type FormField,
   type FormSnapshot,
   type PageLayout,
   type PdfActionTree,
@@ -40,8 +40,8 @@ const text = (
   fieldObjectNumber: number,
   name: string,
   value: string,
-  actions?: FormFieldDTO['actions'],
-): FormFieldDTO => ({
+  actions?: FormField['actions'],
+): FormField => ({
   ref: ref(fieldObjectNumber),
   name,
   kind: 'text',
@@ -70,7 +70,7 @@ const text = (
   ...(actions ? { actions } : {}),
 });
 
-const pushbutton = (fieldObjectNumber: number, name: string): FormFieldDTO => ({
+const pushbutton = (fieldObjectNumber: number, name: string): FormField => ({
   ref: ref(fieldObjectNumber),
   name,
   kind: 'pushbutton',
@@ -301,7 +301,7 @@ describe('form scripting transaction', () => {
     expect(result.status).toBe('applied');
     expect(result.uiEffects).toEqual([
       { type: 'alert', message: 'Summary ready', icon: 0, phase: 'user' },
-      { type: 'gotoPage', page: 1, phase: 'user' },
+      { type: 'goToPage', pageIndex: 1, phase: 'user' },
     ]);
     expect(fx.batches).toEqual([
       [

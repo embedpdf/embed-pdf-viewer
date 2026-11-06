@@ -29,7 +29,7 @@ import {
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import type { FormFieldDraft, WidgetPlacement } from '../forms/draft';
-import type { FormFieldDTO, FormFieldKind } from '../forms/field';
+import type { FormField, FormFieldKind } from '../forms/field';
 import { FormFieldDraftSchema } from '../forms/schema';
 import { fieldValueOf, type FormFieldValue } from '../forms/value';
 import { annotationKey } from '../identity/annotationKey';
@@ -207,20 +207,20 @@ export function planFormValuesImport<T extends FormValuesImportTarget>(input: {
 }
 
 /** Whether a field read holds a value a write can set. */
-function holdsValue(field: FormFieldDTO): boolean {
+function holdsValue(field: FormField): boolean {
   return field.valueEntry.kind === 'scalar' || field.valueEntry.kind === 'array';
 }
 
 /** A field's scripts as a create writes them; each left out is reported. */
 function fieldActionsOf(
-  field: FormFieldDTO,
+  field: FormField,
   mayScript: boolean,
   dropped: FormImportDrop[],
 ): FieldActionsPatch {
   const actions: FieldActionsPatch = {};
   for (const [event, tree] of Object.entries(field.actions ?? {}) as [
     FieldScriptEvent,
-    NonNullable<FormFieldDTO['actions']>[FieldScriptEvent],
+    NonNullable<FormField['actions']>[FieldScriptEvent],
   ][]) {
     if (!tree) continue;
     const script = fieldScriptOf(tree);
@@ -235,7 +235,7 @@ function fieldActionsOf(
 
 /** A widget row as a create places it: on its mapped page, with its look and actions. */
 function placementOf(
-  field: FormFieldDTO,
+  field: FormField,
   row: WidgetAnnotation,
   mapPage: (page: PageRef) => PageRef,
   mayScript: boolean,
@@ -286,7 +286,7 @@ function flagsOf(row: WidgetAnnotation): WidgetFlags {
 
 /** The create a field row becomes, checked against the create schema. */
 function draftOf(
-  field: FormFieldDTO,
+  field: FormField,
   actions: FieldActionsPatch,
   widgets: WidgetPlacement[],
   index: number,

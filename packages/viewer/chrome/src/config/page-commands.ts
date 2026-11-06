@@ -9,7 +9,7 @@
  * Each edit is one step of the history, so the panel's header has undo and redo, and a delete
  * needs no confirm.
  */
-import type { CommandDef } from '@embedpdf/react/commands';
+import type { CommandDefinition } from '@embedpdf/react/commands';
 import {
   PageEditToken,
   type PageEditCapability,
@@ -20,7 +20,7 @@ import { pickFile, saveFile } from '@embedpdf/web';
 
 import { isPdfFile } from './open-files';
 
-type Ctx = Parameters<NonNullable<CommandDef['run']>>[0];
+type Ctx = Parameters<NonNullable<CommandDefinition['run']>>[0];
 
 /** The menu of a page: the commands below, for that page and the others selected with it. */
 export const PAGE_MENU = 'page';
@@ -56,7 +56,7 @@ const PAGE_EDITS = {
   categories: ['pages'],
   allowed: (commandContext: Ctx) => pageEditOf(commandContext)?.canEdit() ?? true,
   notAllowedKey: 'commands.notAllowed.doc-pages-assemble',
-} satisfies Partial<CommandDef>;
+} satisfies Partial<CommandDefinition>;
 
 /**
  * Where new pages go: where the caller says, else after the selected page that comes last, else
@@ -92,7 +92,12 @@ function extractNameOf(commandContext: Ctx): string {
   return `${name || 'document'}-pages.pdf`;
 }
 
-const rotate = (id: string, labelKey: string, icon: string, delta: 90 | -90): CommandDef => ({
+const rotate = (
+  id: string,
+  labelKey: string,
+  icon: string,
+  delta: 90 | -90,
+): CommandDefinition => ({
   id,
   labelKey,
   icon,
@@ -104,7 +109,7 @@ const rotate = (id: string, labelKey: string, icon: string, delta: 90 | -90): Co
   },
 });
 
-export const pageCommands: CommandDef[] = [
+export const pageCommands: CommandDefinition[] = [
   rotate('page:rotate-clockwise', 'commands.pages.rotateClockwise', 'pageRotateClockwise', 90),
   rotate(
     'page:rotate-counterclockwise',
