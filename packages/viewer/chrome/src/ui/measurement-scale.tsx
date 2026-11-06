@@ -29,7 +29,7 @@ export function MeasurementScaleButton() {
         type="button"
         part={buttonPart(surface.isOpen)}
         className={buttonClass(surface.isOpen)}
-        aria-pressed={surface.isOpen || undefined}
+        aria-pressed={surface.isOpen}
         onClick={() => surface.toggle()}
       >
         <span className="flex items-center whitespace-nowrap text-sm">

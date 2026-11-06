@@ -96,7 +96,7 @@ function QuickStampButton({
         type="button"
         onClick={onArm}
         aria-label={asset.label}
-        aria-pressed={active || undefined}
+        aria-pressed={active}
         part={buttonPart(active)}
         className={buttonClass(active, true)}
       >

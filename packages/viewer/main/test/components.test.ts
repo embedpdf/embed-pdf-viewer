@@ -437,7 +437,8 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('your own components', (
       return viewer.get('stage').getZoomLevel() > level;
     }, before);
 
-    expect((await inner('pan'))!.pressed).toBeNull();
+    // Pan is a toggle: it says it isn't pressed, then that it is.
+    expect((await inner('pan'))!.pressed).toBe('false');
     await tab.click('#pan');
     await tab.waitForFunction(
       () =>

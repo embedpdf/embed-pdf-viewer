@@ -11,7 +11,7 @@ const command = useCommand(() => props.id);
     type="button"
     class="button"
     :disabled="!command.enabled"
-    :aria-pressed="command.active"
+    :aria-pressed="command.pressable ? command.active : undefined"
     @click="command.run()"
   >
     {{ command.label }}

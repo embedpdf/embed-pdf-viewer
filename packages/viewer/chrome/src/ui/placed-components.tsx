@@ -218,6 +218,7 @@ const ownRowOf = (item: PlacedMenuItem): ResolvedCommand => ({
   shortcuts: [],
   enabled: true,
   active: item.active,
+  pressable: false,
   visible: true,
   categories: [],
 });

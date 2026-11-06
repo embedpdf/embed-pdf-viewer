@@ -14,7 +14,12 @@
 
 <Toolbar {bar}>
   {#snippet command(cmd, variant, run)}
-    <button onclick={run} disabled={!cmd.enabled} aria-pressed={cmd.active} title={cmd.label}>
+    <button
+      onclick={run}
+      disabled={!cmd.enabled}
+      aria-pressed={cmd.pressable ? cmd.active : undefined}
+      title={cmd.label}
+    >
       <Icon name={cmd.icon} />
       {#if variant === 'icon+label'}{cmd.label}{/if}
     </button>

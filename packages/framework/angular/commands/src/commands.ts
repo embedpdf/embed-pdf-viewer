@@ -216,8 +216,8 @@ export class EpdfCommandShortcuts {
 
 /**
  * A button of yours that runs a command and shows its state: a click runs it, and the button's
- * `disabled`, `aria-pressed`, `title` and `hidden` follow the command. The template reference
- * gives the rest as signals:
+ * `disabled`, `aria-pressed` (a toggle's) or `aria-expanded` (a menu's), `title` and `hidden`
+ * follow the command. The template reference gives the rest as signals:
  *
  *   <button [epdfCommand]="'zoom:in'" #zoomIn="epdfCommand">
  *     {{ zoomIn.label() }} <kbd>{{ zoomIn.shortcut() }}</kbd>
@@ -232,7 +232,8 @@ export class EpdfCommandShortcuts {
   host: {
     '(click)': 'onClick()',
     '[attr.disabled]': 'enabled() ? null : ""',
-    '[attr.aria-pressed]': 'active() ? "true" : null',
+    '[attr.aria-pressed]': 'command().pressable ? active() : null',
+    '[attr.aria-expanded]': 'command().menu ? active() : null',
     '[attr.title]': 'label() || null',
     '[hidden]': '!visible()',
   },

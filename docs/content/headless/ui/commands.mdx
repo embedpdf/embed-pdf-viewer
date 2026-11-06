@@ -14,7 +14,7 @@ commands you need:
 
 ## Show a command
 
-<Fw only={['react', 'vue', 'svelte']}>`useCommand(id)` gives you everything a button needs, and <Word of="rerenders" /> when any of it changes:</Fw><Fw only="angular">The `epdfCommand` directive runs the command on click and keeps your button's `disabled`, `aria-pressed`, `title` and `hidden` in step with it. Its template reference gives you the rest, as signals:</Fw>
+<Fw only={['react', 'vue', 'svelte']}>`useCommand(id)` gives you everything a button needs, and <Word of="rerenders" /> when any of it changes:</Fw><Fw only="angular">The `epdfCommand` directive runs the command on click and keeps your button's `disabled`, `aria-pressed` or `aria-expanded`, `title` and `hidden` in step with it. Its template reference gives you the rest, as signals:</Fw>
 
 <Snippet name="ui/command-button" />
 
@@ -35,6 +35,11 @@ same command as a signal.
 
 `shortcut` is formatted for the user's platform: `⌘K` on a Mac, `Ctrl+K` elsewhere. The
 [toolbar](toolbar) draws commands the same way.
+
+`pressable` says whether the command is a toggle: it has an `active` of its own, or opens a panel.
+Give a toggle's button `aria-pressed`, true or false, and leave it off the others, so a screen
+reader announces only toggles as toggles. A command that opens a menu is `active` while its menu is
+open, and its button says `aria-expanded` instead.
 
 There's always a command, so a button never checks for a missing one: an id no plugin registered
 comes back labelled with its id, neither visible nor enabled, the way a turned-off command does,

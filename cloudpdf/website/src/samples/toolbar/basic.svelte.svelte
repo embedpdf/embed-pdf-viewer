@@ -84,7 +84,7 @@
             title={cmd.label}
             aria-label={cmd.label}
             disabled={!cmd.enabled}
-            aria-pressed={cmd.active}
+            aria-pressed={cmd.pressable ? cmd.active : undefined}
             onclick={run}
           >
             <span class="icon" aria-hidden="true">

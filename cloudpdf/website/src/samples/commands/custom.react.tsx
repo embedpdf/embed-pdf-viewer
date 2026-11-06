@@ -46,7 +46,7 @@ function CommandButton({ id }: { id: string }) {
       type="button"
       className="button"
       disabled={!command.enabled}
-      aria-pressed={command.active}
+      aria-pressed={command.pressable ? command.active : undefined}
       onClick={command.run}
     >
       {command.label}

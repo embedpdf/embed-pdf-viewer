@@ -16,6 +16,7 @@ const cmd = (over: Partial<ResolvedCommand> = {}): ResolvedCommand => ({
   shortcuts: [],
   enabled: true,
   active: false,
+  pressable: false,
   visible: true,
   categories: [],
   ...over,

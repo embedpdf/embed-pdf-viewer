@@ -14,7 +14,7 @@
     class="button"
     title={cmd.label}
     disabled={!cmd.enabled}
-    aria-pressed={cmd.active}
+    aria-pressed={cmd.pressable ? cmd.active : undefined}
     onclick={cmd.run}
   >
     {cmd.label}
