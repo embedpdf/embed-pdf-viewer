@@ -1,8 +1,9 @@
 /**
  * The viewer's languages: English in every build, the others each in a chunk of its own that
  * loads the first time the viewer shows it, and the languages an app adds or changes through
- * `strings`. A language reads right to left when its pack says so (Arabic, Hebrew), or, for a
- * language from `strings`, when its code names a right-to-left script (`fa`, `ur`, `und-Arab`).
+ * `strings`, given as words or as a function that loads them. A language reads right to left when
+ * its pack says so (Arabic, Hebrew), or, for a language from `strings`, when its code names a
+ * right-to-left script (`fa`, `ur`, `und-Arab`).
  */
 import { negotiateLocale } from '@embedpdf/react/i18n';
 import type { Locale, TextDirection, TranslationDictionary } from '@embedpdf/react/i18n';
@@ -13,6 +14,17 @@ export { en };
 
 /** A language that loads when it's first shown. */
 export type LocalePackLoader = () => Promise<Locale>;
+
+/**
+ * A language's words, loaded the first time the viewer needs them: a function that resolves to
+ * the words, or to a module whose `default` export is the words, such as `() => import('./sv.json')`.
+ */
+export type StringsLoader = () => Promise<
+  TranslationDictionary | { readonly default: TranslationDictionary }
+>;
+
+/** A language's words in `strings`: the words, or a function that loads them. */
+export type LanguageStrings = TranslationDictionary | StringsLoader;
 
 /** The viewer's languages besides English, by code. */
 export const LOCALE_LOADERS: Readonly<Record<string, LocalePackLoader>> = {
@@ -34,13 +46,26 @@ export const LOCALE_LOADERS: Readonly<Record<string, LocalePackLoader>> = {
 
 /**
  * The language a `locale` value shows, among `codes`: the browser's languages for `'auto'`,
- * else the closest to the one asked for (`'es-MX'` shows `'es'`), else English.
+ * else the closest to the one asked for (`'es-MX'` shows `'es'`), else the fallback language.
  */
-export const localeCodeOf = (locale: string, codes: readonly string[]): string =>
+export const localeCodeOf = (
+  locale: string,
+  codes: readonly string[],
+  fallback: string = 'en',
+): string =>
   negotiateLocale(
     codes,
     locale !== 'auto' ? [locale] : typeof navigator !== 'undefined' ? navigator.languages : [],
-  ) ?? 'en';
+  ) ?? fallback;
+
+/**
+ * The fallback language among `codes`: the closest to the one asked for (`'sv-SE'` is `'sv'`),
+ * English when none is asked for, and `null` when the viewer has no language for it.
+ */
+export const fallbackCodeOf = (
+  fallback: string | undefined,
+  codes: readonly string[],
+): string | null => (fallback === undefined ? 'en' : negotiateLocale(codes, [fallback]));
 
 const isDictionary = (value: unknown): value is TranslationDictionary =>
   typeof value === 'object' && value !== null;
@@ -76,6 +101,36 @@ export function mergeTranslations(
 
 const withStrings = (pack: Locale, over: TranslationDictionary | undefined): Locale =>
   over ? { ...pack, translations: mergeTranslations(pack.translations, over) } : pack;
+
+const isLoader = (strings: LanguageStrings): strings is StringsLoader =>
+  typeof strings === 'function';
+
+/** What a {@link StringsLoader} resolved to, as words: a module's `default` export, or the words. */
+const wordsOf = (
+  loaded: TranslationDictionary | { readonly default: TranslationDictionary },
+): TranslationDictionary => (isDictionary(loaded.default) ? loaded.default : loaded);
+
+/** A language's words from `strings`, in the order given: the ones given as words, and all of them. */
+interface StringsParts {
+  readonly words: TranslationDictionary | undefined;
+  readonly load: (() => Promise<TranslationDictionary>) | undefined;
+}
+
+function partsOf(given: readonly LanguageStrings[]): StringsParts {
+  const words = given
+    .filter((strings): strings is TranslationDictionary => !isLoader(strings))
+    .reduce<
+      TranslationDictionary | undefined
+    >((merged, over) => mergeTranslations(merged ?? {}, over), undefined);
+  if (!given.some(isLoader)) return { words, load: undefined };
+  const load = () =>
+    Promise.all(
+      given.map((strings) =>
+        isLoader(strings) ? strings().then(wordsOf) : Promise.resolve(strings),
+      ),
+    ).then((all) => all.reduce(mergeTranslations, {}));
+  return { words, load };
+}
 
 /** Scripts written right to left, by their ISO 15924 code. */
 const RIGHT_TO_LEFT_SCRIPTS = new Set([
@@ -129,31 +184,45 @@ export interface ViewerLocales {
 /**
  * The viewer's languages with the app's `strings` over them. A code of one of the viewer's
  * languages (in any case: `zh-cn` is `zh-CN`) changes that language's words; any other code
- * becomes a language of its own, which falls back to English for the words it doesn't give.
+ * becomes a language of its own, which falls back to the fallback language for the words it
+ * doesn't give. Words given as a function load with their language, and the language shows once
+ * they're in; English, in every build, shows its words meanwhile.
  */
-export function localesOf(
-  strings: Readonly<Record<string, TranslationDictionary>> = {},
-): ViewerLocales {
+export function localesOf(strings: Readonly<Record<string, LanguageStrings>> = {}): ViewerLocales {
   const builtInCodes = ['en', ...Object.keys(LOCALE_LOADERS)];
   const builtInCodeOf = (code: string) =>
     builtInCodes.find((builtIn) => builtIn.toLowerCase() === code.toLowerCase());
   // The app's strings by the code they're shown under, a built-in language's code as the viewer
   // spells it.
-  const byCode = new Map<string, TranslationDictionary>();
+  const byCode = new Map<string, LanguageStrings[]>();
   for (const [code, over] of Object.entries(strings)) {
     const shownAs = builtInCodeOf(code) ?? code;
-    byCode.set(shownAs, mergeTranslations(byCode.get(shownAs) ?? {}, over));
+    byCode.set(shownAs, [...(byCode.get(shownAs) ?? []), over]);
   }
+  const partsByCode = new Map([...byCode].map(([code, given]) => [code, partsOf(given)]));
 
-  const locales: Locale[] = [withStrings(en, byCode.get('en'))];
+  const english = partsByCode.get('en');
+  const locales: Locale[] = [withStrings(en, english?.words)];
   const loaders: Record<string, LocalePackLoader> = {};
-  for (const [code, load] of Object.entries(LOCALE_LOADERS)) {
-    const over = byCode.get(code);
-    loaders[code] = over ? () => load().then((pack) => withStrings(pack, over)) : load;
+  if (english?.load) {
+    const load = english.load;
+    loaders.en = () => load().then((words) => withStrings(en, words));
   }
-  for (const [code, over] of byCode) {
+  for (const [code, loadPack] of Object.entries(LOCALE_LOADERS)) {
+    const parts = partsByCode.get(code);
+    const load = parts?.load;
+    const words = parts?.words;
+    loaders[code] = load
+      ? () => Promise.all([loadPack(), load()]).then(([pack, over]) => withStrings(pack, over))
+      : words
+        ? () => loadPack().then((pack) => withStrings(pack, words))
+        : loadPack;
+  }
+  for (const [code, { words, load }] of partsByCode) {
     if (builtInCodeOf(code) !== undefined) continue;
-    locales.push({ code, name: nameOf(code), direction: directionOf(code), translations: over });
+    const language = { code, name: nameOf(code), direction: directionOf(code) };
+    if (load) loaders[code] = () => load().then((translations) => ({ ...language, translations }));
+    else locales.push({ ...language, translations: words ?? {} });
   }
   return { locales, loaders, codes: [...new Set([...builtInCodes, ...byCode.keys()])] };
 }

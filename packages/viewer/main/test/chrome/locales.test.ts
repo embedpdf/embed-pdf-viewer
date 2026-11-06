@@ -18,6 +18,7 @@ import {
   LOCALE_LOADERS,
   directionOf,
   en,
+  fallbackCodeOf,
   localeCodeOf,
   localesOf,
 } from '../../../chrome/src/locales';
@@ -212,5 +213,60 @@ describe('localesOf', () => {
     const { locales } = localesOf({ en: { 'document:download': 'Save a copy' } });
     expect(stringsOf(locales[0]!.translations).get('document:download')).toBe('Save a copy');
     expect(stringsOf(locales[0]!.translations).get('commands.download')).toBe('Download');
+  });
+
+  it('loads words given as a function with their language, from a module or as they are', async () => {
+    let loads = 0;
+    const { locales, loaders, codes } = localesOf({
+      sv: () => {
+        loads++;
+        return Promise.resolve({ default: { 'acme.send': 'Skicka för signering' } });
+      },
+      da: () => Promise.resolve({ 'acme.send': 'Send til underskrift' }),
+      'zh-cn': { 'zoom:in': '放大' },
+      'zh-CN': () => Promise.resolve({ 'zoom:in': '放大一点' }),
+    });
+    expect(loads).toBe(0); // nothing loads before the language is needed
+    expect(locales.map((locale) => locale.code)).toEqual(['en']);
+    expect(codes.slice(-1)).toEqual(['da']);
+
+    const swedish = await loaders.sv!();
+    expect(loads).toBe(1);
+    expect(stringsOf(swedish.translations).get('acme.send')).toBe('Skicka för signering');
+    expect(stringsOf(swedish.translations).get('commands.undo')).toBe(
+      stringsOf((await LOCALE_LOADERS.sv!()).translations).get('commands.undo'),
+    );
+
+    const danish = await loaders.da!();
+    expect(danish).toMatchObject({ code: 'da', direction: 'ltr' });
+    expect(danish.name.toLowerCase()).toBe('dansk');
+    expect(danish.translations).toEqual({ acme: { send: 'Send til underskrift' } });
+
+    // Words and a function for one language merge in the order given.
+    const chinese = await loaders['zh-CN']!();
+    expect(stringsOf(chinese.translations).get('zoom:in')).toBe('放大一点');
+  });
+
+  it('keeps English in every build, and loads your English words given as a function', async () => {
+    const { locales, loaders } = localesOf({
+      en: () => Promise.resolve({ 'acme.send': 'Send for signature' }),
+    });
+    expect(locales[0]).toBe(en); // shows meanwhile
+    const english = await loaders.en!();
+    expect(stringsOf(english.translations).get('acme.send')).toBe('Send for signature');
+    expect(stringsOf(english.translations).get('commands.download')).toBe('Download');
+  });
+});
+
+describe('fallbackCodeOf', () => {
+  it('finds the fallback language among the languages, English without one, null for none', () => {
+    const { codes } = localesOf({ da: { 'zoom:in': 'Zoom ind' } });
+    expect(fallbackCodeOf(undefined, codes)).toBe('en');
+    expect(fallbackCodeOf('sv', codes)).toBe('sv');
+    expect(fallbackCodeOf('sv-SE', codes)).toBe('sv');
+    expect(fallbackCodeOf('DA', codes)).toBe('da');
+    expect(fallbackCodeOf('fi', codes)).toBeNull();
+    // A browser language the viewer has no language for shows the fallback language.
+    expect(localeCodeOf('fi', codes, 'sv')).toBe('sv');
   });
 });

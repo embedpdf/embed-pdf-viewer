@@ -101,7 +101,8 @@ interface BuiltInSettings {
   readonly interaction: ConfigOf<typeof interactionPlugin>;
   readonly commands: ConfigOf<typeof commandsPlugin>;
   readonly shell: never;
-  readonly i18n: ConfigOf<typeof i18nPlugin>;
+  /** Only the fallback language: the viewer's `locale` and `strings` give the languages. */
+  readonly i18n: Pick<ConfigOf<typeof i18nPlugin>, 'fallbackLocale'>;
 }
 
 /** A built-in plugin's settings, as its page in the headless docs lists them. */
@@ -198,6 +199,7 @@ export function readPluginsConfig(plugins: ViewerPluginsConfig | undefined): Plu
       settings[name] = value;
     }
   }
+  if (settings.i18n) settings.i18n = onlyFallbackLocale(settings.i18n, problems);
   const viewer = {
     stamp: takeViewerSettings<ViewerStampSettings>(settings, 'stamp', VIEWER_STAMP_KEYS),
     signature: takeViewerSettings<ViewerSignatureSettings>(
@@ -207,6 +209,22 @@ export function readPluginsConfig(plugins: ViewerPluginsConfig | undefined): Plu
     ),
   };
   return { settings: settings as PluginsConfigRead['settings'], viewer, own, problems };
+}
+
+/**
+ * The i18n settings the viewer takes: the fallback language. The languages are the viewer's own
+ * `locale` and `strings`, so any other key is left out, with a problem saying where it goes.
+ */
+function onlyFallbackLocale(given: object, problems: string[]): object {
+  const { fallbackLocale, ...rest } = given as { readonly fallbackLocale?: unknown };
+  for (const key of Object.keys(rest)) {
+    problems.push(
+      key === 'locale'
+        ? "the i18n plugin's locale is the viewer's `locale`"
+        : `the i18n plugin's ${key} are the viewer's \`strings\`: give your words there`,
+    );
+  }
+  return fallbackLocale === undefined ? {} : { fallbackLocale };
 }
 
 /** Take the viewer's own `keys` out of plugin `name`'s settings in `settings`, and return them. */

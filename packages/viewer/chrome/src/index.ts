@@ -23,6 +23,7 @@ export type {
   PlacedMenuItem,
 } from './ui/placed-components';
 export type { PanelResizeEvent, ViewerFont } from './config-context';
+export type { LanguageStrings, StringsLoader } from './locales';
 export type {
   PluginSettings,
   SignatureFont,

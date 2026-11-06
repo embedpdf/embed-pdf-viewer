@@ -49,7 +49,6 @@ import { signaturePlugin } from '@embedpdf/react/signature';
 import { linkPlugin } from '@embedpdf/react/link';
 import { searchPlugin } from '@embedpdf/react/search';
 import { I18nToken, i18nPlugin, useT } from '@embedpdf/react/i18n';
-import type { TranslationDictionary } from '@embedpdf/react/i18n';
 import { CommandsToken, commandsPlugin } from '@embedpdf/react/commands';
 import type { NotAllowedMode } from '@embedpdf/react/commands';
 import { historyPlugin } from '@embedpdf/react/history';
@@ -58,7 +57,7 @@ import type { LayoutOption, ViewerSize } from '@embedpdf/core-ui';
 import { ThumbsStageToken } from './config/stage';
 import { defaultCommands, toolCommandsFor } from './config/commands';
 import { resolveViewerCommands, type CommandDefinition } from './config/viewer-commands';
-import { localeCodeOf, localesOf } from './locales';
+import { fallbackCodeOf, localeCodeOf, localesOf, type LanguageStrings } from './locales';
 import {
   ViewerConfigProvider,
   type PanelResizeEvent,
@@ -119,11 +118,17 @@ export interface ViewerCustomization<AppState = any> {
   /**
    * Words by language code, over the viewer's own: a built-in button's label under its command's
    * id (`'document:download'`), your own keys (`labelKey`, `titleKey`), dotted keys expanded. A
-   * code the viewer has no language for becomes one, falling back to English, and reads right to
-   * left when its code's script does (`fa`, `ur`).
+   * language's words, or a function that loads them the first time the viewer shows the language
+   * (`sv: () => import('./sv.json')`). A code the viewer has no language for becomes one, falling
+   * back to the fallback language, and reads right to left when its code's script does (`fa`,
+   * `ur`). Read once.
    */
-  strings?: Readonly<Record<string, TranslationDictionary>>;
-  /** 'auto' (default) negotiates from the browser languages. Follows its prop. */
+  strings?: Readonly<Record<string, LanguageStrings>>;
+  /**
+   * 'auto' (default) negotiates from the browser languages, and shows the fallback language
+   * (`plugins.i18n.fallbackLocale`, English unless you set another) when none matches. Follows its
+   * prop.
+   */
   locale?: 'auto' | (string & {});
   /**
    * What this viewer doesn't have, everywhere at once: features (`'annotations'`), their parts
@@ -170,8 +175,9 @@ export interface ViewerCustomization<AppState = any> {
    * Where the viewer's own keys set a plugin's settings too, both count and each only takes
    * away: the plugin's `disabledCategories` and `disabledCommands` add to what `disable` and
    * `readOnly` turn off, and its `editable` and `fillable` keep only what both allow. A list of
-   * definitions (`annotation.tools`, `commands.commands`, `i18n.locales`) adds to the viewer's.
-   * The language is `locale`'s, and `notAllowed`, when given, wins over the plugin's. `stamp`
+   * definitions (`annotation.tools`, `commands.commands`) adds to the viewer's. The i18n plugin
+   * takes only `fallbackLocale`: the languages are `locale`'s and `strings`'. `notAllowed`, when
+   * given, wins over the plugin's. `stamp`
    * and `signature` also take settings only the viewer has: the standard and quick stamps, and
    * which marks people keep and their fonts. Read once.
    */
@@ -403,11 +409,20 @@ export function FullViewer({
   // identities. Later prop changes are ignored, except the ones FollowProps
   // and ThemeProvider follow.
   const [resolved] = useState(() => {
-    // ── languages: the app's strings in the viewer's, and languages of its own ──
-    const { locales, loaders, codes } = localesOf(strings);
-
     // ── plugins: the app's settings for the built-ins, and its own plugins ──
     const pluginsRead = readPluginsConfig(pluginsConfig);
+
+    // ── languages: the app's strings in the viewer's, languages of its own, and the fallback ──
+    const { locales, loaders, codes } = localesOf(strings);
+    const askedFallback = pluginsRead.settings.i18n?.fallbackLocale;
+    const fallback = fallbackCodeOf(askedFallback, codes);
+    const languageProblems =
+      fallback === null
+        ? [
+            `the viewer has no language "${askedFallback}" to fall back to, so it falls back to ` +
+              'English: give its words in `strings`',
+          ]
+        : [];
     const tokens: Record<string, CapabilityToken<unknown>> = { ...VIEWER_PLUGINS };
     for (const { name, plugin } of pluginsRead.own) if (plugin.token) tokens[name] = plugin.token;
 
@@ -439,8 +454,14 @@ export function FullViewer({
       fonts: fonts ?? [],
       warnBeforeLeaving: warnBeforeLeaving !== false,
       onPanelResize,
-      i18n: { locales, loaders, codes, initial: localeCodeOf(locale, codes) },
-      plugins: pluginsRead,
+      i18n: {
+        locales,
+        loaders,
+        codes,
+        fallback: fallback ?? 'en',
+        initial: localeCodeOf(locale, codes, fallback ?? 'en'),
+      },
+      plugins: { ...pluginsRead, problems: [...pluginsRead.problems, ...languageProblems] },
       tokens: tokens as PluginTokens,
       ...turnedOffOf(disable, readOnly, pluginsRead.settings),
       appState,
@@ -584,11 +605,10 @@ export function FullViewer({
     measurementPlugin(settings.measurement),
     searchPlugin(settings.search),
     i18nPlugin({
-      fallbackLocale: 'en',
-      ...settings.i18n,
       locale: resolved.i18n.initial,
-      locales: [...resolved.i18n.locales, ...(settings.i18n?.locales ?? [])],
-      loaders: { ...resolved.i18n.loaders, ...settings.i18n?.loaders },
+      fallbackLocale: resolved.i18n.fallback,
+      locales: resolved.i18n.locales,
+      loaders: resolved.i18n.loaders,
     }),
     commandsPlugin({
       ...settings.commands,
@@ -626,7 +646,7 @@ export function FullViewer({
               appState: resolved.appState,
             }}
             settings={settings}
-            locale={localeCodeOf(locale, resolved.i18n.codes)}
+            locale={localeCodeOf(locale, resolved.i18n.codes, resolved.i18n.fallback)}
             disable={disable}
             readOnly={readOnly}
             appState={appState}

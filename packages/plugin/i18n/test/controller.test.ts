@@ -104,6 +104,78 @@ describe('i18n controller', () => {
     expect(seen).toEqual(['en>ar']);
   });
 
+  it('loads a fallback language from loaders at the start, and shows a language once both are in', async () => {
+    const swedish = deferred<Locale>();
+    const sv: Locale = { code: 'sv', name: 'Svenska', translations: { hi: 'Hej', bye: 'Hej då' } };
+    const da: Locale = { code: 'da', name: 'Dansk', translations: { hi: 'Hej med dig' } };
+    const i18n = harness({
+      locales: [en, da],
+      locale: 'da',
+      fallbackLocale: 'sv',
+      loaders: { sv: () => swedish.promise },
+    });
+    const seen: string[] = [];
+    i18n.onLocaleChanged((event) => seen.push(`${event.previousLocale}>${event.locale}`));
+    expect(i18n.getLocale()).toBe('en'); // the first language in locales, meanwhile
+    expect(i18n.getLoadingLocale()).toBe('da');
+    expect(i18n.t('hi')).toBe('Hello');
+
+    // A switch while the fallback language loads waits for it too.
+    const switched = i18n.setLocale('da');
+    swedish.resolve(sv);
+    await switched;
+    expect(i18n.getLocale()).toBe('da');
+    expect(i18n.t('hi')).toBe('Hej med dig');
+    expect(i18n.t('bye')).toBe('Hej då'); // from the fallback language
+    expect(seen).toEqual(['en>da']);
+  });
+
+  it('shows a language without its fallback language when that fails to load', async () => {
+    const da: Locale = { code: 'da', name: 'Dansk', translations: { hi: 'Hej med dig' } };
+    const i18n = harness({
+      locales: [en, da],
+      locale: 'da',
+      fallbackLocale: 'sv',
+      loaders: {
+        sv: async () => {
+          throw new Error('offline');
+        },
+      },
+    });
+    const failures: string[] = [];
+    i18n.onLocaleLoadFailed((event) => failures.push(event.locale));
+    await flush();
+    expect(failures).toEqual(['sv']);
+    expect(i18n.getLocale()).toBe('da');
+    expect(i18n.getLoadingLocale()).toBeNull();
+  });
+
+  it("shows a language's strings from locales until its loader has run", async () => {
+    const more = deferred<Locale>();
+    const i18n = harness({
+      locales: [en],
+      loaders: { en: () => more.promise },
+    });
+    expect(i18n.getLocale()).toBe('en');
+    expect(i18n.t('hi')).toBe('Hello');
+    expect(i18n.listLocales()).toMatchObject([{ code: 'en', loaded: false }]);
+    more.resolve({ ...en, translations: { ...en.translations, bye: 'Goodbye' } });
+    await flush();
+    expect(i18n.t('bye')).toBe('Goodbye');
+    expect(i18n.getLoadingLocale()).toBeNull();
+    expect(i18n.listLocales()).toMatchObject([{ code: 'en', loaded: true }]);
+  });
+
+  it('fetches a new fallback language from loaders', async () => {
+    const sv: Locale = { code: 'sv', name: 'Svenska', translations: { bye: 'Hej då' } };
+    const i18n = harness({ locales: [en, nl], locale: 'nl', loaders: { sv: async () => sv } });
+    i18n.updateSettings({ fallbackLocale: 'sv' });
+    await flush();
+    expect(i18n.t('bye')).toBe('Hej då');
+    expect(i18n.listLocales().find((locale) => locale.code === 'sv')?.loaded).toBe(true);
+    expect(i18n.getLocale()).toBe('nl');
+  });
+
   it('stops waiting when the signal fires, and the language arriving later stays unused', async () => {
     const pack = deferred<Locale>();
     const i18n = harness({ locales: [en], loaders: { nl: () => pack.promise } });
