@@ -151,6 +151,7 @@ export const he: Locale = {
       redact: {
         mark: 'סמן להשחרה',
         applyAll: 'החל השחרות',
+        apply: { one: 'החל השחרה', two: 'החל {count} השחרות', other: 'החל {count} השחרות' },
         clearAll: 'נקה סימונים',
       },
       undo: 'בטל',
@@ -640,7 +641,11 @@ export const he: Locale = {
       redactionArea: 'סימון אזור',
       redactionText: 'סימון טקסט',
       redactionRemove: 'הסר סימון',
-      redactConfirmTitle: 'להחיל את ההשחרות?',
+      redactConfirmTitle: {
+        one: 'להחיל את ההשחרה?',
+        two: 'להחיל את ההשחרות?',
+        other: 'להחיל את ההשחרות?',
+      },
       redactConfirmBody: {
         one: 'התוכן שמתחת לסימון השחרה אחד יוסר לצמיתות. לא ניתן לבטל פעולה זו.',
         two: 'התוכן שמתחת ל-{count} סימוני השחרה יוסר לצמיתות. לא ניתן לבטל פעולה זו.',

@@ -150,6 +150,7 @@ export const nl: Locale = {
       redact: {
         mark: 'Markeren voor redactie',
         applyAll: 'Redacties toepassen',
+        apply: { one: 'Redactie toepassen', other: '{count} redacties toepassen' },
         clearAll: 'Markeringen wissen',
       },
       undo: 'Ongedaan maken',
@@ -635,7 +636,7 @@ export const nl: Locale = {
       redactionArea: 'Gebiedsmarkering',
       redactionText: 'Tekstmarkering',
       redactionRemove: 'Markering verwijderen',
-      redactConfirmTitle: 'Redacties toepassen?',
+      redactConfirmTitle: { one: 'Redactie toepassen?', other: 'Redacties toepassen?' },
       redactConfirmBody: {
         one: 'De inhoud onder {count} redactiemarkering definitief verwijderen. Dit kan niet ongedaan worden gemaakt.',
         other:

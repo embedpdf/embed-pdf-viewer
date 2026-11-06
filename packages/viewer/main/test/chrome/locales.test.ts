@@ -128,9 +128,11 @@ describe('the language packs', () => {
     );
     expect(plurals.map(([key]) => key).sort()).toEqual([
       'attachments.count',
+      'commands.redact.apply',
       'comments.count',
       'demo.redactConfirmBody',
       'demo.redactConfirmCollateral',
+      'demo.redactConfirmTitle',
       'demo.searchResults',
       'stylePanel.selected',
     ]);

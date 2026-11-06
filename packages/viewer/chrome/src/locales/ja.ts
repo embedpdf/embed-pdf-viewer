@@ -150,6 +150,7 @@ export const ja: Locale = {
       redact: {
         mark: '墨消し用にマーク',
         applyAll: '墨消しを適用',
+        apply: { other: '{count} 件の墨消しを適用' },
         clearAll: 'マークを消去',
       },
       undo: '元に戻す',
@@ -634,7 +635,7 @@ export const ja: Locale = {
       redactionArea: '領域のマーク',
       redactionText: 'テキストのマーク',
       redactionRemove: 'マークを削除',
-      redactConfirmTitle: '墨消しを適用しますか？',
+      redactConfirmTitle: { other: '墨消しを適用しますか？' },
       redactConfirmBody: {
         other:
           '{count} 個の墨消しマークの下にあるコンテンツを完全に削除します。この操作は取り消せません。',

@@ -387,7 +387,19 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('the words the viewer sh
         );
         await run(tab, 'redaction:apply');
       },
-      'Apply redactions?',
+      'Apply redaction?',
+    );
+    await closeEverything(tab);
+    // The annotation bar on the selected mark, and the confirmation its Apply opens.
+    await tab.evaluate(() => {
+      const [mark] = window.element.viewer.get('redaction').listPending();
+      window.element.viewer.get('annotation').selection.select([mark!.ref]);
+    });
+    await visit('a selected redaction mark', async () => {});
+    await visit(
+      'annotation:apply-redaction',
+      () => run(tab, 'annotation:apply-redaction'),
+      'Apply redaction?',
     );
     await closeEverything(tab);
     expect(found).toEqual({});

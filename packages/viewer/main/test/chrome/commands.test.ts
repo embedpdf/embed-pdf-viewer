@@ -325,6 +325,7 @@ describe('the built-in commands', () => {
         'tool:stamp',
         'tool:redact',
         'redaction:apply',
+        'annotation:apply-redaction',
         'measurement:calibrate',
         'selection:copy',
         'selection:highlight',

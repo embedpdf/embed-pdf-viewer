@@ -151,6 +151,14 @@ export const ar: Locale = {
       redact: {
         mark: 'تحديد للتنقيح',
         applyAll: 'تطبيق التنقيحات',
+        apply: {
+          zero: 'تطبيق التنقيحات',
+          one: 'تطبيق التنقيح',
+          two: 'تطبيق التنقيحين',
+          few: 'تطبيق {count} تنقيحات',
+          many: 'تطبيق {count} تنقيحًا',
+          other: 'تطبيق {count} تنقيح',
+        },
         clearAll: 'مسح العلامات',
       },
       undo: 'تراجع',
@@ -660,7 +668,14 @@ export const ar: Locale = {
       redactionArea: 'علامة منطقة',
       redactionText: 'علامة نص',
       redactionRemove: 'إزالة العلامة',
-      redactConfirmTitle: 'تطبيق التنقيحات؟',
+      redactConfirmTitle: {
+        zero: 'تطبيق التنقيحات؟',
+        one: 'تطبيق التنقيح؟',
+        two: 'تطبيق التنقيحين؟',
+        few: 'تطبيق التنقيحات؟',
+        many: 'تطبيق التنقيحات؟',
+        other: 'تطبيق التنقيحات؟',
+      },
       redactConfirmBody: {
         zero: 'لا توجد علامات تنقيح لإزالة المحتوى أسفلها.',
         one: 'ستتم إزالة المحتوى الموجود أسفل علامة تنقيح واحدة نهائيًا. لا يمكن التراجع عن هذا الإجراء.',

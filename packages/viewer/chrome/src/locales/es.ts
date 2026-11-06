@@ -150,6 +150,11 @@ export const es: Locale = {
       redact: {
         mark: 'Marcar para censurar',
         applyAll: 'Aplicar censuras',
+        apply: {
+          one: 'Aplicar censura',
+          many: 'Aplicar {count} de censuras',
+          other: 'Aplicar {count} censuras',
+        },
         clearAll: 'Borrar marcas',
       },
       undo: 'Deshacer',
@@ -645,7 +650,11 @@ export const es: Locale = {
       redactionArea: 'Marca de área',
       redactionText: 'Marca de texto',
       redactionRemove: 'Quitar marca',
-      redactConfirmTitle: '¿Aplicar censuras?',
+      redactConfirmTitle: {
+        one: '¿Aplicar censura?',
+        many: '¿Aplicar censuras?',
+        other: '¿Aplicar censuras?',
+      },
       redactConfirmBody: {
         one: 'Eliminar permanentemente el contenido bajo {count} marca de censura. No se puede deshacer.',
         many: 'Eliminar permanentemente el contenido bajo {count} de marcas de censura. No se puede deshacer.',
