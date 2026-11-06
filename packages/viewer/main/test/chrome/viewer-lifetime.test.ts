@@ -89,7 +89,7 @@ describe('createViewer', () => {
 
   it('stops every listener, registration and watch made through it when disposed', () => {
     const { kernel, documents, opened, executed, listeners } = fakeKernel();
-    const { viewer, dispose } = createViewer(kernel, tokens);
+    const { viewer, destroy } = createViewer(kernel, tokens);
     const heard: string[] = [];
     viewer.documents.onOpened(({ documentId }) => heard.push(`opened ${documentId}`));
     viewer.commands.onExecuted(({ commandId }) => heard.push(`executed ${commandId}`));
@@ -101,7 +101,7 @@ describe('createViewer', () => {
     documents.setActive('two');
     expect(heard).toEqual(['opened two', 'active two']);
 
-    dispose();
+    destroy();
     opened.emit({ documentId: 'three' });
     executed.emit({ commandId: 'zoom:in' });
     documents.setActive('three');
@@ -122,13 +122,13 @@ describe('createViewer', () => {
 
   it('refuses every call with instance-closed once disposed', async () => {
     const { kernel } = fakeKernel();
-    const { viewer, dispose } = createViewer(kernel, tokens);
+    const { viewer, destroy } = createViewer(kernel, tokens);
     const kept = viewer.get('search' as never) as {
       search(): Promise<number>;
       getHitCount(): number;
     };
-    dispose();
-    dispose();
+    destroy();
+    destroy();
 
     for (const call of [
       () => viewer.get('search' as never),
@@ -152,8 +152,8 @@ describe('createViewer', () => {
 
   it('makes a new subscription on a disposed viewer do nothing', () => {
     const { kernel, opened, listeners } = fakeKernel();
-    const { viewer, dispose } = createViewer(kernel, tokens);
-    dispose();
+    const { viewer, destroy } = createViewer(kernel, tokens);
+    destroy();
     const heard: string[] = [];
     const stop = viewer.documents.onOpened(() => heard.push('opened'));
     const unwatch = viewer.watch(

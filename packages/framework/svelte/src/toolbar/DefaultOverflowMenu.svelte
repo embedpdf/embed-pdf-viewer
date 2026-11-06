@@ -51,7 +51,7 @@
 
   function choose(row: OverflowRow) {
     view.execute(row.command);
-    if (row.type !== 'submenu') view.close();
+    if (row.kind !== 'submenu') view.close();
   }
 </script>
 
@@ -97,7 +97,7 @@
             style:white-space="nowrap"
           >
             <span>{command.active && section.role === 'radio' ? '• ' : ''}{command.label}</span>
-            {#if row.type === 'submenu'}<span>▸</span>{/if}
+            {#if row.kind === 'submenu'}<span>▸</span>{/if}
           </button>
         {/if}
       {/each}

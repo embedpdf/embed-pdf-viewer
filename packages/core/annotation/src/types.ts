@@ -286,13 +286,13 @@ export interface SnapSettings {
    * How close a move comes before it snaps, in screen pixels: each pointer
    * sample converts it by its `scale`. Without one it is in page units.
    */
-  readonly alignmentThreshold: number;
+  readonly alignmentThresholdPx: number;
   /** Snap a turn onto `rotationAngles`. */
   readonly rotation: boolean;
   /** The angles a turn snaps to, in degrees clockwise. */
   readonly rotationAngles: readonly number[];
   /** How close a turn comes before it snaps, in degrees. */
-  readonly rotationThreshold: number;
+  readonly rotationThresholdDeg: number;
 }
 
 /**
@@ -614,7 +614,7 @@ export interface PointerInput {
   displayRotation?: PageRotation;
   /**
    * Screen pixels per page unit at the event: the page's view scale. A
-   * setting in screen pixels (`snap.alignmentThreshold`) is converted by it,
+   * setting in screen pixels (`snap.alignmentThresholdPx`) is converted by it,
    * so snapping feels the same at every zoom. Absent → 1.
    */
   scale?: number;

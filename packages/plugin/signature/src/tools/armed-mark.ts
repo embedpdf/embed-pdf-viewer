@@ -29,7 +29,7 @@ export function createArmedMarkHandler(
     id: 'signature:armed-mark-on-field',
     priority: ANNOTATION_EDIT_PRIORITY + 1,
     enabledFor: (tool) => tool.id === ARMED_STAMP_TOOL_ID,
-    onDown: (sample) => {
+    onPointerDown: (sample) => {
       if (!sample.page) return false;
       const armed = stamp.getArmedAsset(documentId);
       if (!armed || stamp.getLibrary(armed.libraryId)?.kind !== SIGNATURES_LIBRARY_KIND)

@@ -314,7 +314,7 @@ describe('store.apply', () => {
   it('selection.update moves a square by its rect, as update does', async () => {
     const harness = annotationHarness();
     await harness.load([square(20)]);
-    harness.capability.selection.set([refOf(20)]);
+    harness.capability.selection.select([refOf(20)]);
     const read = dataOf(harness.capability.get(refOf(20)));
     const rect = read.rect as { x: number; y: number; width: number; height: number };
     const box = read.box as { x: number; y: number; width: number; height: number };
@@ -334,7 +334,7 @@ describe('store.apply', () => {
   it('a rect with a new shape is refused the same way from the sidebar and the API', async () => {
     const harness = annotationHarness();
     await harness.load([square(20)]);
-    harness.capability.selection.set([refOf(20)]);
+    harness.capability.selection.select([refOf(20)]);
     const read = dataOf(harness.capability.get(refOf(20)));
     const rect = read.rect as { x: number; y: number; width: number; height: number };
     const box = read.box as { x: number; y: number; width: number; height: number };
@@ -358,7 +358,7 @@ describe('store.apply', () => {
     for (const unlock of doors) {
       const harness = annotationHarness();
       await harness.load([{ ...square(20), locked: true } as FileAnnotation]);
-      harness.capability.selection.set([refOf(20)]);
+      harness.capability.selection.select([refOf(20)]);
       harness.update.mockResolvedValueOnce({ annotation: square(20) });
       await unlock(harness);
       expect(harness.update.mock.calls[0]![1]).toEqual({ subtype: 'square', locked: false });

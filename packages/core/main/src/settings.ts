@@ -62,7 +62,7 @@ export interface SettingsDeclaration<T> {
 export interface SettingsChangedEvent<T> {
   readonly settings: T;
   /** The top-level settings whose value changed (`['highlight']` when only a highlight color did). */
-  readonly changed: readonly (keyof T)[];
+  readonly changedKeys: readonly (keyof T)[];
 }
 
 /** The four settings calls, spread into a plugin's capability. */
@@ -113,7 +113,7 @@ export interface SettingsStore<T> {
    * listeners go when the instance closes; the settings stay.
    */
   forInstance(cleanup: (teardown: () => void) => void): Settings<T>;
-  dispose(): void;
+  destroy(): void;
 }
 
 /**
@@ -135,7 +135,7 @@ export function createSettingsStore<T extends object>(
     if (changed.length === 0) return;
     current = next;
     wake();
-    changedHook.emit({ settings: next, changed });
+    changedHook.emit({ settings: next, changedKeys: changed });
   };
 
   const api: SettingsApi<T> = {
@@ -150,13 +150,13 @@ export function createSettingsStore<T extends object>(
     forInstance(cleanup) {
       const instanceChanged = createEventHook<SettingsChangedEvent<T>>(report);
       cleanup(changedHook.on((event) => instanceChanged.emit(event)));
-      cleanup(() => instanceChanged.dispose());
+      cleanup(() => instanceChanged.destroy());
       return {
         get: api.getSettings,
         api: { ...api, onSettingsChanged: instanceChanged.on },
       };
     },
-    dispose: () => changedHook.dispose(),
+    destroy: () => changedHook.destroy(),
   };
 }
 

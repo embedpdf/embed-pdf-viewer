@@ -134,6 +134,6 @@ async function cmsFor(
     hash: prepared.algorithm,
     profile,
     signer: key,
-    signingTime: profile === 'pkcs7' ? new Date() : undefined,
+    signingTime: profile === 'pkcs7' ? new Date().toISOString() : undefined,
   });
 }

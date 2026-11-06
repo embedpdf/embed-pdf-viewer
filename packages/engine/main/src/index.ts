@@ -204,10 +204,10 @@ function workerBoot(
       postWorkerInit(spawned.worker, wasm);
       try {
         const transport = await BrowserWorkerTransport.spawn(spawned.worker);
-        spawned.dispose();
+        spawned.destroy();
         return transport;
       } catch (error) {
-        spawned.dispose();
+        spawned.destroy();
         spawned.worker.terminate();
         if (spawned.file === null) throw error;
         throw new Error(
@@ -232,7 +232,7 @@ function postWorkerInit(worker: Worker, wasm: ResolvedWasmSource): void {
 interface CreatedWorker {
   worker: Worker;
   /** Runs once the handshake settles: revokes a blob: URL. */
-  dispose: () => void;
+  destroy: () => void;
   /** The bundled file it started from, for the error when it never starts. */
   file: string | null;
 }
@@ -251,18 +251,18 @@ async function createEngineWorker(
   configuredUrl: string | null,
 ): Promise<CreatedWorker> {
   if (typeof delivery === 'function') {
-    return { worker: delivery(), dispose: () => {}, file: null };
+    return { worker: delivery(), destroy: () => {}, file: null };
   }
   if (configuredUrl !== null) {
     return {
       worker: startWorker(configuredUrl, { type: 'module' }),
-      dispose: () => {},
+      destroy: () => {},
       file: null,
     };
   }
   const file = delivery === undefined ? findEngineWorkerFile() : null;
   if (file !== null) {
-    return { worker: startWorker(file, { type: 'module' }), dispose: () => {}, file };
+    return { worker: startWorker(file, { type: 'module' }), destroy: () => {}, file };
   }
 
   let source: string;
@@ -279,7 +279,7 @@ async function createEngineWorker(
   const blob = createWorkerBlobUrl(source);
   try {
     const worker = startWorker(blob.url, { type: 'module' });
-    return { worker, dispose: blob.revoke, file: null };
+    return { worker, destroy: blob.revoke, file: null };
   } catch (cause) {
     blob.revoke();
     throw new Error(

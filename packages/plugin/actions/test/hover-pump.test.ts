@@ -21,8 +21,9 @@ function fakeDispatch() {
   const submitted: string[] = [];
   const pending: Array<() => void> = [];
   const dispatch = (trigger: ActionTrigger): Promise<ActionTriggerResult> => {
-    if (trigger.scope !== 'annotation') throw new Error('unexpected scope');
-    const objectNumber = trigger.ref.kind === 'objectNumber' ? trigger.ref.objectNumber : -1;
+    if (trigger.type !== 'annotation') throw new Error('unexpected scope');
+    const objectNumber =
+      trigger.annotation.kind === 'objectNumber' ? trigger.annotation.objectNumber : -1;
     submitted.push(`${trigger.event === 'cursorEnter' ? 'E' : 'X'}:${objectNumber}`);
     return new Promise((resolve) =>
       pending.push(() => resolve({ status: 'executed', steps: [], diagnostics: [] })),

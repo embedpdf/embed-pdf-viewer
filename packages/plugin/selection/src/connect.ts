@@ -24,7 +24,7 @@ export function connectSelection(
   ctx.cleanup(
     interaction.registerHandler(
       createTextSelectHandler(selection, interaction, feedback, {
-        dragThreshold: () => settings.get().dragThreshold,
+        dragThresholdPx: () => settings.get().dragThresholdPx,
       }),
     ),
   );

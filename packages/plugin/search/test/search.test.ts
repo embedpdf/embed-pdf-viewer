@@ -98,7 +98,7 @@ function fakeDocument(
         listeners.add(listener);
         return () => listeners.delete(listener);
       },
-      lastServerId: () => null,
+      lastServerSequence: () => null,
     },
     pages: {
       list: () => Promise.resolve({ pageCount: 2, labels: [], pages: [page(5, 0), page(7, 1)] }),
@@ -513,7 +513,8 @@ describe('cancelling', () => {
     const refreshing = api.refresh({ signal: controller.signal });
     await tick();
     controller.abort();
-    await expect(refreshing).resolves.toMatchObject({ status: 'cancelled' });
+    await expect(refreshing).resolves.toBeUndefined();
+    expect(api.getStatus()).toBe('cancelled');
     expect(held[0].aborted).toBe(true);
     await kernel.destroy();
   });
@@ -550,21 +551,21 @@ describe('settings', () => {
     await api.search({ text: 'x' });
 
     api.nextHit();
-    expect(stage.reveals.at(-1)).toMatchObject({ anchor: { y: 0.35 }, behavior: 'smooth' });
+    expect(stage.reveals.at(-1)).toMatchObject({ align: { y: 0.35 }, behavior: 'smooth' });
 
-    api.updateSettings({ reveal: { anchor: { y: 'center' }, behavior: 'instant' } });
+    api.updateSettings({ reveal: { align: { y: 'center' }, behavior: 'instant' } });
     api.nextHit();
-    expect(stage.reveals.at(-1)).toMatchObject({ anchor: { y: 'center' }, behavior: 'instant' });
+    expect(stage.reveals.at(-1)).toMatchObject({ align: { y: 'center' }, behavior: 'instant' });
 
     api.revealActiveHit({ behavior: 'smooth' });
-    expect(stage.reveals.at(-1)).toMatchObject({ anchor: { y: 'center' }, behavior: 'smooth' });
+    expect(stage.reveals.at(-1)).toMatchObject({ align: { y: 'center' }, behavior: 'smooth' });
     await kernel.destroy();
   });
 
   it('a highlight change keeps the colors it leaves out, fires once, and reset goes back to what was registered', async () => {
     const { kernel, api } = await boot([], { config: { highlight: { activeColor: '#ff0000' } } });
     const changes: unknown[] = [];
-    api.onSettingsChanged((event) => changes.push(event.changed));
+    api.onSettingsChanged((event) => changes.push(event.changedKeys));
 
     api.updateSettings({ highlight: { color: 'rgb(253 224 71 / 0.4)', blendMode: 'normal' } });
     expect(api.getSettings().highlight).toEqual({

@@ -129,7 +129,7 @@ export function createStore(report: (error: unknown) => void = console.error): S
       revoke() {
         if (!cell.live) return;
         cell.live = false;
-        changed.dispose();
+        changed.destroy();
         if (leases.get(key) === (handle as SliceLease<unknown>)) {
           leases.delete(key);
           delete states[key];

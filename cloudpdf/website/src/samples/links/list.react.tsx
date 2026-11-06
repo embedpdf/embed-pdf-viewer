@@ -36,7 +36,7 @@ function LinkList() {
   // Every way of following a link ends up here: a click, a key, or code.
   useLinkEvent(
     (link) => link.onActivated,
-    ({ target, activation }) => setLast(`${target.kind} → ${activation.outcome}`),
+    ({ target, activation }) => setLast(`${target.kind} → ${activation.status}`),
   );
 
   return (

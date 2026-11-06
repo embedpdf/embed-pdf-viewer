@@ -67,7 +67,7 @@ function fakeDocument(
   const listeners = new Set<(event: unknown) => void>();
   const reads: Array<ReturnType<typeof deferred<DocumentMetadata>>> = [];
   const emit = (event: unknown) => listeners.forEach((listener) => listener(event));
-  const origin = { kind: 'local', sessionId: 's1', sub: null, ts: 1 };
+  const origin = { kind: 'local', sessionId: 's1', subject: null, at: new Date(1).toISOString() };
   const handle = {
     id: 'doc',
     events: {
@@ -75,7 +75,7 @@ function fakeDocument(
         listeners.add(listener);
         return () => listeners.delete(listener);
       },
-      lastServerId: () => null,
+      lastServerSequence: () => null,
     },
     pages: { list: () => Promise.resolve({ pageCount: 1, labels: [], pages: [page] }) },
     security: { allows: () => options.allowEdit ?? true },
@@ -167,7 +167,7 @@ describe('metadata controller', () => {
 
     doc.emit({
       type: 'metadata.updated',
-      origin: { kind: 'remote', sessionId: 's2', sub: 'alice', ts: 2 },
+      origin: { kind: 'remote', sessionId: 's2', subject: 'alice', at: new Date(2).toISOString() },
       metadata: META({ title: 'newer' }),
       meta: { affectedPages: [], cacheDelta: null },
     });

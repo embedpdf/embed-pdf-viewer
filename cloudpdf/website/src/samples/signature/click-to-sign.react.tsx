@@ -28,7 +28,7 @@ const plugins = [
   annotationPlugin(),
   formPlugin(),
   stampPlugin({ assetEngine }),
-  signaturePlugin({ key: () => signer }),
+  signaturePlugin({ signingKey: () => signer }),
 ];
 
 const agreement: OpenInput = { kind: 'grant', grant: 'shr_G5GcxJeEBa2IiwIs0DCNruCL' };

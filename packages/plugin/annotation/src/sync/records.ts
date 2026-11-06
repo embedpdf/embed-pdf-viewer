@@ -443,7 +443,7 @@ export function createRecordsMirror(
         : { annotations: [] };
       return (current) => withPages(current, pages, annotations);
     },
-    changed: (change) => events.recordsChanged.emit(change),
+    onChanged: (change) => events.recordsChanged.emit(change),
   });
   return records;
 }

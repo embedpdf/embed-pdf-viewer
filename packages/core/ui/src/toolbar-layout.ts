@@ -400,7 +400,7 @@ export function groupMenuView<Command extends ToolbarCommand>(
       {
         labelKey: view.labelKey,
         role: view.role === 'tabs' ? 'radio' : undefined,
-        rows: view.commands.map((command) => ({ type: 'command' as const, command: command.id })),
+        rows: view.commands.map((command) => ({ kind: 'command' as const, command: command.id })),
       },
     ],
     isOpen,

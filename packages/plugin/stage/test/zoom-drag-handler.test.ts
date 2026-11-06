@@ -62,24 +62,24 @@ describe('the zoom drag handler', () => {
   it("takes its lens's presses, on a page or between pages, and forwards the drag in viewport px", () => {
     const { stage, interaction } = fakes();
     const handler = createZoomDragHandler(stage, interaction);
-    expect(handler.onDown(sample('down'))).toBe(true);
+    expect(handler.onPointerDown(sample('down'))).toBe(true);
     expect(stage.beginZoomDrag).toHaveBeenCalledWith({ x: 40, y: 60 });
     expect(
-      handler.onDown(sample('down', { page: { ref: toPageRef(1), point: { x: 1, y: 2 } } })),
+      handler.onPointerDown(sample('down', { page: { ref: toPageRef(1), point: { x: 1, y: 2 } } })),
     ).toBe(true);
-    handler.onMove!(sample('move', { viewport: { x: 90, y: 100 } }));
+    handler.onPointerMove!(sample('move', { viewport: { x: 90, y: 100 } }));
     expect(stage.moveZoomDrag).toHaveBeenCalledWith({ x: 90, y: 100 });
-    handler.onUp!(sample('up'));
+    handler.onPointerUp!(sample('up'));
     expect(stage.endZoomDrag).toHaveBeenCalledWith({ zoomOut: false });
-    handler.onCancel!(sample('cancel'));
+    handler.onPointerCancel!(sample('cancel'));
     expect(stage.cancelZoomDrag).toHaveBeenCalled();
   });
 
   it("leaves another surface's press alone: its px are another element's", () => {
     const { stage, interaction } = fakes();
     const handler = createZoomDragHandler(stage, interaction);
-    expect(handler.onDown(sample('down', { source: undefined }))).toBe(false);
-    expect(handler.onDown(sample('down', { source: 'stage-thumbs' }))).toBe(false);
+    expect(handler.onPointerDown(sample('down', { source: undefined }))).toBe(false);
+    expect(handler.onPointerDown(sample('down', { source: 'stage-thumbs' }))).toBe(false);
     expect(stage.beginZoomDrag).not.toHaveBeenCalled();
   });
 
@@ -87,7 +87,7 @@ describe('the zoom drag handler', () => {
     const { stage, interaction } = fakes();
     const handler = createZoomDragHandler(stage, interaction);
     const alt = { ...NO_KEYS, alt: true };
-    handler.onUp!(sample('up', { modifiers: alt }));
+    handler.onPointerUp!(sample('up', { modifiers: alt }));
     expect(stage.endZoomDrag).toHaveBeenCalledWith({ zoomOut: true });
     handler.onHover!(sample('move', { modifiers: alt }));
     expect(interaction.claimCursor).toHaveBeenLastCalledWith('stage-zoom-out', 'zoom-out');

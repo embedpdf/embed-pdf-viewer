@@ -15,7 +15,7 @@ const engine = {
   open: (input: { id: string }) =>
     Promise.resolve({
       id: input.id,
-      events: { subscribe: () => () => {}, lastServerId: () => null },
+      events: { subscribe: () => () => {}, lastServerSequence: () => null },
       pages: { list: () => Promise.resolve({ pageCount: 0, labels: [], pages: [] }) },
       security: { allows: () => true },
       close: () => Promise.resolve(),

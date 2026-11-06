@@ -96,7 +96,7 @@ describe('interactive form JavaScript acceptance', () => {
       name: 'interactive_pdf_forms_javascript_demo.pdf',
       pageCount: pages.pageCount,
       pages: pages.pages,
-      revision: 0,
+      pagesSequence: 0,
       hasUnsavedChanges: false,
       renderPolicy: { kind: 'continuous' },
       pageLabels: [],
@@ -126,7 +126,7 @@ describe('interactive form JavaScript acceptance', () => {
       );
 
       expect(summaryResult.status).toBe('applied');
-      expect(summaryResult.uiEffects).toContainEqual({ kind: 'gotoPage', page: 1, phase: 'user' });
+      expect(summaryResult.uiEffects).toContainEqual({ type: 'gotoPage', page: 1, phase: 'user' });
       const afterSummary = await doc.forms.list();
       const summary = afterSummary.fields.find(({ name }) => name === 'summary');
       expect(summary?.valueEntry).toMatchObject({ kind: 'scalar' });
@@ -143,7 +143,7 @@ describe('interactive form JavaScript acceptance', () => {
 
       expect(printResult).toMatchObject({
         status: 'unchanged',
-        uiEffects: [{ kind: 'print', phase: 'user' }],
+        uiEffects: [{ type: 'print', phase: 'user' }],
       });
 
       const packageField = afterSummary.fields.find(({ name }) => name === 'package');
@@ -193,7 +193,7 @@ describe('interactive form JavaScript acceptance', () => {
         await activationFor(doc, confirmButton),
       );
       expect(confirmResult.uiEffects).toContainEqual({
-        kind: 'alert',
+        type: 'alert',
         message: 'Event confirmed. This alert was launched by embedded PDF JavaScript.',
         icon: 3,
         phase: 'user',

@@ -95,9 +95,9 @@ async function boot(scope?: string[]) {
     form.notifyWidgetEvent(trigger.ref, triggerRef, event);
   const drain = () =>
     actions.dispatch({
-      scope: 'annotation',
+      type: 'annotation',
       event: 'cursorEnter',
-      ref: { kind: 'objectNumber', page: toPageRef(999), objectNumber: 1 },
+      annotation: { kind: 'objectNumber', page: toPageRef(999), objectNumber: 1 },
       page: toPageRef(999),
     });
   const statusValue = () => {

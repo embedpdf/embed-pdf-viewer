@@ -62,7 +62,7 @@ interface HeldPrint {
 /** Cancel the printout on its way, or free the one made. */
 function drop(held: { current: HeldPrint | null }) {
   held.current?.cancel.abort();
-  held.current?.prepared?.dispose();
+  held.current?.prepared?.destroy();
   held.current = null;
 }
 
@@ -118,7 +118,7 @@ function PrintForm({ onClose }: { onClose: () => void }) {
       })
       .then(
         (prepared) => {
-          if (signal.aborted) return prepared.dispose();
+          if (signal.aborted) return prepared.destroy();
           job.prepared = prepared;
           if (prepared.needsTap) setJob({ kind: 'ready', prepared });
           else print(prepared);

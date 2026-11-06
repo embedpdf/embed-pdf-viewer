@@ -99,7 +99,7 @@ export const RENDER_DEFAULTS: RenderSettings = {
     size: 512,
     quantize: 'exact',
     maxScale: 128,
-    bleed: 1,
+    bleedPx: 1,
     prefetch: { margin: 0.5, velocityBias: true },
     settleMs: 150,
   },
@@ -132,7 +132,7 @@ export interface PageLayerOptions {
 }
 
 /**
- * An encoded page image: `source` is bytes or a URL, `format`/`contentType`
+ * An encoded page image: `source` is bytes or a URL, `format`/`mimeType`
  * say what they are, `width`/`height` its pixel size, and
  * `objectUrl()` mints a revocable object URL for an `<img>`.
  */

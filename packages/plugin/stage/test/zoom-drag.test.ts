@@ -20,7 +20,7 @@ const seenAt = (stage: StageHostCapability, point: Point): { page: PageRef; poin
 };
 /** Where a page point is drawn now, in viewport px. */
 const drawnAt = (stage: StageHostCapability, seen: { page: PageRef; point: Point }): Point => {
-  const frame = stage.getPageFrame(seen.page)!;
+  const frame = stage.getPageBox(seen.page)!;
   const view = frame.transform.pageToView(seen.point);
   return { x: frame.screenX + view.x, y: frame.screenY + view.y };
 };
@@ -97,7 +97,7 @@ describe('the zoom tool: a box', () => {
   it('can start between pages and reach onto the next page', () => {
     const { stage } = instantStage();
     stage.fitPage();
-    const frame = stage.getPageFrame(toPageRef(2))!;
+    const frame = stage.getPageBox(toPageRef(2))!;
     const { x: left, y: secondTop } = stage.worldToViewport({ x: frame.x, y: frame.y });
     const start = { x: left + 100, y: secondTop - 6 };
     expect(stage.getPageAt(start)).toBeNull(); // the space between pages 1 and 2

@@ -33,8 +33,9 @@ function createHarness(annots: Record<string, ModelAnnotation>) {
   const submitted: string[] = [];
   const actions = {
     dispatch: (trigger: ActionTrigger) => {
-      if (trigger.scope === 'annotation') {
-        const objectNumber = trigger.ref.kind === 'objectNumber' ? trigger.ref.objectNumber : -1;
+      if (trigger.type === 'annotation') {
+        const objectNumber =
+          trigger.annotation.kind === 'objectNumber' ? trigger.annotation.objectNumber : -1;
         submitted.push(`${trigger.event === 'cursorEnter' ? 'E' : 'X'}:${objectNumber}`);
       }
       return Promise.resolve({ status: 'executed' as const, steps: [], diagnostics: [] });

@@ -33,7 +33,7 @@ export function createValidation(
       options?.signal,
       validateSignatures(ctx.doc, {
         trust: settings.get().trust,
-        at: options?.at,
+        validationTime: options?.validationTime,
         until: options?.until ?? 'working-copy',
       }),
     );

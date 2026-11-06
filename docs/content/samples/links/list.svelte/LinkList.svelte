@@ -14,7 +14,7 @@
   // Every way of following a link ends up here: a click, a key, or code.
   useLinkEvent(
     (plugin) => plugin.onActivated,
-    ({ target, activation }) => (last = `${target.kind} → ${activation.outcome}`),
+    ({ target, activation }) => (last = `${target.kind} → ${activation.status}`),
   );
 </script>
 

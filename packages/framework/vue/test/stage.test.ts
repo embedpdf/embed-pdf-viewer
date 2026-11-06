@@ -55,7 +55,7 @@ const threePages = {
   open: (input: { id?: string }) =>
     Promise.resolve({
       id: input.id ?? 'doc',
-      events: { subscribe: () => () => {}, lastServerId: () => null },
+      events: { subscribe: () => () => {}, lastServerSequence: () => null },
       pages: {
         list: () => Promise.resolve({ pageCount: 3, labels: [], pages: [0, 1, 2].map(pageAt) }),
       },

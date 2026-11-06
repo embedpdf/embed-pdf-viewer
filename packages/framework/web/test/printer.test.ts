@@ -95,7 +95,7 @@ describe('browserPrinter on iOS', () => {
     expect(titles).toEqual(['Contract']);
     expect(document.title).toBe('My app');
 
-    staged.dispose();
+    staged.destroy();
     expect(document.body.querySelector('[data-epdf-print]')).toBeNull();
     expect(document.head.querySelector('style')).toBeNull();
     expect(revoked).toEqual(made);
@@ -145,7 +145,7 @@ describe('browserPrinter on a desktop browser', () => {
     await staged.print();
     expect(print).toHaveBeenCalledTimes(1);
 
-    staged.dispose();
+    staged.destroy();
     expect(document.body.querySelector('iframe')).toBeNull();
     expect(revoked).toEqual(made);
   });
@@ -207,7 +207,7 @@ describe('browserPrinter and PDFs', () => {
     await first.staged.print();
     expect(first.print).toHaveBeenCalledTimes(1);
     // The viewer prints after print() returned: the frame stays after the print is disposed.
-    first.staged.dispose();
+    first.staged.destroy();
     expect(first.frame.isConnected).toBe(true);
     expect(revoked).toEqual([]);
 
@@ -215,7 +215,7 @@ describe('browserPrinter and PDFs', () => {
     expect(first.frame.isConnected).toBe(false);
     expect(revoked).toEqual(['about:blank#pdf-0']);
     // Never printed: gone at once.
-    second.staged.dispose();
+    second.staged.destroy();
     expect(second.frame.isConnected).toBe(false);
     expect(revoked).toEqual(made);
   });

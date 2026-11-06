@@ -18,7 +18,7 @@ import { pageSpaceBoxesOf } from '@embedpdf/engine-core/runtime';
  *
  * A fake engine whose handle exposes a controllable event stream lets us
  * emit a `pages.rotated` (or move/delete) event and assert the kernel swaps
- * `DocumentMeta.pages` in place and bumps `revision` — the signal every
+ * `DocumentMeta.pages` in place and bumps `pagesSequence` — the signal every
  * document-scoped plugin (every Stage lens) keys its derivations on.
  */
 
@@ -50,7 +50,7 @@ class FakeEvents {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
   }
-  lastServerId(): number | null {
+  lastServerSequence(): number | null {
     return null;
   }
   emit(event: DocumentEvent): void {
@@ -119,7 +119,13 @@ function rotatedEvent(
     rotation,
     layout: { pageCount: pages.length, pages, labels: [], namedPages: [] },
     meta: { affectedPages: [], cacheDelta: null, opId: 'op-1', undoable: true },
-    origin: { kind: 'local', sessionId: 's', sub: null, ts: 1, serverId: null },
+    origin: {
+      kind: 'local',
+      sessionId: 's',
+      subject: null,
+      at: new Date(1).toISOString(),
+      serverSequence: null,
+    },
   };
 }
 
@@ -131,14 +137,14 @@ describe('kernel: document events → page registry', () => {
     await kernel.documents.open({ kind: 'bytes', id: 'doc-1', bytes: new Uint8Array() });
 
     const before = capture.ctx().document()!;
-    expect(before.revision).toBe(0);
+    expect(before.pagesSequence).toBe(0);
     expect(before.pages.map((pageInfo) => pageInfo.rotation)).toEqual([0, 0, 0]);
 
     // The engine confirmed a rotate; the event carries the new layout.
     events.emit(rotatedEvent([1], 90, [page(1, 0, 90), page(2, 1), page(3, 2)]));
 
     const after = capture.ctx().document()!;
-    expect(after.revision).toBe(1); // registry version advanced
+    expect(after.pagesSequence).toBe(1); // registry version advanced
     expect(after.pages.find((pageInfo) => pageInfo.ref.objectNumber === 1)!.rotation).toBe(90);
     expect(after.pageCount).toBe(3); // rotate keeps the page set
     // Identity preserved: same pages, same order.
@@ -156,11 +162,17 @@ describe('kernel: document events → page registry', () => {
       pages: [toPageRef(2)],
       layout: { pageCount: 2, pages: [page(1, 0), page(3, 1)], labels: [], namedPages: [] },
       meta: { affectedPages: [], cacheDelta: null, opId: 'op-1', undoable: true },
-      origin: { kind: 'remote', sessionId: 'other', sub: 'alice', ts: 1, serverId: 7 },
+      origin: {
+        kind: 'remote',
+        sessionId: 'other',
+        subject: 'alice',
+        at: new Date(1).toISOString(),
+        serverSequence: 7,
+      },
     } as DocumentEvent);
 
     const after = capture.ctx().document()!;
-    expect(after.revision).toBe(1);
+    expect(after.pagesSequence).toBe(1);
     expect(after.pageCount).toBe(2);
     expect(after.pages.map((pageInfo) => pageInfo.ref.objectNumber)).toEqual([1, 3]);
   });
@@ -176,10 +188,16 @@ describe('kernel: document events → page registry', () => {
       page: toPageRef(1),
       annotation: {} as never,
       meta: {} as never,
-      origin: { kind: 'local', sessionId: 's', sub: null, ts: 1, serverId: null },
+      origin: {
+        kind: 'local',
+        sessionId: 's',
+        subject: null,
+        at: new Date(1).toISOString(),
+        serverSequence: null,
+      },
     } as DocumentEvent);
 
-    expect(capture.ctx().document()!.revision).toBe(0); // page registry untouched
+    expect(capture.ctx().document()!.pagesSequence).toBe(0); // page registry untouched
   });
 
   it('closing the document unsubscribes — no leak, no post-close writes', async () => {

@@ -48,7 +48,7 @@ const welcome = async (): Promise<OpenInput> => {
         <li>
           <button type="button" class="result" [epdfCommand]="result.id" #command="epdfCommand">
             <span>{{ command.label() }}</span>
-            @if (command.shortcut(); as shortcut) {
+            @if (command.shortcutLabel(); as shortcut) {
               <kbd class="shortcut">{{ shortcut }}</kbd>
             }
           </button>

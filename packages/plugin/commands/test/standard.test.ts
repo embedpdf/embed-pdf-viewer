@@ -140,7 +140,7 @@ describe('standard commands', () => {
     const { command } = standard();
     const refs = [{ id: 1 }, { id: 2 }];
     const annotation = {
-      selection: { list: () => refs.map((ref) => ({ ref })), delete: vi.fn() },
+      selection: { getSelected: () => refs.map((ref) => ({ ref })), delete: vi.fn() },
       canDelete: (ref: { id: number }) => ref.id === 1,
       isEditable: (_ref: { id: number }) => true,
     };

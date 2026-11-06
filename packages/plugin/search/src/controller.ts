@@ -271,12 +271,12 @@ export function createSearchController(ctx: PluginContext<SearchModel, SearchSet
   }
 
   function reveal(hit: SearchHit, options?: SearchRevealOptions): void {
-    // Positioned reveal: the hit (not just its page) arrives at the anchor —
+    // Positioned reveal: the hit (not just its page) arrives at the alignment —
     // the call's options over the `reveal` setting. Zoom never changes.
     const arrival = { ...settings.get().reveal, ...options };
     ctx.tryGet(StageToken)?.reveal(hit.page, {
       rect: hit.bounds,
-      anchor: arrival.anchor,
+      align: arrival.align,
       behavior: arrival.behavior,
     });
   }
@@ -300,10 +300,10 @@ export function createSearchController(ctx: PluginContext<SearchModel, SearchSet
       ctx.allows('doc.text.search') && (!options?.snippets || ctx.allows('doc.text.copy')),
 
     search,
-    refresh: (options) => {
+    refresh: async (options) => {
       const { query, status } = state();
-      if (!query || status === 'idle') return Promise.resolve({ status: 'complete', hitCount: 0 });
-      return search(query, options);
+      if (!query || status === 'idle') return;
+      await search(query, options);
     },
     cancel: () => session.cancel('cancelled'),
     clear,

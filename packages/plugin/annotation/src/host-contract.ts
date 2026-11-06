@@ -107,17 +107,17 @@ export interface AnnotationLender {
     position: AnnotationPosition,
   ): readonly ChangeOp[];
   /** Whether this session may change and delete the record. */
-  authority(record: Annotation): { readonly update: boolean; readonly delete: boolean };
+  getAuthority(record: Annotation): { readonly update: boolean; readonly delete: boolean };
   /** What its records' pictures on a page depend on: a new value means new pictures. */
-  pictureEpoch(page: PageRef): string;
+  getPictureEpoch(page: PageRef): string;
   /** A record's confirmed picture version; kept for one that went, so an undo brings it back with it. */
-  pictureVersion(record: AnnotationRef): number;
+  getPictureVersion(record: AnnotationRef): number;
   /**
    * The record's look as it shows isn't its confirmed look yet, whatever changed it (a restyle,
    * a resize, one just placed, a change the lender made itself): it draws live, by its
    * {@link painter}, until the engine's picture of it is there.
    */
-  pending(record: AnnotationRef): boolean;
+  isPending(record: AnnotationRef): boolean;
   /**
    * How the lender draws the record live: the record upright in `box` (its box, or where a
    * gesture has it), in page space; `null` for one it doesn't draw. A record with a painter
@@ -177,7 +177,7 @@ export interface AnnotationHostCapability extends AnnotationCapability {
   remeasurePage(page: PageRef, scale: PdfMeasure): Promise<RecalibrationReport>;
   /** A distance draft was captured (the measurement plugin turns it into a calibration). */
   readonly onDraftCaptured: EventHook<CapturedAnnotationDraft>;
-  distanceCreationPage(): PageRef | null;
+  getDistanceCreationPage(): PageRef | null;
 
   // ── render projections (page space; a view env projects for a rotated / zoomed view) ──
   /**

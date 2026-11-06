@@ -103,7 +103,7 @@ What signing does depends on whether you give the viewer a key:
   plugins: {
     signature: {
       // your key, a signing service, or one kept in the browser
-      key: () => mySigningService.signer(),
+      signingKey: () => mySigningService.signer(),
       trust: { anchors: async () => [rootCertificate] },
       mode: 'ask',
       allowCertify: true,
@@ -116,7 +116,7 @@ What signing does depends on whether you give the viewer a key:
 
 | Setting | What it does | Default |
 | :-- | :-- | :-- |
-| `key` | The signer, or a function that returns one when someone signs | none: a mark is only drawn into the field |
+| `signingKey` | The signer, or a function that returns one when someone signs | none: a mark is only drawn into the field |
 | `mode` | `'sign'` seals the document, `'visual'` only draws, `'ask'` shows a dialog first | `'sign'` with a key, else `'visual'` |
 | `trust` | The certificates you trust, for checking signatures | none |
 | `allowCertify` | Let the first signature be a certification, which sets what may still change | `false` |

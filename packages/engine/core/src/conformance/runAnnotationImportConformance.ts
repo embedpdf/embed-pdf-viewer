@@ -144,7 +144,7 @@ export function runAnnotationImportConformance(
           if (event.type !== 'annotations.created') return;
           expect(event.annotation).toEqual(result.annotations[index]);
           expect(event.page).toEqual(pageRef);
-          expect(event.origin.tx).toEqual({ id: 'import-1', index, count: 2 });
+          expect(event.origin.transaction).toEqual({ id: 'import-1', index, count: 2 });
         });
       });
     });

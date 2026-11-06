@@ -260,7 +260,9 @@ export function runDocumentFontsConformance(
       const fontsChangedBy = (opId: string) =>
         events.filter(
           (event) =>
-            event.type === 'fonts.changed' && 'tx' in event.origin && event.origin.tx?.id === opId,
+            event.type === 'fonts.changed' &&
+            'transaction' in event.origin &&
+            event.origin.transaction?.id === opId,
         );
 
       const square = await doc.page(page).annotations.create({

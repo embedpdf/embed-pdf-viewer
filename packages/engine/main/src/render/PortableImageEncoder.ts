@@ -30,7 +30,7 @@ export class PortableImageEncoder implements LocalImageEncoder {
         width: raster.width,
         height: raster.height,
         format,
-        contentType: 'image/bmp',
+        mimeType: 'image/bmp',
         source: { kind: 'bytes', bytes: encodeBmp(pixels, raster.width, raster.height) },
       };
     }
@@ -46,7 +46,7 @@ export class PortableImageEncoder implements LocalImageEncoder {
       width: raster.width,
       height: raster.height,
       format,
-      contentType: 'image/png',
+      mimeType: 'image/png',
       source: { kind: 'bytes', bytes },
     };
   }

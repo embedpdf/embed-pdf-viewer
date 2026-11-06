@@ -377,7 +377,7 @@ export interface Viewpoint {
 
 /** Durable, serializable view state — the unit of session persistence. */
 export interface StageViewState extends StageSettings {
-  cursor: number;
+  pageIndex: number;
   anchor: Anchor;
 }
 
@@ -410,7 +410,7 @@ export interface GoToOptions {
 }
 
 /**
- * One axis of a reveal arrival — `scrollIntoView` vocabulary plus two
+ * Where a reveal lands, per axis — `scrollIntoView` vocabulary plus two
  * PDF-protocol necessities:
  *   absent     → minimal movement: scroll only if the target is off-screen
  *                (CSS 'nearest', as a bare reveal does)
@@ -421,11 +421,9 @@ export interface GoToOptions {
  *   number 0–1 → target center at this viewport fraction (0.35 = "top middle",
  *                the browser find-bar feel)
  */
-export type RevealAnchorValue = 'keep' | 'start' | 'center' | 'end' | number;
-
-export interface RevealAnchor {
-  x?: RevealAnchorValue;
-  y?: RevealAnchorValue;
+export interface RevealAlignment {
+  x?: ArrivalAlignValue;
+  y?: ArrivalAlignValue;
 }
 
 /**
@@ -443,13 +441,13 @@ export type RevealZoom = 'keep' | 'fit' | 'fit-width' | 'fit-height' | { level: 
  * Options for `reveal`: bring a page or a spot on it into view (a search hit,
  * "jump to comment"). A destination goes through `goToDestination`.
  *
- * With none of `rect`/`zoom`/`anchor` set, a reveal is minimal movement to
+ * With none of `rect`/`zoom`/`align` set, a reveal is minimal movement to
  * make the page visible, with the cursor untouched.
  * A positioned reveal (any of the three set) is "you are now looking at
- * this spot": the camera places the target per the anchor, a zoom
+ * this spot": the camera places the target per the alignment, a zoom
  * directive resolves to a concrete level (recorded as the zoom intent),
  * and the cursor follows the camera — while still clamping against the
- * normal camera bounds, so anchors are best-effort near document edges.
+ * normal camera bounds, so alignments are best-effort near document edges.
  */
 export interface RevealOptions {
   behavior?: ScrollBehaviorKind;
@@ -460,7 +458,7 @@ export interface RevealOptions {
    */
   rect?: Rect;
   zoom?: RevealZoom;
-  anchor?: RevealAnchor;
+  align?: RevealAlignment;
 }
 
 // ── events ──
@@ -483,7 +481,7 @@ export interface StageMotionEndedEvent {
 }
 export interface StageSettingsChangedEvent {
   readonly settings: StageSettings;
-  readonly changed: readonly (keyof StageSettings)[];
+  readonly changedKeys: readonly (keyof StageSettings)[];
 }
 export interface StageViewportChangedEvent {
   readonly size: Size;
@@ -682,7 +680,7 @@ export interface StageCapability {
   /** A page-space rect → its viewport-space bounding box; null when the page is not laid out. */
   pageRectToViewport(page: PageRef | number, rect: Rect): ViewportRect | null;
   /** The laid-out box for a page (its ref or its index), on screen or not; null before placement. */
-  getPageFrame(page: PageRef | number): VisiblePage | null;
+  getPageBox(page: PageRef | number): VisiblePage | null;
 
   // ── events ──
   /** The cursor page changed. */

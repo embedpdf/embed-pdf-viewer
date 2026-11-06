@@ -203,7 +203,7 @@ describe('onSettingsChanged', () => {
     expect(listener).toHaveBeenCalledTimes(1);
     expect(listener).toHaveBeenCalledWith({
       settings: settings.getSettings(),
-      changed: ['reveal', 'highlight'], // `limit` was already null
+      changedKeys: ['reveal', 'highlight'], // `limit` was already null
     });
 
     settings.updateSettings({ reveal: false, tags: ['text'] }); // equal values: nothing changed
@@ -214,7 +214,7 @@ describe('onSettingsChanged', () => {
     expect(listener).toHaveBeenCalledTimes(2);
     expect(listener).toHaveBeenLastCalledWith({
       settings: DEFAULTS,
-      changed: ['reveal', 'highlight'],
+      changedKeys: ['reveal', 'highlight'],
     });
     settings.resetSettings(); // already what was registered
     expect(listener).toHaveBeenCalledTimes(2);
@@ -313,7 +313,7 @@ describe('settings in the kernel', () => {
     expect(inA).toHaveBeenCalledTimes(1);
     expect(inA).toHaveBeenCalledWith({
       settings: kernel.capability(SearchToken, 'b').getSettings(),
-      changed: ['limit'],
+      changedKeys: ['limit'],
     });
     expect(inB).toHaveBeenCalledTimes(1);
 
@@ -345,7 +345,10 @@ describe('settings in the kernel', () => {
     const changes = vi.fn();
     settings.onSettingsChanged(changes);
     settings.updateSettings({ tags: ['forms'] }); // no document is open yet
-    expect(changes).toHaveBeenCalledWith({ settings: settings.getSettings(), changed: ['tags'] });
+    expect(changes).toHaveBeenCalledWith({
+      settings: settings.getSettings(),
+      changedKeys: ['tags'],
+    });
 
     await kernel.documents.open(bytesInput('a'));
     const inA = kernel.capability(SearchToken, 'a');

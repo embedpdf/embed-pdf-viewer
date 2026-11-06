@@ -39,13 +39,13 @@ doc.events.on('annotations.updated', ({ annotation, origin }) => {
 });
 ```
 
-| Field           | What it is                                                                        |
-| :-------------- | :-------------------------------------------------------------------------------- |
-| `origin.kind`   | `'local'` when the change was made through this `doc`, `'remote'` when it wasn't. |
-| `origin.sub`    | The user who made it (on the cloud).                                              |
-| `origin.ts`     | When it happened, in milliseconds.                                                |
-| `origin.tx`     | The write it came from: its `opId`, and its place among that write's events.      |
-| `origin.undoOf` | On an undo's events: the `opId` of the change it undid.                           |
+| Field                | What it is                                                                        |
+| :------------------- | :-------------------------------------------------------------------------------- |
+| `origin.kind`        | `'local'` when the change was made through this `doc`, `'remote'` when it wasn't. |
+| `origin.subject`     | The user who made it (on the cloud).                                              |
+| `origin.at`          | When it happened, as an ISO 8601 string.                                          |
+| `origin.transaction` | The write it came from: its `opId`, and its place among that write's events.      |
+| `origin.undoOf`      | On an undo's events: the `opId` of the change it undid.                           |
 
 An event fires after the change is saved, never before, and before the call's promise resolves.
 By the time `await page.annotations.create(…)` returns, your listeners have run.
@@ -87,19 +87,19 @@ screen.
 ## Which write an event came from
 
 Every write takes an `opId` in its options, a name for the write, and every event it fires carries
-it as `origin.tx.id`. Leave it out and the engine makes one up. That's how you match an event to a
-change you made:
+it as `origin.transaction.id`. Leave it out and the engine makes one up. That's how you match an
+event to a change you made:
 
 ```ts
 const opId = crypto.randomUUID();
 doc.events.on('annotations.updated', ({ origin }) => {
-  if (origin.tx?.id === opId) markSaved();
+  if (origin.transaction?.id === opId) markSaved();
 });
 await page.annotations.update(ref, { contents: 'Seen' }, { opId });
 ```
 
 One event comes from no write: `fonts.changed` when you register fonts on the local engine. It has
-no `origin.tx`.
+no `origin.transaction`.
 
 An `opId` is 1 to 255 visible ASCII characters (what an HTTP header can carry), on every engine.
 On the cloud, a write retried with the same `opId` is applied once, and the retry gets the first
@@ -112,17 +112,19 @@ The `opId` is also how you undo a write: `doc.apply({ undoOf: opId })`. See
 
 Some calls make many changes at once. An [import](/docs/engine/annotations/import-export) of 50
 annotations fires 50 `annotations.created` events, one after the other, all with the same
-`origin.tx`:
+`origin.transaction`:
 
 ```ts
 doc.events.on('annotations.created', ({ annotation, origin }) => {
   addToSidebar(annotation);
-  if (origin.tx && origin.tx.index === origin.tx.count - 1) redrawSidebar(); // the last of the batch
+  const { transaction } = origin;
+  if (transaction && transaction.index === transaction.count - 1) redrawSidebar(); // the last of the batch
 });
 ```
 
-`tx.id` is the same for all of them, and `tx.index` counts from `0` to `tx.count - 1`. A write
-that makes one change fires one event, with `tx.index` `0` and `tx.count` `1`.
+`transaction.id` is the same for all of them, and `transaction.index` counts from `0` to
+`transaction.count - 1`. A write that makes one change fires one event, with `transaction.index`
+`0` and `transaction.count` `1`.
 
 <Engine local>
 
@@ -151,9 +153,9 @@ the others, through the same `events.on()` you already use.
 
 Everyone who has the document open hears every change as the server saves it. Changes made
 through this `doc` arrive with `origin.kind: 'local'`; everyone else's with `'remote'` and the user
-in `origin.sub`. Every `open()` is someone else here, even by the same user: a second tab, or the
-same document opened twice in one app (a preview beside an editor). Their changes arrive as
-`'remote'`, with the same `sub`.
+in `origin.subject`. Every `open()` is someone else here, even by the same user: a second tab, or
+the same document opened twice in one app (a preview beside an editor). Their changes arrive as
+`'remote'`, with the same `subject`.
 
 The engine connects to the server when you add the first listener and disconnects after you
 remove the last, so listening is free until you need it.
@@ -169,4 +171,4 @@ meantime, you get a `stream.desynced` event. Read what you show again (`doc.anno
 - **Each change arrives once.** Your own changes aren't sent back to you a second time.
 - **A listener that throws** doesn't stop the other listeners, and doesn't make the call fail.
 - **`origin.kind` is about the open document, not the user.** "Did I do this?" (undo, optimistic
-  UI): check `origin.kind`. "Did this user do it?": check `origin.sub`.
+  UI): check `origin.kind`. "Did this user do it?": check `origin.subject`.

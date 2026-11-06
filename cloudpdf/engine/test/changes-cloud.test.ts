@@ -304,14 +304,14 @@ describe('changes on the cloud engine', () => {
       const [change, undo] = eventsB;
       expect(change).toMatchObject({
         type: 'annotations.updated',
-        origin: { kind: 'remote', tx: { id: 'recolor-1', index: 0, count: 1 } },
+        origin: { kind: 'remote', transaction: { id: 'recolor-1', index: 0, count: 1 } },
       });
       expect(change!.type === 'annotations.updated' && change.annotation).toMatchObject({
         color: '#e11d48',
       });
       expect(undo).toMatchObject({
         type: 'annotations.updated',
-        origin: { kind: 'remote', undoOf: 'recolor-1', tx: { id: 'undo-recolor-1' } },
+        origin: { kind: 'remote', undoOf: 'recolor-1', transaction: { id: 'undo-recolor-1' } },
       });
       // A sees its own two, local, and no echo.
       expect(eventsA.map((event) => 'origin' in event && event.origin.kind)).toEqual([

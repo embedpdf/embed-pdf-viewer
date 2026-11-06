@@ -116,9 +116,9 @@ describe('the annotation composables', () => {
     );
     try {
       await settle();
-      expect(warn.mock.calls.some((call) => String(call[0]).includes('useFilePickerProvider'))).toBe(
-        true,
-      );
+      expect(
+        warn.mock.calls.some((call) => String(call[0]).includes('useFilePickerProvider')),
+      ).toBe(true);
       const set = vi.spyOn(annotation, 'setFilePickerProvider');
       shown.value = false;
       await settle();
@@ -153,7 +153,7 @@ describe('the annotation composables', () => {
       const square = annotation
         .list()
         .find((entry) => entry.subtype === 'square' || entry.subtype === 'circle')!;
-      annotation.selection.set([square.ref]);
+      annotation.selection.select([square.ref]);
       await eventually(() => expect(document.querySelector('.menu')).not.toBeNull());
       annotation.selection.clear();
       await eventually(() => expect(document.querySelector('.menu')).toBeNull());
@@ -162,4 +162,3 @@ describe('the annotation composables', () => {
     }
   }, 30_000);
 });
-

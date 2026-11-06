@@ -187,7 +187,7 @@ const testStampPlugin = (exported: Uint8Array[], imported: Uint8Array[]) =>
     state: (): TestStamps => ({ libraries: [], assets: [], previews: {} }),
     create: (ctx) => {
       const changed = createEventHook<StampLibraryChangedEvent>();
-      ctx.cleanup(() => changed.dispose());
+      ctx.cleanup(() => changed.destroy());
       const api: Partial<TestStampCapability> = {
         listLibraries: () => ctx.state.get().libraries,
         listAssets: (filter) =>
@@ -213,7 +213,7 @@ const testStampPlugin = (exported: Uint8Array[], imported: Uint8Array[]) =>
             libraries: [...state.libraries, library],
             assets: [...state.assets, ...assets],
           }));
-          changed.emit({ libraryId: library.id, reason: 'created' });
+          changed.emit({ libraryId: library.id, type: 'created' });
         },
         setPreview: (assetId, preview) =>
           ctx.state.update((state) => ({

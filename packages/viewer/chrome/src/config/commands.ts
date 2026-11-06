@@ -169,16 +169,20 @@ const canMeasureNow = (commandContext: Ctx): boolean => {
 
 // ── annotation-selection predicates (drive the floating strip's contents) ────
 const hasAnnotationSelection = (commandContext: Ctx) =>
-  (anno(commandContext)?.selection.list().length ?? 0) > 0;
+  (anno(commandContext)?.selection.getSelected().length ?? 0) > 0;
 /** Whether people may change every selected annotation by hand (no turned-off feature froze it). */
 const selectionEditable = (commandContext: Ctx): boolean => {
   const annotation = anno(commandContext);
-  return (annotation?.selection.list() ?? []).every(({ ref }) => annotation!.isEditable(ref));
+  return (annotation?.selection.getSelected() ?? []).every(({ ref }) =>
+    annotation!.isEditable(ref),
+  );
 };
 /** Strip items gate per subtype (comment hidden on links/widgets) through
  *  one derivation over the selected DTOs, not per-command lookups. */
 const selectionSubtypes = (commandContext: Ctx) =>
-  new Set((anno(commandContext)?.selection.list() ?? []).map((annotation) => annotation.subtype));
+  new Set(
+    (anno(commandContext)?.selection.getSelected() ?? []).map((annotation) => annotation.subtype),
+  );
 /**
  * The selection's `link` value: a target, `null` (linkable but none set), or
  * `undefined` when the selection cannot carry a link at all (widgets, mixed
@@ -910,7 +914,7 @@ export const defaultCommands: CommandDef[] = [
     // turned-off feature froze (`isEditable`).
     enabled: (commandContext) => {
       const annotation = anno(commandContext);
-      const selected = annotation?.selection.list() ?? [];
+      const selected = annotation?.selection.getSelected() ?? [];
       return (
         selected.length > 0 &&
         selected.every(({ ref }) => annotation!.canDelete(ref) && annotation!.isEditable(ref))
@@ -961,7 +965,7 @@ export const defaultCommands: CommandDef[] = [
       const stamp = commandContext.tryGet(StampToken);
       const documentId = commandContext.documentId;
       if (!annotation || !stamp || documentId == null) return;
-      const dtos = annotation.selection.list();
+      const dtos = annotation.selection.getSelected();
       const page = dtos[0]?.ref.page;
       if (page === undefined) return;
       const i18n = commandContext.tryGet(I18nToken);
@@ -1006,7 +1010,7 @@ export const defaultCommands: CommandDef[] = [
       !selectionSubtypes(commandContext).has('widget') &&
       !selectionSubtypes(commandContext).has('redact') &&
       new Set(
-        (anno(commandContext)?.selection.list() ?? []).map(
+        (anno(commandContext)?.selection.getSelected() ?? []).map(
           (annotation) => annotation.ref.page.objectNumber,
         ),
       ).size === 1,

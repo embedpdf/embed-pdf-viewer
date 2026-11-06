@@ -12,7 +12,7 @@ DEFAULT_IMPORTANCE [VariableDeclaration] (from packages/core/ui/src/schema.ts): 
 GroupDisclosureView [TypeAliasDeclaration] (from packages/framework/svelte/src/toolbar/views.ts): export type GroupDisclosureView = GroupDisclosureViewOf<ResolvedCommand>;
 Importance [TypeAliasDeclaration] (from packages/core/ui/src/schema.ts): export type Importance = 1 | 2 | 3 | 4 | 5;
 OverflowMenuView [TypeAliasDeclaration] (from packages/framework/svelte/src/toolbar/views.ts): export type OverflowMenuView = OverflowMenuViewOf<ResolvedCommand>;
-OverflowRow [TypeAliasDeclaration] (from packages/core/ui/src/projection.ts): export type OverflowRow = |{ readonly type: 'command'; readonly command: string} |{ readonly type: 'submenu'; readonly command: string; readonly menu: string} ;
+OverflowRow [TypeAliasDeclaration] (from packages/core/ui/src/projection.ts): export type OverflowRow = |{ readonly kind: 'command'; readonly command: string} |{ readonly kind: 'submenu'; readonly command: string; readonly menu: string} ;
 OverflowSection [InterfaceDeclaration] (from packages/core/ui/src/projection.ts): export interface OverflowSection{ readonly labelKey?: string; readonly role?: 'radio'; readonly rows: readonly OverflowRow[]; }
 PINNED [VariableDeclaration] (from packages/core/ui/src/schema.ts): PINNED: Importance = 5
 StripView [TypeAliasDeclaration] (from packages/framework/svelte/src/toolbar/strip.svelte.ts): export type StripView = StripViewOf<ResolvedCommand>;

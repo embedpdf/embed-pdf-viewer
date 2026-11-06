@@ -195,7 +195,7 @@ export interface ChangeQueue {
   /** Resolves once at least `count` names are held. */
   reserveObjectNumbers(count: number): Promise<void>;
   /** This session's changes the engine hasn't answered, open holds included, in staging order. */
-  pending(): readonly PendingChange[];
+  listPending(): readonly PendingChange[];
   hasPending(): boolean;
   /** Resolves once every change sent so far is answered; open holds aren't waited for. Never rejects. */
   whenSettled(): Promise<void>;
@@ -553,7 +553,7 @@ export function createDocumentChanges(options: {
         throw toPluginError(capability, error);
       }
     },
-    pending: () => entries,
+    listPending: () => entries,
     hasPending: () => entries.length > 0,
     whenSettled: () => whenSettled(),
     onStaged: staged.on,
@@ -583,8 +583,8 @@ export function createDocumentChanges(options: {
         entry.answered = true;
         entry.reject(new PluginError('instance-closed', entry.capability, 'the document closed'));
       }
-      staged.dispose();
-      settled.dispose();
+      staged.destroy();
+      settled.destroy();
     },
   };
 }

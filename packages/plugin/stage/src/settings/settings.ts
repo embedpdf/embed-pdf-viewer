@@ -86,7 +86,7 @@ export function createSettings(
       // The flow toggled: re-place onto the cursor's page under the new
       // flow's scene (camera coordinates are meaningless across the flow
       // boundary).
-      goToTarget(state().cursor, { behavior: 'instant' });
+      goToTarget(state().pageIndex, { behavior: 'instant' });
     } else if (touched('scene') || touched('refit')) {
       reapply(anchor, align); // rebuild, keep the page, re-fit (fit-all re-places the scene)
     } else if (touched('reclamp')) {
@@ -210,7 +210,7 @@ export function createSettings(
     lastEffective = effective;
     publishActive(active);
     ctx.state.update(patchSettings, effective);
-    ctx.state.update(setCursor, view.cursor ?? 0);
+    ctx.state.update(setCursor, view.pageIndex ?? 0);
     scene.invalidate();
     applyAnchor(view.anchor);
   };

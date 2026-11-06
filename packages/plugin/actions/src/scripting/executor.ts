@@ -118,12 +118,12 @@ export function registerScriptExecutor(
     // submit dataset must be resolved from post-commit truth, so both run
     // after the transaction releases, still inside this queued operation.
     const pendingExternal: Array<{
-      effect: Extract<ScriptUiEffect, { kind: 'print' | 'submitForm' }>;
+      effect: Extract<ScriptUiEffect, { type: 'print' | 'submitForm' }>;
       phase: 'boot' | 'user';
     }> = [];
     const splitExternal = (output: ScriptOutput, phase: 'boot' | 'user'): ScriptUiEffect[] =>
       output.uiEffects.filter((effect) => {
-        if (effect.kind === 'print' || effect.kind === 'submitForm') {
+        if (effect.type === 'print' || effect.type === 'submitForm') {
           pendingExternal.push({ effect, phase });
           return false;
         }
@@ -173,7 +173,7 @@ export function registerScriptExecutor(
       return failure ? { status: 'failed', error: failure } : { status: 'executed' };
     });
     for (const entry of pendingExternal) {
-      if (entry.effect.kind === 'print') {
+      if (entry.effect.type === 'print') {
         await firePrintThroughAdapter(
           { origin: actionContext.origin, phase: entry.phase },
           diagnose,

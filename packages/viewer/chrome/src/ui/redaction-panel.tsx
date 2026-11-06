@@ -35,8 +35,8 @@ export function RedactionPanel() {
                 <div
                   role="button"
                   tabIndex={0}
-                  onClick={() => anno.selection.set([item.ref])}
-                  onKeyDown={(event) => event.key === 'Enter' && anno.selection.set([item.ref])}
+                  onClick={() => anno.selection.select([item.ref])}
+                  onKeyDown={(event) => event.key === 'Enter' && anno.selection.select([item.ref])}
                   className="hover:bg-hover group flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-start"
                 >
                   <Icon

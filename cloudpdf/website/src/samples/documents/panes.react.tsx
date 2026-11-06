@@ -57,7 +57,7 @@ function Pane({ pane, canRemove }: { pane: PaneInfo; canRemove: boolean }) {
           type="button"
           className="button"
           disabled={!canRemove}
-          onClick={() => views.removePane(pane.id)}
+          onClick={() => views.deletePane(pane.id)}
         >
           Close pane
         </button>

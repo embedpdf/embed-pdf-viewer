@@ -119,7 +119,7 @@ export function createPlaceHandler(
     const widget = field.widgets.find(
       (candidate) => candidate.page?.objectNumber === page.objectNumber,
     );
-    if (policy.select && widget?.ref) annotation.selection.set([widget.ref]);
+    if (policy.select && widget?.ref) annotation.selection.select([widget.ref]);
     // Back to design's resting tool, not the default pointer: that one fills, which would end
     // design and drop the new field's selection.
     if (policy.tool === 'default') interaction.activateTool('form-edit');
@@ -152,7 +152,7 @@ export function createPlaceHandler(
         annotation.clearGhost();
       }
     },
-    onDown: (sample) => {
+    onPointerDown: (sample) => {
       // No capture without a page, a known palette tool, or design permission:
       // declining lets editing, panning or text selection take the gesture.
       if (!sample.page || !FORM_TOOL_BY_ID.has(interaction.getActiveToolId())) return false;
@@ -160,14 +160,14 @@ export function createPlaceHandler(
       origin = { page: sample.page.ref, start: sample.page.point, last: sample.page.point };
       return true;
     },
-    onMove: (sample) => {
+    onPointerMove: (sample) => {
       if (!origin) return;
       const point = samplePointOn(sample, origin.page);
       if (!point) return;
       origin.last = point;
       annotation?.previewPlacement(interaction.getActiveToolId(), origin.page, origin.start, point);
     },
-    onUp: (sample) => {
+    onPointerUp: (sample) => {
       if (!origin) return;
       const gesture = origin;
       endGesture();
@@ -186,6 +186,6 @@ export function createPlaceHandler(
       });
     },
     // Aborted (a second finger, a system cancel): nothing is placed.
-    onCancel: endGesture,
+    onPointerCancel: endGesture,
   };
 }

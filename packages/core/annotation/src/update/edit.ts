@@ -65,7 +65,7 @@ export function rotateDraftDelta(
   if (!model.snap.rotation || draft.free) return { delta: raw, angle, snapped: false };
   for (const target of model.snap.rotationAngles) {
     const adjust = arcTo(angle, normalizeDeg(target));
-    if (Math.abs(adjust) <= model.snap.rotationThreshold)
+    if (Math.abs(adjust) <= model.snap.rotationThresholdDeg)
       return { delta: raw + adjust, angle: normalizeDeg(target), snapped: true };
   }
   return { delta: raw, angle, snapped: false };
@@ -227,7 +227,7 @@ export function editMove(model: Model, input: PointerInput): [Model, Effect[]] {
       input.page,
       raw,
       // Screen pixels to page units at this sample's view.
-      model.snap.alignmentThreshold / (input.scale || 1),
+      model.snap.alignmentThresholdPx / (input.scale || 1),
       input.pageBox,
     );
     // A snap adjusts by ≤ threshold, but never past the page edge: re-clamp, and

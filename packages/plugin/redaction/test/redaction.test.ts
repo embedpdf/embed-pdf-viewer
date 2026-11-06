@@ -29,16 +29,16 @@ const MARK: AnnotationRef = { kind: 'objectNumber', objectNumber: 41, page: PAGE
 const LOCAL_ORIGIN = {
   kind: 'local',
   sessionId: 'session-a',
-  sub: null,
-  ts: 0,
-  serverId: null,
+  subject: null,
+  at: new Date(0).toISOString(),
+  serverSequence: null,
 } as const;
 const REMOTE_ORIGIN = {
   kind: 'remote',
   sessionId: 'session-b',
-  sub: 'user-b',
-  ts: 0,
-  serverId: 7,
+  subject: 'user-b',
+  at: new Date(0).toISOString(),
+  serverSequence: 7,
 } as const;
 const APPLY_CAPABILITIES = ['doc.redact', 'doc.pages.modify', 'doc.annotate.modify'] as const;
 

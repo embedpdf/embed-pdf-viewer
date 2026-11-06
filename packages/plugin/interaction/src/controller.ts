@@ -166,8 +166,8 @@ export function createInteractionController(
   let removeSettingTools: Array<() => void> = settings
     .get()
     .tools.map((tool) => removerOf(addTool(tool, true)));
-  settings.api.onSettingsChanged(({ changed }) => {
-    if (!changed.includes('tools')) return;
+  settings.api.onSettingsChanged(({ changedKeys }) => {
+    if (!changedKeys.includes('tools')) return;
     for (const remove of removeSettingTools) remove();
     removeSettingTools = settings.get().tools.map((tool) => removerOf(addTool(tool, true)));
     toolsChanged();
@@ -265,7 +265,7 @@ export function createInteractionController(
         owner = null;
         gesture = null;
         for (const handler of eligible(sample.source)) {
-          if (handler.onDown(sample)) {
+          if (handler.onPointerDown(sample)) {
             owner = handler;
             gesture = {
               toolId: state().activeToolId,
@@ -277,7 +277,7 @@ export function createInteractionController(
           }
         }
       } else if (sample.phase === 'move') {
-        if (owner) owner.onMove?.(sample);
+        if (owner) owner.onPointerMove?.(sample);
         else for (const handler of eligible(sample.source)) handler.onHover?.(sample);
       } else {
         const captured = owner;
@@ -287,10 +287,10 @@ export function createInteractionController(
         if (!captured || !taken) return;
         if (sample.phase === 'cancel') {
           // Abort, don't commit: navigation took the pointer or the system cancelled it.
-          (captured.onCancel ?? captured.onUp)?.call(captured, sample);
+          (captured.onPointerCancel ?? captured.onPointerUp)?.call(captured, sample);
           gestureCancelled.emit(taken);
         } else {
-          captured.onUp?.(sample);
+          captured.onPointerUp?.(sample);
           gestureEnded.emit(taken);
         }
       }
@@ -336,7 +336,7 @@ function ownPointerHandler(tool: HostTool): InteractionHandler | null {
     id: `tool:${tool.id}`,
     priority: OWN_POINTER_PRIORITY,
     enabledFor: (active) => active === tool,
-    onDown: (sample) => {
+    onPointerDown: (sample) => {
       if (!sample.page || !tool.onPointerDown) return false;
       const event = eventOf(sample.page.ref, sample.page.point, sample);
       if (tool.onPointerDown(event) !== true) return false;
@@ -344,12 +344,12 @@ function ownPointerHandler(tool: HostTool): InteractionHandler | null {
       last = event;
       return true;
     },
-    onMove: (sample) => {
+    onPointerMove: (sample) => {
       const event = follow(sample);
       if (event) tool.onPointerMove?.(event);
     },
-    onUp: end,
-    onCancel: end,
+    onPointerUp: end,
+    onPointerCancel: end,
     onHover: (sample) => {
       if (sample.page) tool.onHover?.(eventOf(sample.page.ref, sample.page.point, sample));
     },

@@ -41,7 +41,7 @@ function failingBootSandbox(): ScriptSandbox {
     disposed: false,
     boot: () =>
       output({
-        uiEffects: [{ kind: 'alert', message: 'This PDF requires a newer version…', icon: 1 }],
+        uiEffects: [{ type: 'alert', message: 'This PDF requires a newer version…', icon: 1 }],
         error: { kind: 'exception', message: 'not a function' },
       }),
     run: (_source: string, input: ScriptInput) =>
@@ -147,7 +147,7 @@ describe('FormScriptingController — boot failures degrade, never brick', () =>
     // The failure is surfaced, not swallowed — and not fatal.
     expect(first.diagnostics.some((diagnostic) => diagnostic.code === 'script-error')).toBe(true);
     // The bogus doc-open alert is tagged as boot-phase (suppressible).
-    expect(first.uiEffects).toEqual([expect.objectContaining({ kind: 'alert', phase: 'boot' })]);
+    expect(first.uiEffects).toEqual([expect.objectContaining({ type: 'alert', phase: 'boot' })]);
 
     // Boot ran once; the next commit neither retries nor fails.
     const second = await controller.commit(

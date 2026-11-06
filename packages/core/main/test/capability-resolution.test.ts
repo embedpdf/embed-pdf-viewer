@@ -39,7 +39,7 @@ const page = (pageObjectNumber: number, index: number): PageLayout => ({
 function makeHandle(id: string): DocumentHandle {
   return {
     id,
-    events: { subscribe: () => () => {}, lastServerId: () => null },
+    events: { subscribe: () => () => {}, lastServerSequence: () => null },
     pages: { list: () => Promise.resolve({ pageCount: 1, labels: [], pages: [page(1, 0)] }) },
     close: () => Promise.resolve(),
   } as unknown as DocumentHandle;

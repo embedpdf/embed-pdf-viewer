@@ -37,7 +37,7 @@ const engine = {
   open: () =>
     Promise.resolve({
       id: 'doc',
-      events: { subscribe: () => () => {}, lastServerId: () => null },
+      events: { subscribe: () => () => {}, lastServerSequence: () => null },
       pages: {
         list: () => Promise.resolve({ pageCount: 1, labels: [], pages: [pageLayout(1, 0)] }),
       },
@@ -145,10 +145,10 @@ describe('<epdf-link-layer>', () => {
   it('follows a click through the plugin, which opens an allowed website and reports the rest', async () => {
     const open = vi.spyOn(window, 'open').mockReturnValue(null);
     const fixture = await mountViewer('<test-link-page />', [LinkPage]);
-    const outcomes: LinkActivation['outcome'][] = [];
+    const outcomes: LinkActivation['status'][] = [];
     kernelOf(fixture)
       .capability(LinkToken)
-      .onActivated((event) => outcomes.push(event.activation.outcome));
+      .onActivated((event) => outcomes.push(event.activation.status));
     const [website, script] = await anchors(fixture);
 
     website!.click();
@@ -173,7 +173,7 @@ describe('EpdfLink', () => {
     const fixture = await mountViewer('', []);
     const link = fixture.debugElement.injector.get(EpdfLink);
     await fixture.whenStable(); // the opener is registered once the document is there
-    expect(link.activate({ kind: 'uri', uri: 'https://example.com/a' }).outcome).toBe('uri');
+    expect(link.activate({ kind: 'uri', uri: 'https://example.com/a' }).status).toBe('uri');
     expect(open).toHaveBeenCalledWith('https://example.com/a', '_blank', 'noopener,noreferrer');
   });
 

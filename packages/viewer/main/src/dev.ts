@@ -28,7 +28,7 @@ const element = EmbedPDF.init({
   plugins: {
     search: { highlight: { color: '#a7f3d0' } },
     signature: {
-      key: () => signer,
+      signingKey: () => signer,
       trust: { anchors: async () => [(await signer).certificate] },
       allowCertify: true,
     },

@@ -46,7 +46,7 @@ export async function saveAttachedFile(
 
 /** The one file attachment annotation selected on the pages, or null. */
 const selectedAnnotationFile = (commandContext: Ctx): AttachedFile | null => {
-  const selection = commandContext.tryGet(AnnotationToken)?.selection.list() ?? [];
+  const selection = commandContext.tryGet(AnnotationToken)?.selection.getSelected() ?? [];
   const [only] = selection;
   if (selection.length !== 1 || only?.subtype !== 'file-attachment') return null;
   const key = annotationKey(only.ref);
@@ -66,7 +66,7 @@ const SAVES = {
 /** Adding and deleting: the right to, and the feature on. */
 const EDITS = {
   categories: ['attachments.adding'],
-  allowed: (commandContext: Ctx) => attachmentOf(commandContext)?.canAdd() ?? true,
+  allowed: (commandContext: Ctx) => attachmentOf(commandContext)?.canCreate() ?? true,
   notAllowedKey: 'commands.notAllowed.doc-attachments-modify',
 } satisfies Partial<CommandDef>;
 
@@ -84,7 +84,7 @@ export const attachmentCommands: CommandDef[] = [
       const files = given ?? [await pickFile()].filter((file): file is File => file !== null);
       if (files.length === 0) return;
       commandContext.tryGet(ShellToken)?.open(ATTACHMENTS_PANEL);
-      await attachment.add(files.map((data) => ({ data })));
+      await attachment.create(files.map((data) => ({ data })));
     },
   },
   {
@@ -118,13 +118,13 @@ export const attachmentCommands: CommandDef[] = [
       const attachment = attachmentOf(commandContext);
       const file = selectedOf(commandContext);
       if (!attachment) return true;
-      return file ? attachment.canRemove(file) : attachment.canAdd();
+      return file ? attachment.canDelete(file) : attachment.canCreate();
     },
     enabled: (commandContext) => selectedOf(commandContext) !== null,
     run: async (commandContext) => {
       const attachment = attachmentOf(commandContext);
       const file = selectedOf(commandContext);
-      if (attachment && file) await attachment.remove(file);
+      if (attachment && file) await attachment.delete(file);
     },
   },
   // A file's menu, opened from its row's own button or by a right-click on it.

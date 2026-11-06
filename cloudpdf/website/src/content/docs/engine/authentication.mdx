@@ -138,7 +138,7 @@ change that waits, ask, and answer with `identify()`, or let the waiting changes
 `decline()`.
 
 ```ts
-doc.grant?.onIdentityRequest(async (request) => {
+doc.grant?.onIdentityRequested(async (request) => {
   const answers = await askTheVisitor(request);
   if (answers) await doc.grant!.identify(answers);
   else doc.grant!.decline();
@@ -156,7 +156,7 @@ questions. The document reads on until its session runs out, then its requests w
 it, ask, and go on with `resume()` as the same visitor, or close the document:
 
 ```ts
-doc.grant?.onOpenRequest(async (request) => {
+doc.grant?.onOpenRequested(async (request) => {
   const given = await askTheVisitor(request); // { passphrase } or { identity }
   if (given) await doc.grant!.resume(given);
   else await doc.close();

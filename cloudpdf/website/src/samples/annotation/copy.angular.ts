@@ -122,7 +122,7 @@ export class App {
       untracked(() => {
         const square = this.annotation.list().find((each) => each.nm === 'square');
         if (!square) return;
-        this.annotation.selection.set([square.ref]);
+        this.annotation.selection.select([square.ref]);
         stage.reveal(square.page, { rect: square.rect });
       });
     });

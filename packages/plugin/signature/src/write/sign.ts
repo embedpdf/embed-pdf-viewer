@@ -92,7 +92,7 @@ export function createSigning(
       // The cryptography loads the first time someone signs.
       const { certificateCommonName, sign: signDocument } =
         await import('@embedpdf/core-signature');
-      const key = await resolveKey(input.key);
+      const key = await resolveKey(input.signingKey);
       // The certificate's subject is the default /Name; the caller's facts win.
       const subject =
         key.kind === 'raw' && key.certificateChain[0]

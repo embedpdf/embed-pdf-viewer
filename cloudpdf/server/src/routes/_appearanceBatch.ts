@@ -200,12 +200,12 @@ export async function renderAppearanceBatch(input: {
           width: appearance.image.width,
           height: appearance.image.height,
           format,
-          contentType: appearance.image.contentType,
+          mimeType: appearance.image.mimeType,
         });
         parts.push({
           key,
           filename: `${key}.${ext}`,
-          contentType: appearance.image.contentType,
+          contentType: appearance.image.mimeType,
           body: Buffer.from(appearance.image.bytes),
         });
       }
@@ -260,12 +260,12 @@ export async function renderAppearanceBatch(input: {
         width: appearance.raster.width,
         height: appearance.raster.height,
         format,
-        contentType: encoded.contentType,
+        mimeType: encoded.mimeType,
       });
       parts.push({
         key,
         filename: `${key}.${ext}`,
-        contentType: encoded.contentType,
+        contentType: encoded.mimeType,
         body,
       });
     }

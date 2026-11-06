@@ -278,7 +278,7 @@ export class CloudDocumentHandle implements DocumentHandle {
     this.events = {
       subscribe,
       on: (type, listener) => subscribeToType(subscribe, type, listener),
-      lastServerId: () => hub.lastServerId(),
+      lastServerSequence: () => hub.lastServerSequence(),
     };
     this.publisher = new SessionEventPublisher(hub, sessionId);
     // A version this handle published itself numbers objects anew too.
@@ -752,7 +752,7 @@ export class CloudDocumentHandle implements DocumentHandle {
       // already seen, else the cached manifest's transactional auditHead.
       // Null (cold start, no manifest yet) subscribes "from now", which is
       // exact too: the first manifest fetched afterwards is newer anyway.
-      initialCursor: this.hub.lastServerId() ?? this.manifestCache?.auditHead ?? null,
+      initialCursor: this.hub.lastServerSequence() ?? this.manifestCache?.auditHead ?? null,
       onRow: (row) => {
         // Advance the cached manifest's audit cursor — own echoes and
         // unknown kinds included — so a later `annotations.list()` never stamps a
@@ -791,7 +791,11 @@ export class CloudDocumentHandle implements DocumentHandle {
         this.inflightManifest = null;
         // Tell subscribers their event-derived state may be stale — the
         // gap's mutations will never arrive as events.
-        this.hub.publish({ type: 'stream.desynced', reason: 'backlog-overflow', ts: Date.now() });
+        this.hub.publish({
+          type: 'stream.desynced',
+          reason: 'backlog-overflow',
+          at: new Date().toISOString(),
+        });
       },
       onAuthLost: () => {
         // The stream is gone for good under this credential. Local events

@@ -57,7 +57,7 @@ export interface DocumentGrant {
    * listens doesn't wait: it fails with `VisitorIdentityRequired`. Returns
    * the unsubscriber.
    */
-  onIdentityRequest(listener: (request: VisitorIdentityRequest) => void): () => void;
+  onIdentityRequested(listener: (request: VisitorIdentityRequest) => void): () => void;
   /** Not now: the changes waiting fail with `VisitorIdentityRequired`, and the next one asks again. */
   decline(): void;
   /**
@@ -70,7 +70,7 @@ export interface DocumentGrant {
    * Called when the grant asks before this open can go on: show its passphrase or questions,
    * then `resume`, or close the document. Returns the unsubscriber.
    */
-  onOpenRequest(listener: (request: GrantOpenRequest) => void): () => void;
+  onOpenRequested(listener: (request: GrantOpenRequest) => void): () => void;
   /**
    * Give the grant what it asks (`openRequest`): the same visitor goes on, and the requests
    * waiting go out. Rejects with `GrantPassphraseRequired` or `VisitorIdentityRequired` while it
@@ -79,7 +79,7 @@ export interface DocumentGrant {
   resume(given: {
     readonly passphrase?: string;
     /** The visitor's answers to what the grant asks on open. */
-    readonly identity?: VisitorAnswers;
+    readonly visitorIdentity?: VisitorAnswers;
   }): AbortablePromise<void>;
 }
 

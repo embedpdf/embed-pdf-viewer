@@ -39,7 +39,7 @@ const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY
               <button
                 type="button"
                 class="hit"
-                (click)="stage.reveal(hit.page, { rect: bounds, anchor: { y: 0.35 } })"
+                (click)="stage.reveal(hit.page, { rect: bounds, align: { y: 0.35 } })"
               >
                 <span class="where">page {{ hit.pageIndex + 1 }}</span>
                 <code class="rect">x {{ round(bounds.x) }}, y {{ round(bounds.y) }}</code>

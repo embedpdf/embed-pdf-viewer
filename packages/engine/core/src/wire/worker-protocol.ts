@@ -1047,7 +1047,7 @@ export interface RenderEncode {
  *  own its buffer — it rides the transfer manifest zero-copy, so a pooled
  *  view (e.g. a Node `Buffer` slab slice) would detach unrelated data. */
 export interface EncodedImageWire {
-  contentType: string;
+  mimeType: string;
   width: number;
   height: number;
   bytes: Uint8Array;

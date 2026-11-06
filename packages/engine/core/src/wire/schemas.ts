@@ -1105,7 +1105,7 @@ export const AnnotationAppearanceBatchSchema: z.ZodType<AnnotationAppearanceBatc
       width: z.number().int().positive(),
       height: z.number().int().positive(),
       format: PageNetworkRenderFormatSchema,
-      contentType: z.string().min(1),
+      mimeType: z.string().min(1),
     }),
   ),
 });

@@ -25,7 +25,7 @@ export function useSelection(): SelectionCapability {
  */
 export const useSelectionState = stateReader(selectionState);
 
-/** The selection settings (`dragThreshold`, `color`, `handles`), with or without a document. */
+/** The selection settings (`dragThresholdPx`, `color`, `handles`), with or without a document. */
 export const useSelectionSettings = settingsReader(SelectionToken);
 
 /**

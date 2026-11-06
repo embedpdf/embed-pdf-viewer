@@ -469,7 +469,7 @@ export class DerivedRenderService {
               `unexpected renderPageFileEncoded payload: ${payload.tag}`,
             );
           }
-          encoded = { bytes: payload.image.bytes, contentType: payload.image.contentType };
+          encoded = { bytes: payload.image.bytes, contentType: payload.image.mimeType };
           pageObjectNumber = payload.page.objectNumber;
         } else {
           const payload = await pool.runAdHoc(
@@ -493,7 +493,8 @@ export class DerivedRenderService {
               `unexpected renderPageFile payload: ${payload.tag}`,
             );
           }
-          encoded = await encoder.encodeToBuffer(payload.raster, { format: 'webp' });
+          const image = await encoder.encodeToBuffer(payload.raster, { format: 'webp' });
+          encoded = { bytes: image.bytes, contentType: image.mimeType };
           pageObjectNumber = payload.page.objectNumber;
         }
         const finalKey = this.baseKey(

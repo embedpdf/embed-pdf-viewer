@@ -797,7 +797,7 @@ export function ToolbarMenu({ view, align }: { view: OverflowMenuView; align?: M
             title={section.labelKey ? t(section.labelKey) : undefined}
           >
             {rows.map(({ row, command }) =>
-              row.type === 'submenu' ? (
+              row.kind === 'submenu' ? (
                 <SubmenuItem
                   key={row.command}
                   command={command}

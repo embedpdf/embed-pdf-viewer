@@ -96,7 +96,7 @@ export class BrowserImageEncoder implements LocalImageEncoder {
         width: raster.width,
         height: raster.height,
         format,
-        contentType: 'image/bmp',
+        mimeType: 'image/bmp',
         source: {
           kind: 'bytes',
           bytes: encodeBmp(new Uint8Array(raster.data), raster.width, raster.height),
@@ -109,7 +109,7 @@ export class BrowserImageEncoder implements LocalImageEncoder {
       width: raster.width,
       height: raster.height,
       format,
-      contentType: contentType(format),
+      mimeType: mimeTypeOf(format),
       source: { kind: 'bytes', bytes },
     };
   }
@@ -286,7 +286,7 @@ async function encodeOnMainThread(
   const blob = await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob(
       (value) => (value ? resolve(value) : reject(new Error('canvas.toBlob returned null'))),
-      contentType(format),
+      mimeTypeOf(format),
       quality,
     );
   });
@@ -294,6 +294,6 @@ async function encodeOnMainThread(
   return new Uint8Array(await blob.arrayBuffer());
 }
 
-function contentType(format: PageRenderEncodedFormat): string {
+function mimeTypeOf(format: PageRenderEncodedFormat): string {
   return `image/${format}`;
 }

@@ -59,8 +59,8 @@ export function createComments(
 
   const announce = (
     root: AnnotationRef,
-    change: 'reply' | 'text' | 'status' | 'marked' | 'deleted',
-  ) => events.threadChanged.emit({ rootRef: root, change });
+    type: 'reply' | 'text' | 'status' | 'marked' | 'deleted',
+  ) => events.threadChanged.emit({ rootRef: root, type: type });
 
   const comments: CommentsApi = {
     listThreads: () => threads.index().threads,

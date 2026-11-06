@@ -24,7 +24,7 @@ const plugins = [
   formPlugin(),
   stampPlugin({ assetEngine }),
   signaturePlugin({
-    key: () => signer,
+    signingKey: () => signer,
     // Trust the demo key itself, so its signatures check out as 'valid'.
     trust: { anchors: async () => [(await signer).certificate] },
   }),

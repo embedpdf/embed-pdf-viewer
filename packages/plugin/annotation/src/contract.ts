@@ -269,10 +269,10 @@ export const ANNOTATION_DEFAULTS: AnnotationSettings = {
   },
   snap: {
     alignment: true,
-    alignmentThreshold: 6,
+    alignmentThresholdPx: 6,
     rotation: true,
     rotationAngles: [0, 90, 180, 270],
-    rotationThreshold: 4,
+    rotationThresholdDeg: 4,
   },
   editable: true,
 };
@@ -529,7 +529,7 @@ export interface ToolDefaultsChangedEvent {
 /** A thread changed through this viewer. */
 export interface CommentThreadChangedEvent {
   readonly rootRef: AnnotationRef;
-  readonly change: 'reply' | 'text' | 'status' | 'marked' | 'deleted';
+  readonly type: 'reply' | 'text' | 'status' | 'marked' | 'deleted';
 }
 
 /** Which annotations `list()` returns: every field narrows. */
@@ -562,7 +562,7 @@ export interface AnnotationExportSelection {
 /** The selection: what is selected, and the verbs that change it as one. */
 export interface AnnotationSelectionApi {
   /** Select these annotations; an annotation in a group brings its group. */
-  set(refs: readonly AnnotationRef[]): void;
+  select(refs: readonly AnnotationRef[]): void;
   /** Add these annotations to the selection, with their groups. */
   add(refs: readonly AnnotationRef[]): void;
   /** Select everything that can be selected, on one page or in the whole document. */
@@ -577,7 +577,7 @@ export interface AnnotationSelectionApi {
   /** Clear the selection. */
   clear(): void;
   /** The selected annotations, as the user sees them. */
-  list(): readonly Annotation[];
+  getSelected(): readonly Annotation[];
   /**
    * Change the selected annotations: each takes the fields its kind has, and
    * skips the rest. A function changes each relative to itself. A text box's

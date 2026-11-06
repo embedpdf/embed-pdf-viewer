@@ -120,9 +120,9 @@ export function createScriptWorld(ctx: ActionsContext, { form }: Pick<ActionsSer
   ): ScriptEventInput => {
     const provenance = actionContext.event;
     const type =
-      provenance.scope === 'page'
+      provenance.type === 'page'
         ? 'Page'
-        : provenance.scope === 'document'
+        : provenance.type === 'document'
           ? 'Doc'
           : actionContext.source.kind === 'widget'
             ? 'Field'
@@ -132,13 +132,13 @@ export function createScriptWorld(ctx: ActionsContext, { form }: Pick<ActionsSer
                 ? 'Bookmark'
                 : 'Annot'; // EmbedPDF extension — Acrobat has no plain-annot type
     const name =
-      provenance.scope === 'activate'
+      provenance.type === 'activate'
         ? 'Mouse Up'
-        : provenance.scope === 'annotation'
-          ? (ANNOTATION_EVENT_NAMES[provenance.name] ?? 'Mouse Up')
-          : provenance.scope === 'page'
-            ? (PAGE_EVENT_NAMES[provenance.name] ?? 'Open')
-            : (DOC_EVENT_NAMES[provenance.name] ?? 'Open');
+        : provenance.type === 'annotation'
+          ? (ANNOTATION_EVENT_NAMES[provenance.event] ?? 'Mouse Up')
+          : provenance.type === 'page'
+            ? (PAGE_EVENT_NAMES[provenance.event] ?? 'Open')
+            : (DOC_EVENT_NAMES[provenance.event] ?? 'Open');
     const targetRef =
       actionContext.source.kind === 'widget' ? actionContext.source.field : undefined;
     const targetField = targetRef

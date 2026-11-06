@@ -260,7 +260,7 @@ const plugins = [
   // document text search: budgeted engine slices, viewport-first scanning. Hit
   // navigation lands the match at the viewport's top-middle (y: 0.35 — the
   // browser find-bar feel); try y: 0.5 for dead center, y: 0.65 for bottom.
-  searchPlugin({ reveal: { anchor: { y: 0.35 }, behavior: 'smooth' } }),
+  searchPlugin({ reveal: { align: { y: 0.35 }, behavior: 'smooth' } }),
   // workspace plugin, engine-free: locale packs as store state. Alive from
   // createKernel() — the shell below translates while the engine still boots.
   // 'en' ships eagerly; 'es' is a lazy pack fetched on first switch. The
@@ -1919,7 +1919,7 @@ function Pane({
         </button>
         {canRemove && (
           <button
-            onClick={() => v.removePane(view.id)}
+            onClick={() => v.deletePane(view.id)}
             title="close this pane (documents stay open)"
             style={{
               marginLeft: 'auto',

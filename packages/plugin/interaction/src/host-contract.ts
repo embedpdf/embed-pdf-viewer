@@ -76,11 +76,11 @@ export interface InteractionHandler {
   /** Usually `tool.enables.has('my-tag')`. */
   enabledFor(tool: HostTool): boolean;
   /** Return true to capture: subsequent move/up route here until pointer-up. */
-  onDown(sample: PointerSample): boolean;
-  onMove?(sample: PointerSample): void;
-  onUp?(sample: PointerSample): void;
-  /** The gesture was aborted, not completed. Falls back to `onUp` when absent. */
-  onCancel?(sample: PointerSample): void;
+  onPointerDown(sample: PointerSample): boolean;
+  onPointerMove?(sample: PointerSample): void;
+  onPointerUp?(sample: PointerSample): void;
+  /** The gesture was aborted, not completed. Falls back to `onPointerUp` when absent. */
+  onPointerCancel?(sample: PointerSample): void;
   /** Pointer moved with no active gesture: cursor feedback only. */
   onHover?(sample: PointerSample): void;
   /** Touch consent, second rung: a pure read asked before a touch contact is classified. */

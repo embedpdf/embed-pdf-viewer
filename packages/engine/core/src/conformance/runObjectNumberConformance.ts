@@ -44,7 +44,7 @@ const box = (x: number): PageBox => ({ x, y: 120, width: 40, height: 30 });
  *   twice is `taken`. A refused call changes nothing.
  * - Writes made without waiting apply in the order they were made: a page
  *   named at birth takes an annotation at once.
- * - Every event of a write carries its `opId` as `origin.tx`.
+ * - Every event of a write carries its `opId` as `origin.transaction`.
  */
 export function runObjectNumberConformance(
   runner: ConformanceTestRunner,
@@ -266,7 +266,7 @@ export function runObjectNumberConformance(
           opId: 'op-insert',
         });
         const [create, update, insert] = events.map((event) =>
-          event.type === 'stream.desynced' ? null : event.origin.tx,
+          event.type === 'stream.desynced' ? null : event.origin.transaction,
         );
         expect(events).toHaveLength(3);
         expect(create).toEqual({ id: 'op-create', index: 0, count: 1 });

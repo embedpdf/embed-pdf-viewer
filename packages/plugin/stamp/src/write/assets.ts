@@ -191,7 +191,7 @@ export function createAssetWrites(
         libraryBinaries.set(liveLibrary.id, appended.canonical);
         assetBinaries.set(appended.asset.id, { bytes: appended.bytes, preview: appended.preview });
         ctx.state.update(addAsset, appended.asset);
-        libraryChanged.emit({ libraryId: liveLibrary.id, reason: 'asset-added' });
+        libraryChanged.emit({ libraryId: liveLibrary.id, type: 'asset-created' });
         assetCreated.emit({
           assetId: appended.asset.id,
           libraryId: liveLibrary.id,
@@ -259,7 +259,7 @@ export function createAssetWrites(
         assetBinaries.delete(id);
         ghostRenders.delete(id);
         ctx.state.update(removeAsset, id);
-        libraryChanged.emit({ libraryId: library.id, reason: 'asset-removed' });
+        libraryChanged.emit({ libraryId: library.id, type: 'asset-deleted' });
         assetDeleted.emit({ assetId: id, libraryId: library.id, asset: null });
       },
       signal,
@@ -319,7 +319,7 @@ export function createAssetWrites(
         throwIfCancelled(signal);
         libraryBinaries.set(library.id, rewritten);
         ctx.state.update(setAsset, next);
-        libraryChanged.emit({ libraryId: library.id, reason: 'asset-updated' });
+        libraryChanged.emit({ libraryId: library.id, type: 'asset-updated' });
         assetUpdated.emit({ assetId: next.id, libraryId: library.id, asset: next });
         return { asset: next };
       },

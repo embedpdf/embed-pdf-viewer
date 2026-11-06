@@ -213,7 +213,7 @@ export interface ImportLibraryOptions extends OperationOptions {
   /** Library categories written to catalog `/PieceInfo`. */
   categories?: string[];
   /** Kind stamped onto every imported asset. Default `'stamp'`. */
-  kind?: StampAssetKind;
+  assetKind?: StampAssetKind;
   /** What the file is for; overrides what the file says (an Acrobat-authored set imported for a toolbar). */
   libraryKind?: StampLibraryKind;
   /**
@@ -279,14 +279,14 @@ export interface StampAssetFilter {
 /** A library's bytes changed, and why: the one to save it on. */
 export interface StampLibraryChangedEvent {
   readonly libraryId: string;
-  readonly reason:
+  readonly type:
     | 'created'
     | 'imported'
     | 'updated'
-    | 'asset-added'
+    | 'asset-created'
     | 'asset-updated'
-    | 'asset-removed'
-    | 'removed';
+    | 'asset-deleted'
+    | 'deleted';
 }
 export interface StampLibraryCreatedEvent {
   readonly libraryId: string;
@@ -346,7 +346,7 @@ export interface StampCapability extends SettingsApi<StampSettings> {
     options: { width: number } & OperationOptions,
   ): Promise<StampAssetPreview | null>;
   /** A copy of the asset's placement bytes (a one-page PDF), or null. */
-  readAssetBytes(assetId: string): Uint8Array | null;
+  getAssetBytes(assetId: string): Uint8Array | null;
 
   // ── libraries ──
   /** Create an empty library. Fires `onLibraryCreated` and `onLibraryChanged`. */

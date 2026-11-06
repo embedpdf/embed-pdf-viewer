@@ -54,7 +54,7 @@ watch(
     }
     const handle = lens.createViewDemand(id);
     view.value = handle;
-    onCleanup(() => handle.dispose());
+    onCleanup(() => handle.destroy());
   },
   { immediate: true },
 );

@@ -90,6 +90,6 @@ export function standaloneRealm(
   return {
     transaction: (body) => host.transaction(body),
     budget,
-    dispose: () => host.dispose(),
+    dispose: () => host.destroy(),
   };
 }

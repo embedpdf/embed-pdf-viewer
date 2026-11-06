@@ -98,18 +98,18 @@ export function createWidgetLender(
     reorderOps: (page: PageRef, refs, position) => [
       { type: 'forms.reorderWidgets', page, widgets: [...refs], position },
     ],
-    authority: () => {
+    getAuthority: () => {
       const may = ctx.allows('doc.forms.modify');
       return { update: may, delete: may };
     },
     // The pictures the form layer draws too, from one store: switching modes
     // fetches nothing, and a page's pictures change only with its widgets.
-    pictureEpoch: pictures.epoch,
-    pictureVersion: pictures.versionOf,
+    getPictureEpoch: pictures.epoch,
+    getPictureVersion: pictures.versionOf,
     renderAppearances: pictures.render,
     // A widget draws live, by the painter, while a gesture reshapes it, while its look isn't
     // confirmed (a restyle, a resize, a field just placed), and until its new picture is there.
-    pending: looks.isPending,
+    isPending: looks.isPending,
     painter: (record) =>
       record.subtype === 'widget' ? looks.painterOf(record as WidgetAnnotation) : null,
   };

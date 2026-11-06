@@ -145,10 +145,10 @@ describe('encoded kinds through the real WorkerHost (native runtime + sharp)', (
     });
     const payload = result as {
       tag: string;
-      image: { contentType: string; width: number; height: number; bytes: Uint8Array };
+      image: { mimeType: string; width: number; height: number; bytes: Uint8Array };
     };
     expect(payload.tag).toBe('pages.renderEncoded');
-    expect(payload.image.contentType).toBe('image/webp');
+    expect(payload.image.mimeType).toBe('image/webp');
     expect(payload.image.width).toBe(120);
     expect(payload.image.height).toBe(60); // 200×100 page at width 120
     expect(isWebp(payload.image.bytes)).toBe(true);
@@ -169,8 +169,8 @@ describe('encoded kinds through the real WorkerHost (native runtime + sharp)', (
         options: { viewport: { kind: 'width', width: 120 } },
         encode: { format: 'png' },
       })
-    ).result as { image: { contentType: string; bytes: Uint8Array } };
-    expect(png.image.contentType).toBe('image/png');
+    ).result as { image: { mimeType: string; bytes: Uint8Array } };
+    expect(png.image.mimeType).toBe('image/png');
     expect(isPng(png.image.bytes)).toBe(true);
   }, 30_000);
 

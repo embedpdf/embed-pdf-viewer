@@ -17,7 +17,7 @@ const plugins = [actionsPlugin()];
 
 const links: OpenInput = { kind: 'grant', grant: 'shr_xs-9Y5qwuYrJ2BKtWzuo_2xy' };
 
-// A link to a website, as a PDF carries it: what getActionTree() reads from a link.
+// A link to a website, as a PDF carries it: what readActionTree() reads from a link.
 const websiteLink: PdfActionTree = {
   root: {
     type: 'uri',
@@ -32,7 +32,7 @@ const websiteLink: PdfActionTree = {
 const click: ActionContext = {
   origin: 'user',
   source: { kind: 'api' },
-  event: { scope: 'activate' },
+  event: { type: 'activate' },
 };
 
 // Your UI decides how a website opens: here, it asks first.

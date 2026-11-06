@@ -304,7 +304,7 @@ async function encodeStubRaster(raster, encode) {
       : image.png();
   const bytes = new Uint8Array(await stream.toBuffer());
   return {
-    contentType: encode.format === 'webp' ? 'image/webp' : 'image/png',
+    mimeType: encode.format === 'webp' ? 'image/webp' : 'image/png',
     width: raster.width,
     height: raster.height,
     bytes,

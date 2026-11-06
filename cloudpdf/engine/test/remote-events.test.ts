@@ -97,7 +97,7 @@ describe('remote events: two engines, one document (the collaboration loop)', ()
       const remote = eventsB[0];
       expect(remote.type).toBe('pages.rotated');
       expect(remote.origin.kind).toBe('remote');
-      expect(typeof remote.origin.serverId).toBe('number');
+      expect(typeof remote.origin.serverSequence).toBe('number');
       if (remote.type === 'pages.rotated') {
         expect(remote.rotation).toBe(90);
         expect(remote.pages).toEqual([toPageRef(pageObjectNumber)]);

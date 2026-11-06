@@ -292,7 +292,7 @@ export function createRenderReads(
     return {
       engine,
       placed: placed.sort().join('|'),
-      lent: lentShown && lender ? `lent:${lender.pictureEpoch(page)}` : '',
+      lent: lentShown && lender ? `lent:${lender.getPictureEpoch(page)}` : '',
     };
   };
 
@@ -333,7 +333,7 @@ export function createRenderReads(
 
   /** The engine's last pictures of a record, kept a while after it left its page. */
   const keptOf = (id: string, ref: AnnotationRef) =>
-    ctx.tryGet(RenderHostToken)?.keptAppearances(familyOf(id), ref) ?? [];
+    ctx.tryGet(RenderHostToken)?.getKeptAppearances(familyOf(id), ref) ?? [];
 
   /**
    * The pictures of what shows on `page` that the engine hasn't written yet:

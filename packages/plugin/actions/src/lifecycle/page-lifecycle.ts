@@ -62,16 +62,16 @@ export function createPageLifecycle(
     // page, planPageSteps holds Table 197's /PO-after-/O and /PC-before-/C):
     // close(previous) → invisible set → visible set → open(current).
     if (changedCurrent && previousCurrent !== null) {
-      void dispatch({ scope: 'page', event: 'close', page: toPageRef(previousCurrent) });
+      void dispatch({ type: 'page', event: 'close', page: toPageRef(previousCurrent) });
     }
     for (const pageObjectNumber of leaving) {
-      void dispatch({ scope: 'page', event: 'invisible', page: toPageRef(pageObjectNumber) });
+      void dispatch({ type: 'page', event: 'invisible', page: toPageRef(pageObjectNumber) });
     }
     for (const pageObjectNumber of entering) {
-      void dispatch({ scope: 'page', event: 'visible', page: toPageRef(pageObjectNumber) });
+      void dispatch({ type: 'page', event: 'visible', page: toPageRef(pageObjectNumber) });
     }
     if (changedCurrent && current !== null) {
-      void dispatch({ scope: 'page', event: 'open', page: toPageRef(current) });
+      void dispatch({ type: 'page', event: 'open', page: toPageRef(current) });
     }
   };
 
@@ -102,7 +102,7 @@ export function createPageLifecycle(
         const first = ctx.document()?.pages[0]?.ref.objectNumber;
         if (first !== undefined) {
           lastEmitted = { current: first, visible: lastEmitted.visible };
-          void dispatch({ scope: 'page', event: 'open', page: toPageRef(first) });
+          void dispatch({ type: 'page', event: 'open', page: toPageRef(first) });
         }
       }
     } catch (error) {

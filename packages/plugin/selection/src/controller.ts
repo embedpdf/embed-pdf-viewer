@@ -104,7 +104,7 @@ export function createSelectionController(ctx: PluginContext<SelectionModel, Sel
     name: 'geometry',
     load: (doc, page) => doc.page(page).text.layout(),
     affected: contentChangedPagesOf,
-    changed: ({ cause }) => {
+    onChanged: ({ cause }) => {
       // A page's geometry arrived: a boundary page's segments can fill in.
       if (cause !== 'load') return;
       const current = state().selection;
@@ -192,7 +192,7 @@ export function createSelectionController(ctx: PluginContext<SelectionModel, Sel
   // Only the range and the segments go in, so a change to the gesture fact or
   // the highlight's visibility keeps every read (the range, the page list) as it was.
   const readModel = memo(
-    () => [state().selection, state().segments, ctx.document()?.revision ?? 0],
+    () => [state().selection, state().segments, ctx.document()?.pagesSequence ?? 0],
     (selection, segments): ReadModel => buildReadModel(selection, segments),
   );
 
@@ -553,7 +553,7 @@ export function createSelectionController(ctx: PluginContext<SelectionModel, Sel
     api,
     connect() {
       // Registry changes (rotate/move/delete/insert) bump the document revision.
-      ctx.watch(() => ctx.document()?.revision ?? 0, onPagesUpdated);
+      ctx.watch(() => ctx.document()?.pagesSequence ?? 0, onPagesUpdated);
       ctx.listen(ctx.doc.events, (event) => {
         const pages = contentChangedPagesOf(event);
         if (pages) onContentChanged(pages);

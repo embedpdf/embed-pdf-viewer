@@ -183,7 +183,7 @@ const BUILT_IN_PANELS: ReadonlyMap<string, BuiltInPanel> = new Map<string, Built
           hasJob(
             commandContext,
             attachment.list().length,
-            attachment.canAdd(),
+            attachment.canCreate(),
             'attachments.adding',
           )
         );

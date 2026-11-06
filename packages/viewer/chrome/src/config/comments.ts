@@ -39,7 +39,7 @@ const commentsOf = (commandContext: Ctx) =>
 /** The thread of the first selected annotation. */
 const selectedThread = (commandContext: Ctx): CommentThread | null => {
   const annotation = commandContext.tryGet(AnnotationToken);
-  const [first] = annotation?.selection.list() ?? [];
+  const [first] = annotation?.selection.getSelected() ?? [];
   return first ? (annotation?.comments.getThread(first.ref) ?? null) : null;
 };
 

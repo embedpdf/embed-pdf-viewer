@@ -18,7 +18,7 @@ describe('stage settings', () => {
   it('change only through updateSettings, which announces what changed', () => {
     const { stage } = placedStage(5, { interaction: false });
     const changed: string[][] = [];
-    stage.onSettingsChanged((event) => changed.push([...event.changed]));
+    stage.onSettingsChanged((event) => changed.push([...event.changedKeys]));
     expect(stage.getSettings().interaction).toBe(false);
 
     stage.updateSettings({ zoomGestures: false, layout: 'horizontal' });

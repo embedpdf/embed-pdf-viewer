@@ -68,7 +68,7 @@ function fakeRender() {
     markPainted: () => {},
     markUnpainted: () => {},
     release: vi.fn(),
-    dispose: vi.fn(),
+    destroy: vi.fn(),
   };
   const createViewDemand = vi.fn(() => view);
   const paint = { tiles: true };
@@ -176,7 +176,7 @@ const engineWith = (pageCount: number) =>
     open: (input: { id?: string }) =>
       Promise.resolve({
         id: input.id ?? 'doc',
-        events: { subscribe: () => () => {}, lastServerId: () => null },
+        events: { subscribe: () => () => {}, lastServerSequence: () => null },
         pages: {
           list: () =>
             Promise.resolve({
@@ -229,7 +229,7 @@ describe('the tile plane', () => {
     expect(after.at(-1)!.width).toBeGreaterThan(before.width); // the zoom asked for more pixels
     expect(new Set(after.map((demand) => demand.visible)).size).toBeGreaterThan(1); // the scroll moved the visible part
     expect(render.view.release).not.toHaveBeenCalled();
-    expect(render.view.dispose).not.toHaveBeenCalled();
+    expect(render.view.destroy).not.toHaveBeenCalled();
     expect(render.createViewDemand).toHaveBeenCalledTimes(1);
     expect(tiles()).toHaveLength(1);
   });
@@ -275,14 +275,14 @@ describe('the tile plane', () => {
     expect(render.view.release).toHaveBeenCalledTimes(1);
     expect(render.view.release).toHaveBeenCalledWith(toPageRef(1));
     expect(render.demands.at(-1)!.page).toBe(2);
-    expect(render.view.dispose).not.toHaveBeenCalled();
+    expect(render.view.destroy).not.toHaveBeenCalled();
     expect(render.createViewDemand).toHaveBeenCalledTimes(1);
     expect(tiles()).toHaveLength(1);
 
     // When it goes, it lets go of the page it shows now, and of the view.
     act(() => rerender(null));
     expect(render.view.release).toHaveBeenLastCalledWith(toPageRef(2));
-    expect(render.view.dispose).toHaveBeenCalledTimes(1);
+    expect(render.view.destroy).toHaveBeenCalledTimes(1);
   });
 });
 

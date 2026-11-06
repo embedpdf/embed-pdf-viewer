@@ -283,8 +283,8 @@ export type WidgetAddress = AnnotationRef | FormWidget;
 
 /** What one widget activation did: the form's own scripts ran, or the widget's action did. */
 export type WidgetActivationResult =
-  | { kind: 'form'; result: FormCommitResult }
-  | { kind: 'dispatched'; result: ActionTriggerResult };
+  | { status: 'form'; result: FormCommitResult }
+  | { status: 'dispatched'; result: ActionTriggerResult };
 
 /** How a write through the document's scripts ended. */
 export type FormCommitStatus = 'applied' | 'unchanged' | 'rejected' | 'failed';

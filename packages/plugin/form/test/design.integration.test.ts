@@ -178,10 +178,10 @@ describe('design through lending', () => {
       // The annotations stay the document's own.
       expect(annotation.list().some((each) => each.subtype === 'widget')).toBe(false);
       // Back to filling: the widget leaves the annotation plugin, selection and all.
-      annotation.selection.set([widget]);
+      annotation.selection.select([widget]);
       booted.interaction.activateDefaultTool();
       expect(annotation.get(widget)).toBeNull();
-      expect(annotation.selection.list()).toHaveLength(0);
+      expect(annotation.selection.getSelected()).toHaveLength(0);
     } finally {
       await booted.destroy();
     }
@@ -202,8 +202,8 @@ describe('design through lending', () => {
       const shown = form.get({ kind: 'fqn', name: 'agree' });
       expect(shown?.family).toBe('checkbox');
       const widget = booted.widgetOf({ kind: 'fqn', name: 'agree' });
-      annotation.selection.set([widget]);
-      expect(annotation.selection.list().map((each) => annotationKey(each.ref))).toEqual([
+      annotation.selection.select([widget]);
+      expect(annotation.selection.getSelected().map((each) => annotationKey(each.ref))).toEqual([
         annotationKey(widget),
       ]);
       // Drawn live until the engine has its picture.
@@ -230,7 +230,7 @@ describe('design through lending', () => {
         city: (await booted.truthOf(city))!.rect,
         square: square.rect,
       };
-      annotation.selection.set([name, city, square.ref]);
+      annotation.selection.select([name, city, square.ref]);
       history.clear();
       booted.hold();
       booted.drag({ x: 50, y: 70 }, { x: 70, y: 80 });
@@ -278,7 +278,7 @@ describe('design through lending', () => {
       // Its picture, as the page draws it now.
       const pictures = await annotation.renderAppearances(page, 1);
       expect(pictures.some((each) => annotationKey(each.ref) === annotationKey(widget))).toBe(true);
-      annotation.selection.set([widget]);
+      annotation.selection.select([widget]);
       history.clear();
       booted.hold();
       const field = form.get(NAME)!.ref;
@@ -463,7 +463,7 @@ describe('design through lending', () => {
           .find((item) => item.ref && annotationKey(item.ref) === annotationKey(widget))!;
       const before = itemOf();
       expect(before.source).toBe('baked');
-      annotation.selection.set([widget]);
+      annotation.selection.select([widget]);
       // The south-east handle, on the box's corner, dragged 40 points right and 10 down.
       const corner = { x: before.box.x + before.box.width, y: before.box.y + before.box.height };
       annotation.editPointer('down', page, corner, false, 1);
@@ -502,8 +502,8 @@ describe('design through lending', () => {
       booted.design();
       const widget = booted.widgetOf(NAME);
       expect(annotation.get(widget)).toBeNull();
-      annotation.selection.set([widget]);
-      expect(annotation.selection.list()).toHaveLength(0);
+      annotation.selection.select([widget]);
+      expect(annotation.selection.getSelected()).toHaveLength(0);
       // Nothing is lent, so the form layer keeps drawing the field.
       expect(booted.form.listShownWidgets(booted.page)).toHaveLength(1);
     } finally {
@@ -518,7 +518,7 @@ describe('design through lending', () => {
       booted.design();
       const widget = booted.widgetOf(NAME);
       const before = (await booted.truthOf(widget))!.rect;
-      annotation.selection.set([widget]);
+      annotation.selection.select([widget]);
       booted.drag({ x: before.x + 10, y: before.y + 10 }, { x: before.x + 40, y: before.y + 10 });
       const shown = annotation.get(widget)!.rect;
       // Moved right (alignment guides may snap it a little further).

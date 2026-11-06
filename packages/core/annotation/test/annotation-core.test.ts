@@ -3476,9 +3476,9 @@ describe('page-bound gestures', () => {
 
 /* ── snapping: alignment guides (move) + rotation snap ──────────────────────
  * Guides: the moving selection's edges/centers snap to other annotations on the
- * page (and the page box) within `snap.alignmentThreshold`, nudging the delta and
+ * page (and the page box) within `snap.alignmentThresholdPx`, nudging the delta and
  * reporting guide lines. Rotation: the selection's absolute angle locks onto
- * `snap.rotationAngles` within `snap.rotationThreshold`. Shift bypasses both.
+ * `snap.rotationAngles` within `snap.rotationThresholdDeg`. Shift bypasses both.
  */
 describe('annotation-core — snapping', () => {
   const seededSquare = (

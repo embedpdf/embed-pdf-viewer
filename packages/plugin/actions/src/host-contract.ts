@@ -162,7 +162,7 @@ export interface ScriptRealmPort {
 
 /** A detached realm: the caller owns its lifetime. */
 export interface DetachedScriptRealm extends ScriptRealmPort {
-  dispose(): void;
+  destroy(): void;
 }
 
 /** The form plugin's dataset resolver, registered on the host lens.

@@ -201,7 +201,7 @@ describe('annotation flags', () => {
     const harness = createHarness();
     await loadPage(harness, [squareDTO(20)]);
     const id = harness.model().order[0];
-    harness.capability.selection.set([ref(20)]);
+    harness.capability.selection.select([ref(20)]);
     harness.update.mockResolvedValueOnce({ annotation: squareDTO(20, { locked: true }) });
 
     harness.capability.selection.update({ locked: true });
@@ -222,7 +222,7 @@ describe('annotation flags', () => {
     const harness = createHarness();
     await loadPage(harness, [squareDTO(21, { locked: true }), squareDTO(22)]);
     expect(harness.capability.selection.getProperties().properties).toEqual([]); // nothing selected
-    harness.capability.selection.set([ref(21)]);
+    harness.capability.selection.select([ref(21)]);
     harness.capability.selection.add([ref(22)]);
     const { properties, values, mixed } = harness.capability.selection.getProperties();
     expect(properties.find((property) => property.key === 'locked')?.control).toBe('flag');
@@ -236,7 +236,7 @@ describe('annotation flags', () => {
     const harness = createHarness();
     await loadPage(harness, [squareDTO(23, { locked: true })]);
     const id = harness.model().order[0];
-    harness.capability.selection.set([ref(23)]);
+    harness.capability.selection.select([ref(23)]);
     harness.update.mockResolvedValueOnce({ annotation: squareDTO(23) });
     harness.capability.selection.update({ locked: false });
     expect(harness.model().byId[id].annotation.locked).toBe(false);
@@ -324,9 +324,9 @@ const META = {
 const remoteOrigin = (serverId: number) => ({
   kind: 'remote' as const,
   sessionId: 'cloud:other',
-  sub: 'u-2',
-  ts: 0,
-  serverId,
+  subject: 'u-2',
+  at: new Date(0).toISOString(),
+  serverSequence: serverId,
 });
 
 const createdEvent = (dto: FileAnnotation, serverId: number): DocumentEvent =>
@@ -434,7 +434,11 @@ describe('the records mirror', () => {
 
     // obj:41 was deleted while the stream could not be trusted.
     harness.listAll.mockResolvedValueOnce(snapshot([hydrationSquare(40)], 60));
-    harness.emit({ type: 'stream.desynced', reason: 'backlog-overflow', ts: 0 } as DocumentEvent);
+    harness.emit({
+      type: 'stream.desynced',
+      reason: 'backlog-overflow',
+      at: new Date(0).toISOString(),
+    } as DocumentEvent);
     await harness.capability.whenSynced();
 
     expect(harness.model().byId['obj:41']).toBeUndefined();
@@ -476,11 +480,11 @@ describe('the records mirror', () => {
     expect(updated.mock.calls[0]![0].origin).toEqual({
       kind: 'local',
       sessionId: 'me',
-      sub: null,
-      ts: 0,
-      serverId: null,
+      subject: null,
+      at: new Date(0).toISOString(),
+      serverSequence: null,
       // The change it belongs to: one event of one.
-      tx: { id: harness.applied[0]!.opId, index: 0, count: 1 },
+      transaction: { id: harness.applied[0]!.opId, index: 0, count: 1 },
     });
   });
 });
@@ -513,7 +517,7 @@ describe('links lens — substrate children, no ledger', () => {
       page: PAGE,
       deleted: [{ kind: 'objectNumber', objectNumber: 21 }],
       meta: META,
-      origin: { kind: 'remote', sub: 'alice' },
+      origin: { kind: 'remote', subject: 'alice' },
       ts: Date.now(),
     } as unknown as DocumentEvent);
     expect(harness.capability.links.get(ref(20))).toBe(null);
@@ -522,9 +526,9 @@ describe('links lens — substrate children, no ledger', () => {
   it('a linked annotation selects as a SINGLE unit: no ungroup, full selection', async () => {
     const harness = createHarness();
     await harness.load([hydrationSquare(20), childDTO(21, 20)]);
-    harness.capability.selection.set([ref(20)]);
+    harness.capability.selection.select([ref(20)]);
     // One selected id — the child never joins the selection…
-    expect(harness.capability.selection.list().map((annotation) => annotation.ref)).toEqual([
+    expect(harness.capability.selection.getSelected().map((annotation) => annotation.ref)).toEqual([
       ref(20),
     ]);
     // …and the group verbs stay hidden: ungroup on this "group" would strip
@@ -938,14 +942,14 @@ describe('the twin law — authority fused into presentation and gestures', () =
     selfOnly(harness);
     await harness.load([stamped(20, 'me'), stamped(21, 'alice')]);
     // Own record: full selection chrome.
-    harness.capability.selection.set([ref(20)]);
+    harness.capability.selection.select([ref(20)]);
     expect(
       harness.capability.listChromeNodes(PAGE, 1, 0, 1).filter((node) => node.kind === 'handle')
         .length,
     ).toBeGreaterThan(0);
     // Alice's record under `:self`: selectable, but the same fused predicate
     // that answers canEdit(false) strips every handle — pixels can't lie.
-    harness.capability.selection.set([ref(21)]);
+    harness.capability.selection.select([ref(21)]);
     expect(
       harness.capability.listChromeNodes(PAGE, 1, 0, 1).filter((node) => node.kind === 'handle'),
     ).toHaveLength(0);
@@ -998,7 +1002,7 @@ describe('the twin law — authority fused into presentation and gestures', () =
     const harness = createHarness();
     vi.spyOn(console, 'error').mockImplementation(() => {});
     await harness.load([stamped(20, 'me')]);
-    harness.capability.selection.set([ref(20)]);
+    harness.capability.selection.select([ref(20)]);
     const id = harness.model().order[0]!;
     const before = styleOf(harness.model().byId[id]!.annotation).color;
     harness.update.mockRejectedValueOnce(new Error('Forbidden'));
@@ -1039,14 +1043,14 @@ describe('per-record authorization (collab-resolver mirrors)', () => {
     const harness = createHarness();
     selfOnly(harness);
     await harness.load([stamped(20, 'me'), stamped(21, 'alice')]);
-    harness.capability.selection.set([ref(20)]);
+    harness.capability.selection.select([ref(20)]);
     harness.capability.selection.add([ref(21)]);
     expect(harness.capability.selection.canGroup()).toBe(false);
 
     const h2 = createHarness();
     selfOnly(h2);
     await h2.load([stamped(20, 'me'), stamped(21, 'me')]);
-    h2.capability.selection.set([ref(20)]);
+    h2.capability.selection.select([ref(20)]);
     h2.capability.selection.add([ref(21)]);
     expect(h2.capability.selection.canGroup()).toBe(true);
   });
@@ -1150,7 +1154,7 @@ describe.each([
   it('preserves vector rendering through consecutive local edits and engine responses', async () => {
     const harness = createHarness();
     await harness.load([dto]);
-    harness.capability.selection.set([dto.ref]);
+    harness.capability.selection.select([dto.ref]);
 
     for (const strokeWidth of [2, 3]) {
       const updated = { ...dto, strokeWidth };
@@ -1213,7 +1217,7 @@ describe('distance authoring and recalibration', () => {
     harness.capability.setPageViewports(PAGE, [], fallback);
     harness.capability.createPointer('distance', 'move', PAGE, { x: 220, y: 20 });
     harness.capability.createPointer('distance', 'up', PAGE, { x: 220, y: 20 });
-    expect(harness.capability.distanceCreationPage()).toEqual(PAGE);
+    expect(harness.capability.getDistanceCreationPage()).toEqual(PAGE);
     harness.capability.createPointer('distance', 'down', PAGE, { x: 220, y: 8 });
     expect(harness.create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -1423,7 +1427,7 @@ describe('where UI attaches to an annotation', () => {
     const harness = createHarness();
     await harness.load([note(70), hydrationSquare(80)]);
     const first = harness.capability.getAnnotationAnchor(ref(70));
-    harness.capability.selection.set([ref(80)]); // the model changes, the note doesn't
+    harness.capability.selection.select([ref(80)]); // the model changes, the note doesn't
     expect(harness.capability.getAnnotationAnchor(ref(70))).toBe(first);
   });
 });

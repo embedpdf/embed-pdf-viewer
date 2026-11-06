@@ -373,7 +373,7 @@ describe('turning single commands off', () => {
   it('turns commands off and on through the setting, live', () => {
     const { ctx, commands } = harness({ commands: definitions });
     const changed: string[][] = [];
-    commands.onSettingsChanged((event) => changed.push([...event.changed]));
+    commands.onSettingsChanged((event) => changed.push([...event.changedKeys]));
     const wake = vi.fn();
     ctx.subscribe(wake);
 
@@ -777,7 +777,7 @@ describe('settings', () => {
   it('takes its commands and categories from the settings, live', () => {
     const { ctx, commands } = harness({ commands: [{ id: 'zoom:in', label: 'In' }] });
     const changed: string[][] = [];
-    commands.onSettingsChanged((event) => changed.push([...event.changed]));
+    commands.onSettingsChanged((event) => changed.push([...event.changedKeys]));
     const wake = vi.fn();
     ctx.subscribe(wake);
 

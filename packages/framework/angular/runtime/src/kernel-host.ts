@@ -141,7 +141,7 @@ export class EpdfKernelHost {
   /** A kernel given says it itself: someone else starts it. */
   readonly status: Signal<EpdfViewerStatus> = this.given
     ? this.read(
-        (kernel) => statusOfKernel(kernel.status()),
+        (kernel) => statusOfKernel(kernel.getStatus()),
         () => 'starting',
       )
     : this.statusState.asReadonly();

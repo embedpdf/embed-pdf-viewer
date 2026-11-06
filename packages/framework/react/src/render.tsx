@@ -307,9 +307,9 @@ function TilePlane({ parts }: { parts: PicturePartProps }) {
   // rail's never-engaging demand cannot disturb the main lens's plan (shared
   // state made the main view lose its tiles whenever a rail opened). The
   // handle is reference-stable per view and reference-counted — one
-  // `dispose` per `createViewDemand`.
+  // `destroy` per `createViewDemand`.
   const view = useMemo(() => render.createViewDemand(page.view), [render, page.view]);
-  useEffect(() => () => view.dispose(), [view]);
+  useEffect(() => () => view.destroy(), [view]);
   // Demand in, plan out: setting the demand is the one call that schedules
   // fetches (and re-plans); the read below is pure. Layout-timed so a camera
   // move re-plans before the browser paints this commit. The page's layers

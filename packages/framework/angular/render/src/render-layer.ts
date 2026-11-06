@@ -179,7 +179,7 @@ export class EpdfTilePlane {
       const view = untracked(() => render.createViewDemand(this.page.view));
       this.view.set(view);
       onCleanup(() => {
-        view.dispose();
+        view.destroy();
         this.view.set(null);
       });
     });

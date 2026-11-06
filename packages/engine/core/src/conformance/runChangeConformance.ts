@@ -500,7 +500,8 @@ export function runChangeConformance(
       return { events, stop };
     };
 
-    const txOf = (event: DocumentEvent) => ('origin' in event ? event.origin.tx : undefined);
+    const txOf = (event: DocumentEvent) =>
+      'origin' in event ? event.origin.transaction : undefined;
 
     /** The item of `type` a result holds, applied or left alone. */
     const itemOfType = <T extends ChangeItemType>(
