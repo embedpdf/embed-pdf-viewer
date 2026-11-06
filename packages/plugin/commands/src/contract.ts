@@ -177,6 +177,12 @@ export interface ResolvedCommand {
   readonly menu?: string;
   readonly enabled: boolean;
   readonly active: boolean;
+  /**
+   * Whether it's a toggle, pressed while `active`: it has an `active` of its own, or opens a panel.
+   * Its button says `aria-pressed`, true or false; another button leaves it off. A command that
+   * opens a menu or a dialog isn't one.
+   */
+  readonly pressable: boolean;
   readonly visible: boolean;
   readonly categories: readonly string[];
   /**
@@ -217,6 +223,7 @@ export const resolvedCommandsEqual = (
     left.menu === right.menu &&
     left.enabled === right.enabled &&
     left.active === right.active &&
+    left.pressable === right.pressable &&
     left.visible === right.visible &&
     left.disabledReason === right.disabledReason &&
     left.shortcuts.length === right.shortcuts.length &&
@@ -234,6 +241,7 @@ export const unregisteredCommand = (id: CommandId): ResolvedCommand => ({
   shortcuts: [],
   enabled: false,
   active: false,
+  pressable: false,
   visible: false,
   categories: [],
 });

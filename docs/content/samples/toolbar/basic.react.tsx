@@ -78,7 +78,7 @@ function MainToolbar() {
           title={command.label}
           aria-label={command.label}
           disabled={!command.enabled}
-          aria-pressed={command.active}
+          aria-pressed={command.pressable ? command.active : undefined}
           onClick={run}
         >
           <span className="icon" aria-hidden>

@@ -276,6 +276,18 @@ describe('<Toolbar> keyboard and screen readers', () => {
     expect(toolbar.getAttribute('aria-label')).toBe('Main');
   });
 
+  it('says whether a toggle is pressed, and leaves aria-pressed off the other buttons', async () => {
+    pressed = false;
+    await mountToolbar(<Toolbar bar={bar} />);
+    const pressedOf = (label: string) =>
+      live('button')
+        .find((button) => button.textContent === label)!
+        .getAttribute('aria-pressed');
+    expect(pressedOf('One')).toBeNull();
+    expect(pressedOf('Two')).toBe('false');
+    expect(pressedOf('Three')).toBeNull();
+  });
+
   it('is one tab stop, with arrow keys, Home and End between its buttons, past a disabled one', async () => {
     const schema: BarSchema = {
       id: 'main',

@@ -17,7 +17,7 @@ const bar = {
     <template #command="{ command, variant, run }">
       <button
         :disabled="!command.enabled"
-        :aria-pressed="command.active"
+        :aria-pressed="command.pressable ? command.active : undefined"
         :title="command.label"
         @click="run()"
       >

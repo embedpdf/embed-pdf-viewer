@@ -13,6 +13,7 @@ const zoomIn: ResolvedCommand = {
   shortcuts: ['Mod+=', 'Mod+Plus'],
   enabled: true,
   active: false,
+  pressable: false,
   visible: true,
   categories: ['zoom'],
 };
@@ -50,6 +51,7 @@ describe('unregisteredCommand', () => {
       shortcuts: [],
       enabled: false,
       active: false,
+      pressable: false,
       visible: false,
       categories: [],
     });

@@ -1,7 +1,7 @@
 <!--
   The default command button: a plain <button> with the command's label in
-  every variant (icons are the app's). Pressed when the command is active,
-  disabled when it can't run.
+  every variant (icons are the app's). A toggle says whether it's pressed, a
+  menu's button whether its menu is open; disabled when it can't run.
 -->
 <script setup lang="ts">
 import type { ResolvedCommand } from '@embedpdf/plugin-commands/contract';
@@ -17,8 +17,9 @@ defineProps<{
   <button
     type="button"
     :disabled="!command.enabled"
-    :aria-pressed="command.active || undefined"
+    :aria-pressed="command.pressable ? command.active : undefined"
     :aria-haspopup="command.menu ? 'menu' : undefined"
+    :aria-expanded="command.menu ? command.active : undefined"
     :title="command.label"
     :style="{
       display: 'inline-flex',

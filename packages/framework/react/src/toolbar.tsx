@@ -328,8 +328,9 @@ const defaultRenderCommand = (
     type="button"
     onClick={run}
     disabled={!cmd.enabled}
-    aria-pressed={cmd.active || undefined}
+    aria-pressed={cmd.pressable ? cmd.active : undefined}
     aria-haspopup={cmd.menu ? 'menu' : undefined}
+    aria-expanded={cmd.menu ? cmd.active : undefined}
     title={cmd.label}
     style={{
       display: 'inline-flex',

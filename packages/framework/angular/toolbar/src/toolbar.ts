@@ -372,8 +372,9 @@ export class EpdfToolbarLength {
       <button
         type="button"
         [disabled]="!command.enabled"
-        [attr.aria-pressed]="command.active || null"
+        [attr.aria-pressed]="command.pressable ? command.active : null"
         [attr.aria-haspopup]="command.menu ? 'menu' : null"
+        [attr.aria-expanded]="command.menu ? command.active : null"
         [title]="command.label"
         [style]="commandStyle"
         [style.background]="command.active ? paint.active : 'transparent'"

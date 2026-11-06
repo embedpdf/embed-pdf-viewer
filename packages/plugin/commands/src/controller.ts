@@ -63,6 +63,13 @@ const panelTarget = (
       : definition.panel;
 
 /**
+ * A toggle: it has an `active` of its own, or opens a panel. A menu's button says it's expanded
+ * instead.
+ */
+const pressableOf = (definition: CommandDefinition): boolean =>
+  !definition.menu && (definition.active !== undefined || definition.panel !== undefined);
+
+/**
  * One command's live derivations for a document, as values a memo can
  * compare: the entry, label, accent colors, the enabled/active/visible flags,
  * and why it's disabled when the scope doesn't allow it.
@@ -295,6 +302,7 @@ export function createCommandsController(ctx: PluginContext<void, CommandsSettin
         menu: entry.definition.menu,
         enabled,
         active,
+        pressable: pressableOf(entry.definition),
         visible,
         categories: entry.definition.categories ?? [],
         ...(disabledReason === undefined ? {} : { disabledReason }),

@@ -48,7 +48,7 @@ const bar: BarSchema = {
         :title="command.label"
         :aria-label="command.label"
         :disabled="!command.enabled"
-        :aria-pressed="command.active"
+        :aria-pressed="command.pressable ? command.active : undefined"
         @click="run()"
       >
         <span class="icon" aria-hidden="true">

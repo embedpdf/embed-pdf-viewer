@@ -12,7 +12,7 @@
     type="button"
     class="button"
     disabled={!cmd.enabled}
-    aria-pressed={cmd.active}
+    aria-pressed={cmd.pressable ? cmd.active : undefined}
     onclick={cmd.run}
   >
     {cmd.label}

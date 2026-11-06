@@ -687,6 +687,7 @@ function Toggle({
   return (
     <TooltipButton
       label={title}
+      aria-pressed={active}
       onClick={onClick}
       onMouseDown={keepFocus ? (event) => event.preventDefault() : undefined}
       className={`flex h-9 w-9 items-center justify-center rounded border transition-colors ${

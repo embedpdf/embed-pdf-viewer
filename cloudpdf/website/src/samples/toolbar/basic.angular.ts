@@ -104,7 +104,7 @@ const bar: BarSchema = {
               [title]="command.label"
               [attr.aria-label]="command.label"
               [disabled]="!command.enabled"
-              [attr.aria-pressed]="command.active"
+              [attr.aria-pressed]="command.pressable ? command.active : null"
               (click)="run()"
             >
               <span class="icon" aria-hidden="true">

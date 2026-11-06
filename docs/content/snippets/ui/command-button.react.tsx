@@ -6,7 +6,11 @@ export function CommandButton({ id }: { id: string }) {
   if (!command.visible) return null;
 
   return (
-    <button onClick={command.run} disabled={!command.enabled} aria-pressed={command.active}>
+    <button
+      onClick={command.run}
+      disabled={!command.enabled}
+      aria-pressed={command.pressable ? command.active : undefined}
+    >
       <Icon name={command.icon} />
       {command.label}
       {command.shortcutLabel && <kbd>{command.shortcutLabel}</kbd>}

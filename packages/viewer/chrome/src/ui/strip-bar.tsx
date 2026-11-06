@@ -31,7 +31,8 @@ function StripButton({
   emphasis?: Emphasis;
 }) {
   const tooltip = useTooltip(commandTooltipOf(cmd));
-  // A menu command is active while its menu is open at this button: it says it's expanded.
+  // A toggle says whether it's pressed. A menu command is active while its menu is open at this
+  // button: it says it's expanded.
   const draw = (active: boolean) => (
     <>
       <button
@@ -39,7 +40,7 @@ function StripButton({
         type="button"
         onClick={run}
         disabled={!cmd.enabled}
-        aria-pressed={cmd.menu ? undefined : active || undefined}
+        aria-pressed={cmd.pressable ? active : undefined}
         aria-haspopup={cmd.menu ? 'menu' : undefined}
         aria-expanded={cmd.menu ? active : undefined}
         aria-label={cmd.label}

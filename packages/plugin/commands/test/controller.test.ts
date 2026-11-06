@@ -298,6 +298,26 @@ describe('what a command opens', () => {
       ['outline', { exclusive: undefined, focus: undefined }],
     ]);
   });
+
+  it('is a toggle when it has an active of its own or opens a panel, never for a menu or dialog', () => {
+    const commands = harness({
+      commands: [
+        { id: 'tool:pan', label: 'Pan', active: () => false },
+        { id: 'panel:search', label: 'Search', panel: 'search' },
+        { id: 'zoom:in', label: 'Zoom in', run: () => undefined },
+        { id: 'menu:zoom', label: 'Zoom', menu: 'zoom-menu' },
+        { id: 'menu:more', label: 'More', menu: 'more-menu', active: () => true },
+        { id: 'dialog:print', label: 'Print', modal: 'print' },
+      ],
+    }).commands;
+    const pressable = (id: string) => commands.resolveCommand(id)?.pressable;
+    expect(pressable('tool:pan')).toBe(true);
+    expect(pressable('panel:search')).toBe(true);
+    expect(pressable('zoom:in')).toBe(false);
+    expect(pressable('menu:zoom')).toBe(false);
+    expect(pressable('menu:more')).toBe(false);
+    expect(pressable('dialog:print')).toBe(false);
+  });
 });
 
 describe('category gating', () => {

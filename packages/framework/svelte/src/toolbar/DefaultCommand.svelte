@@ -1,6 +1,6 @@
 <!--
-  The default command button: the command's label in every variant (icons are the app's), pressed
-  when the command is active.
+  The default command button: the command's label in every variant (icons are the app's). A toggle
+  says whether it's pressed, a menu's button whether its menu is open.
 -->
 <script lang="ts">
   import type { ResolvedCommand } from '@embedpdf/plugin-commands/contract';
@@ -13,8 +13,9 @@
   type="button"
   onclick={run}
   disabled={!command.enabled}
-  aria-pressed={command.active || undefined}
+  aria-pressed={command.pressable ? command.active : undefined}
   aria-haspopup={command.menu ? 'menu' : undefined}
+  aria-expanded={command.menu ? command.active : undefined}
   title={command.label}
   style:display="inline-flex"
   style:align-items="center"

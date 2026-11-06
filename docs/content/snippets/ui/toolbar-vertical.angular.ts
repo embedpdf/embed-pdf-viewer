@@ -11,7 +11,7 @@ import { Icon } from './icon';
         <button
           (click)="run()"
           [disabled]="!command.enabled"
-          [attr.aria-pressed]="command.active"
+          [attr.aria-pressed]="command.pressable ? command.active : null"
           [title]="command.label"
         >
           <app-icon [name]="command.icon" />
