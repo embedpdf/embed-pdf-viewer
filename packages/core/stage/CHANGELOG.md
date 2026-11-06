@@ -1,5 +1,11 @@
 # @embedpdf/core-stage
 
+## 3.0.0-next.23
+
+### Minor Changes
+
+- [#1003](https://github.com/embedpdf/embed-pdf-viewer/pull/1003) by [@bobsingor](https://github.com/bobsingor) – `PageGeometry` replaces `PageGeom`, and an `Anchor` says `fractionX` and `fractionY` (were `fx` and `fy`).
+
 ## 3.0.0-next.22
 
 ## 3.0.0-next.21

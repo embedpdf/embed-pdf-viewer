@@ -1,5 +1,25 @@
 # @embedpdf/core-annotation
 
+## 3.0.0-next.23
+
+### Minor Changes
+
+- [#999](https://github.com/embedpdf/embed-pdf-viewer/pull/999) by [@bobsingor](https://github.com/bobsingor) – `writableTarget(target)` takes `PdfLinkTarget | null`, no `undefined`.
+
+- [#982](https://github.com/embedpdf/embed-pdf-viewer/pull/982) by [@bobsingor](https://github.com/bobsingor) – A signature field's widget with a mark in it is the `widget-mark` kind, which has no style rows, so a style panel offers nothing that wouldn't show. `widgetKindOf` takes the widget (its `fieldFamily` and `hasMark`), and `drawsLive` is exported.
+
+- [#1003](https://github.com/embedpdf/embed-pdf-viewer/pull/1003) by [@bobsingor](https://github.com/bobsingor) – Geometry names are spelled out: `anchoredGeometry`, `unanchoredGeometry`, `effectiveGeometry`, `obbFromGeometry`, `isRotatableGeometry`.
+
+- [#1002](https://github.com/embedpdf/embed-pdf-viewer/pull/1002) by [@bobsingor](https://github.com/bobsingor) – `fieldKindOf()` replaces `fieldFamilyOfKind()`, and a widget's `fieldKind` replaces `fieldFamily`.
+
+- [#1000](https://github.com/embedpdf/embed-pdf-viewer/pull/1000) by [@bobsingor](https://github.com/bobsingor) – The snap settings name their units: `alignmentThresholdPx` and `rotationThresholdDeg`.
+
+### Patch Changes
+
+- [#995](https://github.com/embedpdf/embed-pdf-viewer/pull/995) by [@bobsingor](https://github.com/bobsingor) – The editor's rich text predicts the engine's rule: a body it gives is replaced whole over the defaults, and without one the annotation's body is kept.
+
+- [#985](https://github.com/embedpdf/embed-pdf-viewer/pull/985) by [@bobsingor](https://github.com/bobsingor) – The rich text model's plain projection joins paragraphs with `\n`, and a hard line break inside a run is `\n`, matching the rich text the engine returns.
+
 ## 3.0.0-next.22
 
 ### Minor Changes

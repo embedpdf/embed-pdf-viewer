@@ -1,5 +1,15 @@
 # @embedpdf/plugin-actions
 
+## 3.0.0-next.23
+
+### Minor Changes
+
+- [#997](https://github.com/embedpdf/embed-pdf-viewer/pull/997) by [@bobsingor](https://github.com/bobsingor) – `SubmitIntent` and `ActionSubmitRequest` drop `flagsRaw`: an intent's `format`, `method` and resolved fields already say what the flags meant.
+
+- [#1003](https://github.com/embedpdf/embed-pdf-viewer/pull/1003) by [@bobsingor](https://github.com/bobsingor) – The UI adapter's page move is `goToPage(pageIndex, context)` (was `gotoPage(page, …)`). The host contract's `AnnotationCommitEntry`, `AnnotationCommitResult` and `AnnotationCommitSink` are spelled out. Read shapes are `readonly`.
+
+- [#1000](https://github.com/embedpdf/embed-pdf-viewer/pull/1000) by [@bobsingor](https://github.com/bobsingor) – `readActionTree()` replaces `getActionTree()`: a read from the engine is `read*`. `ActionTrigger` and `ActionTriggerEvent` are tagged `type` (was `scope`); a trigger's annotation is `annotation` (was `ref`) and an event's name is `event` (was `name`), as `ActionTreeSource` says. The host contract's realm ends with `destroy()`.
+
 ## 3.0.0-next.22
 
 ## 3.0.0-next.21

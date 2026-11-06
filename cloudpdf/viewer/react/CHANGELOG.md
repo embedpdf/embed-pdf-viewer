@@ -1,5 +1,7 @@
 # @cloudpdf/viewer-react
 
+## 3.0.0-next.23
+
 ## 3.0.0-next.22
 
 ## 3.0.0-next.21

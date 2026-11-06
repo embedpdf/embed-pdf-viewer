@@ -1,5 +1,65 @@
 # @embedpdf/engine-core
 
+## 3.0.0-next.23
+
+### Minor Changes
+
+- [#991](https://github.com/embedpdf/embed-pdf-viewer/pull/991) by [@bobsingor](https://github.com/bobsingor) – The manifest has `contentsVersion`, the document-wide pin of every page's content: it moves with any write that moves a page's `contentVersion`, inserts a page or deletes one, and a write's `cacheDelta` carries it when it moved. A search token pins `contentsVersion` and `layoutVersion` instead of `epoch`, and `searchContentEpoch` is gone.
+
+- [#989](https://github.com/embedpdf/embed-pdf-viewer/pull/989) by [@bobsingor](https://github.com/bobsingor) – Every cached read's token carries its kind's engine value and the shape the client reads (`engine`, `shape`): the encoders take a `TokenPin` and the decoders return one as `pin`. `CACHED_READ_KINDS`, `SHAPES`, `tokenPinOf`, `EngineValues` and `TokenPin` are exported from the wire entry. `DocumentHead` gains `engine`, this server's engine value for each kind. `DocumentManifest` no longer carries `serverFonts`, and render and appearance tokens carry the engine value in its place. The layout and search tokens drop `format` (`LAYOUT_FORMAT` and `SEARCH_RESULT_FORMAT` are gone): their shape is `shape`. `PAGE_TEXT_VERSION` and `LINE_BREAKS_VERSION` version the rules page text and returned text are read by.
+
+- [#994](https://github.com/embedpdf/embed-pdf-viewer/pull/994) by [@bobsingor](https://github.com/bobsingor) – One error body for every HTTP error, `ErrorResponseSchema` (`{ error: { code, message, details? } }`), and `EngineErrorSchema` for the error inside it, replacing `EngineErrorPayloadSchema`. A serialized `EngineError` no longer carries `name`. `EngineErrorCode` is the one code list: it gains the codes the server sends (`Conflict`, `EngineBusy`, `EngineRestarting`, `DocumentQuarantined`, `ThumbnailNotReady`, `TooManyRequests`, `GrantExpired`, `OriginRequired`, `OriginNotAllowed`, `FeatureNotEnabled`, `FeatureStopped`, `LicenseInvalid`, `LicenseUsageLimit`, `UpstreamError`), and `isEngineErrorCode` tells whether a value is one. `SignatureWireComponents` names `DocMdpPermission` and `FieldLockSpec` for the OpenAPI document.
+
+- [#996](https://github.com/embedpdf/embed-pdf-viewer/pull/996) by [@bobsingor](https://github.com/bobsingor) – Every point in time on the wire is an ISO 8601 string: an access's `expiresAt` and its CDN's `cdn.expiresAt` (`DocumentAccessInfo`, `CdnAccessInfo`, `AccessResponseSchema`), a layer version's `createdAt`, and a prepared signature's `expiresAt` (now typed `IsoDateTimeSchema`). They were Unix seconds, and a layer version's milliseconds.
+
+- [#997](https://github.com/embedpdf/embed-pdf-viewer/pull/997) by [@bobsingor](https://github.com/bobsingor) – Names, units and flags follow one rule (naming.md, "The HTTP API"):
+  - **Flags are named booleans.** A `submit-form` action reads and writes `exclude`, `includeNoValueFields`, `format`, `method` and the rest flat on its payload or action, without a `flags` object or a raw word; `encodeSubmitFormFlags` is the inverse of `decodeSubmitFormFlags`. An action tree drops `warningFlags` (its `warnings` name them). A seed value says `filterRequired`, `subFiltersRequired`, `parserVersionRequired`, `digestMethodsRequired` and `reasonsRequired` instead of `requiredFlags` and `presentFlags`, and its `version` is `parserVersion`. A form submission's intent drops `flagsRaw`.
+  - **One name, one meaning.** Mutation results list what they touched in `changedRefs` (was `changed`).
+  - **Units and algorithms in names.** An attachment's `size` and `checksum` are `sizeBytes` and `md5`; a font program's `displayHash` and `sourceHash` are `displaySha256` and `sourceSha256`; a version's `byteLength` is `sizeBytes`; a signature's `contentsSize` (and `prepare`'s) is `contentsSizeBytes`; the head, the manifest and the version list say `baseSha256`, the head `sizeBytes` and the manifest `baseSizeBytes` (was `baseByteLength`); an editing session's `expiresIn` (`EditSessionAccess`, `EditSessionStatus`, an object-number reservation) is `expiresInSeconds`.
+  - **Path parameters are spelled out** in `wireTemplates`: `:annotationKey`, `:sha256` and `:displaySha256`. The `document.fonts.program` worker request names its program by `displaySha256`, and `signatures.finalizeCandidate` takes `contentsSizeBytes`.
+
+- [#995](https://github.com/embedpdf/embed-pdf-viewer/pull/995) by [@bobsingor](https://github.com/bobsingor) – One spelling for "nothing" (naming.md, "Nothing: left out or `null`"):
+  - A destination always has its axes: `PageDestination`'s `x`, `y` and `zoom` (and `PdfDestination`'s `left`, `top` and `zoom`) are always there, `null` to keep the viewer's value, never left out.
+  - `DocumentActionsSnapshot.openDestination` is always there, `null` when the document has none.
+  - `CommentThreadReview.mine` is always there: `null` when the reviewer has none, or when no `currentUserId` was given.
+  - An annotation create's `groupId: null` is no group, refused to a caller who has one; left out is still the caller's own group. It used to put the annotation in the caller's group.
+  - A free text's new rich text replaces the body whole when it gives one (what it leaves out takes the default, as on a comment), and keeps the current body when it doesn't. A partial body used to merge over the current one.
+  - An annotation create left without `nm` still gets a fresh name; `nm: null` now writes none, as a file from a tool that names nothing reads. It used to mint one too. A copy leaves `nm` out.
+  - A widget's `fontFamily`, `fontSize` and `fontColor` take values only: a font can't be removed, so `null` is only the read sent back (no font on the widget or the form), and is refused beside a font. It used to write Helvetica 12 black.
+  - A line's `captionEnabled` reads `false` without `/Cap`, the PDF's default, and takes no `null`. A polygon's and polyline's keep `null` for no caption and no placement.
+  - `OpenOptions.password` is `string`, left out for none.
+  - `LineCaptionPatch` and `ShapeCaptionPatch`, unused, are gone.
+
+- [#993](https://github.com/embedpdf/embed-pdf-viewer/pull/993) by [@bobsingor](https://github.com/bobsingor) – Every union a response carries with a catch-all kind is a named contract model: a field's stored value (`FormValueEntry`) and a measure (`PdfMeasurement`) join `Annotation`, `FormField`, `PdfLinkTarget` and `PdfActionNode` in the wire components. Each of the six, a widget's `fieldFamily` and an error's `code` now describe what a client reads a kind or value it doesn't know as. `openUnionOf()` and `openUnionsIn()` in `@embedpdf/engine-core/conformance` find the unions with a catch-all in a schema.
+
+- [#985](https://github.com/embedpdf/embed-pdf-viewer/pull/985) by [@bobsingor](https://github.com/bobsingor) – Page text ends its lines in `\n` and leaves out the characters a reader can't see as text. A line break PDFium extracts as `\r\n` gives `\n`: its `\r` keeps its place in character space and gives no text. A Unicode noncharacter gives no text either, so a word PDFium joined across a line-end hyphen (which it marks with U+FFFE) reads, copies and searches whole: `Verita-` and `serum` read `Veritaserum`. Character positions don't change, so selections, highlights and search hits are where they were. New exports: `toPageText` (the projection), `isNoncharacter` and `toLineBreaks`.
+
+  Search ignores invisible characters, so a match runs across a soft hyphen, a zero-width space or joiner, a bidi mark, U+FEFF, a control code other than whitespace, or a noncharacter. `SEARCH_FOLD_VERSION` is now 2.
+
+  Every other string the engine returns ends its lines in `\n` too: an annotation's `contents` (its rich text's plain projection joins paragraphs with `\n`) and a hard line break inside a rich text run, which `RichTextRun.text` now spells `\n`.
+
+- [#1005](https://github.com/embedpdf/embed-pdf-viewer/pull/1005) by [@bobsingor](https://github.com/bobsingor) – A PDF's permissions are named flags, `PdfPermissionFlags`: `print`, `modifyContents`, `copy`, `modifyAnnotations`, `fillForms`, `copyForAccessibility`, `assemble` and `printHighQuality` (pdf.js's names), replacing `PdfBits` and its `bit3`…`bit12`. A document head's and security state's `permissions.flags` replaces the raw `bits` word, and `PdfPermissionInfo` carries `flags` with no `bits`. The `advisory` (`canPrint`, …) and `advisoryFromPdfBits()` are gone: `materializePdfPermissions(flags)` says what `pdf.permissions` grants. `permissionFlagsOf(word)` replaces `decodePdfBits()`, and the permission checks take `permissionFlags`.
+
+- [#982](https://github.com/embedpdf/embed-pdf-viewer/pull/982) by [@bobsingor](https://github.com/bobsingor) – A widget reads `hasMark`: `true` when it is a signature field's widget with a mark in it, because the field is signed or a mark was drawn in with `forms.setSignatureAppearance`. A new signature field's widget is predicted with its appearance (its box), and `WIDGET_STYLE_NAMES` lists the fields that make up a widget's style.
+
+- [#990](https://github.com/embedpdf/embed-pdf-viewer/pull/990) by [@bobsingor](https://github.com/bobsingor) – Responses are read tolerantly, as `docs/conventions/api-evolution.md` asks, so a client keeps working against a newer server. No schema a response is parsed with refuses a field it doesn't know any more, nested ones included (`LineLeaderSchema`, a measure's `origin`, `IdentitySchema`, `RedactionApplyScopeSchema`, `BundleLimitsSchema`, `ImageResourceKeysSchema`); requests are still parsed strictly, with `LineLeaderWriteSchema`, `IdentityInputSchema` and `RedactionApplyScopeInputSchema`.
+
+  An annotation of a subtype the client doesn't know reads as `unsupported` instead of failing the whole list, keeping the fields every annotation has, with `rawSubtypeCode` and `rawSubtypeName` from the body when it carries them and `0` and `null` when it doesn't. A subtype the client knows with a malformed body still fails. The other sets with a catch-all read the same way: an error `code` as `Unknown`, a widget's `fieldFamily` and a form field's `family` as `unknown`, a measure as `unknown`, a link or outline target as `unsupported`, an action as `unknown` and a field's value entry as `unsupported`.
+
+  Every other enum, literal and union a response carries is marked closed with the new `closed()`, next to `readsUnknownAs()` and `withCatchAll()` for open ones, and `readingProblems()` and `withUnknownFields()` in `@embedpdf/engine-core/conformance` check a schema against the convention.
+
+- [#1003](https://github.com/embedpdf/embed-pdf-viewer/pull/1003) by [@bobsingor](https://github.com/bobsingor) – `FormField` (with `TextField`, `CheckboxField`, `RadioField`, `ComboBoxField`, `ListBoxField`, `PushButtonField`, `SignatureField` and `UnknownField`) and `Signature` replace the `…DTO` names. The deprecated `Point`, `Rect`, `Size` and `Rotation` aliases and `PointSchema`/`RectSchema` are gone: use the `Pdf…` names. Exported functions take `options`, never `opts`.
+
+- [#1002](https://github.com/embedpdf/embed-pdf-viewer/pull/1002) by [@bobsingor](https://github.com/bobsingor) – A form field is tagged `kind`, not `family`, as naming.md tags things that are: `field.kind === 'checkbox'`, the type `FormFieldKind`, a draft's and a patch's `kind`, and a widget annotation's `fieldKind`. A values import's diagnostics say `unsupported-kind` and `wrong-kind`.
+
+- [#992](https://github.com/embedpdf/embed-pdf-viewer/pull/992) by [@bobsingor](https://github.com/bobsingor) – `API_VERSION` is the version this release speaks, the major and minor of its package version, with `parseApiVersion` and `apiVersionOf` to read one.
+
+- [#1000](https://github.com/embedpdf/embed-pdf-viewer/pull/1000) by [@bobsingor](https://github.com/bobsingor) – An event's `origin` spells out its fields: `subject` (was `sub`), `at` as an ISO 8601 string (was `ts`, milliseconds), `serverSequence` (was `serverId`) and `transaction` (was `tx`); `stream.desynced` carries `at`, and the event stream's `lastServerSequence()` replaces `lastServerId()`. A grant's callbacks are `onIdentityRequested` and `onOpenRequested`, and `resume()` takes `visitorIdentity`. Render results and appearance pictures say `mimeType`, as attachments and stamps do (was `contentType`).
+
+### Patch Changes
+
+- [#999](https://github.com/embedpdf/embed-pdf-viewer/pull/999) by [@bobsingor](https://github.com/bobsingor) – A widget's `dashArray` doc says what the code does: left out on a dashed border is the default pattern, and `null` is no pattern.
+
 ## 3.0.0-next.22
 
 ### Minor Changes

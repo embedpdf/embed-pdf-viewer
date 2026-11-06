@@ -1,5 +1,37 @@
 # @cloudpdf/contract
 
+## 3.0.0-next.23
+
+### Minor Changes
+
+- [#991](https://github.com/embedpdf/embed-pdf-viewer/pull/991) by [@bobsingor](https://github.com/bobsingor) – The manifest and a mutation's `cacheDelta` have `contentsVersion`, the document-wide pin of every page's content.
+
+- [#989](https://github.com/embedpdf/embed-pdf-viewer/pull/989) by [@bobsingor](https://github.com/bobsingor) – `GET …/head` answers `engine`, the server's engine value for each kind of cached read. The manifest no longer has `serverFonts`.
+
+- [#994](https://github.com/embedpdf/embed-pdf-viewer/pull/994) by [@bobsingor](https://github.com/bobsingor) – Every error response is the one error body, `ErrorResponse`, with its error `EngineError`; `AdminErrorPayloadSchema` and `AdminThumbnailUnavailablePayloadSchema` are gone, and a thumbnail that isn't ready says its state in `details.state`. Operations no longer get a type per error status, so a response type is named after its operation alone (`DocFormsListResponse`, not `DocFormsList200Response`). Sizes, counts, durations and the admin timestamps are integers. `nextCursor`, `thumbnailState` and `thumbnailUrl` are always there, and the license status's `license`, `reporting` and `usage` too (`null` when there's nothing). A union of whole-number literals, such as a rotation or a DocMDP level, is one integer enum in `openapi.json`.
+
+- [#996](https://github.com/embedpdf/embed-pdf-viewer/pull/996) by [@bobsingor](https://github.com/bobsingor) – Every point in time is an ISO 8601 string (`format: date-time`): `createdAt`, `updatedAt`, `archivedAt`, `lastExchangedAt`, `firstSeenAt`, `lastSeenAt` and `consentedAt` on tenants, documents, folders, grants, layers and visitors, and every `expiresAt` (grants, the upload URL, tokens, grant sessions, download links), which were milliseconds in some places and seconds in others. A request gives one with its offset: a grant's `expiresAt`, and a token revoke's `expiresAt`, which replaces `expiresAtSeconds`. A date a write takes as a `Date` in process is a date-time string in `openapi.json`. A schema a model reuses no longer takes the `nullable` of the field that used it first: a grant's `createdAt` and `updatedAt`, and a visitor's `firstSeenAt` and `lastSeenAt`, read as non-null.
+
+- [#997](https://github.com/embedpdf/embed-pdf-viewer/pull/997) by [@bobsingor](https://github.com/bobsingor) – Names and units follow one rule: a document's `baseSha` and `storageSizeBytes` are `baseSha256` and `sizeBytes`, and so is a layer's and a visitor's layer's `storageSizeBytes`; the init request's `contentLength` and `uploadTtlSec` are `sizeBytes` and `uploadTtlSeconds`; token issue's and the download link's `expiresIn` is `expiresInSeconds`; folders move-into takes `docIds` (its 404 names `details.docIds`); usage `metrics` are `pdfViews`, `pdfUploads` and `storageBytes`, and a module's meters move to their own `moduleMeters` map; and the path parameters are `{docId}`, `{annotationKey}`, `{sha256}` and `{displaySha256}` (the URLs don't change).
+
+- [#995](https://github.com/embedpdf/embed-pdf-viewer/pull/995) by [@bobsingor](https://github.com/bobsingor) – A destination's axes are always there, `null` to keep the viewer's value, and a document's `openDestination` is always there. A line's `captionEnabled` is a boolean, never `null`. A grant create takes `null` for `origins` and `expiresAt`, as a grant read says them, meaning any origin and no expiry.
+
+- [#1005](https://github.com/embedpdf/embed-pdf-viewer/pull/1005) by [@bobsingor](https://github.com/bobsingor) – A document head's `permissions.flags` (the named `PdfPermissionFlags`) replaces the raw `bits` word.
+
+- [#982](https://github.com/embedpdf/embed-pdf-viewer/pull/982) by [@bobsingor](https://github.com/bobsingor) – A widget reads `hasMark`: `true` when it is a signature field's widget with a
+  mark in it, because the field is signed or a mark was drawn in. Such a widget
+  shows the mark, and a change to its style is refused.
+
+- [#1002](https://github.com/embedpdf/embed-pdf-viewer/pull/1002) by [@bobsingor](https://github.com/bobsingor) – The document init and import answers say what happened in `status` (`created`, `resumed` or `deduped`; `imported`, `deduped` or `accepted`), not `tag`, as every call's answer does. Form fields are tagged `kind` (was `family`) and a widget says `fieldKind`. The contract test checks that a union is tagged `type`, `kind`, `status` or `subtype`.
+
+- [#992](https://github.com/embedpdf/embed-pdf-viewer/pull/992) by [@bobsingor](https://github.com/bobsingor) – The contract declares `EmbedPDF-Version` as a literal global header, so every generated SDK sends the major and minor of the release it was generated from.
+
+### Patch Changes
+
+- [#993](https://github.com/embedpdf/embed-pdf-viewer/pull/993) by [@bobsingor](https://github.com/bobsingor) – `openapi.json` writes a field's stored value and a measure out once, as `FormValueEntry` and `PdfMeasurement`, instead of once per field family and annotation kind, and each union and enum with a catch-all says what an unknown kind or value reads as. A new test fails when a union with a catch-all has no name in the contract, no row in the SDK checks' list or no fixture case. `SHARED_COMPONENT_SCHEMAS` is exported from `@cloudpdf/contract/openapi`.
+
+- [#990](https://github.com/embedpdf/embed-pdf-viewer/pull/990) by [@bobsingor](https://github.com/bobsingor) – Every response schema reads tolerantly: none refuses a field it doesn't know, and every set it carries is marked closed or names what an unknown value reads as, which a new test checks for each operation. A request naming an `identity` is still parsed strictly, and the OpenAPI projection maps that strict twin to the same `Identity` component, so `openapi.json` is unchanged.
+
 ## 3.0.0-next.22
 
 ### Minor Changes

@@ -1,5 +1,17 @@
 # @embedpdf/web
 
+## 3.0.0-next.23
+
+### Minor Changes
+
+- [#1003](https://github.com/embedpdf/embed-pdf-viewer/pull/1003) by [@bobsingor](https://github.com/bobsingor) – An actions adapter's page move is `goToPage(pageIndex, context)`. Follows core-geometry: `Rotation`.
+
+- [#1000](https://github.com/embedpdf/embed-pdf-viewer/pull/1000) by [@bobsingor](https://github.com/bobsingor) – The printer ends with `destroy()`. A page projector's stage is read through `getPageBox()`, and a link anchor dispatches `{ type: 'annotation', annotation }`, as the actions plugin's triggers are.
+
+### Patch Changes
+
+- [#985](https://github.com/embedpdf/embed-pdf-viewer/pull/985) by [@bobsingor](https://github.com/bobsingor) – The rich text editor reads a hard line break, however the browser spells it, as `\n`, and its offsets count paragraphs joined by `\n`, matching the rich text the engine returns.
+
 ## 3.0.0-next.22
 
 ### Minor Changes

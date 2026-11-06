@@ -1,5 +1,21 @@
 # @embedpdf/plugin-form
 
+## 3.0.0-next.23
+
+### Minor Changes
+
+- [#1003](https://github.com/embedpdf/embed-pdf-viewer/pull/1003) by [@bobsingor](https://github.com/bobsingor) – `FormToolDefinition` replaces `FormToolDef`, and form fields are `FormField`. Read shapes are `readonly`.
+
+- [#1002](https://github.com/embedpdf/embed-pdf-viewer/pull/1002) by [@bobsingor](https://github.com/bobsingor) – Form fields are tagged `kind`: `list({ kind })`, the `fillable` setting's field kinds (`FormFieldKind`), a form tool's `fieldKind` and `AuthorableFormKind`.
+
+- [#1000](https://github.com/embedpdf/embed-pdf-viewer/pull/1000) by [@bobsingor](https://github.com/bobsingor) – `WidgetActivationResult` is tagged `status`, as every call result is (was `kind`). `FormUiEffect` is tagged `type`. The scripting realm ends with `destroy()`.
+
+### Patch Changes
+
+- [#997](https://github.com/embedpdf/embed-pdf-viewer/pull/997) by [@bobsingor](https://github.com/bobsingor) – A scripted submit no longer sends `flagsRaw`.
+
+- [#982](https://github.com/embedpdf/embed-pdf-viewer/pull/982) by [@bobsingor](https://github.com/bobsingor) – In design mode a restyled signature field shows its new look at once and keeps it, instead of flashing it and going back. A signature field with a mark in it is drawn only by its picture.
+
 ## 3.0.0-next.22
 
 ## 3.0.0-next.21

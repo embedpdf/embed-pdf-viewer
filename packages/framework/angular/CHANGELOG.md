@@ -1,5 +1,15 @@
 # @embedpdf/angular
 
+## 3.0.0-next.23
+
+### Minor Changes
+
+- [#999](https://github.com/embedpdf/embed-pdf-viewer/pull/999) by [@bobsingor](https://github.com/bobsingor) – The viewer takes `null` for `identity` and `scope`, as its settings read them: `identity: null` is nobody, and `scope: null` lets the user do everything.
+
+- [#1003](https://github.com/embedpdf/embed-pdf-viewer/pull/1003) by [@bobsingor](https://github.com/bobsingor) – Follows the plugins: `CommandDefinition`, `FormField`, `selectionHandleGeometry`, `CustomSlotContext`, and an actions adapter's `goToPage(pageIndex)`.
+
+- [#1000](https://github.com/embedpdf/embed-pdf-viewer/pull/1000) by [@bobsingor](https://github.com/bobsingor) – Follows the plugins: `EpdfAttachment` has `create`, `delete`, `canCreate` and `canDelete`; `EpdfViewManager` has `deletePane` and `paneDeleted$`; `EpdfLink.readAllLinks`, `EpdfStamp.getAssetBytes`, `EpdfFonts.readProgram`, `EpdfActions.readActionTree`; a command's `shortcutLabel`.
+
 ## 3.0.0-next.22
 
 ### Minor Changes

@@ -1,5 +1,11 @@
 # @embedpdf/plugin-metadata
 
+## 3.0.0-next.23
+
+### Patch Changes
+
+- [#1000](https://github.com/embedpdf/embed-pdf-viewer/pull/1000) by [@bobsingor](https://github.com/bobsingor) – Follows core's mirror specs (`onChanged`).
+
 ## 3.0.0-next.22
 
 ## 3.0.0-next.21

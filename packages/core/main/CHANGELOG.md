@@ -1,5 +1,15 @@
 # @embedpdf/core
 
+## 3.0.0-next.23
+
+### Minor Changes
+
+- [#999](https://github.com/embedpdf/embed-pdf-viewer/pull/999) by [@bobsingor](https://github.com/bobsingor) – A settings declaration's `whole` names a setting inside a group by its path (`'snapshot.box'`), and a whole setting's change takes its defaults for what it leaves out, never the value before. `mergeSettings(settings, changes, declaration?)` takes the declaration (`defaults` and `whole`) instead of the `whole` list. `MirrorSpec.load()` answers `cursor?: number`, no `null`.
+
+- [#1003](https://github.com/embedpdf/embed-pdf-viewer/pull/1003) by [@bobsingor](https://github.com/bobsingor) – `PluginDefinition<State, Capability, PluginSettings>` replaces `PluginDef<S, C, T>`, and the generics of `PluginContext<State, PluginSettings>` and `StateCell<State>` are named.
+
+- [#1000](https://github.com/embedpdf/embed-pdf-viewer/pull/1000) by [@bobsingor](https://github.com/bobsingor) – `destroy()` is the one verb that ends an object's life, never `dispose()`: prepared and staged prints, `Scope` (with `destroyed`), event hook sources, the settings store and the test kernel. `acquire(get, release)` names its second argument for what it does. `Kernel.getStatus()` replaces `status()`. A document's page-list counter is `pagesSequence` (on `DocumentMeta` and `DocumentPagesChangedEvent`), not `revision`, which in a PDF means a saved file revision. `PendingPage` is tagged `kind`. Settings events carry `changedKeys`, as metadata's do. Mirror specs take `onChanged`. A document's grant question is `openRequest`, as the engine names it, and `retry()` takes `visitorIdentity`. `changes.listPending()` and the page view's `getPending(page)` start with a verb.
+
 ## 3.0.0-next.22
 
 ## 3.0.0-next.21

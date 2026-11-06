@@ -1,5 +1,19 @@
 # @embedpdf/core-form
 
+## 3.0.0-next.23
+
+### Minor Changes
+
+- [#999](https://github.com/embedpdf/embed-pdf-viewer/pull/999) by [@bobsingor](https://github.com/bobsingor) – `widgetScene(drawing, placement)` takes a `WidgetScenePlacement` (was `WidgetPlacement`, the engine's name for a widget draft's placement).
+
+- [#982](https://github.com/embedpdf/embed-pdf-viewer/pull/982) by [@bobsingor](https://github.com/bobsingor) – The painter draws a signature field's widget: its box, the background and border as a text field draws them, exactly as the engine writes it.
+
+### Patch Changes
+
+- [#1003](https://github.com/embedpdf/embed-pdf-viewer/pull/1003) by [@bobsingor](https://github.com/bobsingor) – Follows engine-core: form fields are `FormField`.
+
+- [#1002](https://github.com/embedpdf/embed-pdf-viewer/pull/1002) by [@bobsingor](https://github.com/bobsingor) – Follows engine-core: form fields are tagged `kind`.
+
 ## 3.0.0-next.22
 
 ## 3.0.0-next.21

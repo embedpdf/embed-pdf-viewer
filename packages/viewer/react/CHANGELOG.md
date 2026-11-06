@@ -1,5 +1,11 @@
 # @embedpdf/viewer-react
 
+## 3.0.0-next.23
+
+### Patch Changes
+
+- [#1003](https://github.com/embedpdf/embed-pdf-viewer/pull/1003) by [@bobsingor](https://github.com/bobsingor) – Follows the plugins' names.
+
 ## 3.0.0-next.22
 
 ## 3.0.0-next.21

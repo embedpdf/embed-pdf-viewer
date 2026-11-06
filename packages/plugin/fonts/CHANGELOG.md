@@ -1,5 +1,15 @@
 # @embedpdf/plugin-fonts
 
+## 3.0.0-next.23
+
+### Minor Changes
+
+- [#1000](https://github.com/embedpdf/embed-pdf-viewer/pull/1000) by [@bobsingor](https://github.com/bobsingor) – `readProgram()` replaces `getProgram()`: a read from the engine is `read*`.
+
+### Patch Changes
+
+- [#997](https://github.com/embedpdf/embed-pdf-viewer/pull/997) by [@bobsingor](https://github.com/bobsingor) – Reads a program's `displaySha256` and `sourceSha256`.
+
 ## 3.0.0-next.22
 
 ### Patch Changes

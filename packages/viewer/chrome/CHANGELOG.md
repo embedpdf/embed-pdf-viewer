@@ -1,5 +1,33 @@
 # @embedpdf/viewer-chrome
 
+## 3.0.0-next.23
+
+### Minor Changes
+
+- [#999](https://github.com/embedpdf/embed-pdf-viewer/pull/999) by [@bobsingor](https://github.com/bobsingor) – The viewer takes `null` for `identity` and `scope`, as its settings read them: `identity: null` is nobody, and `scope: null` lets the user do everything.
+
+- [#1003](https://github.com/embedpdf/embed-pdf-viewer/pull/1003) by [@bobsingor](https://github.com/bobsingor) – A viewer command is a `CommandDefinition` (was `CommandDef`).
+
+- [#1006](https://github.com/embedpdf/embed-pdf-viewer/pull/1006) by [@bobsingor](https://github.com/bobsingor) – A command of yours can have `labelParams`, which gets the same context as `enabled`: plugins by name through `get`, your `appState`, the document and the viewer. Its values fill the `{name}` slots in the command's label, and a number `count` picks the plural form of translated words.
+
+- [#1004](https://github.com/embedpdf/embed-pdf-viewer/pull/1004) by [@bobsingor](https://github.com/bobsingor) – `strings` takes a language's words as a function that loads them the first time the language shows, and `plugins.i18n.fallbackLocale` sets the fallback language, also shown when the browser asks for none of the viewer's languages. `plugins.i18n` takes only `fallbackLocale`. `document:download` saves the document under its name.
+
+- [#1000](https://github.com/embedpdf/embed-pdf-viewer/pull/1000) by [@bobsingor](https://github.com/bobsingor) – `ViewerLifetime.destroy()` replaces `dispose()`. The signature setting's key is `signingKey`.
+
+- [#1011](https://github.com/embedpdf/embed-pdf-viewer/pull/1011) by [@bobsingor](https://github.com/bobsingor) – Selected redaction marks can be applied from the `annotation` bar: its new `annotation:apply-redaction` command shows when every selected annotation is a redaction mark, and asks first in the same confirmation as `redaction:apply`, counting only those marks and the other annotations under them. The confirmation's title takes plural forms in `strings` now (`demo.redactConfirmTitle`), and the command's label is `commands.redact.apply`, such as `{ one: 'Apply Redaction', other: 'Apply {count} Redactions' }`.
+
+### Patch Changes
+
+- [#1009](https://github.com/embedpdf/embed-pdf-viewer/pull/1009) by [@bobsingor](https://github.com/bobsingor) – A comment without an author shows as "Guest" instead of "Unknown", in every language, as it did in v2.
+
+- [#997](https://github.com/embedpdf/embed-pdf-viewer/pull/997) by [@bobsingor](https://github.com/bobsingor) – The attachments panel reads a file's `sizeBytes`.
+
+- [#1001](https://github.com/embedpdf/embed-pdf-viewer/pull/1001) by [@bobsingor](https://github.com/bobsingor) – On a phone, a submenu opened in a menu's sheet covers the menu under it completely. Before, once it finished sliding in, the rows of the menu under it that open submenus showed through its top rows.
+
+- [#1002](https://github.com/embedpdf/embed-pdf-viewer/pull/1002) by [@bobsingor](https://github.com/bobsingor) – Follows engine-core: form fields are tagged `kind`.
+
+- [#1007](https://github.com/embedpdf/embed-pdf-viewer/pull/1007) by [@bobsingor](https://github.com/bobsingor) – Counts read right in every language: the number of files and comments, search results, redaction marks and selected annotations each pick their language's plural form, such as Polish's `few` and `many` and Arabic's six forms, instead of choosing between a singular and a plural word or a "Label: 3" wording. `attachments.countPlural` and `comments.countPlural` are gone: `attachments.count`, `comments.count`, `demo.searchResults`, `demo.redactConfirmBody`, `demo.redactConfirmCollateral` and `stylePanel.selected` take plural forms in `strings`, such as `{ one: '{count} file', other: '{count} files' }`.
+
 ## 3.0.0-next.22
 
 ### Minor Changes

@@ -1,5 +1,13 @@
 # @cloudpdf/server-modules
 
+## 3.0.0-next.23
+
+### Patch Changes
+
+- [#997](https://github.com/embedpdf/embed-pdf-viewer/pull/997) by [@bobsingor](https://github.com/bobsingor) – The test server seeds its documents with the init request's `sizeBytes`.
+
+- [#1002](https://github.com/embedpdf/embed-pdf-viewer/pull/1002) by [@bobsingor](https://github.com/bobsingor) – The test server reads the init answer's `status`.
+
 ## 3.0.0-next.22
 
 ### Minor Changes

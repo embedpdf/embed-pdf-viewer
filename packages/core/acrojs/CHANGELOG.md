@@ -1,5 +1,17 @@
 # @embedpdf/core-acrojs
 
+## 3.0.0-next.23
+
+### Minor Changes
+
+- [#999](https://github.com/embedpdf/embed-pdf-viewer/pull/999) by [@bobsingor](https://github.com/bobsingor) – `cssToScriptColor(css)` takes `string | null`; `null` is transparent.
+
+- [#1003](https://github.com/embedpdf/embed-pdf-viewer/pull/1003) by [@bobsingor](https://github.com/bobsingor) – A script's page move is the effect `{ type: 'goToPage', pageIndex }` (was `gotoPage` with `page`).
+
+- [#1002](https://github.com/embedpdf/embed-pdf-viewer/pull/1002) by [@bobsingor](https://github.com/bobsingor) – A script's field input says `kind` (was `family`), as engine-core's form fields do.
+
+- [#1000](https://github.com/embedpdf/embed-pdf-viewer/pull/1000) by [@bobsingor](https://github.com/bobsingor) – `ScriptUiEffect` is tagged `type`, as effects are things that happen (was `kind`). The script host ends with `destroy()` and says `destroyed`.
+
 ## 3.0.0-next.22
 
 ## 3.0.0-next.21

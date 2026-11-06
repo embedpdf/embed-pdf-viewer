@@ -1,5 +1,33 @@
 # @cloudpdf/engine
 
+## 3.0.0-next.23
+
+### Minor Changes
+
+- [#991](https://github.com/embedpdf/embed-pdf-viewer/pull/991) by [@bobsingor](https://github.com/bobsingor) – Searches pin the manifest's `contentsVersion` and `layoutVersion`, copied rather than computed, and a write's `contentsVersion` is absorbed into the cached manifest.
+
+- [#989](https://github.com/embedpdf/embed-pdf-viewer/pull/989) by [@bobsingor](https://github.com/bobsingor) – Cached reads copy each kind's engine value from `/head` into their URLs, with the shape this client reads. An answer that names another engine value (`EmbedPDF-Engine`) makes the next cached read learn `/head` again.
+
+- [#994](https://github.com/embedpdf/embed-pdf-viewer/pull/994) by [@bobsingor](https://github.com/bobsingor) – Every server error reads as an `EngineError` with the server's code: `GrantExpired`, `OriginNotAllowed`, `OriginRequired`, `EngineBusy` and the rest of the codes the server sends are the error's code, not `Forbidden` or `Unknown`. A code this client doesn't know falls back to the HTTP status.
+
+- [#996](https://github.com/embedpdf/embed-pdf-viewer/pull/996) by [@bobsingor](https://github.com/bobsingor) – A grant session's `expiresAt` is an ISO 8601 string, and renewal works from it.
+
+- [#992](https://github.com/embedpdf/embed-pdf-viewer/pull/992) by [@bobsingor](https://github.com/bobsingor) – Every request to the server says which version the client speaks, in `EmbedPDF-Version`. A read through a CDN leaves it out: its answer never depends on it.
+
+### Patch Changes
+
+- [#997](https://github.com/embedpdf/embed-pdf-viewer/pull/997) by [@bobsingor](https://github.com/bobsingor) – Reads the renamed engine fields (`displaySha256`, `contentsSizeBytes`, `baseSha256`, and the editing session's `expiresInSeconds`).
+
+- [#995](https://github.com/embedpdf/embed-pdf-viewer/pull/995) by [@bobsingor](https://github.com/bobsingor) – `GrantSessionOptions.visitorStore` is a `VisitorStore`, left out for none.
+
+- [#1005](https://github.com/embedpdf/embed-pdf-viewer/pull/1005) by [@bobsingor](https://github.com/bobsingor) – Reads the head's named permission flags; follows engine-core's names.
+
+- [#998](https://github.com/embedpdf/embed-pdf-viewer/pull/998) by [@bobsingor](https://github.com/bobsingor) – A document opened with a token that may not read another client's write, its annotations or its form fields, now hears `fonts.changed` when that write changed the document's fonts, as one that may read the write does.
+
+- [#1003](https://github.com/embedpdf/embed-pdf-viewer/pull/1003) by [@bobsingor](https://github.com/bobsingor) – Follows engine-core's names; exported functions take `options`.
+
+- [#1000](https://github.com/embedpdf/embed-pdf-viewer/pull/1000) by [@bobsingor](https://github.com/bobsingor) – Follows engine-core: an event's `origin` says `subject`, `at` (ISO 8601), `serverSequence` and `transaction`; the grant's callbacks are `onIdentityRequested` and `onOpenRequested`, and its `resume()` takes `visitorIdentity`.
+
 ## 3.0.0-next.22
 
 ## 3.0.0-next.21

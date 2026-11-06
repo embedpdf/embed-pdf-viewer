@@ -1,5 +1,13 @@
 # @embedpdf/plugin-stamp
 
+## 3.0.0-next.23
+
+### Minor Changes
+
+- [#1003](https://github.com/embedpdf/embed-pdf-viewer/pull/1003) by [@bobsingor](https://github.com/bobsingor) – `createAsset()` takes `CreateAssetInput` (was `AddAssetInput`). Read shapes are `readonly`.
+
+- [#1000](https://github.com/embedpdf/embed-pdf-viewer/pull/1000) by [@bobsingor](https://github.com/bobsingor) – `getAssetBytes()` replaces `readAssetBytes()`: it's synchronous. `StampLibraryChangedEvent` is tagged `type` (was `reason`) and says `'asset-created'`, `'asset-deleted'` and `'deleted'`, as `onAssetCreated`, `onAssetDeleted` and `onLibraryDeleted` do. `ImportLibraryOptions.assetKind` replaces `kind`, which `CreateLibraryOptions` uses for the library's.
+
 ## 3.0.0-next.22
 
 ## 3.0.0-next.21
