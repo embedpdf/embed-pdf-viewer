@@ -77,10 +77,10 @@ export type DocumentTriggerEvent =
  *  executor-visible "which event fired" (cursorEnter and cursorExit are both
  *  `origin: 'hover'`; this carries the difference). */
 export type ActionTriggerEvent =
-  | { scope: 'activate' }
-  | { scope: 'annotation'; name: PdfAnnotationEventKind }
-  | { scope: 'page'; name: 'open' | 'close' | 'visible' | 'invisible' }
-  | { scope: 'document'; name: DocumentTriggerEvent };
+  | { type: 'activate' }
+  | { type: 'annotation'; event: PdfAnnotationEventKind }
+  | { type: 'page'; event: 'open' | 'close' | 'visible' | 'invisible' }
+  | { type: 'document'; event: DocumentTriggerEvent };
 
 /** The four field-level /AA scripts (ISO Table 198: K F V C). */
 export type PdfFieldEventKind = 'keystroke' | 'format' | 'validate' | 'calculate';
@@ -96,7 +96,7 @@ export type PdfNamedAction =
   | (string & {});
 
 /**
- * Where an action tree lives, for {@link ActionsCapability.getActionTree}.
+ * Where an action tree lives, for {@link ActionsCapability.readActionTree}.
  * Each arm names its own event vocabulary; the annotation arm defaults to
  * the /A click tree, the page and document arms to their open trees.
  */
@@ -143,35 +143,35 @@ export type PdfAnnotationEventKind =
  * anchor `event.target`); policy never reads it and it cannot change origin.
  */
 export type ActionTrigger =
-  | { scope: 'activate'; ref: AnnotationRef; page: PageRef; source?: ActionSource }
+  | { type: 'activate'; annotation: AnnotationRef; page: PageRef; source?: ActionSource }
   | {
-      scope: 'annotation';
+      type: 'annotation';
       event: PdfAnnotationEventKind;
-      ref: AnnotationRef;
+      annotation: AnnotationRef;
       page: PageRef;
       source?: ActionSource;
     }
-  | { scope: 'page'; event: 'open' | 'close' | 'visible' | 'invisible'; page: PageRef }
-  | { scope: 'document'; event: DocumentTriggerEvent };
+  | { type: 'page'; event: 'open' | 'close' | 'visible' | 'invisible'; page: PageRef }
+  | { type: 'document'; event: DocumentTriggerEvent };
 
 /** Trigger → provenance descriptor (the {@link ActionContext.event} axis). */
 export const eventOf = (trigger: ActionTrigger): ActionTriggerEvent => {
-  switch (trigger.scope) {
+  switch (trigger.type) {
     case 'activate':
-      return { scope: 'activate' };
+      return { type: 'activate' };
     case 'annotation':
-      return { scope: 'annotation', name: trigger.event };
+      return { type: 'annotation', event: trigger.event };
     case 'page':
-      return { scope: 'page', name: trigger.event };
+      return { type: 'page', event: trigger.event };
     case 'document':
-      return { scope: 'document', name: trigger.event };
+      return { type: 'document', event: trigger.event };
   }
 };
 
 /** The one origin mapping, derived by the dispatcher and never claimed by a
  *  caller: a feed cannot launder a hover into a user gesture. */
 export const triggerOriginOf = (trigger: ActionTrigger): ActionOrigin => {
-  switch (trigger.scope) {
+  switch (trigger.type) {
     case 'activate':
       return 'user';
     case 'annotation':
@@ -555,7 +555,7 @@ export interface ActionsCapability extends SettingsApi<ActionsSettings> {
    * ISO 32000-2 Table 197's "/A shadows /AA U" are not applied here. Rejects
    * `operation-cancelled` when `options.signal` fires.
    */
-  getActionTree(
+  readActionTree(
     source: ActionTreeSource,
     options?: OperationOptions,
   ): Promise<PdfActionTree | null>;

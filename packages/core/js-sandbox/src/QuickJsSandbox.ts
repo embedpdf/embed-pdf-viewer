@@ -163,7 +163,7 @@ export class QuickJsSandbox implements ScriptSandbox {
     this.context = context;
   }
 
-  get disposed(): boolean {
+  get destroyed(): boolean {
     return this.isDisposed;
   }
 
@@ -187,7 +187,7 @@ export class QuickJsSandbox implements ScriptSandbox {
     return this.invoke('__acrojsRun', source, input, assertBudget(budget));
   }
 
-  dispose(): void {
+  destroy(): void {
     if (this.isDisposed) return;
     this.isDisposed = true;
     this.context.dispose();
@@ -200,7 +200,7 @@ export class QuickJsSandbox implements ScriptSandbox {
 
   private poison(): void {
     try {
-      this.dispose();
+      this.destroy();
     } catch {
       // The instance remains permanently marked disposed even if QuickJS itself
       // reports a teardown assertion after a fatal runtime condition.

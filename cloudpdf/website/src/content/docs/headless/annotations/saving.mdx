@@ -55,7 +55,7 @@ subscription.unsubscribe();
 | `onReordered`       | The drawing order on a page changed.                                | `page`, `order`, `origin` |
 | `onResynced`        | Annotations were read again, as after loading a document.           | `pages`                   |
 | `onWriteFailed`     | The engine refused a change the user made.                          | `refs`, `error`           |
-| `onSettingsChanged` | A setting changed, through `updateSettings()` or `resetSettings()`. | `settings`, `changed`     |
+| `onSettingsChanged` | A setting changed, through `updateSettings()` or `resetSettings()`. | `settings`, `changedKeys` |
 
 - **Once, and after it's saved.** <Fw only={['react', 'vue', 'svelte']}>`onCreated`, `onUpdated`, `onDeleted` and
   `onReordered`</Fw><Fw only="angular">`created$`, `updated$`, `deleted$` and `reordered$`</Fw> fire when the engine has saved
@@ -79,12 +79,12 @@ A tool's defaults have <Fw only={['react', 'vue', 'svelte']}>`tools.onDefaultsCh
 
 `origin` says who made the change:
 
-| Field         | What it is                                                                    |
-| :------------ | :---------------------------------------------------------------------------- |
-| `origin.kind` | `'local'` when this viewer made the change, `'remote'` when someone else did. |
-| `origin.sub`  | The user who made it (on a shared document).                                  |
-| `origin.ts`   | When it happened, in milliseconds.                                            |
-| `origin.tx`   | Shared by every change one call made, such as an import.                      |
+| Field                | What it is                                                                    |
+| :------------------- | :---------------------------------------------------------------------------- |
+| `origin.kind`        | `'local'` when this viewer made the change, `'remote'` when someone else did. |
+| `origin.subject`     | The user who made it (on a shared document).                                  |
+| `origin.at`          | When it happened, as an ISO 8601 string.                                      |
+| `origin.transaction` | Shared by every change one call made, such as an import.                      |
 
 <Snippet name="annotations/saving/remote-toast" />
 
@@ -138,7 +138,8 @@ Export waits for pending changes, and imported annotations show at once, like an
 What to export:
 
 ```ts
-await annotation.export({ refs: annotation.selection.list().map((a) => a.ref) }); // the selection
+const selected = annotation.selection.getSelected();
+await annotation.export({ refs: selected.map((a) => a.ref) }); // the selection
 await annotation.export({ pages: [page.ref] }); // one page
 ```
 

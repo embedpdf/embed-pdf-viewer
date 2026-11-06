@@ -16,8 +16,20 @@ import { measurementState } from '../src/state';
 
 const PAGE = toPageRef(1);
 const PAGE_BOX = { x: 0, y: 0, width: 600, height: 800 };
-const LOCAL_ORIGIN = { kind: 'local', sessionId: 'session-a', sub: null, ts: 0, serverId: null };
-const REMOTE_ORIGIN = { kind: 'remote', sessionId: 'session-b', sub: 'user-b', ts: 0, serverId: 3 };
+const LOCAL_ORIGIN = {
+  kind: 'local',
+  sessionId: 'session-a',
+  subject: null,
+  at: new Date(0).toISOString(),
+  serverSequence: null,
+};
+const REMOTE_ORIGIN = {
+  kind: 'remote',
+  sessionId: 'session-b',
+  subject: 'user-b',
+  at: new Date(0).toISOString(),
+  serverSequence: 3,
+};
 const ONE_TO_HUNDRED = measureFromRatio(1, 100, 'm');
 
 const owned = (measure: PdfMeasure): PageMeasurementViewport => ({
@@ -378,7 +390,7 @@ describe('page viewports from the engine', () => {
       origin: REMOTE_ORIGIN,
     } as never);
     await settle();
-    await ctx.dispose();
+    await ctx.destroy();
     // The kernel reports a write into a closed instance (`instance-closed`); none may come.
     const written = vi.spyOn(ctx.state, 'update');
     fail(new Error('document closed'));

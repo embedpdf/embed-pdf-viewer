@@ -43,7 +43,7 @@ const engine = {
   open: () =>
     Promise.resolve({
       id: 'doc',
-      events: { subscribe: () => () => {}, lastServerId: () => null },
+      events: { subscribe: () => () => {}, lastServerSequence: () => null },
       pages: { list: () => Promise.resolve({ pageCount: 1, labels: [], pages: [page] }) },
       security: { allows: () => true },
       page: () => ({
@@ -86,8 +86,8 @@ describe('LinkLayer', () => {
     const { kernel, view } = await viewerWith(plugins(), LinkHarness, {}, engine);
     await kernel.documents.open(bytesInput('doc'));
     flushSync();
-    const outcomes: LinkActivation['outcome'][] = [];
-    kernel.capability(LinkToken).onActivated((event) => outcomes.push(event.activation.outcome));
+    const outcomes: LinkActivation['status'][] = [];
+    kernel.capability(LinkToken).onActivated((event) => outcomes.push(event.activation.status));
     await waitFor(() => expect(view.container.querySelectorAll('a')).toHaveLength(2));
     const [website, script] = Array.from(view.container.querySelectorAll('a'));
 
@@ -119,7 +119,7 @@ describe('LinkLayer', () => {
     );
     await kernel.documents.open(bytesInput('doc'));
     flushSync();
-    expect(link!.activate({ kind: 'uri', uri: 'https://example.com/a' }).outcome).toBe('uri');
+    expect(link!.activate({ kind: 'uri', uri: 'https://example.com/a' }).status).toBe('uri');
     expect(open).toHaveBeenCalledWith('https://example.com/a', '_blank', 'noopener,noreferrer');
   });
 });

@@ -51,7 +51,7 @@ const engine = {
   open: () =>
     Promise.resolve({
       id: 'doc',
-      events: { subscribe: () => () => {}, lastServerId: () => null },
+      events: { subscribe: () => () => {}, lastServerSequence: () => null },
       pages: { list: () => Promise.resolve({ pageCount: 1, labels: [], pages: [page] }) },
       security: { allows: () => true, allowsAnnotation: () => true },
       attachments: { list: () => Promise.resolve({ attachments: files }) },
@@ -68,13 +68,13 @@ describe('useAttachmentState', () => {
   it("has the page's State fields as refs: empty with no document, the document's once read", async () => {
     const states: unknown[] = [];
     const Probe = probe(() => {
-      const { files, selected, status, canAdd, canDownload } = useAttachmentState();
+      const { files, selected, status, canCreate, canDownload } = useAttachmentState();
       return () => {
         states.push({
           files: files.value,
           selected: selected.value,
           status: status.value,
-          canAdd: canAdd.value,
+          canCreate: canCreate.value,
           canDownload: canDownload.value,
         });
         return null;
@@ -89,7 +89,7 @@ describe('useAttachmentState', () => {
     await settle();
     const state = latest(states) as AttachmentState;
     expect(state.files.map((file) => file.name)).toEqual(['notes.txt', 'scan.pdf']);
-    expect(state).toMatchObject({ status: 'ready', canAdd: true, canDownload: true });
+    expect(state).toMatchObject({ status: 'ready', canCreate: true, canDownload: true });
   });
 
   it('with a selector, is one ref that follows the value it picks', async () => {
@@ -120,9 +120,9 @@ describe('useAttachment outside a document', () => {
       found.attachment = useAttachment();
     });
     await viewerWith([attachmentPlugin()], () => h(Capture), engine);
-    expect(() => found.attachment!.canAdd()).toThrow(
+    expect(() => found.attachment!.canCreate()).toThrow(
       expect.objectContaining({ code: 'not-ready' }),
     );
-    await expect(found.attachment!.add([])).rejects.toMatchObject({ code: 'not-ready' });
+    await expect(found.attachment!.create([])).rejects.toMatchObject({ code: 'not-ready' });
   });
 });

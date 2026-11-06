@@ -11,7 +11,7 @@ export class LibraryStatus {
   private readonly stamp = inject(EpdfStamp);
 
   protected readonly message = toSignal(
-    this.stamp.libraryChanged$.pipe(map(({ libraryId, reason }) => `${libraryId}: ${reason}`)),
+    this.stamp.libraryChanged$.pipe(map(({ libraryId, type }) => `${libraryId}: ${type}`)),
     { initialValue: '' },
   );
 }

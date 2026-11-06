@@ -29,8 +29,8 @@ export interface BuildDetachedCmsInput {
   hash: Exclude<DigestAlgorithm, 'sha1'>;
   profile: SignatureProfile;
   signer: RawSigner;
-  /** `pkcs7` only: the CMS `signing-time` attribute. PAdES (`cades-b`) never carries one. */
-  signingTime?: Date;
+  /** `pkcs7` only: the CMS `signing-time` attribute, as an ISO 8601 string. PAdES (`cades-b`) never carries one. */
+  signingTime?: string;
 }
 
 /**
@@ -73,7 +73,7 @@ export async function buildDetachedCms(input: BuildDetachedCmsInput): Promise<Ui
     attributes.push(
       new pkijs.Attribute({
         type: OID.signingTime,
-        values: [new asn1js.UTCTime({ valueDate: input.signingTime })],
+        values: [new asn1js.UTCTime({ valueDate: new Date(input.signingTime) })],
       }),
     );
   }

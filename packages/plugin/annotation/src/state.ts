@@ -24,7 +24,7 @@ export interface AnnotationState {
 export const annotationState = defineState(AnnotationToken, {
   read: (annotation): AnnotationState => ({
     status: annotation.getStatus(),
-    selected: annotation.selection.list(),
+    selected: annotation.selection.getSelected(),
     hovered: annotation.getHovered(),
     editing: annotation.text.getEditing(),
   }),

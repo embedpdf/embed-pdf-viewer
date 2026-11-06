@@ -243,11 +243,11 @@ export interface GrantSessionOptions {
  *
  * When the grant asks before the first change and the visitor hasn't
  * answered, the document's writes wait at {@link writeGate} while someone
- * listens (`grant.onIdentityRequest`), until `grant.identify` exchanges again
+ * listens (`grant.onIdentityRequested`), until `grant.identify` exchanges again
  * with the answers or `grant.decline` lets them fail.
  *
  * When a renewal is refused for a passphrase or questions on open (the grant
- * got them after this open), the open asks once (`grant.onOpenRequest`) and
+ * got them after this open), the open asks once (`grant.onOpenRequested`) and
  * exchanges nothing more: the session serves until it runs out, then
  * requests wait while someone listens, until `grant.resume` exchanges again
  * with what the visitor gave.
@@ -374,7 +374,7 @@ export class GrantSessionSource {
   }
 
   /** Called when a write waits for the visitor's answers. Returns the unsubscriber. */
-  onIdentityRequest(listener: (request: VisitorIdentityRequest) => void): () => void {
+  onIdentityRequested(listener: (request: VisitorIdentityRequest) => void): () => void {
     this.listeners.add(listener);
     return () => {
       this.listeners.delete(listener);
@@ -387,7 +387,7 @@ export class GrantSessionSource {
   }
 
   /** Called when the grant asks before this open goes on. Returns the unsubscriber. */
-  onOpenRequest(listener: (request: GrantOpenRequest) => void): () => void {
+  onOpenRequested(listener: (request: GrantOpenRequest) => void): () => void {
     this.openListeners.add(listener);
     return () => {
       this.openListeners.delete(listener);
@@ -400,14 +400,14 @@ export class GrantSessionSource {
    * the refusal says) and rejects.
    */
   async resume(
-    given: { readonly passphrase?: string; readonly identity?: VisitorAnswers },
+    given: { readonly passphrase?: string; readonly visitorIdentity?: VisitorAnswers },
     signal?: AbortSignal,
   ): Promise<void> {
     const asked = this.asked;
     if (!asked) return;
     await this.inflight?.catch(() => undefined);
     if (given.passphrase !== undefined) this.passphrase = given.passphrase;
-    const exchanged = this.exchange(given.identity, signal).finally(() => {
+    const exchanged = this.exchange(given.visitorIdentity, signal).finally(() => {
       this.inflight = null;
     });
     this.inflight = exchanged;
@@ -573,8 +573,8 @@ class SessionGrant implements DocumentGrant {
     return AbortablePromise.run((signal) => this.source.identify(answers, signal));
   }
 
-  onIdentityRequest(listener: (request: VisitorIdentityRequest) => void): () => void {
-    return this.source.onIdentityRequest(listener);
+  onIdentityRequested(listener: (request: VisitorIdentityRequest) => void): () => void {
+    return this.source.onIdentityRequested(listener);
   }
 
   decline(): void {
@@ -585,13 +585,13 @@ class SessionGrant implements DocumentGrant {
     return this.source.openRequest;
   }
 
-  onOpenRequest(listener: (request: GrantOpenRequest) => void): () => void {
-    return this.source.onOpenRequest(listener);
+  onOpenRequested(listener: (request: GrantOpenRequest) => void): () => void {
+    return this.source.onOpenRequested(listener);
   }
 
   resume(given: {
     readonly passphrase?: string;
-    readonly identity?: VisitorAnswers;
+    readonly visitorIdentity?: VisitorAnswers;
   }): AbortablePromise<void> {
     return AbortablePromise.run((signal) => this.source.resume(given, signal));
   }

@@ -48,7 +48,7 @@ export class EpdfLink extends pluginService({
     'listLinks',
     'getLink',
     'getLinkAt',
-    'listAllLinks',
+    'readAllLinks',
     'ensureLoaded',
     'isLoaded',
     'getStatus',

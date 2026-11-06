@@ -179,7 +179,7 @@ export function createSnapshots(
     priority: 10,
     enabledFor: (tool) => tool.enables.has(SNAPSHOT_BOX_TAG),
     // A press between pages does nothing: a box lives on one page.
-    onDown: (sample) =>
+    onPointerDown: (sample) =>
       sample.page
         ? begin(
             sample.page.ref,
@@ -188,18 +188,18 @@ export function createSnapshots(
             sample.page.rotation ?? 0,
           )
         : false,
-    onMove: (sample) => {
+    onPointerMove: (sample) => {
       const dragged = box();
       const point = dragged && samplePointOn(sample, dragged.page);
       if (point) move(point);
     },
-    onUp: (sample) => {
+    onPointerUp: (sample) => {
       const dragged = box();
       const point = dragged && samplePointOn(sample, dragged.page);
       if (point) move(point);
       end();
     },
-    onCancel: cancel,
+    onPointerCancel: cancel,
   };
 
   // The box as a page layer draws it: the same object while the box is the same.

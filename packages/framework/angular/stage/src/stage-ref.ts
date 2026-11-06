@@ -168,5 +168,5 @@ export class EpdfStageRef {
   readonly viewportToPage = this.binding.method('viewportToPage');
   readonly pageToViewport = this.binding.method('pageToViewport');
   readonly pageRectToViewport = this.binding.method('pageRectToViewport');
-  readonly getPageFrame = this.binding.method('getPageFrame');
+  readonly getPageBox = this.binding.method('getPageBox');
 }

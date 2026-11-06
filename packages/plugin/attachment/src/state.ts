@@ -17,7 +17,7 @@ export interface AttachmentState {
   /** `idle` until something reads the state, then `loading` and `ready`, or `forbidden` or `error`. */
   readonly status: ResourceStatus;
   /** Whether this session may add and remove attachments (`doc.attachments.modify`). */
-  readonly canAdd: boolean;
+  readonly canCreate: boolean;
   /** Whether this session may take files out (`doc.download`). */
   readonly canDownload: boolean;
 }
@@ -27,14 +27,14 @@ export const attachmentState = defineState(AttachmentToken, {
     files: attachment.list(),
     selected: attachment.getSelected(),
     status: attachment.getStatus(),
-    canAdd: attachment.canAdd(),
+    canCreate: attachment.canCreate(),
     canDownload: attachment.canDownload(),
   }),
   empty: {
     files: [],
     selected: [],
     status: 'idle',
-    canAdd: false,
+    canCreate: false,
     canDownload: false,
   },
   ensure: (attachment) => attachment.ensureLoaded(),

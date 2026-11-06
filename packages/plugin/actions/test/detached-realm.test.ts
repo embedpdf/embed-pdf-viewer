@@ -28,10 +28,10 @@ describe('detached-realm script surfaces', () => {
 
     capability.surfaceScriptResult({
       uiEffects: [
-        { kind: 'alert', message: 'Approved', icon: 3 },
-        { kind: 'gotoPage', page: 4 },
-        { kind: 'print' },
-        { kind: 'submitForm', url: 'https://example.test', fieldNames: null, includeEmpty: false },
+        { type: 'alert', message: 'Approved', icon: 3 },
+        { type: 'gotoPage', page: 4 },
+        { type: 'print' },
+        { type: 'submitForm', url: 'https://example.test', fieldNames: null, includeEmpty: false },
       ],
       diagnostics: [],
       origin: 'user',
@@ -59,7 +59,7 @@ describe('detached-realm script surfaces', () => {
     const gotoPage = vi.fn();
     capability.setUiAdapter({ openUri: vi.fn(), print: vi.fn(), gotoPage });
     capability.surfaceScriptResult({
-      uiEffects: [{ kind: 'gotoPage', page: 4 }],
+      uiEffects: [{ type: 'gotoPage', page: 4 }],
       diagnostics: [],
       origin: 'user',
       phase: 'user',
@@ -76,8 +76,8 @@ describe('detached-realm script surfaces', () => {
     capability.onScriptDiagnosticReported((diagnostic) => diagnostics.push(diagnostic));
     capability.surfaceScriptResult({
       uiEffects: [
-        { kind: 'focusField', field: 'email' },
-        { kind: 'focusField', field: 'missing' },
+        { type: 'focusField', field: 'email' },
+        { type: 'focusField', field: 'missing' },
       ],
       diagnostics: [],
       origin: 'user',
@@ -100,8 +100,8 @@ describe('detached-realm script surfaces', () => {
     capability.surfaceScriptCommit(
       {
         uiEffects: [
-          { kind: 'alert', message: 'boot nag', icon: 0, phase: 'boot' },
-          { kind: 'alert', message: 'user alert', icon: 1, phase: 'user' },
+          { type: 'alert', message: 'boot nag', icon: 0, phase: 'boot' },
+          { type: 'alert', message: 'user alert', icon: 1, phase: 'user' },
         ],
         diagnostics: [{ code: 'script-error', message: 'one' }],
         error: { kind: 'exception', message: 'boom' },
@@ -146,7 +146,7 @@ describe('detached-realm script surfaces', () => {
     });
     capability.surfaceScriptCommit(
       {
-        uiEffects: [{ kind: 'alert', message: 'only user', icon: 0, phase: 'user' }],
+        uiEffects: [{ type: 'alert', message: 'only user', icon: 0, phase: 'user' }],
         diagnostics: [],
       },
       { origin: 'user', realm: 'document' },

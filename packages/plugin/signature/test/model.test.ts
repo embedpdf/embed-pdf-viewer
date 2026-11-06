@@ -23,9 +23,9 @@ import {
 const origin: EventOrigin = {
   kind: 'local',
   sessionId: 'session',
-  sub: null,
-  ts: 0,
-  serverId: null,
+  subject: null,
+  at: new Date(0).toISOString(),
+  serverSequence: null,
 };
 const field = { kind: 'objectNumber', objectNumber: 9 } as const;
 /** A prepared signing; the fold reads only its id. */

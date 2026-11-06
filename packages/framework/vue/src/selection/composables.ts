@@ -34,5 +34,5 @@ export function useSelectionEvent<Event>(
  */
 export const useSelectionState = stateComposable(selectionState);
 
-/** The selection settings (`dragThreshold`, `color`, `handles`), with or without a document, as refs. Takes a selector. */
+/** The selection settings (`dragThresholdPx`, `color`, `handles`), with or without a document, as refs. Takes a selector. */
 export const useSelectionSettings = settingsComposable(SelectionToken);

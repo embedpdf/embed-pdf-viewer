@@ -63,7 +63,7 @@ await attachment.add([{ data: picked }, { data: bytes, name: 'figures.csv' }]);
 
 Names are unique in a document: a name it has already gets a number, `notes (2).txt`, so nothing
 is replaced. The files show at once, `isPending(file)` while the engine saves them, and `add()`
-resolves with them. Check `canAdd` first.
+resolves with them. Check `canCreate` first.
 
 ## Remove a file
 
@@ -117,7 +117,7 @@ Every method that returns a promise also takes a `signal` in its options, to can
 | `files`       | Every file, the document's then the pages', with your changes shown before the engine answers  | `list()`          |
 | `selected`    | The selected files, in the order they were selected                                            | `getSelected()`   |
 | `status`      | `'idle'` until something asks for them, then `'loading'`, `'ready'`, `'forbidden'` or `'error'` | `getStatus()`     |
-| `canAdd`      | Whether attaching and removing files is allowed                                                | `canAdd()`        |
+| `canCreate`      | Whether attaching and removing files is allowed                                                | `canCreate()`        |
 | `canDownload` | Whether saving files is allowed                                                                | `canDownload()`   |
 
 ## Events
@@ -126,10 +126,10 @@ Every method that returns a promise also takes a `signal` in its options, to can
 
 | Event        | Fires when                                                                                         | Carries                   |
 | :----------- | :------------------------------------------------------------------------------------------------- | :------------------------ |
-| `onChanged`  | The document's attachments were added, removed or brought back by an undo, by you or by someone else | `type`, `files`, `origin` |
+| `onChanged`  | The document's attachments were created, deleted or brought back by an undo, by you or by someone else | `type`, `files`, `origin` |
 | `onResynced` | The attachments were read from the file: the first time they're asked for, after `refresh()`, or to catch up after a lost connection | `files` |
 
-`type` is `'added'`, `'removed'` or `'restored'`; for a removal, `files` are the files as they
+`type` is `'created'`, `'deleted'` or `'restored'`; for a deletion, `files` are the files as they
 were. A file on a page is an annotation: its changes are the annotation plugin's events.
 
 ## Permissions
@@ -138,7 +138,7 @@ were. A file on a page is an annotation: its changes are the annotation plugin's
 | :----------------------- | :--------------------------------------------------- | :--------------------------------- |
 | `doc.open`               | Listing the files                                    | none: it opened                    |
 | `doc.download`           | Saving a file: it leaves the document                | `attachment.canDownload()`         |
-| `doc.attachments.modify` | Attaching files and removing the document's own      | `attachment.canAdd()`              |
+| `doc.attachments.modify` | Attaching files and removing the document's own      | `attachment.canCreate()`              |
 
 Removing a file on a page is deleting its annotation, so the annotation's own permission decides:
 `canRemove(file)` asks it.

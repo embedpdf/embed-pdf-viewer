@@ -44,13 +44,13 @@ describe('EpdfAttachment', () => {
     const attachment = fixture.debugElement.injector.get(EpdfAttachment);
     expect(attachment.files()).toEqual([]);
     expect(attachment.status()).toBe('idle');
-    expect(attachment.canAdd()).toBe(false);
+    expect(attachment.canCreate()).toBe(false);
 
     await kernelOf(fixture).documents.open(bytesInput('doc'));
     // Reading the service reads the attachments: nothing reads them as the document opens.
     await vi.waitFor(() => expect(attachment.status()).toBe('ready'));
     expect(attachment.files().map((file) => file.name)).toEqual(['notes.txt', 'scan.pdf']);
-    expect(attachment.canAdd()).toBe(true);
+    expect(attachment.canCreate()).toBe(true);
 
     const [notes] = attachment.files();
     expect(attachment.get(notes!.id)).toBe(notes);

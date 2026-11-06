@@ -21,7 +21,7 @@ import { createActionsTestContext } from './helpers/context';
 const USER: ActionContext = {
   origin: 'user',
   source: { kind: 'api' },
-  event: { scope: 'activate' },
+  event: { type: 'activate' },
 };
 
 const tree = (root: PdfActionNode | null): PdfActionTree => ({
@@ -160,7 +160,7 @@ describe('document lifecycle events (/WC, /WS, /DS, /WP, /DP)', () => {
       'did-print',
       'will-close',
     ] as const) {
-      const result = await capability.dispatch({ scope: 'document', event });
+      const result = await capability.dispatch({ type: 'document', event });
       expect(result.status).toBe('executed');
     }
     expect(log).toEqual(['ws', 'ds', 'wp', 'dp', 'wc']);
@@ -173,10 +173,10 @@ describe('document lifecycle events (/WC, /WS, /DS, /WP, /DP)', () => {
       trees: { willSave: tree(script('ws')) },
     });
     // No adapter, no user activity — the open latch is still armed.
-    await capability.dispatch({ scope: 'document', event: 'will-save' });
+    await capability.dispatch({ type: 'document', event: 'will-save' });
     expect(log).toEqual(['open', 'ws']);
     // And the sequence counts as fired: a document-open trigger replays inert.
-    const replay = await capability.dispatch({ scope: 'document', event: 'open' });
+    const replay = await capability.dispatch({ type: 'document', event: 'open' });
     expect(replay.status).toBe('inert');
     expect(
       replay.diagnostics.some((diagnostic) => diagnostic.code === 'open-sequence-replayed'),
@@ -311,7 +311,7 @@ describe('document lifecycle events (/WC, /WS, /DS, /WP, /DP)', () => {
     });
     expect(value).toBe('ok');
     expect(log).toEqual(['op']);
-    const dispatched = await capability.dispatch({ scope: 'document', event: 'will-save' });
+    const dispatched = await capability.dispatch({ type: 'document', event: 'will-save' });
     expect(dispatched.status).toBe('inert');
     expect(
       dispatched.diagnostics.some((diagnostic) => diagnostic.code === 'trigger-disabled'),
@@ -330,10 +330,10 @@ describe('document lifecycle events (/WC, /WS, /DS, /WP, /DP)', () => {
       readFailsFirst: true,
       trees: { willSave: tree(script('ws')) },
     });
-    const first = await capability.dispatch({ scope: 'document', event: 'will-save' });
+    const first = await capability.dispatch({ type: 'document', event: 'will-save' });
     expect(first.status).toBe('inert');
     expect(diagnostics.some((diagnostic) => diagnostic.code === 'trigger-failed')).toBe(true);
-    const second = await capability.dispatch({ scope: 'document', event: 'will-save' });
+    const second = await capability.dispatch({ type: 'document', event: 'will-save' });
     expect(second.status).toBe('executed');
     expect(log).toEqual(['ws']);
     expect(readCallCount()).toBe(2);

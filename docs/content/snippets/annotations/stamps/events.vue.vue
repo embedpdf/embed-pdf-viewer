@@ -6,7 +6,7 @@ const message = ref('');
 
 useStampEvent(
   (stamp) => stamp.onLibraryChanged,
-  ({ libraryId, reason }) => (message.value = `${libraryId}: ${reason}`),
+  ({ libraryId, type }) => (message.value = `${libraryId}: ${type}`),
 );
 </script>
 

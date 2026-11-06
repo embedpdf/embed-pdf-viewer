@@ -237,13 +237,13 @@ export interface BoundCommand extends ResolvedCommand {
   /** Run the command for the document it was read for. */
   readonly run: () => Promise<ExecuteResult>;
   /** Its first shortcut, formatted for the platform (`'⌘K'` on a Mac, `'Ctrl+K'` elsewhere), or `null`. */
-  readonly shortcut: string | null;
+  readonly shortcutLabel: string | null;
 }
 
 /**
- * A resolved command, bound for a button: `run` executes it through `execute`, and `shortcut` is
- * its first shortcut formatted for the platform. Which platform is the caller's to know
- * (`isMacPlatform()` in `@embedpdf/web`).
+ * A resolved command, bound for a button: `run` executes it through `execute`, and
+ * `shortcutLabel` is its first shortcut formatted for the platform. Which platform is the
+ * caller's to know (`isMacPlatform()` in `@embedpdf/web`).
  */
 export function boundCommandOf(
   command: ResolvedCommand,
@@ -254,7 +254,7 @@ export function boundCommandOf(
   return {
     ...command,
     run: () => execute(command.id),
-    shortcut: first === undefined ? null : formatShortcut(first, { isMac: options.isMac }),
+    shortcutLabel: first === undefined ? null : formatShortcut(first, { isMac: options.isMac }),
   };
 }
 

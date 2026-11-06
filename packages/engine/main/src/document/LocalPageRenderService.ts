@@ -128,7 +128,7 @@ export class LocalPageRenderService implements RawPageRenderService {
       const handle = createPageImageHandle(result, {
         async blob() {
           return new Blob([copyToExactArrayBuffer(bytes)], {
-            type: result.contentType,
+            type: result.mimeType,
           });
         },
       });

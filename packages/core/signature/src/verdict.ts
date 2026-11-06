@@ -26,7 +26,7 @@ export interface SignatureVerdict {
   /** The certificate chains to one of the caller's anchors. */
   trust: TrustStatus;
   trustReason?: string;
-  validatedAt: ValidationTime;
+  validationTime: ValidationTime;
   /**
    * What changed after the signature, and which bytes were judged: the loaded
    * file (`persisted`), or the session's unsaved edits snapshotted as one
@@ -48,7 +48,7 @@ export interface SignatureVerdict {
 
 export interface ValidateSignaturesOptions {
   trust?: TrustPort | null;
-  at?: ValidationTime;
+  validationTime?: ValidationTime;
   /**
    * `persisted` (default): the loaded bytes — what a file on disk says.
    * `working-copy`: unsaved edits are judged too, as the revision a save would
@@ -81,7 +81,7 @@ async function validateOne(
   signature: SignatureDTO,
   options: ValidateSignaturesOptions,
 ): Promise<SignatureVerdict> {
-  const at = options.at ?? { kind: 'now' };
+  const validationTime = options.validationTime ?? { kind: 'now' };
   let integrity: IntegrityVerdict = 'indeterminate';
   let cryptography: CryptographyVerdict = 'unsupported';
   let trust: TrustStatus = 'unknown';
@@ -109,7 +109,7 @@ async function validateOne(
 
   if (internal) {
     cryptography = await verifyCmsSignature(internal);
-    const chain = await validateChain(internal, options.trust ?? null, at);
+    const chain = await validateChain(internal, options.trust ?? null, validationTime);
     trust = chain.status;
     trustReason = chain.reason;
   }
@@ -144,7 +144,7 @@ async function validateOne(
     cryptography,
     trust,
     trustReason,
-    validatedAt: at,
+    validationTime,
     modifications,
     summary,
     cms,

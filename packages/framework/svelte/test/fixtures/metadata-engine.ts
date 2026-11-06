@@ -23,7 +23,7 @@ export const metadataEngine = {
   open: (input: { id?: string }) =>
     Promise.resolve({
       id: input.id ?? 'doc',
-      events: { subscribe: () => () => {}, lastServerId: () => null },
+      events: { subscribe: () => () => {}, lastServerSequence: () => null },
       pages: { list: () => Promise.resolve({ pageCount: 1, labels: [], pages: [testPage] }) },
       security: { allows: () => true, allowsAnnotation: () => true },
       metadata: {

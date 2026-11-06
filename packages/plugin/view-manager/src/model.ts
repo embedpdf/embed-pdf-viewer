@@ -85,7 +85,7 @@ export function createPane(state: ViewManagerModel, index?: number): ViewManager
   };
 }
 
-export function removePane(state: ViewManagerModel, id: PaneId): ViewManagerModel {
+export function deletePane(state: ViewManagerModel, id: PaneId): ViewManagerModel {
   if (!state.panes[id]) return state;
   const { [id]: _removed, ...panes } = state.panes;
   const order = state.order.filter((other) => other !== id);

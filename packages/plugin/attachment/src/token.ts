@@ -10,8 +10,8 @@ export const AttachmentToken = createCapabilityToken<AttachmentCapability>('atta
   promises: {
     ensureLoaded: true,
     refresh: true,
-    add: true,
-    remove: true,
+    create: true,
+    delete: true,
     download: true,
   },
 });

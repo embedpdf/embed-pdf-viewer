@@ -124,7 +124,7 @@ describe('the editable setting', () => {
 
     const before = harness.model().byId[SQUARE_KEY]!.annotation;
     drag(harness);
-    expect(harness.capability.selection.list().map((annotation) => annotation.ref)).toEqual([
+    expect(harness.capability.selection.getSelected().map((annotation) => annotation.ref)).toEqual([
       SQUARE,
     ]);
     expect(harness.model().byId[SQUARE_KEY]!.annotation).toBe(before);
@@ -136,7 +136,7 @@ describe('the editable setting', () => {
   it('keeps the selection edits and delete away from a frozen annotation', async () => {
     const harness = annotationHarness({ config: { editable: false } });
     await harness.load([square(20)]);
-    harness.capability.selection.set([SQUARE]);
+    harness.capability.selection.select([SQUARE]);
     await harness.capability.selection.update({ opacity: 0.5 });
     await harness.capability.selection.delete();
     expect(harness.update).not.toHaveBeenCalled();
@@ -161,8 +161,8 @@ describe('the editable setting', () => {
     const harness = annotationHarness();
     await harness.load([square(20)]);
     const changes: string[][] = [];
-    harness.capability.onSettingsChanged(({ changed }) => changes.push([...changed]));
-    harness.capability.selection.set([SQUARE]);
+    harness.capability.onSettingsChanged(({ changedKeys }) => changes.push([...changedKeys]));
+    harness.capability.selection.select([SQUARE]);
     expect(handlesOf(harness)).toHaveLength(8);
 
     harness.capability.updateSettings({ editable: false });

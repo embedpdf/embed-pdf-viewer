@@ -11,11 +11,7 @@ import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { EpdfInteraction, withInteraction } from '@embedpdf/angular/interaction';
-import {
-  EpdfAnnotation,
-  EpdfAnnotationLayer,
-  withAnnotation,
-} from '@embedpdf/angular/annotation';
+import { EpdfAnnotation, EpdfAnnotationLayer, withAnnotation } from '@embedpdf/angular/annotation';
 import { EpdfForm, EpdfFormLayer, toFieldRef, withForm } from '@embedpdf/angular/form';
 import type { FormFieldDTO } from '@embedpdf/angular/form';
 import { cloudEngine } from '@cloudpdf/engine';
@@ -116,7 +112,7 @@ export class App {
       untracked(() => {
         this.interaction.activateTool('form-edit');
         const widget = this.form.get(toFieldRef('name'))?.widgets[0]?.ref;
-        if (widget) this.annotation.selection.set([widget]);
+        if (widget) this.annotation.selection.select([widget]);
       });
     });
   }

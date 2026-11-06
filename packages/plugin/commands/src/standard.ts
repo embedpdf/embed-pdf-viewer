@@ -228,7 +228,7 @@ export function createStandardCommands(
       enabled: (context) => {
         const annotation = context.tryGet(AnnotationToken);
         if (!annotation) return false;
-        const selected = annotation.selection.list();
+        const selected = annotation.selection.getSelected();
         // `isEditable`: the annotation plugin's `editable` setting lets people change it by hand.
         return (
           selected.length > 0 &&

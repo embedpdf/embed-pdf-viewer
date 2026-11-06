@@ -67,21 +67,21 @@ describe('documents · grants', () => {
     const id = documents.getOrder()[0]!;
     expect(documents.get(id)).toMatchObject({
       status: 'error',
-      grantRequest: { kind: 'passphrase', passphraseProvided: false },
+      openRequest: { kind: 'passphrase', passphraseProvided: false },
     });
 
     await expect(documents.retry(id, { passphrase: 'wrong' })).rejects.toBeDefined();
-    expect(documents.get(id)?.grantRequest).toEqual({
+    expect(documents.get(id)?.openRequest).toEqual({
       kind: 'passphrase',
       passphraseProvided: true,
     });
 
     await expect(documents.retry(id, { passphrase: 'open sesame' })).rejects.toBeDefined();
-    expect(documents.get(id)?.grantRequest).toEqual({ kind: 'identity', request: ASKED });
+    expect(documents.get(id)?.openRequest).toEqual({ kind: 'identity', request: ASKED });
 
     // The passphrase given before stays; the answers add to who the page said the user is.
     await expect(
-      documents.retry(id, { identity: { displayName: 'Ada', email: 'ada@example.com' } }),
+      documents.retry(id, { visitorIdentity: { displayName: 'Ada', email: 'ada@example.com' } }),
     ).resolves.toMatchObject({ document: { id: 'shared-doc', status: 'ready' } });
     expect(opened.at(-1)).toEqual({
       input: { kind: 'grant', grant: 'grt_x', passphrase: 'open sesame' },
@@ -94,11 +94,11 @@ describe('documents · grants', () => {
         },
       }),
     });
-    expect(documents.get('shared-doc')?.grantRequest).toBeUndefined();
+    expect(documents.get('shared-doc')?.openRequest).toBeUndefined();
 
     // Answers go only to a grant.
     await expect(documents.open(bytesInput('plain'))).rejects.toThrow('network down');
-    expect(documents.get('plain')?.grantRequest).toBeUndefined();
+    expect(documents.get('plain')?.openRequest).toBeUndefined();
     await expect(documents.retry('plain', { passphrase: 'x' })).rejects.toMatchObject({
       code: 'invalid-input',
     });
@@ -124,7 +124,7 @@ describe('documents · grants', () => {
           }
           identityRequest = null;
         }),
-      onIdentityRequest: (listener) => {
+      onIdentityRequested: (listener) => {
         ask = listener;
         return () => {
           ask = null;
@@ -132,7 +132,7 @@ describe('documents · grants', () => {
       },
       decline,
       openRequest: null,
-      onOpenRequest: () => () => {},
+      onOpenRequested: () => () => {},
       resume: () => AbortablePromise.run(async () => {}),
     };
     const handle = Object.assign(makeHandle('a'), { grant });
@@ -175,12 +175,12 @@ describe('documents · grants', () => {
       keep: true,
       identityRequest: null,
       identify: () => AbortablePromise.run(async () => {}),
-      onIdentityRequest: () => () => {},
+      onIdentityRequested: () => () => {},
       decline: () => {},
       get openRequest() {
         return openRequest;
       },
-      onOpenRequest: (listener) => {
+      onOpenRequested: (listener) => {
         ask = listener;
         return () => {
           ask = null;
@@ -212,12 +212,12 @@ describe('documents · grants', () => {
 
     openRequest = { kind: 'passphrase', passphraseProvided: false };
     ask!(openRequest);
-    expect(documents.get('b')).toMatchObject({ status: 'ready', grantRequest: openRequest });
+    expect(documents.get('b')).toMatchObject({ status: 'ready', openRequest });
 
     await expect(documents.retry('b', { passphrase: 'wrong' })).rejects.toMatchObject({
       code: 'permission-denied',
     });
-    expect(documents.get('b')?.grantRequest).toEqual({
+    expect(documents.get('b')?.openRequest).toEqual({
       kind: 'passphrase',
       passphraseProvided: true,
     });
@@ -225,7 +225,7 @@ describe('documents · grants', () => {
     await expect(documents.retry('b', { passphrase: 'open sesame' })).resolves.toMatchObject({
       document: { id: 'b', status: 'ready' },
     });
-    expect(documents.get('b')?.grantRequest).toBeUndefined();
+    expect(documents.get('b')?.openRequest).toBeUndefined();
     expect(given).toEqual([{ passphrase: 'wrong' }, { passphrase: 'open sesame' }]);
 
     await documents.close('b');

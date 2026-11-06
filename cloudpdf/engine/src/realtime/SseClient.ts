@@ -12,7 +12,7 @@ export interface SseClientOptions {
   http: HttpClient;
   path: string;
   /** Resume cursor for the first connect (manifest `auditHead` /
-   *  `lastServerId`); `null` subscribes "from now". */
+   *  `lastServerSequence`); `null` subscribes "from now". */
   initialCursor: number | null;
   /** One parsed audit row, in id order. The cursor has already advanced. */
   onRow(row: AuditEventRow): void;

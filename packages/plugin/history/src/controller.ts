@@ -179,7 +179,7 @@ export function createHistoryController(ctx: PluginContext<History, HistorySetti
 
   /** A change still being typed: what undo would undo before anything in the history. */
   const openHold = (): PendingChange | null =>
-    ctx.changes.pending().find((change) => change.held && change.history) ?? null;
+    ctx.changes.listPending().find((change) => change.held && change.history) ?? null;
 
   const api: HistoryCapability = {
     ...settings.api,

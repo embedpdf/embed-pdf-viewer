@@ -526,7 +526,7 @@ describe('a grant that asks who the visitor is', () => {
       expect(changesSent).toEqual([]);
 
       const asked: unknown[] = [];
-      docGrant.onIdentityRequest((request) => asked.push(request));
+      docGrant.onIdentityRequested((request) => asked.push(request));
       const waiting = square(doc);
       await pause(50);
       expect(asked).toEqual([expect.objectContaining({ missing: ['displayName'] })]);
@@ -574,7 +574,7 @@ describe('a grant that asks who the visitor is', () => {
       const doc = await engine.open({ kind: 'grant', grant: grant });
       expect(doc.grant?.identityRequest).toBeNull();
       const asked: unknown[] = [];
-      doc.grant!.onIdentityRequest((request) => asked.push(request));
+      doc.grant!.onIdentityRequested((request) => asked.push(request));
       // The grant starts asking while the document is open: the change's own
       // request renews into a session the server refuses changes from.
       await updateGrant(grant, {
@@ -603,7 +603,7 @@ describe('a grant that asks who the visitor is', () => {
     try {
       const doc = await engine.open({ kind: 'grant', grant: grant });
       let asked = 0;
-      doc.grant!.onIdentityRequest(() => {
+      doc.grant!.onIdentityRequested(() => {
         asked += 1;
       });
       const waiting = square(doc);
@@ -673,7 +673,7 @@ describe('a grant that asks again while a document is open', () => {
       const doc = await engine.open({ kind: 'grant', grant: grant });
       const docGrant = doc.grant!;
       const asked: unknown[] = [];
-      docGrant.onOpenRequest((request) => asked.push(request));
+      docGrant.onOpenRequested((request) => asked.push(request));
       await updateGrant(grant, {
         visitorIdentity: { fields: { displayName: 'required' }, ask: 'on-open' },
       });
@@ -702,7 +702,7 @@ describe('a grant that asks again while a document is open', () => {
       expect(tries.count - before).toBe(1);
       expect(reads).toHaveLength(5);
 
-      await docGrant.resume({ identity: { displayName: 'Ada' } });
+      await docGrant.resume({ visitorIdentity: { displayName: 'Ada' } });
       await reading;
       expect(reads).toEqual([200, 200, 200, 200, 200, 200]);
       expect(docGrant.openRequest).toBeNull();
@@ -727,7 +727,7 @@ describe('a grant that asks again while a document is open', () => {
       const doc = await engine.open({ kind: 'grant', grant: grant });
       const docGrant = doc.grant!;
       const asked: unknown[] = [];
-      docGrant.onOpenRequest((request) => asked.push(request));
+      docGrant.onOpenRequested((request) => asked.push(request));
       await updateGrant(grant, { passphrase: 'open sesame' });
 
       await read(doc);

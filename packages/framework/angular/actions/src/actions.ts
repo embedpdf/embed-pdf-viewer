@@ -30,7 +30,7 @@ import { createDefaultActionsUiAdapter } from '@embedpdf/web';
 
 /**
  * The actions of the document in scope (`[epdfDocumentScope]`), else the active one:
- * `executeNamed()`, `execute()`, `dispatch()`, `getActionTree()`, the checks (`canExecuteNamed()`,
+ * `executeNamed()`, `execute()`, `dispatch()`, `readActionTree()`, the checks (`canExecuteNamed()`,
  * `isScriptingEnabled()`, …), the settings (`settings()`, `updateSettings()`, …, which work with
  * no document) and the streams (`executed$`, `diagnosticReported$`, `scriptFailed$`, …). With
  * no document every other call refuses with `not-ready`.
@@ -44,7 +44,7 @@ export class EpdfActions extends pluginService({
     'executeNamed',
     'execute',
     'dispatch',
-    'getActionTree',
+    'readActionTree',
     'isScriptingEnabled',
     'setUiAdapter',
     'setSubmitHandler',

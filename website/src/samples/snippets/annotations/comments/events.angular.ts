@@ -12,7 +12,7 @@ export class CommentsSidebar {
   constructor() {
     inject(EpdfComments)
       .threadChanged$.pipe(
-        filter(({ change }) => change === 'reply'),
+        filter(({ type }) => type === 'reply'),
         takeUntilDestroyed(),
       )
       .subscribe(({ rootRef }) => notifyThreadAuthor(rootRef));

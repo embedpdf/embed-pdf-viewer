@@ -12,7 +12,7 @@
   <li>
     <button type="button" class="result" disabled={!cmd.enabled} onclick={cmd.run}>
       <span>{cmd.label}</span>
-      {#if cmd.shortcut}<kbd class="shortcut">{cmd.shortcut}</kbd>{/if}
+      {#if cmd.shortcutLabel}<kbd class="shortcut">{cmd.shortcutLabel}</kbd>{/if}
     </button>
   </li>
 {/if}

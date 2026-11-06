@@ -15,6 +15,6 @@ const command = useCommand(() => props.id);
   >
     <Icon :name="command.icon" />
     {{ command.label }}
-    <kbd v-if="command.shortcut">{{ command.shortcut }}</kbd>
+    <kbd v-if="command.shortcutLabel">{{ command.shortcutLabel }}</kbd>
   </button>
 </template>

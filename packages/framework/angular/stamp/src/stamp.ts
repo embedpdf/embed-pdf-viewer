@@ -54,7 +54,7 @@ export class EpdfStamp extends pluginService({
     'getAsset',
     'getAssetPreview',
     'renderAssetPreview',
-    'readAssetBytes',
+    'getAssetBytes',
     'createLibrary',
     'updateLibrary',
     'deleteLibrary',

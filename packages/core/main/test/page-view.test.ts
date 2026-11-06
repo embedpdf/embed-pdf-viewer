@@ -44,10 +44,10 @@ const [ONE, TWO, THREE] = [1, 2, 3].map(toPageRef) as [
 const origin = (kind: 'local' | 'remote', id?: string) => ({
   kind,
   sessionId: kind === 'local' ? 'me' : 'them',
-  sub: null,
-  ts: 0,
-  serverId: null,
-  ...(id ? { tx: { id, index: 0, count: 1 } } : {}),
+  subject: null,
+  at: new Date(0).toISOString(),
+  serverSequence: null,
+  ...(id ? { transaction: { id, index: 0, count: 1 } } : {}),
 });
 
 /** The engine's pages as a layout event carries them. */
@@ -98,7 +98,7 @@ function harness() {
 describe('the page list', () => {
   it('shows a page change at once, and an answer that matches it changes nothing', async () => {
     const { ctx, answer, order } = harness();
-    const revision = ctx.document()!.revision;
+    const revision = ctx.document()!.pagesSequence;
 
     ctx.changes.stage({
       label: { key: 'pages.reorder' },
@@ -106,7 +106,7 @@ describe('the page list', () => {
     });
     expect(order()).toEqual([3, 1, 2]);
     expect(ctx.document()!.pages.map((page) => page.index)).toEqual([0, 1, 2]);
-    expect(ctx.document()!.revision).toBe(revision + 1);
+    expect(ctx.document()!.pagesSequence).toBe(revision + 1);
     // An index names the page the user sees.
     expect(ctx.pageOf(0).ref).toEqual(THREE);
 
@@ -114,7 +114,7 @@ describe('the page list', () => {
     answer(0, (opId) => [layoutEvent('pages.reordered', shown, origin('local', opId))]);
     await tick();
     expect(ctx.document()!.pages).toBe(shown);
-    expect(ctx.document()!.revision).toBe(revision + 1);
+    expect(ctx.document()!.pagesSequence).toBe(revision + 1);
   });
 
   it('takes a refused page change back', async () => {
@@ -164,7 +164,7 @@ describe('the page list', () => {
     });
     expect(order()).toEqual([1, 40, 2, 3]);
     expect(ctx.getPage(toPageRef(40))!.size).toEqual({ width: 300, height: 200 });
-    expect([...ctx.document()!.pendingPages]).toEqual([[40, { look: 'blank' }]]);
+    expect([...ctx.document()!.pendingPages]).toEqual([[40, { kind: 'blank' }]]);
 
     const shown = ctx.document()!.pages;
     answer(0, (opId) => [layoutEvent('pages.inserted', shown, origin('local', opId))]);
@@ -181,7 +181,7 @@ describe('the page list', () => {
     });
     expect(order()).toEqual([1, 40, 2, 3]);
     expect(ctx.getPage(toPageRef(40))!.rotation).toBe(90);
-    expect(ctx.document()!.pendingPages.get(40)).toEqual({ look: 'copy', of: TWO });
+    expect(ctx.document()!.pendingPages.get(40)).toEqual({ kind: 'copy', of: TWO });
   });
 
   it('moves the labels with the pages as the engine does, and an undo puts them back', () => {
@@ -242,7 +242,7 @@ describe('the page list', () => {
     });
     expect(order()).toEqual([1, 2, 3]);
     expect(ctx.getPage(TWO)!.rotation).toBe(90);
-    expect(ctx.document()!.pendingPages.get(2)).toEqual({ look: 'own' });
+    expect(ctx.document()!.pendingPages.get(2)).toEqual({ kind: 'own' });
   });
 });
 

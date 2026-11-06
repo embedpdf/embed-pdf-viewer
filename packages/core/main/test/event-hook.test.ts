@@ -58,7 +58,7 @@ describe('createEventHook', () => {
     const hook = createEventHook<void>();
     const listener = vi.fn();
     hook.on(listener);
-    hook.dispose();
+    hook.destroy();
     expect(() => hook.emit()).not.toThrow();
     const off = hook.on(listener);
     expect(() => off()).not.toThrow();

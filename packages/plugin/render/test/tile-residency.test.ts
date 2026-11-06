@@ -31,7 +31,7 @@ function createHarness(options?: {
   let liveFetches = 0;
   let maxLiveFetches = 0;
 
-  const resolved = resolveRenderOptions({ tiles: { settleMs: 0, bleed: 0, ...options?.tiling } });
+  const resolved = resolveRenderOptions({ tiles: { settleMs: 0, bleedPx: 0, ...options?.tiling } });
   const tileManager = new TileManager({
     store,
     getOptions: () => resolved,

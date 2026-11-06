@@ -615,7 +615,7 @@ export function runFormTransferConformance(
         created.forEach((event, index) => {
           if (event.type !== 'forms.created') return;
           expect(event.field).toEqual(imported.fields[index]);
-          expect(event.origin.tx).toEqual({
+          expect(event.origin.transaction).toEqual({
             id: 'form-import-1',
             index,
             count: SOURCE_FIELDS.length,

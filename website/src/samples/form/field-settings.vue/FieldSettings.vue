@@ -21,7 +21,7 @@ function useDesignForm() {
       started = true;
       interaction.activateTool('form-edit');
       const widget = form.get(toFieldRef('name'))?.widgets[0]?.ref;
-      if (widget) annotation.selection.set([widget]);
+      if (widget) annotation.selection.select([widget]);
     },
     { immediate: true },
   );
@@ -43,12 +43,7 @@ function rename(field: FormFieldDTO, event: FocusEvent) {
     <label class="setting">
       Name
       <!-- Keyed by the field, so another field's panel starts from its own name. -->
-      <input
-        :key="field.name"
-        class="input"
-        :value="field.name"
-        @blur="rename(field, $event)"
-      />
+      <input :key="field.name" class="input" :value="field.name" @blur="rename(field, $event)" />
     </label>
     <label class="setting">
       Tooltip

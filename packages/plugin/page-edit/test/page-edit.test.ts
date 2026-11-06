@@ -138,7 +138,7 @@ describe('PageEditCapability', () => {
         ],
       ]);
       // Undoing it turns each page back to the rotation it had.
-      const [change] = ctx.changes.pending();
+      const [change] = ctx.changes.listPending();
       expect(change!.label).toEqual({ key: 'pages.rotate', count: 3 });
       expect(change!.undo).toEqual([
         { type: 'pages.rotate', pages: [toPageRef(10), toPageRef(30)], rotation: 0 },
@@ -214,7 +214,7 @@ describe('PageEditCapability', () => {
       const { ctx, pageEdit, sent, control } = harness({ pages: THREE_PAGES });
       control.hold = true;
       void pageEdit.delete([toPageRef(30), 0]);
-      expect(ctx.changes.pending()[0]!.label).toEqual({ key: 'pages.delete', count: 2 });
+      expect(ctx.changes.listPending()[0]!.label).toEqual({ key: 'pages.delete', count: 2 });
       // The pages go at once: the one page left is all the user sees.
       expect(ctx.document()!.pages.map((page) => page.ref)).toEqual([toPageRef(20)]);
       await expect(pageEdit.delete([0])).rejects.toMatchObject({ code: 'invalid-input' });
@@ -226,7 +226,7 @@ describe('PageEditCapability', () => {
       control.hold = true;
       const before = ctx.document()!.pages;
       void pageEdit.delete([toPageRef(30), toPageRef(10)]);
-      expect(ctx.changes.pending()[0]!.undo).toEqual([
+      expect(ctx.changes.listPending()[0]!.undo).toEqual([
         {
           type: 'pages.restore',
           pages: [
@@ -246,7 +246,7 @@ describe('PageEditCapability', () => {
         toPageRef(10),
         toPageRef(20),
       ]);
-      expect(ctx.changes.pending()[0]!.undo).toEqual([
+      expect(ctx.changes.listPending()[0]!.undo).toEqual([
         { type: 'pages.reorder', pages: [toPageRef(10)], position: 'start' },
         { type: 'pages.reorder', pages: [toPageRef(20)], position: { after: toPageRef(10) } },
       ]);
@@ -317,7 +317,7 @@ describe('PageEditCapability', () => {
       expect(last()).toEqual(
         blank({ width: 612, height: 792 }, 3, { after: toPageRef(10) }, [101, 102, 103]),
       );
-      expect(ctx.changes.pending()[0]!.label).toEqual({ key: 'pages.insertBlank', count: 3 });
+      expect(ctx.changes.listPending()[0]!.label).toEqual({ key: 'pages.insertBlank', count: 3 });
     });
 
     it('a blank insert shows its pages at once, named from the pool, and undoing it deletes them', () => {
@@ -326,8 +326,8 @@ describe('PageEditCapability', () => {
       void pageEdit.insertBlank({ position: { after: toPageRef(10) } });
       expect(ctx.document()!.pages.map((page) => page.ref.objectNumber)).toEqual([10, 101, 20, 30]);
       expect(ctx.getPage(toPageRef(101))!.size).toEqual({ width: 100, height: 200 });
-      expect(ctx.document()!.pendingPages.get(101)).toEqual({ look: 'blank' });
-      expect(ctx.changes.pending()[0]!.undo).toEqual([
+      expect(ctx.document()!.pendingPages.get(101)).toEqual({ kind: 'blank' });
+      expect(ctx.changes.listPending()[0]!.undo).toEqual([
         { type: 'pages.delete', pages: [toPageRef(101)] },
       ]);
     });
@@ -351,7 +351,7 @@ describe('PageEditCapability', () => {
         { type: 'pages.insert', source: bytes, position: { after: toPageRef(20) } },
       ]);
       // How many pages a PDF holds isn't known before the engine reads it.
-      expect(ctx.changes.pending()[0]!.label).toEqual({ key: 'pages.insert' });
+      expect(ctx.changes.listPending()[0]!.label).toEqual({ key: 'pages.insert' });
     });
 
     it('duplicate copies the pages right after the last of them, shown at once as they show', async () => {
@@ -372,8 +372,8 @@ describe('PageEditCapability', () => {
         10, 20, 101, 102, 30,
       ]);
       expect(ctx.getPage(toPageRef(101))!.rotation).toBe(90);
-      expect(ctx.document()!.pendingPages.get(102)).toEqual({ look: 'copy', of: toPageRef(20) });
-      expect(ctx.changes.pending()[1]!.undo).toEqual([
+      expect(ctx.document()!.pendingPages.get(102)).toEqual({ kind: 'copy', of: toPageRef(20) });
+      expect(ctx.changes.listPending()[1]!.undo).toEqual([
         { type: 'pages.delete', pages: [toPageRef(101), toPageRef(102)] },
       ]);
       // Nothing leaves the document.

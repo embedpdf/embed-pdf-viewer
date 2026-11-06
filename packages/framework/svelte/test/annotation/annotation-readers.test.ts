@@ -117,7 +117,7 @@ describe('the annotation readers', () => {
       await waitFor(() => expect(latest(ink.seen)).toBe('#123456'));
 
       const square = annotation.list().find((entry) => entry.subtype === 'square')!;
-      annotation.selection.set([square.ref]);
+      annotation.selection.select([square.ref]);
       flushSync();
       await waitFor(() => expect(latest(panel.seen)).toBeGreaterThan(0));
     } finally {

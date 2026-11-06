@@ -77,12 +77,12 @@ export function createAttachmentController(ctx: PluginContext<AttachmentModel>) 
   ): Omit<AttachmentsChangedEvent, 'origin'> | null => {
     switch (event.type) {
       case 'attachments.created':
-        return { type: 'added', files: [fileOfAttachment(event.attachment)] };
+        return { type: 'created', files: [fileOfAttachment(event.attachment)] };
       case 'attachments.restored':
         return { type: 'restored', files: [fileOfAttachment(event.attachment)] };
       case 'attachments.deleted': {
         const gone = previous?.find((file) => file.ref.key === event.deleted?.key);
-        return { type: 'removed', files: gone ? [fileOfAttachment(gone)] : [] };
+        return { type: 'deleted', files: gone ? [fileOfAttachment(gone)] : [] };
       }
       default:
         return null;
@@ -96,7 +96,7 @@ export function createAttachmentController(ctx: PluginContext<AttachmentModel>) 
     load: async (doc) => ({ value: (await doc.attachments.list()).attachments }),
     fold: foldFiles,
     predict: predictFiles,
-    changed: ({ cause, event, previous, next }) => {
+    onChanged: ({ cause, event, previous, next }) => {
       if (!next) return;
       if (cause === 'load') {
         resynced.emit({ files: next.map(fileOfAttachment) });
@@ -201,7 +201,7 @@ export function createAttachmentController(ctx: PluginContext<AttachmentModel>) 
     };
   };
 
-  const add: AttachmentCapability['add'] = async (sources, options) => {
+  const create: AttachmentCapability['create'] = async (sources, options) => {
     refuse(MODIFY, 'attachment.add', options);
     if (sources.length === 0) return NO_FILES;
     // The names in the document decide the free ones, so they are read first.
@@ -219,7 +219,7 @@ export function createAttachmentController(ctx: PluginContext<AttachmentModel>) 
     );
   };
 
-  const remove: AttachmentCapability['remove'] = async (file, options) => {
+  const remove: AttachmentCapability['delete'] = async (file, options) => {
     if (file.home.kind === 'page') {
       return annotationsFor('attachment.remove').delete(file.home.ref, options);
     }
@@ -269,11 +269,11 @@ export function createAttachmentController(ctx: PluginContext<AttachmentModel>) 
     const annotation = annotations();
     const record = annotation?.get(file.home.ref);
     if (!annotation || !record) return;
-    annotation.selection.set([record.ref]);
+    annotation.selection.select([record.ref]);
     // The file lands a third down the view, as a comment's annotation does.
     ctx.tryGet(StageToken)?.reveal(record.ref.page, {
       rect: record.rect,
-      anchor: { x: 'center', y: 0.35 },
+      align: { x: 'center', y: 0.35 },
       behavior: 'smooth',
     });
   };
@@ -282,21 +282,25 @@ export function createAttachmentController(ctx: PluginContext<AttachmentModel>) 
     list,
     get,
     getSelected,
-    select: (files) => ctx.state.update(selected, files.map((file) => file.id)),
+    select: (files) =>
+      ctx.state.update(
+        selected,
+        files.map((file) => file.id),
+      ),
     isPending,
     getStatus: files.getStatus,
     ensureLoaded: (options) => ctx.cancellable(options?.signal, files.ensureLoaded()),
     refresh: (options) => ctx.cancellable(options?.signal, files.refresh()),
 
     canDownload: () => ctx.allows(DOWNLOAD),
-    canAdd: () => ctx.allows(MODIFY),
-    canRemove: (file) =>
+    canCreate: () => ctx.allows(MODIFY),
+    canDelete: (file) =>
       file.home.kind === 'page'
         ? (annotations()?.canDelete(file.home.ref) ?? false)
         : ctx.allows(MODIFY),
 
-    add,
-    remove,
+    create,
+    delete: remove,
     download,
     reveal,
 

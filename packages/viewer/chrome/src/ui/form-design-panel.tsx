@@ -54,11 +54,11 @@ function useFormDesign() {
     select(widget: WidgetAnnotation) {
       // The widgets are lent only while a form is designed.
       if (!isFormDesignTool(activeTool)) interaction?.activateTool(FORM_DESIGN_TOOL);
-      annotation?.selection.set([widget.ref]);
+      annotation?.selection.select([widget.ref]);
       stage.reveal(widget.page, { rect: widget.box });
     },
     clear() {
-      annotation?.selection.set([]);
+      annotation?.selection.select([]);
     },
   };
 }

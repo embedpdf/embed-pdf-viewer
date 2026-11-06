@@ -9,8 +9,8 @@ import { Icon } from './icon';
     <button [epdfCommand]="id()" #command="epdfCommand">
       <app-icon [name]="command.icon()" />
       {{ command.label() }}
-      @if (command.shortcut()) {
-        <kbd>{{ command.shortcut() }}</kbd>
+      @if (command.shortcutLabel()) {
+        <kbd>{{ command.shortcutLabel() }}</kbd>
       }
     </button>
   `,

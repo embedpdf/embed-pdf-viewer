@@ -138,7 +138,7 @@ export function installAcroJs(globalObject: Record<string, unknown>): void {
       source: { enumerable: false, get: () => doc },
     });
     wrapper.setFocus = () => {
-      state?.uiEffects.push({ kind: 'focusField', field: String(input.name) });
+      state?.uiEffects.push({ type: 'focusField', field: String(input.name) });
     };
     return wrapper;
   };
@@ -339,7 +339,7 @@ export function installAcroJs(globalObject: Record<string, unknown>): void {
       get: () => Number((state?.input.document as AnyRecord | undefined)?.pageNumber ?? 0),
       set: (value: unknown) => {
         const page = Math.trunc(Number(value));
-        if (Number.isFinite(page)) state?.uiEffects.push({ kind: 'gotoPage', page });
+        if (Number.isFinite(page)) state?.uiEffects.push({ type: 'gotoPage', page });
       },
     },
   });
@@ -363,7 +363,7 @@ export function installAcroJs(globalObject: Record<string, unknown>): void {
       }
     }
   };
-  doc.print = () => state?.uiEffects.push({ kind: 'print' });
+  doc.print = () => state?.uiEffects.push({ type: 'print' });
   // Acrobat's doc.submitForm: positional (cURL, bFDF, bEmpty, aFields) or a
   // single argument object ({cURL, aFields, bEmpty, cSubmitAs, bGet}). It
   // emits a submit intent — resolution (Table 239/240 semantics) and the
@@ -393,7 +393,7 @@ export function installAcroJs(globalObject: Record<string, unknown>): void {
                 ? 'html'
                 : undefined;
     state.uiEffects.push({
-      kind: 'submitForm',
+      type: 'submitForm',
       url: args.cURL === undefined || args.cURL === null ? null : String(args.cURL),
       fieldNames: names,
       includeEmpty: Boolean(args.bEmpty),
@@ -418,7 +418,7 @@ export function installAcroJs(globalObject: Record<string, unknown>): void {
     formsVersion: 21,
     alert: (message: unknown, icon?: unknown, _type?: unknown, title?: unknown): number => {
       state?.uiEffects.push({
-        kind: 'alert',
+        type: 'alert',
         message: String(message),
         icon: Number.isFinite(Number(icon)) ? Number(icon) : 0,
         ...(title === undefined ? {} : { title: String(title) }),
@@ -944,7 +944,7 @@ export function installAcroJs(globalObject: Record<string, unknown>): void {
 
   const rejectWithAlert = (message: string): void => {
     if (!state) return;
-    state.uiEffects.push({ kind: 'alert', message, icon: 0 });
+    state.uiEffects.push({ type: 'alert', message, icon: 0 });
     state.event.rc = false;
   };
   const formatMismatch = (): void =>

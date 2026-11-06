@@ -71,7 +71,7 @@ const text = (
 
 class NodeSandbox implements ScriptSandbox {
   private readonly vm: AcroJsVmGlobal;
-  disposed = false;
+  destroyed = false;
 
   constructor() {
     const context = createContext({});
@@ -87,8 +87,8 @@ class NodeSandbox implements ScriptSandbox {
     return this.plain(this.vm.__acrojsRun(source, input, budget));
   }
 
-  dispose(): void {
-    this.disposed = true;
+  destroy(): void {
+    this.destroyed = true;
   }
 
   protected plain(output: ScriptOutput): ScriptOutput {
@@ -123,7 +123,7 @@ const documentMeta = (): DocumentMeta => ({
   pageCount: 1,
   // Only the page's identity matters to the scripting controller.
   pages: [{ ref: toPageRef(10) } as PageLayout],
-  revision: 0,
+  pagesSequence: 0,
   hasUnsavedChanges: false,
   renderPolicy: { kind: 'continuous' },
   pageLabels: [],
@@ -200,7 +200,7 @@ describe('script fault ladder', () => {
     expect(rejected.status).toBe('rejected');
     expect(rejected.uiEffects).toContainEqual(
       expect.objectContaining({
-        kind: 'alert',
+        type: 'alert',
         message: 'The value entered does not match the format of the field [ price ]',
         phase: 'user',
       }),

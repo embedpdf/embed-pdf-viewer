@@ -15,7 +15,7 @@
     untrack(() => {
       const richText = annotation.list().find((each) => each.nm === 'rich-text');
       if (!richText) return;
-      annotation.selection.set([richText.ref]);
+      annotation.selection.select([richText.ref]);
       stage.reveal(richText.page, { rect: richText.rect });
     });
   });

@@ -18,7 +18,7 @@ import { fontsPlugin, fontsState, FontsToken, type FontCss } from '@embedpdf/plu
 /**
  * The fonts of the document in scope (`[epdfDocumentScope]`), else the active one: the font list
  * as `list()`, its load state as `status()`, `ensureLoaded()` and `refresh()`, `resolve()`,
- * `getProgram()`, the CSS a font, a face or a resolved run is drawn with (`getFontCss()`,
+ * `readProgram()`, the CSS a font, a face or a resolved run is drawn with (`getFontCss()`,
  * `getFaceCss()`, `getRunCss()`), the fonts a box's text is painted in (`getPaintFonts()`), and
  * the stream `fontListChanged$`. With no document the signals read null and `'idle'`, and every
  * call refuses with `not-ready`.
@@ -34,7 +34,7 @@ export class EpdfFonts extends pluginService({
     'ensureLoaded',
     'refresh',
     'resolve',
-    'getProgram',
+    'readProgram',
     'getFontList',
     'getStatus',
     'getFontCss',

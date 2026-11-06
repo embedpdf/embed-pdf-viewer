@@ -47,7 +47,7 @@ describe('KernelProvider', () => {
     expect(tree.getByTestId('count').textContent).toBe('1');
 
     tree.unmount();
-    expect(kernel.status()).toBe('started');
+    expect(kernel.getStatus()).toBe('started');
     expect(kernel.capability(CounterToken).getCount()).toBe(1);
   });
 

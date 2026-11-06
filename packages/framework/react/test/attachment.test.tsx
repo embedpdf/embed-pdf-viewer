@@ -52,7 +52,7 @@ const engine = {
   open: () =>
     Promise.resolve({
       id: 'doc',
-      events: { subscribe: () => () => {}, lastServerId: () => null },
+      events: { subscribe: () => () => {}, lastServerSequence: () => null },
       pages: { list: () => Promise.resolve({ pageCount: 1, labels: [], pages: [page] }) },
       security: { allows: () => true, allowsAnnotation: () => true },
       attachments: { list: () => Promise.resolve({ attachments: files }) },
@@ -88,7 +88,7 @@ describe('useAttachmentState', () => {
       ['doc:notes.txt', 'notes.txt'],
       ['doc:scan.pdf', 'scan.pdf'],
     ]);
-    expect(state).toMatchObject({ status: 'ready', canAdd: true, canDownload: true });
+    expect(state).toMatchObject({ status: 'ready', canCreate: true, canDownload: true });
   });
 
   it('picks one value with a selector', async () => {
@@ -115,7 +115,7 @@ describe('useAttachment outside a document', () => {
     }
     await viewerWith([attachmentPlugin()], <Capture />, engine);
     const attachment = captured.attachment!;
-    expect(() => attachment.canAdd()).toThrow(expect.objectContaining({ code: 'not-ready' }));
-    await expect(attachment.add([])).rejects.toMatchObject({ code: 'not-ready' });
+    expect(() => attachment.canCreate()).toThrow(expect.objectContaining({ code: 'not-ready' }));
+    await expect(attachment.create([])).rejects.toMatchObject({ code: 'not-ready' });
   });
 });

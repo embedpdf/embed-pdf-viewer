@@ -40,7 +40,7 @@ export function MeasurementSection() {
     AnnotationToken,
     (annotation) =>
       annotation.selection
-        .list()
+        .getSelected()
         .filter(
           (candidate) =>
             (candidate.subtype === 'polygon' || candidate.subtype === 'polyline') &&
@@ -55,7 +55,7 @@ export function MeasurementSection() {
     MeasurementToken,
     (measurement) =>
       anno.selection
-        .list()
+        .getSelected()
         .map((annotation) => measurement.getReadout(annotation.ref))
         .filter((readout): readout is MeasurementReadout => !('unavailable' in readout)),
     (left, right) => JSON.stringify(left) === JSON.stringify(right),

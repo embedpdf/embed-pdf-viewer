@@ -33,7 +33,7 @@ import {
 } from './mirror';
 import type { OperationOptions, ResourceStatus } from './types';
 
-/** One applied change of one page, handed to the spec's `changed` callback. */
+/** One applied change of one page, handed to the spec's `onChanged` callback. */
 export interface PageMirrorChange<V> {
   readonly page: PageRef;
   /** `load` for reads, `event` for a folded event, `drop` when the page was deleted. */
@@ -66,7 +66,7 @@ export interface PageMirrorSpec<V> {
    */
   predict?(value: V, op: PredictedOp, page: PageRef): V;
   /** Runs after every load of a page (even one that changed nothing) and every applied change. */
-  readonly changed?: (change: PageMirrorChange<V>) => void;
+  readonly onChanged?: (change: PageMirrorChange<V>) => void;
 }
 
 export interface PageMirror<V> {
@@ -163,7 +163,7 @@ export function createPageMirror<V>(
   const announce = (change: PageMirrorChange<V>): void => {
     if (change.cause !== 'load' && change.previous === change.next) return;
     try {
-      spec.changed?.(change);
+      spec.onChanged?.(change);
     } catch (error) {
       env.report(error);
     }
@@ -179,14 +179,14 @@ export function createPageMirror<V>(
       };
       const closed = () => done(false);
       const off = env.pages.onChange(() => {
-        if (!env.pages.pending(page)) done(env.pages.has(page));
+        if (!env.pages.getPending(page)) done(env.pages.has(page));
       });
       env.lifetime.addEventListener('abort', closed, { once: true });
     });
 
   /** Read the page; one a pending change makes once the engine has it. */
   const read = (page: PageRef): Promise<V | typeof GONE> =>
-    env.pages.pending(page)
+    env.pages.getPending(page)
       ? whenHeld(page).then<V | typeof GONE>((held) =>
           held ? spec.load(env.doc, page, env.lifetime) : GONE,
         )

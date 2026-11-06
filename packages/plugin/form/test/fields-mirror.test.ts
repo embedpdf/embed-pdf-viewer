@@ -88,9 +88,9 @@ const snapshot = (value: string): FormSnapshot => ({
 const origin = (kind: 'local' | 'remote') => ({
   kind,
   sessionId: kind === 'local' ? 'me' : 'them',
-  sub: null,
-  ts: 0,
-  serverId: null,
+  subject: null,
+  at: new Date(0).toISOString(),
+  serverSequence: null,
 });
 
 async function boot() {
@@ -105,7 +105,7 @@ async function boot() {
         listeners.add(listener);
         return () => listeners.delete(listener);
       },
-      lastServerId: () => null,
+      lastServerSequence: () => null,
     },
     pages: { list: () => Promise.resolve({ pageCount: 1, labels: [], pages: [page] }) },
     security: { allows: () => true, allowsField: () => true },
@@ -122,7 +122,11 @@ async function boot() {
           };
           // Like both real engines: the event is published before the promise settles.
           const tx = { id: opId, index: 0, count: 1 };
-          emit({ type: 'forms.valueSet', origin: { ...origin('local'), tx }, ...result });
+          emit({
+            type: 'forms.valueSet',
+            origin: { ...origin('local'), transaction: tx },
+            ...result,
+          });
           resolve({ items: [], meta: { ...NOTHING_CHANGED, opId, undoable: true } });
         }),
       ),
@@ -204,8 +208,16 @@ describe('form fields mirror', () => {
     const harness = await boot();
     harness.reads[0]!(snapshot('initial'));
     await settle();
-    harness.emit({ type: 'stream.desynced', reason: 'backlog-overflow', ts: 0 });
-    harness.emit({ type: 'stream.desynced', reason: 'backlog-overflow', ts: 0 });
+    harness.emit({
+      type: 'stream.desynced',
+      reason: 'backlog-overflow',
+      at: new Date(0).toISOString(),
+    });
+    harness.emit({
+      type: 'stream.desynced',
+      reason: 'backlog-overflow',
+      at: new Date(0).toISOString(),
+    });
     expect(harness.reads).toHaveLength(2);
     harness.reads[1]!(snapshot('after desync'));
     await settle();

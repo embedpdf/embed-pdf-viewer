@@ -337,7 +337,7 @@ describe('the outline and attachments panels', () => {
     const list = () => Array.from({ length: entries }, (_, index) => ({ id: String(index) }));
     const capabilities = new Map<unknown, unknown>([
       [OutlineToken, { list, canEdit: () => mayAdd }],
-      [AttachmentToken, { list, canAdd: () => mayAdd }],
+      [AttachmentToken, { list, canCreate: () => mayAdd }],
       [CommandsToken, { isCategoryDisabled: (feature: string) => off.includes(feature) }],
     ]);
     const tryGet = (token: unknown) => capabilities.get(token) ?? null;

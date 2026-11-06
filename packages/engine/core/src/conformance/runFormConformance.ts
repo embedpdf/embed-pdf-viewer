@@ -268,7 +268,7 @@ export function runFormConformance(
         if (after.family !== 'text') throw new Error('expected text family');
         expect(after.value).toBe('xyz');
         // One burst: the change's events share its opId.
-        expect(new Set(events.map((event) => event.origin.tx?.id))).toEqual(
+        expect(new Set(events.map((event) => event.origin.transaction?.id))).toEqual(
           new Set([result.meta.opId]),
         );
         unsubscribe();
@@ -383,10 +383,14 @@ export function runFormConformance(
         expect(names).toContain('billing.name');
         // One event per changed field, all in one transaction.
         expect(events.length).toBe(result.fields.length);
-        const txIds = new Set(events.map((event) => event.origin.tx?.id));
+        const txIds = new Set(events.map((event) => event.origin.transaction?.id));
         expect(txIds.size).toBe(1);
-        expect(events.map((event) => event.origin.tx?.index)).toEqual(events.map((_, i) => i));
-        expect(events.every((event) => event.origin.tx?.count === events.length)).toBe(true);
+        expect(events.map((event) => event.origin.transaction?.index)).toEqual(
+          events.map((_, i) => i),
+        );
+        expect(events.every((event) => event.origin.transaction?.count === events.length)).toBe(
+          true,
+        );
         const after = await doc.forms.list();
         const radio = after.fields.find((field) => field.name === 'ntto_radio');
         if (radio?.family === 'radio') expect(radio.value).toBe('x');

@@ -35,7 +35,7 @@ function SelectSquare() {
     done.current = true;
     const square = annotation.list().find((each) => each.nm === 'square');
     if (!square) return;
-    annotation.selection.set([square.ref]);
+    annotation.selection.select([square.ref]);
     stage.reveal(square.page, { rect: square.rect });
   }, [annotation, stage, ready]);
 

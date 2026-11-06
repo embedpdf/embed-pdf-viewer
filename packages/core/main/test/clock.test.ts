@@ -108,7 +108,7 @@ describe('ctx.clock', () => {
     const ctx = createTestContext({ clock: time.clock });
     const ran: string[] = [];
     ctx.clock.after(10, () => ran.push('timer'));
-    await ctx.dispose();
+    await ctx.destroy();
     time.advance(10);
     expect(ran).toEqual([]);
   });

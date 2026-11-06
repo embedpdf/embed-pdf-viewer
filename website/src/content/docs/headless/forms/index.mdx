@@ -283,7 +283,7 @@ The colors are what the viewer draws around fields; a field's own colors are sav
 | `onValidationRejected` | The form's validation refused a value                                     | `field`, `issues` |
 | `onFocusChanged`       | The cursor moved into a field, to another one, or out of the fields       | `field`, `widget` |
 | `onResynced`           | The whole form was read, as when it opens, after `refresh()` or a repair  | `snapshot`        |
-| `onSettingsChanged` | The settings changed | `settings`, `changed` |
+| `onSettingsChanged` | The settings changed | `settings`, `changedKeys` |
 
 Fields that are added, changed or removed have their own events; see
 [Building forms](forms/building#events).

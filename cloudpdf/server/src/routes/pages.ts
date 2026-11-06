@@ -723,12 +723,13 @@ async function renderPageImage(input: {
           atPins(async () => {
             if (input.encodeInEngine) {
               const image = await renderEncoded(signal);
-              return { bytes: image.bytes, contentType: image.contentType };
+              return { bytes: image.bytes, contentType: image.mimeType };
             }
-            return input.imageEncoder.encodeToBuffer(await renderRaster(signal), {
+            const image = await input.imageEncoder.encodeToBuffer(await renderRaster(signal), {
               format,
               quality: imageOptions.quality,
             });
+            return { bytes: image.bytes, contentType: image.mimeType };
           }),
         input.signal,
       )
@@ -746,7 +747,7 @@ async function renderPageImage(input: {
   if (input.encodeInEngine) {
     const image = await atPins(() => renderEncoded(input.signal));
     pinned ? setImmutableCache(input.reply) : setNoStore(input.reply);
-    input.reply.type(image.contentType);
+    input.reply.type(image.mimeType);
     input.reply.header('X-EmbedPDF-Image-Width', String(image.width));
     input.reply.header('X-EmbedPDF-Image-Height', String(image.height));
     return input.reply.send(Buffer.from(image.bytes));
@@ -757,7 +758,7 @@ async function renderPageImage(input: {
     quality: imageOptions.quality,
   });
   pinned ? setImmutableCache(input.reply) : setNoStore(input.reply);
-  input.reply.type(encoded.contentType);
+  input.reply.type(encoded.mimeType);
   input.reply.header('X-EmbedPDF-Image-Width', String(raster.width));
   input.reply.header('X-EmbedPDF-Image-Height', String(raster.height));
   return input.reply.send(encoded.stream);

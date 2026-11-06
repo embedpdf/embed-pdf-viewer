@@ -18,7 +18,7 @@ export interface LinkHostCapability extends LinkCapability {
   isNavigationEngaged(): boolean;
   /**
    * Register the framework's website opener. The plugin never touches the
-   * DOM: without an opener, a website link activates as `{ outcome: 'uri' }`
+   * DOM: without an opener, a website link activates as `{ status: 'uri' }`
    * for the caller to open. The latest registration wins until it is removed.
    */
   registerUriOpener(opener: UriOpener): Unsubscribe;

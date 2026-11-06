@@ -53,7 +53,7 @@ const page: PageLayout = {
 function engine(): Engine {
   const handle = {
     id: 'd',
-    events: { subscribe: () => () => {}, lastServerId: () => null },
+    events: { subscribe: () => () => {}, lastServerSequence: () => null },
     pages: { list: () => Promise.resolve({ pageCount: 1, labels: [], pages: [page] }) },
     security: { allows: () => true },
     close: () => Promise.resolve(),
@@ -88,10 +88,10 @@ const handler = (
   id,
   priority,
   enabledFor: (tool) => tool.enables.has(tag),
-  onDown: () => (log.push(`${id}:down`), capture),
-  onMove: () => log.push(`${id}:move`),
-  onUp: () => log.push(`${id}:up`),
-  onCancel: () => log.push(`${id}:cancel`),
+  onPointerDown: () => (log.push(`${id}:down`), capture),
+  onPointerMove: () => log.push(`${id}:move`),
+  onPointerUp: () => log.push(`${id}:up`),
+  onPointerCancel: () => log.push(`${id}:cancel`),
   onHover: () => log.push(`${id}:hover`),
 });
 
@@ -292,7 +292,7 @@ describe('settings', () => {
     hub.updateSettings({ tools: [{ id: 'ruler', cursor: 'crosshair' }] });
     expect(hub.listTools()).not.toBe(tools);
     expect(hub.listTools().map((tool) => tool.id)).toEqual(['pointer', 'pan', 'zoom', 'ruler']);
-    expect(changed).toHaveBeenCalledWith(expect.objectContaining({ changed: ['tools'] }));
+    expect(changed).toHaveBeenCalledWith(expect.objectContaining({ changedKeys: ['tools'] }));
     await kernel.destroy();
   });
 

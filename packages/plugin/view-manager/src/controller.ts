@@ -11,7 +11,7 @@ import type {
   PaneCreatedEvent,
   PaneFocusChangedEvent,
   PaneInfo,
-  PaneRemovedEvent,
+  PaneDeletedEvent,
   ViewManagerCapability,
 } from './contract';
 import {
@@ -25,7 +25,7 @@ import {
   reconcile,
   removeDocument,
   renameDocument,
-  removePane,
+  deletePane,
   setActiveDocument,
   setFocusedPane,
   type ViewManagerModel,
@@ -36,13 +36,13 @@ const sameIds = (left: readonly string[], right: readonly string[]): boolean =>
 
 export function createViewManagerController(ctx: PluginContext<ViewManagerModel>) {
   const paneCreated = ctx.events.source<PaneCreatedEvent>();
-  const paneRemoved = ctx.events.source<PaneRemovedEvent>();
+  const paneDeleted = ctx.events.source<PaneDeletedEvent>();
   const focusChanged = ctx.events.source<PaneFocusChangedEvent>();
   const documentMoved = ctx.events.source<DocumentMovedEvent>();
 
   ctx.state.onChange(({ previous, next }) => {
     for (const id of next.order) if (!previous.panes[id]) paneCreated.emit({ paneId: id });
-    for (const id of previous.order) if (!next.panes[id]) paneRemoved.emit({ paneId: id });
+    for (const id of previous.order) if (!next.panes[id]) paneDeleted.emit({ paneId: id });
     if (previous.focusedPaneId !== next.focusedPaneId) {
       focusChanged.emit({ paneId: next.focusedPaneId });
     }
@@ -88,7 +88,7 @@ export function createViewManagerController(ctx: PluginContext<ViewManagerModel>
     getFocusedPaneId: () => state().focusedPaneId,
     getPaneOfDocument: (documentId) => paneOfDocument(state(), documentId),
     createPane: (options) => createPaneWith(options?.documentIds),
-    removePane: (id, options) => {
+    deletePane: (id, options) => {
       const pane = state().panes[id];
       if (!pane) return;
       const remaining = state().order.filter((other) => other !== id);
@@ -103,7 +103,7 @@ export function createViewManagerController(ctx: PluginContext<ViewManagerModel>
           ctx.state.update(moveDocumentBetween, id, targetId, documentId);
         }
       }
-      ctx.state.update(removePane, id);
+      ctx.state.update(deletePane, id);
     },
     movePane: (id, toIndex) => ctx.state.update(movePane, id, toIndex),
     setFocusedPane: (id) => ctx.state.update(setFocusedPane, id),
@@ -122,7 +122,7 @@ export function createViewManagerController(ctx: PluginContext<ViewManagerModel>
     moveDocumentBetween: (fromPaneId, toPaneId, documentId, toIndex) =>
       ctx.state.update(moveDocumentBetween, fromPaneId, toPaneId, documentId, toIndex),
     onPaneCreated: paneCreated.on,
-    onPaneRemoved: paneRemoved.on,
+    onPaneDeleted: paneDeleted.on,
     onFocusChanged: focusChanged.on,
     onDocumentMoved: documentMoved.on,
   };

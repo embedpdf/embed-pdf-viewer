@@ -42,7 +42,7 @@ class FakeEvents {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
   }
-  lastServerId(): number | null {
+  lastServerSequence(): number | null {
     return null;
   }
   get subscriberCount(): number {
@@ -434,7 +434,7 @@ describe('kernel status machine', () => {
     await kernel.destroy();
     expect(ready.close).toHaveBeenCalledTimes(1);
     expect(locked.close).toHaveBeenCalledTimes(1);
-    expect(kernel.status()).toBe('destroyed');
+    expect(kernel.getStatus()).toBe('destroyed');
   });
 
   it('destroy is idempotent (same promise) and start()/open() afterwards fail clearly', async () => {
@@ -464,7 +464,7 @@ describe('kernel status machine', () => {
     await kernel.destroy();
 
     expect(teardown).toHaveBeenCalledTimes(1);
-    expect(kernel.status()).toBe('destroyed');
+    expect(kernel.getStatus()).toBe('destroyed');
     await start; // start resolves, never rejects here
   });
 
@@ -493,11 +493,11 @@ describe('kernel status machine', () => {
     });
 
     await expect(kernel.start()).rejects.toThrow('workspace connect exploded');
-    expect(kernel.status()).toBe('failed');
+    expect(kernel.getStatus()).toBe('failed');
     expect(teardown).toHaveBeenCalledTimes(1); // rollback, not a limbo 'starting'
     await expect(kernel.documents.open(bytesInput('a'))).rejects.toThrow(/failed kernel/);
     await kernel.destroy(); // destroy from failed is legal and quiet
-    expect(kernel.status()).toBe('destroyed');
+    expect(kernel.getStatus()).toBe('destroyed');
   });
 
   it('start is idempotent: a second call joins the first', async () => {
@@ -518,7 +518,7 @@ describe('kernel status machine', () => {
 
     await Promise.all([kernel.documents.close('a'), kernel.destroy()]);
     expect(close).toHaveBeenCalledTimes(1);
-    expect(kernel.status()).toBe('destroyed');
+    expect(kernel.getStatus()).toBe('destroyed');
   });
 
   it('the StrictMode script: destroyed kernel stays dead; a fresh kernel connects exactly once', async () => {

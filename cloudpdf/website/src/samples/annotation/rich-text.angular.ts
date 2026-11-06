@@ -128,7 +128,7 @@ export class App {
       untracked(() => {
         const richText = this.annotation.list().find((each) => each.nm === 'rich-text');
         if (!richText) return;
-        this.annotation.selection.set([richText.ref]);
+        this.annotation.selection.select([richText.ref]);
         stage.reveal(richText.page, { rect: richText.rect });
       });
     });

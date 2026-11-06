@@ -215,7 +215,7 @@ describe('the property surface while editing', () => {
     });
     // No editor: all the box's text takes the toggle, written as a rich body patch.
     await harness.capability.text.end();
-    harness.capability.selection.set([REF]);
+    harness.capability.selection.select([REF]);
     harness.capability.text.toggleFormat('bold');
     expect(textOf(harness.model().byId[harness.id]!.annotation)!.bold).toBe(true);
     expect(harness.capability.selection.getProperties().values.bold).toBe(true);
@@ -397,7 +397,7 @@ describe('a selected text box', () => {
 
   it('reads all its text: a format is on only when all of it has it', async () => {
     const harness = await loaded(paid());
-    harness.capability.selection.set([REF]);
+    harness.capability.selection.select([REF]);
     const props = harness.capability.selection.getProperties();
     expect(props.values.bold).toBe(false); // the first word's, as a range reads
     expect([...props.mixed].sort()).toEqual(['bold', 'fontColor']);
@@ -411,7 +411,7 @@ describe('a selected text box', () => {
 
   it('styles all its text: a word with its own color follows the box', async () => {
     const harness = await loaded(paid());
-    harness.capability.selection.set([REF]);
+    harness.capability.selection.select([REF]);
     const written = harness.capability.selection.update({ fontColor: '#cc0000' });
     const following = [{ runs: [{ text: 'Paid ' }, { text: 'in full', style: { weight: 700 } }] }];
     expect(harness.data().richText.paragraphs).toEqual(following);

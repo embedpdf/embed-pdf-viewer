@@ -62,7 +62,7 @@ function recordingPrinter(log: string[] = []) {
       const index = staged.push({ sheets, name: options.name }) - 1;
       return {
         print: async () => void log.push(`dialog ${index}`),
-        dispose: () => void disposed.push(index),
+        destroy: () => void disposed.push(index),
       };
     },
   };
@@ -86,7 +86,7 @@ function pdfPrinter(log: string[] = [], refuse?: 'stage' | 'print') {
           if (refuse === 'print') throw new Error('the PDF viewer is off');
           log.push(`pdf dialog ${index}`);
         },
-        dispose: () => void log.push(`pdf disposed ${index}`),
+        destroy: () => void log.push(`pdf disposed ${index}`),
       };
     },
   };
@@ -268,7 +268,7 @@ describe('printing', () => {
     expect(disposed).toEqual([0]); // the stale pictures are freed
     expect(log).toEqual(['dialog 0', 'dialog 1']);
 
-    prepared.dispose();
+    prepared.destroy();
     expect(disposed).toEqual([0, 1]);
     await expect(prepared.print()).rejects.toMatchObject({ code: 'invalid-input' });
   });

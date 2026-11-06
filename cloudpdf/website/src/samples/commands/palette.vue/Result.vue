@@ -10,7 +10,7 @@ const command = useCommand(() => props.id);
   <li v-if="command">
     <button type="button" class="result" :disabled="!command.enabled" @click="command.run()">
       <span>{{ command.label }}</span>
-      <kbd v-if="command.shortcut" class="shortcut">{{ command.shortcut }}</kbd>
+      <kbd v-if="command.shortcutLabel" class="shortcut">{{ command.shortcutLabel }}</kbd>
     </button>
   </li>
 </template>

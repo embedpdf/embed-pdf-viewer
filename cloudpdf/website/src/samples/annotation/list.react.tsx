@@ -72,7 +72,7 @@ function AnnotationList() {
               className="item"
               onClick={() => {
                 stage.reveal(each.page, { rect: each.rect });
-                annotation.selection.set([each.ref]);
+                annotation.selection.select([each.ref]);
               }}
             >
               <span className="kind">

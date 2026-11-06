@@ -5,7 +5,7 @@
 
   useStampEvent(
     (stamp) => stamp.onLibraryChanged,
-    ({ libraryId, reason }) => (message = `${libraryId}: ${reason}`),
+    ({ libraryId, type }) => (message = `${libraryId}: ${type}`),
   );
 </script>
 

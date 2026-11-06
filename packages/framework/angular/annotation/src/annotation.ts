@@ -87,7 +87,7 @@ export interface EpdfAnnotationTools extends Omit<AnnotationToolsApi, 'onDefault
 /**
  * Annotations: `create()`, `update()`, `delete()` and the rest of the Methods tables, the
  * selecting page's State table as signals (`annotation.selected()`), the parts the capability
- * has (`annotation.selection.set(refs)`, `annotation.tools.updateDefaults(id, changes)`), its
+ * has (`annotation.selection.select(refs)`, `annotation.tools.updateDefaults(id, changes)`), its
  * events as streams (`annotation.created$`), and its settings (`annotation.settings()`,
  * `annotation.updateSettings({ chrome })`). Comments have their own service, `EpdfComments`.
  *
@@ -144,14 +144,14 @@ export class EpdfAnnotation extends pluginService({
     injectDocumentScope(),
   );
 
-  /** The selection: `set(refs)`, `update(changes)`, `delete()`, … and `properties()`. */
+  /** The selection: `select(refs)`, `update(changes)`, `delete()`, … and `properties()`. */
   readonly selection: EpdfAnnotationSelection = {
-    set: this.binding.namespaceMethod('selection', 'set'),
+    select: this.binding.namespaceMethod('selection', 'select'),
     add: this.binding.namespaceMethod('selection', 'add'),
     selectAll: this.binding.namespaceMethod('selection', 'selectAll'),
     selectInRect: this.binding.namespaceMethod('selection', 'selectInRect'),
     clear: this.binding.namespaceMethod('selection', 'clear'),
-    list: this.binding.namespaceMethod('selection', 'list'),
+    getSelected: this.binding.namespaceMethod('selection', 'getSelected'),
     update: this.binding.namespaceMethod('selection', 'update'),
     updateLink: this.binding.namespaceMethod('selection', 'updateLink'),
     getProperties: this.binding.namespaceMethod('selection', 'getProperties'),

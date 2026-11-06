@@ -39,7 +39,7 @@ function Thread({ thread }: { thread: CommentThreadView }) {
 
   function show() {
     stage.reveal(thread.page, { rect: thread.root.rect });
-    annotation.selection.set([thread.root.ref]); // and select it
+    annotation.selection.select([thread.root.ref]); // and select it
   }
 
   return (

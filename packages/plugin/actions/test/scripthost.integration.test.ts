@@ -86,7 +86,7 @@ const hoverContext = {
     annotation: { kind: 'objectNumber' as const, page: toPageRef(3), objectNumber: 5 },
     page: toPageRef(3),
   },
-  event: { scope: 'annotation' as const, name: 'cursorEnter' as const },
+  event: { type: 'annotation' as const, event: 'cursorEnter' as const },
 };
 
 describe('the ScriptHost executor (real VM, real engine world)', () => {

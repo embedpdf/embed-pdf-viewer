@@ -1,6 +1,6 @@
 /**
  * One change, one store update. Both engines publish a change's events in one
- * synchronous burst that shares `origin.tx`. While a burst of several events
+ * synchronous burst that shares `origin.transaction`. While a burst of several events
  * arrives, the store holds its notifications, so readers hear of the whole
  * change once, after its last event, whoever made it.
  */
@@ -8,7 +8,7 @@ import type { DocumentEvent } from '@embedpdf/engine-core/runtime';
 
 import type { Store } from './store';
 
-const txOf = (event: DocumentEvent) => ('origin' in event ? event.origin.tx : undefined);
+const txOf = (event: DocumentEvent) => ('origin' in event ? event.origin.transaction : undefined);
 
 export interface BurstGate {
   /** Run before every other listener: opens at a burst's first event. */

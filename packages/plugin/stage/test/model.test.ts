@@ -15,7 +15,7 @@ describe('stage transitions', () => {
     const state = initialStageModel({});
     expect(setCamera(state, state.camera)).toBe(state);
     expect(setViewport(state, state.viewport)).toBe(state);
-    expect(setCursor(state, state.cursor)).toBe(state);
+    expect(setCursor(state, state.pageIndex)).toBe(state);
     expect(setActiveRules(state, state.activeRules)).toBe(state);
     expect(patchSettings(state, { layout: state.layout, padding: undefined })).toBe(state);
   });

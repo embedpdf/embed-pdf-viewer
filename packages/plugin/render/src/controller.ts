@@ -233,7 +233,7 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
   /** The page a pending copy copies; null for any other page. */
   const copiedFrom = (page: PageRef): PageRef | null => {
     const pending = ctx.document()?.pendingPages.get(page.objectNumber);
-    return pending?.look === 'copy' ? pending.of : null;
+    return pending?.kind === 'copy' ? pending.of : null;
   };
   /** Resolves once the engine has a pending page; rejects `not-found` when it went first. */
   const whenHeld = async (page: PageRef, signal: AbortSignal | undefined): Promise<void> => {
@@ -680,7 +680,7 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
         pages.delete(page.objectNumber);
         tiles.releasePage(viewId, page.objectNumber);
       },
-      dispose: () => {
+      destroy: () => {
         const view = views.get(viewId);
         if (!view || view.refs === 0) return;
         view.refs -= 1;
@@ -770,7 +770,7 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
     createViewDemand,
     reportPicture: pictures.open,
     renderAppearances,
-    keptAppearances: (family, item) => recentAppearances.of(family, annotationKey(item)),
+    getKeptAppearances: (family, item) => recentAppearances.of(family, annotationKey(item)),
     getAppearanceScale: (renderScale) => snapAppearanceScale(renderPolicy(), renderScale),
     onRenderCompleted: renderCompleted.on,
     onRenderFailed: renderFailed.on,

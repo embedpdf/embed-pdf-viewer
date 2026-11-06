@@ -261,7 +261,7 @@ function nodeAssetEngine(engine: Engine): LocalEngine {
                   get(targetRender, renderProperty) {
                     if (renderProperty === 'image') {
                       return async () => ({
-                        contentType: 'image/png',
+                        mimeType: 'image/png',
                         source: { kind: 'bytes', bytes: pngBytes() },
                       });
                     }
@@ -363,7 +363,7 @@ describe('@embedpdf/default-stamps', () => {
       for (const asset of assets) {
         expect(asset.size.width).toBeGreaterThan(0);
         expect(asset.size.height).toBeGreaterThan(0);
-        expect(stamp.readAssetBytes(asset.id)?.length ?? 0).toBeGreaterThan(0);
+        expect(stamp.getAssetBytes(asset.id)?.length ?? 0).toBeGreaterThan(0);
       }
     });
   }

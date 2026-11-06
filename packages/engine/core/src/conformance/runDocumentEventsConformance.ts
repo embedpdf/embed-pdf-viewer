@@ -131,7 +131,7 @@ export function runDocumentEventsConformance(
           expect(typeof event.origin.sessionId).toBe('string');
           expect(event.origin.sessionId.length > 0).toBe(true);
           expect(event.origin.sessionId).toBe(first.origin.sessionId);
-          expect(typeof event.origin.ts).toBe('number');
+          expect(Number.isNaN(Date.parse(event.origin.at))).toBe(false);
         }
       } finally {
         await doc.close();

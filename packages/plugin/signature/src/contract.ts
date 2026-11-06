@@ -66,7 +66,7 @@ export type {
 export type SignatureMode = 'sign' | 'visual' | 'ask';
 
 /** The key that signs: a signer port, or a function that returns one when someone signs. */
-export type SignatureKey = SignerPort | (() => SignerPort | Promise<SignerPort>);
+export type SigningKey = SignerPort | (() => SignerPort | Promise<SignerPort>);
 
 /**
  * The signature plugin's settings. `signaturePlugin(config)` registers them
@@ -76,7 +76,7 @@ export type SignatureKey = SignerPort | (() => SignerPort | Promise<SignerPort>)
  */
 export interface SignatureSettings {
   /** The key: a raw signer (the CMS is built here) or a CMS signer (a service builds it); `null` for none. */
-  readonly key: SignatureKey | null;
+  readonly signingKey: SigningKey | null;
   /** What a mark does in a field; `null` is `'sign'` with a key, else `'visual'`. */
   readonly mode: SignatureMode | null;
   /** The certificates you trust, for checking signatures. Without them a verdict is at best `valid-untrusted`. */
@@ -87,7 +87,7 @@ export interface SignatureSettings {
 
 /** What the signature settings are when the app registers none. */
 export const SIGNATURE_DEFAULTS: SignatureSettings = {
-  key: null,
+  signingKey: null,
   mode: null,
   trust: null,
   allowCertify: false,
@@ -109,7 +109,7 @@ export interface SignFieldInput {
   field: FormFieldRef;
   mark: Mark;
   /** A per-call key; the `key` setting otherwise. */
-  key?: SignatureKey;
+  signingKey?: SigningKey;
   /** What the signature dictionary says about the signer; the name defaults to the certificate's subject. */
   signer?: SignatureSignerInput;
   /** Instead of the mark: a ready one-page appearance PDF the embedder composed itself. */
@@ -192,10 +192,10 @@ export interface SignatureInfo extends SignatureDTO {
 
 /** What `placeMark` did: sealed, drawn, handed to the chrome (mode `ask`), or placed as a stamp. */
 export type PlaceMarkResult =
-  | { kind: 'signed'; field: FormFieldRef; result: SignatureCompleteResult }
-  | { kind: 'filled'; field: FormFieldRef }
-  | { kind: 'requested'; field: FormFieldRef }
-  | { kind: 'placed'; annotation: AnnotationRef };
+  | { status: 'signed'; field: FormFieldRef; result: SignatureCompleteResult }
+  | { status: 'filled'; field: FormFieldRef }
+  | { status: 'requested'; field: FormFieldRef }
+  | { status: 'placed'; annotation: AnnotationRef };
 
 // ── events ──
 /** A signing completed, in this session or another: the confirmed `signatures.completed` fact. */
@@ -240,7 +240,7 @@ export interface SignatureInspectionRequestedEvent {
 /** Options for `validate()` and `validateField()`. */
 export interface SignatureValidateOptions extends OperationOptions {
   /** The moment the certificates are judged at; now by default. */
-  readonly at?: ValidationTime;
+  readonly validationTime?: ValidationTime;
   /** `'persisted'` checks the file as it was opened; `'working-copy'` (the default) counts unsaved changes. */
   readonly until?: 'persisted' | 'working-copy';
 }
@@ -328,8 +328,8 @@ export interface SignatureCapability extends SettingsApi<SignatureSettings> {
   requestInspection(field: FormFieldRef): void;
 
   // ── checking ──
-  /** Read the signatures again; resolves the snapshot. */
-  refresh(options?: OperationOptions): Promise<SignatureSnapshot | null>;
+  /** Read the signatures again. */
+  refresh(options?: OperationOptions): Promise<void>;
   /**
    * Check every signature again and resolve the verdicts. Unsaved changes
    * count, so the verdict is the one the downloaded file will get;

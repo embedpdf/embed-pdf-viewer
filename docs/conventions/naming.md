@@ -121,6 +121,7 @@ HTTP contract.
 
 - **`type`** tags things that happen: messages, events, effects.
 - **`kind`** tags things that are: geometry, refs, borders, drafts.
+- **`status`** tags what a call did: `{ status: 'executed' }`, `{ status: 'refused', reason }`.
 - Tag values use one style per union (kebab-case or camelCase), never both.
 
 ## The HTTP API
@@ -171,10 +172,28 @@ its rules hold in every language:
 | `open` / `close` / `toggle`            | Surfaces, menus, documents.                                                              |
 | `begin*` / `end*`                      | Bracket a gesture or an edit session.                                                    |
 | `register*`                            | Add an extension. Always returns `Unsubscribe`.                                          |
+| `destroy()`                            | End an object's life: free what it holds. Later calls refuse. Never `dispose()`.         |
 | `on*` on a capability                  | An `EventHook`, named `on<Subject?><PastParticiple>`: `onFieldCreated`, `onZoomChanged`. |
-| `on*` on a registration object         | A callback the capability calls, such as `InteractionHandler.onDown`.                    |
+| `on*` on a registration object         | A callback the capability calls, such as `InteractionHandler.onPointerDown`.             |
 
 `i18n.t` is the one single-letter member, following the universal i18n convention.
+
+### Shapes every plugin shares
+
+- A page argument is `PageRef | number` (a ref or a display index); a read returns a `PageRef`.
+- Every engine-backed plugin has `getStatus()`, `ensureLoaded()`, `refresh(): Promise<void>` and
+  `onResynced`. Its confirmed-change events carry `origin: EventOrigin`, and a previous value is
+  `previous<X>`.
+- A create or update resolves a wrapper named after its noun (`{ annotation }`, `{ asset }`); each
+  permission check is a `can<Verb>` twin taking the verb's arguments.
+- `XDraft` is a document object's create input (`AnnotationDraft`, `FormFieldDraft`); `XInput` is
+  any other create verb's.
+- `documentId` is the viewer's open document; `docId` is the stored document.
+- A number that only goes up is a `…Sequence`: `serverSequence`, `pagesSequence`.
+- `src` is the document a viewer element or its config shows, HTML's word (`<img src>`); core and
+  the engine say `source` (`open(source)`).
+- `CommandDef`'s predicates are named after the field they compute (`enabled?(context)` gives
+  `enabled`), an exception to "boolean functions are `is*`/`can*`".
 
 ## Files and folders
 

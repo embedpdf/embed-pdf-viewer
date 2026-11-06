@@ -109,7 +109,7 @@ export function createZoom(
         cancelAnimation();
         const before = buildScene();
         if (!before.itemCount) return;
-        const item = paged() ? before.items[0] : before.items[itemIndexOfPage(state().cursor)];
+        const item = paged() ? before.items[0] : before.items[itemIndexOfPage(state().pageIndex)];
         // The ladder (the platform convention) ascends reading postures, each
         // derived from a zoom intent: see the page (automatic), read the text
         // (fit-width), inspect (2.5× the automatic fit). Stops within 10% of

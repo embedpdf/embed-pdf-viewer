@@ -69,7 +69,7 @@ export class Thread {
   protected show() {
     const { page, root } = this.thread();
     this.stage().reveal(page, { rect: root.rect });
-    this.annotation.selection.set([root.ref]); // and select it
+    this.annotation.selection.select([root.ref]); // and select it
   }
 
   protected reply() {

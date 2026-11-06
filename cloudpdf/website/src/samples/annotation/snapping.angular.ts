@@ -110,7 +110,7 @@ export class App {
       untracked(() => {
         const circle = this.annotation.list().find((each) => each.nm === 'circle');
         if (!circle) return;
-        this.annotation.selection.set([circle.ref]);
+        this.annotation.selection.select([circle.ref]);
         stage.reveal(circle.page, { rect: circle.rect });
       });
     });

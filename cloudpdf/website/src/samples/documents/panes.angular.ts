@@ -74,7 +74,7 @@ const article: OpenInput = { kind: 'grant', grant: 'shr_v09cJHOmj3C8vrfUlZNTDyqX
               type="button"
               class="button"
               [disabled]="views.panes().length < 2"
-              (click)="views.removePane(pane.id)"
+              (click)="views.deletePane(pane.id)"
             >
               Close pane
             </button>

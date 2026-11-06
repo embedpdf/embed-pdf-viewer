@@ -11,7 +11,7 @@ export const ActionsToken = createCapabilityToken<ActionsCapability>('actions', 
   promises: {
     execute: true,
     executeNamed: true,
-    getActionTree: true,
+    readActionTree: true,
     dispatch: true,
     runDocumentVerb: true,
     prepareClose: true,

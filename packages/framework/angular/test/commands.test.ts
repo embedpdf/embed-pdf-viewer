@@ -49,7 +49,7 @@ describe('[epdfCommand]', () => {
         features: [withCommands({ commands: [command] })],
         template: `
           <button [epdfCommand]="'review:approve'" #approve="epdfCommand">
-            {{ approve.label() }}|{{ approve.icon() }}|{{ approve.shortcut() }}
+            {{ approve.label() }}|{{ approve.icon() }}|{{ approve.shortcutLabel() }}
           </button>
         `,
       }),

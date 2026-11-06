@@ -1,7 +1,7 @@
 /**
  * The pages' viewports: a page mirror re-read whenever a confirmed
  * `pages.scaleSet` names a loaded page, from this session or another
- * (stream gaps and version moves re-read every loaded page). Its `changed`
+ * (stream gaps and version moves re-read every loaded page). Its `onChanged`
  * callback tells the annotation plugin a page's viewports, and a new
  * `defaultScale` setting tells it again. `connect` loads every page in the
  * registry, including pages inserted later.
@@ -57,7 +57,7 @@ export function createViewportSync(
       }
     },
     affected: (event) => (event.type === 'pages.scaleSet' ? [event.page] : null),
-    changed: ({ page, cause, next }) => {
+    onChanged: ({ page, cause, next }) => {
       if (cause === 'drop' || next === undefined) return;
       ctx.state.update(clearLoadError, page.objectNumber);
       const layout = ctx.getPage(page);
@@ -120,8 +120,8 @@ export function createViewportSync(
     ctx.watch(() => ctx.document()?.pages, hydrate);
     // A new default scale reaches the pages without one: the annotation
     // plugin measures new drawings on them with it.
-    ctx.listen(settings.api.onSettingsChanged, ({ changed }) => {
-      if (!changed.includes('defaultScale')) return;
+    ctx.listen(settings.api.onSettingsChanged, ({ changedKeys }) => {
+      if (!changedKeys.includes('defaultScale')) return;
       for (const layout of ctx.document()?.pages ?? []) {
         const known = viewports.get(layout.ref);
         if (known) annotation.setPageViewports(layout.ref, [...known], fallbackOf(layout));

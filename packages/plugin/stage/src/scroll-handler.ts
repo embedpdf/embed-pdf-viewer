@@ -40,7 +40,7 @@ export function createScrollHandler(
     priority: 10, // below page-aware handlers (selection, annotation), which claim first
     enabledFor: (tool) =>
       tool.enables.has('scroll') || (panFallback && tool.gapCursor === undefined),
-    onDown: (sample) => {
+    onPointerDown: (sample) => {
       // Fallback: a non-pan tool pans only over a gap. On a page, decline so the
       // tool's own (higher-priority) handler keeps the down it already captured.
       if (!isPanTool() && sample.page) return false;
@@ -48,11 +48,11 @@ export function createScrollHandler(
       interaction.claimCursor('stage-grab', 'grabbing', 40); // closed hand while panning
       return true; // capture the drag
     },
-    onMove: (sample) => {
+    onPointerMove: (sample) => {
       stage.panBy(sample.viewport.x - last.x, sample.viewport.y - last.y);
       last = sample.viewport;
     },
-    onUp: () => interaction.claimCursor('stage-grab', null),
+    onPointerUp: () => interaction.claimCursor('stage-grab', null),
     onHover: (sample) => {
       // An open hand over a gap when a non-pan tool would fall back to pan
       // there; cleared over a page (the tool's cursor shows). The pan tool

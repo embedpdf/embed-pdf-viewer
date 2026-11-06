@@ -55,9 +55,9 @@ export function createHoverPump(
     if (from && from.events?.exit !== false) {
       submissions.push(
         dispatch({
-          scope: 'annotation',
+          type: 'annotation',
           event: 'cursorExit',
-          ref: from.ref,
+          annotation: from.ref,
           page: from.page,
           ...(from.source ? { source: from.source } : {}),
         }),
@@ -66,9 +66,9 @@ export function createHoverPump(
     if (to && to.events?.enter !== false) {
       submissions.push(
         dispatch({
-          scope: 'annotation',
+          type: 'annotation',
           event: 'cursorEnter',
-          ref: to.ref,
+          annotation: to.ref,
           page: to.page,
           ...(to.source ? { source: to.source } : {}),
         }),

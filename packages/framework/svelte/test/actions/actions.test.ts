@@ -86,7 +86,7 @@ describe('useActionsUiAdapter', () => {
   const click: ActionContext = {
     origin: 'user',
     source: { kind: 'api' },
-    event: { scope: 'activate' },
+    event: { type: 'activate' },
   };
 
   it('installs the adapter for the document, reads the handlers late, and removes it with the component', async () => {

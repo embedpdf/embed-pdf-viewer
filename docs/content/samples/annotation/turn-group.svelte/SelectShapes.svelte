@@ -17,7 +17,7 @@
         .list()
         .filter((each) => each.nm === 'square' || each.nm === 'circle');
       if (found.length === 0) return;
-      annotation.selection.set(found.map((each) => each.ref));
+      annotation.selection.select(found.map((each) => each.ref));
       stage.reveal(found[0].page, { rect: found[0].rect });
     });
   });

@@ -97,7 +97,7 @@
       );
       return () => {
         alive = false;
-        binding.dispose();
+        binding.destroy();
         // The kernel first (it closes every document handle), then the engine we own.
         void kernel.destroy().then(() => {
           if (ownsEngine) void created.destroy();

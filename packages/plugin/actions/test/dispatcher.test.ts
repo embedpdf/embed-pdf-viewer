@@ -14,12 +14,12 @@ import { createActionsTestContext } from './helpers/context';
 const USER: ActionContext = {
   origin: 'user',
   source: { kind: 'api' },
-  event: { scope: 'activate' },
+  event: { type: 'activate' },
 };
 const LIFECYCLE: ActionContext = {
   origin: 'lifecycle',
   source: { kind: 'api' },
-  event: { scope: 'document', name: 'open' },
+  event: { type: 'document', event: 'open' },
 };
 
 const tree = (root: PdfActionNode | null, incomplete = false): PdfActionTree => ({
@@ -201,7 +201,7 @@ describe('actions dispatcher', () => {
     const hover = await capability.execute(payloaded, {
       origin: 'hover',
       source: { kind: 'api' },
-      event: { scope: 'annotation', name: 'cursorEnter' },
+      event: { type: 'annotation', event: 'cursorEnter' },
     });
     expect(hover.nodes[0].status).toBe('blocked');
 

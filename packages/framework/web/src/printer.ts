@@ -23,7 +23,7 @@ export interface WebPrintSheet {
 /** Structural twin of `StagedPrint` (`@embedpdf/core`). */
 export interface WebStagedPrint {
   print(): Promise<void>;
-  dispose(): void;
+  destroy(): void;
 }
 
 /** Structural twin of `HostPrinter` (`@embedpdf/core`). */
@@ -63,7 +63,7 @@ export function browserPrinter(): WebPrinter {
           frame.view.print();
           printed = true;
         },
-        dispose() {
+        destroy() {
           if (printed) removePrinted = frame.remove;
           else frame.remove();
         },
@@ -214,7 +214,7 @@ async function stageInFrame(
     await decodeAll(Array.from(frameDocument.querySelectorAll('img')), signal);
     return {
       print: () => printFrom(view),
-      dispose: () => {
+      destroy: () => {
         frame.remove();
         revoke();
       },
@@ -272,7 +272,7 @@ async function stageInPage(
         document.title = title;
       }
     },
-    dispose: () => {
+    destroy: () => {
       remove();
       revoke();
     },

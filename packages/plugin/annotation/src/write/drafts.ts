@@ -84,7 +84,7 @@ export function createDrafts(
     cancel: () => {
       store.commit({ type: 'cancel' });
     },
-    distanceCreationPage: () => {
+    getDistanceCreationPage: () => {
       const draft = store.model().draft;
       return draft?.kind === 'create-distance' && draft.step === 'offset' ? draft.page : null;
     },

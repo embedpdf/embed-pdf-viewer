@@ -140,7 +140,7 @@ export function useSelectionEvent<T>(
  */
 export const useSelectionState = stateHook(selectionState);
 
-/** The selection settings (`dragThreshold`, `color`, `handles`), with or without a document. Takes a selector. */
+/** The selection settings (`dragThresholdPx`, `color`, `handles`), with or without a document. Takes a selector. */
 export const useSelectionSettings = settingsHook(SelectionToken);
 
 export interface SelectionMenuProps {
@@ -361,8 +361,10 @@ export function SelectionHandles({ token: explicitToken }: SelectionHandlesProps
   );
 }
 
-export interface SelectionClipboardProps
-  extends Pick<SelectionClipboardOptions, 'prefetch' | 'onRefused'> {
+export interface SelectionClipboardProps extends Pick<
+  SelectionClipboardOptions,
+  'prefetch' | 'onRefused'
+> {
   /**
    * Copy only while focus is inside this element, for a page with more than one viewer.
    * Default: anywhere on the page.

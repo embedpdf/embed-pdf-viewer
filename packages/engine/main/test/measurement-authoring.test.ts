@@ -25,7 +25,7 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
       const page = pages[0];
       const pageObjectNumber = page.ref.objectNumber;
       const { ctx, annotation } = await annotationShell(doc, pages);
-      cleanups.push(() => ctx.dispose());
+      cleanups.push(() => ctx.destroy());
       const scale = measureFromKnownLength(100, { value: 5, unit: 'm' });
       await doc.page(toPageRef(pageObjectNumber)).measure!.setScale(scale);
       annotation.setPageViewports(
@@ -41,12 +41,14 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
       annotation.createPointer('distance', 'down', page.ref, { x: 50, y: 100 });
       annotation.createPointer('distance', 'move', page.ref, { x: 250, y: 100 });
       annotation.createPointer('distance', 'up', page.ref, { x: 250, y: 100 });
-      expect(annotation.selection.list()).toHaveLength(0);
+      expect(annotation.selection.getSelected()).toHaveLength(0);
       annotation.createPointer('distance', 'move', page.ref, { x: 250, y: 88 });
       annotation.createPointer('distance', 'down', page.ref, { x: 250, y: 88 });
       // Written and confirmed: its ref is the engine's.
-      await vi.waitFor(() => expect(annotation.selection.list()[0]?.ref.kind).toBe('objectNumber'));
-      const created = annotation.selection.list()[0]!;
+      await vi.waitFor(() =>
+        expect(annotation.selection.getSelected()[0]?.ref.kind).toBe('objectNumber'),
+      );
+      const created = annotation.selection.getSelected()[0]!;
       const createdId = annotationKey(created.ref);
       const expectVector = () => {
         expect(

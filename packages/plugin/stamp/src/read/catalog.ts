@@ -89,7 +89,7 @@ export function createCatalog(
             : null;
         },
       ),
-      readAssetBytes: (assetId) => {
+      getAssetBytes: (assetId) => {
         const bytes = assetBinaries.get(assetId)?.bytes;
         return bytes ? new Uint8Array(bytes) : null;
       },

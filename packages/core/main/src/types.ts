@@ -111,8 +111,8 @@ export type {
   /**
    * Where a confirmed document change came from, on every fact event a plugin
    * emits: `kind` (`'local'` for this engine instance, `'remote'` for another
-   * session), `sessionId`, `sub` (the signed-in user on the cloud, null
-   * locally), `ts`, `serverId` and `tx`. Always the engine event's own
+   * session), `sessionId`, `subject` (the signed-in user on the cloud, null
+   * locally), `at`, `serverSequence` and `transaction`. Always the engine event's own
    * `origin`, passed on as it is, never built by hand.
    */
   EventOrigin,
@@ -221,9 +221,9 @@ export type PromiseMembers<Capability> = { readonly [Path in PromiseMemberOf<Cap
  * it copies (`copy`).
  */
 export type PendingPage =
-  | { readonly look: 'blank' }
-  | { readonly look: 'own' }
-  | { readonly look: 'copy'; readonly of: PageRef };
+  | { readonly kind: 'blank' }
+  | { readonly kind: 'own' }
+  | { readonly kind: 'copy'; readonly of: PageRef };
 
 /**
  * What the kernel knows about an open document: its pages as the user sees
@@ -266,7 +266,7 @@ export interface DocumentMeta {
    * Stage's laid-out scene) keys on it, so a change that keeps the page count
    * (a rotation) still invalidates.
    */
-  readonly revision: number;
+  readonly pagesSequence: number;
   /**
    * The deployment render policy the document's engine advertises — a
    * document fact like `pages`, materialized by the kernel at open (before
@@ -293,7 +293,7 @@ export interface DocumentMeta {
    * The grant asks before the document goes on (a passphrase, or questions on open, it got
    * after the document opened): give it with `documents.retry()`.
    */
-  readonly grantRequest?: GrantOpenRequest;
+  readonly openRequest?: GrantOpenRequest;
 }
 
 /**
@@ -313,7 +313,7 @@ export interface PendingMeta {
   /** `error` only: what the open rejected with. Never carries a password. */
   readonly error?: unknown;
   /** `error` only: the grant's passphrase or questions the open waits for. */
-  readonly grantRequest?: GrantOpenRequest;
+  readonly openRequest?: GrantOpenRequest;
 }
 
 /** The document registry — what document scope is built on. */
@@ -472,7 +472,7 @@ export interface PluginContext<S = unknown, T extends object = NoSettings> {
   // ── events ──
   /** Mint a capability event; disposed with the instance. Expose only `.on`. */
   readonly events: {
-    source<T>(): { readonly on: EventHook<T>; emit(event: T): void; dispose(): void };
+    source<T>(): { readonly on: EventHook<T>; emit(event: T): void; destroy(): void };
   };
   /** Subscribe for the instance lifetime; the unsubscribe is owned by the kernel. */
   listen<T>(source: Subscribable<T>, listener: (event: T) => void): void;
@@ -526,7 +526,7 @@ export interface PluginContext<S = unknown, T extends object = NoSettings> {
   /** Acquire a resource whose disposal the instance owns; a late arrival after close is disposed, not returned. */
   acquire<R>(
     get: (lifetime: AbortSignal) => Promise<R>,
-    dispose: (resource: R) => void | Promise<void>,
+    release: (resource: R) => void | Promise<void>,
   ): Promise<R>;
   /**
    * Run an engine call the caller can cancel: when `signal` fires, the call is
@@ -643,7 +643,7 @@ export interface DocumentInfo {
    * The grant's passphrase or questions the document waits for (`retry` with them): `error`,
    * before it opens; `ready`, when the grant got them after it opened.
    */
-  readonly grantRequest?: GrantOpenRequest;
+  readonly openRequest?: GrantOpenRequest;
   /**
    * `ready` only: a change waits for the visitor's answers to what the grant asks before
    * the first change. Show the questions, then `identify()` or `declineIdentity()`.
@@ -719,7 +719,7 @@ export interface UnlockOptions extends OperationOptions {
   readonly password: string;
 }
 
-/** Options for `retry()`: what a document from a grant waited for (`grantRequest`). */
+/** Options for `retry()`: what a document from a grant waited for (`openRequest`). */
 export interface RetryOptions extends OperationOptions {
   /** The grant's passphrase. */
   readonly passphrase?: string;
@@ -727,7 +727,7 @@ export interface RetryOptions extends OperationOptions {
    * The visitor's answers to what the grant asks, added to who the page said the user is
    * (`identity`); ones given before stay.
    */
-  readonly identity?: VisitorAnswers;
+  readonly visitorIdentity?: VisitorAnswers;
 }
 
 /** Options for `download()`. */
@@ -797,7 +797,7 @@ export interface PreparedPrint {
    */
   print(options?: OperationOptions): Promise<void>;
   /** Free what preparing took. Closing the document does too. */
-  dispose(): void;
+  destroy(): void;
 }
 
 /** One printed sheet: a picture of a page, and the page's size on paper. */
@@ -815,7 +815,7 @@ export interface StagedPrint {
   /** Open the print dialog. Resolves once the printer has the job. */
   print(): Promise<void>;
   /** Free what staging took. */
-  dispose(): void;
+  destroy(): void;
 }
 
 /**
@@ -882,7 +882,7 @@ export interface DocumentActiveChangedEvent {
 }
 export interface DocumentPagesChangedEvent {
   readonly documentId: string;
-  readonly revision: number;
+  readonly pagesSequence: number;
   readonly pages: readonly PageInfo[];
 }
 export interface DocumentUnsavedChangesChangedEvent {
@@ -914,10 +914,10 @@ export interface DocumentsCapability {
    * Open a failed document (`status: 'error'`) again, with the same source and options, in its
    * own tab: it keeps its id and its place, and the active document stays the active one. A
    * document from a grant that waited for its passphrase or the visitor's answers
-   * (`grantRequest`) opens with `passphrase` or `identity`; a ready one the grant asks again
-   * (`grantRequest`) goes on with them, as the same visitor. Resolves like `open()`. Rejects
+   * (`openRequest`) opens with `passphrase` or `identity`; a ready one the grant asks again
+   * (`openRequest`) goes on with them, as the same visitor. Resolves like `open()`. Rejects
    * `invalid-input` for a document that didn't fail and isn't asked, or answers for one not from
-   * a grant; `permission-denied` while the grant still asks, and `grantRequest` says what.
+   * a grant; `permission-denied` while the grant still asks, and `openRequest` says what.
    */
   retry(id: string, options?: RetryOptions): Promise<OpenDocumentResult>;
   /**

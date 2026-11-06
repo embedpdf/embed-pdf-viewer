@@ -66,9 +66,9 @@ import type { AttachmentRef } from '../dto/Attachment';
  * "this user". Every open is its own session: the same user in two tabs, or
  * an app that opens one cloud document twice, is two sessions, and a
  * mutation made through one arrives in the other as `'remote'` (with the
- * same `sub`). Rule of thumb for consumers: "is this my action" → check
+ * same `subject`). Rule of thumb for consumers: "is this my action" → check
  * `kind` / `sessionId` (undo stacks, optimism reconciliation); "is this my
- * user" → check `sub` (attribution).
+ * user" → check `subject` (attribution).
  */
 export interface EventOrigin {
   /** 'local' = made through this handle; 'remote' = another session. */
@@ -76,19 +76,19 @@ export interface EventOrigin {
   /** Identifies the session (the open document handle) that made the mutation. */
   sessionId: string;
   /** Authenticated subject of the originator (cloud); `null` locally. */
-  sub: string | null;
-  /** Mutation timestamp (server ts for remote, client ts for local). */
-  ts: number;
+  subject: string | null;
+  /** When the mutation was made, as an ISO 8601 string: the server's time for remote, the client's for local. */
+  at: string;
   /** Server audit-log row id — monotonic per document, the resume cursor.
    *  `null` until the mutation has a server identity (local engines; cloud
    *  own-mutation events before the server echoes the id). */
-  serverId: number | null;
+  serverSequence: number | null;
   /**
    * Set when this fact is one of several committed together, such as the
    * annotations of one import: they share `id`, and `index` counts from 0 to
    * `count - 1` in the order they were emitted.
    */
-  tx?: { id: string; index: number; count: number };
+  transaction?: { id: string; index: number; count: number };
   /** Set on the events of an undo: the `opId` of the change it undid. */
   undoOf?: string;
 }
@@ -105,7 +105,7 @@ export interface EventOrigin {
  *     the event itself at confirmation time; the remote channel exists to
  *     tell everyone else (own echoes are dropped by `sessionId`). A change
  *     that commits several facts at once, such as an import, emits one
- *     event per fact, back to back, sharing `origin.tx`.
+ *     event per fact, back to back, sharing `origin.transaction`.
  *   - ground truth only: events fire after the mutation is confirmed —
  *     never optimistically. Optimism is a plugin concern.
  *   - results ride verbatim: each event embeds the mutation result the
@@ -320,7 +320,8 @@ export type DocumentEvent =
        */
       type: 'stream.desynced';
       reason: 'backlog-overflow';
-      ts: number;
+      /** When the stream fell behind, as an ISO 8601 string. */
+      at: string;
     };
 
 export type DocumentEventType = DocumentEvent['type'];

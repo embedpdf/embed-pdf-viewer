@@ -136,7 +136,7 @@ box that checks together with the others.
 
 ```ts
 const { widget } = await form.addWidget(plan.ref);
-annotation.selection.set([widget.ref]); // in design mode, so it can be dragged
+annotation.selection.select([widget.ref]); // in design mode, so it can be dragged
 ```
 
 Without a place, it goes next in line: below the last button if they stand in a column, beside it

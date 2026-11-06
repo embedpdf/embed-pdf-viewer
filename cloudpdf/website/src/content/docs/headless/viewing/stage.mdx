@@ -333,7 +333,7 @@ Give `reveal()` a rectangle and it becomes your "go to this search result" call:
 stage.reveal(hit.page, {
   rect: hit.bounds, // a box in page coordinates
   zoom: 'fit-width', // zoom so the box spans the view, or 'keep'
-  anchor: { y: 0.35 }, // about a third from the top, like a browser's find bar
+  align: { y: 0.35 }, // about a third from the top, like a browser's find bar
 });
 ```
 
@@ -512,7 +512,7 @@ from around it, or through `inject(EpdfStageRef)` from inside it.
 | `nextPage(options?)`, `previousPage(options?)`           | Goes past the pages you're on, to the next or previous page, or a whole spread while a spread fits across the view                                                |
 | `goToFirstPage(options?)`, `goToLastPage(options?)`      | Goes to the first or the last page                                                                                                                                |
 | `canGoNext()`, `canGoPrevious()`                         | Whether there's a page after or before the pages you're on, to disable your buttons                                                                               |
-| `reveal(page, options?)`                                 | Brings a page into view, scrolling only as far as needed. With `rect`, `zoom` or `anchor`, it lands on that spot. [Jump to an exact spot](#jump-to-an-exact-spot) |
+| `reveal(page, options?)`                                 | Brings a page into view, scrolling only as far as needed. With `rect`, `zoom` or `align`, it lands on that spot. [Jump to an exact spot](#jump-to-an-exact-spot) |
 | `goToDestination(destination)`                           | Goes where a link, a bookmark or the document's opening view points. [Follow a destination](#follow-a-destination)                                                |
 | `getCurrentDestination()`                                | Where the view is now, as a destination that keeps the zoom; `null` before a page shows. [Follow a destination](#follow-a-destination)                          |
 | `scrollTo({ left, top })`, `scrollBy({ left, top })`     | Scrolls like a scrolling element does, in screen pixels. It jumps unless you pass `behavior: 'smooth'`. [Scrollbars](#scrollbars)                                  |
@@ -531,7 +531,7 @@ from around it, or through `inject(EpdfStageRef)` from inside it.
 | `listCurrentPages()`                                     | The pages you're on: the current spread while it fits across the view, else the current page. What a page number names, and what `nextPage()` and `previousPage()` step past |
 | `getPageAt(point)`                                       | The page under a point in the Stage and the point on that page, or `null` over the space between pages                                                            |
 | `viewportToPage(page, point)`, `pageToViewport(page, point)`, `pageRectToViewport(page, rect)` | Converts a point between the Stage and a page, and a box on a page to the Stage. `null` when the page isn't laid out. [Page coordinates](#page-coordinates) |
-| `getPageFrame(page)`                                     | Where a page is laid out in the Stage, on screen or not, or `null` before it's placed                                                                            |
+| `getPageBox(page)`                                     | Where a page is laid out in the Stage, on screen or not, or `null` before it's placed                                                                            |
 | `getViewportSize()`                                      | The Stage's size in screen pixels, as last measured                                                                                                               |
 
 The page moves (`goToPage()`, `nextPage()`, `previousPage()`, `goToFirstPage()`, `goToLastPage()`)
@@ -630,7 +630,7 @@ on the Stage, such as `stage.pageChanged$`, for code that holds it through `view
 | `onCameraChanged`   | The view moved, on every frame of a scroll or zoom   | `camera`                                  |
 | `onMotionEnded`     | Scrolling, a fling or an animated move came to rest  | `camera`                                  |
 | `onViewportChanged` | The Stage itself changed size                        | `size`                                    |
-| `onSettingsChanged` | A setting changed, by you or by a responsive rule    | `settings`, `changed`                     |
+| `onSettingsChanged` | A setting changed, by you or by a responsive rule    | `settings`, `changedKeys`                 |
 
 ## Good to know
 

@@ -42,7 +42,7 @@ const engine = {
   open: () =>
     Promise.resolve({
       id: 'doc',
-      events: { subscribe: () => () => {}, lastServerId: () => null },
+      events: { subscribe: () => () => {}, lastServerSequence: () => null },
       pages: { list: () => Promise.resolve({ pageCount: 1, labels: [], pages: [page] }) },
       security: { allows: () => true },
       page: () => ({
@@ -113,8 +113,8 @@ describe('LinkLayer', () => {
   it('follows a click through the plugin, which opens an allowed website and reports the rest', async () => {
     const open = vi.spyOn(window, 'open').mockReturnValue(null);
     const { kernel } = await mountPage(() => h(LinkLayer));
-    const outcomes: LinkActivation['outcome'][] = [];
-    kernel.capability(LinkToken).onActivated((event) => outcomes.push(event.activation.outcome));
+    const outcomes: LinkActivation['status'][] = [];
+    kernel.capability(LinkToken).onActivated((event) => outcomes.push(event.activation.status));
     await until(() => document.querySelectorAll('a').length === 2);
     const [website, script] = Array.from(document.querySelectorAll('a'));
 
@@ -154,7 +154,7 @@ describe('LinkLayer', () => {
     );
     await kernel.documents.open(bytesInput('doc'));
     await settle();
-    expect(link!.activate({ kind: 'uri', uri: 'https://example.com/a' }).outcome).toBe('uri');
+    expect(link!.activate({ kind: 'uri', uri: 'https://example.com/a' }).status).toBe('uri');
     expect(open).toHaveBeenCalledWith('https://example.com/a', '_blank', 'noopener,noreferrer');
   });
 });

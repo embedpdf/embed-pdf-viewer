@@ -199,7 +199,7 @@ export function runPageRenderConformance(
         viewport: { kind: 'scale', scale: 0.25 },
       });
       const blob = await image.blob();
-      expect(blob.type).toBe(image.contentType);
+      expect(blob.type).toBe(image.mimeType);
       const bytes = new Uint8Array(await blob.arrayBuffer());
       const decoded = await decodePng(bytes);
       expect([decoded.width, decoded.height]).toEqual([image.width, image.height]);

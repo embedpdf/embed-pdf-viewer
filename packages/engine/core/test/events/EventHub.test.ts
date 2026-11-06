@@ -4,7 +4,7 @@ import type { DocumentEvent } from '../../src/events/DocumentEvent';
 import { EventHub, SessionEventPublisher } from '../../src/events/EventHub';
 
 function metadataEvent(
-  serverId: number | null = null,
+  serverSequence: number | null = null,
 ): Extract<DocumentEvent, { type: 'metadata.updated' }> {
   return {
     type: 'metadata.updated',
@@ -20,7 +20,13 @@ function metadataEvent(
       trapped: 'unknown',
     },
     meta: { affectedPages: [], cacheDelta: null, opId: 'op-0', undoable: true },
-    origin: { kind: 'local', sessionId: 's', sub: null, ts: 1, serverId },
+    origin: {
+      kind: 'local',
+      sessionId: 's',
+      subject: null,
+      at: new Date(1).toISOString(),
+      serverSequence,
+    },
   };
 }
 
@@ -41,14 +47,14 @@ describe('EventHub: delivery contract', () => {
     expect((errors[0] as Error).message).toBe('listener one is broken');
   });
 
-  test('lastServerId tracks the highest remote cursor seen', () => {
+  test('lastServerSequence tracks the highest remote cursor seen', () => {
     const hub = new EventHub(() => {});
-    expect(hub.lastServerId()).toBeNull();
+    expect(hub.lastServerSequence()).toBeNull();
     hub.publish(metadataEvent(7));
     hub.publish(metadataEvent(3)); // out-of-order delivery never regresses it
-    expect(hub.lastServerId()).toBe(7);
+    expect(hub.lastServerSequence()).toBe(7);
     hub.publish(metadataEvent(null)); // local events don't move it
-    expect(hub.lastServerId()).toBe(7);
+    expect(hub.lastServerSequence()).toBe(7);
   });
 
   test('publisher stamps a local origin with the session identity and the write', () => {
@@ -66,11 +72,11 @@ describe('EventHub: delivery contract', () => {
       {
         kind: 'local',
         sessionId: 'session-x',
-        sub: 'alice',
-        serverId: null,
-        tx: { id: 'op-1', index: 0, count: 2 },
+        subject: 'alice',
+        serverSequence: null,
+        transaction: { id: 'op-1', index: 0, count: 2 },
       },
-      { tx: { id: 'op-1', index: 1, count: 2 } },
+      { transaction: { id: 'op-1', index: 1, count: 2 } },
     ]);
   });
 });

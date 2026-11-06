@@ -70,7 +70,13 @@ const snapshot = (fields: FormFieldDTO[]): FormSnapshot =>
     calculationOrder: [],
   }) as FormSnapshot;
 
-const origin = { kind: 'remote', sessionId: 'them', sub: null, ts: 0, serverId: null };
+const origin = {
+  kind: 'remote',
+  sessionId: 'them',
+  subject: null,
+  at: new Date(0).toISOString(),
+  serverSequence: null,
+};
 const event = (value: object) => ({ origin, widgets: [], ...value }) as unknown as DocumentEvent;
 /** A user who may fill in every field. */
 const ALWAYS = () => true;

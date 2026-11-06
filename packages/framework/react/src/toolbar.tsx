@@ -441,7 +441,7 @@ function DefaultOverflowMenu({
           {section.rows.map((row) => {
             const cmd = view.resolve(row.command);
             if (!cmd) return null;
-            const isSubmenu = row.type === 'submenu';
+            const isSubmenu = row.kind === 'submenu';
             return (
               <button
                 key={row.command}

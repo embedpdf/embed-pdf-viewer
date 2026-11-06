@@ -48,7 +48,7 @@ describe('useCommand', () => {
 
     const command = latest(renders);
     expect(command).toMatchObject({ label: 'Approve', enabled: true });
-    expect(command.shortcut).toBe(formatShortcut('Mod+Enter'));
+    expect(command.shortcutLabel).toBe(formatShortcut('Mod+Enter'));
     await act(() => command.run());
     expect(run).toHaveBeenCalledWith(expect.objectContaining({ documentId: 'a' }));
   });

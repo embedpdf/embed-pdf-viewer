@@ -222,7 +222,7 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('designing a form', () =
             { page: page.ref, rect, ...(kind === 'radio' ? { exportValue: 'Choice1' } : {}) },
           ],
         });
-        viewer.get('annotation').selection.set([field.widgets[0].ref]);
+        viewer.get('annotation').selection.select([field.widgets[0].ref]);
       },
       { family, name },
     );
@@ -260,7 +260,7 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('designing a form', () =
         boxes: form.getWidgets(ref).map((row: any) => row.box),
         selected: window.element.viewer
           .get('annotation')
-          .selection.list()
+          .selection.getSelected()
           .map((record: any) => record.ref.objectNumber),
         last: field.widgets[1].objectNumber,
       };

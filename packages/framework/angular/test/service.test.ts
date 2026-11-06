@@ -136,7 +136,9 @@ describe('a service’s settings', () => {
     const fixture = await mount(viewerHost({ template: '' }));
     const counter = fixture.debugElement.injector.get(EpdfCounter);
     const changes: unknown[] = [];
-    const subscription = counter.settingsChanged$.subscribe(({ changed }) => changes.push(changed));
+    const subscription = counter.settingsChanged$.subscribe(({ changedKeys }) =>
+      changes.push(changedKeys),
+    );
     counter.updateSettings({ step: 4 });
     counter.updateSettings({ step: 4 });
     expect(changes).toEqual([['step']]);

@@ -61,9 +61,9 @@ describe('text-select handler — haptic trigger', () => {
     const { selection } = makeSelection(true);
     const feedback = makeFeedback();
     const handler = createTextSelectHandler(selection, interaction, feedback);
-    expect(handler.onDown(down({ clickCount: 2, pointerType: 'touch', gesture: 'long-press' }))).toBe(
-      true,
-    );
+    expect(
+      handler.onPointerDown(down({ clickCount: 2, pointerType: 'touch', gesture: 'long-press' })),
+    ).toBe(true);
     expect(feedback.selection).toHaveBeenCalledTimes(1);
     expect(feedback.impact).not.toHaveBeenCalled();
   });
@@ -72,7 +72,7 @@ describe('text-select handler — haptic trigger', () => {
     const { selection } = makeSelection(true);
     const feedback = makeFeedback();
     const handler = createTextSelectHandler(selection, interaction, feedback);
-    handler.onDown(down({ clickCount: 2, pointerType: 'mouse' }));
+    handler.onPointerDown(down({ clickCount: 2, pointerType: 'mouse' }));
     expect(feedback.selection).not.toHaveBeenCalled();
   });
 
@@ -82,7 +82,7 @@ describe('text-select handler — haptic trigger', () => {
     const { selection } = makeSelection(true);
     const feedback = makeFeedback();
     const handler = createTextSelectHandler(selection, interaction, feedback);
-    handler.onDown(down({ clickCount: 2, pointerType: 'touch' }));
+    handler.onPointerDown(down({ clickCount: 2, pointerType: 'touch' }));
     expect(feedback.selection).not.toHaveBeenCalled();
   });
 
@@ -90,14 +90,14 @@ describe('text-select handler — haptic trigger', () => {
     const { selection } = makeSelection(false); // no text under the point
     const feedback = makeFeedback();
     const handler = createTextSelectHandler(selection, interaction, feedback);
-    handler.onDown(down({ clickCount: 2, pointerType: 'touch', gesture: 'long-press' }));
+    handler.onPointerDown(down({ clickCount: 2, pointerType: 'touch', gesture: 'long-press' }));
     expect(feedback.selection).not.toHaveBeenCalled();
   });
 
   it('no feedback capability registered → everything still routes', () => {
     const { selection, calls } = makeSelection(true);
     const handler = createTextSelectHandler(selection, interaction);
-    expect(handler.onDown(down({ clickCount: 2, gesture: 'long-press' }))).toBe(true);
+    expect(handler.onPointerDown(down({ clickCount: 2, gesture: 'long-press' }))).toBe(true);
     expect(calls).toContain('word');
   });
 });
