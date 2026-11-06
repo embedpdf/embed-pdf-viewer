@@ -82,7 +82,9 @@ function Controls() {
     if (search.canSearch()) void search.search({ text });
   }, [search, text]);
   useEffect(() => {
-    if (cover) selection.select({ page: cover, start: 28, count: 30 });
+    // [!doc-range welcome firstWord]
+    if (cover) selection.select({ page: cover, start: 28, count: 9 });
+    // [!/doc-range]
   }, [selection, cover]);
 
   const copy = async () => {

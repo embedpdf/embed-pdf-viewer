@@ -93,10 +93,10 @@ export class App {
   private readonly document = inject(EpdfDocument);
 
   constructor() {
-    // Something selected on load: the title on the cover.
+    // Something selected on load: "Documents", the first word on the cover.
     effect(() => {
       const cover = this.document.pages()[0]?.ref;
-      if (cover) this.selection.select({ page: cover, start: 28, count: 30 });
+      if (cover) this.selection.select({ page: cover, start: 36, count: 9 });
     });
   }
 }

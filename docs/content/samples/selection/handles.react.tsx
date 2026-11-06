@@ -41,13 +41,15 @@ function CopyButton() {
   );
 }
 
-// A word selected on load, as a long-press selects one: "Viewers", on the cover.
+// A word selected on load, as a long-press selects one: "Documents", on the cover.
 function SelectWord() {
   const selection = useSelection();
   const cover = usePageList()[0]?.ref;
 
   useEffect(() => {
-    if (cover) selection.select({ page: cover, start: 14, count: 7 });
+    // [!doc-range welcome firstWord]
+    if (cover) selection.select({ page: cover, start: 28, count: 9 });
+    // [!/doc-range]
   }, [selection, cover]);
 
   return null;

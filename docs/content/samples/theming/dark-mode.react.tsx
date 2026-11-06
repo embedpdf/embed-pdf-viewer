@@ -19,7 +19,9 @@ const plugins = [
   searchPlugin(),
 ];
 
-const TITLE = { start: 28, count: 30 };
+// [!doc-range welcome firstWord]
+const FIRST_WORD = { start: 28, count: 9 };
+// [!/doc-range]
 
 // [!doc-source welcome]
 const welcome = async (): Promise<OpenInput> => {
@@ -28,7 +30,7 @@ const welcome = async (): Promise<OpenInput> => {
 };
 // [!/doc-source]
 
-// On load: the cover's title is selected and "PDF" is found, so every color below has something to paint.
+// On load: the first word is selected and "PDF" is found, so every color below has something to paint.
 function ShowColors() {
   const selection = useSelection();
   const search = useSearch();
@@ -37,7 +39,7 @@ function ShowColors() {
     void search.search({ text: 'PDF' });
   }, [search]);
   useEffect(() => {
-    if (cover) selection.select({ page: cover, ...TITLE });
+    if (cover) selection.select({ page: cover, ...FIRST_WORD });
   }, [selection, cover]);
   return null;
 }

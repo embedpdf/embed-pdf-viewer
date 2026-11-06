@@ -4,7 +4,7 @@ import { usePageList } from '@embedpdf/vue/runtime';
 import { useSearch } from '@embedpdf/vue/search';
 import { useSelection } from '@embedpdf/vue/selection';
 
-// Something on every layer on load: the matches of a search, and the title selected.
+// Something on every layer on load: the matches of a search, and the first word selected.
 const search = useSearch();
 const selection = useSelection();
 const pages = usePageList();
@@ -14,7 +14,9 @@ void search.search({ text: 'PDF' });
 watch(
   cover,
   (page) => {
-    if (page) selection.select({ page, start: 28, count: 30 });
+    // [!doc-range welcome firstWord]
+    if (page) selection.select({ page, start: 28, count: 9 });
+    // [!/doc-range]
   },
   { immediate: true },
 );

@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { DEMO_DOCUMENTS } from '../documents.mjs';
-import { pageExamples, siteFiles, sitePages, transformViewerFile } from './sync.mjs';
+import { pageExamples, siteFiles, sitePages, transformFile, transformViewerFile } from './sync.mjs';
 
 const cloud = (source, file) => transformViewerFile(source, 'cloud', file);
 const document = DEMO_DOCUMENTS.welcome.viewerCloud;
@@ -119,6 +119,38 @@ describe('the cloud site’s copy of a viewer file', () => {
     const source =
       'import { PDFViewer } from \'@embedpdf/viewer-react\';\n<PDFViewer src="/report.pdf" />\n';
     assert.equal(transformViewerFile(source, 'local', 'viewer/a.react.tsx'), source);
+  });
+});
+
+describe('characters of a demo document', () => {
+  const sample = (engine, source) =>
+    transformFile(source, engine, 'selection/a.vue/Select.vue', { viewer: false });
+  const { local, cloud } = DEMO_DOCUMENTS.welcome.ranges.firstWord;
+  const source = `  // [!doc-range welcome firstWord]
+  selection.select({ page, start: ${local.start}, count: ${local.count} });
+  // [!/doc-range]
+`;
+
+  it('are the site’s own copy’s', () => {
+    assert.equal(
+      sample('local', source),
+      `  selection.select({ page, start: ${local.start}, count: ${local.count} });\n`,
+    );
+    assert.equal(
+      sample('cloud', source),
+      `  selection.select({ page, start: ${cloud.start}, count: ${cloud.count} });\n`,
+    );
+  });
+
+  it('are named once, as the local copy has them', () => {
+    assert.throws(
+      () => sample('cloud', source.replace(`start: ${local.start}`, 'start: 3')),
+      /names `start: \d+, count: \d+` once/,
+    );
+    assert.throws(
+      () => sample('cloud', source.replace('firstWord', 'lastWord')),
+      /unknown doc-range 'welcome lastWord'/,
+    );
   });
 });
 

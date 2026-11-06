@@ -21,8 +21,8 @@ import { withInteraction } from '@embedpdf/angular/interaction';
 import { EpdfSelection, EpdfSelectionLayer, withSelection } from '@embedpdf/angular/selection';
 import { localEngine } from '@embedpdf/engine';
 
-// The characters of the cover's title.
-const TITLE = { start: 28, count: 30 };
+// The characters of "Documents", the first word on the cover.
+const FIRST_WORD = { start: 28, count: 9 };
 const SWATCHES = ['#3858e9', '#e91e63', '#0f6e56', '#c2410c'];
 
 const welcome = async (): Promise<OpenInput> => {
@@ -30,7 +30,7 @@ const welcome = async (): Promise<OpenInput> => {
   return { kind: 'bytes', id: 'welcome', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
-// The cover's title is selected on load, so the accent shows; drag over any text to see more.
+// The first word is selected on load, so the accent shows; drag over any text to see more.
 @Component({
   selector: 'demo-select-title',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -42,7 +42,7 @@ export class SelectTitle {
     const document = inject(EpdfDocument);
     effect(() => {
       const cover = document.pages()[0]?.ref;
-      if (cover) untracked(() => selection.select({ page: cover, ...TITLE }));
+      if (cover) untracked(() => selection.select({ page: cover, ...FIRST_WORD }));
     });
   }
 }

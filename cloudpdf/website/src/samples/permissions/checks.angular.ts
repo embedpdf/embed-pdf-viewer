@@ -96,7 +96,7 @@ export class Controls {
     });
     effect(() => {
       const cover = this.document.pages()[0]?.ref;
-      if (cover) untracked(() => this.selection.select({ page: cover, start: 28, count: 30 }));
+      if (cover) untracked(() => this.selection.select({ page: cover, start: 36, count: 9 }));
     });
   }
 

@@ -100,12 +100,12 @@ export class App {
   private readonly document = inject(EpdfDocument);
 
   constructor() {
-    // Something on every layer on load: the matches of a search, and the title selected.
+    // Something on every layer on load: the matches of a search, and the first word selected.
     effect(() => {
       const cover = this.document.pages()[0]?.ref;
       if (!cover) return;
       void this.search.search({ text: 'PDF' });
-      this.selection.select({ page: cover, start: 28, count: 30 });
+      this.selection.select({ page: cover, start: 36, count: 9 });
     });
   }
 

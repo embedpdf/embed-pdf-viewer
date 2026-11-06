@@ -108,6 +108,11 @@ Each document has a key in `../documents.mjs`. A sample opens it with a
 `// [!doc-source <key>]` block that fetches `/pdfs/<key>.pdf`; the docs sync gives the cloud
 site's copy its own form of the block, which opens the document's grant.
 
+A sample that selects characters by index names them in a `// [!doc-range <key> <name>]` block.
+The welcome's cover has a different tagline per brand, so its title starts at another character
+on each site; the document's `ranges` in `documents.mjs` give each site's, and the build fails
+when one no longer reads its text. Change them with the cover.
+
 ## On CloudPDF
 
 cloudpdf.com's examples open the same PDFs from CloudPDF, with CloudPDF's welcome. `pdfs:cloud`

@@ -11,8 +11,10 @@
  *
  * Samples emit per flavor: the engine import/factory lines swap from
  * `engines.mjs`, each `// [!doc-source <key>]` block swaps to the
- * flavor's form from `documents.mjs`, and a `// [!asset-engine]` block (the
- * browser-side engine a stamp library opens on) swaps to the flavor's
+ * flavor's form from `documents.mjs`, each `// [!doc-range <key> <name>]`
+ * block gets the flavor's characters of that document (`swapDocRanges`), and
+ * a `// [!asset-engine]` block (the browser-side engine a stamp library opens
+ * on) swaps to the flavor's
  * `assetEngine` — the document's own engine locally, a local engine beside
  * the cloud one on the cloud site. Sample files carry NO marker (they are
  * displayed verbatim in docs code panels); the drift check is their guard.
@@ -363,6 +365,33 @@ function swapDocSources(source, relative, replace) {
   });
 }
 
+/**
+ * Every `// [!doc-range <key> <name>]` … `// [!/doc-range]` block: code that names characters of
+ * a demo document by index. Each site has its own copy of a document whose text differs (the
+ * welcome names its own brand), so the same words can start at another index there. The block
+ * names the document's local range from `documents.mjs` once, as `start: …, count: …`; a flavor's
+ * copy gets that flavor's range in its place. Both marker lines are consumed, as a doc-source
+ * block's are.
+ */
+function swapDocRanges(source, engine, relative) {
+  const marker =
+    /^[ \t]*\/\/ \[!doc-range (\w+) (\w+)\]\n([\s\S]*?)^[ \t]*\/\/ \[!\/doc-range\]\n/gm;
+  return source.replace(marker, (whole, key, name, body) => {
+    const ranges = DEMO_DOCUMENTS[key]?.ranges?.[name];
+    if (!ranges) {
+      throw new Error(`${relative}: unknown doc-range '${key} ${name}' (documents.mjs)`);
+    }
+    const local = rangeCode(ranges.local);
+    if (body.split(local).length !== 2) {
+      throw new Error(`${relative}: a doc-range '${key} ${name}' block names \`${local}\` once`);
+    }
+    return body.replace(local, rangeCode(ranges[engine]));
+  });
+}
+
+/** A range as a sample writes it in an object: `start: 28, count: 9`. */
+const rangeCode = ({ start, count }) => `start: ${start}, count: ${count}`;
+
 // ── the ready-made viewer ───────────────────────────────────────────────────
 
 /** A viewer document's declaration, up to its value: `const welcome = `, `readonly welcome = `. */
@@ -494,11 +523,12 @@ function swapViewerCode(mdx, engine) {
 }
 
 /** A sample or snippet as a flavor's site gets it. */
-function transformFile(source, engine, relative, { viewer }) {
+export function transformFile(source, engine, relative, { viewer }) {
   if (!integrationOf(relative)) return source; // an example's stylesheet: engine-neutral
+  const ranged = swapDocRanges(source, engine, relative);
   return viewer
-    ? transformViewerFile(source, engine, relative)
-    : transformSample(source, engine, relative);
+    ? transformViewerFile(ranged, engine, relative)
+    : transformSample(ranged, engine, relative);
 }
 
 // ── the site's copy ─────────────────────────────────────────────────────────

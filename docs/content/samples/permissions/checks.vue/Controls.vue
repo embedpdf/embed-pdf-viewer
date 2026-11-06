@@ -25,7 +25,9 @@ watch(
 watch(
   cover,
   (page) => {
-    if (page) selection.select({ page, start: 28, count: 30 });
+    // [!doc-range welcome firstWord]
+    if (page) selection.select({ page, start: 28, count: 9 });
+    // [!/doc-range]
   },
   { immediate: true },
 );

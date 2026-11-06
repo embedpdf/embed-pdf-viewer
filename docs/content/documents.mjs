@@ -56,6 +56,19 @@ export const DEMO_DOCUMENTS = {
     viewerCloud: `{ grant: '${grantOf('welcome')}' }`,
     /** The demo file itself, and `/report.pdf`, the path the snippets give for a reader's own PDF. */
     viewerUrls: ['/pdfs/welcome.pdf', '/report.pdf'],
+    /**
+     * Characters on the cover the samples select, in each site's welcome, by the name a
+     * `[!doc-range welcome <name>]` block gives: `text` is what they read. The brand's tagline
+     * comes before the title in the cover's text, and CloudPDF's is longer, so the title starts 8
+     * characters later on cloudpdf.com. The PDF build fails when a range no longer reads its text.
+     */
+    ranges: {
+      firstWord: {
+        text: 'Documents',
+        local: { start: 28, count: 9 },
+        cloud: { start: 36, count: 9 },
+      },
+    },
   },
   links: { cloudSource: cloudSource('links'), ...viewerForms('links') },
   forms: { cloudSource: cloudSource('forms'), ...viewerForms('forms') },

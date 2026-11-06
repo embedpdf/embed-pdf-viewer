@@ -19,13 +19,15 @@ const welcome = async (): Promise<OpenInput> => {
 };
 // [!/doc-source]
 
-// Something to see on load: the title on the cover, selected from code.
+// Something to see on load: "Documents", the first word on the cover, selected from code.
 function SelectTitle() {
   const selection = useSelection();
   const cover = usePageList()[0]?.ref;
 
   useEffect(() => {
-    if (cover) selection.select({ page: cover, start: 28, count: 30 });
+    // [!doc-range welcome firstWord]
+    if (cover) selection.select({ page: cover, start: 28, count: 9 });
+    // [!/doc-range]
   }, [selection, cover]);
 
   return null;

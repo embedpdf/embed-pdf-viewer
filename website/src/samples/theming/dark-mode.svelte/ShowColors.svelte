@@ -1,8 +1,8 @@
 <script lang="ts" module>
-  const TITLE = { start: 28, count: 30 };
+  const FIRST_WORD = { start: 28, count: 9 };
 </script>
 
-<!-- On load: the cover's title is selected and "PDF" is found, so every color has something to paint. -->
+<!-- On load: the first word is selected and "PDF" is found, so every color has something to paint. -->
 <script lang="ts">
   import { onMount } from 'svelte';
   import { usePageList } from '@embedpdf/svelte/runtime';
@@ -18,6 +18,6 @@
     void search.search({ text: 'PDF' });
   });
   $effect(() => {
-    if (cover) selection.select({ page: cover, ...TITLE });
+    if (cover) selection.select({ page: cover, ...FIRST_WORD });
   });
 </script>

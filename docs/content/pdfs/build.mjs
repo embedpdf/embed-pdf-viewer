@@ -20,12 +20,16 @@ import { inflateSync } from 'node:zlib';
 import { localEngine } from '@embedpdf/engine';
 import { chromium } from 'playwright-core';
 
+import { DEMO_DOCUMENTS } from '../documents.mjs';
+
 const here = dirname(fileURLToPath(import.meta.url));
 // Where each site serves the PDFs, by the brand it's for.
 const SITES = {
   embedpdf: resolve(here, '../../../website/public/pdfs'),
   cloudpdf: resolve(here, '../../../cloudpdf/website/public/pdfs'),
 };
+// The engine each site's samples use, which `documents.mjs` gives a document's ranges by.
+const SITE_ENGINES = { embedpdf: 'local', cloudpdf: 'cloud' };
 const chrome =
   process.env.CHROME_PATH ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 
@@ -70,6 +74,7 @@ try {
       const { pdf, marks } = await print(join(here, name, 'document.html'), brand);
       const { bytes, published } = await bake(name, bakeModule, company, pdf, marks);
       await checkNames(name, bytes, company);
+      await checkRanges(name, bytes, sites);
       for (const site of sites) {
         await writeFile(join(SITES[site], `${name}.pdf`), bytes);
         for (const [extension, data] of published) {
@@ -215,6 +220,33 @@ async function checkNames(name, bytes, company) {
     );
     if (named.length > 0) {
       throw new Error(`${name}: ${company.displayName}'s document names ${named.join(' and ')}`);
+    }
+  } finally {
+    await doc.close();
+  }
+}
+
+/**
+ * Fails when a range on the cover the samples select (`ranges` in `documents.mjs`) doesn't read
+ * its text in the copy a site gets: the document changed under the samples.
+ */
+async function checkRanges(name, bytes, sites) {
+  const ranges = Object.entries(DEMO_DOCUMENTS[name]?.ranges ?? {});
+  if (ranges.length === 0) return;
+  const doc = await engine.open({ kind: 'bytes', bytes });
+  try {
+    const { pages } = await doc.pages.list();
+    const cover = doc.page(pages[0].ref);
+    for (const [rangeName, range] of ranges) {
+      for (const site of sites) {
+        const read = await cover.text.slice(range[SITE_ENGINES[site]]);
+        if (read !== range.text) {
+          throw new Error(
+            `${name}: ${site}'s range '${rangeName}' reads ${JSON.stringify(read)}, ` +
+              `not ${JSON.stringify(range.text)} (documents.mjs)`,
+          );
+        }
+      }
     }
   } finally {
     await doc.close();

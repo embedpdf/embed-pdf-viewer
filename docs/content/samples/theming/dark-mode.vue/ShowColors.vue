@@ -4,9 +4,11 @@ import { usePageList } from '@embedpdf/vue/runtime';
 import { useSelection } from '@embedpdf/vue/selection';
 import { useSearch } from '@embedpdf/vue/search';
 
-const TITLE = { start: 28, count: 30 };
+// [!doc-range welcome firstWord]
+const FIRST_WORD = { start: 28, count: 9 };
+// [!/doc-range]
 
-// On load: the cover's title is selected and "PDF" is found, so every color has something to paint.
+// On load: the first word is selected and "PDF" is found, so every color has something to paint.
 const selection = useSelection();
 const search = useSearch();
 const pages = usePageList();
@@ -17,7 +19,7 @@ onMounted(() => {
 });
 watchEffect(
   () => {
-    if (cover.value) selection.select({ page: cover.value, ...TITLE });
+    if (cover.value) selection.select({ page: cover.value, ...FIRST_WORD });
   },
   { flush: 'post' },
 );

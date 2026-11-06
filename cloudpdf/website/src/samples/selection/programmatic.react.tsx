@@ -17,8 +17,9 @@ import './programmatic.css';
 const engine = cloudEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), selectionPlugin()];
 
-// On the cover: the characters of its title, and a point on its word "Viewers", in page coordinates.
-const TITLE = { start: 28, count: 30 };
+// On the cover: the characters of its first word, "Documents", and a point on its word "web",
+// in page coordinates.
+const FIRST_WORD = { start: 36, count: 9 };
 const POINT = { x: 260, y: 242 };
 
 const welcome: OpenInput = { kind: 'grant', grant: 'shr_gvpJcG1ULUMon19C0D1wODSY' };
@@ -29,9 +30,9 @@ function SelectionToolbar() {
   const { hasSelection, range, pages } = useSelectionState();
   const cover = usePageList()[0]?.ref;
 
-  // The title is selected on load.
+  // The first word is selected on load.
   useEffect(() => {
-    if (cover) selection.select({ page: cover, ...TITLE });
+    if (cover) selection.select({ page: cover, ...FIRST_WORD });
   }, [selection, cover]);
 
   const canSelect = selection.canSelect();
@@ -45,9 +46,9 @@ function SelectionToolbar() {
         type="button"
         className="button"
         disabled={!canSelect || !cover}
-        onClick={() => cover && selection.select({ page: cover, ...TITLE })}
+        onClick={() => cover && selection.select({ page: cover, ...FIRST_WORD })}
       >
-        Title
+        Characters
       </button>
       <button
         type="button"
