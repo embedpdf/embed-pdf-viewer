@@ -15,7 +15,7 @@ const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), formPlugin(
 
 const forms: OpenInput = { kind: 'grant', grant: 'shr_eBRW5E3MpolzD8G36Alp30EF' };
 
-/** One field of each family, with `setValue()` in the shape each one takes. */
+/** One field of each kind, with `setValue()` in the shape each one takes. */
 async function fillIn(form: FormCapability) {
   await form.setValue(toFieldRef('name'), { value: 'Ada Lovelace' }); // text
   await form.setValue(toFieldRef('updates'), { checked: true }); // checkbox

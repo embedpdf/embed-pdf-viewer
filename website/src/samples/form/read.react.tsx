@@ -39,9 +39,9 @@ function useFilledInName() {
   }, [form, status]);
 }
 
-/** A field's value as text, whatever its family. */
+/** A field's value as text, whatever its kind. */
 function valueText(field: FormFieldDTO): string {
-  switch (field.family) {
+  switch (field.kind) {
     case 'text':
     case 'combobox':
       return field.value || '—';
@@ -85,7 +85,7 @@ function FieldList() {
       {fields.map((field) => (
         <li key={field.name} className="field">
           <span className="field-name">
-            {field.name} <span className="family">{field.family}</span>
+            {field.name} <span className="kind">{field.kind}</span>
           </span>
           <span className="field-value">{valueText(field)}</span>
         </li>

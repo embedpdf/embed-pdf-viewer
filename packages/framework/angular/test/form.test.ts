@@ -136,12 +136,12 @@ describe('<epdf-form-layer> over fields made from code', () => {
       ]);
       const page = kernelOf(fixture).documents.getPage(0, 'blank')!.ref;
       await form.create({
-        family: 'text',
+        kind: 'text',
         name: 'name',
         widgets: [{ page, rect: { x: 72, y: 100, width: 160, height: 20 }, color: '#94a3b8' }],
       });
       await form.create({
-        family: 'checkbox',
+        kind: 'checkbox',
         name: 'agree',
         widgets: [{ page, rect: { x: 72, y: 140, width: 14, height: 14 } }],
       });
@@ -216,12 +216,12 @@ describe('<epdf-form-layer> field pictures', () => {
       ]);
       const page = kernelOf(fixture).documents.getPage(0, 'blank')!.ref;
       await form.create({
-        family: 'text',
+        kind: 'text',
         name: 'name',
         widgets: [{ page, rect: { x: 72, y: 100, width: 160, height: 20 } }],
       });
       await form.create({
-        family: 'checkbox',
+        kind: 'checkbox',
         name: 'agree',
         widgets: [{ page, rect: { x: 72, y: 140, width: 14, height: 14 } }],
       });
@@ -309,13 +309,13 @@ describe('<epdf-form-layer> choices', () => {
       const page = kernelOf(fixture).documents.getPage(0, 'blank')!.ref;
       const options = ['NL', 'BE', 'DE'].map((value) => ({ label: value, value }));
       await form.create({
-        family: 'combobox',
+        kind: 'combobox',
         name: 'country',
         options,
         widgets: [{ page, rect: { x: 72, y: 100, width: 160, height: 20 } }],
       });
       await form.create({
-        family: 'listbox',
+        kind: 'listbox',
         name: 'languages',
         options,
         widgets: [{ page, rect: { x: 72, y: 140, width: 160, height: 60 } }],
@@ -369,7 +369,7 @@ describe('<epdf-form-layer> signature fields', () => {
       ]);
       const page = kernelOf(fixture).documents.getPage(0, 'blank')!.ref;
       await form.create({
-        family: 'signature',
+        kind: 'signature',
         name: 'approval',
         widgets: [{ page, rect: { x: 72, y: 100, width: 160, height: 48 } }],
       });
@@ -499,8 +499,8 @@ describe('EpdfForm', () => {
 
       const page = viewer.kernel()!.documents.getPage(0, 'blank')!.ref;
       const at = (y: number) => ({ page, rect: { x: 72, y, width: 160, height: 20 } });
-      await form.create({ family: 'text', name: 'name', widgets: [at(100)] });
-      await form.create({ family: 'text', name: 'total', widgets: [at(140)] });
+      await form.create({ kind: 'text', name: 'name', widgets: [at(100)] });
+      await form.create({ kind: 'text', name: 'total', widgets: [at(140)] });
       await form.setValue(toFieldRef('total'), { value: '120.00' });
       await form.setValue(toFieldRef('name'), { value: 'Ada' });
       await fixture.whenStable();

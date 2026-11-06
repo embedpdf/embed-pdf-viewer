@@ -185,7 +185,7 @@ export function runPermissionConformance(
           EngineErrorCode.Forbidden,
         );
         expectRefused(
-          await refusal(doc.forms.create({ family: 'text', name: 'extra' })),
+          await refusal(doc.forms.create({ kind: 'text', name: 'extra' })),
           EngineErrorCode.Forbidden,
         );
       });
@@ -203,7 +203,7 @@ export function runPermissionConformance(
       });
 
       // A widget is the form's: the annotation verbs refuse one as the wrong
-      // family, before any right is looked at, whatever the token.
+      // kind, before any right is looked at, whatever the token.
       for (const token of ['everything', 'comment', 'fill'] as const) {
         await as(token, async (doc) => {
           const page = doc.page(PAGE);

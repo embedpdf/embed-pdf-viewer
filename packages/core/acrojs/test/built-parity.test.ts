@@ -28,7 +28,7 @@ const scriptInput: ScriptInput = {
     {
       ref: { kind: 'fqn', name: 'label' },
       name: 'label',
-      family: 'text',
+      kind: 'text',
       value: '',
       defaultValue: '',
       display: 'visible',

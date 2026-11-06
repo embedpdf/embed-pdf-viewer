@@ -589,7 +589,7 @@ export function runAnnotationPredictionConformance(
     for (const [at, scenario] of WIDGET_CASES.entries()) {
       test(`widget: ${scenario.name}`, async () => {
         const { widgets } = await doc.forms.create({
-          family: 'text',
+          kind: 'text',
           name: `predicted_${at}`,
           widgets: [{ page: page.ref, rect: BOX }],
         });

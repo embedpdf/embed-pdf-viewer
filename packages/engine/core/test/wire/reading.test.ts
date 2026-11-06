@@ -186,17 +186,17 @@ describe('the fixtures every generated SDK reads', () => {
       'link',
     ]);
     const [, , widget, line, link] = list.annotations;
-    expect(widget!.fieldFamily).toBe('unknown');
+    expect(widget!.fieldKind).toBe('unknown');
     expect(line!.measure).toEqual({ subtype: 'unknown' });
     expect(link!.target).toEqual({ kind: 'unsupported' });
     expect(link!.actions.activate.root).toMatchObject({ type: 'unknown', next: [] });
   });
 
-  test('the form reads a field of an unknown family and a value of an unknown kind', () => {
+  test('the form reads a field of an unknown kind and a value of an unknown kind', () => {
     const form = FormSnapshotSchema.parse(fixture('form.json')) as {
       fields: Array<Record<string, any>>;
     };
-    expect(form.fields.map(({ family }) => family)).toEqual(['text', 'unknown']);
+    expect(form.fields.map(({ kind }) => kind)).toEqual(['text', 'unknown']);
     expect(form.fields[0]!.valueEntry).toEqual({ kind: 'unsupported' });
     expect(form.fields[1]).toMatchObject({ name: 'Ticket', rawValue: '' });
   });
@@ -204,11 +204,11 @@ describe('the fixtures every generated SDK reads', () => {
 
 describe('openUnionOf and openUnionsIn', () => {
   test('name a union with a catch-all and every one a response carries', () => {
-    expect(openUnionOf(FormFieldDTOSchema)).toMatchObject({ tag: 'family', catchAll: 'unknown' });
+    expect(openUnionOf(FormFieldDTOSchema)).toMatchObject({ tag: 'kind', catchAll: 'unknown' });
     expect(openUnionOf(FormSnapshotSchema)).toBeUndefined();
     expect(openUnionsIn(FormSnapshotSchema).map(({ tag, catchAll }) => [tag, catchAll])).toEqual(
       expect.arrayContaining([
-        ['family', 'unknown'],
+        ['kind', 'unknown'],
         ['kind', 'unsupported'],
         ['type', 'unknown'],
       ]),

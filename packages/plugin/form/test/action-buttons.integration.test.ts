@@ -192,7 +192,7 @@ describe('action buttons e2e (scripting OFF — actions ≠ JavaScript)', () => 
   it('a button made through create() draws, and resets the form when pressed', async () => {
     await using harness = await boot(false);
     const { field } = await harness.form.create({
-      family: 'pushbutton',
+      kind: 'pushbutton',
       name: 'clear',
       widgets: [
         {

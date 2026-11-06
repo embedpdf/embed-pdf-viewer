@@ -119,7 +119,7 @@ describe('render, form and measure values', () => {
   test("a field's actions go to spots on the pages they go to; the rest of the field stays", () => {
     const boxOf = visibleBoxesOf([layout(4, crop)]);
     const field = {
-      family: 'pushbutton',
+      kind: 'pushbutton',
       name: 'go',
       widgets: [],
       actions: {
@@ -150,7 +150,7 @@ describe('render, form and measure values', () => {
       },
     });
     const plain = {
-      family: 'pushbutton',
+      kind: 'pushbutton',
       name: 'plain',
       widgets: [],
     } as unknown as FormFieldDTO<PdfCoordinates>;

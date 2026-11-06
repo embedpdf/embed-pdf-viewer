@@ -146,14 +146,14 @@ export function runFormTransferConformance(
     };
 
     /**
-     * Alice's form, a field of every family on both pages: values, a
+     * Alice's form, a field of every kind on both pages: values, a
      * script, a link, a radio group across the pages, and two calculated
      * fields, the second calculated first.
      */
     const build = async (doc: DocumentHandle) => {
       const { forms } = doc;
       await forms.create({
-        family: 'text',
+        kind: 'text',
         name: 'customer.name',
         maxLength: 40,
         actions: { validate: script('validated();') },
@@ -161,13 +161,13 @@ export function runFormTransferConformance(
       });
       await forms.setValue(fqn('customer.name'), { value: 'Ada' });
       await forms.create({
-        family: 'checkbox',
+        kind: 'checkbox',
         name: 'agree',
         widgets: [{ page: FIRST, rect: small(20, 200), exportValue: 'Yes' }],
       });
       await forms.setValue(fqn('agree'), { checked: true });
       await forms.create({
-        family: 'radio',
+        kind: 'radio',
         name: 'plan',
         widgets: [
           { page: FIRST, rect: small(20, 160), exportValue: 'basic' },
@@ -176,7 +176,7 @@ export function runFormTransferConformance(
       });
       await forms.setValue(fqn('plan'), { value: 'pro' });
       await forms.create({
-        family: 'combobox',
+        kind: 'combobox',
         name: 'country',
         options: [
           { label: 'Netherlands', value: 'NL' },
@@ -186,7 +186,7 @@ export function runFormTransferConformance(
       });
       await forms.setValue(fqn('country'), { value: 'BE' });
       await forms.create({
-        family: 'listbox',
+        kind: 'listbox',
         name: 'tags',
         multiSelect: true,
         options: [
@@ -198,7 +198,7 @@ export function runFormTransferConformance(
       });
       await forms.setValue(fqn('tags'), { selectedValues: ['a', 'c'] });
       await forms.create({
-        family: 'pushbutton',
+        kind: 'pushbutton',
         name: 'go',
         widgets: [
           {
@@ -210,18 +210,18 @@ export function runFormTransferConformance(
         ],
       });
       await forms.create({
-        family: 'signature',
+        kind: 'signature',
         name: 'sign',
         widgets: [{ page: SECOND, rect: { x: 200, y: 20, width: 80, height: 40 } }],
       });
       await forms.create({
-        family: 'text',
+        kind: 'text',
         name: 'subtotal',
         actions: { calculate: script('event.value = 1;') },
         widgets: [{ page: FIRST, rect: wide(100) }],
       });
       await forms.create({
-        family: 'text',
+        kind: 'text',
         name: 'total',
         actions: { calculate: script('event.value = 2;') },
         widgets: [{ page: FIRST, rect: wide(60) }],
@@ -424,9 +424,9 @@ export function runFormTransferConformance(
       await using(async (opened) => {
         const bundle = await sourceBundle(opened);
         const target = await opened(open(ALICE));
-        await target.forms.create({ family: 'text', name: 'agree' });
-        await target.forms.create({ family: 'text', name: 'customer' });
-        await target.forms.create({ family: 'text', name: 'go.now' });
+        await target.forms.create({ kind: 'text', name: 'agree' });
+        await target.forms.create({ kind: 'text', name: 'customer' });
+        await target.forms.create({ kind: 'text', name: 'go.now' });
         const result = await target.forms.import(bundle);
         const conflicts = result.dropped
           .filter(({ reason }) => reason === 'name-conflict')
@@ -446,7 +446,7 @@ export function runFormTransferConformance(
         const bundle = await sourceBundle(opened);
         const target = await opened(open(ALICE));
         await target.forms.create({
-          family: 'text',
+          kind: 'text',
           name: 'own',
           actions: { calculate: script('event.value = 0;') },
         });
@@ -503,7 +503,7 @@ export function runFormTransferConformance(
         expect(result.fields.map((field) => field.name)).toEqual(['customer.name', 'tags']);
         expect(result.dropped.map(({ reason }) => reason)).toEqual([
           'no-field',
-          'wrong-family',
+          'wrong-kind',
           'value-not-allowed',
         ]);
         expect(await fieldOf(target, 'customer.name')).toMatchObject({
@@ -521,7 +521,7 @@ export function runFormTransferConformance(
         const bundle = await sourceBundle(opened);
         const target = await opened(open(ALICE));
         await target.forms.create({
-          family: 'text',
+          kind: 'text',
           name: 'own',
           actions: { calculate: script('event.value = 0;') },
         });

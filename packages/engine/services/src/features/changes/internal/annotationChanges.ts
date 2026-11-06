@@ -486,7 +486,7 @@ function authorizeReorder(
   }
 }
 
-/** A reorder's item: the family's new order on the page, and the rows that moved. */
+/** A reorder's item: the kind's new order on the page, and the rows that moved. */
 function reorderItem(
   ctx: ChangeContext,
   family: AnnotationFamily,
@@ -531,7 +531,7 @@ export function writeUpdate(
   const before = readAnnotation(ctx, ref);
   const written =
     before.subtype === 'widget'
-      ? fitWidgetToFamily(before.fieldFamily, patch as WidgetPatch<PdfCoordinates>)
+      ? fitWidgetToFamily(before.fieldKind, patch as WidgetPatch<PdfCoordinates>)
       : patch;
   const linked = linkedTo(before, written).map((other) => ({
     objectNumber: objectNumberOf(ctx, other),

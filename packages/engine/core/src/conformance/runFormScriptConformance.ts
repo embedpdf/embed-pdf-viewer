@@ -95,7 +95,7 @@ export function runFormScriptConformance(
     };
 
     const createCalculated = async (doc: DocumentHandle, name: string) =>
-      doc.forms.create({ family: 'text', name, actions: { calculate: CALCULATE } });
+      doc.forms.create({ kind: 'text', name, actions: { calculate: CALCULATE } });
 
     const outcome = (attempt: Promise<unknown>) =>
       attempt.then(
@@ -106,7 +106,7 @@ export function runFormScriptConformance(
     test("create writes a field's scripts; a calculate script puts it in the order", async () => {
       await withDoc(async (doc) => {
         const created = await doc.forms.create({
-          family: 'text',
+          kind: 'text',
           name: 'total',
           readOnly: true,
           actions: {
@@ -247,7 +247,7 @@ export function runFormScriptConformance(
     test("a widget's actions are written with its placement and read back from its row", async () => {
       await withDoc(async (doc) => {
         const { field } = await doc.forms.create({
-          family: 'text',
+          kind: 'text',
           name: 'clearing',
           widgets: [
             {
@@ -339,7 +339,7 @@ export function runFormScriptConformance(
         expect(
           await outcome(
             doc.forms.create({
-              family: 'text',
+              kind: 'text',
               name: 'y',
               widgets: [
                 {
@@ -385,7 +385,7 @@ export function runFormScriptConformance(
         const refused = [
           await outcome(doc.forms.update(NAME, { actions: { format: script('f();') } })),
           await outcome(
-            doc.forms.create({ family: 'text', name: 'x', actions: { calculate: CALCULATE } }),
+            doc.forms.create({ kind: 'text', name: 'x', actions: { calculate: CALCULATE } }),
           ),
           await outcome(
             doc.apply({
@@ -401,7 +401,7 @@ export function runFormScriptConformance(
         ];
         expect(refused.every((code) => code === EngineErrorCode.Forbidden)).toBe(true);
         // A field without scripts, and a removal, need only doc.forms.modify.
-        await doc.forms.create({ family: 'text', name: 'plain' });
+        await doc.forms.create({ kind: 'text', name: 'plain' });
         await doc.forms.update(NAME, { actions: { format: null } });
       }, DESIGN_ONLY);
     });

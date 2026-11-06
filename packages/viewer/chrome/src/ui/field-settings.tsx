@@ -1,7 +1,7 @@
 /**
  * A field's settings, as the form plugin describes them (`getFieldSettings`),
  * written with `form.update()`: the form designer's sidebar shows them for the
- * selected field. Nothing here knows a field family: the description says what
+ * selected field. Nothing here knows a field kind: the description says what
  * to draw.
  */
 import {

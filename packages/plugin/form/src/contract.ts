@@ -20,7 +20,7 @@ import type {
   FormBundle,
   FormFieldDraft,
   FormFieldDTO,
-  FormFieldFamily,
+  FormFieldKind,
   FormFieldPatch,
   FormFieldRef,
   FormFieldValue,
@@ -50,7 +50,7 @@ export type {
   FormBundle,
   FormFieldDraft,
   FormFieldDTO,
-  FormFieldFamily,
+  FormFieldKind,
   FormFieldPatch,
   FormFieldRef,
   FormFieldValue,
@@ -95,7 +95,7 @@ export interface FormSettings {
   };
   /**
    * Which fields people may fill in by hand: `true`, every one; `false`,
-   * none; or a list of field families (`'text'`, `'checkbox'`,
+   * none; or a list of field kinds (`'text'`, `'checkbox'`,
    * `'signature'`…). A field left out draws as a read-only one does, and
    * takes no typing, clicks or picks. Only the interface: your code still
    * fills it in (`setValue()`, `importValues()`), and `canFill()` doesn't change.
@@ -103,8 +103,8 @@ export interface FormSettings {
   readonly fillable: FillableFields;
 }
 
-/** Which fields people may fill in by hand: all, none, or those of these families. */
-export type FillableFields = boolean | readonly FormFieldFamily[];
+/** Which fields people may fill in by hand: all, none, or those of these kinds. */
+export type FillableFields = boolean | readonly FormFieldKind[];
 
 /** What the form settings are when the app registers none. */
 export const FORM_DEFAULTS: FormSettings = {
@@ -121,7 +121,7 @@ export type FormConfig = DeepPartial<FormSettings>;
 
 /** Which fields `list()` returns: all of them, or those that match every given part. */
 export interface FormFilter {
-  readonly family?: FormFieldFamily;
+  readonly kind?: FormFieldKind;
   /** Fields with a box on this page: its ref or its index. */
   readonly page?: PageRef | number;
   /** One full name, such as `'billing.name'`. */

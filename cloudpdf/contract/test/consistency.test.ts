@@ -182,6 +182,33 @@ describe('naming rules in openapi.json', () => {
     expect(both).toEqual([]);
   });
 
+  test('a union is tagged type, kind, status or subtype', () => {
+    // `type` for what happens, `kind` for what is, `status` for what a call did; `subtype` is
+    // the PDF's own /Subtype. A tag is the field every arm fixes to one value.
+    const TAGS = new Set(['type', 'kind', 'status', 'subtype']);
+    const fixedFields = (arm: Schema): Set<string> => {
+      const fields = new Set<string>();
+      for (const [name, field] of Object.entries(resolved(arm).properties ?? {})) {
+        const { enum: values } = resolved(field) as Schema & { enum?: unknown[] };
+        if (values?.length === 1) fields.add(name);
+      }
+      return fields;
+    };
+    const odd: string[] = [];
+    const visit = (node: unknown, at: string): void => {
+      if (typeof node !== 'object' || node === null) return;
+      const arms = (node as Schema).oneOf ?? (node as Schema).anyOf;
+      if (arms && arms.length > 1) {
+        const [first, ...rest] = arms.map(fixedFields);
+        const tags = [...first!].filter((name) => rest.every((fields) => fields.has(name)));
+        for (const tag of tags) if (!TAGS.has(tag)) odd.push(`${at} (${tag})`);
+      }
+      for (const [key, value] of Object.entries(node)) visit(value, `${at}/${key}`);
+    };
+    visit(spec, '#');
+    expect(unique(odd)).toEqual([]);
+  });
+
   test('a size in bytes ends in Bytes, and a hash names its algorithm', () => {
     const unnamed = everyProperty
       .filter(({ name }) =>

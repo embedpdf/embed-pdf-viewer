@@ -38,8 +38,8 @@ with open(os.environ["CLOUDPDF_FORM_FIXTURE"], encoding="utf-8") as fixture:
 
 print(f"fields: {len(form.fields)}")
 text, barcode = form.fields
-if [text.family, barcode.family] != ["text", "unknown"]:
-    sys.exit(f"read {[field.family for field in form.fields]}")
+if [text.kind, barcode.kind] != ["text", "unknown"]:
+    sys.exit(f"read {[field.kind for field in form.fields]}")
 if text.value_entry.kind != "unsupported":
     sys.exit(f"read a value of an unknown kind as {text.value_entry.kind}")
 if barcode.raw_value != "":

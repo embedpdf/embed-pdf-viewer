@@ -60,20 +60,20 @@ export function joinWidgetFieldNumbers(
     if (fieldObjectNumber <= 0) {
       // In no field, or in one stored inline, which no ref can address.
       annotation.field = null;
-      annotation.fieldFamily = 'unknown';
+      annotation.fieldKind = 'unknown';
       annotation.caption = null;
       annotation.hasMark = false;
       continue;
     }
     annotation.field = { kind: 'objectNumber', objectNumber: fieldObjectNumber };
-    annotation.fieldFamily =
+    annotation.fieldKind =
       FAMILY_BY_CODE[runtime.fn.EPDFForm_GetFieldFamily(model, fieldIndex)] ?? 'unknown';
-    if (annotation.fieldFamily === 'checkbox' || annotation.fieldFamily === 'radio') {
+    if (annotation.fieldKind === 'checkbox' || annotation.fieldKind === 'radio') {
       annotation.checkStyle = checkStyleOfCaption(annotation.caption ?? null);
     }
-    if (annotation.fieldFamily !== 'pushbutton') annotation.caption = null;
+    if (annotation.fieldKind !== 'pushbutton') annotation.caption = null;
     annotation.hasMark =
-      annotation.fieldFamily === 'signature' &&
+      annotation.fieldKind === 'signature' &&
       (annotation.hasMark ||
         runtime.fn.EPDFForm_GetFieldValueKind(model, fieldIndex) !== VALUE_KIND_NONE);
   }

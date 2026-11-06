@@ -208,7 +208,7 @@ export function runPageSpaceConformance(
               height: 20,
             };
             const { field, widgets } = await doc.forms.create({
-              family: 'text',
+              kind: 'text',
               name: `placed_${layout.ref.objectNumber}`,
               widgets: [{ page: layout.ref, rect: spot }],
             });

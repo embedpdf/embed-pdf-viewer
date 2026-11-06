@@ -222,7 +222,7 @@ export function runObjectNumberConformance(
         const [field, left, right, widget, split] = await take(doc, 5);
         const created = await doc.forms.create(
           {
-            family: 'text',
+            kind: 'text',
             name: 'billing.name',
             widgets: [
               { page: second!, rect: box(20) },

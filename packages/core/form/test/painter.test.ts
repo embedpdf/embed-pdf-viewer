@@ -64,7 +64,7 @@ const widget = (patch: Partial<WidgetAnnotation> = {}): WidgetAnnotation =>
 
 const textField = (value: string): FormFieldDTO =>
   ({
-    family: 'text',
+    kind: 'text',
     value,
     multiline: false,
     password: false,
@@ -89,11 +89,11 @@ describe('the painter', () => {
   });
 
   it("draws a signature field's box, and nothing of an unknown family", () => {
-    const box = widgetDrawing(widget(), { family: 'signature' } as FormFieldDTO)!;
+    const box = widgetDrawing(widget(), { kind: 'signature' } as FormFieldDTO)!;
     // The background over the whole box, then the border inside it; no text.
     expect(box.ops.map((op) => op.kind)).toEqual(['fill', 'stroke']);
     expect(box.approximate).toBeNull();
-    expect(widgetDrawing(widget(), { family: 'unknown' } as FormFieldDTO)).toBeNull();
+    expect(widgetDrawing(widget(), { kind: 'unknown' } as FormFieldDTO)).toBeNull();
   });
 
   it('shows the text it is given over the value', () => {

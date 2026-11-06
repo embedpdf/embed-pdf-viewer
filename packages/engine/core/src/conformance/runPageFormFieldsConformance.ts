@@ -168,7 +168,7 @@ async function fieldsOf(doc: DocumentHandle): Promise<Record<string, FieldSummar
 }
 
 function valueOf(field: FormFieldDTO): string | boolean {
-  switch (field.family) {
+  switch (field.kind) {
     case 'text':
     case 'radio':
       return field.value;

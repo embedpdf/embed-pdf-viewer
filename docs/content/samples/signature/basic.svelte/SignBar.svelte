@@ -14,7 +14,7 @@
   const rows = useSignerRows();
   const status = useFormState((formState) => formState.status);
   const field = useFormState((formState) =>
-    formState.fields.find((candidate) => candidate.family === 'signature'),
+    formState.fields.find((candidate) => candidate.kind === 'signature'),
   );
   const person = $derived(rows.current[0]);
   // Ada's signature, once she signs: the agreement already carries Lanternfield's.

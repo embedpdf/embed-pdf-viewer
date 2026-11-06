@@ -65,7 +65,7 @@ describe('annotation hover feed', () => {
       draft: annotation('draft', { actions: { cursorEnter: tree } }, { unconfirmed: true }),
       'obj:3': annotation('obj:3', {
         subtype: 'widget',
-        fieldFamily: 'text',
+        fieldKind: 'text',
         actions: { cursorEnter: tree },
       }),
       'obj:4': annotation('obj:4', { subtype: 'link', actions: { cursorEnter: tree } }),

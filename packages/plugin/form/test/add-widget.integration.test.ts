@@ -59,7 +59,7 @@ describe('addWidget', () => {
     try {
       const plan: FormFieldRef = { kind: 'fqn', name: 'plan' };
       await form.create({
-        family: 'radio',
+        kind: 'radio',
         name: 'plan',
         widgets: [{ page, rect: box(72, 100), exportValue: 'Choice1', color: '#ff0000' }],
       });
@@ -83,7 +83,7 @@ describe('addWidget', () => {
     try {
       const size: FormFieldRef = { kind: 'fqn', name: 'size' };
       await form.create({
-        family: 'radio',
+        kind: 'radio',
         name: 'size',
         widgets: [
           { page, rect: box(72, 200), exportValue: 'small' },
@@ -104,7 +104,7 @@ describe('addWidget', () => {
     try {
       const agree: FormFieldRef = { kind: 'fqn', name: 'agree' };
       await form.create({
-        family: 'checkbox',
+        kind: 'checkbox',
         name: 'agree',
         widgets: [{ page, rect: box(72, 300) }],
       });
@@ -126,7 +126,7 @@ describe('addWidget', () => {
     try {
       const pick: FormFieldRef = { kind: 'fqn', name: 'pick' };
       await form.create({
-        family: 'radio',
+        kind: 'radio',
         name: 'pick',
         widgets: [{ page, rect: box(72, 400), exportValue: 'a' }],
       });

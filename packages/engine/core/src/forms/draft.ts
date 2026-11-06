@@ -30,7 +30,7 @@ export interface WidgetPlacement<
   /**
    * A checkbox or radio widget's export value: what the form data holds
    * while it's checked. Required for a radio button (and never `'Off'`);
-   * `'Yes'` for a checkbox when left out. Other families take none.
+   * `'Yes'` for a checkbox when left out. Other kinds take none.
    */
   exportValue?: string;
   /**
@@ -92,7 +92,7 @@ interface FormFieldDraftBase {
 export interface TextFieldDraft<
   C extends Coordinates = PageCoordinates,
 > extends FormFieldDraftBase {
-  family: 'text';
+  kind: 'text';
   defaultValue?: string;
   maxLength?: number;
   multiline?: boolean;
@@ -104,7 +104,7 @@ export interface TextFieldDraft<
 export interface CheckboxFieldDraft<
   C extends Coordinates = PageCoordinates,
 > extends FormFieldDraftBase {
-  family: 'checkbox';
+  kind: 'checkbox';
   widgets?: WidgetPlacement<C>[];
 }
 
@@ -112,7 +112,7 @@ export interface CheckboxFieldDraft<
 export interface RadioFieldDraft<
   C extends Coordinates = PageCoordinates,
 > extends FormFieldDraftBase {
-  family: 'radio';
+  kind: 'radio';
   radiosInUnison?: boolean;
   noToggleToOff?: boolean;
   /** One per button, each with its `exportValue`. */
@@ -122,7 +122,7 @@ export interface RadioFieldDraft<
 export interface ComboBoxFieldDraft<
   C extends Coordinates = PageCoordinates,
 > extends FormFieldDraftBase {
-  family: 'combobox';
+  kind: 'combobox';
   /** Free text allowed in addition to the options. */
   edit?: boolean;
   options?: FormFieldOptionInput[];
@@ -133,7 +133,7 @@ export interface ComboBoxFieldDraft<
 export interface ListBoxFieldDraft<
   C extends Coordinates = PageCoordinates,
 > extends FormFieldDraftBase {
-  family: 'listbox';
+  kind: 'listbox';
   multiSelect?: boolean;
   options?: FormFieldOptionInput[];
   /** Option values `reset()` selects. */
@@ -149,7 +149,7 @@ export interface ListBoxFieldDraft<
 export interface SignatureFieldDraft<
   C extends Coordinates = PageCoordinates,
 > extends FormFieldDraftBase {
-  family: 'signature';
+  kind: 'signature';
   widgets?: WidgetPlacement<C>[];
 }
 
@@ -160,11 +160,11 @@ export interface SignatureFieldDraft<
 export interface PushButtonFieldDraft<
   C extends Coordinates = PageCoordinates,
 > extends FormFieldDraftBase {
-  family: 'pushbutton';
+  kind: 'pushbutton';
   widgets?: WidgetPlacement<C>[];
 }
 
-/** What `doc.forms.create` takes: per family, mirroring the DTO union. */
+/** What `doc.forms.create` takes: per kind, mirroring the DTO union. */
 export type FormFieldDraft<C extends Coordinates = PageCoordinates> =
   | TextFieldDraft<C>
   | CheckboxFieldDraft<C>

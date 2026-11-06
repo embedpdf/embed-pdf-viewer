@@ -100,7 +100,7 @@ export function installAcroJs(globalObject: Record<string, unknown>): void {
     const wrapper: AnyRecord = {};
     Object.defineProperties(wrapper, {
       name: { enumerable: true, get: () => input.name },
-      type: { enumerable: true, get: () => input.family },
+      type: { enumerable: true, get: () => input.kind },
       value: {
         enumerable: true,
         get: () => cloneValue(record.value),
@@ -635,21 +635,21 @@ export function installAcroJs(globalObject: Record<string, unknown>): void {
   };
 
   const formValue = (field: FieldRecord, value: unknown): AnyRecord | null => {
-    const family = String(field.input.family);
-    if (family === 'text') return { value: String(value ?? '') };
-    if (family === 'checkbox' || family === 'radio') {
+    const kind = String(field.input.kind);
+    if (kind === 'text') return { value: String(value ?? '') };
+    if (kind === 'checkbox' || kind === 'radio') {
       // A toggle's script value is its export value, 'Off' when clear.
       return {
         value:
           value === null || value === undefined || String(value) === 'Off' ? null : String(value),
       };
     }
-    if (family === 'combobox') {
+    if (kind === 'combobox') {
       const selected = Array.isArray(value) ? value[0] : value;
       const text = selected === null || selected === undefined ? '' : String(selected);
       return { value: text === '' ? null : text };
     }
-    if (family === 'listbox') {
+    if (kind === 'listbox') {
       if (Array.isArray(value)) return { selectedValues: value.map(String) };
       return {
         selectedValues:

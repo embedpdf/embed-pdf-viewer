@@ -186,12 +186,12 @@ yourself.
 
 ## Signature fields and their look
 
-A signature field is a form field of family `'signature'`. Create one like any field (see
+A signature field is a form field of kind `'signature'`. Create one like any field (see
 [Creating form fields](/docs/engine/forms/authoring)):
 
 ```ts
 const { field } = await doc.forms.create({
-  family: 'signature',
+  kind: 'signature',
   name: 'approver',
   widgets: [{ page: page.ref, rect: { x: 300, y: 682, width: 200, height: 60 } }],
 });

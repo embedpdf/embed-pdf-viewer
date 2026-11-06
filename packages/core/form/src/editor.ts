@@ -83,7 +83,7 @@ export function textEditorLayout<C extends Coordinates = PageCoordinates>(
   text: string,
   fonts?: PaintFonts,
 ): TextEditorLayout | null {
-  if (field.family !== 'text') return null;
+  if (field.kind !== 'text') return null;
   const { look } = textLookOf(widget, fonts);
   const facts = {
     multiline: field.multiline,

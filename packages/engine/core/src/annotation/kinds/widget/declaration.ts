@@ -52,7 +52,7 @@ export const WidgetDeclaration = defineKind('widget', {
   caption: field.data(z.string()).nullable().optional(),
   /**
    * The symbol a checkbox's or radio button's widget shows while it's on
-   * (`/MK /CA`); `null` shows its family's own, a checkbox's check and a
+   * (`/MK /CA`); `null` shows its kind's own, a checkbox's check and a
    * radio button's circle. Always `null` for other widgets, and one written
    * to another widget is refused.
    */
@@ -72,8 +72,8 @@ export const WidgetDeclaration = defineKind('widget', {
     .space('actions'),
   /** The field the widget belongs to, or `null` when it's in none. */
   field: field.engine(FormFieldRefSchema).nullable(),
-  /** Its field's family, so a widget reads as what it is without the form. */
-  fieldFamily: field.engine(
+  /** Its field's kind, so a widget reads as what it is without the form. */
+  fieldKind: field.engine(
     readsUnknownAs(
       z.enum([
         'text',

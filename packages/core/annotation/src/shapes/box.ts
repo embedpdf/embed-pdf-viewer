@@ -58,7 +58,7 @@ type TurningAnnotation = Extract<Annotation, { subtype: 'square' | 'circle' | 's
 /** Whether a box kind draws the ellipse in its box: a circle, and a radio button (the engine draws one round). */
 const drawsEllipse = (annotation: Annotation): boolean =>
   annotation.subtype === 'circle' ||
-  (annotation.subtype === 'widget' && annotation.fieldFamily === 'radio');
+  (annotation.subtype === 'widget' && annotation.fieldKind === 'radio');
 
 /** A box kind's shape, read off its annotation. */
 function readBox(annotation: Annotation): BoxShape {

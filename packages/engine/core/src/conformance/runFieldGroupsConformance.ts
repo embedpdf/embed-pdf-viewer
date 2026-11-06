@@ -293,13 +293,13 @@ export function runFieldGroupsConformance(
     test('a designer puts fields in her own group, or one she may set', async () => {
       await as('designer', async (doc) => {
         const own = await doc.forms.create({
-          family: 'text',
+          kind: 'text',
           name: 'clause',
           widgets: [{ page: PAGE, rect: { x: 20, y: 200, width: 100, height: 20 } }],
         });
         expect(own.field.groupId).toBe('legal');
         const buyers = await doc.forms.create({
-          family: 'text',
+          kind: 'text',
           name: 'buyer_address',
           groupId: 'buyer',
           widgets: [{ page: PAGE, rect: { x: 140, y: 200, width: 100, height: 20 } }],
@@ -307,7 +307,7 @@ export function runFieldGroupsConformance(
         expect(buyers.field.groupId).toBe('buyer');
         const refused = await refusal(
           doc.forms.create({
-            family: 'text',
+            kind: 'text',
             name: 'seller_address',
             groupId: 'seller',
             widgets: [{ page: PAGE, rect: { x: 260, y: 200, width: 100, height: 20 } }],

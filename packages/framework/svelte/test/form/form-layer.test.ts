@@ -82,12 +82,14 @@ describe('<FormLayer> over fields made from code', () => {
         await form.refresh();
         const ref = kernel.documents.getPage(0, 'blank')!.ref;
         await form.create({
-          family: 'text',
+          kind: 'text',
           name: 'name',
-          widgets: [{ page: ref, rect: { x: 72, y: 100, width: 160, height: 20 }, color: '#94a3b8' }],
+          widgets: [
+            { page: ref, rect: { x: 72, y: 100, width: 160, height: 20 }, color: '#94a3b8' },
+          ],
         });
         await form.create({
-          family: 'checkbox',
+          kind: 'checkbox',
           name: 'agree',
           widgets: [{ page: ref, rect: { x: 72, y: 140, width: 14, height: 14 } }],
         });
@@ -161,7 +163,7 @@ describe('a dropdown in the form layer', () => {
       await form.refresh();
       const ref = kernel.documents.getPage(0, 'blank')!.ref;
       await form.create({
-        family: 'combobox',
+        kind: 'combobox',
         name: 'country',
         options: [
           { label: 'Netherlands', value: 'NL' },
@@ -287,12 +289,12 @@ describe('<FormLayer> field pictures', () => {
         await form.refresh();
         const ref = kernel.documents.getPage(0, 'blank')!.ref;
         await form.create({
-          family: 'text',
+          kind: 'text',
           name: 'name',
           widgets: [{ page: ref, rect: { x: 72, y: 100, width: 160, height: 20 } }],
         });
         await form.create({
-          family: 'checkbox',
+          kind: 'checkbox',
           name: 'agree',
           widgets: [{ page: ref, rect: { x: 72, y: 140, width: 14, height: 14 } }],
         });

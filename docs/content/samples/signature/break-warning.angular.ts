@@ -15,11 +15,7 @@ import type { OpenInput } from '@embedpdf/angular/runtime';
 import { EpdfPageTemplate, EpdfStage, withStage } from '@embedpdf/angular/stage';
 import { EpdfRenderLayer, withRender } from '@embedpdf/angular/render';
 import { withInteraction } from '@embedpdf/angular/interaction';
-import {
-  EpdfAnnotation,
-  EpdfAnnotationLayer,
-  withAnnotation,
-} from '@embedpdf/angular/annotation';
+import { EpdfAnnotation, EpdfAnnotationLayer, withAnnotation } from '@embedpdf/angular/annotation';
 import { EpdfForm, toFieldRef, withForm } from '@embedpdf/angular/form';
 import { EpdfSignature, withSignature } from '@embedpdf/angular/signature';
 import { localEngine } from '@embedpdf/engine';
@@ -157,7 +153,7 @@ export class App {
     if (!widget) return;
     const { rect } = widget;
     await this.form.create({
-      family: 'text',
+      kind: 'text',
       name: 'purchase_order',
       widgets: [
         {

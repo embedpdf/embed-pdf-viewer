@@ -108,12 +108,12 @@ describe('<FormLayer> over fields made from code', () => {
         await form.refresh();
         const page = kernel.documents.getPage(0, 'blank')!.ref;
         await form.create({
-          family: 'text',
+          kind: 'text',
           name: 'name',
           widgets: [{ page, rect: { x: 72, y: 100, width: 160, height: 20 }, color: '#94a3b8' }],
         });
         await form.create({
-          family: 'checkbox',
+          kind: 'checkbox',
           name: 'agree',
           widgets: [{ page, rect: { x: 72, y: 140, width: 14, height: 14 } }],
         });
@@ -138,7 +138,9 @@ describe('<FormLayer> over fields made from code', () => {
         await settle();
         expect(name.value).toEqual({ value: 'Ada Lovelace' });
 
-        const checkbox = document.querySelector<HTMLElement>('[role="checkbox"][aria-label="agree"]')!;
+        const checkbox = document.querySelector<HTMLElement>(
+          '[role="checkbox"][aria-label="agree"]',
+        )!;
         checkbox.click();
         await vi.waitFor(() =>
           expect(form.getValue(toFieldRef('agree'))).toEqual({ checked: true }),
@@ -147,7 +149,9 @@ describe('<FormLayer> over fields made from code', () => {
         // Another field changed: the name's ref kept its value.
         expect(nameChanges.at(-1)).toEqual({ value: 'Ada Lovelace' });
         expect(
-          nameChanges.filter((value) => value && 'value' in value && value.value === 'Ada Lovelace'),
+          nameChanges.filter(
+            (value) => value && 'value' in value && value.value === 'Ada Lovelace',
+          ),
         ).toHaveLength(1);
 
         // The checkbox has no border of its own: the layer draws its edge in the setting's color.
@@ -209,12 +213,12 @@ describe('<FormLayer> field pictures', () => {
         await form.refresh();
         const page = kernel.documents.getPage(0, 'blank')!.ref;
         await form.create({
-          family: 'text',
+          kind: 'text',
           name: 'name',
           widgets: [{ page, rect: { x: 72, y: 100, width: 160, height: 20 } }],
         });
         await form.create({
-          family: 'checkbox',
+          kind: 'checkbox',
           name: 'agree',
           widgets: [{ page, rect: { x: 72, y: 140, width: 14, height: 14 } }],
         });

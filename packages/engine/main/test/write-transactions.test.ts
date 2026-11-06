@@ -155,7 +155,7 @@ describe.each(['wasm', 'native'] as const)(
           what: 'forms.create',
           write: () =>
             doc.forms.create({
-              family: 'text',
+              kind: 'text',
               name: 'probe',
               widgets: [{ page: firstPage, rect: rect(160) }],
             }),
@@ -210,7 +210,7 @@ describe.each(['wasm', 'native'] as const)(
           what: 'forms.setSignatureAppearance',
           setup: () =>
             doc.forms.create({
-              family: 'signature',
+              kind: 'signature',
               name: 'sig',
               widgets: [{ page: firstPage, rect: rect(260) }],
             }),

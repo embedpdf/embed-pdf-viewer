@@ -11,7 +11,7 @@ export interface FormFieldPatch {
     mappingName?: (string | null) | undefined;
     groupId?: string | undefined;
     actions?: CloudPDF.FieldActionsPatch | undefined;
-    family?: FormFieldPatch.Family | undefined;
+    kind?: FormFieldPatch.Kind | undefined;
     defaultValue?: (FormFieldPatch.DefaultValue | null) | undefined;
     maxLength?: (number | null) | undefined;
     multiline?: boolean | undefined;
@@ -25,7 +25,7 @@ export interface FormFieldPatch {
 }
 
 export namespace FormFieldPatch {
-    export const Family = {
+    export const Kind = {
         Text: "text",
         Checkbox: "checkbox",
         Radio: "radio",
@@ -34,7 +34,7 @@ export namespace FormFieldPatch {
         Pushbutton: "pushbutton",
         Signature: "signature",
     } as const;
-    export type Family = (typeof Family)[keyof typeof Family];
+    export type Kind = (typeof Kind)[keyof typeof Kind];
     export type DefaultValue = string | string[];
     export type Options = Options.Item[];
 

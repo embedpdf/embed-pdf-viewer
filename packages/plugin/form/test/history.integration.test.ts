@@ -72,7 +72,7 @@ async function boot() {
       fields: snapshot.fields
         .map((field) => ({
           name: field.name,
-          family: field.family,
+          kind: field.kind,
           required: field.required,
           readOnly: field.readOnly,
           maxLength: 'maxLength' in field ? field.maxLength : null,
@@ -288,7 +288,7 @@ const DESIGNS: Design[] = [
   {
     name: 'create a field',
     act: (form) =>
-      form.create({ family: 'text', name: 'city', widgets: [place(form, 20), place(form, 60)] }),
+      form.create({ kind: 'text', name: 'city', widgets: [place(form, 20), place(form, 60)] }),
   },
   {
     name: 'change its settings',
@@ -298,7 +298,7 @@ const DESIGNS: Design[] = [
   {
     name: 'delete one widget of two',
     setup: (form) =>
-      form.create({ family: 'text', name: 'twice', widgets: [place(form, 20), place(form, 60)] }),
+      form.create({ kind: 'text', name: 'twice', widgets: [place(form, 20), place(form, 60)] }),
     act: (form) => form.deleteWidget(form.get(ref('twice'))!.widgets[1]!.ref!),
   },
 ];

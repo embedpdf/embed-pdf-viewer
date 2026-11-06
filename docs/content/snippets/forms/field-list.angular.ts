@@ -6,7 +6,7 @@ import { EpdfForm } from '@embedpdf/angular/form';
   template: `
     <ul>
       @for (field of form.fields(); track field.name) {
-        <li>{{ field.name }}: {{ field.family }}</li>
+        <li>{{ field.name }}: {{ field.kind }}</li>
       }
     </ul>
   `,

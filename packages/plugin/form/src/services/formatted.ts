@@ -23,7 +23,7 @@ export interface FormattedTexts {
 }
 
 const valueOf = (field: FormFieldDTO): string | null =>
-  field.family === 'text' || field.family === 'combobox' ? field.value : null;
+  field.kind === 'text' || field.kind === 'combobox' ? field.value : null;
 
 export function createFormattedTexts(ctx: FormContext, fields: Mirror<FieldIndex>): FormattedTexts {
   const texts = new Map<FieldKey, Map<string, string>>();

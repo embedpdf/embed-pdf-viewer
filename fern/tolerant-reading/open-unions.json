@@ -11,7 +11,7 @@
   },
   {
     "name": "FormField",
-    "tag": "family",
+    "tag": "kind",
     "catchAll": "unknown",
     "fill": [{ "field": "rawValue", "is": "string", "otherwise": "" }],
     "fixtureKind": "barcode"

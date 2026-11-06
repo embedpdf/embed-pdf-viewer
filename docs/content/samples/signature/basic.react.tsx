@@ -96,7 +96,7 @@ function SignBar() {
   const [person] = useSignerRows();
   const { signatures, target, busy } = useSignatureState();
   const field = useFormState((state) =>
-    state.fields.find((candidate) => candidate.family === 'signature'),
+    state.fields.find((candidate) => candidate.kind === 'signature'),
   );
   const [error, setError] = useState<string | null>(null);
   // Ada's signature, once she signs: the agreement already carries Lanternfield's.

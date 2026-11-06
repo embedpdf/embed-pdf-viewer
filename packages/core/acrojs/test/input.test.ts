@@ -16,11 +16,11 @@ function snapshotWith(field: FormFieldDTO): FormSnapshot {
 describe('scriptFieldsFromSnapshot', () => {
   it.each(['checkbox', 'radio'] as const)(
     'exposes an absent %s value and default as Acrobat Off tokens',
-    (family) => {
+    (kind) => {
       const field = {
         ref: { kind: 'objectNumber', objectNumber: 5 },
         name: 'toggle',
-        family,
+        kind,
         valueEntry: { kind: 'none' },
         defaultValueEntry: { kind: 'none' },
         readOnly: false,
@@ -40,7 +40,7 @@ describe('scriptFieldsFromSnapshot', () => {
     const field = {
       ref: { kind: 'objectNumber', objectNumber: 7 },
       name: 'size',
-      family: 'radio',
+      kind: 'radio',
       valueEntry: { kind: 'scalar', value: '1' },
       defaultValueEntry: { kind: 'scalar', value: '0' },
       readOnly: false,
@@ -59,7 +59,7 @@ describe('scriptFieldsFromSnapshot', () => {
     const field = {
       ref: { kind: 'objectNumber', objectNumber: 6 },
       name: 'text',
-      family: 'text',
+      kind: 'text',
       valueEntry: { kind: 'none' },
       defaultValueEntry: { kind: 'none' },
       readOnly: false,
@@ -76,7 +76,7 @@ describe('scriptFieldsFromSnapshot', () => {
     const field = {
       ref: { kind: 'objectNumber', objectNumber: 8 },
       name: 'vip',
-      family: 'text',
+      kind: 'text',
       valueEntry: { kind: 'none' },
       defaultValueEntry: { kind: 'none' },
       readOnly: false,

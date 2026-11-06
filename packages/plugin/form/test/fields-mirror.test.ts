@@ -40,7 +40,7 @@ const textField = (value: string): FormFieldDTO =>
   ({
     ref: { kind: 'objectNumber', objectNumber: 5 },
     name: 'name',
-    family: 'text',
+    kind: 'text',
     origin: 'acroform',
     readOnly: false,
     required: false,

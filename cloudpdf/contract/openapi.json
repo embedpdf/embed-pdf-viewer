@@ -17658,7 +17658,7 @@
                 "nullable": true
               },
               "field": {},
-              "fieldFamily": {},
+              "fieldKind": {},
               "hasMark": {}
             },
             "required": ["subtype"],
@@ -21461,7 +21461,7 @@
                   "$ref": "#/components/schemas/FormWidget"
                 }
               },
-              "family": {
+              "kind": {
                 "type": "string",
                 "enum": ["text"]
               },
@@ -21506,7 +21506,7 @@
               "filledAt",
               "importedBy",
               "widgets",
-              "family",
+              "kind",
               "value",
               "defaultValue",
               "maxLength",
@@ -21612,7 +21612,7 @@
                   "additionalProperties": false
                 }
               },
-              "family": {
+              "kind": {
                 "type": "string",
                 "enum": ["checkbox"]
               },
@@ -21642,7 +21642,7 @@
               "filledAt",
               "importedBy",
               "widgets",
-              "family",
+              "kind",
               "checked",
               "exportValue"
             ],
@@ -21711,7 +21711,7 @@
                   "$ref": "#/components/schemas/FormField/anyOf/1/properties/widgets/items"
                 }
               },
-              "family": {
+              "kind": {
                 "type": "string",
                 "enum": ["radio"]
               },
@@ -21744,7 +21744,7 @@
               "filledAt",
               "importedBy",
               "widgets",
-              "family",
+              "kind",
               "value",
               "radiosInUnison",
               "noToggleToOff"
@@ -21811,7 +21811,7 @@
               "widgets": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/widgets"
               },
-              "family": {
+              "kind": {
                 "type": "string",
                 "enum": ["combobox"]
               },
@@ -21863,7 +21863,7 @@
               "filledAt",
               "importedBy",
               "widgets",
-              "family",
+              "kind",
               "value",
               "defaultValue",
               "edit",
@@ -21931,7 +21931,7 @@
               "widgets": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/widgets"
               },
-              "family": {
+              "kind": {
                 "type": "string",
                 "enum": ["listbox"]
               },
@@ -21980,7 +21980,7 @@
               "filledAt",
               "importedBy",
               "widgets",
-              "family",
+              "kind",
               "selectedValues",
               "defaultValue",
               "multiSelect",
@@ -22049,7 +22049,7 @@
               "widgets": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/widgets"
               },
-              "family": {
+              "kind": {
                 "type": "string",
                 "enum": ["pushbutton"]
               }
@@ -22073,7 +22073,7 @@
               "filledAt",
               "importedBy",
               "widgets",
-              "family"
+              "kind"
             ],
             "additionalProperties": false
           },
@@ -22137,7 +22137,7 @@
               "widgets": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/widgets"
               },
-              "family": {
+              "kind": {
                 "type": "string",
                 "enum": ["signature"]
               }
@@ -22161,7 +22161,7 @@
               "filledAt",
               "importedBy",
               "widgets",
-              "family"
+              "kind"
             ],
             "additionalProperties": false
           },
@@ -22225,7 +22225,7 @@
               "widgets": {
                 "$ref": "#/components/schemas/FormField/anyOf/0/properties/widgets"
               },
-              "family": {
+              "kind": {
                 "type": "string",
                 "enum": ["unknown"]
               },
@@ -22252,7 +22252,7 @@
               "filledAt",
               "importedBy",
               "widgets",
-              "family",
+              "kind",
               "rawValue"
             ],
             "additionalProperties": false
@@ -22402,7 +22402,7 @@
                   "$ref": "#/components/schemas/WidgetPlacement"
                 }
               },
-              "family": {
+              "kind": {
                 "type": "string",
                 "enum": ["text"]
               },
@@ -22424,7 +22424,7 @@
                 "type": "boolean"
               }
             },
-            "required": ["name", "family"],
+            "required": ["name", "kind"],
             "additionalProperties": false
           },
           {
@@ -22457,12 +22457,12 @@
               "widgets": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/widgets"
               },
-              "family": {
+              "kind": {
                 "type": "string",
                 "enum": ["checkbox"]
               }
             },
-            "required": ["name", "family"],
+            "required": ["name", "kind"],
             "additionalProperties": false
           },
           {
@@ -22495,7 +22495,7 @@
               "widgets": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/widgets"
               },
-              "family": {
+              "kind": {
                 "type": "string",
                 "enum": ["radio"]
               },
@@ -22506,7 +22506,7 @@
                 "type": "boolean"
               }
             },
-            "required": ["name", "family"],
+            "required": ["name", "kind"],
             "additionalProperties": false
           },
           {
@@ -22539,7 +22539,7 @@
               "widgets": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/widgets"
               },
-              "family": {
+              "kind": {
                 "type": "string",
                 "enum": ["combobox"]
               },
@@ -22566,7 +22566,7 @@
                 "type": "string"
               }
             },
-            "required": ["name", "family"],
+            "required": ["name", "kind"],
             "additionalProperties": false
           },
           {
@@ -22599,7 +22599,7 @@
               "widgets": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/widgets"
               },
-              "family": {
+              "kind": {
                 "type": "string",
                 "enum": ["listbox"]
               },
@@ -22619,7 +22619,7 @@
                 }
               }
             },
-            "required": ["name", "family"],
+            "required": ["name", "kind"],
             "additionalProperties": false
           },
           {
@@ -22652,12 +22652,12 @@
               "widgets": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/widgets"
               },
-              "family": {
+              "kind": {
                 "type": "string",
                 "enum": ["pushbutton"]
               }
             },
-            "required": ["name", "family"],
+            "required": ["name", "kind"],
             "additionalProperties": false
           },
           {
@@ -22690,12 +22690,12 @@
               "widgets": {
                 "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/widgets"
               },
-              "family": {
+              "kind": {
                 "type": "string",
                 "enum": ["signature"]
               }
             },
-            "required": ["name", "family"],
+            "required": ["name", "kind"],
             "additionalProperties": false
           }
         ]
@@ -22732,7 +22732,7 @@
           "actions": {
             "$ref": "#/components/schemas/FieldActionsPatch"
           },
-          "family": {
+          "kind": {
             "type": "string",
             "enum": ["text", "checkbox", "radio", "combobox", "listbox", "pushbutton", "signature"]
           },
@@ -23179,7 +23179,7 @@
             ],
             "nullable": true
           },
-          "fieldFamily": {
+          "fieldKind": {
             "type": "string",
             "enum": [
               "text",
@@ -23244,7 +23244,7 @@
           "caption",
           "checkStyle",
           "field",
-          "fieldFamily",
+          "fieldKind",
           "hasMark"
         ],
         "additionalProperties": false
@@ -23463,7 +23463,7 @@
             "nullable": true
           },
           "field": {},
-          "fieldFamily": {},
+          "fieldKind": {},
           "hasMark": {}
         },
         "additionalProperties": false
@@ -26397,7 +26397,7 @@
           {
             "type": "object",
             "properties": {
-              "tag": {
+              "status": {
                 "type": "string",
                 "enum": ["created"]
               },
@@ -26540,13 +26540,13 @@
                 ]
               }
             },
-            "required": ["tag", "document", "upload"],
+            "required": ["status", "document", "upload"],
             "additionalProperties": false
           },
           {
             "type": "object",
             "properties": {
-              "tag": {
+              "status": {
                 "type": "string",
                 "enum": ["resumed"]
               },
@@ -26557,13 +26557,13 @@
                 "$ref": "#/components/schemas/DocumentsInitResponse/anyOf/0/properties/upload"
               }
             },
-            "required": ["tag", "document", "upload"],
+            "required": ["status", "document", "upload"],
             "additionalProperties": false
           },
           {
             "type": "object",
             "properties": {
-              "tag": {
+              "status": {
                 "type": "string",
                 "enum": ["deduped"]
               },
@@ -26571,7 +26571,7 @@
                 "$ref": "#/components/schemas/DocumentsInitResponse/anyOf/0/properties/document"
               }
             },
-            "required": ["tag", "document"],
+            "required": ["status", "document"],
             "additionalProperties": false
           }
         ]
@@ -26798,7 +26798,7 @@
       "DocumentsImportFrom200Response": {
         "type": "object",
         "properties": {
-          "tag": {
+          "status": {
             "type": "string",
             "enum": ["imported", "deduped", "accepted"]
           },
@@ -26883,13 +26883,13 @@
             "additionalProperties": false
           }
         },
-        "required": ["tag", "document"],
+        "required": ["status", "document"],
         "additionalProperties": false
       },
       "DocumentsImportFrom202Response": {
         "type": "object",
         "properties": {
-          "tag": {
+          "status": {
             "type": "string",
             "enum": ["imported", "deduped", "accepted"]
           },
@@ -26974,7 +26974,7 @@
             "additionalProperties": false
           }
         },
-        "required": ["tag", "document"],
+        "required": ["status", "document"],
         "additionalProperties": false
       },
       "DocumentsListResponse": {

@@ -324,7 +324,7 @@ export class FormScriptingController {
       }
     }
 
-    if (!activation && hasProposedValue && target.actions?.keystroke && target.family === 'text') {
+    if (!activation && hasProposedValue && target.actions?.keystroke && target.kind === 'text') {
       let program: string;
       try {
         program = javaScriptProgramFromActionTree(target.actions.keystroke);

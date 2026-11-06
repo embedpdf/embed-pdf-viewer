@@ -11,7 +11,7 @@ description: Add text fields, checkboxes, radio groups, dropdowns, lists, button
 
 ```ts
 const { field } = await doc.forms.create({
-  family: 'text',
+  kind: 'text',
   name: 'customer.email',
   maxLength: 60,
   widgets: [{ page: page.ref, rect: { x: 72, y: 168, width: 228, height: 24 } }],
@@ -25,7 +25,7 @@ The new field fills in, exports and shows like any other field; see
 
 ## Fields and widgets
 
-A form has two parts. The **field** holds the value: it has a name, a family and a few settings,
+A form has two parts. The **field** holds the value: it has a name, a kind and a few settings,
 and it belongs to the document, not to a page. A **widget** is where the field shows: the box on
 a page that you see and click.
 
@@ -35,13 +35,13 @@ field can have widgets on several pages that all show the same value.
 
 ## Create a field
 
-`create()` takes the family, the field's full name and its settings. `widgets` places it on the
+`create()` takes the kind, the field's full name and its settings. `widgets` places it on the
 pages, one entry per place it shows; leave it out to create a field that isn't on any page yet,
 and [add a widget](#add-a-widget) later.
 
 | Field           | What it is                                                                                                                                                | Default    |
 | :-------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------- | :--------- |
-| `family`        | `'text'`, `'checkbox'`, `'radio'`, `'combobox'`, `'listbox'`, `'pushbutton'` or `'signature'`                                                             |            |
+| `kind`          | `'text'`, `'checkbox'`, `'radio'`, `'combobox'`, `'listbox'`, `'pushbutton'` or `'signature'`                                                             |            |
 | `name`          | The full name. Dots make groups: `customer.email` creates `customer` if it's new.                                                                         |            |
 | `widgets`       | Where it shows: a list of `{ page, rect }`, `rect` in points from the page's top-left, each with the [widget's look](#the-widgets-look).                  | not placed |
 | `readOnly`      | PDF apps don't let the user change it.                                                                                                                    | `false`    |
@@ -55,7 +55,7 @@ and [add a widget](#add-a-widget) later.
 `NotFound` for a page that isn't there) and creates nothing. A name that's already taken fails
 with `InvalidArg` too.
 
-Each family adds its own settings:
+Each kind adds its own settings:
 
 | Family       | Settings                                                                                                                         |
 | :----------- | :------------------------------------------------------------------------------------------------------------------------------- |
@@ -74,7 +74,7 @@ with, so it can't be `'Off'`:
 
 ```ts
 const { field } = await doc.forms.create({
-  family: 'radio',
+  kind: 'radio',
   name: 'plan',
   noToggleToOff: true,
   widgets: [
@@ -96,7 +96,7 @@ Options are `{ label, value }`: the user sees the `label`, the form stores the `
 
 ```ts
 await doc.forms.create({
-  family: 'combobox',
+  kind: 'combobox',
   name: 'country',
   options: [
     { label: 'Netherlands', value: 'NL' },
@@ -114,7 +114,7 @@ A push button holds no value: it does something when it's clicked. Give each wid
 
 ```ts
 await doc.forms.create({
-  family: 'pushbutton',
+  kind: 'pushbutton',
   name: 'clear',
   widgets: [
     {
@@ -188,7 +188,7 @@ await doc.forms.update(field.ref, { required: true, maxLength: 80 });
 A setting you leave out keeps its value. `null` removes one: `{ maxLength: null }` for no limit,
 `{ defaultValue: null }` for no default, `{ alternateName: null }` for no tooltip.
 
-You can change the settings in the tables above, except the family and the widgets. A signature
+You can change the settings in the tables above, except the kind and the widgets. A signature
 field takes the settings every field has: `name`, `readOnly`, `required`, `noExport`,
 `alternateName` and `mappingName`.
 Also:
@@ -207,7 +207,7 @@ take them in `actions`:
 
 ```ts
 const { field: total } = await doc.forms.create({
-  family: 'text',
+  kind: 'text',
   name: 'total',
   readOnly: true,
   actions: {
@@ -325,7 +325,7 @@ the `rect` or the `box`, as a create of any shape that turns does:
 
 ```ts
 await doc.forms.create({
-  family: 'text',
+  kind: 'text',
   name: 'side',
   // 24 wide and 160 tall: the text runs up the page
   widgets: [{ page: page.ref, rect: { x: 20, y: 120, width: 24, height: 160 }, rotation: 270 }],

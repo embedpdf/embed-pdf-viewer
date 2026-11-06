@@ -71,7 +71,7 @@ function withFields(index: FieldIndex, parts: readonly FieldWithWidgets[]): Fiel
 
 /** The fields a reset of the whole form puts back: the ones that hold a value. */
 const resetTargets = (index: FieldIndex): FormFieldDTO[] =>
-  (index.snapshot?.fields ?? []).filter((field) => RESET_FAMILIES.has(field.family));
+  (index.snapshot?.fields ?? []).filter((field) => RESET_FAMILIES.has(field.kind));
 
 const RESET_FAMILIES = new Set(['text', 'checkbox', 'radio', 'combobox', 'listbox']);
 

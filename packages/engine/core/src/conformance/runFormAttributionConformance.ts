@@ -92,7 +92,7 @@ export function runFormAttributionConformance(
       const doc = await open(ALICE, DESIGN);
       try {
         const before = Date.now();
-        const { field } = await doc.forms.create({ family: 'text', name: 'extra' });
+        const { field } = await doc.forms.create({ kind: 'text', name: 'extra' });
         expect(field.createdBy).toBe('alice');
         expectStampedSince(field.createdAt, before);
         expect(field.filledBy).toBe(null);
