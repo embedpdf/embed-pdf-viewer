@@ -400,11 +400,13 @@ function SheetMenu({
     if (menu.current) menu.current.inert = covered;
   }, [covered]);
   return (
+    // Isolated, so the menu over this one covers it whole: a submenu's row is positioned, and
+    // without it would paint through the menu on top once that menu's slide ends.
     <div
       ref={menu}
       role="menu"
       part="menu"
-      className={`bg-elevated col-start-1 row-start-1 min-w-0 ${
+      className={`bg-elevated isolate col-start-1 row-start-1 min-w-0 ${
         onBack
           ? 'starting:translate-x-full rtl:starting:-translate-x-full transition-[translate] duration-200 ease-out motion-reduce:transition-none'
           : ''
