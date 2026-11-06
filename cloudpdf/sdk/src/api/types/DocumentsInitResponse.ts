@@ -9,7 +9,7 @@ export type DocumentsInitResponse =
 
 export namespace DocumentsInitResponse {
     export interface Created {
-        tag: "created";
+        status: "created";
         document: DocumentsInitResponseCreated.Document;
         upload: CloudPDF.DocumentsInitResponseCreatedUpload;
     }
@@ -53,7 +53,7 @@ export namespace DocumentsInitResponse {
     }
 
     export interface Resumed {
-        tag: "resumed";
+        status: "resumed";
         document: DocumentsInitResponseResumed.Document;
         upload: CloudPDF.DocumentsInitResponseResumedUpload;
     }
@@ -97,7 +97,7 @@ export namespace DocumentsInitResponse {
     }
 
     export interface Deduped {
-        tag: "deduped";
+        status: "deduped";
         document: DocumentsInitResponseDeduped.Document;
     }
 

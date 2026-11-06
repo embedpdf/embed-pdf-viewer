@@ -264,19 +264,19 @@ export const AdminInitUploadSchema = closed(
 export type AdminInitUpload = z.infer<typeof AdminInitUploadSchema>;
 
 export const AdminDocumentInitResponseSchema = closed(
-  z.discriminatedUnion('tag', [
+  z.discriminatedUnion('status', [
     z.object({
-      tag: z.literal('created'),
+      status: z.literal('created'),
       document: AdminDocumentRecordSchema,
       upload: AdminInitUploadSchema,
     }),
     z.object({
-      tag: z.literal('resumed'),
+      status: z.literal('resumed'),
       document: AdminDocumentRecordSchema,
       upload: AdminInitUploadSchema,
     }),
     z.object({
-      tag: z.literal('deduped'),
+      status: z.literal('deduped'),
       document: AdminDocumentRecordSchema,
     }),
   ]),
@@ -435,7 +435,7 @@ export const AdminDocumentImportResponseSchema = z.object({
    * `accepted` — async: the job is queued (HTTP 202); poll the
    * document until `ready` or `failed`.
    */
-  tag: closed(z.enum(['imported', 'deduped', 'accepted'])),
+  status: closed(z.enum(['imported', 'deduped', 'accepted'])),
   document: AdminDocumentRecordSchema,
 });
 export type AdminDocumentImportResponse = z.infer<typeof AdminDocumentImportResponseSchema>;

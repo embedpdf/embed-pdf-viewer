@@ -9,7 +9,7 @@ import { buildSubmitEntries, resolveFieldSelection } from '../src/field-selectio
 const field = (
   name: string,
   overrides: Partial<{
-    family: string;
+    kind: string;
     noExport: boolean;
     valueEntry: FormFieldDTO['valueEntry'];
     fieldObjectNumber: number;
@@ -18,7 +18,7 @@ const field = (
   ({
     ref: { kind: 'objectNumber', objectNumber: overrides.fieldObjectNumber ?? 0 },
     name,
-    family: overrides.family ?? 'text',
+    kind: overrides.kind ?? 'text',
     origin: 'acroform',
     readOnly: false,
     required: false,
@@ -96,8 +96,8 @@ describe('buildSubmitEntries — the ISO dataset matrix', () => {
       [
         field('plain'),
         field('secret', { noExport: true }),
-        field('button', { family: 'pushbutton' }),
-        field('sig', { family: 'signature' }),
+        field('button', { kind: 'pushbutton' }),
+        field('sig', { kind: 'signature' }),
       ],
       intent(),
       diagnose,
@@ -131,7 +131,7 @@ describe('buildSubmitEntries — the ISO dataset matrix', () => {
   it('an explicitly listed push-button is DIAGNOSED, never silent', () => {
     const { list, diagnose } = diagnostics();
     const entries = buildSubmitEntries(
-      [field('button', { family: 'pushbutton' })],
+      [field('button', { kind: 'pushbutton' })],
       intent({ fields: [{ kind: 'name', name: 'button' }] }),
       diagnose,
     );

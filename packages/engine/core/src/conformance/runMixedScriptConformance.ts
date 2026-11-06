@@ -136,7 +136,7 @@ const WRITERS: Writer[] = [
     box: { x: 20, y: 100, width: 260, height: 24 },
     async write(doc, page, value, fontFamily) {
       const { field } = await doc.forms.create({
-        family: 'text',
+        kind: 'text',
         name: `mixed-${++fields}`,
         widgets: [
           {

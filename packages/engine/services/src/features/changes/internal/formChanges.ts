@@ -89,7 +89,7 @@ type Op<T extends ChangeOp['type']> = Extract<
 /** What a value write may write in a widget: its appearance and its look. */
 const WIDGET_KEYS = ['AP', 'MK'];
 
-/** The families that hold a value: the ones a reset puts back. */
+/** The kinds that hold a value: the ones a reset puts back. */
 const VALUE_FAMILIES = new Set(['text', 'checkbox', 'radio', 'combobox', 'listbox']);
 
 /** The ops that fill a form; the rest change its design. */
@@ -142,7 +142,7 @@ export function reset(ctx: ChangeContext, op: Op<'forms.reset'>): Done {
   authorizeSomeFill(ctx);
   const targets = op.fields
     ? op.fields.map((ref) => readField(ctx, ref))
-    : allFields(ctx).filter(({ field }) => VALUE_FAMILIES.has(field.family));
+    : allFields(ctx).filter(({ field }) => VALUE_FAMILIES.has(field.kind));
   // A reset fills in every field it puts back: each must be the caller's to fill.
   for (const target of targets) authorizeFieldWrite(ctx.authority, target.field.groupId, 'fill');
   const pending = captureBefore(ctx.runtime, ctx.session, targets.flatMap(objectsOf));
@@ -947,7 +947,7 @@ function writeUpdate(ctx: ChangeContext, before: ReadField, patch: FormFieldPatc
       const was = propertiesOf(before.field) as Record<string, unknown>;
       const is = propertiesOf(after) as Record<string, unknown>;
       const keys = Object.keys(patch).filter(
-        (key) => key !== 'family' && !valuesEqual(was[key], is[key]),
+        (key) => key !== 'kind' && !valuesEqual(was[key], is[key]),
       );
       return {
         kind: 'properties',
@@ -1204,7 +1204,7 @@ function propertiesOf(field: FormFieldDTO<PdfCoordinates>): FormFieldPatch {
   const hasDefault = field.defaultValueEntry.kind !== 'none';
   const options = (list: readonly { label: string; value: string }[]) =>
     list.map(({ label, value }) => ({ label, value }));
-  switch (field.family) {
+  switch (field.kind) {
     case 'text':
       return {
         ...base,
@@ -1292,7 +1292,7 @@ function redrawnBy(type: ChangeItemType, field: FormFieldDTO<PdfCoordinates>): F
   const widgets = field.widgets as FormWidget[];
   if (type === 'forms.setDisplay') return [];
   if (type === 'forms.setValue' || type === 'forms.reset') {
-    return redrawnByValue(field.family, widgets);
+    return redrawnByValue(field.kind, widgets);
   }
   return widgets;
 }

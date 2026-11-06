@@ -49,9 +49,9 @@ interface PredictionCase {
 const box = (x: number, y = 600, width = 120, height = 24): PageBox => ({ x, y, width, height });
 
 const text =
-  (extra: Partial<Extract<FormFieldDraft, { family: 'text' }>> = {}) =>
+  (extra: Partial<Extract<FormFieldDraft, { kind: 'text' }>> = {}) =>
   (page: PageRef, name: string): FormFieldDraft => ({
-    family: 'text',
+    kind: 'text',
     name,
     widgets: [{ page, rect: box(72) }],
     ...extra,
@@ -60,7 +60,7 @@ const text =
 const checkbox =
   (exportValues: readonly (string | undefined)[]) =>
   (page: PageRef, name: string): FormFieldDraft => ({
-    family: 'checkbox',
+    kind: 'checkbox',
     name,
     widgets: exportValues.map((exportValue, at) => ({
       page,
@@ -75,7 +75,7 @@ const radio =
     extra: { radiosInUnison?: boolean; noToggleToOff?: boolean } = {},
   ) =>
   (page: PageRef, name: string): FormFieldDraft => ({
-    family: 'radio',
+    kind: 'radio',
     name,
     ...extra,
     widgets: exportValues.map((exportValue, at) => ({
@@ -92,9 +92,9 @@ const OPTIONS = [
 ];
 
 const combo =
-  (extra: Partial<Extract<FormFieldDraft, { family: 'combobox' }>> = {}) =>
+  (extra: Partial<Extract<FormFieldDraft, { kind: 'combobox' }>> = {}) =>
   (page: PageRef, name: string): FormFieldDraft => ({
-    family: 'combobox',
+    kind: 'combobox',
     name,
     options: OPTIONS,
     widgets: [{ page, rect: box(72) }],
@@ -102,9 +102,9 @@ const combo =
   });
 
 const list =
-  (extra: Partial<Extract<FormFieldDraft, { family: 'listbox' }>> = {}) =>
+  (extra: Partial<Extract<FormFieldDraft, { kind: 'listbox' }>> = {}) =>
   (page: PageRef, name: string): FormFieldDraft => ({
-    family: 'listbox',
+    kind: 'listbox',
     name,
     options: OPTIONS,
     widgets: [{ page, rect: box(72, 560, 120, 60) }],
@@ -134,7 +134,7 @@ const CREATES: readonly { name: string; draft: (page: PageRef, name: string) => 
     {
       name: 'text, turned a quarter',
       draft: (page, name) => ({
-        family: 'text',
+        kind: 'text',
         name,
         widgets: [{ page, box: box(72, 500, 120, 24), rotation: 90 }],
       }),
@@ -142,7 +142,7 @@ const CREATES: readonly { name: string; draft: (page: PageRef, name: string) => 
     {
       name: 'text, styled',
       draft: (page, name) => ({
-        family: 'text',
+        kind: 'text',
         name,
         widgets: [
           {
@@ -159,7 +159,7 @@ const CREATES: readonly { name: string; draft: (page: PageRef, name: string) => 
     {
       name: 'checkbox with a diamond, dashed',
       draft: (page, name) => ({
-        family: 'checkbox',
+        kind: 'checkbox',
         name,
         widgets: [
           {
@@ -185,7 +185,7 @@ const CREATES: readonly { name: string; draft: (page: PageRef, name: string) => 
     {
       name: 'signature field',
       draft: (page, name) => ({
-        family: 'signature',
+        kind: 'signature',
         name,
         widgets: [{ page, rect: box(72, 500, 160, 48) }],
       }),
@@ -193,7 +193,7 @@ const CREATES: readonly { name: string; draft: (page: PageRef, name: string) => 
     {
       name: 'push button with a caption',
       draft: (page, name) => ({
-        family: 'pushbutton',
+        kind: 'pushbutton',
         name,
         widgets: [{ page, rect: box(72), caption: 'Go' }],
       }),
@@ -511,14 +511,14 @@ const REFUSALS: readonly PredictionCase[] = [
   },
   {
     name: 'a signature field holds no value',
-    draft: (page, name) => ({ family: 'signature', name, widgets: [{ page, rect: box(72) }] }),
+    draft: (page, name) => ({ kind: 'signature', name, widgets: [{ page, rect: box(72) }] }),
     op: value({ value: 'x' }),
   },
 ];
 
 /**
  * What a form op leaves, predicted (`forms/predict.ts`): each op of every
- * family run against a fresh field, and the field and its widgets' rows the
+ * kind run against a fresh field, and the field and its widgets' rows the
  * engine reads back compared with the prediction, field by field. What the
  * engine stamps on a write (dates, who filled it in), its fonts from the
  * document's default appearance and the names it mints are left out.

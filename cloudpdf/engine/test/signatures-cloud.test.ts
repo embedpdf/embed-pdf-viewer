@@ -419,7 +419,7 @@ describe('digital signatures (cloud SDK, real runtime)', () => {
       const signer = await createTestSigner({ commonName: 'Erin' });
       const page = (await erin.doc.pages.list()).pages[0]!;
       await erin.doc.forms.create({
-        family: 'signature',
+        kind: 'signature',
         name: 'sig2',
         widgets: [{ page: page.ref, rect: { x: 50, y: 50, width: 200, height: 70 } }],
       });

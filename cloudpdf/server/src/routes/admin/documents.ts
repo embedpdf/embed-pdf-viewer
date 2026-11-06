@@ -45,7 +45,7 @@ export interface AdminDocumentsRouteDeps {
  * The flow customers walk through:
  *   1. POST /v1/tenants/:tenantId/documents/init
  *      body: { sizeBytes, contentSha256, name?, metadata?, idempotencyKey?, dedupMode?, docId? }
- *      -> { id, state, tag: 'created'|'resumed'|'deduped', upload?: { ... } }
+ *      -> { id, state, status: 'created'|'resumed'|'deduped', upload?: { ... } }
  *
  *   2. (If not deduped:) PUT the bytes to `upload.url` (presigned) or
  *      POST multipart to `.../documents/:docId/upload-proxy` when the
@@ -59,7 +59,7 @@ export interface AdminDocumentsRouteDeps {
  * customer's own storage — the server-side pull:
  *      POST /v1/tenants/:tenantId/documents/import
  *      body: { source: { kind: 'url', url }, expected?, ... }
- *      -> { tag: 'imported'|'deduped', document }
+ *      -> { status: 'imported'|'deduped'|'accepted', document }
  *
  * Listing / deleting / downloading are flat REST against the tenant documents collection.
  */
@@ -120,9 +120,9 @@ export async function registerAdminDocumentsRoutes(
         : {}),
     });
 
-    if (result.tag === 'deduped') {
+    if (result.status === 'deduped') {
       return reply.send({
-        tag: result.tag,
+        status: result.status,
         document: docPublic(result.doc),
       });
     }
@@ -137,7 +137,7 @@ export async function registerAdminDocumentsRoutes(
       { ttlSec: body.uploadTtlSeconds, preference: body.uploadPreference },
     );
     return reply.send({
-      tag: result.tag,
+      status: result.status,
       document: docPublic(result.doc),
       upload: uploadPublic(upload),
     });
@@ -212,8 +212,8 @@ export async function registerAdminDocumentsRoutes(
       mode: body.mode,
     });
     return reply
-      .code(result.tag === 'accepted' ? 202 : 200)
-      .send({ tag: result.tag, document: docPublic(result.doc) });
+      .code(result.status === 'accepted' ? 202 : 200)
+      .send({ status: result.status, document: docPublic(result.doc) });
   });
 
   const listOp = adminOperations['documents.list'];

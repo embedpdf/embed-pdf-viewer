@@ -7,7 +7,7 @@ export function FieldList() {
     <ul>
       {fields.map((field) => (
         <li key={field.name}>
-          {field.name}: {field.family}
+          {field.name}: {field.kind}
         </li>
       ))}
     </ul>

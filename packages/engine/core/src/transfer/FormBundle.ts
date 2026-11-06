@@ -150,7 +150,7 @@ export function assertFormBundleManifest(
     if (
       !isRecord(row) ||
       !isRecord(row.data) ||
-      typeof row.data.family !== 'string' ||
+      typeof row.data.kind !== 'string' ||
       typeof row.data.name !== 'string' ||
       !isRecord(row.data.ref)
     ) {

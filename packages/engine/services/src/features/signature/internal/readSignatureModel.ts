@@ -316,7 +316,7 @@ export function readStructure(runtime: PdfRuntimeModule, docPtr: Ptr): RevisionS
         fields.push({
           objectNumber: fieldObjectNumberOf(f),
           name: f.name,
-          family: f.family,
+          kind: f.kind,
           widgets: f.widgets.map((w) => w.objectNumber),
           flags: fn.EPDFForm_GetFieldFlags(formModel, index),
         });

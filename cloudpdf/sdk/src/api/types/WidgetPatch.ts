@@ -49,7 +49,7 @@ export interface WidgetPatch {
     caption?: (string | null) | undefined;
     checkStyle?: (WidgetPatch.CheckStyle | null) | undefined;
     field?: unknown | undefined;
-    fieldFamily?: unknown | undefined;
+    fieldKind?: unknown | undefined;
     hasMark?: unknown | undefined;
 }
 

@@ -32,10 +32,10 @@ import {
 } from '../src/model';
 import { fillItems, projectWidget } from '../src/read/fill-items';
 
-const text = (over: Partial<Extract<FormFieldDTO, { family: 'text' }>> = {}): FormFieldDTO => ({
+const text = (over: Partial<Extract<FormFieldDTO, { kind: 'text' }>> = {}): FormFieldDTO => ({
   ref: { kind: 'objectNumber', objectNumber: 4 },
   name: 'maxlen_text',
-  family: 'text',
+  kind: 'text',
   origin: 'acroform',
   readOnly: false,
   required: false,
@@ -309,11 +309,11 @@ describe('fill projection', () => {
 });
 
 const signature = (
-  over: Partial<Extract<FormFieldDTO, { family: 'signature' }>> = {},
+  over: Partial<Extract<FormFieldDTO, { kind: 'signature' }>> = {},
 ): FormFieldDTO => ({
   ref: { kind: 'objectNumber', objectNumber: 9 },
   name: 'sig',
-  family: 'signature',
+  kind: 'signature',
   origin: 'acroform',
   readOnly: false,
   required: false,

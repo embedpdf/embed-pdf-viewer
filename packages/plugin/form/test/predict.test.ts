@@ -33,7 +33,7 @@ const name: FormFieldDTO = {
   ...base,
   ref: { kind: 'objectNumber', objectNumber: 4 },
   name: 'name',
-  family: 'text',
+  kind: 'text',
   valueEntry: { kind: 'scalar', value: 'abc' },
   defaultValueEntry: { kind: 'scalar', value: 'start' },
   widgets: [formWidget(5, PAGE)],
@@ -57,7 +57,7 @@ const agree: FormFieldDTO = {
   ...base,
   ref: { kind: 'objectNumber', objectNumber: 10 },
   name: 'agree',
-  family: 'checkbox',
+  kind: 'checkbox',
   valueEntry: { kind: 'scalar', value: 'Off' },
   defaultValueEntry: { kind: 'none' },
   checked: false,
@@ -69,7 +69,7 @@ const size: FormFieldDTO = {
   ...base,
   ref: { kind: 'objectNumber', objectNumber: 20 },
   name: 'size',
-  family: 'radio',
+  kind: 'radio',
   valueEntry: { kind: 'scalar', value: 'Off' },
   defaultValueEntry: { kind: 'scalar', value: 'L' },
   value: 'Off',
@@ -82,7 +82,7 @@ const send: FormFieldDTO = {
   ...base,
   ref: { kind: 'objectNumber', objectNumber: 30 },
   name: 'send',
-  family: 'pushbutton',
+  kind: 'pushbutton',
   valueEntry: { kind: 'none' },
   defaultValueEntry: { kind: 'none' },
   widgets: [formWidget(31, PAGE)],
@@ -96,7 +96,7 @@ const row = (objectNumber: number, over: Partial<WidgetAnnotation> = {}): Widget
     rect: { x: objectNumber, y: 0, width: 10, height: 10 },
     box: { x: objectNumber, y: 0, width: 10, height: 10 },
     rotation: null,
-    fieldFamily: 'text',
+    fieldKind: 'text',
     hasAppearance: true,
     appearanceState: null,
     hidden: false,
@@ -285,7 +285,7 @@ describe('design ops', () => {
     const next = predictFormOp(form(), {
       type: 'forms.create',
       draft: {
-        family: 'text',
+        kind: 'text',
         name: 'total',
         widgets: [{ page: PAGE, rect: { x: 0, y: 40, width: 80, height: 20 } }],
         actions: { calculate: { type: 'javascript', script: 'event.value = 1;' } },
@@ -293,13 +293,13 @@ describe('design ops', () => {
       objectNumber: 90,
       widgetObjectNumbers: [91],
     });
-    expect(field(next, 90)).toMatchObject({ name: 'total', family: 'text', value: '' });
+    expect(field(next, 90)).toMatchObject({ name: 'total', kind: 'text', value: '' });
     expect(widgetRowOf(next, 91)?.rect).toMatchObject({ x: 0, y: 40, width: 80, height: 20 });
     expect(next.snapshot?.calculationOrder).toEqual([{ kind: 'objectNumber', objectNumber: 90 }]);
     // Without its numbers, it shows once the engine answers.
     const unnamed = form();
     expect(
-      predictFormOp(unnamed, { type: 'forms.create', draft: { family: 'text', name: 'later' } }),
+      predictFormOp(unnamed, { type: 'forms.create', draft: { kind: 'text', name: 'later' } }),
     ).toBe(unnamed);
   });
 
@@ -347,7 +347,7 @@ describe('design ops', () => {
       {
         type: 'forms.create',
         draft: {
-          family: 'checkbox',
+          kind: 'checkbox',
           name: 'new',
           widgets: [{ page: PAGE, rect: { x: 0, y: 0, width: 10, height: 10 } }],
         },

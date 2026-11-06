@@ -57,8 +57,8 @@ async function formOf(doc: DocumentHandle) {
 
 function summary(field: FormFieldDTO) {
   const value =
-    field.family === 'checkbox' ? field.checked : 'value' in field ? field.value : undefined;
-  return { family: field.family, value, widgets: field.widgets.length };
+    field.kind === 'checkbox' ? field.checked : 'value' in field ? field.value : undefined;
+  return { family: field.kind, value, widgets: field.widgets.length };
 }
 
 describe('merging form PDFs into a blank one (engine-local, wasm runtime)', () => {

@@ -44,13 +44,13 @@ export function toolDraft(
   name: string,
   widget: WidgetPlacement,
 ): FormFieldDraft {
-  switch (tool.family) {
+  switch (tool.fieldKind) {
     case 'radio':
-      return { family: 'radio', name, widgets: [{ ...widget, exportValue: 'Choice1' }] };
+      return { kind: 'radio', name, widgets: [{ ...widget, exportValue: 'Choice1' }] };
     case 'combobox':
     case 'listbox':
       return {
-        family: tool.family,
+        kind: tool.fieldKind,
         name,
         widgets: [widget],
         options: [
@@ -59,9 +59,9 @@ export function toolDraft(
         ],
       };
     case 'pushbutton':
-      return { family: 'pushbutton', name, widgets: [{ ...widget, caption: 'Button' }] };
+      return { kind: 'pushbutton', name, widgets: [{ ...widget, caption: 'Button' }] };
     default:
-      return { family: tool.family, name, widgets: [widget] };
+      return { kind: tool.fieldKind, name, widgets: [widget] };
   }
 }
 
@@ -108,7 +108,7 @@ export function createPlaceHandler(
     const look = widgetAppearanceOf(
       annotation ? annotation.tools.getDefaults(tool.id) : tool.defaults,
     );
-    const name = nextFieldName(tool.family, new Set(form.list().map((field) => field.name)));
+    const name = nextFieldName(tool.fieldKind, new Set(form.list().map((field) => field.name)));
     // The new field shows at once, when the document holds the numbers it
     // takes: then it is selected in the same frame. Otherwise once it shows.
     const created = form.create(toolDraft(tool, name, { page, rect, ...look }));

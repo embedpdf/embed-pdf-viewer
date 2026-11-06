@@ -24,7 +24,7 @@ const FIELD = { kind: 'objectNumber' as const, objectNumber: 5 };
 const textField: FormFieldDTO = {
   ref: FIELD,
   name: 'name',
-  family: 'text',
+  kind: 'text',
   origin: 'acroform',
   readOnly: false,
   required: false,

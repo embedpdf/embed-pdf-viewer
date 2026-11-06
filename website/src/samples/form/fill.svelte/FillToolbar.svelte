@@ -1,7 +1,7 @@
 <script lang="ts">
   import { toFieldRef, useForm, type FormCapability } from '@embedpdf/svelte/form';
 
-  /** One field of each family, with `setValue()` in the shape each one takes. */
+  /** One field of each kind, with `setValue()` in the shape each one takes. */
   async function fillIn(form: FormCapability) {
     await form.setValue(toFieldRef('name'), { value: 'Ada Lovelace' }); // text
     await form.setValue(toFieldRef('updates'), { checked: true }); // checkbox

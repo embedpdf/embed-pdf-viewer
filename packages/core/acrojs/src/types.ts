@@ -2,7 +2,7 @@ import type {
   AnnotationRef,
   FormEffect,
   FormFieldDisplay,
-  FormFieldFamily,
+  FormFieldKind,
   FormFieldRef,
 } from '@embedpdf/engine-core/runtime';
 
@@ -18,7 +18,7 @@ export interface ScriptFieldOption {
 export interface ScriptFieldInput {
   ref: FormFieldRef;
   name: string;
-  family: FormFieldFamily;
+  kind: FormFieldKind;
   value: ScriptValue;
   defaultValue: ScriptValue;
   display: FormFieldDisplay;

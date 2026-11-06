@@ -120,9 +120,13 @@ HTTP contract.
 ## Discriminated unions
 
 - **`type`** tags things that happen: messages, events, effects.
-- **`kind`** tags things that are: geometry, refs, borders, drafts.
-- **`status`** tags what a call did: `{ status: 'executed' }`, `{ status: 'refused', reason }`.
+- **`kind`** tags things that are: geometry, refs, borders, drafts, form fields.
+- **`status`** tags what a call did: `{ status: 'executed' }`, `{ status: 'refused', reason }`,
+  and an HTTP answer such as a document init's `{ status: 'deduped' }`.
+- **`subtype`** is the one other tag: an annotation's, which is the PDF's own `/Subtype`.
 - Tag values use one style per union (kebab-case or camelCase), never both.
+
+`cloudpdf/contract/test/consistency.test.ts` checks the HTTP API's unions.
 
 ## The HTTP API
 

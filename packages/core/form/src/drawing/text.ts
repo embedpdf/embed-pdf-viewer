@@ -1,5 +1,5 @@
 /**
- * The families with text: a text field (`GenerateTextFieldFormAP` and
+ * The kinds with text: a text field (`GenerateTextFieldFormAP` and
  * `GenerateTextFieldAP`), a combo box (`GenerateComboBoxFormAP`,
  * `GenerateComboBoxAP`), a list box (`GenerateListBoxFormAP`,
  * `GenerateListBoxAP`) and a push button's caption
@@ -28,7 +28,7 @@ const isFloatBigger = (left: number, right: number) =>
 const isFloatSmaller = (left: number, right: number) =>
   left < right && !isFloatZero(f32(left - right));
 
-/** What every text family reads from its widget. */
+/** What every text kind reads from its widget. */
 export interface TextLook {
   readonly bbox: PdfRect;
   readonly border: BorderStyleInfo;

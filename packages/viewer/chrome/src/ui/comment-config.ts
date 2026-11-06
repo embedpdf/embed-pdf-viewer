@@ -6,7 +6,7 @@ import type { Annotation, Color } from '@embedpdf/react/annotation';
  * set's registry names and accent slots. The color model follows the spec:
  * there is exactly one `/C` ("color") and one `/IC` ("interiorColor"), so
  * `primary` is the annotation's `/C` and `secondary` its interior fill where
- * the family has one.
+ * the kind has one.
  */
 
 export interface IconAccent {

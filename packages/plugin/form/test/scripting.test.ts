@@ -44,7 +44,7 @@ const text = (
 ): FormFieldDTO => ({
   ref: ref(fieldObjectNumber),
   name,
-  family: 'text',
+  kind: 'text',
   origin: 'acroform',
   readOnly: false,
   required: false,
@@ -73,7 +73,7 @@ const text = (
 const pushbutton = (fieldObjectNumber: number, name: string): FormFieldDTO => ({
   ref: ref(fieldObjectNumber),
   name,
-  family: 'pushbutton',
+  kind: 'pushbutton',
   origin: 'acroform',
   readOnly: false,
   required: false,

@@ -17,11 +17,11 @@ const byObjectNumber = (objectNumber: number) => ({ kind: 'objectNumber' as cons
 
 const field = (
   objectNumber = 5,
-  over: Partial<Extract<FormFieldDTO, { family: 'text' }>> = {},
+  over: Partial<Extract<FormFieldDTO, { kind: 'text' }>> = {},
 ): FormFieldDTO => ({
   ref: { kind: 'objectNumber', objectNumber },
   name: `name-${objectNumber}`,
-  family: 'text',
+  kind: 'text',
   origin: 'acroform',
   readOnly: false,
   required: false,
@@ -161,7 +161,7 @@ describe('form authority twins', () => {
 
   it('refuses building the form without doc.forms.modify, before any engine call', async () => {
     const fixture = harness(['doc.forms.read', 'doc.forms.fill']);
-    const draft = { family: 'text' as const, name: 'x' };
+    const draft = { kind: 'text' as const, name: 'x' };
     for (const call of [
       () => fixture.capability.create(draft),
       () => fixture.capability.update(byObjectNumber(5), { required: true }),

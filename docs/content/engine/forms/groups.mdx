@@ -22,7 +22,7 @@ A field's group is its `groupId`. Give it when you create the field, or change i
 
 ```ts
 await doc.forms.create({
-  family: 'text',
+  kind: 'text',
   name: 'buyer.name',
   groupId: 'buyer',
   widgets: [{ page, rect: { x: 72, y: 120, width: 200, height: 24 } }],

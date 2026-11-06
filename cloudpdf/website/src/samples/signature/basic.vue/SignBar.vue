@@ -31,7 +31,12 @@ function useSetUp() {
           libraryId: library.id,
           name: 'signature',
           label: 'Signature',
-          mark: { kind: 'text', text: 'Ada Lovelace', fontFamily: 'times-italic', color: '#1d2b53' },
+          mark: {
+            kind: 'text',
+            text: 'Ada Lovelace',
+            fontFamily: 'times-italic',
+            color: '#1d2b53',
+          },
         });
       })();
     },
@@ -45,7 +50,7 @@ const rows = useSignerRows();
 const person = computed(() => rows.value[0]);
 const { signatures, target, busy } = useSignatureState();
 const field = useFormState((state) =>
-  state.fields.find((candidate) => candidate.family === 'signature'),
+  state.fields.find((candidate) => candidate.kind === 'signature'),
 );
 const error = ref<string | null>(null);
 // Ada's signature, once she signs: the agreement already carries Lanternfield's.

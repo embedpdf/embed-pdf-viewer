@@ -42,7 +42,7 @@ function textField(
   return {
     ref: refOf(objectNumber),
     name,
-    family: 'text',
+    kind: 'text',
     origin: 'acroform',
     readOnly: false,
     required: false,
@@ -146,7 +146,7 @@ describe('planFormImport', () => {
       widgets: [0],
       value: { value: 'customer.name value' },
       draft: {
-        family: 'text',
+        kind: 'text',
         name: 'customer.name',
         widgets: [{ page, rect: { x: 20, y: 20, width: 120, height: 24 }, fontSize: 12 }],
       },
@@ -157,11 +157,11 @@ describe('planFormImport', () => {
     ).not.toHaveProperty('value');
   });
 
-  test('leaves out a taken name, a name the bundle names twice, an unknown family, a widget without its field', () => {
+  test('leaves out a taken name, a name the bundle names twice, an unknown kind, a widget without its field', () => {
     const a = textField('a', 10, [11]);
     const again = textField('a', 20, [21]);
     const taken = textField('taken', 30, []);
-    const unknown = { ...textField('odd', 40, []), family: 'unknown' } as FormFieldDTO;
+    const unknown = { ...textField('odd', 40, []), kind: 'unknown' } as FormFieldDTO;
     const { creates, dropped } = plan(
       bundleOf(
         [a, again, taken, unknown],
@@ -173,7 +173,7 @@ describe('planFormImport', () => {
     expect(dropped).toEqual([
       { ref: again.ref, reason: 'name-conflict' },
       { ref: taken.ref, reason: 'name-conflict' },
-      { ref: unknown.ref, reason: 'unsupported-family' },
+      { ref: unknown.ref, reason: 'unsupported-kind' },
       { ref: refOf(98), widget: widgetRef(99), reason: 'no-field' },
     ]);
   });
@@ -226,10 +226,10 @@ describe('planFormValuesImport', () => {
     const locked = textField('locked', 40, []);
     const empty = textField('empty', 50, [], { valueEntry: { kind: 'none' } });
     const fields = [
-      { ref: refOf(110), name: 'name', family: 'text' as const },
-      { ref: refOf(130), name: 'box', family: 'checkbox' as const },
-      { ref: refOf(140), name: 'locked', family: 'text' as const },
-      { ref: refOf(150), name: 'empty', family: 'text' as const },
+      { ref: refOf(110), name: 'name', kind: 'text' as const },
+      { ref: refOf(130), name: 'box', kind: 'checkbox' as const },
+      { ref: refOf(140), name: 'locked', kind: 'text' as const },
+      { ref: refOf(150), name: 'empty', kind: 'text' as const },
     ];
     const { writes, dropped } = planFormValuesImport({
       bundle: bundleOf([name, missing, box, locked, empty], []),
@@ -239,7 +239,7 @@ describe('planFormValuesImport', () => {
     expect(writes).toEqual([{ field: 0, target: fields[0], value: { value: 'name value' } }]);
     expect(dropped).toEqual([
       { ref: missing.ref, reason: 'no-field' },
-      { ref: box.ref, reason: 'wrong-family' },
+      { ref: box.ref, reason: 'wrong-kind' },
       { ref: locked.ref, reason: 'locked' },
     ]);
   });
@@ -256,7 +256,7 @@ describe('formExportRowsOf', () => {
   test('takes whole fields: a signature unsigned, a field the form does not export without its value', () => {
     const signed = {
       ...textField('sign', 10, []),
-      family: 'signature',
+      kind: 'signature',
       valueEntry: { kind: 'scalar', value: '12 0 R' },
     } as unknown as FormFieldDTO;
     const quiet = textField('quiet', 20, [], { noExport: true });

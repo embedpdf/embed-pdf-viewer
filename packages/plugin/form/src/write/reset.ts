@@ -41,7 +41,7 @@ export function createResetWrites(
    * signature refs, and another signer's fields are theirs.
    */
   const resettable = (field: FormFieldDTO): boolean =>
-    field.family !== 'pushbutton' && field.family !== 'signature' && rights.mayFill(field);
+    field.kind !== 'pushbutton' && field.kind !== 'signature' && rights.mayFill(field);
 
   /**
    * Reset the selected fields, then recalculate, as one change. `origin` is carried through to

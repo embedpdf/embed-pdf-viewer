@@ -22,7 +22,7 @@ async function addField(
   page: NonNullable<Parameters<typeof form.create>[0]['widgets']>[number]['page'],
 ) {
   await form.create({
-    family: 'text',
+    kind: 'text',
     name: 'name',
     widgets: [{ page, rect: { x: 72, y: 540, width: 240, height: 24 } }],
   });

@@ -67,11 +67,11 @@ export const buildSubmitEntries = (
   const entries: FormSubmissionEntry[] = [];
   for (const field of selected) {
     const explicit = explicitInclude && listed(field);
-    if (field.family === 'pushbutton' || field.family === 'signature') {
+    if (field.kind === 'pushbutton' || field.kind === 'signature') {
       if (explicit) {
         diagnose({
           code: 'submit-entry-unsupported',
-          message: `submit: '${field.name}' (${field.family}) has no representable submission value in v1 — skipped`,
+          message: `submit: '${field.name}' (${field.kind}) has no representable submission value in v1 — skipped`,
         });
       }
       continue;

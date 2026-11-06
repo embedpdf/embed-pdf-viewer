@@ -173,7 +173,7 @@ describe('documents.importFrom E2E', () => {
     });
     expect(res.statusCode, res.body).toBe(200);
     const body = JSON.parse(res.body) as { tag: string; document: Record<string, any> };
-    expect(body.tag).toBe('imported');
+    expect(body.status).toBe('imported');
     expect(body.document.state).toBe('ready');
     expect(body.document.baseSha256).toBe(PDF_SHA);
     expect(body.document.sizeBytes).toBe(PDF.byteLength);
@@ -244,7 +244,7 @@ describe('documents.importFrom E2E', () => {
     });
     expect(retry.statusCode, retry.body).toBe(200);
     const body = JSON.parse(retry.body) as { tag: string; document: Record<string, any> };
-    expect(body.tag).toBe('imported');
+    expect(body.status).toBe('imported');
     expect(body.document.id).toBe('imp-flaky');
     expect(body.document.state).toBe('ready');
     expect(body.document.baseSha256).toBe(PDF_SHA);
@@ -258,7 +258,7 @@ describe('documents.importFrom E2E', () => {
     });
     expect(res.statusCode, res.body).toBe(200);
     const body = JSON.parse(res.body) as { tag: string; document: Record<string, any> };
-    expect(body.tag).toBe('deduped');
+    expect(body.status).toBe('deduped');
     expect(body.document.id).toBe('imp-flaky');
     expect(hits.filter((u) => u.startsWith('/flaky')).length).toBe(before);
   });
@@ -272,7 +272,7 @@ describe('documents.importFrom E2E', () => {
     });
     expect(res.statusCode, res.body).toBe(200);
     const body = JSON.parse(res.body) as { tag: string; document: Record<string, any> };
-    expect(body.tag).toBe('deduped');
+    expect(body.status).toBe('deduped');
     expect(body.document.baseSha256).toBe(PDF_SHA);
     expect(hits.filter((u) => u.startsWith('/ok')).length).toBe(before);
   });
@@ -411,7 +411,7 @@ describe('documents.importFrom connection sources E2E', () => {
     });
     expect(res.statusCode, res.body).toBe(200);
     const body = JSON.parse(res.body) as { tag: string; document: Record<string, unknown> };
-    expect(body.tag).toBe('imported');
+    expect(body.status).toBe('imported');
     expect(body.document['state']).toBe('ready');
     expect(body.document['baseSha256']).toBe(PDF_SHA);
 
@@ -487,7 +487,7 @@ describe('documents.importFrom connection sources E2E', () => {
     });
     expect(res.statusCode, res.body).toBe(202);
     const body = JSON.parse(res.body) as { tag: string; document: Record<string, unknown> };
-    expect(body.tag).toBe('accepted');
+    expect(body.status).toBe('accepted');
     expect(body.document['state']).toBe('pending');
 
     await vi.waitFor(
@@ -567,7 +567,7 @@ describe('documents.importFrom fs connection E2E', () => {
     });
     expect(res.statusCode, res.body).toBe(200);
     const body = JSON.parse(res.body) as { tag: string; document: Record<string, unknown> };
-    expect(body.tag).toBe('imported');
+    expect(body.status).toBe('imported');
     expect(body.document['state']).toBe('ready');
     expect(body.document['baseSha256']).toBe(PDF_SHA);
 

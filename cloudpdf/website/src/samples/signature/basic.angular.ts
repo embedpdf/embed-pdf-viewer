@@ -112,7 +112,7 @@ export class App {
 
   protected readonly person = computed(() => this.signature.signerRows()[0]);
   private readonly field = computed(() =>
-    this.form.fields().find((candidate) => candidate.family === 'signature'),
+    this.form.fields().find((candidate) => candidate.kind === 'signature'),
   );
   private readonly error = signal<string | null>(null);
 

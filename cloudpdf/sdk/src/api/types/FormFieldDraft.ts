@@ -13,7 +13,7 @@ export type FormFieldDraft =
 
 export namespace FormFieldDraft {
     export interface Text {
-        family: "text";
+        kind: "text";
         name: string;
         readOnly?: boolean | undefined;
         required?: boolean | undefined;
@@ -31,7 +31,7 @@ export namespace FormFieldDraft {
     }
 
     export interface Checkbox {
-        family: "checkbox";
+        kind: "checkbox";
         name: string;
         readOnly?: boolean | undefined;
         required?: boolean | undefined;
@@ -44,7 +44,7 @@ export namespace FormFieldDraft {
     }
 
     export interface Radio {
-        family: "radio";
+        kind: "radio";
         name: string;
         readOnly?: boolean | undefined;
         required?: boolean | undefined;
@@ -59,7 +59,7 @@ export namespace FormFieldDraft {
     }
 
     export interface Combobox {
-        family: "combobox";
+        kind: "combobox";
         name: string;
         readOnly?: boolean | undefined;
         required?: boolean | undefined;
@@ -86,7 +86,7 @@ export namespace FormFieldDraft {
     }
 
     export interface Listbox {
-        family: "listbox";
+        kind: "listbox";
         name: string;
         readOnly?: boolean | undefined;
         required?: boolean | undefined;
@@ -113,7 +113,7 @@ export namespace FormFieldDraft {
     }
 
     export interface Pushbutton {
-        family: "pushbutton";
+        kind: "pushbutton";
         name: string;
         readOnly?: boolean | undefined;
         required?: boolean | undefined;
@@ -126,7 +126,7 @@ export namespace FormFieldDraft {
     }
 
     export interface Signature {
-        family: "signature";
+        kind: "signature";
         name: string;
         readOnly?: boolean | undefined;
         required?: boolean | undefined;

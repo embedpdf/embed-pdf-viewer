@@ -180,7 +180,7 @@ const ROUND_TRIPS: { readonly [T in ChangeOp['type']]: RoundTrip } = {
       {
         type: 'forms.create',
         draft: {
-          family: 'text',
+          kind: 'text',
           name: 'email',
           // A calculate script also puts it in the calculation order.
           actions: { calculate: CALCULATE },
@@ -234,7 +234,7 @@ const ROUND_TRIPS: { readonly [T in ChangeOp['type']]: RoundTrip } = {
       {
         type: 'forms.create',
         draft: {
-          family: 'text',
+          kind: 'text',
           name: 'email',
           widgets: [
             { page: PAGE, rect: { x: 20, y: 60, width: 140, height: 24 } },
@@ -253,7 +253,7 @@ const ROUND_TRIPS: { readonly [T in ChangeOp['type']]: RoundTrip } = {
       { type: 'forms.update', field: NAME, patch: { actions: { calculate: CALCULATE } } },
       {
         type: 'forms.create',
-        draft: { family: 'text', name: 'total', actions: { calculate: CALCULATE } },
+        draft: { kind: 'text', name: 'total', actions: { calculate: CALCULATE } },
         objectNumber: field,
       },
     ],
@@ -271,7 +271,7 @@ const ROUND_TRIPS: { readonly [T in ChangeOp['type']]: RoundTrip } = {
       {
         type: 'forms.create',
         draft: {
-          family: 'text',
+          kind: 'text',
           name: 'email',
           widgets: [
             { page: PAGE, rect: { x: 20, y: 60, width: 140, height: 24 } },
@@ -305,7 +305,7 @@ const ROUND_TRIPS: { readonly [T in ChangeOp['type']]: RoundTrip } = {
       {
         type: 'forms.create',
         draft: {
-          family: 'signature',
+          kind: 'signature',
           name: 'signature',
           widgets: [{ page: EMPTY_PAGE, rect: { x: 20, y: 100, width: 120, height: 40 } }],
         },
@@ -754,14 +754,14 @@ export function runChangeConformance(
         const undone = await doc.forms.get(NAME);
         expect(undone.required).toBe(false);
         expect(undone.noExport).toBe(false);
-        expect(undone.family === 'text' && undone.value).toBe('Bea');
+        expect(undone.kind === 'text' && undone.value).toBe('Bea');
 
         // The undo's undo makes it required again, and leaves the rest.
         await doc.apply({ undoOf: undo.meta.opId });
         const redone = await doc.forms.get(NAME);
         expect(redone.required).toBe(true);
         expect(redone.noExport).toBe(false);
-        expect(redone.family === 'text' && redone.value).toBe('Bea');
+        expect(redone.kind === 'text' && redone.value).toBe('Bea');
       });
     });
 

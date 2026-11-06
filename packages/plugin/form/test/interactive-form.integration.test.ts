@@ -49,31 +49,31 @@ async function activationFor(
 
 function expectAdobeResetState(snapshot: FormSnapshot): void {
   expect(snapshot.fields.find(({ name }) => name === 'package')).toMatchObject({
-    family: 'combobox',
+    kind: 'combobox',
     value: 'Studio - $500',
   });
   expect(snapshot.fields.find(({ name }) => name === 'recording')).toMatchObject({
-    family: 'checkbox',
+    kind: 'checkbox',
     checked: false,
   });
   expect(snapshot.fields.find(({ name }) => name === 'catering')).toMatchObject({
-    family: 'checkbox',
+    kind: 'checkbox',
     checked: false,
   });
   expect(snapshot.fields.find(({ name }) => name === 'base_amount')).toMatchObject({
-    family: 'text',
+    kind: 'text',
     value: '$500.00',
   });
   expect(snapshot.fields.find(({ name }) => name === 'guest_amount')).toMatchObject({
-    family: 'text',
+    kind: 'text',
     value: '$180.00',
   });
   expect(snapshot.fields.find(({ name }) => name === 'extras_amount')).toMatchObject({
-    family: 'text',
+    kind: 'text',
     value: '$0.00',
   });
   expect(snapshot.fields.find(({ name }) => name === 'total_amount')).toMatchObject({
-    family: 'text',
+    kind: 'text',
     value: '$680.00',
   });
 }
@@ -148,7 +148,7 @@ describe('interactive form JavaScript acceptance', () => {
 
       const packageField = afterSummary.fields.find(({ name }) => name === 'package');
       const recording = afterSummary.fields.find(({ name }) => name === 'recording');
-      if (packageField?.family !== 'combobox' || recording?.family !== 'checkbox') {
+      if (packageField?.kind !== 'combobox' || recording?.kind !== 'checkbox') {
         throw new Error('demo package/recording fields are missing');
       }
       const premium = packageField.options.find(({ label }) => label === 'Premium - $900');
@@ -182,7 +182,7 @@ describe('interactive form JavaScript acceptance', () => {
       }
 
       const confirmation = afterReset.fields.find(({ name }) => name === 'confirmation');
-      if (confirmation?.family !== 'text') throw new Error('confirmation field is missing');
+      if (confirmation?.kind !== 'text') throw new Error('confirmation field is missing');
       await controller.commit(confirmation.ref, { value: 'CONFIRM' });
 
       const beforeConfirm = await doc.forms.list();
@@ -201,7 +201,7 @@ describe('interactive form JavaScript acceptance', () => {
 
       const afterConfirm = await doc.forms.list();
       expect(afterConfirm.fields.find(({ name }) => name === 'confirmation_result')).toMatchObject({
-        family: 'text',
+        kind: 'text',
         value: expect.stringContaining('Confirmed on '),
       });
     } finally {

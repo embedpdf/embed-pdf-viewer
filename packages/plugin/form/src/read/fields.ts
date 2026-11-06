@@ -38,7 +38,7 @@ export const widgetObjectOf = (widget: WidgetAddress): number =>
 export function valueOf(field: FormFieldDTO): FormFieldValue | null {
   const entry = field.valueEntry;
   if (entry.kind === 'none' || entry.kind === 'unsupported') return null;
-  switch (field.family) {
+  switch (field.kind) {
     case 'text':
       return { value: field.value };
     case 'checkbox':
@@ -64,14 +64,14 @@ export function plainValueOf(field: FormFieldDTO): FormPlainValue | undefined {
 }
 
 /**
- * The write a plain value makes for a field of this family, or null when the
- * family can't take it (a list given `true`, a value for a push button).
+ * The write a plain value makes for a field of this kind, or null when the
+ * kind can't take it (a list given `true`, a value for a push button).
  */
 export function writeOfPlainValue(
   field: FormFieldDTO,
   value: FormPlainValue,
 ): FormFieldValue | null {
-  switch (field.family) {
+  switch (field.kind) {
     case 'checkbox':
       if (typeof value === 'boolean') return { checked: value };
       return typeof value === 'string' || value === null ? { value } : null;
@@ -90,7 +90,7 @@ export function writeOfPlainValue(
 
 /** Whether a field holds nothing a required check would accept. */
 export function isEmpty(field: FormFieldDTO): boolean {
-  switch (field.family) {
+  switch (field.kind) {
     case 'text':
     case 'combobox':
       return field.value === '';
@@ -120,7 +120,7 @@ export function createFieldReads(
     if (filter.page !== undefined && !page) return NO_FIELDS;
     return all().filter(
       (field) =>
-        (!filter.family || field.family === filter.family) &&
+        (!filter.kind || field.kind === filter.kind) &&
         (filter.name === undefined || field.name === filter.name) &&
         (!page || field.widgets.some((widget) => widget.page && pageRefsEqual(widget.page, page))),
     );

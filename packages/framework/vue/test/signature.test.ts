@@ -78,7 +78,7 @@ describe('a signature field in the form layer', () => {
       await form.refresh();
       const page = kernel.documents.getPage(0, 'blank')!.ref;
       await form.create({
-        family: 'signature',
+        kind: 'signature',
         name: 'approval',
         widgets: [{ page, rect: { x: 72, y: 560, width: 220, height: 64 } }],
       });
@@ -141,7 +141,9 @@ const standInStampPlugin = definePlugin<StampStore, StampCapability>({
     const api: StandInStamp = {
       listLibraries: (filter) => {
         const kinds = filter?.kind === undefined ? null : ([] as string[]).concat(filter.kind);
-        return ctx.state.get().libraries.filter((library) => !kinds || kinds.includes(library.kind));
+        return ctx.state
+          .get()
+          .libraries.filter((library) => !kinds || kinds.includes(library.kind));
       },
       listAssets: (filter) =>
         ctx.state

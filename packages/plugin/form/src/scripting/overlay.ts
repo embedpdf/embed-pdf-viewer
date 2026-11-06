@@ -62,7 +62,7 @@ export function scriptValueFromFormValue(
   field: ScriptFieldInput,
   value: FormFieldValue,
 ): ScriptValue {
-  switch (field.family) {
+  switch (field.kind) {
     case 'text':
     case 'combobox':
       if ('value' in value) return value.value ?? '';
@@ -84,13 +84,13 @@ export function scriptValueFromFormValue(
       if ('selectedValues' in value) return [...value.selectedValues];
       break;
   }
-  throw new Error(`Form field '${field.name}' (${field.family}) does not take this value`);
+  throw new Error(`Form field '${field.name}' (${field.kind}) does not take this value`);
 }
 
-/** A script value as the engine writes it, or null for a family that holds none. */
+/** A script value as the engine writes it, or null for a kind that holds none. */
 export function formValueFromScriptValue(field: ScriptFieldInput): FormFieldValue | null {
   const value = field.value;
-  switch (field.family) {
+  switch (field.kind) {
     case 'text':
       return { value: String(value ?? '') };
     case 'checkbox':

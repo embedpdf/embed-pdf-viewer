@@ -33,7 +33,7 @@ const rowTop = (row: number) => 470 + row * 36;
 /** A dropdown in a row's country box. */
 function addDropdown(form: EpdfForm, page: PageRef, row: number) {
   return form.create({
-    family: 'combobox',
+    kind: 'combobox',
     name: `country_${row + 1}`,
     options: [
       { label: 'Netherlands', value: 'NL' },
@@ -48,7 +48,7 @@ function addDropdown(form: EpdfForm, page: PageRef, row: number) {
 function addRadioGroup(form: EpdfForm, page: PageRef, row: number) {
   const y = rowTop(row) + 4;
   return form.create({
-    family: 'radio',
+    kind: 'radio',
     name: `ticket_${row + 1}`,
     widgets: [
       { page, rect: { x: 330, y, width: 16, height: 16 }, exportValue: 'one-day', ...look },
@@ -124,14 +124,14 @@ export class App {
   );
 
   /** Each kind of field fills its column from the top: the next row that hasn't got one. */
-  protected rowFor(family: FormFieldDTO['family']) {
-    return this.added().filter((field) => field.family === family).length;
+  protected rowFor(kind: FormFieldDTO['kind']) {
+    return this.added().filter((field) => field.kind === kind).length;
   }
 
-  protected async add(addField: typeof addDropdown, family: FormFieldDTO['family']) {
+  protected async add(addField: typeof addDropdown, kind: FormFieldDTO['kind']) {
     const page = this.page();
     if (!page) return;
-    const { field } = await addField(this.form, page, this.rowFor(family));
+    const { field } = await addField(this.form, page, this.rowFor(kind));
     this.added.update((fields) => [...fields, field]);
     this.stage()?.reveal(page, { rect: this.form.getWidget(field.widgets[0])!.rect });
   }

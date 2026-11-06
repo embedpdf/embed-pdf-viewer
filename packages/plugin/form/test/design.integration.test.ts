@@ -52,12 +52,12 @@ async function withSignatureFields(): Promise<Uint8Array> {
   const page = name.widgets[0]!.page!;
   const look = { color: '#1a1a1a', interiorColor: '#eeeeee' };
   await doc.forms.create({
-    family: 'signature',
+    kind: 'signature',
     name: 'approval',
     widgets: [{ page, rect: { x: 40, y: 300, width: 160, height: 50 }, ...look }],
   });
   await doc.forms.create({
-    family: 'signature',
+    kind: 'signature',
     name: 'marked',
     widgets: [{ page, rect: { x: 40, y: 380, width: 160, height: 50 }, ...look }],
   });
@@ -193,14 +193,14 @@ describe('design through lending', () => {
       const { annotation, form, page } = booted;
       booted.design();
       // The first create fills the session's pool of object numbers.
-      await form.create({ family: 'text', name: 'warm', widgets: [{ page, rect: box(200, 10) }] });
+      await form.create({ kind: 'text', name: 'warm', widgets: [{ page, rect: box(200, 10) }] });
       const created = form.create({
-        family: 'checkbox',
+        kind: 'checkbox',
         name: 'agree',
         widgets: [{ page, rect: box(200, 60, 18, 18) }],
       });
       const shown = form.get({ kind: 'fqn', name: 'agree' });
-      expect(shown?.family).toBe('checkbox');
+      expect(shown?.kind).toBe('checkbox');
       const widget = booted.widgetOf({ kind: 'fqn', name: 'agree' });
       annotation.selection.select([widget]);
       expect(annotation.selection.getSelected().map((each) => annotationKey(each.ref))).toEqual([
@@ -220,7 +220,7 @@ describe('design through lending', () => {
     const booted = await boot();
     try {
       const { annotation, form, history, page, square } = booted;
-      await form.create({ family: 'text', name: 'city', widgets: [{ page, rect: box(150, 100) }] });
+      await form.create({ kind: 'text', name: 'city', widgets: [{ page, rect: box(150, 100) }] });
       await settled(booted);
       booted.design();
       const name = booted.widgetOf(NAME);

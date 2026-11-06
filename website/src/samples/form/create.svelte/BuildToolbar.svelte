@@ -13,7 +13,7 @@
   /** A dropdown in a row's country box. */
   function addDropdown(form: FormCapability, page: PageRef, row: number) {
     return form.create({
-      family: 'combobox',
+      kind: 'combobox',
       name: `country_${row + 1}`,
       options: [
         { label: 'Netherlands', value: 'NL' },
@@ -28,7 +28,7 @@
   function addRadioGroup(form: FormCapability, page: PageRef, row: number) {
     const y = rowTop(row) + 4;
     return form.create({
-      family: 'radio',
+      kind: 'radio',
       name: `ticket_${row + 1}`,
       widgets: [
         { page, rect: { x: 330, y, width: 16, height: 16 }, exportValue: 'one-day', ...look },
@@ -44,13 +44,13 @@
   let added = $state.raw<FormFieldDTO[]>([]);
 
   // Each kind of field fills its column from the top: the next row that hasn't got one.
-  function rowFor(family: FormFieldDTO['family']) {
-    return added.filter((field) => field.family === family).length;
+  function rowFor(kind: FormFieldDTO['kind']) {
+    return added.filter((field) => field.kind === kind).length;
   }
 
-  async function add(addField: typeof addDropdown, family: FormFieldDTO['family']) {
+  async function add(addField: typeof addDropdown, kind: FormFieldDTO['kind']) {
     if (!page) return;
-    const { field } = await addField(form, page, rowFor(family));
+    const { field } = await addField(form, page, rowFor(kind));
     added = [...added, field];
     stage.reveal(page, { rect: form.getWidget(field.widgets[0])!.rect });
   }

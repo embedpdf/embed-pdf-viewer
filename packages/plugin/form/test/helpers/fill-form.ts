@@ -22,16 +22,16 @@ export async function formBytes(engine: Engine): Promise<Uint8Array> {
     ['a', 20],
     ['b', 50],
   ] as const) {
-    await doc.forms.create({ family: 'text', name, defaultValue: '0', widgets: at(y) });
+    await doc.forms.create({ kind: 'text', name, defaultValue: '0', widgets: at(y) });
   }
   await doc.forms.create({
-    family: 'text',
+    kind: 'text',
     name: 'total',
     readOnly: true,
     widgets: at(80),
     actions: { calculate: { type: 'javascript', script: SUM } },
   });
-  await doc.forms.create({ family: 'checkbox', name: 'agree', widgets: at(110) });
+  await doc.forms.create({ kind: 'checkbox', name: 'agree', widgets: at(110) });
   for (const name of ['a', 'b', 'total']) {
     await doc.forms.setValue({ kind: 'fqn', name }, { value: '0' });
   }
@@ -91,6 +91,6 @@ export function gated(
 
 export const valueOf = (field: FormFieldDTO | null | undefined): string | boolean | undefined => {
   if (!field) return undefined;
-  if (field.family === 'checkbox') return field.checked;
-  return field.family === 'text' ? field.value : undefined;
+  if (field.kind === 'checkbox') return field.checked;
+  return field.kind === 'text' ? field.value : undefined;
 };

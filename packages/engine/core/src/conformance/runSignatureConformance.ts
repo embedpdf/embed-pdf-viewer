@@ -321,7 +321,7 @@ export function runSignatureConformance(
         expect(imported.dropped).toEqual([{ ref: row!.data.ref, reason: 'locked' }]);
         expect(imported.fields).toEqual([]);
         const field = await doc.forms.get(lockedRef);
-        expect(field.family).toBe('text');
+        expect(field.kind).toBe('text');
         expect((field as { value?: string }).value === 'changed').toBe(false);
       } finally {
         await doc.close();

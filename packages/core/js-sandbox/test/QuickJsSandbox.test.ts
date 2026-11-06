@@ -30,7 +30,7 @@ const input = (kind: ScriptInput['event']['kind'] = 'field-format'): ScriptInput
     {
       ref: ref('dynamic-label'),
       name: 'dynamic-label',
-      family: 'text',
+      kind: 'text',
       value: '',
       defaultValue: '',
       display: 'visible',

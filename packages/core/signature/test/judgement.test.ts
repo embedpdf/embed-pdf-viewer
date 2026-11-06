@@ -237,7 +237,7 @@ describe('what a validator concludes', () => {
       // A new signature field after an approval signature is permitted.
       const page = (await doc.pages.list()).pages[0]!;
       await doc.forms.create({
-        family: 'signature',
+        kind: 'signature',
         name: 'sig2',
         widget: {
           page: page.ref,

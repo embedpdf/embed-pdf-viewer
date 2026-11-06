@@ -161,7 +161,7 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
         },
       });
 
-      expect(result.tag).toBe('created');
+      expect(result.status).toBe('created');
       expect(result.document.state).toBe('ready');
       expect(result.document.baseSha256).toBe(sha256Hex(bytes));
       expect(result.document.metadata).toEqual({ name: 'Q1 Report' });
@@ -184,10 +184,10 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
       const key = 'retry-1';
 
       const first = await admin.documents.create({ bytes, idempotencyKey: key });
-      expect(first.tag).toBe('created');
+      expect(first.status).toBe('created');
 
       const second = await admin.documents.create({ bytes, idempotencyKey: key });
-      expect(second.tag).toBe('deduped');
+      expect(second.status).toBe('deduped');
       expect(second.document.id).toBe(first.document.id);
     });
 
@@ -250,11 +250,11 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
       const bytes = fakePdf(3, 1024);
       const first = await admin.documents.create({ bytes });
       const second = await admin.documents.create({ bytes, dedupMode: 'reuse-existing' });
-      expect(second.tag).toBe('deduped');
+      expect(second.status).toBe('deduped');
       expect(second.document.id).toBe(first.document.id);
 
       const third = await admin.documents.create({ bytes });
-      expect(third.tag).toBe('created');
+      expect(third.status).toBe('created');
       expect(third.document.id).not.toBe(first.document.id);
     });
 
@@ -270,7 +270,7 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
         sizeBytes: bytes.byteLength,
         contentSha256: declaredButWrongSha,
       });
-      if (init.tag === 'deduped') throw new Error('unexpected dedup');
+      if (init.status === 'deduped') throw new Error('unexpected dedup');
       expect(init.upload.kind).toBe('proxy');
 
       await admin.documents.uploadProxy({
@@ -297,7 +297,7 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
         sizeBytes: bytes.byteLength + 1,
         contentSha256: sha256Hex(bytes),
       });
-      if (init.tag === 'deduped') throw new Error('unexpected dedup');
+      if (init.status === 'deduped') throw new Error('unexpected dedup');
 
       await expect(
         admin.documents.uploadProxy({ docId: init.document.id, body: bytes }),
@@ -481,7 +481,7 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
         sizeBytes: bytes.byteLength,
         contentSha256: sha256Hex(bytes),
       });
-      if (init.tag === 'deduped') throw new Error('unexpected dedup');
+      if (init.status === 'deduped') throw new Error('unexpected dedup');
       expect(init.document.state).toBe('pending');
 
       await new Promise((r) => setTimeout(r, 400));
@@ -925,7 +925,7 @@ export function runAdminE2e(dialect: AdminE2eDialectFixture): void {
         sizeBytes: bytes.byteLength,
         contentSha256: wrongSha,
       });
-      if (init.tag === 'deduped') throw new Error('unexpected dedup');
+      if (init.status === 'deduped') throw new Error('unexpected dedup');
       await admin.documents.uploadProxy({
         docId: init.document.id,
         body: bytes,

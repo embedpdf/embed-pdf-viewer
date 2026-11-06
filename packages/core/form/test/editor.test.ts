@@ -35,9 +35,9 @@ const widget = (patch: Partial<WidgetAnnotation> = {}): WidgetAnnotation =>
     ...patch,
   }) as WidgetAnnotation;
 
-const textField = (patch: Partial<FormFieldDTO & { family: 'text' }> = {}): FormFieldDTO =>
+const textField = (patch: Partial<FormFieldDTO & { kind: 'text' }> = {}): FormFieldDTO =>
   ({
-    family: 'text',
+    kind: 'text',
     value: '',
     multiline: false,
     password: false,
@@ -60,7 +60,7 @@ function cssBaseline(row: WidgetAnnotation, field: FormFieldDTO, text: string): 
   const ascent =
     (standardPaintFont(row.fontFamily as StandardFont).ascent * layout.fontSize) / 1000;
   const content = row.box!.height - layout.padding.top - layout.padding.bottom;
-  const multiline = field.family === 'text' && field.multiline;
+  const multiline = field.kind === 'text' && field.multiline;
   const lineTop = layout.padding.top + (multiline ? 0 : (content - layout.lineHeight) / 2);
   return lineTop + ascent;
 }
@@ -124,7 +124,7 @@ describe('textEditorLayout', () => {
   });
 
   it('is only for text fields', () => {
-    expect(textEditorLayout(widget(), { family: 'checkbox' } as FormFieldDTO, '')).toBeNull();
+    expect(textEditorLayout(widget(), { kind: 'checkbox' } as FormFieldDTO, '')).toBeNull();
   });
 
   it('names the programs its text is drawn in: the face, the fallbacks it needs, the last resort', () => {
@@ -176,7 +176,7 @@ describe('widgetText', () => {
     expect(widgetText(widget(), textField({ password: true }))).toBe('');
     expect(
       widgetText(widget(), {
-        family: 'listbox',
+        kind: 'listbox',
         options: [
           { label: 'One', selected: false },
           { label: 'שתיים', selected: true },
@@ -184,9 +184,9 @@ describe('widgetText', () => {
         topIndex: 0,
       } as unknown as FormFieldDTO),
     ).toBe('One\nשתיים');
-    expect(widgetText(widget({ caption: 'שלח' }), { family: 'pushbutton' } as FormFieldDTO)).toBe(
+    expect(widgetText(widget({ caption: 'שלח' }), { kind: 'pushbutton' } as FormFieldDTO)).toBe(
       'שלח',
     );
-    expect(widgetText(widget(), { family: 'checkbox' } as FormFieldDTO)).toBe('');
+    expect(widgetText(widget(), { kind: 'checkbox' } as FormFieldDTO)).toBe('');
   });
 });

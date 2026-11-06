@@ -1,4 +1,4 @@
-import type { FormFieldFamily } from '../../forms/field';
+import type { FormFieldKind } from '../../forms/field';
 import type {
   BaseVersionInfo,
   DocMdpPermission,
@@ -122,7 +122,7 @@ export interface RevisionField {
   objectNumber: number;
   /** Fully qualified name. */
   name: string;
-  family: FormFieldFamily;
+  kind: FormFieldKind;
   /** Widget annotation object numbers (a merged field-widget lists its own number). */
   widgets: number[];
   /**

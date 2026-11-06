@@ -100,7 +100,7 @@ function signatureField(overrides: Partial<FormFieldDTO> = {}): FormFieldDTO {
   return {
     ref: { kind: 'objectNumber', objectNumber: 9 },
     name: 'sig',
-    family: 'signature',
+    kind: 'signature',
     origin: 'acroform',
     readOnly: false,
     required: false,
@@ -650,7 +650,7 @@ describe('the armed mark over a field', () => {
     const stamp = stampStub(artwork);
     const hits: Record<string, ReturnType<typeof signatureField> | null> = {
       sig: signatureField(),
-      text: signatureField({ family: 'text', name: 'name' } as Partial<FormFieldDTO>),
+      text: signatureField({ kind: 'text', name: 'name' } as Partial<FormFieldDTO>),
       signed: signatureField({ valueEntry: { kind: 'unsupported' } }),
     };
     let where: keyof typeof hits | 'nothing' = 'sig';
@@ -749,7 +749,7 @@ describe('judging what a save would write', () => {
       // A new form field after an approval signature is not fill-in, signing
       // or commenting (corpus v3/86: "Form Fields Added", invalid): the
       // working copy is judged forbidden and the plugin warns, once.
-      await doc.forms.create({ family: 'text', name: 'late_field' } as never);
+      await doc.forms.create({ kind: 'text', name: 'late_field' } as never);
       await settle(700);
       expect(signature.getVerdict(SIG)).toMatchObject({
         summary: 'invalid',
@@ -762,7 +762,7 @@ describe('judging what a save would write', () => {
       expect((warnings[0] as { detail: string }).detail).toMatch(/field/i);
 
       // A second forbidden edit changes nothing about the verdict: no second warning.
-      await doc.forms.create({ family: 'text', name: 'later_field' } as never);
+      await doc.forms.create({ kind: 'text', name: 'later_field' } as never);
       await settle(700);
       expect(events.filter((event) => event.type === 'invalidating')).toHaveLength(1);
 

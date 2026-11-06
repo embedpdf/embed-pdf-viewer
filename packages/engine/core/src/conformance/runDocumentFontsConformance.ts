@@ -128,7 +128,7 @@ export function runDocumentFontsConformance(
     async function fieldIn(doc: DocumentHandle, fontFamily: string, value: string, name: string) {
       const page = await firstPage(doc);
       const { field } = await doc.forms.create({
-        family: 'text',
+        kind: 'text',
         name,
         widgets: [{ page, rect: { x: 40, y: 40, width: 200, height: 24 }, fontFamily }],
       });
@@ -205,7 +205,7 @@ export function runDocumentFontsConformance(
       expect(plain.meta.missingCharacters).toBe(undefined);
 
       const { field } = await doc.forms.create({
-        family: 'text',
+        kind: 'text',
         name: 'missing',
         widgets: [
           { page, rect: { x: 40, y: 140, width: 200, height: 24 }, fontFamily: 'helvetica' },

@@ -43,7 +43,7 @@ const text = (
 ): FormFieldDTO => ({
   ref: ref(fieldObjectNumber),
   name,
-  family: 'text',
+  kind: 'text',
   origin: 'acroform',
   readOnly: false,
   required: false,

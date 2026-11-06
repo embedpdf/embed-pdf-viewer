@@ -60,11 +60,11 @@ const lookOf = (widget: WidgetAnnotation | undefined): Partial<WidgetPlacement> 
 /**
  * The export value a field's new widget gets when none is given: a radio group's next free
  * `Choice<n>` (the radio tool names its first button `Choice1`), a checkbox's own value, so
- * the boxes check together. Other families take none.
+ * the boxes check together. Other kinds take none.
  */
 function exportValueFor(field: FormFieldDTO): string | undefined {
-  if (field.family === 'checkbox') return field.exportValue;
-  if (field.family !== 'radio') return undefined;
+  if (field.kind === 'checkbox') return field.exportValue;
+  if (field.kind !== 'radio') return undefined;
   const taken = new Set(field.widgets.map((widget) => widget.exportValue));
   let n = field.widgets.length + 1;
   while (taken.has(`Choice${n}`)) n += 1;

@@ -195,7 +195,7 @@
         "kind": "objectNumber",
         "objectNumber": 12
       },
-      "fieldFamily": "barcode"
+      "fieldKind": "barcode"
     },
     {
       "subtype": "line",

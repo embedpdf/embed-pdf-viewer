@@ -57,7 +57,7 @@ export interface AppearanceStatesConformanceOptions {
  * every engine. A page's appearance batch holds every appearance an
  * annotation stores: each mode it has, and every state of each mode, each
  * image labelled with both, whatever `/AS` says. The annotation's
- * `appearanceState` says which state it shows. Each family has its own
+ * `appearanceState` says which state it shows. Each kind has its own
  * batch: `page.annotations` the square's, `page.forms` the check box's, and
  * neither holds the other's. A page picture draws what its two options ask
  * for, the annotations and the form fields, each without the other.
@@ -105,7 +105,7 @@ export function runAppearanceStatesConformance(
       return labels;
     };
 
-    /** Both families' pictures, each from its own batch. */
+    /** Both kinds' pictures, each from its own batch. */
     const render = async (modes?: AnnotationAppearanceMode[]) => {
       const options = {
         format: 'png' as const,

@@ -28,7 +28,7 @@ const RADIO: FormFieldDTO = {
   ...BASE,
   ref: { kind: 'objectNumber', objectNumber: 6 },
   name: 'gender',
-  family: 'radio',
+  kind: 'radio',
   valueEntry: { kind: 'scalar', value: 'male' },
   defaultValueEntry: { kind: 'none' },
   value: 'male',
@@ -66,7 +66,7 @@ const LISTBOX: FormFieldDTO = {
   ...BASE,
   ref: { kind: 'objectNumber', objectNumber: 9 },
   name: 'fruits',
-  family: 'listbox',
+  kind: 'listbox',
   valueEntry: { kind: 'array', values: ['Apple', 'Cherry'] },
   defaultValueEntry: { kind: 'array', values: ['Apple'] },
   selectedValues: ['Apple', 'Cherry'],
@@ -100,7 +100,7 @@ describe('form schemas', () => {
   test('family discriminant rejects cross-family members', () => {
     // A listbox payload claiming to be text must fail: no `value` string,
     // and `selectedValues` is not part of the text member.
-    const bad = { ...LISTBOX, family: 'text' };
+    const bad = { ...LISTBOX, kind: 'text' };
     expect(() => FormFieldDTOSchema.parse(bad)).toThrow();
   });
 

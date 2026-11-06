@@ -178,9 +178,9 @@ export interface AnnotationReorderStep {
   readonly family: AnnotationFamily;
   /** The rows the reorder moved, in the order it was given them. */
   readonly refs: readonly AnnotationRef[];
-  /** The family's order before the reorder, bottom to top: where the rows go back to. */
+  /** The kind's order before the reorder, bottom to top: where the rows go back to. */
   readonly before: readonly AnnotationRef[];
-  /** The family's order it left. */
+  /** The kind's order it left. */
   readonly after: readonly AnnotationRef[];
 }
 

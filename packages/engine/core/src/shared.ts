@@ -639,7 +639,7 @@ export type { FormFieldRef, FormWidget } from './identity/FormFieldRef';
 export { formWidget, toFieldRef } from './identity/FormFieldRef';
 export { encodeFieldRefKey, decodeFieldRefKey } from './identity/FormFieldRef';
 export type {
-  FormFieldFamily,
+  FormFieldKind,
   FormFieldOrigin,
   ToggleFieldWidget,
   FormFieldWidget,

@@ -54,7 +54,7 @@ function textField(objnum: number, name: string) {
   return {
     ref: { kind: 'objectNumber' as const, objectNumber: objnum },
     name,
-    family: 'text' as const,
+    kind: 'text' as const,
     origin: 'acroform' as const,
     readOnly: false,
     required: false,

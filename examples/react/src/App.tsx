@@ -959,7 +959,7 @@ function FieldPanel() {
   const field = useFormState((state) => state.selectedField);
   if (!field) return null;
   const patch = (p: Record<string, unknown>) =>
-    void form.update(field.ref, { family: field.family, ...p } as FormFieldPatch);
+    void form.update(field.ref, { kind: field.kind, ...p } as FormFieldPatch);
   return (
     <div
       style={{
@@ -971,7 +971,7 @@ function FieldPanel() {
       }}
     >
       <span style={{ fontSize: 10, letterSpacing: 0.4, textTransform: 'uppercase', color: '#999' }}>
-        Field · {field.family}
+        Field · {field.kind}
       </span>
       <SideField label="Name">
         <input
@@ -992,7 +992,7 @@ function FieldPanel() {
         />
         required
       </label>
-      {(field.family === 'combobox' || field.family === 'listbox') && (
+      {(field.kind === 'combobox' || field.kind === 'listbox') && (
         <SideField label="Options (one per line)">
           <textarea
             key={field.name}

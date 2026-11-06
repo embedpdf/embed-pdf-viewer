@@ -119,7 +119,7 @@ describe('form place handler', () => {
     await flush();
     expect(placed).toHaveLength(1);
     // The next free name: the form already has `text_1`.
-    expect(placed[0]).toMatchObject({ family: 'text', name: 'text_2' });
+    expect(placed[0]).toMatchObject({ kind: 'text', name: 'text_2' });
     expect(widgetOf(placed[0])).toMatchObject({
       page: PAGE_REF,
       // 160×24 centred on the down point (the core's `d.from` rule).
@@ -287,7 +287,7 @@ describe('form place handler', () => {
     }
     await flush();
     expect(widgetOf(placed[0])).toMatchObject({ exportValue: 'Choice1' });
-    expect(placed[1]).toMatchObject({ family: 'combobox', name: 'combobox_1' });
+    expect(placed[1]).toMatchObject({ kind: 'combobox', name: 'combobox_1' });
     expect((placed[1] as { options: unknown[] }).options).toHaveLength(2);
   });
 

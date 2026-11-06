@@ -21,7 +21,7 @@ const field = (
 ): ScriptFieldInput => ({
   ref: ref(name),
   name,
-  family: 'text',
+  kind: 'text',
   value,
   defaultValue: value,
   display: 'visible',

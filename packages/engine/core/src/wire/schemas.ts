@@ -1336,7 +1336,7 @@ export const FormImportResultSchema: z.ZodType<FormImportResult> = z.object({
         z.enum([
           'name-conflict',
           'no-field',
-          'unsupported-family',
+          'unsupported-kind',
           'script-not-allowed',
           'unsupported-action',
         ]),
@@ -1354,7 +1354,7 @@ export const FormValuesImportResultSchema: z.ZodType<FormValuesImportResult> = z
     z.object({
       ref: FormFieldRefSchema,
       reason: closed(
-        z.enum(['no-field', 'wrong-family', 'value-not-allowed', 'locked', 'fill-not-allowed']),
+        z.enum(['no-field', 'wrong-kind', 'value-not-allowed', 'locked', 'fill-not-allowed']),
       ),
     }),
   ),

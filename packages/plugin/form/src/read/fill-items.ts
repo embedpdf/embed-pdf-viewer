@@ -82,7 +82,7 @@ export type FormWidgetItem = FormWidgetItemBase &
 
 /**
  * Project one widget of a field into a fill control; `fillable`: the user may
- * fill the field in (a signature field: sign it). Null for families with no
+ * fill the field in (a signature field: sign it). Null for kinds with no
  * fill control.
  */
 export function projectWidget(
@@ -103,7 +103,7 @@ export function projectWidget(
     disabled: field.readOnly || !fillable,
     label: field.alternateName ?? field.name,
   };
-  switch (field.family) {
+  switch (field.kind) {
     case 'text':
       return {
         ...base,

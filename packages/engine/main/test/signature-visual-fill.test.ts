@@ -80,7 +80,7 @@ describe('signature fields in the viewer phase', () => {
     try {
       const page = (await doc.pages.list()).pages[0]!;
       const created = await doc.forms.create({
-        family: 'signature',
+        kind: 'signature',
         name: 'sig2',
         widgets: [
           {
@@ -89,7 +89,7 @@ describe('signature fields in the viewer phase', () => {
           },
         ],
       });
-      expect(created.field.family).toBe('signature');
+      expect(created.field.kind).toBe('signature');
       expect(created.field.widgets).toHaveLength(1);
       const before = await doc.signatures.list();
       expect(before.signatures.map((s) => [s.fieldName, s.signed])).toEqual([
@@ -145,7 +145,7 @@ describe('signature fields in the viewer phase', () => {
         { kind: 'fqn', name: 'sig2' },
         { pdf: artwork },
       );
-      expect(again.field.family).toBe('signature');
+      expect(again.field.kind).toBe('signature');
     } finally {
       await doc.close();
     }
@@ -165,7 +165,7 @@ describe('signature fields in the viewer phase', () => {
           (row) => row.ref.kind === 'objectNumber' && row.ref.objectNumber === objectNumber,
         )!;
       const created = await doc.forms.create({
-        family: 'signature',
+        kind: 'signature',
         name: 'boxed',
         widgets: [
           {

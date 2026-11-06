@@ -97,7 +97,7 @@ export function fieldMatches(
  * value and who filled it, and a signature field without its signature.
  */
 function exportedField<C extends Coordinates>(field: FormFieldDTO<C>): FormFieldDTO<C> {
-  if (field.family === 'signature') return { ...field, valueEntry: { kind: 'none' } };
+  if (field.kind === 'signature') return { ...field, valueEntry: { kind: 'none' } };
   if (!field.noExport) return field;
   const unfilled = {
     ...field,
@@ -106,28 +106,28 @@ function exportedField<C extends Coordinates>(field: FormFieldDTO<C>): FormField
     filledByName: null,
     filledAt: null,
   } as const;
-  switch (field.family) {
+  switch (field.kind) {
     case 'text':
     case 'combobox':
-      return { ...unfilled, family: field.family, value: '' } as FormFieldDTO<C>;
+      return { ...unfilled, kind: field.kind, value: '' } as FormFieldDTO<C>;
     case 'checkbox':
       return {
         ...unfilled,
-        family: 'checkbox',
+        kind: 'checkbox',
         checked: false,
         widgets: field.widgets.map((widget) => ({ ...widget, checked: false })),
       } as FormFieldDTO<C>;
     case 'radio':
       return {
         ...unfilled,
-        family: 'radio',
+        kind: 'radio',
         value: 'Off',
         widgets: field.widgets.map((widget) => ({ ...widget, checked: false })),
       } as FormFieldDTO<C>;
     case 'listbox':
       return {
         ...unfilled,
-        family: 'listbox',
+        kind: 'listbox',
         selectedValues: [],
         options: field.options.map((option) => ({ ...option, selected: false })),
       } as FormFieldDTO<C>;
