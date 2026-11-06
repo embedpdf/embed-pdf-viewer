@@ -593,7 +593,7 @@ export const fr: Locale = {
       retry: 'Réessayer',
       empty: 'Aucun commentaire pour l’instant. Utilisez l’outil Note pour lancer une discussion.',
       emptyReadOnly: 'Aucun commentaire dans ce document.',
-      anonymous: 'Inconnu',
+      anonymous: 'Invité',
       page: 'Page {page}',
       count: '{count} commentaire',
       countPlural: '{count} commentaires',

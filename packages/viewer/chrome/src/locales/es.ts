@@ -589,7 +589,7 @@ export const es: Locale = {
       retry: 'Reintentar',
       empty: 'Aún no hay comentarios. Usa la herramienta de nota para iniciar un hilo.',
       emptyReadOnly: 'Este documento no tiene comentarios.',
-      anonymous: 'Desconocido',
+      anonymous: 'Invitado',
       page: 'Página {page}',
       count: '{count} comentario',
       countPlural: '{count} comentarios',

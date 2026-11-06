@@ -603,7 +603,7 @@ export const en: Locale = {
       retry: 'Retry',
       empty: 'No comments yet. Use the note tool to start a thread.',
       emptyReadOnly: 'No comments on this document.',
-      anonymous: 'Unknown',
+      anonymous: 'Guest',
       page: 'Page {page}',
       count: '{count} comment',
       countPlural: '{count} comments',

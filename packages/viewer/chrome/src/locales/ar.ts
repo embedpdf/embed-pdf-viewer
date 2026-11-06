@@ -589,7 +589,7 @@ export const ar: Locale = {
       retry: 'إعادة المحاولة',
       empty: 'لا توجد تعليقات بعد. استخدم أداة الملاحظة لبدء سلسلة تعليقات.',
       emptyReadOnly: 'لا توجد تعليقات على هذا المستند.',
-      anonymous: 'غير معروف',
+      anonymous: 'ضيف',
       page: 'الصفحة {page}',
       count: 'التعليقات: {count}',
       countPlural: 'التعليقات: {count}',

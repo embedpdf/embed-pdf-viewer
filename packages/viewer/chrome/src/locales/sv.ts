@@ -591,7 +591,7 @@ export const sv: Locale = {
       retry: 'Försök igen',
       empty: 'Inga kommentarer än. Använd anteckningsverktyget för att starta en tråd.',
       emptyReadOnly: 'Inga kommentarer i det här dokumentet.',
-      anonymous: 'Okänd',
+      anonymous: 'Gäst',
       page: 'Sida {page}',
       count: '{count} kommentar',
       countPlural: '{count} kommentarer',

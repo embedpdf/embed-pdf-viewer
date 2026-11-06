@@ -591,7 +591,7 @@ export const de: Locale = {
       retry: 'Erneut versuchen',
       empty: 'Noch keine Kommentare. Beginnen Sie mit dem Notiz-Werkzeug eine Diskussion.',
       emptyReadOnly: 'Dieses Dokument enthält keine Kommentare.',
-      anonymous: 'Unbekannt',
+      anonymous: 'Gast',
       page: 'Seite {page}',
       count: '{count} Kommentar',
       countPlural: '{count} Kommentare',
