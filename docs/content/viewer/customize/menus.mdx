@@ -103,7 +103,7 @@ Three bars appear over what's selected:
 | Bar | Appears over | What's in it |
 | :-- | :-- | :-- |
 | `selection` | Selected text | Copy, highlight, underline, strike out |
-| `annotation` | Selected annotations | Comment, style, link, group, delete |
+| `annotation` | Selected annotations | Comment, style, link, group, apply redaction, delete |
 | `snapshot` | The box the [snapshot tool](../documents#take-a-snapshot) holds | Copy, save image |
 
 They're bars, so the same edits work. Add your own action, or remove one:
@@ -117,8 +117,9 @@ layout
 A selection bar appears when the selection is made, not while the mouse is still dragging. The bar
 for text sits above it, and the bars for annotations and the snapshot below them. Each flips to the other side when
 there's no room, and on a touch screen the text bar keeps clear of the handles. Each item is shown
-only for a selection it works on: **Comment** isn't offered on a link, and **Group** only when more
-than one annotation is selected.
+only for a selection it works on: **Comment** isn't offered on a link, **Group** only when more
+than one annotation is selected, and **Apply Redaction** only when every selected annotation is a
+redaction mark.
 
 ## The "More" menu
 

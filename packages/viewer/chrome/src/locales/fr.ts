@@ -151,6 +151,11 @@ export const fr: Locale = {
       redact: {
         mark: 'Marquer pour biffage',
         applyAll: 'Appliquer les biffages',
+        apply: {
+          one: 'Appliquer le biffage',
+          many: 'Appliquer {count} de biffages',
+          other: 'Appliquer {count} biffages',
+        },
         clearAll: 'Effacer les marques',
       },
       undo: 'Annuler',
@@ -649,7 +654,11 @@ export const fr: Locale = {
       redactionArea: 'Marque de zone',
       redactionText: 'Marque de texte',
       redactionRemove: 'Supprimer la marque',
-      redactConfirmTitle: 'Appliquer les biffages ?',
+      redactConfirmTitle: {
+        one: 'Appliquer le biffage ?',
+        many: 'Appliquer les biffages ?',
+        other: 'Appliquer les biffages ?',
+      },
       redactConfirmBody: {
         one: 'Supprimer définitivement le contenu situé sous {count} marque de biffage. Cette opération est irréversible.',
         many: 'Supprimer définitivement le contenu situé sous {count} de marques de biffage. Cette opération est irréversible.',

@@ -150,6 +150,12 @@ export const pl: Locale = {
       redact: {
         mark: 'Oznacz do zaczernienia',
         applyAll: 'Zastosuj zaczernienia',
+        apply: {
+          one: 'Zastosuj zaczernienie',
+          few: 'Zastosuj {count} zaczernienia',
+          many: 'Zastosuj {count} zaczernień',
+          other: 'Zastosuj {count} zaczernienia',
+        },
         clearAll: 'Wyczyść oznaczenia',
       },
       undo: 'Cofnij',
@@ -654,7 +660,12 @@ export const pl: Locale = {
       redactionArea: 'Oznaczenie obszaru',
       redactionText: 'Oznaczenie tekstu',
       redactionRemove: 'Usuń oznaczenie',
-      redactConfirmTitle: 'Zastosować zaczernienia?',
+      redactConfirmTitle: {
+        one: 'Zastosować zaczernienie?',
+        few: 'Zastosować zaczernienia?',
+        many: 'Zastosować zaczernienia?',
+        other: 'Zastosować zaczernienia?',
+      },
       redactConfirmBody: {
         one: 'Zawartość pod {count} oznaczeniem do zaczernienia zostanie trwale usunięta. Tej operacji nie można cofnąć.',
         few: 'Zawartość pod {count} oznaczeniami do zaczernienia zostanie trwale usunięta. Tej operacji nie można cofnąć.',

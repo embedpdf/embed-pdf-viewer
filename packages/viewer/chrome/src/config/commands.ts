@@ -24,7 +24,7 @@
  *   history undo/redo                      → real History
  */
 import { panelCommandOf } from '@embedpdf/core-ui';
-import type { AnnotationToolInput } from '@embedpdf/react/annotation';
+import type { AnnotationRef, AnnotationToolInput } from '@embedpdf/react/annotation';
 import {
   CommandsToken,
   standardCommands,
@@ -193,6 +193,16 @@ const selectionSubtypes = (commandContext: Ctx) =>
   new Set(
     (anno(commandContext)?.selection.getSelected() ?? []).map((annotation) => annotation.subtype),
   );
+/**
+ * The selected redaction marks, when every selected annotation is one; none for a mixed
+ * selection, so the annotation bar's Apply never stands for part of what's selected.
+ */
+const selectedMarks = (commandContext: Ctx): readonly AnnotationRef[] => {
+  const selected = anno(commandContext)?.selection.getSelected() ?? [];
+  return selected.every((annotation) => annotation.subtype === 'redact')
+    ? selected.map((annotation) => annotation.ref)
+    : [];
+};
 /**
  * The selection's `link` value: a target, `null` (linkable but none set), or
  * `undefined` when the selection cannot carry a link at all (widgets, mixed
@@ -837,8 +847,8 @@ export const defaultCommands: CommandDefinition[] = [
     check: DESIGNS_FORMS,
   }),
 
-  // ── redaction (the toolbar arms the tool; the panel owns the destructive
-  // verbs — Apply All / Clear live in the redaction sidebar) ─────────────────
+  // ── redaction (the toolbar arms the tool; the panel applies every mark and
+  // the annotation bar the selected ones, both through the one confirmation) ──
   // Marks are annotations, so marking is `redaction.canMark()`.
   tool('tool:redact', 'redact', 'commands.redact.mark', 'redactArea', {
     feature: 'redaction',
@@ -858,6 +868,26 @@ export const defaultCommands: CommandDefinition[] = [
     enabled: (commandContext) => {
       const redaction = commandContext.tryGet(RedactionToken);
       return !!redaction && redaction.getPendingCount() > 0 && !redaction.isApplying();
+    },
+  },
+  {
+    // The annotation bar's Apply: the selected marks only. The same confirmation asks first,
+    // given the marks selected at the click, so it applies what the user saw selected.
+    id: 'annotation:apply-redaction',
+    labelKey: 'commands.redact.apply',
+    labelParams: (commandContext) => ({ count: selectedMarks(commandContext).length }),
+    icon: 'check',
+    categories: ['redaction'],
+    allowed: (commandContext) => commandContext.tryGet(RedactionToken)?.canApply() ?? true,
+    run: (commandContext) =>
+      commandContext.tryGet(ShellToken)?.open(REDACT_CONFIRM_DIALOG, {
+        exclusive: 'modal',
+        props: { refs: selectedMarks(commandContext) },
+      }),
+    visible: (commandContext) => selectedMarks(commandContext).length > 0,
+    enabled: (commandContext) => {
+      const redaction = commandContext.tryGet(RedactionToken);
+      return !!redaction && !redaction.isApplying();
     },
   },
 

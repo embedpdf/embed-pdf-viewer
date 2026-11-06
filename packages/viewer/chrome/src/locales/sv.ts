@@ -151,6 +151,7 @@ export const sv: Locale = {
       redact: {
         mark: 'Markera för maskering',
         applyAll: 'Tillämpa maskeringar',
+        apply: { one: 'Tillämpa maskering', other: 'Tillämpa {count} maskeringar' },
         clearAll: 'Rensa markeringar',
       },
       undo: 'Ångra',
@@ -635,7 +636,7 @@ export const sv: Locale = {
       redactionArea: 'Områdesmarkering',
       redactionText: 'Textmarkering',
       redactionRemove: 'Ta bort markering',
-      redactConfirmTitle: 'Tillämpa maskeringar?',
+      redactConfirmTitle: { one: 'Tillämpa maskering?', other: 'Tillämpa maskeringar?' },
       redactConfirmBody: {
         one: 'Ta bort innehållet under {count} maskeringsmarkering permanent. Det går inte att ångra.',
         other:

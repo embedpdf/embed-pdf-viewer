@@ -147,6 +147,7 @@ export const en: Locale = {
       redact: {
         mark: 'Mark for Redaction',
         applyAll: 'Apply Redactions',
+        apply: { one: 'Apply Redaction', other: 'Apply {count} Redactions' },
         clearAll: 'Clear Marks',
       },
       undo: 'Undo',
@@ -646,7 +647,7 @@ export const en: Locale = {
       redactionArea: 'Area mark',
       redactionText: 'Text mark',
       redactionRemove: 'Remove mark',
-      redactConfirmTitle: 'Apply redactions?',
+      redactConfirmTitle: { one: 'Apply redaction?', other: 'Apply redactions?' },
       redactConfirmBody: {
         one: 'Permanently remove the content under {count} redaction mark. This cannot be undone.',
         other:

@@ -152,6 +152,7 @@ export const zhTW: Locale = {
       redact: {
         mark: '標記為要編修',
         applyAll: '套用編修',
+        apply: { other: '套用 {count} 處編修' },
         clearAll: '清除標記',
       },
       undo: '復原',
@@ -633,7 +634,7 @@ export const zhTW: Locale = {
       redactionArea: '區域標記',
       redactionText: '文字標記',
       redactionRemove: '移除標記',
-      redactConfirmTitle: '要套用編修嗎？',
+      redactConfirmTitle: { other: '要套用編修嗎？' },
       redactConfirmBody: { other: '永久移除 {count} 個編修標記下的內容。此動作無法復原。' },
       redactConfirmCollateral: { other: '另有 {count} 個註解也會被移除。' },
       redactApply: '套用',

@@ -150,6 +150,7 @@ export const zhCN: Locale = {
       redact: {
         mark: '标记涂黑',
         applyAll: '应用涂黑',
+        apply: { other: '应用 {count} 处涂黑' },
         clearAll: '清除标记',
       },
       undo: '撤销',
@@ -631,7 +632,7 @@ export const zhCN: Locale = {
       redactionArea: '区域标记',
       redactionText: '文本标记',
       redactionRemove: '删除标记',
-      redactConfirmTitle: '应用涂黑？',
+      redactConfirmTitle: { other: '应用涂黑？' },
       redactConfirmBody: { other: '永久删除 {count} 个涂黑标记下的内容。此操作无法撤销。' },
       redactConfirmCollateral: { other: '另有 {count} 个注释也将被删除。' },
       redactApply: '应用',

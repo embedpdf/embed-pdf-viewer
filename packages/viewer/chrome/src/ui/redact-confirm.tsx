@@ -1,12 +1,14 @@
 import { useId, useState } from 'react';
+import type { AnnotationRef } from '@embedpdf/react/annotation';
 import { useRedaction } from '@embedpdf/react/redaction';
 import { useSurface } from '@embedpdf/react/shell';
 import { useT } from '@embedpdf/react/i18n';
 import { Dialog } from './dialog';
 
 /**
- * The apply-all confirm modal (`redact-confirm` shell surface, `exclusive:
- * 'modal'` via the command router). Shows the pending count and the
+ * The apply confirm modal (`redact-confirm` shell surface, `exclusive:
+ * 'modal'`). Opened with `props.refs` (the annotation bar's Apply) it applies
+ * those marks; opened without (Apply all) every mark. Shows how many and the
  * client-side collateral estimate — other annotations the apply will destroy —
  * before anything irreversible happens. The authoritative collateral count
  * comes back on the result. Escape cancels, unless the apply is running.
@@ -21,14 +23,15 @@ export function RedactConfirmModal() {
 
   if (!surface.isOpen) return null;
 
-  const count = redaction.getPendingCount();
-  const collateral = redaction.estimateCollateral().count;
+  const refs = surface.props.refs as readonly AnnotationRef[] | undefined;
+  const count = refs ? refs.length : redaction.getPendingCount();
+  const collateral = redaction.estimateCollateral(refs).count;
 
   const apply = async () => {
     setBusy(true);
     setError(null);
     try {
-      await redaction.applyAll();
+      await (refs ? redaction.apply(refs) : redaction.applyAll());
       surface.close();
     } catch (error) {
       setError(error instanceof Error ? error.message : String(error));
@@ -46,7 +49,7 @@ export function RedactConfirmModal() {
       className="border-border bg-surface w-96 rounded-lg border p-4 shadow-xl"
     >
       <h2 id={titleId} className="text-fg text-base font-semibold">
-        {t('demo.redactConfirmTitle')}
+        {t('demo.redactConfirmTitle', { params: { count } })}
       </h2>
       <p className="text-fg-muted mt-2 text-sm">
         {t('demo.redactConfirmBody', { params: { count } })}

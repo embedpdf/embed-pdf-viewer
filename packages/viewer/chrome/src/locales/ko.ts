@@ -150,6 +150,7 @@ export const ko: Locale = {
       redact: {
         mark: '교정 표시',
         applyAll: '교정 적용',
+        apply: { other: '교정 {count}개 적용' },
         clearAll: '표시 지우기',
       },
       undo: '실행 취소',
@@ -633,7 +634,7 @@ export const ko: Locale = {
       redactionArea: '영역 표시',
       redactionText: '텍스트 표시',
       redactionRemove: '표시 제거',
-      redactConfirmTitle: '교정을 적용하시겠습니까?',
+      redactConfirmTitle: { other: '교정을 적용하시겠습니까?' },
       redactConfirmBody: {
         other:
           '교정 표시 {count}개 아래의 콘텐츠를 영구적으로 제거합니다. 이 작업은 실행 취소할 수 없습니다.',

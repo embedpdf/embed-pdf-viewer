@@ -150,6 +150,7 @@ export const de: Locale = {
       redact: {
         mark: 'Zum Schwärzen markieren',
         applyAll: 'Schwärzungen anwenden',
+        apply: { one: 'Schwärzung anwenden', other: '{count} Schwärzungen anwenden' },
         clearAll: 'Markierungen löschen',
       },
       undo: 'Rückgängig',
@@ -635,7 +636,7 @@ export const de: Locale = {
       redactionArea: 'Bereichsmarkierung',
       redactionText: 'Textmarkierung',
       redactionRemove: 'Markierung entfernen',
-      redactConfirmTitle: 'Schwärzungen anwenden?',
+      redactConfirmTitle: { one: 'Schwärzung anwenden?', other: 'Schwärzungen anwenden?' },
       redactConfirmBody: {
         one: 'Inhalt unter {count} Schwärzungsmarkierung endgültig entfernen. Dies kann nicht rückgängig gemacht werden.',
         other:

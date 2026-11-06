@@ -150,6 +150,11 @@ export const pt: Locale = {
       redact: {
         mark: 'Marcar para tarjar',
         applyAll: 'Aplicar tarjas',
+        apply: {
+          one: 'Aplicar tarja',
+          many: 'Aplicar {count} de tarjas',
+          other: 'Aplicar {count} tarjas',
+        },
         clearAll: 'Limpar marcações',
       },
       undo: 'Desfazer',
@@ -646,7 +651,11 @@ export const pt: Locale = {
       redactionArea: 'Marcação de área',
       redactionText: 'Marcação de texto',
       redactionRemove: 'Remover marcação',
-      redactConfirmTitle: 'Aplicar tarjas?',
+      redactConfirmTitle: {
+        one: 'Aplicar tarja?',
+        many: 'Aplicar tarjas?',
+        other: 'Aplicar tarjas?',
+      },
       redactConfirmBody: {
         one: 'Remover permanentemente o conteúdo sob {count} marcação de tarja. Esta ação não pode ser desfeita.',
         many: 'Remover permanentemente o conteúdo sob {count} de marcações de tarja. Esta ação não pode ser desfeita.',

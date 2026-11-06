@@ -150,6 +150,11 @@ export const it: Locale = {
       redact: {
         mark: 'Contrassegna per oscuramento',
         applyAll: 'Applica oscuramenti',
+        apply: {
+          one: 'Applica oscuramento',
+          many: 'Applica {count} di oscuramenti',
+          other: 'Applica {count} oscuramenti',
+        },
         clearAll: 'Cancella contrassegni',
       },
       undo: 'Annulla',
@@ -642,7 +647,11 @@ export const it: Locale = {
       redactionArea: 'Contrassegno area',
       redactionText: 'Contrassegno testo',
       redactionRemove: 'Rimuovi contrassegno',
-      redactConfirmTitle: 'Applicare gli oscuramenti?',
+      redactConfirmTitle: {
+        one: 'Applicare l’oscuramento?',
+        many: 'Applicare gli oscuramenti?',
+        other: 'Applicare gli oscuramenti?',
+      },
       redactConfirmBody: {
         one: 'Rimuovere definitivamente il contenuto sotto {count} contrassegno di oscuramento. L’operazione non può essere annullata.',
         many: 'Rimuovere definitivamente il contenuto sotto {count} di contrassegni di oscuramento. L’operazione non può essere annullata.',

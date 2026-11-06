@@ -237,8 +237,8 @@ export const DEFAULT_LAYOUT: LayoutData = {
           ],
           importance: 4,
         },
-        // Its own group, so a line sets delete apart.
-        { id: 'danger', items: ['annotation:delete'], importance: 5 },
+        // Its own group, so a line sets apart what removes: applying a redaction, and delete.
+        { id: 'danger', items: ['annotation:apply-redaction', 'annotation:delete'], importance: 5 },
       ],
     },
 
