@@ -23,7 +23,7 @@ const DEFAULT_SCOPES = ['@embedpdf', '@cloudpdf'];
  * a bare spec already installs latest.
  */
 export function resolveInstallChannel() {
-  return process.env.DOCS_INSTALL_CHANNEL ?? 'next';
+  return process.env.DOCS_INSTALL_CHANNEL ?? 'latest';
 }
 
 function buildMatcher(scopes) {

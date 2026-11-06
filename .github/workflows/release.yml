@@ -1,21 +1,16 @@
-# Canonical release workflow for `main`.
+# Canonical release workflow for `main`: stable releases, on npm's `latest`
+# dist-tag and the server image's `latest` tag.
 #
-# GA promotion checklist (perform in the stable version PR):
-#   1. Run `pnpm changeset pre exit` so Changesets prepares stable versions.
-#   2. In package.json's `ci:publish`, remove `--tag next`; keep the
-#      `node scripts/assert-publish-phase.mjs &&` prefix and
-#      `--publish-branch main --report-summary`. The assert script reads
-#      .changeset/pre.json and flips its own assertions at GA — it hard-fails
-#      a forgotten `--tag`, a straggler version, or a package that dodged
-#      versioning, in either phase.
-#   3. Change the workflow/release labels, Changesets PR labels, and fallback
-#      release notes below from "next" to stable; then set `prerelease: false`
-#      and `make_latest: true`.
-#   4. In merge-image, expand "Read server version" to also emit
-#      `minor=${v%.*}`, then swap the `next` and `sha-*` tags in "Create
-#      multi-arch manifest" for the minor tag and `latest`.
-# Keep the consume gate for stable releases.
-name: Release (next)
+# 3.0.0 left the `next` prerelease train. To start another one:
+#   1. Run `pnpm changeset pre enter <tag>`.
+#   2. Add `--tag <tag>` to package.json's `ci:publish`.
+#      scripts/assert-publish-phase.mjs reads .changeset/pre.json and refuses
+#      a publish whose dist-tag and versions disagree, in either phase.
+#   3. Label the workflow, the Changesets PR and the GitHub release with the
+#      tag; set `prerelease: true` and `make_latest: false`.
+#   4. In merge-image, tag the image with `<tag>` instead of its minor and
+#      `latest`.
+name: Release
 
 on:
   push:
@@ -38,7 +33,7 @@ on:
         type: string
 
 concurrency:
-  group: release-next
+  group: release
   cancel-in-progress: false
 
 permissions:
@@ -210,9 +205,8 @@ jobs:
         id: changesets
         uses: changesets/action@v1
         with:
-          # GA: remove the "(next)" suffixes; the publish command stays the same.
-          commit: 'chore: version packages (next)'
-          title: 'chore: version packages (next)'
+          commit: 'chore: version packages'
+          title: 'chore: version packages'
           version: pnpm ci:version
           publish: pnpm ci:publish
           createGithubReleases: false
@@ -255,8 +249,7 @@ jobs:
           sed -n '/# Releases/,$p' "$notes_source" | tail -n +2 > release-notes.md || true
 
           if [ ! -s release-notes.md ]; then
-            # GA: replace this fallback with "Automated release."
-            echo "Pre-release from main." > release-notes.md
+            echo "Automated release." > release-notes.md
             echo "" >> release-notes.md
             echo "Packages published:" >> release-notes.md
             echo "${{ steps.published.outputs.published }}" >> release-notes.md
@@ -300,25 +293,24 @@ jobs:
           done
           ls -lh release-assets || true
 
-      - name: Create GitHub pre-release
+      - name: Create GitHub release
         if: steps.published.outputs.did_publish == 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.published.outputs.version }}
-          # GA: rename to "Release v...", then flip the two flags below.
-          name: 'Release Next v${{ steps.published.outputs.version }}'
+          name: 'Release v${{ steps.published.outputs.version }}'
           body_path: release-notes.md
           files: release-assets/*
           draft: false
-          prerelease: true
-          make_latest: false
+          prerelease: false
+          make_latest: true
 
-  # Preview container image for the `next` channel, multi-arch. Each arch is
-  # built NATIVELY on its own runner (amd64 on ubuntu-latest, arm64 on
-  # ubuntu-24.04-arm — the same runner family build-engine-runtime already
-  # uses). QEMU is avoided on purpose: the in-image monorepo build is far too
-  # heavy to emulate, and turbo's Rust binary is already known to break under
-  # it (see cloudpdf/server/Dockerfile). Each build pushes by digest only;
+  # The server's container image, multi-arch. Each arch is built NATIVELY on
+  # its own runner (amd64 on ubuntu-latest, arm64 on ubuntu-24.04-arm — the
+  # same runner family build-engine-runtime already uses). QEMU is avoided on
+  # purpose: the in-image monorepo build is far too heavy to emulate, and
+  # turbo's Rust binary is already known to break under it (see
+  # cloudpdf/server/Dockerfile). Each build pushes by digest only;
   # merge-image below assembles the manifest and owns every tag.
   publish-image:
     needs: [build-runtime, release, recover-server]
@@ -429,9 +421,7 @@ jobs:
           retention-days: 1
 
   # Stitch the per-arch digests into one multi-arch manifest and apply the
-  # channel tags (the prerelease version, `next`, and `sha-<short>`) so
-  # candidates can be pulled + smoke/soak tested before promotion. Never
-  # moves `latest`.
+  # release tags: the version, its minor (`3.0`) and `latest`.
   merge-image:
     needs: publish-image
     if: ${{ !cancelled() && needs.publish-image.result == 'success' }}
@@ -450,9 +440,10 @@ jobs:
 
       - name: Read server version
         id: ver
-        # GA: expand this step as described in the promotion checklist to emit
-        # the stable minor tag as well as the full version.
-        run: echo "version=$(jq -r .version cloudpdf/server/package.json)" >> "$GITHUB_OUTPUT"
+        run: |
+          v="$(jq -r .version cloudpdf/server/package.json)"
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "minor=${v%.*}" >> "$GITHUB_OUTPUT"
 
       - name: Download digests
         uses: actions/download-artifact@v7
@@ -473,16 +464,11 @@ jobs:
 
       - name: Create multi-arch manifest
         working-directory: /tmp/digests
-        env:
-          SOURCE_SHA: ${{ needs.publish-image.outputs.source_sha }}
-        # GA: swap the `next` and `sha-*` tags for `:${minor}` and `:latest`
-        # per the promotion checklist.
         run: |
-          short_sha="${SOURCE_SHA:0:7}"
           docker buildx imagetools create \
             -t 'ghcr.io/embedpdf/cloudpdf-server:${{ steps.ver.outputs.version }}' \
-            -t 'ghcr.io/embedpdf/cloudpdf-server:next' \
-            -t "ghcr.io/embedpdf/cloudpdf-server:sha-${short_sha}" \
+            -t 'ghcr.io/embedpdf/cloudpdf-server:${{ steps.ver.outputs.minor }}' \
+            -t 'ghcr.io/embedpdf/cloudpdf-server:latest' \
             $(printf 'ghcr.io/embedpdf/cloudpdf-server@sha256:%s ' *)
 
       - name: Verify manifest
@@ -491,9 +477,9 @@ jobs:
   # The Helm chart ships as an OCI artifact in the same registry, version-
   # locked to the npm package and the image. It publishes only after
   # merge-image verified the image manifest, so an installable chart's
-  # default image (tag = appVersion) always exists. Helm treats `-next.N`
-  # versions as prereleases — invisible to a bare `helm install` until GA,
-  # exactly like the npm `next` dist-tag. One-time setup: flip the
+  # default image (tag = appVersion) always exists. Helm treats prerelease
+  # versions (`-next.N`) as invisible to a bare `helm install`, like an npm
+  # dist-tag other than `latest`. One-time setup: flip the
   # `charts/cloudpdf-server` GHCR package to public, like the image.
   publish-chart:
     needs: merge-image
