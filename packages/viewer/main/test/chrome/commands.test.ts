@@ -95,6 +95,21 @@ describe('a command of yours', () => {
     expect(heard).toEqual([{ viewer: true, documentId: 'doc', args: { page: 2 }, token: stage }]);
   });
 
+  it('gives labelParams the same context, so a label reads a plugin by its name', () => {
+    const command = toPluginCommand(
+      {
+        id: 'acme:count',
+        label: 'Zoom {count} times',
+        labelParams: ({ get, documentId }) => ({
+          count: (get('stage') as unknown) === stage ? 3 : 0,
+          document: documentId ?? 'none',
+        }),
+      },
+      scope,
+    );
+    expect(command.labelParams?.(pluginContext())).toEqual({ count: 3, document: 'doc' });
+  });
+
   it("gets your app's state, typed by the command, and runs what it gives", () => {
     interface Review {
       done: string[];

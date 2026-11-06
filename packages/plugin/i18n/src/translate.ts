@@ -2,7 +2,12 @@
  * The lookup: a key in, a string out. Pure, with no platform access
  * (`Intl.PluralRules` is core ECMAScript, not DOM).
  */
-import type { Locale, TranslateOptions, TranslationDictionary } from './contract';
+import {
+  interpolate,
+  type Locale,
+  type TranslateOptions,
+  type TranslationDictionary,
+} from './contract';
 import { embedpdfStringsFor } from './strings';
 
 /** Walk a dotted path (`'commands.zoom.in'`) through a dictionary. */
@@ -32,7 +37,7 @@ function pluralCategory(locale: string, count: number): string {
 function resolveNode(
   node: string | TranslationDictionary | undefined,
   locale: string,
-  params?: Record<string, string | number>,
+  params?: Readonly<Record<string, string | number>>,
 ): string | undefined {
   if (typeof node === 'string') return node;
   if (node !== undefined && typeof params?.count === 'number') {
@@ -40,14 +45,6 @@ function resolveNode(
     if (typeof branch === 'string') return branch;
   }
   return undefined;
-}
-
-/** Fill in `{name}` slots; a slot without a value stays as it is, so it shows while testing. */
-export function interpolate(text: string, params?: Record<string, string | number>): string {
-  if (!params) return text;
-  return text.replace(/\{(\w+)\}/g, (match, slot) =>
-    params[slot] !== undefined ? String(params[slot]) : match,
-  );
 }
 
 /** What a lookup reads: the two languages it tries, and the app's strings. */
@@ -69,7 +66,7 @@ const stringIn = (
   sources: TranslationSources,
   code: string,
   key: string,
-  params?: Record<string, string | number>,
+  params?: Readonly<Record<string, string | number>>,
 ): string | undefined =>
   resolveNode(lookup(sources.locales[code]?.translations, key), code, params) ??
   resolveNode(lookup(embedpdfStringsFor(code), key), code, params);

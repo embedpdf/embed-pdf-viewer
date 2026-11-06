@@ -44,7 +44,7 @@ export interface CommandContext<AppState = any> extends ScopedViewer {
  */
 export interface CommandDefinition<AppState = any> extends Omit<
   PluginCommandDef<AppState>,
-  'icon' | 'iconAccent' | 'allowed' | 'enabled' | 'active' | 'visible' | 'run'
+  'icon' | 'iconAccent' | 'allowed' | 'enabled' | 'active' | 'visible' | 'labelParams' | 'run'
 > {
   /** An icon's name: one of the viewer's, or one of yours (`icons`). */
   readonly icon?: IconName | (string & {});
@@ -58,6 +58,12 @@ export interface CommandDefinition<AppState = any> extends Omit<
   active?(context: CommandContext<AppState>): boolean;
   /** When it shows at all. Default: always. */
   visible?(context: CommandContext<AppState>): boolean;
+  /**
+   * The values for its label's `{name}` slots, such as how many pages are selected:
+   * `({ get }) => ({ count: get('pageEdit').getSelected().length })`. A number `count` also picks
+   * the plural form of a translated label.
+   */
+  labelParams?(context: CommandContext<AppState>): Readonly<Record<string, string | number>>;
   /** What it does; `execute()` resolves once it has. Not needed for a `menu` or `panel`. */
   run?(context: CommandContext<AppState>): void | Promise<unknown>;
 }
@@ -69,7 +75,15 @@ export interface CommandScope {
   viewer(): Viewer | null;
 }
 
-const FUNCTIONS = ['iconAccent', 'allowed', 'enabled', 'active', 'visible', 'run'] as const;
+const FUNCTIONS = [
+  'iconAccent',
+  'allowed',
+  'enabled',
+  'active',
+  'visible',
+  'labelParams',
+  'run',
+] as const;
 
 /** Fields that go together: giving one of them replaces all of the built-in command's. */
 const TOGETHER: readonly (readonly (keyof PluginCommandDef)[])[] = [

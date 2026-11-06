@@ -61,11 +61,15 @@ export interface IconAccent {
 export interface CommandDefinition<AppState = any> {
   /** A unique name, by convention `area:action`: `'zoom:in'`, `'review:approve'`. */
   readonly id: string;
-  /** What the user sees. With `labelKey` too, it's what shows when no language has the key. */
+  /**
+   * What the user sees. With `labelKey` too, it's what shows when no language has the key. Its
+   * `{name}` slots take the values `labelParams` gives.
+   */
   readonly label?: string;
   /**
    * A translation key for the label, read through the i18n plugin. Without the plugin, or a
-   * string for the key, the command shows `label`, else the key.
+   * string for the key, the command shows `label`, else the key. The string's `{name}` slots
+   * take the values `labelParams` gives, and a number `count` picks its plural form.
    */
   readonly labelKey?: string;
   /** Your icon's name; your buttons turn it into an icon. */
@@ -138,6 +142,12 @@ export interface CommandDefinition<AppState = any> {
   active?(context: CommandContext<AppState>): boolean;
   /** When it shows at all. Default: always. One that throws counts as false. */
   visible?(context: CommandContext<AppState>): boolean;
+  /**
+   * The values for its label's `{name}` slots, such as how many pages are selected:
+   * `({ count: pageEdit.getSelected().length })`. A number `count` also picks the plural form of a
+   * translated label. One that throws gives none, and the slots show as they are.
+   */
+  labelParams?(context: CommandContext<AppState>): Readonly<Record<string, string | number>>;
 
   /** What it does; `execute()` resolves once it has. Not needed for a `menu`, `panel` or `modal`. */
   run?(context: CommandContext<AppState>): void | Promise<unknown>;

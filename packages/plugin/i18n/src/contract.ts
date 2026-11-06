@@ -26,6 +26,21 @@ export interface TranslationDictionary {
   readonly [key: string]: string | TranslationDictionary;
 }
 
+/**
+ * A string with its `{name}` slots filled from `params`: what `t()` does to the strings it finds,
+ * for text that has no translation, such as a command's `label` without the i18n plugin. A slot
+ * without a value stays as it is, so it shows while testing.
+ */
+export function interpolate(
+  text: string,
+  params?: Readonly<Record<string, string | number>>,
+): string {
+  if (!params) return text;
+  return text.replace(/\{(\w+)\}/g, (match, slot: string) =>
+    params[slot] !== undefined ? String(params[slot]) : match,
+  );
+}
+
 /** How a language reads. */
 export type TextDirection = 'ltr' | 'rtl';
 
@@ -98,7 +113,7 @@ export interface TranslateOptions {
    * t('pages', { params: { count: 1 } }) // '1 page'
    * ```
    */
-  params?: Record<string, string | number>;
+  params?: Readonly<Record<string, string | number>>;
   /**
    * Another key, read in each language that has no string for the key, before the fallback
    * language is: a specific key in front of a general one.

@@ -13,7 +13,7 @@ import type {
   SettingLock,
   Settings,
 } from '@embedpdf/core';
-import { I18nToken } from '@embedpdf/plugin-i18n/contract';
+import { I18nToken, interpolate } from '@embedpdf/plugin-i18n/contract';
 
 import type {
   CommandContext,
@@ -29,19 +29,37 @@ import type {
 export const isCategoryOff = (category: string, disabled: readonly string[]): boolean =>
   disabled.some((off) => category === off || category.startsWith(`${off}.`));
 
+/** The values for a label's slots, from `labelParams`; none without it, or when it throws. */
+const labelParamsOf = (
+  definition: CommandDefinition,
+  context: CommandContext,
+): Readonly<Record<string, string | number>> | undefined => {
+  if (!definition.labelParams) return undefined;
+  try {
+    return definition.labelParams(context);
+  } catch {
+    return undefined;
+  }
+};
+
 /**
  * The label: a language's string under the command's id, else under its `labelKey` (the current
- * language, then the fallback one), else `label`, else the id. So a string for
- * `'document:download'` relabels that one command, whichever key its label is under.
+ * language, then the fallback one), else `label`, else the id, with `labelParams` in its slots.
+ * So a string for `'document:download'` relabels that one command, whichever key its label is
+ * under.
  */
 export const labelOf = (definition: CommandDefinition, context: CommandContext): string => {
+  const params = labelParamsOf(definition, context);
   const i18n = context.tryGet(I18nToken);
-  if (!i18n) return definition.label ?? definition.labelKey ?? definition.id;
-  const fallbackKey = definition.labelKey ? { fallbackKey: definition.labelKey } : {};
+  if (!i18n) return interpolate(definition.label ?? definition.labelKey ?? definition.id, params);
+  const options = {
+    ...(definition.labelKey ? { fallbackKey: definition.labelKey } : {}),
+    ...(params ? { params } : {}),
+  };
   // A command with a key and no label of its own warns once when no language has the key.
   return definition.label === undefined && definition.labelKey
-    ? i18n.t(definition.id, fallbackKey)
-    : i18n.t(definition.id, { ...fallbackKey, fallback: definition.label ?? definition.id });
+    ? i18n.t(definition.id, options)
+    : i18n.t(definition.id, { ...options, fallback: definition.label ?? definition.id });
 };
 
 /**
