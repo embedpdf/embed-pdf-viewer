@@ -1,5 +1,5 @@
 diff --git a/dist/changesets-assemble-release-plan.cjs.js b/dist/changesets-assemble-release-plan.cjs.js
-index e07ba6e793021b6cfdec898afca517e293386ddb..8afc4efbd0d8350d14abb488747e85bbd955c9dc 100644
+index e07ba6e793021b6cfdec898afca517e293386ddb..a6a6f94feb198f22e1108fa2281ef756a477026e 100644
 --- a/dist/changesets-assemble-release-plan.cjs.js
 +++ b/dist/changesets-assemble-release-plan.cjs.js
 @@ -317,6 +317,9 @@ function shouldBumpMajor({
@@ -12,3 +12,34 @@ index e07ba6e793021b6cfdec898afca517e293386ddb..8afc4efbd0d8350d14abb488747e85bb
    // we check if it is a peerDependency because if it is, our dependent bump type might need to be major.
    return depType === "peerDependencies" && nextRelease.type !== "none" && nextRelease.type !== "patch" && (
    // 1. If onlyUpdatePeerDependentsWhenOutOfRange set to true, bump major if the version is leaving the range.
+@@ -521,7 +524,17 @@ snapshot) {
+       // If a package had a prerelease, but didn't trigger a version bump in the regular release,
+       // we want to give it a patch release.
+       // Detailed explanation at https://github.com/changesets/changesets/pull/382#discussion_r434434182
+-      if (preInfo.preVersions.get(pkg.packageJson.name) !== 0) {
++      // A private or ignored package never had a prerelease: getPreInfo leaves
++      // it out of preVersions, so without this skip it would read as one and
++      // get a patch. Backported from @changesets/assemble-release-plan 7.0.0.
++      if (shouldSkipPackage.shouldSkipPackage(pkg, {
++        ignore: refinedConfig.ignore,
++        allowPrivatePackages: refinedConfig.privatePackages.version
++      })) {
++        continue;
++      }
++      const preVersion = preInfo.preVersions.get(pkg.packageJson.name);
++      if (preVersion != null && preVersion !== 0) {
+         const existingRelease = releases.get(pkg.packageJson.name);
+         if (!existingRelease) {
+           releases.set(pkg.packageJson.name, {
+@@ -530,10 +543,7 @@ snapshot) {
+             oldVersion: pkg.packageJson.version,
+             changesets: []
+           });
+-        } else if (existingRelease.type === "none" && !shouldSkipPackage.shouldSkipPackage(pkg, {
+-          ignore: refinedConfig.ignore,
+-          allowPrivatePackages: refinedConfig.privatePackages.version
+-        })) {
++        } else if (existingRelease.type === "none") {
+           existingRelease.type = "patch";
+         }
+       }
