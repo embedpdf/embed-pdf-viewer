@@ -9,7 +9,7 @@ import {
   type ObjectReferrer,
   type PdfCoordinates,
   type RevisionStructure,
-  type SignatureDTO,
+  type Signature,
 } from '../../src/shared';
 
 describe("parsePdfValue: the fork's shallow serialisation", () => {
@@ -98,8 +98,8 @@ function change(
 function signature(
   index: number,
   fieldObjectNumber: number,
-  extra: Partial<SignatureDTO> = {},
-): SignatureDTO {
+  extra: Partial<Signature> = {},
+): Signature {
   return {
     index,
     field: { kind: 'objectNumber', objectNumber: fieldObjectNumber },

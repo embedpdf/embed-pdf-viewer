@@ -1,7 +1,7 @@
 import type { MutationMeta } from './MutationMeta';
 import type { AppearanceOutcome } from '../annotation/appearance';
 import type { WidgetAnnotation } from '../annotation/kinds/widget';
-import type { FormFieldDTO } from '../forms/field';
+import type { FormField } from '../forms/field';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { FormFieldRef, FormWidget } from '../identity/FormFieldRef';
 import type { PageRef } from '../identity/PageRef';
@@ -40,7 +40,7 @@ export interface FormWidgetRows<C extends Coordinates = PageCoordinates> {
 export interface FormSetValueResult<
   C extends Coordinates = PageCoordinates,
 > extends FormWidgetRows<C> {
-  field: FormFieldDTO<C>;
+  field: FormField<C>;
   meta: FormMutationMeta;
 }
 
@@ -52,7 +52,7 @@ export interface FormSetValueResult<
 export interface FormResetResult<
   C extends Coordinates = PageCoordinates,
 > extends FormWidgetRows<C> {
-  fields: FormFieldDTO<C>[];
+  fields: FormField<C>[];
   meta: FormMutationMeta;
 }
 
@@ -94,7 +94,7 @@ export function formResetFacts<C extends Coordinates>(
 export interface FormFieldCreateResult<
   C extends Coordinates = PageCoordinates,
 > extends FormWidgetRows<C> {
-  field: FormFieldDTO<C>;
+  field: FormField<C>;
   /** The form's calculation order, when the write changed it (a `calculate` script). */
   calculationOrder?: FormFieldRef[];
   meta: FormMutationMeta;
@@ -104,7 +104,7 @@ export interface FormFieldCreateResult<
 export interface FormFieldUpdateResult<
   C extends Coordinates = PageCoordinates,
 > extends FormWidgetRows<C> {
-  field: FormFieldDTO<C>;
+  field: FormField<C>;
   /** The form's calculation order, when the write changed it (a `calculate` script). */
   calculationOrder?: FormFieldRef[];
   meta: FormMutationMeta;
@@ -165,7 +165,7 @@ export function deletedFieldOf(result: FormFieldDeleteResult): FormFieldRef | nu
 export interface FormWidgetLinkResult<
   C extends Coordinates = PageCoordinates,
 > extends FormWidgetRows<C> {
-  field: FormFieldDTO<C>;
+  field: FormField<C>;
   meta: FormMutationMeta;
 }
 
@@ -177,7 +177,7 @@ export interface FormWidgetLinkResult<
 export interface FormWidgetDeleteResult<C extends Coordinates = PageCoordinates> {
   widget: AnnotationRef;
   page: PageRef;
-  field: FormFieldDTO<C> | null;
+  field: FormField<C> | null;
   meta: FormMutationMeta;
 }
 
@@ -188,7 +188,7 @@ export interface FormWidgetDeleteResult<C extends Coordinates = PageCoordinates>
 export interface FormWidgetRestoreResult<
   C extends Coordinates = PageCoordinates,
 > extends FormWidgetRows<C> {
-  field: FormFieldDTO<C> | null;
+  field: FormField<C> | null;
   meta: FormMutationMeta;
 }
 

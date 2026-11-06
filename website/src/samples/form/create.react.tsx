@@ -5,7 +5,7 @@ import { Stage, stagePlugin, useStage } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
 import { interactionPlugin } from '@embedpdf/react/interaction';
 import { FormLayer, formPlugin, useForm } from '@embedpdf/react/form';
-import type { FormCapability, FormFieldDTO } from '@embedpdf/react/form';
+import type { FormCapability, FormField } from '@embedpdf/react/form';
 import type { PageRef } from '@embedpdf/react/runtime';
 import { localEngine } from '@embedpdf/engine';
 
@@ -57,13 +57,12 @@ function BuildToolbar() {
   const form = useForm();
   const stage = useStage();
   const page = usePageList()[0]?.ref; // the printed form
-  const [added, setAdded] = useState<FormFieldDTO[]>([]);
+  const [added, setAdded] = useState<FormField[]>([]);
 
   // Each kind of field fills its column from the top: the next row that hasn't got one.
-  const rowFor = (kind: FormFieldDTO['kind']) =>
-    added.filter((field) => field.kind === kind).length;
+  const rowFor = (kind: FormField['kind']) => added.filter((field) => field.kind === kind).length;
 
-  const add = async (addField: typeof addDropdown, kind: FormFieldDTO['kind']) => {
+  const add = async (addField: typeof addDropdown, kind: FormField['kind']) => {
     if (!page) return;
     const { field } = await addField(form, page, rowFor(kind));
     setAdded((fields) => [...fields, field]);

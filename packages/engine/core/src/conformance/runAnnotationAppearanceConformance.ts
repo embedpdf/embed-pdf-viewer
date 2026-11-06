@@ -54,15 +54,15 @@ interface NormalizedAppearance {
 
 export function runAnnotationAppearanceConformance(
   runner: ConformanceTestRunner,
-  opts: AnnotationAppearanceConformanceOptions,
+  options: AnnotationAppearanceConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`annotation appearance conformance: ${opts.label}`, () => {
+  describe(`annotation appearance conformance: ${options.label}`, () => {
     let engine: Engine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -70,12 +70,12 @@ export function runAnnotationAppearanceConformance(
     });
 
     test('renders the expected set of appearances with valid output', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
-        const { page, appearances } = await collect(doc, opts);
+        const { page, appearances } = await collect(doc, options);
 
-        expect(page.objectNumber).toBe(opts.fixture.pageObjectNumber);
-        expect(appearances.length >= opts.fixture.minAppearanceCount).toBe(true);
+        expect(page.objectNumber).toBe(options.fixture.pageObjectNumber);
+        expect(appearances.length >= options.fixture.minAppearanceCount).toBe(true);
 
         for (const appearance of appearances) {
           // Identity is the ref — never a stableId.
@@ -94,11 +94,11 @@ export function runAnnotationAppearanceConformance(
       }
     });
 
-    if (opts.fixture.expectsInlineAppearance) {
+    if (options.fixture.expectsInlineAppearance) {
       test('annotations born inline are emitted under their baseIndex name', async () => {
-        const doc = await openFixture(engine, opts);
+        const doc = await openFixture(engine, options);
         try {
-          const { appearances } = await collect(doc, opts);
+          const { appearances } = await collect(doc, options);
           const inline = appearances.find((a) => a.ref.kind === 'baseIndex');
           expect(inline !== undefined).toBe(true);
         } finally {
@@ -108,9 +108,9 @@ export function runAnnotationAppearanceConformance(
     }
 
     test('rendered appearances are not blank (non-zero alpha)', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
-        const page = doc.page(toPageRef(opts.fixture.pageObjectNumber));
+        const page = doc.page(toPageRef(options.fixture.pageObjectNumber));
         // Guards the blank-render regression: at least one appearance must
         // have a visible (non-transparent) pixel, as the engine gives it
         // (raw locally, a decoded image on the cloud).
@@ -125,9 +125,9 @@ export function runAnnotationAppearanceConformance(
     });
 
     test('abort() rejects with AbortError', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
-        const page = doc.page(toPageRef(opts.fixture.pageObjectNumber));
+        const page = doc.page(toPageRef(options.fixture.pageObjectNumber));
         const p = isLocalPage(page)
           ? page.annotations.renderAppearancesRaw({ viewport: { kind: 'scale', scale: 1 } })
           : page.annotations.renderAppearances({

@@ -6,7 +6,7 @@
  * and upright placement. The engine speaks page space too: the same
  * numbers, nothing to convert.
  */
-import { isQuarterTurn, type PageRotation, type Size } from '@embedpdf/core-geometry';
+import { isQuarterTurn, type Rotation, type Size } from '@embedpdf/core-geometry';
 import { paintedNear, type PaintedPiece } from './painted';
 import {
   DEG2RAD,
@@ -65,7 +65,8 @@ export const turnPivotOf = (geometry: Shape): Point => familyOf(geometry).pivot(
  *  Orientation is a geometry fact; whether the user may rotate is the separate
  *  `caps.rotatable` gate — a caret is oriented (it rides its text's tilt) yet
  *  offers no rotate gesture. */
-export const isRotatableGeom = (geometry: Shape): boolean => familyOf(geometry).oriented(geometry);
+export const isRotatableGeometry = (geometry: Shape): boolean =>
+  familyOf(geometry).oriented(geometry);
 
 /**
  * Rotate a geom by `deltaDeg` (clockwise) about `pivot`: a box's middle
@@ -135,7 +136,7 @@ const clampScalar = (value: number, lo: number, hi: number): number =>
  * is about the centre), so clamping one clamps the other.
  */
 export function fitStampBox(center: Point, desired: Size, page: Size, rotCW: number): Rect {
-  const quarter = isQuarterTurn((normalizeDeg(rotCW) as PageRotation) ?? 0);
+  const quarter = isQuarterTurn((normalizeDeg(rotCW) as Rotation) ?? 0);
   // Footprint (AABB) dims for the desired size, before fitting.
   const fw0 = quarter ? desired.height : desired.width;
   const fh0 = quarter ? desired.width : desired.height;
@@ -165,7 +166,7 @@ export function geomResetRotation(geometry: Shape, pivot?: Point): Shape {
  * of its upright points, turned about their middle — the snug tilted
  * rectangle. Returns null for non-rotatable kinds.
  */
-export function obbFromGeom(
+export function obbFromGeometry(
   geometry: Shape,
   stroke: Stroke,
 ): { corners: [Point, Point, Point, Point]; angle: number } | null {
@@ -369,7 +370,7 @@ export const selectionBounds = (geometry: Shape, stroke: Stroke): Rect =>
 
 /**
  * The four corners of the oriented selection box — the same quad `chrome` draws.
- * For a rotatable kind this is the OBB (the tilted box, from `obbFromGeom`); at
+ * For a rotatable kind this is the OBB (the tilted box, from `obbFromGeometry`); at
  * `rot == 0` those are just the axis-aligned corners of `selectionBounds`, and
  * for non-rotatable kinds (markup quads, callouts) it falls back to the rect
  * corners. The grab region, the floating-menu anchor and the multi/group union
@@ -377,7 +378,7 @@ export const selectionBounds = (geometry: Shape, stroke: Stroke): Rect =>
  * the outline you see.
  */
 export function selectionQuad(geometry: Shape, stroke: Stroke): [Point, Point, Point, Point] {
-  const obb = obbFromGeom(geometry, stroke);
+  const obb = obbFromGeometry(geometry, stroke);
   if (obb) return obb.corners;
   return rectCornerPoints(selectionBounds(geometry, stroke)) as [Point, Point, Point, Point];
 }

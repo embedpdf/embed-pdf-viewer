@@ -9,7 +9,7 @@ import {
 
 import type { FormHostCapability } from '../host-contract';
 import type { Box } from '../model';
-import { FORM_TOOL_BY_ID, type FormToolDef } from './definitions';
+import { FORM_TOOL_BY_ID, type FormToolDefinition } from './definitions';
 
 type Vec = { x: number; y: number };
 
@@ -40,7 +40,7 @@ export function clampToPage(box: Box, page: Box): Box | null {
  * settings panel.
  */
 export function toolDraft(
-  tool: FormToolDef,
+  tool: FormToolDefinition,
   name: string,
   widget: WidgetPlacement,
 ): FormFieldDraft {
@@ -98,7 +98,7 @@ export function createPlaceHandler(
     annotation?.clearGhost();
   };
 
-  const place = async (tool: FormToolDef, page: PageRef, box: Box): Promise<void> => {
+  const place = async (tool: FormToolDefinition, page: PageRef, box: Box): Promise<void> => {
     const pageBox = form.getPageBox(page);
     const rect = pageBox ? clampToPage(box, pageBox) : null;
     if (!rect) return;

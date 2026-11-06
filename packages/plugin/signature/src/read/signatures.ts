@@ -6,7 +6,7 @@ import type {
   AnnotationRef,
   FormFieldRef,
   FormWidget,
-  SignatureDTO,
+  Signature,
 } from '@embedpdf/engine-core/runtime';
 
 import type { SignatureCapability, SignatureFieldAddress, SignatureInfo } from '../contract';
@@ -41,13 +41,16 @@ export function createSignatureReads(
   const lists = memo(
     () => [snapshot(), ctx.state.get().verdicts],
     (current, verdicts) => {
-      if (!current) return { signed: EMPTY_SIGNATURES, unsigned: EMPTY_FIELDS };
-      const verdictOf = (signature: SignatureDTO): SignatureVerdict | null =>
+      if (!current)
+        return { all: EMPTY_SIGNATURES, signed: EMPTY_SIGNATURES, unsigned: EMPTY_FIELDS };
+      const verdictOf = (signature: Signature): SignatureVerdict | null =>
         verdicts?.find((verdict) => verdict.signature.index === signature.index) ?? null;
+      const all = current.signatures.map(
+        (signature): SignatureInfo => ({ ...signature, verdict: verdictOf(signature) }),
+      );
       return {
-        signed: current.signatures
-          .filter((signature) => signature.signed)
-          .map((signature): SignatureInfo => ({ ...signature, verdict: verdictOf(signature) })),
+        all,
+        signed: all.filter((signature) => signature.signed),
         unsigned: current.signatures
           .filter((signature) => !signature.signed)
           .map((signature) => signature.field),
@@ -55,7 +58,7 @@ export function createSignatureReads(
     },
   );
 
-  const getSignature = (field: SignatureFieldAddress): SignatureDTO | null => {
+  const findSignature = (field: SignatureFieldAddress): Signature | null => {
     const current = snapshot();
     if (!current) return null;
     const widget = widgetOf(field);
@@ -65,7 +68,7 @@ export function createSignatureReads(
       );
       if (byWidget) return byWidget;
       const owner = form.getFieldForWidget(widget);
-      return owner ? getSignature(owner.ref) : null;
+      return owner ? findSignature(owner.ref) : null;
     }
     if (!isFieldRef(field)) return null;
     return (
@@ -76,8 +79,14 @@ export function createSignatureReads(
       ) ?? null
     );
   };
+  /** A field's facts with its verdict, the same object `listSignatures()` holds for a signed one. */
+  const getSignature = (field: SignatureFieldAddress): SignatureInfo | null => {
+    const signature = findSignature(field);
+    if (!signature) return null;
+    return lists().all.find((info) => info.index === signature.index) ?? null;
+  };
   const getVerdict = (field: SignatureFieldAddress): SignatureVerdict | null => {
-    const signature = getSignature(field);
+    const signature = findSignature(field);
     if (!signature) return null;
     return (
       ctx.state.get().verdicts?.find((verdict) => verdict.signature.index === signature.index) ??
@@ -87,7 +96,7 @@ export function createSignatureReads(
 
   return {
     snapshot,
-    getSignature,
+    findSignature,
     getVerdict,
     api: {
       getSnapshot: snapshot,

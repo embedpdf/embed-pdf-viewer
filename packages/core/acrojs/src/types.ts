@@ -202,7 +202,7 @@ export interface ScriptInput {
 export type ScriptUiEffect =
   | { type: 'alert'; message: string; icon: number; title?: string }
   | { type: 'print' }
-  | { type: 'gotoPage'; page: number }
+  | { type: 'goToPage'; pageIndex: number }
   /** `field.setFocus()`: the cursor into that field, by its full name. */
   | { type: 'focusField'; field: string }
   /** `doc.submitForm(...)` — a submit intent, resolved and sink-routed

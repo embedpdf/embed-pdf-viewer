@@ -8,7 +8,7 @@ import { memo } from '@embedpdf/core';
 import {
   tabOrderOf,
   type AnnotationRef,
-  type FormFieldDTO,
+  type FormField,
   type FormFieldRef,
   type WidgetAnnotation,
 } from '@embedpdf/engine-core/runtime';
@@ -29,12 +29,12 @@ import type { FormContext, FormServices } from '../services';
 /** A place Tab stops at: a box, the field it belongs to, and where it comes in Tab's order. */
 interface Stop {
   readonly row: WidgetAnnotation;
-  readonly field: FormFieldDTO;
+  readonly field: FormField;
   readonly at: number;
 }
 
 /** A radio button as its field lists it: whether it's the checked one, and the value it picks. */
-const radioButtonOf = (field: FormFieldDTO, widget: number) =>
+const radioButtonOf = (field: FormField, widget: number) =>
   field.kind === 'radio'
     ? (field.widgets.find((candidate) => candidate.objectNumber === widget) ?? null)
     : null;
@@ -70,7 +70,7 @@ export function createFocus(
   );
 
   /** The buttons of a radio group, in Tab's order; on one page, with `page`. */
-  const buttonsOf = (field: FormFieldDTO, page?: number): WidgetAnnotation[] =>
+  const buttonsOf = (field: FormField, page?: number): WidgetAnnotation[] =>
     order().rows.filter(
       (row) =>
         (page === undefined || row.page.objectNumber === page) &&
@@ -155,7 +155,7 @@ export function createFocus(
 
   const getFocusedField = memo(
     () => [fields.view(), cursor.focused()],
-    (index, focused): FormFieldDTO | null => (focused ? fieldByKey(index, focused.field) : null),
+    (index, focused): FormField | null => (focused ? fieldByKey(index, focused.field) : null),
   );
 
   return {

@@ -31,7 +31,7 @@ import type {
 import type { AnnotationListMutationMeta } from '../mutation/AnnotationListMutationMeta';
 import type { Annotation } from '../annotation/kinds';
 import type { WidgetAnnotation } from '../annotation/kinds/widget';
-import type { FormFieldDTO } from '../forms/field';
+import type { FormField } from '../forms/field';
 import type { CustomMetadataUpdateResult } from '../mutation/CustomMetadataUpdateResult';
 import type { MetadataUpdateResult } from '../mutation/MetadataUpdateResult';
 import type {
@@ -244,7 +244,7 @@ export type DocumentEvent =
        */
       type: 'forms.restored';
       origin: EventOrigin;
-      field: FormFieldDTO;
+      field: FormField;
       widgets: WidgetAnnotation[];
       meta: FormMutationMeta;
     }

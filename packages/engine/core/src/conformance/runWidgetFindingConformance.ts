@@ -122,15 +122,15 @@ export interface WidgetFindingConformanceOptions {
 
 export function runWidgetFindingConformance(
   runner: ConformanceTestRunner,
-  opts: WidgetFindingConformanceOptions,
+  options: WidgetFindingConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`widget finding conformance: ${opts.label}`, () => {
+  describe(`widget finding conformance: ${options.label}`, () => {
     let engine: Engine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -142,7 +142,7 @@ export function runWidgetFindingConformance(
       WidgetFindingCase,
     ][]) {
       test(`${name}: ${found.does}`, async () => {
-        const doc = await opts.open(engine, found.pdf.slice(), name);
+        const doc = await options.open(engine, found.pdf.slice(), name);
         try {
           const { pages } = await doc.pages.list();
           const form = await doc.forms.list();

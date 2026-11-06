@@ -1,5 +1,5 @@
 import { createHostToken, type EventHook, type PageRef, type Unsubscribe } from '@embedpdf/core';
-import type { PageRotation, Point } from '@embedpdf/core-geometry';
+import type { Rotation, Point } from '@embedpdf/core-geometry';
 
 import { InteractionToken as PublicInteractionToken } from './contract';
 import type {
@@ -48,7 +48,7 @@ export interface PointerSample {
     ref: PageRef;
     point: Point;
     scale?: number;
-    rotation?: PageRotation;
+    rotation?: Rotation;
     zoom?: number;
   };
   modifiers: Modifiers;

@@ -31,7 +31,7 @@ import {
   type ChangeOp,
   type ChangeResult,
   type DocumentHandle,
-  type FormFieldDTO,
+  type FormField,
   type OutlineItem,
   type PageLabelSection,
   type RestoredPage,
@@ -58,7 +58,7 @@ export type PredictedOp =
     }
   | {
       readonly type: 'forms.restore';
-      readonly field: FormFieldDTO;
+      readonly field: FormField;
       /** The rows of its widgets, as they were. */
       readonly widgets: readonly WidgetAnnotation[];
     }
@@ -67,7 +67,7 @@ export type PredictedOp =
       /** The widget's row, as it was. */
       readonly widget: WidgetAnnotation;
       /** Its field as the restore leaves it, with the widget back; `null` when it had none. */
-      readonly field: FormFieldDTO | null;
+      readonly field: FormField | null;
     }
   | {
       readonly type: 'outline.restore';

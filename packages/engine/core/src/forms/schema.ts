@@ -9,7 +9,7 @@ import { PageBoxSchema, PdfRotationSchema } from '../geometry/schemas';
 import type { FormWidget } from '../identity/FormFieldRef';
 import type { FormFieldDraft, FormFieldOptionInput, WidgetPlacement } from './draft';
 import type { FormFieldPatch } from './patch';
-import type { FormFieldDTO, FormFieldOption, FormFieldWidget, ToggleFieldWidget } from './field';
+import type { FormField, FormFieldOption, FormFieldWidget, ToggleFieldWidget } from './field';
 import type { FormKind, FormSnapshot } from './snapshot';
 import type { FormFieldValue } from './value';
 import type { FormValueEntry } from './value-entry';
@@ -88,7 +88,7 @@ const FormFieldBaseShape = {
  * A field of a kind this client doesn't know reads as `unknown`, with the
  * body's `rawValue` when it carries one and `''` when it doesn't.
  */
-export const FormFieldDTOSchema: z.ZodType<FormFieldDTO> = withCatchAll(
+export const FormFieldDTOSchema: z.ZodType<FormField> = withCatchAll(
   z.discriminatedUnion('kind', [
     z.object({
       ...FormFieldBaseShape,
@@ -145,7 +145,7 @@ export const FormFieldDTOSchema: z.ZodType<FormFieldDTO> = withCatchAll(
       kind: z.literal('unknown'),
       rawValue: z.string(),
     }),
-  ]) as unknown as z.ZodType<FormFieldDTO>,
+  ]) as unknown as z.ZodType<FormField>,
   'unknown',
   (field) => ({ ...field, rawValue: typeof field.rawValue === 'string' ? field.rawValue : '' }),
 ).describe(

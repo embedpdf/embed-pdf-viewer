@@ -3,7 +3,7 @@
  * the engine checks a value against its field, shared by the engine (before
  * it writes) and a viewer (before it shows the write, `predict.ts`).
  */
-import type { FormFieldDTO, FormFieldKind } from './field';
+import type { FormField, FormFieldKind } from './field';
 import type { FormFieldValue } from './value';
 import type { FormValueEntry } from './value-entry';
 import { EngineError } from '../errors/EngineError';
@@ -37,7 +37,7 @@ const TAKES: Partial<Record<FormFieldKind, string>> = {
  * dropdown that allows editing). `InvalidArg` otherwise.
  */
 export function fieldValueWriteOf(
-  field: FormFieldDTO<Coordinates>,
+  field: FormField<Coordinates>,
   value: FormFieldValue,
 ): FieldValueWrite {
   switch (field.kind) {
@@ -109,7 +109,7 @@ export function assertChoiceDefault(target: ChoiceDefaultTarget, values: readonl
 }
 
 /** Whether `write` would leave `field` as it is. */
-export function isNoOpWrite(field: FormFieldDTO<Coordinates>, write: FieldValueWrite): boolean {
+export function isNoOpWrite(field: FormField<Coordinates>, write: FieldValueWrite): boolean {
   switch (write.kind) {
     case 'text':
       return field.kind === 'text' && field.value === write.value;
@@ -134,7 +134,7 @@ export function isNoOpWrite(field: FormFieldDTO<Coordinates>, write: FieldValueW
  * Whether a reset would leave `field` as it is: its value is its default, and
  * a checkbox's or radio group's buttons show that default.
  */
-export function isAtDefault(field: FormFieldDTO<Coordinates>): boolean {
+export function isAtDefault(field: FormField<Coordinates>): boolean {
   if (field.valueEntry.kind === 'unsupported') return false;
   if (!valueEntriesEqual(field.valueEntry, field.defaultValueEntry)) return false;
   if (field.kind !== 'checkbox' && field.kind !== 'radio') return true;
@@ -158,7 +158,7 @@ export function valueEntriesEqual(left: FormValueEntry, right: FormValueEntry): 
 
 /** A checkbox's or radio group's on-state for an export value; `'Off'` and `null` clear it. */
 function toggleStateOf(
-  field: Extract<FormFieldDTO<Coordinates>, { kind: 'checkbox' | 'radio' }>,
+  field: Extract<FormField<Coordinates>, { kind: 'checkbox' | 'radio' }>,
   exportValue: string | null,
 ): string | null {
   if (exportValue === null || exportValue === 'Off') return null;
@@ -170,7 +170,7 @@ function toggleStateOf(
 }
 
 function choiceOf(
-  field: Extract<FormFieldDTO<Coordinates>, { kind: 'combobox' | 'listbox' }>,
+  field: Extract<FormField<Coordinates>, { kind: 'combobox' | 'listbox' }>,
   values: string[],
 ): FieldValueWrite {
   if (new Set(values).size !== values.length) {

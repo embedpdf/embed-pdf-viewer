@@ -341,7 +341,7 @@ export type PluginScope = 'workspace' | 'document';
  * `S` is the plugin's session state and `T` its settings, `NoSettings` for a
  * plugin that declares none.
  */
-export interface PluginContext<S = unknown, T extends object = NoSettings> {
+export interface PluginContext<State = unknown, PluginSettings extends object = NoSettings> {
   // ── identity ──
   readonly id: string;
   /** Unique per open of this document (workspace plugins: `workspace:<id>`). */
@@ -419,7 +419,7 @@ export interface PluginContext<S = unknown, T extends object = NoSettings> {
 
   // ── state ──
   /** This instance's session state, changed only through pure transitions. */
-  readonly state: StateCell<S>;
+  readonly state: StateCell<State>;
 
   // ── settings ──
   /**
@@ -431,7 +431,7 @@ export interface PluginContext<S = unknown, T extends object = NoSettings> {
    * `onSettingsChanged` listeners go when it closes. The merge rules are in `settings.ts`.
    * A plugin whose definition declares no settings has none to read: calling it throws.
    */
-  readonly settings: () => Settings<T>;
+  readonly settings: () => Settings<PluginSettings>;
 
   // ── reactivity ──
   /**
@@ -550,11 +550,14 @@ export interface PluginContext<S = unknown, T extends object = NoSettings> {
  * `update` applies a pure transition, and a transition that returns the
  * current value changes nothing.
  */
-export interface StateCell<S> {
-  get(): S;
-  update<Args extends unknown[]>(transition: (state: S, ...args: Args) => S, ...args: Args): void;
+export interface StateCell<State> {
+  get(): State;
+  update<Args extends unknown[]>(
+    transition: (state: State, ...args: Args) => State,
+    ...args: Args
+  ): void;
   /** Fires synchronously after every committed change of this instance's state. */
-  readonly onChange: EventHook<StateChange<S>>;
+  readonly onChange: EventHook<StateChange<State>>;
 }
 
 /** One committed state change: the value before and after. */
@@ -574,9 +577,13 @@ export interface StateChange<S> {
  * controller that returns less than the capability is a type error, not a
  * narrower capability.
  */
-export interface PluginDef<S = unknown, C = unknown, T extends object = NoSettings> {
+export interface PluginDefinition<
+  State = unknown,
+  Capability = unknown,
+  PluginSettings extends object = NoSettings,
+> {
   readonly id: string;
-  readonly token?: CapabilityToken<C>;
+  readonly token?: CapabilityToken<Capability>;
   readonly scope?: PluginScope;
   readonly requires?: ReadonlyArray<CapabilityToken<unknown>>;
   readonly optional?: ReadonlyArray<CapabilityToken<unknown>>;
@@ -588,30 +595,32 @@ export interface PluginDef<S = unknown, C = unknown, T extends object = NoSettin
    */
   readonly resolvesAnyCapability?: true;
   /** Initial session state, built fresh for every instance. Omit for stateless plugins. */
-  readonly state?: () => S;
+  readonly state?: () => State;
   /**
    * The plugin's settings: its defaults, and what the app registered (the factory's config).
    * The kernel builds one store per registration from it when it plans the plugin list, so the
    * settings can be read and changed before any document opens (`kernel.settingsOf(token)`).
    * The plugin reads them with `ctx.settings()`. Omit for a plugin without settings.
    */
-  readonly settings?: SettingsDeclaration<T>;
+  readonly settings?: SettingsDeclaration<PluginSettings>;
   /**
    * Build the instance's API and, optionally, the connections (subscriptions
    * to engine events and sibling capabilities) that start once every
    * dependency is constructed. Runs once per instance.
    */
-  readonly create: NoInfer<(ctx: PluginContext<S, T>) => { api: C; connect?: () => void }>;
+  readonly create: NoInfer<
+    (ctx: PluginContext<State, PluginSettings>) => { api: Capability; connect?: () => void }
+  >;
   /**
    * This capability as seen from inside a document's scope: calls that leave out the document
    * use `documentId` instead of the active one. Workspace plugins only. The kernel builds the
    * view once per document and hands it out whenever that document is named
    * (`kernel.capability(token, documentId)`, `ctx.forDocument`, a `<DocumentScope>`).
    */
-  readonly inScope?: NoInfer<(api: C, documentId: string) => C>;
+  readonly inScope?: NoInfer<(api: Capability, documentId: string) => Capability>;
 }
 
-export type AnyPlugin = PluginDef<any, any, any>;
+export type AnyPlugin = PluginDefinition<any, any, any>;
 
 // ── Built-in: the document registry, exposed as a capability ─────────────────
 

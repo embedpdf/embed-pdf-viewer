@@ -4,7 +4,7 @@ import { usePageList } from '@embedpdf/vue/runtime';
 import type { PageRef } from '@embedpdf/vue/runtime';
 import { useStage } from '@embedpdf/vue/stage';
 import { useForm } from '@embedpdf/vue/form';
-import type { FormCapability, FormFieldDTO } from '@embedpdf/vue/form';
+import type { FormCapability, FormField } from '@embedpdf/vue/form';
 
 // The printed boxes are the fields' look: a new field only sets its text size.
 const look = { fontSize: 11 };
@@ -44,14 +44,14 @@ const form = useForm();
 const stage = useStage();
 const pages = usePageList();
 const page = computed(() => pages.value[0]?.ref); // the printed form
-const added = shallowRef<FormFieldDTO[]>([]);
+const added = shallowRef<FormField[]>([]);
 
 // Each kind of field fills its column from the top: the next row that hasn't got one.
-function rowFor(kind: FormFieldDTO['kind']) {
+function rowFor(kind: FormField['kind']) {
   return added.value.filter((field) => field.kind === kind).length;
 }
 
-async function add(addField: typeof addDropdown, kind: FormFieldDTO['kind']) {
+async function add(addField: typeof addDropdown, kind: FormField['kind']) {
   if (!page.value) return;
   const { field } = await addField(form, page.value, rowFor(kind));
   added.value = [...added.value, field];

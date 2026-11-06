@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { timerClock, type PageImageHandle } from '@embedpdf/core';
 import type { Rect } from '@embedpdf/core-geometry';
 
-import { resolveRenderOptions, type TilesOptions } from '../src/paint-plan';
+import { resolveRenderOptions, type TilesSettings } from '../src/paint-plan';
 import { RasterStore } from '../src/raster-store';
 import { TileManager } from '../src/tile-manager';
 
@@ -22,7 +22,7 @@ const LATTICE = {
   enforced: false,
 } as const;
 
-function createHarness(options?: { policy?: unknown; tiling?: TilesOptions }) {
+function createHarness(options?: { policy?: unknown; tiling?: TilesSettings }) {
   const store = new RasterStore(256);
   const pending: Array<{
     view: string;

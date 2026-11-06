@@ -85,14 +85,14 @@ export interface CreateLocalEngineOptions extends Omit<LocalEngineOptions, 'tran
  * Synchronous: the runtime (WASM compile / native load) boots lazily on the
  * first operation, inside the engine's {@link LazyTransport}.
  */
-export function createLocalEngine(opts: CreateLocalEngineOptions = {}): LocalEngine {
-  const transport = new LazyTransport(() => startInlineTransport(opts.runtime));
+export function createLocalEngine(options: CreateLocalEngineOptions = {}): LocalEngine {
+  const transport = new LazyTransport(() => startInlineTransport(options.runtime));
   return LocalEngine.fromTransport({
     transport,
-    concurrency: opts.concurrency,
-    imageEncoder: opts.imageEncoder,
-    renderPolicy: opts.renderPolicy,
-    signedDocumentPolicy: opts.signedDocumentPolicy,
+    concurrency: options.concurrency,
+    imageEncoder: options.imageEncoder,
+    renderPolicy: options.renderPolicy,
+    signedDocumentPolicy: options.signedDocumentPolicy,
   });
 }
 
@@ -111,15 +111,17 @@ export interface CreateLocalEngineWithWorkerOptions
  * {@link watchWorkerReady}) so a worker that finishes booting before the first
  * engine operation cannot hang the lazy boot.
  */
-export function createLocalEngineWithWorker(opts: CreateLocalEngineWithWorkerOptions): LocalEngine {
-  const boot = workerBoot(opts.worker, opts);
+export function createLocalEngineWithWorker(
+  options: CreateLocalEngineWithWorkerOptions,
+): LocalEngine {
+  const boot = workerBoot(options.worker, options);
   const transport = new LazyTransport(boot.spawn, boot.lazyOptions);
   return LocalEngine.fromTransport({
     transport,
-    concurrency: opts.concurrency,
-    imageEncoder: opts.imageEncoder,
-    renderPolicy: opts.renderPolicy,
-    signedDocumentPolicy: opts.signedDocumentPolicy,
+    concurrency: options.concurrency,
+    imageEncoder: options.imageEncoder,
+    renderPolicy: options.renderPolicy,
+    signedDocumentPolicy: options.signedDocumentPolicy,
   });
 }
 

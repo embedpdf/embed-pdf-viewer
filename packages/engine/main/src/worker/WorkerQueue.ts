@@ -129,9 +129,9 @@ export class WorkerQueue implements JobQueue {
 
   constructor(
     private readonly transport: Transport,
-    opts: { concurrency?: number } = {},
+    options: { concurrency?: number } = {},
   ) {
-    this.maxConcurrency = Math.max(1, opts.concurrency ?? 1);
+    this.maxConcurrency = Math.max(1, options.concurrency ?? 1);
     this.unsubscribe = transport.onMessage((msg) => this.handleResponse(msg));
   }
 

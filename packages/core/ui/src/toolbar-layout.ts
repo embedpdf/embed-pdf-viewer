@@ -64,7 +64,7 @@ export interface OverflowMenuView<Command extends ToolbarCommand = ToolbarComman
 }
 
 /** What a custom item's renderer receives besides the item's variant. */
-export interface CustomSlotCtx {
+export interface CustomSlotContext {
   /** `'live'` in the visible row, `'measure'` in the hidden measurement layer. */
   layer: 'live' | 'measure';
   /**

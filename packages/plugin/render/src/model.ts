@@ -4,7 +4,7 @@
  * applies the transitions with `ctx.state.update`.
  */
 import type { PageObjectNumber, PageRef, PageRenderLayers } from '@embedpdf/core';
-import type { PageRotation, Point } from '@embedpdf/core-geometry';
+import type { Rotation, Point } from '@embedpdf/core-geometry';
 import type { InvalidateScope } from './contract';
 
 /**
@@ -39,7 +39,7 @@ export interface SnapshotBox {
   /** View px per page unit at the press, which tells a box from a click. */
   readonly scale: number;
   /** The page's turn on screen at the press: the picture turns with it. */
-  readonly rotation: PageRotation;
+  readonly rotation: Rotation;
   /** Released: the box is the snapshot. */
   readonly held: boolean;
 }

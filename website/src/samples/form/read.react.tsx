@@ -13,7 +13,7 @@ import {
   useFormState,
   useFormValue,
 } from '@embedpdf/react/form';
-import type { FormFieldDTO } from '@embedpdf/react/form';
+import type { FormField } from '@embedpdf/react/form';
 import { localEngine } from '@embedpdf/engine';
 
 import './read.css';
@@ -40,7 +40,7 @@ function useFilledInName() {
 }
 
 /** A field's value as text, whatever its kind. */
-function valueText(field: FormFieldDTO): string {
+function valueText(field: FormField): string {
   switch (field.kind) {
     case 'text':
     case 'combobox':

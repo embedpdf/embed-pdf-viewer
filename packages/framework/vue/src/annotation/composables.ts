@@ -20,7 +20,7 @@ import type {
   AnnotationProperties,
   AnnotationRef,
   CommentThread,
-  CommentsApi,
+  CommentsCapability,
   FilePickerProvider,
   ToolDefaults,
 } from '@embedpdf/plugin-annotation';
@@ -85,7 +85,9 @@ const NO_DEFAULTS: ToolDefaults = Object.freeze({});
  * over the engine's. It follows them, so a color picker always shows the
  * current color. Empty without a document.
  */
-export function useAnnotationDefaults(toolId: MaybeRefOrGetter<string>): Readonly<Ref<ToolDefaults>> {
+export function useAnnotationDefaults(
+  toolId: MaybeRefOrGetter<string>,
+): Readonly<Ref<ToolDefaults>> {
   return useOptionalSelector(
     AnnotationToken,
     (annotation) => annotation.tools.getDefaults(toValue(toolId)),
@@ -149,7 +151,7 @@ export function useAnnotationAnchor(
  * always reaches the current document. Pair it with {@link useCommentThreads}
  * for the threads to show.
  */
-export function useComments(): CommentsApi {
+export function useComments(): CommentsCapability {
   const annotation = useAnnotation();
   // Read `comments` at each use, never once here: the document in scope may change.
   const target = markRaw({});
@@ -159,7 +161,7 @@ export function useComments(): CommentsApi {
         ? Reflect.get(target, key)
         : Reflect.get(annotation.comments, key),
     has: (_target, key) => Reflect.has(annotation.comments, key),
-  }) as CommentsApi;
+  }) as CommentsCapability;
 }
 
 const NO_PAGES: readonly PageLayout[] = Object.freeze([]);

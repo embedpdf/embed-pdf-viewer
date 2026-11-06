@@ -1,5 +1,5 @@
 import type {
-  FormFieldDTO,
+  FormField,
   FormFieldRef,
   FormSubmissionEntry,
   PdfActionTargetRef,
@@ -58,7 +58,7 @@ export const resolveFieldSelection = <F extends { name: string; ref: FormFieldRe
  *   box) → string[]; the submitted name is the fully qualified name.
  */
 export const buildSubmitEntries = (
-  fields: readonly FormFieldDTO[],
+  fields: readonly FormField[],
   intent: SubmitIntent,
   diagnose: (diagnostic: ActionDiagnostic) => void,
 ): FormSubmissionEntry[] => {

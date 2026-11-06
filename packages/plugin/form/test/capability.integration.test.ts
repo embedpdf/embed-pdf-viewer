@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 import { createKernel } from '@embedpdf/core';
 import { createLocalEngine } from '@embedpdf/engine';
-import type { FormFieldDTO } from '@embedpdf/engine-core/runtime';
+import type { FormField } from '@embedpdf/engine-core/runtime';
 import { interactionPlugin } from '@embedpdf/plugin-interaction';
 
 import {
@@ -106,7 +106,7 @@ async function buildForm({ form, page }: Harness) {
   });
 }
 
-const names = (fields: readonly FormFieldDTO[]) => fields.map((field) => field.name);
+const names = (fields: readonly FormField[]) => fields.map((field) => field.name);
 
 describe('the form capability on a real engine', () => {
   it('builds a form from code: create resolves { field }, the state follows, the events fire', async () => {

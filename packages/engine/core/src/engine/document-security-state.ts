@@ -85,12 +85,12 @@ export function advisoryFromPdfBits(b: PdfBits): PdfPermissionAdvisory {
 
 export function securityStateFromProbe(
   info: DocumentSecurityProbeInfo,
-  opts: { accessEndpoint?: string; cdnRequired?: boolean } = {},
+  options: { accessEndpoint?: string; cdnRequired?: boolean } = {},
 ): DocumentSecurityState {
   const permission = permissionInfoFromProbe(info);
   const reasons: DocumentAccessReason[] = [];
   if (info.encryptionRequiresPassword === true && !permission) reasons.push('password');
-  if (opts.cdnRequired) reasons.push('cdn');
+  if (options.cdnRequired) reasons.push('cdn');
   if (info.encryptionState === 'unknown') reasons.push('permissions-unknown');
 
   return {
@@ -109,7 +109,7 @@ export function securityStateFromProbe(
     access: {
       required: reasons.length > 0,
       reasons,
-      ...(reasons.length > 0 && opts.accessEndpoint ? { endpoint: opts.accessEndpoint } : {}),
+      ...(reasons.length > 0 && options.accessEndpoint ? { endpoint: options.accessEndpoint } : {}),
     },
   };
 }

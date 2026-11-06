@@ -64,7 +64,7 @@ import type { MetadataPatch } from '../dto/MetadataPatch';
 import type { SerializedEngineError } from '../errors/EngineError';
 import type { FormFieldDraft, WidgetPlacement } from '../forms/draft';
 import type { FormFieldDisplay } from '../forms/effects';
-import type { FormFieldDTO } from '../forms/field';
+import type { FormField } from '../forms/field';
 import type { FormFieldPatch } from '../forms/patch';
 import type { FormFieldValue } from '../forms/value';
 import type { PdfRotation } from '../geometry/primitives';
@@ -451,7 +451,7 @@ export type ChangeItem<C extends Coordinates = PageCoordinates> =
   | ({ type: 'forms.delete' } & FormFieldDeleteResult)
   | {
       type: 'forms.restore';
-      field: FormFieldDTO<C>;
+      field: FormField<C>;
       widgets: WidgetAnnotation<C>[];
       meta: FormMutationMeta;
     }

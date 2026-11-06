@@ -35,7 +35,7 @@ import type {
   PdfRevision,
   SignatureCancelResult,
   SignatureCompleteResult,
-  SignatureDTO,
+  Signature,
   SignaturePrepared,
   SignatureSeedValue,
   SignatureSnapshot,
@@ -2104,7 +2104,7 @@ export const SignatureSeedValueSchema: z.ZodType<SignatureSeedValue> = z.object(
   unsupportedRequired: z.boolean(),
 });
 
-export const SignatureDTOSchema: z.ZodType<SignatureDTO> = z.object({
+export const SignatureDTOSchema: z.ZodType<Signature> = z.object({
   index: z.number().int().nonnegative(),
   field: FormFieldRefSchema,
   fieldName: z.string(),

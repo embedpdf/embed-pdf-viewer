@@ -78,7 +78,7 @@ export const EMPTY_TILE_PLAN: TilePaintPlan = {
  * The base-plane strategy: the pixel budget and the render points below it.
  * Device px throughout (CSS px × devicePixelRatio).
  */
-export interface FullPageOptions {
+export interface FullPageSettings {
   /**
    * The budget: no full-page raster ever renders wider. Small by design —
    * the base is the instant backdrop; sharpness past it is the tile plane's
@@ -96,7 +96,7 @@ export interface FullPageOptions {
 }
 
 /** The tile-plane strategy. Pass `tiles: false` to disable the plane. */
-export interface TilesOptions {
+export interface TilesSettings {
   /** Tile edge in device px. Default 512 (policy `tileSizes` win when advertised). */
   size?: number;
   /**
@@ -184,8 +184,8 @@ export interface ResolvedRenderOptions {
  * width other than the default 640.
  */
 export function resolveRenderOptions(options: {
-  fullPage?: FullPageOptions;
-  tiles?: TilesOptions | false;
+  fullPage?: FullPageSettings;
+  tiles?: TilesSettings | false;
   format?: 'png' | 'webp' | 'bmp' | null;
   quality?: number | null;
   debug?: boolean;

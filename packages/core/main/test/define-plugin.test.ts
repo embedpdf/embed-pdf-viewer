@@ -1,7 +1,7 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import { createCapabilityToken, definePlugin } from '../src/index';
 import type { NoSettings, SettingsApi } from '../src/settings';
-import type { AnyPlugin, PluginContext, PluginDef } from '../src/types';
+import type { AnyPlugin, PluginContext, PluginDefinition } from '../src/types';
 
 /**
  * `definePlugin` takes no type arguments: it reads the capability from
@@ -46,7 +46,7 @@ describe('definePlugin', () => {
       settings: { defaults: DEFAULTS, registered: { step: 2 } },
       create: createCounterController,
     });
-    expectTypeOf(plugin).toEqualTypeOf<PluginDef<Counter, CounterApi, CounterSettings>>();
+    expectTypeOf(plugin).toEqualTypeOf<PluginDefinition<Counter, CounterApi, CounterSettings>>();
     expect(plugin.settings?.registered).toEqual({ step: 2 });
   });
 
@@ -73,7 +73,7 @@ describe('definePlugin', () => {
         return { api: { ping: () => 'pong' } };
       },
     });
-    expectTypeOf(plugin).toEqualTypeOf<PluginDef<void, { ping(): string }, NoSettings>>();
+    expectTypeOf(plugin).toEqualTypeOf<PluginDefinition<void, { ping(): string }, NoSettings>>();
   });
 
   it('lets one plugin list hold plugins with and without settings', () => {

@@ -76,15 +76,15 @@ const SQUARE: AnnotationDraft = {
  */
 export function runAnnotationAttributionConformance(
   runner: ConformanceTestRunner,
-  opts: AnnotationAttributionConformanceOptions,
+  options: AnnotationAttributionConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`annotation attribution conformance: ${opts.label}`, () => {
+  describe(`annotation attribution conformance: ${options.label}`, () => {
     let engine: Engine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -96,7 +96,7 @@ export function runAnnotationAttributionConformance(
       session: AttributionSession,
       run: (page: PageHandle, doc: DocumentHandle) => Promise<T>,
     ): Promise<T> => {
-      const doc = await opts.openAs(engine, session);
+      const doc = await options.openAs(engine, session);
       try {
         return await run(await firstPage(doc), doc);
       } finally {
@@ -153,7 +153,7 @@ export function runAnnotationAttributionConformance(
     });
 
     test("update stamps modifiedAt and modifiedBy, and keeps the creator's attribution", async () => {
-      const alice = await opts.openAs(engine, { scope: SCOPE, identity: ALICE });
+      const alice = await options.openAs(engine, { scope: SCOPE, identity: ALICE });
       let original: Annotation;
       try {
         const page = await firstPage(alice);
@@ -165,7 +165,7 @@ export function runAnnotationAttributionConformance(
         await alice.close();
         throw error;
       }
-      const bob = await opts.openAs(engine, { scope: SCOPE, identity: BOB }, alice);
+      const bob = await options.openAs(engine, { scope: SCOPE, identity: BOB }, alice);
       await alice.close();
       try {
         const page = await firstPage(bob);
@@ -264,7 +264,7 @@ export function runAnnotationAttributionConformance(
     test('a restoring import keeps the attribution a bundle has, and records who imported it', async () => {
       // Alice writes, Bob edits one of hers: the bundle carries both, and the
       // annotations another tool wrote.
-      const alice = await opts.openAs(engine, { scope: READ, identity: ALICE });
+      const alice = await options.openAs(engine, { scope: READ, identity: ALICE });
       const page = await firstPage(alice);
       const rect = { x: 300, y: 300, width: 30, height: 30 };
       const { annotation: square } = await page.annotations.create(SQUARE);
@@ -285,7 +285,7 @@ export function runAnnotationAttributionConformance(
         },
         { resources: { file: new TextEncoder().encode('minutes') } },
       );
-      const bob = await opts.openAs(engine, { scope: READ, identity: BOB }, alice);
+      const bob = await options.openAs(engine, { scope: READ, identity: BOB }, alice);
       await alice.close();
       await (await firstPage(bob)).annotations.update(square.ref, { contents: 'Checked' });
       // Without names, so the copies land beside the originals.
@@ -295,7 +295,7 @@ export function runAnnotationAttributionConformance(
         items: exported.items.map((item) => ({ ...item, data: { ...item.data, nm: null } })),
       } as typeof exported;
 
-      const importer = await opts.openAs(
+      const importer = await options.openAs(
         engine,
         { scope: [...READ, 'doc.annotate.import'], identity: IMPORTER },
         bob,
@@ -381,7 +381,7 @@ export function runAnnotationAttributionConformance(
 
     test("a note with someone else's reply is deleted whole or not at all", async () => {
       const rect = { x: 200, y: 40, width: 20, height: 20 };
-      const alice = await opts.openAs(engine, { scope: SCOPE, identity: ALICE });
+      const alice = await options.openAs(engine, { scope: SCOPE, identity: ALICE });
       let note: Annotation;
       try {
         ({ annotation: note } = await (
@@ -395,7 +395,7 @@ export function runAnnotationAttributionConformance(
         await alice.close();
         throw error;
       }
-      const bob = await opts.openAs(engine, { scope: SCOPE, identity: BOB }, alice);
+      const bob = await options.openAs(engine, { scope: SCOPE, identity: BOB }, alice);
       await alice.close();
       let reply: Annotation;
       try {
@@ -420,7 +420,7 @@ export function runAnnotationAttributionConformance(
         'doc.annotate.modify',
         'annotations:delete:self',
       ];
-      const aliceAgain = await opts.openAs(engine, { scope: own, identity: ALICE }, bob);
+      const aliceAgain = await options.openAs(engine, { scope: own, identity: ALICE }, bob);
       await bob.close();
       try {
         const page = await firstPage(aliceAgain);

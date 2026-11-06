@@ -12,7 +12,7 @@
  */
 import type { FormFieldOptionInput, FormFieldDraft, WidgetPlacement } from './draft';
 import type { FormFieldDisplay } from './effects';
-import type { FormFieldDTO, FormFieldOption, FormFieldWidget, ToggleFieldWidget } from './field';
+import type { FormField, FormFieldOption, FormFieldWidget, ToggleFieldWidget } from './field';
 import type { FormFieldPatch } from './patch';
 import type { FormFieldValue } from './value';
 import type { FormValueEntry } from './value-entry';
@@ -29,7 +29,7 @@ import { annotationOfDraft } from '../pageSpace/helpers';
 
 /** A field and the rows of its widgets: what a form op changes, as its answer reports them. */
 export interface FieldWithWidgets<C extends Coordinates = PageCoordinates> {
-  readonly field: FormFieldDTO<C>;
+  readonly field: FormField<C>;
   /** The rows of the field's widgets, as the form's `widgets` holds them. */
   readonly widgets: readonly WidgetAnnotation<C>[];
 }
@@ -227,7 +227,7 @@ export function formFieldOfDraft(
     filledAt: null,
     importedBy: null,
   };
-  let field: FormFieldDTO;
+  let field: FormField;
   switch (draft.kind) {
     case 'text': {
       const defaultValue = draft.defaultValue ?? '';
@@ -316,7 +316,7 @@ export function formFieldAfter<C extends Coordinates>(
   patch: FormFieldPatch,
 ): FieldWithWidgets<C> {
   const given = patch as Record<string, unknown>;
-  let field = { ...current.field } as FormFieldDTO<C> & Record<string, unknown>;
+  let field = { ...current.field } as FormField<C> & Record<string, unknown>;
   if (patch.name !== undefined) {
     const parent = field.name.lastIndexOf('.');
     field.name = parent < 0 ? patch.name : `${field.name.slice(0, parent + 1)}${patch.name}`;
@@ -352,7 +352,7 @@ export function formFieldAfter<C extends Coordinates>(
       field = withDefault(field, values) as typeof field;
     }
   }
-  const after = { ...current, field: field as FormFieldDTO<C> };
+  const after = { ...current, field: field as FormField<C> };
   return redraw ? redrawn(after.field, after) : after;
 }
 
@@ -380,7 +380,7 @@ function firstCharacters(text: string, limit: number | null): string {
 
 /** The field, with every widget's appearance drawn again (a text or choice write). */
 function redrawn<C extends Coordinates>(
-  field: FormFieldDTO<C>,
+  field: FormField<C>,
   current: FieldWithWidgets<C>,
 ): FieldWithWidgets<C> {
   return {
@@ -467,14 +467,14 @@ const choiceMatches = (
   values: readonly string[],
 ): boolean => values.every((value) => field.options.some((option) => option.value === value));
 
-const freeTextAllowed = (field: FormFieldDTO<Coordinates>, values: readonly string[]): boolean =>
+const freeTextAllowed = (field: FormField<Coordinates>, values: readonly string[]): boolean =>
   field.kind === 'combobox' && field.edit && values.length === 1;
 
 /** A choice field holding `values`: its options' selection, its value and `/V`. */
 function choiceFieldWith<C extends Coordinates>(
-  field: Extract<FormFieldDTO<C>, { kind: 'combobox' | 'listbox' }>,
+  field: Extract<FormField<C>, { kind: 'combobox' | 'listbox' }>,
   values: readonly string[],
-): FormFieldDTO<C> {
+): FormField<C> {
   const matched = choiceMatches(field, values) ? matchedIndexes(field.options, values) : [];
   const freeText = values.length > 0 && matched.length === 0;
   const options = field.options.map((option, at) => {
@@ -502,9 +502,9 @@ function inOptionOrder(options: readonly FormFieldOption[], values: readonly str
 
 /** A choice field with new options: what is still an option stays selected, and stays its default. */
 function withOptions<C extends Coordinates>(
-  field: Extract<FormFieldDTO<C>, { kind: 'combobox' | 'listbox' }>,
+  field: Extract<FormField<C>, { kind: 'combobox' | 'listbox' }>,
   options: FormFieldOption[],
-): FormFieldDTO<C> {
+): FormField<C> {
   const exports = options.map((option) => option.value);
   const keepsFreeText = field.kind === 'combobox' && field.edit;
   const current =
@@ -520,7 +520,7 @@ function withOptions<C extends Coordinates>(
   if (field.defaultValueEntry.kind === 'none') return reselected;
   const keptDefaults = keptValues(defaults, exports, keepsFreeText);
   return withDefault(
-    reselected as Extract<FormFieldDTO<C>, { kind: 'combobox' | 'listbox' }>,
+    reselected as Extract<FormField<C>, { kind: 'combobox' | 'listbox' }>,
     keptDefaults,
     true,
   );
@@ -547,10 +547,10 @@ function keptValues(
  * where none left is an empty default rather than no default.
  */
 function withDefault<C extends Coordinates>(
-  field: Extract<FormFieldDTO<C>, { kind: 'combobox' | 'listbox' }>,
+  field: Extract<FormField<C>, { kind: 'combobox' | 'listbox' }>,
   values: readonly string[],
   filtered = false,
-): FormFieldDTO<C> {
+): FormField<C> {
   if (values.length === 0) {
     const entry: FormValueEntry = !filtered
       ? none()
@@ -619,6 +619,6 @@ const objectNumberOf = (ref: AnnotationRef | Annotation['ref']): number =>
 const scalar = (value: string): FormValueEntry => ({ kind: 'scalar', value });
 const none = (): FormValueEntry => ({ kind: 'none' });
 
-function notReset(field: FormFieldDTO<Coordinates>): EngineError {
+function notReset(field: FormField<Coordinates>): EngineError {
   return new EngineError(EngineErrorCode.Unknown, `'${field.name}' could not be reset`);
 }

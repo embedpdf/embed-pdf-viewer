@@ -19,7 +19,7 @@ import type {
   Point,
   ViewEnv,
 } from '@embedpdf/core-annotation';
-import type { PageRotation } from '@embedpdf/core-geometry';
+import type { Rotation } from '@embedpdf/core-geometry';
 import type {
   AnnotationAppearanceImage,
   AnnotationPosition,
@@ -32,7 +32,10 @@ import type {
   RichTextParagraph,
   SerializedEngineError,
 } from '@embedpdf/engine-core/runtime';
-import type { AnnotCommitEntry, AnnotCommitResult } from '@embedpdf/plugin-actions/contract/host';
+import type {
+  AnnotationCommitEntry,
+  AnnotationCommitResult,
+} from '@embedpdf/plugin-actions/contract/host';
 import type { AppearancePicture } from '@embedpdf/plugin-render/contract/host';
 
 import type {
@@ -187,7 +190,7 @@ export interface AnnotationHostCapability extends AnnotationCapability {
    */
   getSelectionAnchorIn(view: {
     scale?: number;
-    rotation?: PageRotation;
+    rotation?: Rotation;
     zoom?: number;
   }): AnnotationSelectionAnchor | null;
   /**
@@ -209,12 +212,7 @@ export interface AnnotationHostCapability extends AnnotationCapability {
    * engine picture is drawn under. `null` for one that isn't a free text here.
    */
   getTextItem(ref: AnnotationRef, view?: ViewEnv): TextItem | null;
-  listChromeNodes(
-    page: PageRef,
-    scale?: number,
-    rotation?: PageRotation,
-    zoom?: number,
-  ): ChromeNode[];
+  listChromeNodes(page: PageRef, scale?: number, rotation?: Rotation, zoom?: number): ChromeNode[];
   listLinkItems(page: PageRef): LinkNavItem[];
   /**
    * What a page's pictures depend on: its baked records at their picture
@@ -247,7 +245,7 @@ export interface AnnotationHostCapability extends AnnotationCapability {
     page: PageRef,
     point: Point,
     scale?: number,
-    rotation?: PageRotation,
+    rotation?: Rotation,
     zoom?: number,
   ): boolean;
   draftContents(ref: AnnotationRef, text: string): void;
@@ -274,7 +272,7 @@ export interface AnnotationHostCapability extends AnnotationCapability {
     page: PageRef,
     point: Point,
     scale?: number,
-    rotation?: PageRotation,
+    rotation?: Rotation,
     zoom?: number,
     touch?: boolean,
   ): 'handle' | 'rotate' | 'group-handle' | 'annot' | 'empty';
@@ -282,14 +280,14 @@ export interface AnnotationHostCapability extends AnnotationCapability {
     page: PageRef,
     point: Point,
     scale?: number,
-    rotation?: PageRotation,
+    rotation?: Rotation,
     zoom?: number,
   ): boolean;
   getCursorAt(
     page: PageRef,
     point: Point,
     scale?: number,
-    rotation?: PageRotation,
+    rotation?: Rotation,
     zoom?: number,
   ): string | null;
   hoverAt(
@@ -297,7 +295,7 @@ export interface AnnotationHostCapability extends AnnotationCapability {
       page: PageRef;
       point: Point;
       scale?: number;
-      rotation?: PageRotation;
+      rotation?: Rotation;
       zoom?: number;
     } | null,
   ): void;
@@ -307,7 +305,7 @@ export interface AnnotationHostCapability extends AnnotationCapability {
     point: Point,
     shift: boolean,
     scale?: number,
-    rotation?: PageRotation,
+    rotation?: Rotation,
     zoom?: number,
     touch?: boolean,
   ): void;
@@ -317,7 +315,7 @@ export interface AnnotationHostCapability extends AnnotationCapability {
     point: Point,
     shift: boolean,
     scale?: number,
-    rotation?: PageRotation,
+    rotation?: Rotation,
     zoom?: number,
   ): void;
   createPointer(
@@ -326,13 +324,13 @@ export interface AnnotationHostCapability extends AnnotationCapability {
     page: PageRef,
     point: Point,
     finish?: boolean,
-    displayRotation?: PageRotation,
+    displayRotation?: Rotation,
   ): void;
   finishInkDraft(): void;
   /** Place with the active tool at a click; `displayRotation` and `zoom` are the page's view there. */
-  placeAt(page: PageRef, point: Point, displayRotation?: PageRotation, zoom?: number): boolean;
-  placeArmedStamp(page: PageRef, point: Point, displayRotation?: PageRotation): boolean;
-  requestStampAt(page: PageRef, point: Point, displayRotation?: PageRotation): boolean;
+  placeAt(page: PageRef, point: Point, displayRotation?: Rotation, zoom?: number): boolean;
+  placeArmedStamp(page: PageRef, point: Point, displayRotation?: Rotation): boolean;
+  requestStampAt(page: PageRef, point: Point, displayRotation?: Rotation): boolean;
 
   // ── markup bridge (the selection plugin meets the text tools) ──
   /**
@@ -359,7 +357,7 @@ export interface AnnotationHostCapability extends AnnotationCapability {
     toolId: string,
     page: PageRef,
     point: Point,
-    displayRotation?: PageRotation,
+    displayRotation?: Rotation,
     zoom?: number,
   ): void;
   clearGhost(): void;
@@ -392,7 +390,7 @@ export interface AnnotationHostCapability extends AnnotationCapability {
   /** The engaged behavior that owns this annotation now, or `null`. */
   getBehaviorFor(annotation: Annotation): Behavior | null;
   pruneEngagedSelection(): void;
-  commitScriptEffects(entries: AnnotCommitEntry[]): Promise<AnnotCommitResult>;
+  commitScriptEffects(entries: AnnotationCommitEntry[]): Promise<AnnotationCommitResult>;
 }
 
 /**

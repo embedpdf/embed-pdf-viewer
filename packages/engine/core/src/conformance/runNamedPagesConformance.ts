@@ -27,15 +27,15 @@ import { EVERY_PERMISSION } from './fixtureScope';
  */
 export function runNamedPagesConformance(
   runner: ConformanceTestRunner,
-  opts: ConformanceOptions,
+  options: ConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`named pages conformance: ${opts.label}`, () => {
+  describe(`named pages conformance: ${options.label}`, () => {
     let engine: Engine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -43,7 +43,7 @@ export function runNamedPagesConformance(
     });
 
     test('pages.list() carries namedPages and every entry resolves', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const layout = await doc.pages.list();
         PageListSnapshotSchema.parse(layout);
@@ -61,7 +61,7 @@ export function runNamedPagesConformance(
     });
 
     test('pages.setName() registers, replaces by key, and renames via `replace`', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         if (!doc.pages.setName) return;
         const before = await doc.pages.list();
@@ -119,7 +119,7 @@ export function runNamedPagesConformance(
     });
 
     test('non-ASCII keys round-trip through set → list', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         if (!doc.pages.setName) return;
         const before = await doc.pages.list();
@@ -140,7 +140,7 @@ export function runNamedPagesConformance(
     });
 
     test('pages.removeName() drops the registration and keeps the page', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         if (!doc.pages.setName || !doc.pages.removeName) return;
         const before = await doc.pages.list();
@@ -162,7 +162,7 @@ export function runNamedPagesConformance(
     });
 
     test('pages.setName() rejects an empty name and an unknown page', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         if (!doc.pages.setName) return;
         const before = await doc.pages.list();
@@ -185,7 +185,7 @@ export function runNamedPagesConformance(
     });
 
     test('deleting a page removes every registration pointing at it', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         if (!doc.pages.setName) return;
         const before = await doc.pages.list();
@@ -211,7 +211,7 @@ export function runNamedPagesConformance(
     });
 
     test('abort on pages.setName() rejects with AbortError', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         if (!doc.pages.setName) return;
         const before = await doc.pages.list();

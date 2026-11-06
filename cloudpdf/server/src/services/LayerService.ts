@@ -1709,13 +1709,13 @@ export class LayerService {
   ): Promise<ChangeAnswer[]> {
     // The outcome table answers retries; the audit log's replay (by
     // `Idempotency-Key`) stays out of it.
-    const writeCtx: LayerWriteContext = { ...ctx, idempotencyKey: undefined };
-    return this.enqueueLayerWrite(writeCtx, input.docId, input.layerName, async () => {
+    const writeContext: LayerWriteContext = { ...ctx, idempotencyKey: undefined };
+    return this.enqueueLayerWrite(writeContext, input.docId, input.layerName, async () => {
       // A request whose every change has its answer gets them, and nothing
       // else happens: its numbers were spent by the attempt that answered.
       let kept = new Map<string, ChangeOutcomeRow>();
       const { layer } = await this.prepareLayerMutation(
-        writeCtx,
+        writeContext,
         input.docId,
         input.layerName,
         () => ({
@@ -1731,8 +1731,9 @@ export class LayerService {
           return answers.every((answer) => answer !== undefined) ? answers : undefined;
         },
       );
-      const plan = await this.planChanges(writeCtx, layer, input, kept);
-      if (plan.run.length === 0) return this.commitChanges(writeCtx, input, layer, plan, [], null);
+      const plan = await this.planChanges(writeContext, layer, input, kept);
+      if (plan.run.length === 0)
+        return this.commitChanges(writeContext, input, layer, plan, [], null);
       return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
         const payload = await this.runLayerWrite(
           input.docId,
@@ -1756,7 +1757,7 @@ export class LayerService {
         }
         const artifact =
           payload.artifact || payload.artifactFile ? requireLayerArtifact(payload) : null;
-        return this.commitChanges(writeCtx, input, layer, plan, payload.outcomes, artifact);
+        return this.commitChanges(writeContext, input, layer, plan, payload.outcomes, artifact);
       });
     });
   }

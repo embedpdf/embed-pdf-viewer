@@ -15,7 +15,7 @@ import {
   toPageRef,
   type DocumentHandle,
   type ChangeOp,
-  type FormFieldDTO,
+  type FormField,
   type FormSnapshot,
   type PageLayout,
   type PdfActionTree,
@@ -39,8 +39,8 @@ const text = (
   fieldObjectNumber: number,
   name: string,
   value: string,
-  actions?: FormFieldDTO['actions'],
-): FormFieldDTO => ({
+  actions?: FormField['actions'],
+): FormField => ({
   ref: ref(fieldObjectNumber),
   name,
   kind: 'text',

@@ -27,7 +27,7 @@ import { ShellToken } from '@embedpdf/plugin-shell/contract';
 
 import type {
   CommandContext,
-  CommandDef,
+  CommandDefinition,
   CommandExecutedEvent,
   CommandExecutionFailedEvent,
   CommandFamily,
@@ -54,7 +54,7 @@ import {
 import { createTurningOff } from './write/turning-off';
 
 const panelTarget = (
-  definition: CommandDef,
+  definition: CommandDefinition,
 ): { id: string; exclusive?: string; focus?: boolean } | null =>
   definition.panel === undefined
     ? null
@@ -354,7 +354,10 @@ export function createCommandsController(ctx: PluginContext<void, CommandsSettin
   );
 
   /** What running a command does: its `run`, or opening what it opens. */
-  const runCommand = async (definition: CommandDef, context: CommandContext): Promise<void> => {
+  const runCommand = async (
+    definition: CommandDefinition,
+    context: CommandContext,
+  ): Promise<void> => {
     if (definition.run) {
       await definition.run(context);
       return;
@@ -399,7 +402,10 @@ export function createCommandsController(ctx: PluginContext<void, CommandsSettin
     return { status: 'executed' };
   };
 
-  const registerOne = (definition: CommandDef, options?: RegisterCommandOptions): Unsubscribe => {
+  const registerOne = (
+    definition: CommandDefinition,
+    options?: RegisterCommandOptions,
+  ): Unsubscribe => {
     const taken = registered.has(definition.id) || configured().commands.has(definition.id);
     if (taken && !options?.replace) {
       throw new PluginError('conflict', 'commands', `duplicate command '${definition.id}'`);

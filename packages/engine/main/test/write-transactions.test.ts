@@ -22,7 +22,7 @@ import {
   type AnnotationRef,
   type AttachmentRef,
   type FormBundle,
-  type FormFieldDTO,
+  type FormField,
   type FormFieldRef,
   type PageRef,
 } from '@embedpdf/engine-core';
@@ -74,9 +74,9 @@ function comparable(bytes: Uint8Array): string {
 
 const fqn = (name: string): FormFieldRef => ({ kind: 'fqn', name });
 /** `bundle` with `change` made to each of its fields. */
-const withFields = (bundle: FormBundle, change: Partial<FormFieldDTO>): FormBundle => ({
+const withFields = (bundle: FormBundle, change: Partial<FormField>): FormBundle => ({
   ...bundle,
-  fields: bundle.fields.map(({ data }) => ({ data: { ...data, ...change } as FormFieldDTO })),
+  fields: bundle.fields.map(({ data }) => ({ data: { ...data, ...change } as FormField })),
 });
 const rect = (x: number) => ({ x, y: 40, width: 40, height: 30 });
 

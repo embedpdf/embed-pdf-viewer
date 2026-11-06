@@ -2,7 +2,7 @@ import { createKernel, type DocumentHandle, type Engine } from '@embedpdf/core';
 import { describe, expect, it, vi } from 'vitest';
 
 import { commandsPlugin } from '../src/commands.plugin';
-import type { CommandDef } from '../src/contract';
+import type { CommandDefinition } from '../src/contract';
 import { CommandsToken } from '../src/host-contract';
 
 /**
@@ -28,7 +28,7 @@ const openDocument = (id: string) => ({ kind: 'bytes' as const, id, bytes: new U
 /** Documents `a` and `b`, with `b` active, and two commands that show their target. */
 async function twoDocuments() {
   const ran: (string | null)[] = [];
-  const commands: CommandDef[] = [
+  const commands: CommandDefinition[] = [
     { id: 'show', label: 'show', run: (context) => void ran.push(context.documentId) },
     { id: 'only-a', label: 'only a', enabled: (context) => context.documentId === 'a' },
   ];

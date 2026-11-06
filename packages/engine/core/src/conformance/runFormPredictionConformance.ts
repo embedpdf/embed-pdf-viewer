@@ -4,7 +4,7 @@ import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import type { FormFieldDraft } from '../forms/draft';
 import type { FormFieldDisplay } from '../forms/effects';
-import type { FormFieldDTO } from '../forms/field';
+import type { FormField } from '../forms/field';
 import type { FormFieldPatch } from '../forms/patch';
 import {
   fieldAfterReset,
@@ -525,19 +525,19 @@ const REFUSALS: readonly PredictionCase[] = [
  */
 export function runFormPredictionConformance(
   runner: ConformanceTestRunner,
-  opts: FormPredictionConformanceOptions,
+  options: FormPredictionConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`form prediction conformance: ${opts.label}`, () => {
+  describe(`form prediction conformance: ${options.label}`, () => {
     let engine: Engine;
     let doc: DocumentHandle;
     let page: PageRef;
     let named = 0;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
-      doc = await opts.open(engine);
+      engine = await options.makeEngine();
+      doc = await options.open(engine);
       const { pages } = await doc.pages.list();
       page = toPageRef(pages[0]!.ref.objectNumber);
     });
@@ -660,7 +660,7 @@ const sameRef = (left: FormFieldRef, right: FormFieldRef): boolean =>
     : left.kind === 'fqn' && right.kind === 'fqn' && left.name === right.name;
 
 /** The rows of a field's widgets, in the field's widget order. */
-function rowsOf(field: FormFieldDTO, rows: readonly WidgetAnnotation[]): WidgetAnnotation[] {
+function rowsOf(field: FormField, rows: readonly WidgetAnnotation[]): WidgetAnnotation[] {
   return field.widgets.flatMap((widget) => {
     const row = rows.find(
       (candidate) =>

@@ -1,6 +1,6 @@
 import type {
   FormFieldBase,
-  FormFieldDTO,
+  FormField,
   FormFieldKind,
   FormFieldOption,
   FormFieldWidget,
@@ -136,7 +136,7 @@ export function readFieldAt(
   fieldIndex: number,
   docPtr: Ptr,
   actionBudget = new ActionReadBudgetTracker(),
-): FormFieldDTO<PdfCoordinates> {
+): FormField<PdfCoordinates> {
   const { fn } = runtime;
   const fieldObjectNumber = fn.EPDFForm_GetFieldObjNum(model, fieldIndex);
   const name = readWide(runtime, (buf, cap) =>
@@ -263,7 +263,7 @@ export function readFormFields(
 ): Omit<FormSnapshot<PdfCoordinates>, 'widgets'> {
   const { fn } = runtime;
   const count = fn.EPDFForm_CountFields(model);
-  const fields: FormFieldDTO<PdfCoordinates>[] = [];
+  const fields: FormField<PdfCoordinates>[] = [];
   const actionBudget = new ActionReadBudgetTracker();
   for (let i = 0; i < count; i++) {
     fields.push(readFieldAt(runtime, model, i, docPtr, actionBudget));

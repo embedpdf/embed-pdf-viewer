@@ -312,14 +312,14 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
   // The real render plugin, on the same document: its appearance door fetches
   // the page's pictures from the engine (`renderAppearances`), shares and keeps them.
   const renderDefinition = renderPlugin();
-  const renderCtx = createTestContext({
+  const renderContext = createTestContext({
     id: 'render',
     state: (renderDefinition.state as () => unknown)(),
     settings: renderDefinition.settings,
     pages,
     doc,
   });
-  const render = renderDefinition.create(renderCtx as never) as { api: unknown };
+  const render = renderDefinition.create(renderContext as never) as { api: unknown };
   const ctx = createTestContext<AnnotationModel, AnnotationSettings>({
     id: 'annotation',
     state: initialAnnotationModel(),

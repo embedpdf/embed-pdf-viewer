@@ -30,15 +30,15 @@ import { EVERY_PERMISSION } from './fixtureScope';
  */
 export function runPageRotateConformance(
   runner: ConformanceTestRunner,
-  opts: ConformanceOptions,
+  options: ConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`page rotate conformance: ${opts.label}`, () => {
+  describe(`page rotate conformance: ${options.label}`, () => {
     let engine: Engine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -46,7 +46,7 @@ export function runPageRotateConformance(
     });
 
     test('pages.rotate() sets the absolute rotation and returns the full layout', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const before = await doc.pages.list();
         const target = before.pages[0];
@@ -77,7 +77,7 @@ export function runPageRotateConformance(
     });
 
     test('absolute rotation is idempotent: setting the same value twice is a no-op', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const list = await doc.pages.list();
         const pageObjectNumber = list.pages[0].ref.objectNumber;
@@ -92,7 +92,7 @@ export function runPageRotateConformance(
     });
 
     test('one rotation applies to EVERY listed page (the multi-select gesture)', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const list = await doc.pages.list();
         if (list.pages.length < 2) return;
@@ -109,7 +109,7 @@ export function runPageRotateConformance(
     });
 
     test('an annotation born inline keeps its baseIndex name when its page is rotated', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const inline = (await doc.annotations.list()).annotations.find(
           (a) => a.ref.kind === 'baseIndex',
@@ -129,7 +129,7 @@ export function runPageRotateConformance(
     });
 
     test('pages.rotate() rejects an invalid rotation value with InvalidArg', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const list = await doc.pages.list();
         const pageObjectNumber = list.pages[0].ref.objectNumber;
@@ -148,7 +148,7 @@ export function runPageRotateConformance(
     });
 
     test('pages.rotate() rejects duplicate PONs with InvalidArg', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const list = await doc.pages.list();
         const pageObjectNumber = list.pages[0].ref.objectNumber;
@@ -165,7 +165,7 @@ export function runPageRotateConformance(
     });
 
     test('pages.rotate() rejects unknown PON with NotFound or InvalidArg', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const list = await doc.pages.list();
         let bogus = 0;
@@ -188,7 +188,7 @@ export function runPageRotateConformance(
     });
 
     test('abort on pages.rotate() rejects with AbortError', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const list = await doc.pages.list();
         const pageObjectNumber = list.pages[0].ref.objectNumber;

@@ -1,10 +1,10 @@
 <script lang="ts">
-  import { useFormState, type FormFieldDTO } from '@embedpdf/svelte/form';
+  import { useFormState, type FormField } from '@embedpdf/svelte/form';
 
   const formState = useFormState();
 
   /** A field's value as text, whatever its kind. */
-  function valueText(field: FormFieldDTO): string {
+  function valueText(field: FormField): string {
     switch (field.kind) {
       case 'text':
       case 'combobox':

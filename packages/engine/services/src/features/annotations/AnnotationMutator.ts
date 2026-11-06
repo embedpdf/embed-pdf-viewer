@@ -177,7 +177,7 @@ export class AnnotationMutator {
     try {
       throwIfAborted(signal);
 
-      const writeCtx = this.writeContext(resources);
+      const writeContext = this.writeContext(resources);
 
       // Blend mode lives inside the existing /AP graphics state rather than in
       // the annotation dictionary. Capture it before re-baking so an unrelated
@@ -210,11 +210,11 @@ export class AnnotationMutator {
       // exactly this.
       assertCaptionMetadataWritable(fn, annotPtr, currentDto, patch);
       patch = pdfResolveAnnotationPatch(currentDto, patch, {
-        describeFont: writeCtx.describeFont,
+        describeFont: writeContext.describeFont,
       });
       assertMarkKeepsItsLook(currentDto, patch);
       assertAnnotationResources(currentDto.subtype, resources, 'update');
-      preflightPatch(patch, writeCtx);
+      preflightPatch(patch, writeContext);
 
       // Apply boundary: validation and cancellation are complete before the
       // first document write.
@@ -235,7 +235,7 @@ export class AnnotationMutator {
       }
 
       // Apply caller-supplied subtype-specific writes.
-      applyPatch(fn, mem, annotPtr, patch, writeCtx);
+      applyPatch(fn, mem, annotPtr, patch, writeContext);
       // A derived plain label supersedes imported rich contents; retaining stale /RC
       // would show a different value in consumers that prefer rich text.
       if (

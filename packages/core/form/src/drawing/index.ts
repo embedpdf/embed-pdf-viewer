@@ -9,7 +9,7 @@
 import { defaultPaintFonts, type PaintFonts } from '@embedpdf/core-text';
 import {
   isStandardFontName,
-  type FormFieldDTO,
+  type FormField,
   type WidgetAnnotation,
   type Coordinates,
   type PageCoordinates,
@@ -67,8 +67,7 @@ export function textLookOf<C extends Coordinates = PageCoordinates>(
 }
 
 /** Whether the painter draws this field's widgets: not a kind the engine doesn't know. */
-export const paints = (field: Pick<FormFieldDTO, 'kind'>): boolean =>
-  PAINTED_FAMILIES.has(field.kind);
+export const paints = (field: Pick<FormField, 'kind'>): boolean => PAINTED_FAMILIES.has(field.kind);
 
 const PAINTED_FAMILIES: ReadonlySet<string> = new Set([
   'checkbox',
@@ -87,7 +86,7 @@ const PAINTED_FAMILIES: ReadonlySet<string> = new Set([
  */
 export function widgetText<C extends Coordinates = PageCoordinates>(
   widget: WidgetAnnotation<C>,
-  field: FormFieldDTO<C>,
+  field: FormField<C>,
   shown: ShownValue = {},
 ): string {
   switch (field.kind) {
@@ -112,7 +111,7 @@ export function widgetText<C extends Coordinates = PageCoordinates>(
  */
 export function widgetDrawing<C extends Coordinates = PageCoordinates>(
   widget: WidgetAnnotation<C>,
-  field: FormFieldDTO<C>,
+  field: FormField<C>,
   shown: ShownValue = {},
   fonts?: PaintFonts,
 ): WidgetDrawing | null {

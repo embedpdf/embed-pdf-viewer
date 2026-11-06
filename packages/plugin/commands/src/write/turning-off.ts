@@ -5,15 +5,15 @@
  */
 import type { Settings } from '@embedpdf/core';
 
-import type { CommandDef, CommandsCapability, CommandsSettings } from '../contract';
+import type { CommandDefinition, CommandsCapability, CommandsSettings } from '../contract';
 import { isCategoryOff } from '../services/availability';
 
 type OffList = 'disabledCategories' | 'disabledCommands';
 
 export function createTurningOff(
   settings: Settings<CommandsSettings>,
-  definitionOf: (id: string) => CommandDef | null,
-  isTurnedOff: (definition: CommandDef) => boolean,
+  definitionOf: (id: string) => CommandDefinition | null,
+  isTurnedOff: (definition: CommandDefinition) => boolean,
 ) {
   const listOf = (list: OffList): readonly string[] => settings.get()[list];
   const replace = (list: OffList, names: readonly string[]): void =>

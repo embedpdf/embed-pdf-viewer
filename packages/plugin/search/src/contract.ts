@@ -8,7 +8,12 @@ import {
 } from '@embedpdf/core';
 import type { Rect } from '@embedpdf/core-geometry';
 import type { RevealAlignment, ScrollBehaviorKind } from '@embedpdf/plugin-stage/contract';
-import type { PdfTextSegment, SearchQuery, SearchSnippet } from '@embedpdf/engine-core/runtime';
+import type {
+  BlendMode,
+  PdfTextSegment,
+  SearchQuery,
+  SearchSnippet,
+} from '@embedpdf/engine-core/runtime';
 
 export { validateSearchQuery, validateSearchRegex } from '@embedpdf/engine-core/runtime';
 export type {
@@ -69,25 +74,6 @@ export interface SearchReveal {
 /** The `reveal` setting for one call: what the call leaves out comes from the setting. */
 export type SearchRevealOptions = Partial<SearchReveal>;
 
-/** How the highlights mix with the page: a CSS `mix-blend-mode` keyword. */
-export type SearchBlendMode =
-  | 'normal'
-  | 'multiply'
-  | 'screen'
-  | 'overlay'
-  | 'darken'
-  | 'lighten'
-  | 'color-dodge'
-  | 'color-burn'
-  | 'hard-light'
-  | 'soft-light'
-  | 'difference'
-  | 'exclusion'
-  | 'hue'
-  | 'saturation'
-  | 'color'
-  | 'luminosity';
-
 /**
  * The search plugin's settings. `searchPlugin(config)` registers them over
  * {@link SEARCH_DEFAULTS}, and `updateSettings()` changes them for every
@@ -108,7 +94,7 @@ export interface SearchSettings {
      * color and only the paper tints. On dark or scanned pages, where a
      * multiplied highlight disappears, use `'normal'` with translucent colors.
      */
-    readonly blendMode: SearchBlendMode;
+    readonly blendMode: BlendMode;
   };
 }
 

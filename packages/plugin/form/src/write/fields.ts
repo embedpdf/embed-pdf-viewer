@@ -17,7 +17,7 @@ import {
   writesScripts,
   type ChangeItem,
   type ChangeOp,
-  type FormFieldDTO,
+  type FormField,
   type WidgetAnnotation,
   type WidgetPlacement,
 } from '@embedpdf/engine-core/runtime';
@@ -62,7 +62,7 @@ const lookOf = (widget: WidgetAnnotation | undefined): Partial<WidgetPlacement> 
  * `Choice<n>` (the radio tool names its first button `Choice1`), a checkbox's own value, so
  * the boxes check together. Other kinds take none.
  */
-function exportValueFor(field: FormFieldDTO): string | undefined {
+function exportValueFor(field: FormField): string | undefined {
   if (field.kind === 'checkbox') return field.exportValue;
   if (field.kind !== 'radio') return undefined;
   const taken = new Set(field.widgets.map((widget) => widget.exportValue));
@@ -72,7 +72,7 @@ function exportValueFor(field: FormFieldDTO): string | undefined {
 }
 
 /** Whether the field's dictionary is its only widget's too, which adding a widget splits. */
-const isMerged = (field: FormFieldDTO): boolean =>
+const isMerged = (field: FormField): boolean =>
   field.ref.kind === 'objectNumber' &&
   field.widgets.some(
     (widget) => widget.objectNumber === (field.ref as { objectNumber: number }).objectNumber,

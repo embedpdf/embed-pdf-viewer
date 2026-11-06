@@ -6,7 +6,7 @@ import type {
   RevisionField,
   RevisionStructure,
   SignatureCoverage,
-  SignatureDTO,
+  Signature,
   SignatureSeedValue,
 } from '@embedpdf/engine-core/runtime';
 import { formWidget } from '@embedpdf/engine-core/runtime';
@@ -162,10 +162,10 @@ function readSeedValue(
 }
 
 /** Every signature field of a native signature model, in model order. */
-export function readSignaturesFromModel(runtime: PdfRuntimeModule, model: Ptr): SignatureDTO[] {
+export function readSignaturesFromModel(runtime: PdfRuntimeModule, model: Ptr): Signature[] {
   const { fn } = runtime;
   const count = fn.EPDFSig_Count(model);
-  const out: SignatureDTO[] = [];
+  const out: Signature[] = [];
   const str = (i: number, key: number) =>
     readWide(runtime, (buf, cap) => fn.EPDFSig_GetString(model, i, key, buf, cap));
   for (let i = 0; i < count; i++) {
@@ -231,7 +231,7 @@ export function readContentsAt(runtime: PdfRuntimeModule, model: Ptr, index: num
 export function readRevisions(
   runtime: PdfRuntimeModule,
   docPtr: Ptr,
-  signatures: ReadonlyArray<SignatureDTO>,
+  signatures: ReadonlyArray<Signature>,
 ): PdfRevision[] {
   const { fn, mem } = runtime;
   const count = fn.EPDFDoc_GetRevisionCount(docPtr);

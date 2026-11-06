@@ -8,7 +8,7 @@ import {
 } from '@embedpdf/core';
 import {
   pageSpaceBoxesOf,
-  type FormFieldDTO,
+  type FormField,
   type FormFieldRef,
   type FormSnapshot,
 } from '@embedpdf/engine-core/runtime';
@@ -36,7 +36,7 @@ const page = {
 
 const NAME: FormFieldRef = { kind: 'objectNumber', objectNumber: 5 };
 
-const textField = (value: string): FormFieldDTO =>
+const textField = (value: string): FormField =>
   ({
     ref: NAME,
     name: 'name',
@@ -61,7 +61,7 @@ const textField = (value: string): FormFieldDTO =>
     multiline: false,
     password: false,
     comb: false,
-  }) as unknown as FormFieldDTO;
+  }) as unknown as FormField;
 
 const snapshot: FormSnapshot = {
   formKind: 'acroform',

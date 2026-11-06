@@ -9,7 +9,7 @@
  */
 import type {
   AnnotationRef,
-  FormFieldDTO,
+  FormField,
   FormFieldOption,
   FormFieldRef,
 } from '@embedpdf/engine-core/runtime';
@@ -86,7 +86,7 @@ export type FormWidgetItem = FormWidgetItemBase &
  * fill control.
  */
 export function projectWidget(
-  field: FormFieldDTO,
+  field: FormField,
   annotObjectNumber: number,
   widget: PageWidget,
   fillable: boolean,
@@ -177,7 +177,7 @@ export function fillItems(
   index: FieldIndex,
   pageObjectNumber: number,
   widgets: PageWidgets | undefined,
-  mayFill: (field: FormFieldDTO) => boolean,
+  mayFill: (field: FormField) => boolean,
 ): FormWidgetItem[] {
   if (!index.snapshot || !widgets) return [];
   const items: FormWidgetItem[] = [];

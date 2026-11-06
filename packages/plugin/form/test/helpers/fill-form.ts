@@ -5,7 +5,7 @@
  */
 import type { DocumentHandle, Engine } from '@embedpdf/core';
 import { CHANGE_FIXTURE_PDF } from '@embedpdf/engine-core/conformance';
-import type { Change, FormFieldDTO } from '@embedpdf/engine-core/runtime';
+import type { Change, FormField } from '@embedpdf/engine-core/runtime';
 
 export const SUM =
   "event.value = Number(this.getField('a').value) + Number(this.getField('b').value);";
@@ -89,7 +89,7 @@ export function gated(
   });
 }
 
-export const valueOf = (field: FormFieldDTO | null | undefined): string | boolean | undefined => {
+export const valueOf = (field: FormField | null | undefined): string | boolean | undefined => {
   if (!field) return undefined;
   if (field.kind === 'checkbox') return field.checked;
   return field.kind === 'text' ? field.value : undefined;

@@ -15,7 +15,7 @@ import { groupCaps } from './group';
 import { isSubstrateOnly } from './plane';
 import { isTransformableByHand } from './editable';
 import { annotInteractive, viewable } from './flags';
-import { anchoredGeom, anchoredStrokeWidth, anchorModeOf, type ViewEnv } from './anchor';
+import { anchoredGeometry, anchoredStrokeWidth, anchorModeOf, type ViewEnv } from './anchor';
 import { paintedNear, type PaintedPiece } from './painted';
 import {
   type ModelAnnotation,
@@ -104,7 +104,7 @@ const hasHandles = (model: Model, record: ModelAnnotation): boolean => {
  *  projection for `noZoom`/`noRotate` annotations, the stored geom otherwise.
  *  The same projection `pageItems` renders, so click matches paint. */
 const hitGeomOf = (record: ModelAnnotation, view: ViewEnv | undefined): Shape =>
-  anchoredGeom(shapeOf(record.annotation), anchorModeOf(record), view);
+  anchoredGeometry(shapeOf(record.annotation), anchorModeOf(record), view);
 
 /**
  * What an annotation paints where the pointer meets it (`painted.ts`): its

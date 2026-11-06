@@ -20,10 +20,10 @@ import {
   type ResourceStatus,
   type SettingsApi,
 } from '@embedpdf/core';
-import type { PageRotation, PageTransform, Rect } from '@embedpdf/core-geometry';
-import type { FullPageOptions, PageViewDemand, TilesOptions } from './paint-plan';
+import type { Rotation, PageTransform, Rect } from '@embedpdf/core-geometry';
+import type { FullPageSettings, PageViewDemand, TilesSettings } from './paint-plan';
 
-export type { FullPageOptions, PageViewDemand, TilesOptions } from './paint-plan';
+export type { FullPageSettings, PageViewDemand, TilesSettings } from './paint-plan';
 export { samePageViewDemand } from './paint-plan';
 
 // ── settings ────────────────────────────────────────────────────────────────
@@ -42,9 +42,9 @@ export type RenderFormat = NonNullable<PageImageOptions['format']>;
  */
 export interface RenderSettings {
   /** Base plane: the pixel budget + render points. */
-  readonly fullPage: FullPageOptions;
+  readonly fullPage: FullPageSettings;
   /** Tile plane strategy; `false` disables the plane entirely. */
-  readonly tiles: TilesOptions | false;
+  readonly tiles: TilesSettings | false;
   /**
    * Encode format for both planes. `null` → engine default (png local, the
    * deployment's format on cloud). `'bmp'` is the local fast path — no
@@ -150,7 +150,7 @@ export interface RenderPageOptions extends OperationOptions, PageLayerOptions {
    */
   rect?: Rect;
   /** Turn the picture clockwise. Default 0: the page as stored. */
-  rotation?: PageRotation;
+  rotation?: Rotation;
   /** Per-call encode overrides; default to the plugin's strategy. */
   format?: RenderFormat;
   quality?: number;

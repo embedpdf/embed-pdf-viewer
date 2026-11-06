@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { useFormState } from '@embedpdf/vue/form';
-import type { FormFieldDTO } from '@embedpdf/vue/form';
+import type { FormField } from '@embedpdf/vue/form';
 
 const { fields } = useFormState();
 
 /** A field's value as text, whatever its kind. */
-function valueText(field: FormFieldDTO): string {
+function valueText(field: FormField): string {
   switch (field.kind) {
     case 'text':
     case 'combobox':

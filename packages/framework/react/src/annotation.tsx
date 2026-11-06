@@ -42,7 +42,7 @@ import {
   type AnnotationProperties,
   type AnnotationRef,
   type ChromeSettings,
-  type CommentsApi,
+  type CommentsCapability,
   type CommentThread,
   type FilePickerProvider,
   type HandleRole,
@@ -1070,7 +1070,7 @@ export interface CommentThreadView extends CommentThread {
 
 /** The comments API: the `comments` part of `useAnnotation()`. Pair it with
  *  {@link useCommentThreads} for the threads to show. */
-export function useComments(): CommentsApi {
+export function useComments(): CommentsCapability {
   return useCapability(AnnotationToken).comments;
 }
 

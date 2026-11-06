@@ -13,7 +13,7 @@
  */
 import { initialSession, sameSession } from '@embedpdf/core-annotation';
 import type { EditableKinds, Id, Point, Session, SnapSettings } from '@embedpdf/core-annotation';
-import type { PageRotation } from '@embedpdf/core-geometry';
+import type { Rotation } from '@embedpdf/core-geometry';
 import type { PageRef } from '@embedpdf/engine-core/runtime';
 
 import type { EditorSelection } from './rich-text';
@@ -24,7 +24,7 @@ export interface GhostPointer {
   readonly page: PageRef;
   readonly point: Point;
   /** The page's display rotation at the pointer (an upright tool lays its click out as seen). */
-  readonly displayRotation?: PageRotation;
+  readonly displayRotation?: Rotation;
   /** The page's zoom at the pointer (a screen-sized icon's size depends on it). */
   readonly zoom?: number;
 }

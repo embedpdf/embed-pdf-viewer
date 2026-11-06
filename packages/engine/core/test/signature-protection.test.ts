@@ -9,9 +9,9 @@ import {
   PROTECTABLE_CAPABILITIES,
   SIGNATURE_POLICY_VERSION,
 } from '../src/signature/protection';
-import type { SignatureDTO } from '../src/signature/types';
+import type { Signature } from '../src/signature/types';
 
-const sig = (over: Partial<SignatureDTO>): SignatureDTO => ({
+const sig = (over: Partial<Signature>): Signature => ({
   index: 0,
   field: { kind: 'objectNumber', objectNumber: 10 },
   fieldName: 'sig',

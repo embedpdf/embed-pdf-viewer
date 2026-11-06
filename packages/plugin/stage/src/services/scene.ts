@@ -354,7 +354,7 @@ export function createScene(ctx: PluginContext<StageModel>) {
     const scene = buildScene();
     return scene.itemCount
       ? anchorFromCamera(camera(), scene, viewport(), at)
-      : { pageIndex: state().pageIndex, fx: 0.5, fy: 0 };
+      : { pageIndex: state().pageIndex, fractionX: 0.5, fractionY: 0 };
   };
   const currentAnchor = (): Anchor => anchorAt(anchorPoint());
 

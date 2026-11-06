@@ -22,7 +22,7 @@ export function createJudging(
   { store }: Pick<SignatureServices, 'store'>,
   { validate }: Pick<SignatureValidation, 'validate'>,
   signatures: Mirror<SignatureRecord>,
-  { getSignature, getVerdict }: Pick<SignatureReads, 'getSignature' | 'getVerdict'>,
+  { findSignature, getVerdict }: Pick<SignatureReads, 'findSignature' | 'getVerdict'>,
 ) {
   const { requireSignatures } = store;
 
@@ -56,7 +56,7 @@ export function createJudging(
           if ('revisionIndex' in target) {
             revisionIndex = target.revisionIndex;
           } else {
-            const signature = getSignature(target);
+            const signature = findSignature(target);
             if (!signature?.signed || signature.revisionIndex === null) {
               throw new PluginError('not-found', 'signature', 'no signed revision at that address');
             }

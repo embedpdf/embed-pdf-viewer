@@ -12,11 +12,11 @@ import {
   type AttachedFile,
   type AttachmentCapability,
 } from '@embedpdf/react/attachment';
-import type { CommandDef } from '@embedpdf/react/commands';
+import type { CommandDefinition } from '@embedpdf/react/commands';
 import { ShellToken } from '@embedpdf/react/shell';
 import { pickFile, saveFile } from '@embedpdf/web';
 
-type Ctx = Parameters<NonNullable<CommandDef['run']>>[0];
+type Ctx = Parameters<NonNullable<CommandDefinition['run']>>[0];
 
 /** The attachments panel's id in the layout. */
 export const ATTACHMENTS_PANEL = 'attachments';
@@ -61,16 +61,16 @@ const SAVES = {
   categories: ['documents.download'],
   allowed: (commandContext: Ctx) => attachmentOf(commandContext)?.canDownload() ?? true,
   notAllowedKey: 'commands.notAllowed.doc-download',
-} satisfies Partial<CommandDef>;
+} satisfies Partial<CommandDefinition>;
 
 /** Adding and deleting: the right to, and the feature on. */
 const EDITS = {
   categories: ['attachments.adding'],
   allowed: (commandContext: Ctx) => attachmentOf(commandContext)?.canCreate() ?? true,
   notAllowedKey: 'commands.notAllowed.doc-attachments-modify',
-} satisfies Partial<CommandDef>;
+} satisfies Partial<CommandDefinition>;
 
-export const attachmentCommands: CommandDef[] = [
+export const attachmentCommands: CommandDefinition[] = [
   {
     // Acrobat's Add File, in its Attachments panel.
     id: 'attachment:add',

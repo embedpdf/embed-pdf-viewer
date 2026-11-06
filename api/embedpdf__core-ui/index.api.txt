@@ -11,7 +11,7 @@ BarSections [InterfaceDeclaration] (from packages/core/ui/src/schema.ts): export
 CollapsedGroupView [InterfaceDeclaration] (from packages/core/ui/src/toolbar-layout.ts): export interface CollapsedGroupView<Command extends ToolbarCommand = ToolbarCommand>{ readonly id: string; readonly labelKey?: string; readonly collapse: 'menu' | 'select'; readonly role: 'buttons' | 'tabs'; readonly commands: readonly Command[]; execute(id: string): void; }
 CompileBarOptions [InterfaceDeclaration] (from packages/core/ui/src/layout-compile.ts): export interface CompileBarOptions{ readonly omit?: ReadonlySet<string>; }
 CustomItem [InterfaceDeclaration] (from packages/core/ui/src/schema.ts): export interface CustomItem{ readonly slot: string; readonly variants?: readonly string[]; readonly terminal?: string; readonly importance?: Importance; readonly grow?: boolean; }
-CustomSlotCtx [InterfaceDeclaration] (from packages/core/ui/src/toolbar-layout.ts): export interface CustomSlotCtx{ layer: 'live' | 'measure'; measure: (length: number) => void; }
+CustomSlotContext [InterfaceDeclaration] (from packages/core/ui/src/toolbar-layout.ts): export interface CustomSlotContext{ layer: 'live' | 'measure'; measure: (length: number) => void; }
 DEFAULT_IMPORTANCE [VariableDeclaration] (from packages/core/ui/src/schema.ts): DEFAULT_IMPORTANCE: Importance = 3
 EXPANDED_MIN_WIDTH_PX [VariableDeclaration] (from packages/core/ui/src/layout.ts): EXPANDED_MIN_WIDTH_PX = 1024
 Emphasis [TypeAliasDeclaration] (from packages/core/ui/src/schema.ts): export type Emphasis = 'primary';

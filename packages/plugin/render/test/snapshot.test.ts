@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { toPageRef, type PageRef } from '@embedpdf/core';
-import type { PageRotation, Point } from '@embedpdf/core-geometry';
+import type { Rotation, Point } from '@embedpdf/core-geometry';
 import { interactionPlugin } from '@embedpdf/plugin-interaction';
 import { InteractionToken, type PointerSample } from '@embedpdf/plugin-interaction/contract/host';
 
@@ -28,7 +28,7 @@ async function bootTool(
   const pointer = (
     phase: PointerSample['phase'],
     point: Point,
-    { page = PAGE, rotation = 0 }: { page?: PageRef; rotation?: PageRotation } = {},
+    { page = PAGE, rotation = 0 }: { page?: PageRef; rotation?: Rotation } = {},
   ) =>
     interaction.dispatchPointer({
       phase,
@@ -38,7 +38,7 @@ async function bootTool(
       pointerType: 'mouse',
     });
   /** Press at `from`, move to `to`, let go there. */
-  const drag = (from: Point, to: Point, rotation: PageRotation = 0) => {
+  const drag = (from: Point, to: Point, rotation: Rotation = 0) => {
     pointer('down', from, { rotation });
     pointer('move', to, { rotation });
     pointer('up', to, { rotation });

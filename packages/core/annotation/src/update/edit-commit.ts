@@ -3,7 +3,7 @@
  * new geometry, and one patch effect per changed record asks for the write.
  * A grab that changed nothing writes nothing.
  */
-import { anchorModeOf, unanchoredGeom } from '../anchor';
+import { anchorModeOf, unanchoredGeometry } from '../anchor';
 import { geomRotateAbout, geomScaleAbout, geomTranslate, groupResizeFactors } from '../geometry';
 import { measurementOf } from '../measurement';
 import { moveMeasurementCaption, shapeMeasurementReadout } from '../measurement-shape';
@@ -53,7 +53,7 @@ export function editUp(model: Model): [Model, Effect[]] {
     // `cur` is view-space (the projected geometry the user dragged); the
     // commit maps it back to stored space — the identity when un-flagged.
     const before = model.byId[draft.id];
-    const stored = unanchoredGeom(draft.current, anchorModeOf(before), draft.view);
+    const stored = unanchoredGeometry(draft.current, anchorModeOf(before), draft.view);
     const measure = measurementOf(before.annotation);
     if (measure?.intent === 'polygon-dimension') {
       const readout = shapeMeasurementReadout(stored, measure);
@@ -71,7 +71,7 @@ export function editUp(model: Model): [Model, Effect[]] {
     for (const id of draft.ids) {
       const record = byId[id];
       if (!record) continue;
-      // The gesture composed in view space (`effGeom`); the commit replays the
+      // The gesture composed in view space (`effectiveGeometry`); the commit replays the
       // same composition and unprojects — a screen-anchored member's authored
       // tilt turns WYSIWYG, exactly as previewed. A measurement's caption
       // center turns with its shape.

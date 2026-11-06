@@ -3,7 +3,7 @@ import type {
   FieldScriptWrite,
   FormFieldDisplay,
   FormFieldDraft,
-  FormFieldDTO,
+  FormField,
   FormFieldKind,
   FormFieldPatch,
   FormFieldRef,
@@ -262,7 +262,7 @@ export class FormMutator {
       });
     if (written.length > 0) this.session.invalidateDerived();
 
-    const fields: FormFieldDTO<PdfCoordinates>[] = [];
+    const fields: FormField<PdfCoordinates>[] = [];
     const changedWidgets: FormWidget[] = [];
     const redrawnWidgets: FormWidget[] = [];
     for (const { before, changed } of written) {
@@ -288,10 +288,10 @@ export class FormMutator {
   }
 
   /** Every field a whole-form reset puts back: those with a value, written directly, unlocked. */
-  private wholeFormTargets(model: Ptr): FormFieldDTO<PdfCoordinates>[] {
+  private wholeFormTargets(model: Ptr): FormField<PdfCoordinates>[] {
     const docPtr = this.session.requireDocPtr();
     const locks = readFieldLocks(this.runtime, this.session);
-    const targets: FormFieldDTO<PdfCoordinates>[] = [];
+    const targets: FormField<PdfCoordinates>[] = [];
     const count = this.runtime.fn.EPDFForm_CountFields(model);
     for (let index = 0; index < count; index++) {
       const field = readFieldAt(this.runtime, model, index, docPtr);
@@ -303,10 +303,10 @@ export class FormMutator {
   }
 
   /** The named fields with a value, each once; one that can't be written is refused. */
-  private namedTargets(model: Ptr, refs: FormFieldRef[]): FormFieldDTO<PdfCoordinates>[] {
+  private namedTargets(model: Ptr, refs: FormFieldRef[]): FormField<PdfCoordinates>[] {
     const docPtr = this.session.requireDocPtr();
     const seen = new Set<number>();
-    const targets: FormFieldDTO<PdfCoordinates>[] = [];
+    const targets: FormField<PdfCoordinates>[] = [];
     for (const ref of refs) {
       const resolved = resolveFieldRef(this.runtime, model, ref);
       const field = readFieldAt(this.runtime, model, resolved.fieldIndex, docPtr);
@@ -360,7 +360,7 @@ export class FormMutator {
       /** Its widgets', in `draft.widgets` order; the next free ones when absent. */
       readonly widgetObjectNumbers?: readonly number[];
     } = {},
-  ): { field: FormFieldDTO<PdfCoordinates>; calculationOrder: OrderChange | null } {
+  ): { field: FormField<PdfCoordinates>; calculationOrder: OrderChange | null } {
     throwIfAborted(signal);
     const { fn } = this.runtime;
     const docPtr = this.session.requireDocPtr();
@@ -534,7 +534,7 @@ export class FormMutator {
     ref: FormFieldRef,
     pdf: Uint8Array,
     signal: AbortSignal,
-  ): { field: FormFieldDTO<PdfCoordinates> } {
+  ): { field: FormField<PdfCoordinates> } {
     throwIfAborted(signal);
     const docPtr = this.session.requireDocPtr();
     const model = acquireFormModel(this.runtime, this.session);
@@ -578,7 +578,7 @@ export class FormMutator {
     ref: FormFieldRef,
     patch: FormFieldPatch,
     signal: AbortSignal,
-  ): { field: FormFieldDTO<PdfCoordinates>; calculationOrder: OrderChange | null } {
+  ): { field: FormField<PdfCoordinates>; calculationOrder: OrderChange | null } {
     throwIfAborted(signal);
     const { fn } = this.runtime;
     const docPtr = this.session.requireDocPtr();
@@ -784,7 +784,7 @@ export class FormMutator {
       /** Where a merged field's widget moves; the next free one when absent. */
       readonly splitObjectNumber?: number;
     } = {},
-  ): { field: FormFieldDTO<PdfCoordinates>; widget: FormWidget } {
+  ): { field: FormField<PdfCoordinates>; widget: FormWidget } {
     throwIfAborted(signal);
     const { fn } = this.runtime;
     const docPtr = this.session.requireDocPtr();
@@ -837,7 +837,7 @@ export class FormMutator {
     ref: FormFieldRef,
     widget: AnnotationRef,
     signal: AbortSignal,
-  ): { field: FormFieldDTO<PdfCoordinates>; widget: FormWidget } {
+  ): { field: FormField<PdfCoordinates>; widget: FormWidget } {
     throwIfAborted(signal);
     const { fn } = this.runtime;
     const model = acquireFormModel(this.runtime, this.session);
@@ -922,7 +922,7 @@ export class FormMutator {
     }
   }
 
-  private readBackField(fieldObjectNumber: number): FormFieldDTO<PdfCoordinates> {
+  private readBackField(fieldObjectNumber: number): FormField<PdfCoordinates> {
     const fresh = acquireFormModel(this.runtime, this.session);
     const fieldIndex = this.runtime.fn.EPDFForm_GetFieldIndexByObjNum(fresh, fieldObjectNumber);
     if (fieldIndex < 0) {
@@ -964,8 +964,8 @@ export class FormMutator {
    */
   private writeFieldAfter(
     fieldObjectNumber: number,
-    before: FormFieldDTO<PdfCoordinates>,
-    after: FormFieldDTO<PdfCoordinates>,
+    before: FormField<PdfCoordinates>,
+    after: FormField<PdfCoordinates>,
     redraw = false,
   ): number[] | null {
     const { fn, mem } = this.runtime;
@@ -1049,7 +1049,7 @@ export class FormMutator {
     if (fieldIndex < 0) {
       throw new EngineError(EngineErrorCode.Unknown, 'form field vanished after write');
     }
-    const field: FormFieldDTO<PdfCoordinates> = readFieldAt(
+    const field: FormField<PdfCoordinates> = readFieldAt(
       this.runtime,
       fresh,
       fieldIndex,

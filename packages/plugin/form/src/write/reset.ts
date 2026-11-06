@@ -5,7 +5,7 @@
  * signer's fields stay as they are.
  */
 import type { OperationOptions } from '@embedpdf/core';
-import type { FormFieldDTO, FormFieldRef, PdfActionTargetRef } from '@embedpdf/engine-core/runtime';
+import type { FormField, FormFieldRef, PdfActionTargetRef } from '@embedpdf/engine-core/runtime';
 import type { ActionOrigin } from '@embedpdf/plugin-actions/contract';
 
 import type { FormCommitResult } from '../contract';
@@ -40,7 +40,7 @@ export function createResetWrites(
    * Whether a reset puts this field back: the engine refuses push button and
    * signature refs, and another signer's fields are theirs.
    */
-  const resettable = (field: FormFieldDTO): boolean =>
+  const resettable = (field: FormField): boolean =>
     field.kind !== 'pushbutton' && field.kind !== 'signature' && rights.mayFill(field);
 
   /**

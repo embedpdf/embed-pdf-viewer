@@ -13,7 +13,7 @@ import {
   type PageRef,
 } from '@embedpdf/engine-core/runtime';
 
-import { anchoredGeom, anchorModeOf, unanchoredGeom, type ViewEnv } from '../anchor';
+import { anchoredGeometry, anchorModeOf, unanchoredGeometry, type ViewEnv } from '../anchor';
 import { sourceOfNew } from '../appearance';
 import { DRAWN_FLAGS } from '../flags';
 import { annotationOfNew, shapeOf } from '../record';
@@ -31,7 +31,7 @@ export const sub = (from: Point, to: Point): Point => ({ x: from.x - to.x, y: fr
  * Commit a view-space gesture result for one annotation: apply `op` to the
  * projected geometry (the identity for un-flagged annotations — `op` then
  * simply runs on the stored geom) and map the result back to stored space
- * through `unanchoredGeom`. The exact composition `effGeom` previewed, so a
+ * through `unanchoredGeometry`. The exact composition `effectiveGeometry` previewed, so a
  * released gesture commits what it showed — for screen-anchored and plain
  * annotations alike, through one code path.
  */
@@ -41,7 +41,11 @@ export const commitViewGesture = (
   op: (geometry: Shape) => Shape,
 ): Shape => {
   const mode = anchorModeOf(record);
-  return unanchoredGeom(op(anchoredGeom(shapeOf(record.annotation), mode, view)), mode, view);
+  return unanchoredGeometry(
+    op(anchoredGeometry(shapeOf(record.annotation), mode, view)),
+    mode,
+    view,
+  );
 };
 
 export const geomEqual = (left: Shape, right: Shape): boolean =>

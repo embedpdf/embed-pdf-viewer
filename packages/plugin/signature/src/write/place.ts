@@ -16,14 +16,14 @@ import { verb } from '../services/errors';
 export function createTarget(
   ctx: SignatureContext,
   { events }: Pick<SignatureServices, 'events'>,
-  { getSignature }: Pick<SignatureReads, 'getSignature'>,
+  { findSignature }: Pick<SignatureReads, 'findSignature'>,
 ) {
   const { inspectionRequested } = events;
   /** One field, whether a ref names it by object number or by name. */
   const sameField = (left: FormFieldRef, right: FormFieldRef): boolean => {
     if (sameFieldRef(left, right)) return true;
-    const signature = getSignature(left);
-    return signature !== null && signature.index === getSignature(right)?.index;
+    const signature = findSignature(left);
+    return signature !== null && signature.index === findSignature(right)?.index;
   };
   /** A field that was just signed or filled is no longer the target. */
   const clearIfTarget = (field: FormFieldRef): void => {

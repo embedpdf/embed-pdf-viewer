@@ -33,7 +33,7 @@ Package names follow a separate law: [`packages.md`](./packages.md).
 | Units                            | Put the unit in the name when it is not obvious.                                                                                                           | `delayMs`, `thresholdPx`, `sizePt`, `angleDeg`                                 |
 | Unused parameters                | Prefix with `_`. Never use `_` for "private".                                                                                                              | `(_event, page) => …`                                                          |
 | Declarations                     | `const` unless reassigned; `let` otherwise; never `var`.                                                                                                   |                                                                                |
-| Generic parameters               | `T`, `K`, `V` only in fully generic helpers; name them elsewhere.                                                                                          | `memo<Inputs, Result>`, `PluginDef<State, Capability>`                         |
+| Generic parameters               | `T`, `K`, `V` only in fully generic helpers; name them elsewhere.                                                                                          | `memo<Inputs, Result>`, `PluginDefinition<State, Capability>`                         |
 
 ## Glossary
 
@@ -70,6 +70,8 @@ Spell out everything else: `error` (not `err`, `e`), `options` (not `opts`),
 | `XState`                          | a plugin's session state                                                        |
 | `XCapability` / `XHostCapability` | the public / sibling-plugin capability                                          |
 | `XConfig`                         | registration configuration (`xPlugin(config)`)                                  |
+| `XSettings`                       | what a plugin reads with `getSettings()` and changes with `updateSettings()`    |
+| `XDefinition`                     | what a register call takes: `PluginDefinition`, `CommandDefinition`             |
 | `XOptions`                        | per-call options; extends `OperationOptions` when the call does work            |
 | `XInput`                          | the input of a create verb                                                      |
 | `XPatch`                          | a partial update                                                                |
@@ -81,6 +83,7 @@ Spell out everything else: `error` (not `err`, `e`), `options` (not `opts`),
 - Use `interface` for object shapes in contracts, and `type` for unions,
   aliases and mapped types.
 - Contract fields and state fields are `readonly`.
+- No `DTO` in a public name: a read shape is named for what it is (`FormField`, `Signature`).
 - Getters return `T | null` for "absent". Optional inputs and optional data
   fields use `?:`. One API never uses both `undefined` and `null` for the same
   meaning: [Nothing](#nothing-left-out-or-null) says which to use where.
@@ -196,7 +199,7 @@ its rules hold in every language:
 - A number that only goes up is a `…Sequence`: `serverSequence`, `pagesSequence`.
 - `src` is the document a viewer element or its config shows, HTML's word (`<img src>`); core and
   the engine say `source` (`open(source)`).
-- `CommandDef`'s predicates are named after the field they compute (`enabled?(context)` gives
+- `CommandDefinition`'s predicates are named after the field they compute (`enabled?(context)` gives
   `enabled`), an exception to "boolean functions are `is*`/`can*`".
 
 ## Files and folders

@@ -11,7 +11,7 @@ import {
   type PaintFont,
   type PaintFonts,
 } from '@embedpdf/core-text';
-import type { FormFieldDTO, WidgetAnnotation } from '@embedpdf/engine-core/runtime';
+import type { FormField, WidgetAnnotation } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
 import { widgetDrawing, widgetScene } from '../src';
@@ -62,7 +62,7 @@ const widget = (patch: Partial<WidgetAnnotation> = {}): WidgetAnnotation =>
     ...patch,
   }) as WidgetAnnotation;
 
-const textField = (value: string): FormFieldDTO =>
+const textField = (value: string): FormField =>
   ({
     kind: 'text',
     value,
@@ -70,7 +70,7 @@ const textField = (value: string): FormFieldDTO =>
     password: false,
     comb: false,
     maxLength: null,
-  }) as FormFieldDTO;
+  }) as FormField;
 
 describe('the painter', () => {
   it('says when its drawing may differ from the engine picture', () => {
@@ -89,11 +89,11 @@ describe('the painter', () => {
   });
 
   it("draws a signature field's box, and nothing of an unknown family", () => {
-    const box = widgetDrawing(widget(), { kind: 'signature' } as FormFieldDTO)!;
+    const box = widgetDrawing(widget(), { kind: 'signature' } as FormField)!;
     // The background over the whole box, then the border inside it; no text.
     expect(box.ops.map((op) => op.kind)).toEqual(['fill', 'stroke']);
     expect(box.approximate).toBeNull();
-    expect(widgetDrawing(widget(), { kind: 'unknown' } as FormFieldDTO)).toBeNull();
+    expect(widgetDrawing(widget(), { kind: 'unknown' } as FormField)).toBeNull();
   });
 
   it('shows the text it is given over the value', () => {
@@ -176,7 +176,7 @@ describe('the painter', () => {
       fontFamily: '"epdf-arabic"',
       program: { ...HEBREW.program, hash: 'arabic-hash', family: 'epdf-arabic' },
     };
-    const comb = { ...textField('مرحبا'), comb: true, maxLength: 5 } as FormFieldDTO;
+    const comb = { ...textField('مرحبا'), comb: true, maxLength: 5 } as FormField;
     const scene = widgetScene(
       widgetDrawing(widget(), comb, {}, { ...FONTS, fallbacks: [arabic] })!,
       { box: { x: 10, y: 20, width: 100, height: 20 } },

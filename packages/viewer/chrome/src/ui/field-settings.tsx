@@ -6,7 +6,7 @@
  */
 import {
   FormToken,
-  type FormFieldDTO,
+  type FormField,
   type FormFieldPatch,
   type FormFieldSetting,
 } from '@embedpdf/react/form';
@@ -26,7 +26,7 @@ interface Option {
 }
 
 /** The field's settings, each with the control its description names. */
-export function FieldSettings({ field }: { field: FormFieldDTO }) {
+export function FieldSettings({ field }: { field: FormField }) {
   const form = useOptionalCapability(FormToken);
   const settings = useOptionalSelector(
     FormToken,

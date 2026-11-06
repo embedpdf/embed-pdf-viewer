@@ -58,15 +58,15 @@ export interface PageGeometryOrientationOptions extends Omit<ConformanceOptions,
 
 export function runPageGeometryOrientationConformance(
   runner: ConformanceTestRunner,
-  opts: PageGeometryOrientationOptions,
+  options: PageGeometryOrientationOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`page geometry orientation conformance: ${opts.label} [${opts.fixture.id}]`, () => {
+  describe(`page geometry orientation conformance: ${options.label} [${options.fixture.id}]`, () => {
     let engine: Engine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -77,8 +77,8 @@ export function runPageGeometryOrientationConformance(
       snapshot: PageGeometrySnapshot;
       close: () => Promise<void>;
     }> => {
-      const doc = await openFixture(engine, opts);
-      const layout = await doc.page(toPageRef(opts.fixture.pageObjectNumber)).text.layout();
+      const doc = await openFixture(engine, options);
+      const layout = await doc.page(toPageRef(options.fixture.pageObjectNumber)).text.layout();
       return { snapshot: { runs: [...layout.runs] }, close: () => doc.close() };
     };
 
@@ -113,7 +113,7 @@ export function runPageGeometryOrientationConformance(
     test('runs match the fixture orientation expectation', async () => {
       const { snapshot, close } = await readSnapshot();
       try {
-        const expectation = opts.fixture.expectation;
+        const expectation = options.fixture.expectation;
         if (expectation.kind === 'upright') {
           for (const run of snapshot.runs) {
             expect(isRotatedGeometryRun(run)).toBe(false);

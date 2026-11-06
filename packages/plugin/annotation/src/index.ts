@@ -22,7 +22,7 @@ export {
 export { widgetAppearanceOf } from './authoring';
 export { DEFAULT_TOOLS } from './tools/definitions';
 export type {
-  AnnotationToolDef,
+  AnnotationToolDefinition,
   AnnotationToolInput,
   GhostPolicy,
   ResolvedGhost,

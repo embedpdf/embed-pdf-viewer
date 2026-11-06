@@ -54,16 +54,16 @@ export interface TextDivergenceConformanceOptions extends Omit<ConformanceOption
 
 export function runTextDivergenceConformance(
   runner: ConformanceTestRunner,
-  opts: TextDivergenceConformanceOptions,
+  options: TextDivergenceConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
-  const fixture = opts.fixture;
+  const fixture = options.fixture;
 
-  describe(`text divergence conformance: ${opts.label} [${fixture.id}]`, () => {
+  describe(`text divergence conformance: ${options.label} [${fixture.id}]`, () => {
     let engine: Engine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -71,7 +71,7 @@ export function runTextDivergenceConformance(
     });
 
     test('snapshot is schema-valid with the exact text, charCount, and charMap', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const snap = await doc.page(toPageRef(fixture.pageObjectNumber)).text.get();
         // Schema-parse enforces every charMap invariant (the {0,2} step
@@ -93,7 +93,7 @@ export function runTextDivergenceConformance(
     });
 
     test('char-space slicing round-trips through the map', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const page = doc.page(toPageRef(fixture.pageObjectNumber));
         const snap = await page.text.get();
@@ -109,7 +109,7 @@ export function runTextDivergenceConformance(
     if (fixture.search) {
       const probe = fixture.search;
       test('search hits address character space and join the text by slicing', async () => {
-        const doc = await openFixture(engine, opts);
+        const doc = await openFixture(engine, options);
         try {
           const slice = await doc.search.query({ text: probe.query });
           const hit = slice.matches.find((m) => m.page.objectNumber === fixture.pageObjectNumber);

@@ -1,7 +1,7 @@
 import type { BundleImportPages } from './bundle';
 import type { FormBundle } from './FormBundle';
 import type { WidgetAnnotation, WidgetPatch } from '../annotation/kinds/widget';
-import type { FormFieldDTO } from '../forms/field';
+import type { FormField } from '../forms/field';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { FormFieldRef } from '../identity/FormFieldRef';
 import {
@@ -105,7 +105,7 @@ export interface FormValuesImportDrop {
 
 export interface FormImportResult<C extends Coordinates = PageCoordinates> {
   /** The fields the import made, in bundle order, each as it is now. */
-  fields: FormFieldDTO<C>[];
+  fields: FormField<C>[];
   /** Their widgets' rows. */
   widgets: WidgetAnnotation<C>[];
   /** Each imported field's ref in the bundle, and its ref in this document. */
@@ -119,7 +119,7 @@ export interface FormImportResult<C extends Coordinates = PageCoordinates> {
 
 export interface FormValuesImportResult<C extends Coordinates = PageCoordinates> {
   /** The fields whose value changed, in bundle order, each as it is now. */
-  fields: FormFieldDTO<C>[];
+  fields: FormField<C>[];
   /** The rows of the widgets whose look changed. */
   widgets: WidgetAnnotation<C>[];
   /** What was left out, in bundle order. */

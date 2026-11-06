@@ -108,7 +108,7 @@ export interface Kernel extends SettingsApi<ViewerSettings> {
   /**
    * Resolve a capability. For document-scoped tokens, `documentId` defaults to the active doc.
    * For a workspace token, a `documentId` gives the capability as seen from that document's
-   * scope (`PluginDef.inScope`; the documents capability too): the same object on every call
+   * scope (`PluginDefinition.inScope`; the documents capability too): the same object on every call
    * while the document is open.
    */
   capability<T>(token: CapabilityToken<T>, documentId?: string): T;
@@ -345,7 +345,7 @@ interface DocumentSession extends SessionRef {
    * store holds its notifications while a document's plugins are built.)
    */
   building: Set<AnyPlugin>;
-  /** Workspace capabilities as seen from this document's scope (`PluginDef.inScope`), by token. */
+  /** Workspace capabilities as seen from this document's scope (`PluginDefinition.inScope`), by token. */
   views: Map<CapabilityToken<unknown>, unknown>;
   /** `connect` halves of `create()`, run once every instance of the document is built. */
   connectors: Map<AnyPlugin, () => void>;

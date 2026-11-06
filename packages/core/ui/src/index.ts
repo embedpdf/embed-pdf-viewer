@@ -110,7 +110,7 @@ export type { OverflowRow, OverflowSection, ResolveMenuTarget, StripGroup } from
 export { groupMenuView, layoutToolbar, sameStripGroups, stripGroupsOf } from './toolbar-layout';
 export type {
   CollapsedGroupView,
-  CustomSlotCtx,
+  CustomSlotContext,
   GroupDisclosureView,
   LiveGroup,
   LiveSection,

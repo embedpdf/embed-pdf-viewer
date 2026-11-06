@@ -25,7 +25,7 @@
  */
 import { panelCommandOf } from '@embedpdf/core-ui';
 import type { AnnotationToolInput } from '@embedpdf/react/annotation';
-import { CommandsToken, type CommandDef, type IconAccent } from '@embedpdf/react/commands';
+import { CommandsToken, type CommandDefinition, type IconAccent } from '@embedpdf/react/commands';
 import { FormToken } from '@embedpdf/react/form';
 import { HistoryToken } from '@embedpdf/react/history';
 import { DocumentsToken } from '@embedpdf/react/runtime';
@@ -54,7 +54,7 @@ import { outlineCommands } from './outline';
 import { pageCommands } from './page-commands';
 
 // ── helpers ────────────────────────────────────────────────────────────────
-type Ctx = Parameters<NonNullable<CommandDef['run']>>[0];
+type Ctx = Parameters<NonNullable<CommandDefinition['run']>>[0];
 
 /** The dialog the Go to Page command opens without a page to go to (ui/go-to-page.tsx). */
 export const GO_TO_PAGE_DIALOG = 'go-to-page';
@@ -118,7 +118,7 @@ const snapshotFileName = (commandContext: Ctx, page: PageRef): string => {
  * sentence for when it may not (docs/conventions/permissions.md). Without the plugin there is
  * nothing to ask, and the command's own `enabled` or `visible` says it can't run.
  */
-type Check = Pick<CommandDef, 'allowed' | 'notAllowedKey'>;
+type Check = Pick<CommandDefinition, 'allowed' | 'notAllowedKey'>;
 
 /** Drawing an annotation of any kind: `annotation.canCreate()`. */
 const CREATES_ANNOTATIONS: Check = {
@@ -262,7 +262,7 @@ const toolCommand = (
   toolId: string,
   icon: string | undefined,
   { feature, check, accent }: ToolOptions,
-): Omit<CommandDef, 'labelKey'> => {
+): Omit<CommandDefinition, 'labelKey'> => {
   if (icon) TOOL_ICONS[toolId] = { icon, ...(accent ? { accent } : {}) };
   TOOL_FEATURES[toolId] = feature;
   return {
@@ -283,7 +283,7 @@ const tool = (
   labelKey: string,
   icon: string,
   options: ToolOptions,
-): CommandDef => ({ ...toolCommand(id, toolId, icon, options), labelKey });
+): CommandDefinition => ({ ...toolCommand(id, toolId, icon, options), labelKey });
 
 /**
  * Selected text made into a highlight, an underline or a strikeout, with the colors of the
@@ -295,7 +295,7 @@ const markupSelection = (
   labelKey: string,
   icon: string,
   feature: Feature,
-): CommandDef => ({
+): CommandDefinition => ({
   id,
   labelKey,
   icon,
@@ -313,14 +313,19 @@ const pageArgOf = (args: unknown): number | null => {
 };
 
 /** A fixed zoom level (fraction), e.g. 1 = 100%. */
-const zoomLevel = (id: string, level: number, label: string): CommandDef => ({
+const zoomLevel = (id: string, level: number, label: string): CommandDefinition => ({
   id,
   labelKey: label,
   run: (commandContext) => stage(commandContext)?.zoomTo({ level }),
   enabled: (commandContext) => stage(commandContext) != null,
 });
 
-const spread = (id: string, mode: SpreadMode, labelKey: string, icon: string): CommandDef => ({
+const spread = (
+  id: string,
+  mode: SpreadMode,
+  labelKey: string,
+  icon: string,
+): CommandDefinition => ({
   id,
   labelKey,
   icon,
@@ -335,7 +340,7 @@ const scroll = (
   layout: Exclude<LayoutKind, 'grid'>,
   labelKey: string,
   icon: string,
-): CommandDef => ({
+): CommandDefinition => ({
   id,
   labelKey,
   icon,
@@ -349,7 +354,7 @@ const scroll = (
     stage(commandContext)?.getLock('flow') ?? stage(commandContext)?.getLock('layout') ?? null,
 });
 
-export const defaultCommands: CommandDef[] = [
+export const defaultCommands: CommandDefinition[] = [
   // ── zoom ───────────────────────────────────────────────────────────────
   {
     id: 'zoom:in',
@@ -1216,7 +1221,7 @@ function modeCommand(
   id: (typeof MODE_SURFACES)[number],
   labelKey: string,
   { feature }: { feature?: Feature } = {},
-): CommandDef {
+): CommandDefinition {
   return {
     id,
     labelKey,
@@ -1244,8 +1249,8 @@ function modeCommand(
 export function toolCommandsFor(
   tools: readonly AnnotationToolInput[],
   isTaken: (id: string) => boolean,
-): CommandDef[] {
-  return tools.flatMap((input): CommandDef[] => {
+): CommandDefinition[] {
+  return tools.flatMap((input): CommandDefinition[] => {
     const id = `tool:${input.id}`;
     if (isTaken(id)) return [];
     const base = input.extends;

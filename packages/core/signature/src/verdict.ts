@@ -1,8 +1,4 @@
-import type {
-  DocumentHandle,
-  SignatureDTO,
-  SignatureSnapshot,
-} from '@embedpdf/engine-core/runtime';
+import type { DocumentHandle, Signature, SignatureSnapshot } from '@embedpdf/engine-core/runtime';
 
 import { bytesEqual } from './cms/engine';
 import { CmsError, parseCmsInternal, type ParsedCms, type ParsedCmsInternal } from './cms/parse';
@@ -18,7 +14,7 @@ export type ModificationsVerdict = 'unchanged' | 'permitted' | 'forbidden' | 'in
  * changes allowed") and the shape a UI can explain.
  */
 export interface SignatureVerdict {
-  signature: SignatureDTO;
+  signature: Signature;
   /** The sealed bytes are intact: whole-revision coverage and the CMS message digest matches them. */
   integrity: IntegrityVerdict;
   /** The CMS verifies with its own certificate. */
@@ -78,7 +74,7 @@ export async function validateSignatures(
 async function validateOne(
   doc: DocumentHandle,
   snapshot: SignatureSnapshot,
-  signature: SignatureDTO,
+  signature: Signature,
   options: ValidateSignaturesOptions,
 ): Promise<SignatureVerdict> {
   const validationTime = options.validationTime ?? { kind: 'now' };
@@ -160,7 +156,7 @@ async function validateOne(
 async function modificationsOf(
   doc: DocumentHandle,
   snapshot: SignatureSnapshot,
-  signature: SignatureDTO,
+  signature: Signature,
   until: 'persisted' | 'working-copy',
 ): Promise<SignatureVerdict['modifications']> {
   if (signature.revisionIndex === null) {

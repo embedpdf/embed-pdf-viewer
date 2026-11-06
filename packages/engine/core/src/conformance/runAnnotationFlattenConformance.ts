@@ -30,15 +30,15 @@ const square = (x: number, y: number): SquareDraft => ({
  */
 export function runAnnotationFlattenConformance(
   runner: ConformanceTestRunner,
-  opts: ConformanceOptions,
+  options: ConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
-  describe(`annotation flatten conformance: ${opts.label}`, () => {
+  describe(`annotation flatten conformance: ${options.label}`, () => {
     let engine: Engine;
 
     beforeAll(async () => {
-      engine = await opts.makeEngine();
+      engine = await options.makeEngine();
     });
 
     afterAll(async () => {
@@ -46,7 +46,7 @@ export function runAnnotationFlattenConformance(
     });
 
     test('flattens exactly the given refs and reports per-ref status', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const layoutBefore = await doc.pages.list();
         const pageObjectNumber = layoutBefore.pages[0].ref.objectNumber;
@@ -87,7 +87,7 @@ export function runAnnotationFlattenConformance(
     });
 
     test('a ref on another page rejects InvalidArg and mutates nothing', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const layout = await doc.pages.list();
         if (layout.pages.length < 2) return;
@@ -108,7 +108,7 @@ export function runAnnotationFlattenConformance(
     });
 
     test('an empty ref list rejects InvalidArg; an unknown ref rejects NotFound', async () => {
-      const doc = await openFixture(engine, opts);
+      const doc = await openFixture(engine, options);
       try {
         const pageObjectNumber = (await doc.pages.list()).pages[0].ref.objectNumber;
         const page = doc.page(toPageRef(pageObjectNumber));

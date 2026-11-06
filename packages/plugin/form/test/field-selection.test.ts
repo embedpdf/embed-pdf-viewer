@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { FormFieldDTO } from '@embedpdf/engine-core/runtime';
+import type { FormField } from '@embedpdf/engine-core/runtime';
 import type { ActionDiagnostic, SubmitIntent } from '@embedpdf/plugin-actions/contract';
 
 import { buildSubmitEntries, resolveFieldSelection } from '../src/field-selection';
@@ -11,10 +11,10 @@ const field = (
   overrides: Partial<{
     kind: string;
     noExport: boolean;
-    valueEntry: FormFieldDTO['valueEntry'];
+    valueEntry: FormField['valueEntry'];
     fieldObjectNumber: number;
   }> = {},
-): FormFieldDTO =>
+): FormField =>
   ({
     ref: { kind: 'objectNumber', objectNumber: overrides.fieldObjectNumber ?? 0 },
     name,
@@ -34,7 +34,7 @@ const field = (
     valueEntry: overrides.valueEntry ?? { kind: 'scalar', value: `${name}-value` },
     defaultValueEntry: { kind: 'none' },
     widgets: [],
-  }) as unknown as FormFieldDTO;
+  }) as unknown as FormField;
 
 const intent = (overrides: Partial<SubmitIntent> = {}): SubmitIntent => ({
   url: 'https://home.test/x',

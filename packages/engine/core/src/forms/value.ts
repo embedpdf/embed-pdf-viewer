@@ -1,4 +1,4 @@
-import type { FormFieldDTO } from './field';
+import type { FormField } from './field';
 import type { Coordinates } from '../pageSpace/coordinates';
 
 /**
@@ -23,7 +23,7 @@ export type FormFieldValue =
  * same field changes nothing. `null` for a field whose value a write can't
  * set (a push button, a signature, a kind the engine doesn't know).
  */
-export function fieldValueOf(field: FormFieldDTO<Coordinates>): FormFieldValue | null {
+export function fieldValueOf(field: FormField<Coordinates>): FormFieldValue | null {
   switch (field.kind) {
     case 'checkbox':
       return { checked: field.checked };

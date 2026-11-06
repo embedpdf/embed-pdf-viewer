@@ -19,7 +19,7 @@ import {
   type FormFieldCreateResult,
   type FormFieldDeleteResult,
   type FormFieldDraft,
-  type FormFieldDTO,
+  type FormField,
   type FormFieldPatch,
   type FormFieldRef,
   type FormFieldUpdateResult,
@@ -84,10 +84,10 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     return this.await(submission, 'forms.list', (payload) => payload.snapshot);
   }
 
-  get(ref: FormFieldRef): AbortablePromise<FormFieldDTO> {
+  get(ref: FormFieldRef): AbortablePromise<FormField> {
     // Resolved client-side over the snapshot: the worker's form model is
     // version-cached, so this costs one (usually cached) list read.
-    return AbortablePromise.run<FormFieldDTO>(async (signal) => {
+    return AbortablePromise.run<FormField>(async (signal) => {
       const snapshot = await this.forwardAbort(this.list(), signal);
       const field = snapshot.fields.find((f) =>
         ref.kind === 'objectNumber'

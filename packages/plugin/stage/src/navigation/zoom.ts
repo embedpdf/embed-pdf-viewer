@@ -13,7 +13,7 @@ import {
   ZoomMode,
   type ZoomLimits,
 } from '@embedpdf/core-stage';
-import { addRotations, type PageRotation } from '@embedpdf/core-geometry';
+import { addRotations, type Rotation } from '@embedpdf/core-geometry';
 import type { PluginContext } from '@embedpdf/core';
 
 import type { StageAnimation } from '../camera/animation';
@@ -100,7 +100,7 @@ export function createZoom(
     if (target !== camera().zoom) gestures.zoomAround(around, target / camera().zoom);
   };
 
-  const setViewRotation = (viewRotation: PageRotation): void =>
+  const setViewRotation = (viewRotation: Rotation): void =>
     settings.updateSettings({ viewRotation });
 
   return {

@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   COMMANDS_DEFAULTS,
   type CommandContext,
-  type CommandDef,
+  type CommandDefinition,
   type CommandFamily,
   type CommandsConfig,
 } from '../src/contract';
@@ -28,7 +28,8 @@ function harness<AppState>(config: CommandsConfig<AppState> = {}) {
   return { ctx, commands };
 }
 
-const capabilityWith = (definition: CommandDef) => harness({ commands: [definition] }).commands;
+const capabilityWith = (definition: CommandDefinition) =>
+  harness({ commands: [definition] }).commands;
 
 describe('resolution carries iconAccent', () => {
   it('lands a derived accent on the resolved command', () => {
@@ -94,8 +95,8 @@ describe('enabled, active and visible', () => {
 describe('registry', () => {
   it('rejects a duplicate id unless replaced, and a remover owns only its registration', () => {
     const { commands } = harness();
-    const first: CommandDef = { id: 'zoom:in', label: 'first' };
-    const second: CommandDef = { id: 'zoom:in', label: 'second' };
+    const first: CommandDefinition = { id: 'zoom:in', label: 'first' };
+    const second: CommandDefinition = { id: 'zoom:in', label: 'second' };
     const removeFirst = commands.registerCommand(first);
     expect(() => commands.registerCommand(second)).toThrow(
       expect.objectContaining({ code: 'conflict' }),
@@ -212,7 +213,7 @@ describe("your app's state", () => {
   }
 
   /** A command over an app's checklist: enabled once all four are done, active once approved. */
-  const approve: CommandDef<Review> = {
+  const approve: CommandDefinition<Review> = {
     id: 'acme:approve',
     label: 'Approve',
     enabled: ({ appState }) => appState.done.length === 4,
@@ -343,7 +344,7 @@ describe('turning features off', () => {
 });
 
 describe('turning single commands off', () => {
-  const definitions: CommandDef[] = [
+  const definitions: CommandDefinition[] = [
     { id: 'tool:highlight', label: 'Highlight', categories: ['annotations.highlight'] },
     { id: 'tool:underline', label: 'Underline', categories: ['annotations.markup'] },
   ];
@@ -420,7 +421,7 @@ describe('locked settings', () => {
   // A spread setting the test holds or lets go, as the Stage's getLock() would answer.
   let held: { by: string; reasonKey?: string } | null = null;
   let spread = 'none';
-  const choice = (id: string, value: string): CommandDef => ({
+  const choice = (id: string, value: string): CommandDefinition => ({
     id,
     label: id === 'view:single-page' ? 'Single page' : 'Two pages',
     run: () => {
@@ -534,8 +535,16 @@ describe('permissions', () => {
     return ctx.connect(createCommandsController(ctx));
   }
 
-  const print: CommandDef = { id: 'document:print', label: 'Print', requires: ['doc.print'] };
-  const note: CommandDef = { id: 'tool:note', label: 'Note', requires: ['annotations:create'] };
+  const print: CommandDefinition = {
+    id: 'document:print',
+    label: 'Print',
+    requires: ['doc.print'],
+  };
+  const note: CommandDefinition = {
+    id: 'tool:note',
+    label: 'Note',
+    requires: ['annotations:create'],
+  };
 
   it('hides a command whose permission the scope leaves out, and refuses it', async () => {
     const commands = harnessWith({ commands: [print, note] }, securityWithout('doc.print'));
@@ -678,20 +687,20 @@ describe('permissions', () => {
 
   it('refuses a command its allowed check says no to, with the sentence its key names', async () => {
     let canPrint = false;
-    const checked: CommandDef = {
+    const checked: CommandDefinition = {
       id: 'document:print',
       label: 'Print',
       allowed: () => canPrint,
       notAllowedKey: 'commands.notAllowed.doc-print',
     };
-    const thrown: CommandDef = {
+    const thrown: CommandDefinition = {
       id: 'acme:thrown',
       label: 'Thrown',
       allowed: () => {
         throw new Error('no plugin');
       },
     };
-    const general: CommandDef = { id: 'acme:general', label: 'Send', allowed: () => false };
+    const general: CommandDefinition = { id: 'acme:general', label: 'Send', allowed: () => false };
     const strings = { 'commands.notAllowed.doc-print': "Printing isn't allowed" };
     const hidden = harnessWith(
       { commands: [checked, thrown, general] },
