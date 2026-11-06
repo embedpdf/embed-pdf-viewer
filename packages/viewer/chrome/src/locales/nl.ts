@@ -591,7 +591,7 @@ export const nl: Locale = {
       retry: 'Opnieuw proberen',
       empty: 'Nog geen opmerkingen. Gebruik het notitiegereedschap om een discussie te starten.',
       emptyReadOnly: 'Dit document heeft geen opmerkingen.',
-      anonymous: 'Onbekend',
+      anonymous: 'Gast',
       page: 'Pagina {page}',
       count: '{count} opmerking',
       countPlural: '{count} opmerkingen',

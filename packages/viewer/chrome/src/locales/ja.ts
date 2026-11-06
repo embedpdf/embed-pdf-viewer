@@ -590,7 +590,7 @@ export const ja: Locale = {
       retry: '再試行',
       empty: 'コメントはまだありません。コメントツールでスレッドを開始できます。',
       emptyReadOnly: 'この文書にはコメントがありません。',
-      anonymous: '不明',
+      anonymous: 'ゲスト',
       page: '{page} ページ',
       count: 'コメント {count} 件',
       countPlural: 'コメント {count} 件',

@@ -590,7 +590,7 @@ export const pl: Locale = {
       retry: 'Ponów próbę',
       empty: 'Brak komentarzy. Użyj narzędzia notatki, aby rozpocząć wątek.',
       emptyReadOnly: 'Ten dokument nie ma komentarzy.',
-      anonymous: 'Nieznany',
+      anonymous: 'Gość',
       page: 'Strona {page}',
       count: 'Komentarze: {count}',
       countPlural: 'Komentarze: {count}',

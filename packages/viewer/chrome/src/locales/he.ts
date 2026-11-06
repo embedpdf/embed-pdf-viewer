@@ -589,7 +589,7 @@ export const he: Locale = {
       retry: 'נסה שוב',
       empty: 'אין הערות עדיין. השתמש בכלי הפתק כדי לפתוח שרשור.',
       emptyReadOnly: 'אין הערות במסמך זה.',
-      anonymous: 'לא ידוע',
+      anonymous: 'אורח',
       page: 'עמוד {page}',
       count: 'הערות: {count}',
       countPlural: 'הערות: {count}',

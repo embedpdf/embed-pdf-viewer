@@ -590,7 +590,7 @@ export const it: Locale = {
       retry: 'Riprova',
       empty: 'Ancora nessun commento. Usa lo strumento Nota per avviare una discussione.',
       emptyReadOnly: 'Nessun commento in questo documento.',
-      anonymous: 'Sconosciuto',
+      anonymous: 'Ospite',
       page: 'Pagina {page}',
       count: '{count} commento',
       countPlural: '{count} commenti',

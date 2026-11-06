@@ -588,7 +588,7 @@ export const zhCN: Locale = {
       retry: '重试',
       empty: '尚无注释。使用注释工具开始讨论。',
       emptyReadOnly: '此文档没有注释。',
-      anonymous: '未知',
+      anonymous: '访客',
       page: '第 {page} 页',
       count: '{count} 条注释',
       countPlural: '{count} 条注释',

@@ -590,7 +590,7 @@ export const zhTW: Locale = {
       retry: '重試',
       empty: '尚無註解。使用註解工具開始討論。',
       emptyReadOnly: '此文件沒有註解。',
-      anonymous: '未知',
+      anonymous: '訪客',
       page: '第 {page} 頁',
       count: '{count} 則註解',
       countPlural: '{count} 則註解',

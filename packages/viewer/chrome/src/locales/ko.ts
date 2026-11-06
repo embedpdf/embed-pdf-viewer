@@ -589,7 +589,7 @@ export const ko: Locale = {
       retry: '다시 시도',
       empty: '아직 댓글이 없습니다. 댓글 도구를 사용하여 스레드를 시작하십시오.',
       emptyReadOnly: '이 문서에는 댓글이 없습니다.',
-      anonymous: '알 수 없음',
+      anonymous: '게스트',
       page: '{page}페이지',
       count: '댓글 {count}개',
       countPlural: '댓글 {count}개',
