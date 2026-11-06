@@ -23,7 +23,10 @@ export const WidgetDeclaration = defineKind('widget', {
   interiorColor: field.data(ColorSchema).nullable().optional(),
   strokeWidth: field.data(z.number().nonnegative()).optional(),
   borderStyle: field.data(WidgetBorderStyleSchema).optional(),
-  /** The border's dash pattern (`/BS /D`), for a dashed border; `null` for the default (3 on, 3 off). */
+  /**
+   * The border's dash pattern (`/BS /D`), for a dashed border. Left out on a dashed border: the
+   * default (3 on, 3 off); `null` is no pattern.
+   */
   dashArray: field
     .data(z.array(z.number().nonnegative()))
     .writes(DashArrayWriteSchema)

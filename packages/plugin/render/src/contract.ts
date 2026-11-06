@@ -46,14 +46,14 @@ export interface RenderSettings {
   /** Tile plane strategy; `false` disables the plane entirely. */
   readonly tiles: TilesOptions | false;
   /**
-   * Encode format for both planes. Unset → engine default (png local, the
+   * Encode format for both planes. `null` → engine default (png local, the
    * deployment's format on cloud). `'bmp'` is the local fast path — no
    * compression, no encoder-worker round trip; under a lattice it conforms
    * to `policy.formats`.
    */
-  readonly format: RenderFormat | undefined;
-  /** WebP quality from 0 (smallest) to 1 (best); PNG and BMP ignore it. */
-  readonly quality: number | undefined;
+  readonly format: RenderFormat | null;
+  /** WebP quality from 0 (smallest) to 1 (best); PNG and BMP ignore it. `null` → the engine's. */
+  readonly quality: number | null;
   /**
    * How long a page waits for its first picture before its state turns `slow`, in milliseconds:
    * the moment to show a loading indicator ({@link PictureState}). `0` turns it on at once.
@@ -73,8 +73,9 @@ export interface SnapshotSettings {
    */
   readonly scale: number;
   /**
-   * The look of the box you drag. A color left `null` follows the viewer's
-   * accent (the fill at 8%); CSS `--epdf-snapshot-box-fill` and
+   * The look of the box you drag, one value: a change replaces it whole, and a
+   * color it leaves out is `null` again. A color left `null` follows the
+   * viewer's accent (the fill at 8%); CSS `--epdf-snapshot-box-fill` and
    * `--epdf-snapshot-box-stroke` win over both.
    */
   readonly box: SnapshotBoxLook;
@@ -102,8 +103,8 @@ export const RENDER_DEFAULTS: RenderSettings = {
     prefetch: { margin: 0.5, velocityBias: true },
     settleMs: 150,
   },
-  format: undefined,
-  quality: undefined,
+  format: null,
+  quality: null,
   slowAfterMs: 400,
   debug: false,
   snapshot: { scale: 2, box: { fill: null, stroke: null } },

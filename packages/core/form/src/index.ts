@@ -8,5 +8,5 @@
 export { paints, widgetDrawing, widgetText, type ShownValue } from './drawing';
 export { textEditorLayout, type TextEditorLayout } from './editor';
 export type { DrawOp, PathSegment, Rgb, TextRun, WidgetDrawing } from './drawing';
-export { widgetScene, type WidgetPlacement } from './scene';
+export { widgetScene, type WidgetScenePlacement } from './scene';
 export type { MountableFontProgram } from '@embedpdf/core-fonts';

@@ -301,6 +301,10 @@ Set them when you register the plugin, and change them while the app runs with
 | `snapshot.box.fill`           | Inside the box you drag with the snapshot tool                        | the viewer's `accent` at 8% |
 | `snapshot.box.stroke`         | Its dashed edge                                                       | the viewer's `accent` |
 
+`format` and `quality` read `null` while the engine chooses, and `updateSettings({ format: null })`
+gives the choice back. `snapshot.box` is one look: a change replaces it whole, so a color you leave
+out follows the accent again.
+
 `<RenderLayer>` takes four <Word of="props" />: `annotations` and `formFields`, unset by default
 (see [What the picture draws](#what-the-picture-draws)), `tiles` (default `true`), and `thumbnail`:
 in a strip of thumbnails, `<RenderLayer thumbnail />` draws each page's

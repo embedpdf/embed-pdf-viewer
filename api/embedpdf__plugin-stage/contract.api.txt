@@ -22,7 +22,7 @@ Point [InterfaceDeclaration] (from packages/core/geometry/src/index.ts): export 
 ResponsiveRule [InterfaceDeclaration]: export interface ResponsiveRule{ name?: string; when: BoxQuery | ((box: StageBox) => boolean); settings?: StageSettingsPatch; }
 RevealAnchor [InterfaceDeclaration]: export interface RevealAnchor{ x?: RevealAnchorValue; y?: RevealAnchorValue; }
 RevealAnchorValue [TypeAliasDeclaration]: export type RevealAnchorValue = 'keep' | 'start' | 'center' | 'end' | number;
-RevealOptions [InterfaceDeclaration]: export interface RevealOptions{ behavior?: ScrollBehaviorKind; rect?: Rect | null; zoom?: RevealZoom; anchor?: RevealAnchor; }
+RevealOptions [InterfaceDeclaration]: export interface RevealOptions{ behavior?: ScrollBehaviorKind; rect?: Rect; zoom?: RevealZoom; anchor?: RevealAnchor; }
 RevealZoom [TypeAliasDeclaration]: export type RevealZoom = 'keep' | 'fit' | 'fit-width' | 'fit-height' |{ level: number} ;
 ScrollBehaviorKind [TypeAliasDeclaration]: export type ScrollBehaviorKind = 'smooth' | 'instant';
 ScrollMetrics [InterfaceDeclaration] (from packages/core/stage/src/index.ts): export interface ScrollMetrics{ scrollLeft: number; scrollTop: number; scrollWidth: number; scrollHeight: number; clientWidth: number; clientHeight: number; scrollableX: boolean; scrollableY: boolean; }

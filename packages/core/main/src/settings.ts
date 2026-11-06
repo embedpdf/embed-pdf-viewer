@@ -24,6 +24,15 @@ type DeepPartialValue<V> = V extends readonly unknown[] | ((...args: never[]) =>
 /** Every field optional, down through the plain objects. */
 export type DeepPartial<T> = { readonly [K in keyof T]?: DeepPartialValue<T[K]> };
 
+/** A setting's name, or its path inside a group of settings: `'identity'`, `'snapshot.box'`. */
+export type SettingPath<T> = {
+  [K in keyof T & string]: T[K] extends readonly unknown[] | ((...args: never[]) => unknown)
+    ? K
+    : T[K] extends object
+      ? K | `${K}.${SettingPath<T[K]>}`
+      : K;
+}[keyof T & string];
+
 declare const noSettings: unique symbol;
 
 /**
@@ -42,10 +51,11 @@ export interface SettingsDeclaration<T> {
   /** What the app registered, usually the plugin factory's config: merged over `defaults`. */
   readonly registered?: DeepPartial<T> | undefined;
   /**
-   * Top-level settings that are one value each, such as a person: a change replaces them
-   * whole instead of merging into them, so nothing of the previous value stays.
+   * Settings that are one value each, such as a person or a box's colors, by name or by their
+   * path inside a group (`'snapshot.box'`): a change replaces them whole instead of merging into
+   * them, and what it leaves out takes its default, so nothing of the previous value stays.
    */
-  readonly whole?: readonly (keyof T & string)[];
+  readonly whole?: readonly SettingPath<T>[];
 }
 
 /** What `onSettingsChanged` carries: the settings after the change, and which of them changed. */
@@ -115,7 +125,7 @@ export function createSettingsStore<T extends object>(
   wake: () => void,
   report: (error: unknown) => void,
 ): SettingsStore<T> {
-  const initial = mergeSettings(defaults, registered, whole);
+  const initial = mergeSettings(defaults, registered, { defaults, whole });
   let current = initial;
   const changedHook = createEventHook<SettingsChangedEvent<T>>(report);
 
@@ -130,7 +140,7 @@ export function createSettingsStore<T extends object>(
 
   const api: SettingsApi<T> = {
     getSettings: () => current,
-    updateSettings: (changes) => commit(mergeSettings(current, changes, whole)),
+    updateSettings: (changes) => commit(mergeSettings(current, changes, { defaults, whole })),
     resetSettings: () => commit(initial),
     onSettingsChanged: changedHook.on,
   };
@@ -151,33 +161,63 @@ export function createSettingsStore<T extends object>(
 }
 
 /**
- * `changes` merged into `settings`, the `whole` ones replaced instead: the merge every settings
- * store applies, for code that keeps changes before a store exists (an adapter whose engine is
+ * `changes` merged into `settings`, the declaration's `whole` ones replaced instead: the merge
+ * every settings store applies, for code that keeps changes before a store exists (an adapter whose engine is
  * still loading). What a change leaves as it was keeps its object, so a reader that compares by
  * reference sees only what really changed.
  */
 export function mergeSettings<T>(
   settings: T,
   changes: DeepPartial<T> | undefined,
-  whole: readonly string[] = [],
+  declaration?: Pick<SettingsDeclaration<T>, 'defaults' | 'whole'>,
 ): T {
+  const whole = declaration?.whole ?? [];
   if (whole.length === 0 || !isPlainObject(changes)) return mergeValue(settings, changes) as T;
-  const merged = mergeValue(settings, omit(changes, whole)) as Record<string, unknown>;
-  let replaced: Record<string, unknown> | null = null;
-  for (const key of whole) {
-    const change = (changes as Record<string, unknown>)[key];
-    if (change === undefined || sameValue(merged[key], change)) continue;
-    replaced ??= { ...merged };
-    replaced[key] = change;
+  const paths = whole.map((path) => path.split('.'));
+  let merged = mergeValue(settings, withoutPaths(changes, paths));
+  for (const path of paths) {
+    const change = valueAt(changes, path);
+    if (change === undefined) continue;
+    const value = filledFrom(valueAt(declaration?.defaults, path), change);
+    if (!sameValue(valueAt(merged, path), value)) merged = withValueAt(merged, path, value);
   }
-  return (replaced ?? merged) as T;
+  return merged as T;
 }
 
-/** `object` without `keys`. */
-function omit(object: Record<string, unknown>, keys: readonly string[]): Record<string, unknown> {
-  const rest: Record<string, unknown> = {};
-  for (const key of Object.keys(object)) if (!keys.includes(key)) rest[key] = object[key];
+/** The value at `path` inside `value`, or undefined where the path ends early. */
+function valueAt(value: unknown, path: readonly string[]): unknown {
+  let at = value;
+  for (const key of path) {
+    if (!isPlainObject(at) || !hasOwn(at, key)) return undefined;
+    at = at[key];
+  }
+  return at;
+}
+
+/** `value` with `next` at `path`, the objects along the path copied. */
+function withValueAt(value: unknown, path: readonly string[], next: unknown): unknown {
+  if (path.length === 0) return next;
+  const [key, ...rest] = path as [string, ...string[]];
+  const into = isPlainObject(value) ? value : {};
+  return { ...into, [key]: withValueAt(into[key], rest, next) };
+}
+
+/** `changes` without what lies at `paths`, the objects along each path copied. */
+function withoutPaths(changes: Record<string, unknown>, paths: readonly string[][]): unknown {
+  let rest: Record<string, unknown> = changes;
+  for (const path of paths) {
+    if (valueAt(rest, path) === undefined) continue;
+    rest = withValueAt(rest, path, undefined) as Record<string, unknown>;
+  }
   return rest;
+}
+
+/** A whole value: a plain object's keys left out (or `undefined`) take their defaults. */
+function filledFrom(defaultValue: unknown, change: unknown): unknown {
+  if (!isPlainObject(change) || !isPlainObject(defaultValue)) return change;
+  const filled: Record<string, unknown> = { ...defaultValue };
+  for (const key of Object.keys(change)) if (change[key] !== undefined) filled[key] = change[key];
+  return filled;
 }
 
 function mergeValue(base: unknown, change: unknown): unknown {

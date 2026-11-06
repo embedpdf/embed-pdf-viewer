@@ -24,7 +24,7 @@ Rect [InterfaceDeclaration] (from packages/core/geometry/src/index.ts): export i
 ResponsiveRule [InterfaceDeclaration] (from packages/plugin/stage/src/contract.ts): export interface ResponsiveRule{ name?: string; when: BoxQuery | ((box: StageBox) => boolean); settings?: StageSettingsPatch; }
 RevealAnchor [InterfaceDeclaration] (from packages/plugin/stage/src/contract.ts): export interface RevealAnchor{ x?: RevealAnchorValue; y?: RevealAnchorValue; }
 RevealAnchorValue [TypeAliasDeclaration] (from packages/plugin/stage/src/contract.ts): export type RevealAnchorValue = 'keep' | 'start' | 'center' | 'end' | number;
-RevealOptions [InterfaceDeclaration] (from packages/plugin/stage/src/contract.ts): export interface RevealOptions{ behavior?: ScrollBehaviorKind; rect?: Rect | null; zoom?: RevealZoom; anchor?: RevealAnchor; }
+RevealOptions [InterfaceDeclaration] (from packages/plugin/stage/src/contract.ts): export interface RevealOptions{ behavior?: ScrollBehaviorKind; rect?: Rect; zoom?: RevealZoom; anchor?: RevealAnchor; }
 RevealZoom [TypeAliasDeclaration] (from packages/plugin/stage/src/contract.ts): export type RevealZoom = 'keep' | 'fit' | 'fit-width' | 'fit-height' |{ level: number} ;
 ScrollBehaviorKind [TypeAliasDeclaration] (from packages/plugin/stage/src/contract.ts): export type ScrollBehaviorKind = 'smooth' | 'instant';
 ScrollMetrics [InterfaceDeclaration] (from packages/core/stage/src/index.ts): export interface ScrollMetrics{ scrollLeft: number; scrollTop: number; scrollWidth: number; scrollHeight: number; clientWidth: number; clientHeight: number; scrollableX: boolean; scrollableY: boolean; }

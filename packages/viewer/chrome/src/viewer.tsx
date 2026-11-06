@@ -138,11 +138,11 @@ export interface ViewerCustomization<AppState = any> {
   readOnly?: boolean | ReadOnlyExceptions;
   /**
    * What the user may do: the permissions the engine checks on every call, from a button or
-   * from code. Left out, they may do everything. Documents opened after a change use the new one.
+   * from code. Left out or `null`, they may do everything. Documents opened after a change use the new one.
    */
-  scope?: readonly string[];
-  /** Who the user is: the author of what they write. */
-  identity?: Identity;
+  scope?: readonly string[] | null;
+  /** Who the user is: the author of what they write. Left out or `null`: nobody. */
+  identity?: Identity | null;
   /** What the scope doesn't allow: `'hide'` it (default), or `'disable'` it with the reason. */
   notAllowed?: NotAllowedMode;
   /**

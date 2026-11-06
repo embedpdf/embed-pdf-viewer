@@ -22,6 +22,6 @@ export const renderPlugin = (config?: RenderConfig) =>
     token: RenderToken,
     optional: [InteractionToken],
     state: initialRenderState,
-    settings: { defaults: RENDER_DEFAULTS, registered: config },
+    settings: { defaults: RENDER_DEFAULTS, registered: config, whole: ['snapshot.box'] },
     create: createRenderController,
   });

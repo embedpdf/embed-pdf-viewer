@@ -76,7 +76,7 @@ const foldRecords = (value: Records, event: DocumentEvent): Records => {
 };
 
 function setup(options: {
-  loads?: Deferred<{ value: Records; cursor?: number | null }>[];
+  loads?: Deferred<{ value: Records; cursor?: number }>[];
   readable?: () => boolean;
   fold?: (value: Records, event: DocumentEvent) => Records | ReturnType<typeof reload>;
   loadPages?: () => Promise<(value: Records) => Records>;

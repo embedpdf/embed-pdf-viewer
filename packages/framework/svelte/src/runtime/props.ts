@@ -38,13 +38,14 @@ export interface ViewerProps {
    * opened after a change use the new value; open ones keep theirs. With the cloud engine the
    * document's token decides, and a share link takes it as the visitor's answers to what the
    * link asks.
+   * Left out or `null`: nobody.
    */
-  identity?: Identity;
+  identity?: Identity | null;
   /**
    * What the user may do, as permissions, in every document opened without a `scope` of its own.
-   * Left out, they may do everything. Changes reach the documents opened after them.
+   * Left out or `null`, they may do everything. Changes reach the documents opened after them.
    */
-  scope?: readonly string[];
+  scope?: readonly string[] | null;
   /** The color every part without a color of its own follows. CSS `--epdf-accent` wins over it. */
   accent?: string;
   /** How pages look: `background` before the picture arrives, and the `shadow` under each page. */

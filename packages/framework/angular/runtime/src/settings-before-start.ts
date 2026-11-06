@@ -20,15 +20,11 @@ export class SettingsBeforeStart<T extends object> {
   readonly current: Signal<T>;
 
   constructor(declaration: SettingsDeclaration<T>) {
-    const registered = mergeSettings(
-      declaration.defaults,
-      declaration.registered,
-      declaration.whole,
-    );
+    const registered = mergeSettings(declaration.defaults, declaration.registered, declaration);
     this.current = computed(() =>
       this.changes().reduce<T>(
         (settings, change) =>
-          change === 'reset' ? registered : mergeSettings(settings, change, declaration.whole),
+          change === 'reset' ? registered : mergeSettings(settings, change, declaration),
         registered,
       ),
     );

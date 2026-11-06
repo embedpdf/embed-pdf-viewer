@@ -140,7 +140,7 @@ export function lastResortPaintFont(): PaintFont {
  * The fonts a box draws with when the viewer gives none: its standard font
  * (Helvetica for any other), no fallbacks, and the last resort.
  */
-export function defaultPaintFonts(fontFamily: string | null | undefined): PaintFonts {
+export function defaultPaintFonts(fontFamily: string | null): PaintFonts {
   return {
     face: standardPaintFont(standardFontOf(fontFamily ?? 'helvetica')),
     fallbacks: [],

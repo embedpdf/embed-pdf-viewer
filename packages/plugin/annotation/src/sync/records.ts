@@ -429,7 +429,7 @@ export function createRecordsMirror(
       const list = await doc.annotations.list();
       return {
         value: fromSnapshot(records.get(), list.annotations),
-        cursor: list.auditHead ?? null,
+        cursor: list.auditHead,
       };
     },
     fold: foldRecords,

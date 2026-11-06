@@ -87,9 +87,7 @@ export function createReveal(
     const target = Math.max(0, Math.min(pageIndex, pageCount - 1));
     const positioned =
       !!options &&
-      // `rect: null` means "no rect", the same as absent, so nullable sources
-      // flow in without a `?? undefined`.
-      (options.rect != null ||
+      (options.rect !== undefined ||
         options.anchor !== undefined ||
         (options.zoom !== undefined && options.zoom !== 'keep'));
 

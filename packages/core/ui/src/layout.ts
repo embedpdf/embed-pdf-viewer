@@ -849,11 +849,11 @@ export type LayoutOption = Layout | LayoutData | LayoutFunction;
  * warning saying so.
  */
 export function resolveLayout(
-  option: LayoutOption | null | undefined,
+  option: LayoutOption | undefined,
   defaults: Layout,
   env: LayoutEnv,
 ): Layout {
-  if (option === undefined || option === null) return defaults;
+  if (option === undefined) return defaults;
   if (typeof option === 'function') {
     let result: unknown;
     try {

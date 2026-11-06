@@ -109,7 +109,9 @@ HTTP contract.
 - **Objects inside a patch.** A value (a destination, a rect, a rich-text
   body, a file) is replaced whole: what it leaves out takes its default, never
   the current value. A map keyed by name (actions by trigger, custom metadata
-  by key) is patched per key: left out keeps, `null` removes.
+  by key) is patched per key: left out keeps, `null` removes. Settings follow
+  the same rule: a group (`chrome.outline`) merges per key, and a setting that
+  is one value (a person, a box's look) is declared `whole` and replaced whole.
 - **Options and parameters.** Left out is the default. `null` only for a value
   a read can hand out as `null`, or where `null` is a named value of its own
   (`move(ref, null)` moves to the top level). A parameter is `T | null` or

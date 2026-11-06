@@ -27,6 +27,6 @@ export const annotationPlugin = (config?: AnnotationConfig) =>
     requires: [InteractionToken],
     optional: [SelectionToken, PublicActionsToken, RenderToken, FontsToken],
     state: initialAnnotationModel,
-    settings: { defaults: ANNOTATION_DEFAULTS, registered: config },
+    settings: { defaults: ANNOTATION_DEFAULTS, registered: config, whole: ['chrome.marquee'] },
     create: createAnnotationController,
   });
