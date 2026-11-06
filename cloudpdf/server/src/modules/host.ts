@@ -25,7 +25,7 @@ import {
   type PageRef,
   type PageRenderOptions,
   type PageRenderRaster,
-  type PdfBits,
+  type PdfPermissionFlags,
   type WorkerJobId,
 } from '@embedpdf/engine-core/runtime';
 import { pagePictureOf } from '@embedpdf/engine-core/wire';
@@ -355,14 +355,18 @@ function mountDocRoute(
       const access = requireLayerDocAccessOnly(req, docId!, layerName!);
       // Whether the tenant may use the module at all, before anything is read.
       await deps.tenantFeatures.require(access.tenantId, module.id);
-      const pdfBits = await deps.documentService.getEffectivePdfBits(access, docId!, layerName!);
-      const ctx = requireLayerCapability(req, docId!, layerName!, 'doc.open', pdfBits);
+      const permissionFlags = await deps.documentService.getEffectivePermissionFlags(
+        access,
+        docId!,
+        layerName!,
+      );
+      const ctx = requireLayerCapability(req, docId!, layerName!, 'doc.open', permissionFlags);
       if (
         !checkPluginPermission(permission, ctx.jwt.scope, deps.permissions.documentPermissions())
       ) {
         throw new PermissionDenied(permission);
       }
-      const opened: Opened = { ctx, docId: docId!, layerName: layerName!, pdfBits };
+      const opened: Opened = { ctx, docId: docId!, layerName: layerName!, permissionFlags };
       const target = { tenantId: ctx.tenantId, docId: docId!, layerName: layerName! };
       const signal = abortSignalOf(reply);
       const callerToken = bearerOf(req);
@@ -413,7 +417,7 @@ interface Opened {
   readonly ctx: ReturnType<typeof requireLayerCapability>;
   readonly docId: string;
   readonly layerName: string;
-  readonly pdfBits: PdfBits;
+  readonly permissionFlags: PdfPermissionFlags;
 }
 
 /** The caller's own bearer token; null for the deployment's API token, which opens no session. */
@@ -433,7 +437,7 @@ function connection(
 }
 
 function moduleSession(opened: Opened, deps: RouteDeps): ModuleSession {
-  const { ctx, docId, layerName, pdfBits } = opened;
+  const { ctx, docId, layerName, permissionFlags } = opened;
   let protection: Promise<DocumentProtection | null> | undefined;
   return {
     sub: ctx.sub,
@@ -454,7 +458,7 @@ function moduleSession(opened: Opened, deps: RouteDeps): ModuleSession {
       if (isProtectableCapability(parsed.name)) {
         protection ??= deps.documentService.getProtection(ctx, docId, layerName);
       }
-      return holdsCapability(ctx, parsed.name, pdfBits, (await protection) ?? null);
+      return holdsCapability(ctx, parsed.name, permissionFlags, (await protection) ?? null);
     },
   };
 }
@@ -467,13 +471,13 @@ async function renderRawAsModule(
   signal: AbortSignal,
   deps: RouteDeps,
 ): Promise<PageRenderRaster> {
-  const { ctx, docId, layerName, pdfBits } = opened;
+  const { ctx, docId, layerName, permissionFlags } = opened;
   if (options.usage === 'print') {
     throw new EngineError(EngineErrorCode.InvalidArg, "a module's raw render is for the screen");
   }
   // Drawn as the module: everything the picture draws is the module's to hold.
   const held = ['doc.open', ...(module.requires?.document ?? [])];
-  const holds = (capability: DocCapability) => checkCapability(capability, held, pdfBits);
+  const holds = (capability: DocCapability) => checkCapability(capability, held, permissionFlags);
   // The local engine's defaults, the module being the reader: it draws what it may read.
   const includeAnnotations = options.includeAnnotations ?? holds('doc.annotate.read');
   const includeFormFields =

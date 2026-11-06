@@ -14,7 +14,7 @@
  * Never imported by engine-local — this is HTTP-wire territory.
  */
 
-import type { PdfBits } from '../../auth/scope';
+import type { PdfPermissionFlags } from '../../auth/scope';
 import type { LayerScopePlane, LayerScopes } from '../../dto/LayerScopes';
 import { PAGE_PICTURES } from '../renderFamilies';
 import { checkResourceAccess, DOC_RESOURCES, type DocResourceId } from '../resources';
@@ -95,7 +95,7 @@ const RESOURCE_PLANES: Partial<Record<DocResourceId, readonly LayerScopePlane[]>
 
 export function cdnCoverageForScope(
   rawScope: ReadonlyArray<string>,
-  pdfBits: PdfBits,
+  permissionFlags: PdfPermissionFlags,
   context: {
     docId: string;
     layerName?: string;
@@ -115,7 +115,7 @@ export function cdnCoverageForScope(
     if (!r.cdnCacheable) continue;
     const planes = RESOURCE_PLANES[id];
     if (planes && scopes && planes.some((plane) => scopes[plane] === 'layer')) continue;
-    if (!checkResourceAccess(id, rawScope, pdfBits)) continue;
+    if (!checkResourceAccess(id, rawScope, permissionFlags)) continue;
     out.push({
       resourceId: id,
       pathPattern: r.resolvePathPattern(context.docId, context.layerName),

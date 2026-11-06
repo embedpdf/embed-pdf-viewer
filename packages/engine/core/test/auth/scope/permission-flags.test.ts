@@ -1,42 +1,42 @@
 import { describe, expect, it } from 'vitest';
-import { PDF_BITS, decodePdfBits } from '../../../src/auth/scope';
+import { PDF_BITS, permissionFlagsOf } from '../../../src/auth/scope';
 
-describe('decodePdfBits', () => {
+describe('permissionFlagsOf', () => {
   it('returns all-false for null input', () => {
-    expect(decodePdfBits(null)).toEqual({
-      bit3: false,
-      bit4: false,
-      bit5: false,
-      bit6: false,
-      bit9: false,
-      bit10: false,
-      bit11: false,
-      bit12: false,
+    expect(permissionFlagsOf(null)).toEqual({
+      print: false,
+      modifyContents: false,
+      copy: false,
+      modifyAnnotations: false,
+      fillForms: false,
+      copyForAccessibility: false,
+      assemble: false,
+      printHighQuality: false,
     });
   });
 
   it('returns all-false for zero', () => {
-    const bits = decodePdfBits(0);
+    const bits = permissionFlagsOf(0);
     expect(Object.values(bits).every((v) => v === false)).toBe(true);
   });
 
   it('decodes each known bit in isolation', () => {
-    expect(decodePdfBits(PDF_BITS.PRINT).bit3).toBe(true);
-    expect(decodePdfBits(PDF_BITS.MODIFY).bit4).toBe(true);
-    expect(decodePdfBits(PDF_BITS.COPY).bit5).toBe(true);
-    expect(decodePdfBits(PDF_BITS.ANNOTATE_FILL).bit6).toBe(true);
-    expect(decodePdfBits(PDF_BITS.FILL_FORMS).bit9).toBe(true);
-    expect(decodePdfBits(PDF_BITS.ACCESSIBILITY).bit10).toBe(true);
-    expect(decodePdfBits(PDF_BITS.ASSEMBLE).bit11).toBe(true);
-    expect(decodePdfBits(PDF_BITS.PRINT_HIGH).bit12).toBe(true);
+    expect(permissionFlagsOf(PDF_BITS.PRINT).print).toBe(true);
+    expect(permissionFlagsOf(PDF_BITS.MODIFY).modifyContents).toBe(true);
+    expect(permissionFlagsOf(PDF_BITS.COPY).copy).toBe(true);
+    expect(permissionFlagsOf(PDF_BITS.ANNOTATE_FILL).modifyAnnotations).toBe(true);
+    expect(permissionFlagsOf(PDF_BITS.FILL_FORMS).fillForms).toBe(true);
+    expect(permissionFlagsOf(PDF_BITS.ACCESSIBILITY).copyForAccessibility).toBe(true);
+    expect(permissionFlagsOf(PDF_BITS.ASSEMBLE).assemble).toBe(true);
+    expect(permissionFlagsOf(PDF_BITS.PRINT_HIGH).printHighQuality).toBe(true);
   });
 
   it('does not set neighbouring bits when only one mask is supplied', () => {
-    const onlyPrint = decodePdfBits(PDF_BITS.PRINT);
-    expect(onlyPrint.bit3).toBe(true);
-    expect(onlyPrint.bit4).toBe(false);
-    expect(onlyPrint.bit5).toBe(false);
-    expect(onlyPrint.bit12).toBe(false);
+    const onlyPrint = permissionFlagsOf(PDF_BITS.PRINT);
+    expect(onlyPrint.print).toBe(true);
+    expect(onlyPrint.modifyContents).toBe(false);
+    expect(onlyPrint.copy).toBe(false);
+    expect(onlyPrint.printHighQuality).toBe(false);
   });
 
   it('decodes a fully-permissive integer (all known bits set)', () => {
@@ -49,23 +49,23 @@ describe('decodePdfBits', () => {
       PDF_BITS.ACCESSIBILITY |
       PDF_BITS.ASSEMBLE |
       PDF_BITS.PRINT_HIGH;
-    const bits = decodePdfBits(all);
+    const bits = permissionFlagsOf(all);
     expect(bits).toEqual({
-      bit3: true,
-      bit4: true,
-      bit5: true,
-      bit6: true,
-      bit9: true,
-      bit10: true,
-      bit11: true,
-      bit12: true,
+      print: true,
+      modifyContents: true,
+      copy: true,
+      modifyAnnotations: true,
+      fillForms: true,
+      copyForAccessibility: true,
+      assemble: true,
+      printHighQuality: true,
     });
   });
 
   it('ignores reserved bits (1, 2, 7, 8, 13+)', () => {
     // Set bits 1, 2, 7, 8, 13 only — none of those are in our typed view.
     const reservedOnly = (1 << 0) | (1 << 1) | (1 << 6) | (1 << 7) | (1 << 12);
-    const bits = decodePdfBits(reservedOnly);
+    const bits = permissionFlagsOf(reservedOnly);
     expect(Object.values(bits).every((v) => v === false)).toBe(true);
   });
 

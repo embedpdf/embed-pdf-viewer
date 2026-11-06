@@ -10,18 +10,18 @@ import {
   parseScope,
   pluginPermissionsOf,
   PDF_BITS,
-  decodePdfBits,
+  permissionFlagsOf,
   type CollabFilter,
   type Identity,
-  type PdfBits,
+  type PdfPermissionFlags,
 } from '../../../src/auth/scope';
 
 // ============================================================================
 // Test fixtures
 // ============================================================================
 
-const NO_BITS: PdfBits = decodePdfBits(null);
-const ALL_BITS: PdfBits = decodePdfBits(
+const NO_BITS: PdfPermissionFlags = permissionFlagsOf(null);
+const ALL_BITS: PdfPermissionFlags = permissionFlagsOf(
   PDF_BITS.PRINT |
     PDF_BITS.MODIFY |
     PDF_BITS.COPY |
@@ -87,7 +87,7 @@ describe('pdf.permissions expansion — always-on capabilities', () => {
 
 describe('pdf.permissions expansion — bit-derived', () => {
   it('bit 5 grants text.select, text.copy, text.search, content.copy', () => {
-    const bits = decodePdfBits(PDF_BITS.COPY);
+    const bits = permissionFlagsOf(PDF_BITS.COPY);
     expect(checkCapability('doc.text.select', ['pdf.permissions'], bits)).toBe(true);
     expect(checkCapability('doc.text.copy', ['pdf.permissions'], bits)).toBe(true);
     expect(checkCapability('doc.text.search', ['pdf.permissions'], bits)).toBe(true);
@@ -102,61 +102,61 @@ describe('pdf.permissions expansion — bit-derived', () => {
   });
 
   it('bit 3 grants doc.print', () => {
-    const bits = decodePdfBits(PDF_BITS.PRINT);
+    const bits = permissionFlagsOf(PDF_BITS.PRINT);
     expect(checkCapability('doc.print', ['pdf.permissions'], bits)).toBe(true);
     expect(checkCapability('doc.print.high', ['pdf.permissions'], bits)).toBe(false);
   });
 
   it('bit 12 grants doc.print.high ONLY when bit 3 is also set', () => {
-    const onlyHigh = decodePdfBits(PDF_BITS.PRINT_HIGH);
+    const onlyHigh = permissionFlagsOf(PDF_BITS.PRINT_HIGH);
     expect(checkCapability('doc.print.high', ['pdf.permissions'], onlyHigh)).toBe(false);
 
-    const both = decodePdfBits(PDF_BITS.PRINT | PDF_BITS.PRINT_HIGH);
+    const both = permissionFlagsOf(PDF_BITS.PRINT | PDF_BITS.PRINT_HIGH);
     expect(checkCapability('doc.print', ['pdf.permissions'], both)).toBe(true);
     expect(checkCapability('doc.print.high', ['pdf.permissions'], both)).toBe(true);
   });
 
   it('bit 4 grants doc.pages.modify, doc.redact, and doc.metadata.modify', () => {
-    const bits = decodePdfBits(PDF_BITS.MODIFY);
+    const bits = permissionFlagsOf(PDF_BITS.MODIFY);
     expect(checkCapability('doc.pages.modify', ['pdf.permissions'], bits)).toBe(true);
     expect(checkCapability('doc.redact', ['pdf.permissions'], bits)).toBe(true);
     expect(checkCapability('doc.metadata.modify', ['pdf.permissions'], bits)).toBe(true);
   });
 
   it('bit 11 or bit 4 grants doc.pages.assemble', () => {
-    const onlyB11 = decodePdfBits(PDF_BITS.ASSEMBLE);
-    const onlyB4 = decodePdfBits(PDF_BITS.MODIFY);
+    const onlyB11 = permissionFlagsOf(PDF_BITS.ASSEMBLE);
+    const onlyB4 = permissionFlagsOf(PDF_BITS.MODIFY);
     expect(checkCapability('doc.pages.assemble', ['pdf.permissions'], onlyB11)).toBe(true);
     expect(checkCapability('doc.pages.assemble', ['pdf.permissions'], onlyB4)).toBe(true);
   });
 
   it('bit 11 or bit 4 grants doc.outline.modify: assembling includes outline items', () => {
-    const onlyB11 = decodePdfBits(PDF_BITS.ASSEMBLE);
-    const onlyB4 = decodePdfBits(PDF_BITS.MODIFY);
-    const onlyB6 = decodePdfBits(PDF_BITS.ANNOTATE_FILL);
+    const onlyB11 = permissionFlagsOf(PDF_BITS.ASSEMBLE);
+    const onlyB4 = permissionFlagsOf(PDF_BITS.MODIFY);
+    const onlyB6 = permissionFlagsOf(PDF_BITS.ANNOTATE_FILL);
     expect(checkCapability('doc.outline.modify', ['pdf.permissions'], onlyB11)).toBe(true);
     expect(checkCapability('doc.outline.modify', ['pdf.permissions'], onlyB4)).toBe(true);
     expect(checkCapability('doc.outline.modify', ['pdf.permissions'], onlyB6)).toBe(false);
   });
 
   it('bit 6 grants doc.annotate.read AND doc.annotate.modify', () => {
-    const bits = decodePdfBits(PDF_BITS.ANNOTATE_FILL);
+    const bits = permissionFlagsOf(PDF_BITS.ANNOTATE_FILL);
     expect(checkCapability('doc.annotate.read', ['pdf.permissions'], bits)).toBe(true);
     expect(checkCapability('doc.annotate.modify', ['pdf.permissions'], bits)).toBe(true);
   });
 
   it('bit 4, 6 or 9 grants doc.forms.fill and doc.sign', () => {
     for (const bit of [PDF_BITS.MODIFY, PDF_BITS.ANNOTATE_FILL, PDF_BITS.FILL_FORMS]) {
-      const bits = decodePdfBits(bit);
+      const bits = permissionFlagsOf(bit);
       expect(checkCapability('doc.forms.fill', ['pdf.permissions'], bits)).toBe(true);
       expect(checkCapability('doc.sign', ['pdf.permissions'], bits)).toBe(true);
     }
   });
 
   it('doc.forms.modify requires bit 6 AND bit 4', () => {
-    const onlyB6 = decodePdfBits(PDF_BITS.ANNOTATE_FILL);
-    const onlyB4 = decodePdfBits(PDF_BITS.MODIFY);
-    const both = decodePdfBits(PDF_BITS.ANNOTATE_FILL | PDF_BITS.MODIFY);
+    const onlyB6 = permissionFlagsOf(PDF_BITS.ANNOTATE_FILL);
+    const onlyB4 = permissionFlagsOf(PDF_BITS.MODIFY);
+    const both = permissionFlagsOf(PDF_BITS.ANNOTATE_FILL | PDF_BITS.MODIFY);
     expect(checkCapability('doc.forms.modify', ['pdf.permissions'], onlyB6)).toBe(false);
     expect(checkCapability('doc.forms.modify', ['pdf.permissions'], onlyB4)).toBe(false);
     expect(checkCapability('doc.forms.modify', ['pdf.permissions'], both)).toBe(true);
@@ -274,7 +274,7 @@ describe('expandedCapabilities — implications', () => {
   });
 
   it('pdf.permissions + bit 6 implies annotate.modify (read already unconditional)', () => {
-    const bits = decodePdfBits(PDF_BITS.ANNOTATE_FILL);
+    const bits = permissionFlagsOf(PDF_BITS.ANNOTATE_FILL);
     const set = expandRawScope(['pdf.permissions'], bits);
     expect(set.has('doc.annotate.read')).toBe(true);
     expect(set.has('doc.annotate.modify')).toBe(true);
@@ -312,7 +312,7 @@ describe('checkCollab — narrowing model', () => {
   });
 
   it('pdf.permissions bit 6 → modify → covers any target (no collab present)', () => {
-    const bits = decodePdfBits(PDF_BITS.ANNOTATE_FILL);
+    const bits = permissionFlagsOf(PDF_BITS.ANNOTATE_FILL);
     const target = { userId: 'bob', groupId: '5' };
     expect(checkCollab('delete', target, ['pdf.permissions'], ALICE, bits)).toBe(true);
   });
@@ -581,7 +581,7 @@ describe('checkSetGroup', () => {
   });
 
   it('pdf.permissions + bit 6 grants modify but NOT cross-group set-group', () => {
-    const bits = decodePdfBits(PDF_BITS.ANNOTATE_FILL);
+    const bits = permissionFlagsOf(PDF_BITS.ANNOTATE_FILL);
     expect(checkSetGroup('annotations', 'legal', 'engineering', ['pdf.permissions'])).toBe(false);
   });
 
@@ -666,7 +666,7 @@ describe('parser + resolver integration', () => {
 
 describe('plugin permissions', () => {
   const installed = new Set(['protected-display.view', 'snapshot.create']);
-  const noBits = decodePdfBits(null);
+  const noBits = permissionFlagsOf(null);
 
   it('holds the installed plugin permissions a scope names', () => {
     expect([...pluginPermissionsOf(['doc.open', 'protected-display.view'], installed)]).toEqual([

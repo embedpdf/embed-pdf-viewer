@@ -3,7 +3,7 @@ import {
   AbortablePromise,
   checkCapability,
   CONTINUOUS_RENDER_POLICY,
-  decodePdfBits,
+  permissionFlagsOf,
   EngineError,
   EngineErrorCode,
   generateUuid,
@@ -131,7 +131,7 @@ export class LocalEngine implements LocalEngineContract {
     // the file is loaded, as the cloud refuses the token at `/head`.
     // (`pdf.permissions` grants it, and an omitted scope means every one.)
     try {
-      if (options?.scope && !checkCapability('doc.open', options.scope, decodePdfBits(null))) {
+      if (options?.scope && !checkCapability('doc.open', options.scope, permissionFlagsOf(null))) {
         return AbortablePromise.rejectReason(new PermissionDenied('doc.open', 'engine-local'));
       }
     } catch (error) {

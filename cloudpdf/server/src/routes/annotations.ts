@@ -19,7 +19,7 @@ import {
   type CollabTarget,
   type DocumentManifest,
   type DocumentProtection,
-  type PdfBits,
+  type PdfPermissionFlags,
   type WorkerJobId,
   type AnnotationAppearanceExportInput,
   type AnnotationFlattenInput,
@@ -170,8 +170,12 @@ export async function registerAnnotationRoutes(
         token: string;
       };
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-      const ctx = requireLayerResource(req, docId, layerName, 'annotations-read', pdfBits);
+      const permissionFlags = await documentService.getEffectivePermissionFlags(
+        accessCtx,
+        docId,
+        layerName,
+      );
+      const ctx = requireLayerResource(req, docId, layerName, 'annotations-read', permissionFlags);
       return readAnnotations({
         documentService,
         reply,
@@ -192,8 +196,12 @@ export async function registerAnnotationRoutes(
         pageKey: string;
       };
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-      const ctx = requireLayerResource(req, docId, layerName, 'annotations-read', pdfBits);
+      const permissionFlags = await documentService.getEffectivePermissionFlags(
+        accessCtx,
+        docId,
+        layerName,
+      );
+      const ctx = requireLayerResource(req, docId, layerName, 'annotations-read', permissionFlags);
       return readAnnotations({
         documentService,
         reply,
@@ -236,8 +244,18 @@ export async function registerAnnotationRoutes(
       token: string;
     };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-    const ctx = requireLayerResource(req, docId, layerName, 'layer-annotations-all', pdfBits);
+    const permissionFlags = await documentService.getEffectivePermissionFlags(
+      accessCtx,
+      docId,
+      layerName,
+    );
+    const ctx = requireLayerResource(
+      req,
+      docId,
+      layerName,
+      'layer-annotations-all',
+      permissionFlags,
+    );
     return readAnnotationsAll({
       documentService,
       reply,
@@ -291,8 +309,18 @@ export async function registerAnnotationRoutes(
         token: string;
       };
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-      const ctx = requireLayerResource(req, docId, layerName, 'layer-annotations-export', pdfBits);
+      const permissionFlags = await documentService.getEffectivePermissionFlags(
+        accessCtx,
+        docId,
+        layerName,
+      );
+      const ctx = requireLayerResource(
+        req,
+        docId,
+        layerName,
+        'layer-annotations-export',
+        permissionFlags,
+      );
       return exportAnnotations({
         documentService,
         limits: bundleLimits,
@@ -316,8 +344,18 @@ export async function registerAnnotationRoutes(
     async (req, reply) => {
       const { docId, layerName } = req.params as { docId: string; layerName: string };
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-      const ctx = requireLayerResource(req, docId, layerName, 'layer-annotations-export', pdfBits);
+      const permissionFlags = await documentService.getEffectivePermissionFlags(
+        accessCtx,
+        docId,
+        layerName,
+      );
+      const ctx = requireLayerResource(
+        req,
+        docId,
+        layerName,
+        'layer-annotations-export',
+        permissionFlags,
+      );
       const request = parseOrInvalidArg<Omit<AnnotationsExportToken, 'pin'>>(
         AnnotationsExportRequestSchema as unknown as SchemaLike<
           Omit<AnnotationsExportToken, 'pin'>
@@ -343,8 +381,18 @@ export async function registerAnnotationRoutes(
       layerName: string;
     };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-    const ctx = requireLayerResource(req, docId, layerName, 'layer-annotations-all', pdfBits);
+    const permissionFlags = await documentService.getEffectivePermissionFlags(
+      accessCtx,
+      docId,
+      layerName,
+    );
+    const ctx = requireLayerResource(
+      req,
+      docId,
+      layerName,
+      'layer-annotations-all',
+      permissionFlags,
+    );
     return readAnnotationsAll({
       documentService,
       reply,
@@ -370,8 +418,12 @@ export async function registerAnnotationRoutes(
         token: string;
       };
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-      const ctx = requireLayerResource(req, docId, layerName, 'annotations-read', pdfBits);
+      const permissionFlags = await documentService.getEffectivePermissionFlags(
+        accessCtx,
+        docId,
+        layerName,
+      );
+      const ctx = requireLayerResource(req, docId, layerName, 'annotations-read', permissionFlags);
       return renderAppearanceBatch({
         family: 'annotations',
         documentService,
@@ -402,8 +454,12 @@ export async function registerAnnotationRoutes(
         pageKey: string;
       };
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-      const ctx = requireLayerResource(req, docId, layerName, 'annotations-read', pdfBits);
+      const permissionFlags = await documentService.getEffectivePermissionFlags(
+        accessCtx,
+        docId,
+        layerName,
+      );
+      const ctx = requireLayerResource(req, docId, layerName, 'annotations-read', permissionFlags);
       return renderAppearanceBatch({
         family: 'annotations',
         documentService,
@@ -425,7 +481,11 @@ export async function registerAnnotationRoutes(
   app.post('/v1/docs/:docId/layers/:layerName/annotations/import', async (req, reply) => {
     const { docId, layerName } = req.params as { docId: string; layerName: string };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+    const permissionFlags = await documentService.getEffectivePermissionFlags(
+      accessCtx,
+      docId,
+      layerName,
+    );
     const protection = await documentService.getProtection(accessCtx, docId, layerName);
     const limits = bundleLimits;
     const { body, resources } = await readBundleImportRequest(req, limits, {
@@ -438,13 +498,20 @@ export async function registerAnnotationRoutes(
     if (attribution === 'restore') {
       // Restoring writes attribution that isn't the caller's, groups
       // included, so it takes the capabilities instead of per-group checks.
-      requireLayerCapability(req, docId, layerName, 'doc.annotate.modify', pdfBits, protection);
+      requireLayerCapability(
+        req,
+        docId,
+        layerName,
+        'doc.annotate.modify',
+        permissionFlags,
+        protection,
+      );
       ctx = requireLayerCapability(
         req,
         docId,
         layerName,
         'doc.annotate.import',
-        pdfBits,
+        permissionFlags,
         protection,
       );
     } else {
@@ -470,7 +537,7 @@ export async function registerAnnotationRoutes(
           layerName,
           'create',
           target,
-          pdfBits,
+          permissionFlags,
           protection,
         );
       }
@@ -505,7 +572,11 @@ export async function registerAnnotationRoutes(
       };
       const pageObjectNumber = resolvePageKeyParam(pageKey);
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+      const permissionFlags = await documentService.getEffectivePermissionFlags(
+        accessCtx,
+        docId,
+        layerName,
+      );
       const protection = await documentService.getProtection(accessCtx, docId, layerName);
       const envelope = await readMutationEnvelope(req, annotationBinaryPolicy);
       // The draft, and beside its fields the files it names by role.
@@ -531,7 +602,7 @@ export async function registerAnnotationRoutes(
         layerName,
         'create',
         target,
-        pdfBits,
+        permissionFlags,
         protection,
       );
       const actor = actorFromJwt(ctx.jwt, groupId);
@@ -564,11 +635,15 @@ export async function registerAnnotationRoutes(
       };
       const pageObjectNumber = resolvePageKeyParam(pageKey);
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+      const permissionFlags = await documentService.getEffectivePermissionFlags(
+        accessCtx,
+        docId,
+        layerName,
+      );
       const protection = await documentService.getProtection(accessCtx, docId, layerName);
       // The worker checks each annotation it moves inside the write: a
       // reorder takes `doc.annotate.modify`. Widgets have their own order.
-      const ctx = requireLayerAnnotationWrite(req, docId, layerName, pdfBits, protection);
+      const ctx = requireLayerAnnotationWrite(req, docId, layerName, permissionFlags, protection);
       const { refs, position } = parseOrInvalidArg<{
         refs: AnnotationRef[];
         position: AnnotationPosition;
@@ -604,17 +679,28 @@ export async function registerAnnotationRoutes(
       };
       const pageObjectNumber = resolvePageKeyParam(pageKey);
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+      const permissionFlags = await documentService.getEffectivePermissionFlags(
+        accessCtx,
+        docId,
+        layerName,
+      );
       const protection = await documentService.getProtection(accessCtx, docId, layerName);
       const ctx = requireLayerCapability(
         req,
         docId,
         layerName,
         'doc.pages.modify',
-        pdfBits,
+        permissionFlags,
         protection,
       );
-      requireLayerCapability(req, docId, layerName, 'doc.annotate.modify', pdfBits, protection);
+      requireLayerCapability(
+        req,
+        docId,
+        layerName,
+        'doc.annotate.modify',
+        permissionFlags,
+        protection,
+      );
       const raw = (req.body ?? {}) as { refs?: unknown; usage?: unknown };
       const body = parseOrInvalidArg<AnnotationFlattenInput>(
         AnnotationFlattenInputSchema as unknown as SchemaLike<AnnotationFlattenInput>,
@@ -644,8 +730,12 @@ export async function registerAnnotationRoutes(
       };
       const pageObjectNumber = resolvePageKeyParam(pageKey);
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-      const ctx = requireLayerCapability(req, docId, layerName, 'doc.download', pdfBits);
+      const permissionFlags = await documentService.getEffectivePermissionFlags(
+        accessCtx,
+        docId,
+        layerName,
+      );
+      const ctx = requireLayerCapability(req, docId, layerName, 'doc.download', permissionFlags);
       const body = parseOrInvalidArg<AnnotationAppearanceExportInput>(
         AnnotationAppearanceExportInputSchema as unknown as SchemaLike<AnnotationAppearanceExportInput>,
         req.body,
@@ -685,8 +775,12 @@ export async function registerAnnotationRoutes(
       };
       const pageObjectNumber = resolvePageKeyParam(pageKey);
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-      const ctx = requireLayerCapability(req, docId, layerName, 'doc.download', pdfBits);
+      const permissionFlags = await documentService.getEffectivePermissionFlags(
+        accessCtx,
+        docId,
+        layerName,
+      );
+      const ctx = requireLayerCapability(req, docId, layerName, 'doc.download', permissionFlags);
       const bytes = await documentService.readAnnotationAppearance(
         ctx,
         docId,
@@ -717,7 +811,11 @@ export async function registerAnnotationRoutes(
       };
       const pageObjectNumber = resolvePageKeyParam(pageKey);
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+      const permissionFlags = await documentService.getEffectivePermissionFlags(
+        accessCtx,
+        docId,
+        layerName,
+      );
       const protection = await documentService.getProtection(accessCtx, docId, layerName);
       const envelope = await readMutationEnvelope(req, annotationBinaryPolicy);
       const body = envelope.body as Record<string, unknown> | null | undefined;
@@ -727,7 +825,7 @@ export async function registerAnnotationRoutes(
       setNoStore(reply);
       return updateAnnotation(
         req,
-        pdfBits,
+        permissionFlags,
         protection,
         {
           docId,
@@ -757,13 +855,17 @@ export async function registerAnnotationRoutes(
       };
       const pageObjectNumber = resolvePageKeyParam(pageKey);
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+      const permissionFlags = await documentService.getEffectivePermissionFlags(
+        accessCtx,
+        docId,
+        layerName,
+      );
       const protection = await documentService.getProtection(accessCtx, docId, layerName);
 
       setNoStore(reply);
       return deleteAnnotation(
         req,
-        pdfBits,
+        permissionFlags,
         protection,
         { docId, layerName, ref: refFromKey(annotKey, pageObjectNumber) },
         abortSignalOf(reply),
@@ -779,7 +881,7 @@ export async function registerAnnotationRoutes(
    */
   async function updateAnnotation(
     req: FastifyRequest,
-    pdfBits: PdfBits,
+    permissionFlags: PdfPermissionFlags,
     protection: DocumentProtection | null,
     input: {
       docId: string;
@@ -791,7 +893,7 @@ export async function registerAnnotationRoutes(
     signal: AbortSignal,
   ): Promise<AnnotationUpdateResult> {
     const { docId, layerName, ref, resources } = input;
-    const ctx = requireLayerAnnotationWrite(req, docId, layerName, pdfBits, protection);
+    const ctx = requireLayerAnnotationWrite(req, docId, layerName, permissionFlags, protection);
     const patch = parseOrInvalidArg<AnnotationPatch>(
       AnnotationPatchSchema as unknown as SchemaLike<AnnotationPatch>,
       input.patch,
@@ -818,12 +920,18 @@ export async function registerAnnotationRoutes(
    */
   async function deleteAnnotation(
     req: FastifyRequest,
-    pdfBits: PdfBits,
+    permissionFlags: PdfPermissionFlags,
     protection: DocumentProtection | null,
     input: { docId: string; layerName: string; ref: AnnotationRef },
     signal: AbortSignal,
   ): Promise<AnnotationDeleteResult> {
-    const ctx = requireLayerAnnotationWrite(req, input.docId, input.layerName, pdfBits, protection);
+    const ctx = requireLayerAnnotationWrite(
+      req,
+      input.docId,
+      input.layerName,
+      permissionFlags,
+      protection,
+    );
     return layerService.deleteAnnotation(ctx, { ...input, authority: ctx.authority }, signal);
   }
 }

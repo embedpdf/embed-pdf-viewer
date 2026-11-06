@@ -56,8 +56,8 @@ export async function registerOutlineRoutes(
       token: string;
     };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await service.getEffectivePdfBits(accessCtx, docId, layerName);
-    const ctx = requireLayerResource(req, docId, layerName, 'layer-outline', pdfBits);
+    const permissionFlags = await service.getEffectivePermissionFlags(accessCtx, docId, layerName);
+    const ctx = requireLayerResource(req, docId, layerName, 'layer-outline', permissionFlags);
     const requested = parseTokenOrInvalidArg(decodeOutlineToken, token, 'outline token');
     const body = await readAtPins({
       documentService: service,
@@ -76,8 +76,8 @@ export async function registerOutlineRoutes(
   app.get('/v1/docs/:docId/layers/:layerName/outline', async (req, reply) => {
     const { docId, layerName } = req.params as { docId: string; layerName: string };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await service.getEffectivePdfBits(accessCtx, docId, layerName);
-    const ctx = requireLayerResource(req, docId, layerName, 'layer-outline', pdfBits);
+    const permissionFlags = await service.getEffectivePermissionFlags(accessCtx, docId, layerName);
+    const ctx = requireLayerResource(req, docId, layerName, 'layer-outline', permissionFlags);
     const body = await service.readLayerOutline(ctx, docId, layerName, abortSignalOf(reply));
     setNoStore(reply);
     return body;

@@ -9,7 +9,7 @@ import { Readable } from 'node:stream';
 import {
   EngineError,
   EngineErrorCode,
-  decodePdfBits,
+  permissionFlagsOf,
   securityStateFromProbe,
   toPageRef,
   wirePack,
@@ -24,7 +24,7 @@ import {
   type DocumentSecurityProbeInfo,
   type PageListSnapshot,
   type PageRef,
-  type PdfBits,
+  type PdfPermissionFlags,
   type PdfSaveMode,
   type WorkerJobId,
   type WorkerResultPayload,
@@ -424,15 +424,15 @@ export class DocumentService {
    * anonymous probe at ingest, so it reflects either "no permissions"
    * (probe rejected by password) or restrictive user-mode bits, never
    * the actual bits the caller sees with their unlocked session. Route
-   * guards should prefer {@link getEffectivePdfBits} which consults the
+   * guards should prefer {@link getEffectivePermissionFlags} which consults the
    * active password session first.
    *
    * Kept exposed as a focused primitive for cases that genuinely want
    * the document-row state regardless of session (e.g. /head's advisory
    * display before any unlock happens).
    */
-  async getPdfBits(tenantId: string, docId: string) {
-    return this.documents.getPdfBits(docId, tenantId);
+  async getPermissionFlags(tenantId: string, docId: string) {
+    return this.documents.getPermissionFlags(docId, tenantId);
   }
 
   /**
@@ -459,15 +459,15 @@ export class DocumentService {
    * hand from `unlockLayerAccess`, which is the authoritative source
    * for the moment it just unlocked. Use that probe directly.
    */
-  async getEffectivePdfBits(
+  async getEffectivePermissionFlags(
     ctx: OpenContext,
     docId: string,
     // Default to the token's pinned layer: doc-level shared routes
     // must evaluate the claimed layer's post-unlock bits, not 'default''s.
     layerName: string = pinnedLayerName(ctx),
-  ): Promise<PdfBits> {
+  ): Promise<PdfPermissionFlags> {
     const row = await this.requireReadyRow(ctx, docId);
-    const fromRow = decodePdfBits(row.security.pdfPermissionsBits ?? null);
+    const fromRow = permissionFlagsOf(row.security.pdfPermissionsBits ?? null);
 
     // Only encrypted documents have per-caller (post-unlock) bits. This
     // includes permission-only docs (empty user password), where an owner
@@ -487,7 +487,7 @@ export class DocumentService {
     const binding = this.passwordSessionBinding(ctx, row, layerName);
     const session = await this.passwordSessions.findActive(binding);
     if (session) {
-      return decodePdfBits(session.pdfPermissionsBits);
+      return permissionFlagsOf(session.pdfPermissionsBits);
     }
     return fromRow;
   }
@@ -1390,7 +1390,7 @@ export class DocumentService {
       // no grant means "baseline". Revoke any active (owner) session so the
       // anonymous response we return matches what reads will now enforce —
       // otherwise the session would keep granting elevated bits via
-      // getEffectivePdfBits while this response claims a downgrade.
+      // getEffectivePermissionFlags while this response claims a downgrade.
       if (this.passwordSessions && ctx.jwt?.jti) {
         await this.passwordSessions.revoke(this.passwordSessionBinding(ctx, row, layerName));
       }
@@ -2661,7 +2661,10 @@ function buildHead(
   const baseSha = requireBaseSha(row);
   const permissions = {
     known: row.security.pdfPermissionsBits !== null,
-    bits: row.security.pdfPermissionsBits,
+    flags:
+      row.security.pdfPermissionsBits === null
+        ? null
+        : permissionFlagsOf(row.security.pdfPermissionsBits),
     allAllowed: row.security.pdfPermissionsAllAllowed,
     openedAs: row.security.pdfOpenedAs,
     securityHandlerRevision: row.security.securityHandlerRevision,

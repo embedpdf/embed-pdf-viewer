@@ -926,7 +926,7 @@ function fallbackUnknownHead(id: string): DocumentHead {
     encryption: { state: 'unknown', requiresPassword: null },
     permissions: {
       known: false,
-      bits: null,
+      flags: null,
       allAllowed: null,
       openedAs: null,
       securityHandlerRevision: null,

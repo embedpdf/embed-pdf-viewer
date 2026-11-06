@@ -962,9 +962,9 @@ export type {
   ParsedScope,
   ParsedVirtual,
   ParsedWildcard,
-  PdfBits,
+  PdfPermissionFlags,
 } from './auth/scope';
-export { PDF_BITS, decodePdfBits } from './auth/scope';
+export { PDF_BITS, permissionFlagsOf } from './auth/scope';
 export {
   CORE_NAMESPACES,
   isPluginId,

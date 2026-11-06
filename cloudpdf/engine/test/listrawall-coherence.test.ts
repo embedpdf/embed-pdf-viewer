@@ -95,7 +95,16 @@ function headPayload(docVersion: number) {
     encryption: { state: 'none', requiresPassword: false },
     permissions: {
       known: true,
-      bits: 0xffffffff,
+      flags: {
+        print: true,
+        modifyContents: true,
+        copy: true,
+        modifyAnnotations: true,
+        fillForms: true,
+        copyForAccessibility: true,
+        assemble: true,
+        printHighQuality: true,
+      },
       allAllowed: true,
       openedAs: 'none',
       securityHandlerRevision: null,

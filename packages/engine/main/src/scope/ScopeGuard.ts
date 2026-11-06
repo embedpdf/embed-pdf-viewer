@@ -10,7 +10,7 @@ import {
   checkSetGroup,
   type CollabAction,
   type CollabTarget,
-  decodePdfBits,
+  permissionFlagsOf,
   describeProtection,
   type DocCapability,
   type DocumentProtection,
@@ -54,7 +54,7 @@ export class ScopeGuard {
    * grants follows.
    */
   setPdfPermissions(pdfPermissionsBits: number | null): void {
-    this.ctx = { ...this.ctx, pdfBits: decodePdfBits(pdfPermissionsBits) };
+    this.ctx = { ...this.ctx, permissionFlags: permissionFlagsOf(pdfPermissionsBits) };
   }
 
   /** The signature-derived restrictions this guard subtracts (`null` when none apply). */
@@ -89,7 +89,7 @@ export class ScopeGuard {
    */
   effectiveScope(): DocCapability[] {
     return [
-      ...expandRawScope(this.ctx.scope, this.ctx.pdfBits, this.protection),
+      ...expandRawScope(this.ctx.scope, this.ctx.permissionFlags, this.protection),
     ].sort() as DocCapability[];
   }
 
@@ -100,7 +100,7 @@ export class ScopeGuard {
    * exactly what `assertCapability` would let through.
    */
   can(cap: DocCapability): boolean {
-    return checkCapability(cap, this.ctx.scope, this.ctx.pdfBits, this.protection);
+    return checkCapability(cap, this.ctx.scope, this.ctx.permissionFlags, this.protection);
   }
 
   /**
@@ -127,7 +127,7 @@ export class ScopeGuard {
    * like `/text` which the cloud gates on `doc.text.copy OR doc.text.search`).
    */
   assertAnyCapability(caps: ReadonlyArray<DocCapability>): void {
-    if (!checkAnyCapability(caps, this.ctx.scope, this.ctx.pdfBits, this.protection)) {
+    if (!checkAnyCapability(caps, this.ctx.scope, this.ctx.permissionFlags, this.protection)) {
       throw new PermissionDenied(caps[0] ?? 'doc.open', 'engine-local', caps);
     }
   }
@@ -148,7 +148,7 @@ export class ScopeGuard {
     // A declared signature constraint outranks the caller's collab
     // authority, exactly as it outranks a capability grant.
     if (protectedCapabilities(this.protection).has('doc.annotate.modify')) return false;
-    return checkCollab(action, target, this.ctx.scope, this.ctx.identity, this.ctx.pdfBits);
+    return checkCollab(action, target, this.ctx.scope, this.ctx.identity, this.ctx.permissionFlags);
   }
 
   /** Non-throwing destination-group check — see `assertSetGroup`. */
@@ -165,7 +165,7 @@ export class ScopeGuard {
   fieldRights(): FieldRights {
     return fieldRightsOf(
       this.ctx.scope,
-      this.ctx.pdfBits,
+      this.ctx.permissionFlags,
       this.protection,
       this.ctx.identity.groupId,
     );
@@ -201,7 +201,7 @@ export class ScopeGuard {
   annotationAuthority(): AnnotationAuthority {
     return {
       identity: this.ctx.identity,
-      grants: { scope: this.ctx.scope, pdfBits: this.ctx.pdfBits },
+      grants: { scope: this.ctx.scope, permissionFlags: this.ctx.permissionFlags },
     };
   }
 

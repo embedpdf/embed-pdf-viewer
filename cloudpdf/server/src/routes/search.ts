@@ -106,13 +106,17 @@ async function runSearchSlice(
   const { documentService } = deps;
   const { docId, layerName } = req.params as { docId: string; layerName: string };
   const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-  const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+  const permissionFlags = await documentService.getEffectivePermissionFlags(
+    accessCtx,
+    docId,
+    layerName,
+  );
   const ctx: OpenContext = requireLayerResource(
     req,
     docId,
     layerName,
     RESOURCE_BY_TIER[tier],
-    pdfBits,
+    permissionFlags,
   );
 
   const manifest = await documentService.getLayerManifest(ctx, docId, layerName);

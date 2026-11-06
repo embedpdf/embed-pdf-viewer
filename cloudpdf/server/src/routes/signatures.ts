@@ -89,7 +89,7 @@ export async function registerSignatureRoutes(
     accessCtx: ReturnType<typeof requireLayerDocAccessOnly>,
     docId: string,
     layerName: string,
-  ) => service.getEffectivePdfBits(accessCtx, docId, layerName);
+  ) => service.getEffectivePermissionFlags(accessCtx, docId, layerName);
 
   const readSignatures = (
     ctx: OpenContext,
@@ -119,8 +119,8 @@ export async function registerSignatureRoutes(
     };
     rejectQueryParamsOnTokenUrl(req.query);
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
-    const ctx = requireLayerResource(req, docId, layerName, 'layer-signatures', pdfBits);
+    const permissionFlags = await bitsForLayer(accessCtx, docId, layerName);
+    const ctx = requireLayerResource(req, docId, layerName, 'layer-signatures', permissionFlags);
     const requested = parseTokenOrInvalidArg(decodeDocToken, token, 'docVersion token');
     const snapshot = await readAtPins({
       documentService: service,
@@ -145,8 +145,8 @@ export async function registerSignatureRoutes(
   app.get('/v1/docs/:docId/layers/:layerName/signatures', async (req, reply) => {
     const { docId, layerName } = req.params as { docId: string; layerName: string };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
-    const ctx = requireLayerResource(req, docId, layerName, 'layer-signatures', pdfBits);
+    const permissionFlags = await bitsForLayer(accessCtx, docId, layerName);
+    const ctx = requireLayerResource(req, docId, layerName, 'layer-signatures', permissionFlags);
     setNoStore(reply);
     return readSignatures(ctx, docId, layerName, abortSignalOf(reply));
   });
@@ -159,8 +159,14 @@ export async function registerSignatureRoutes(
     };
     rejectQueryParamsOnTokenUrl(req.query);
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
-    const ctx = requireLayerResource(req, docId, layerName, 'layer-signatures-analysis', pdfBits);
+    const permissionFlags = await bitsForLayer(accessCtx, docId, layerName);
+    const ctx = requireLayerResource(
+      req,
+      docId,
+      layerName,
+      'layer-signatures-analysis',
+      permissionFlags,
+    );
     const requested = parseTokenOrInvalidArg(decodeAnalysisToken, token, 'analysis token');
     requireServedPolicy(reply, requested.policyVersion);
     const input: AnalyzeInput = {
@@ -195,8 +201,14 @@ export async function registerSignatureRoutes(
   app.get('/v1/docs/:docId/layers/:layerName/signatures/analysis', async (req, reply) => {
     const { docId, layerName } = req.params as { docId: string; layerName: string };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
-    const ctx = requireLayerResource(req, docId, layerName, 'layer-signatures-analysis', pdfBits);
+    const permissionFlags = await bitsForLayer(accessCtx, docId, layerName);
+    const ctx = requireLayerResource(
+      req,
+      docId,
+      layerName,
+      'layer-signatures-analysis',
+      permissionFlags,
+    );
     const query = parseOrInvalidArg(
       LayerAnalysisQuerySchema as unknown as SchemaLike<
         ReturnType<typeof LayerAnalysisQuerySchema.parse>
@@ -219,9 +231,9 @@ export async function registerSignatureRoutes(
   app.post('/v1/docs/:docId/layers/:layerName/signatures/prepare', async (req, reply) => {
     const { docId, layerName } = req.params as { docId: string; layerName: string };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
+    const permissionFlags = await bitsForLayer(accessCtx, docId, layerName);
     // Whether this field is the token's to sign (its group) is checked in the worker.
-    const ctx = requireLayerFieldWrite(req, docId, layerName, 'sign', pdfBits, null);
+    const ctx = requireLayerFieldWrite(req, docId, layerName, 'sign', permissionFlags, null);
     // Appearance artwork is a page of a PDF: the stamp rule (sniffed, never declared).
     const envelope = await readMutationEnvelope(req, () => 'image-or-pdf');
     const parsed = parseOrInvalidArg(
@@ -232,7 +244,7 @@ export async function registerSignatureRoutes(
       'request body',
     );
     if (parsed.certify) {
-      requireLayerCapability(req, docId, layerName, 'doc.sign.certify', pdfBits);
+      requireLayerCapability(req, docId, layerName, 'doc.sign.certify', permissionFlags);
     }
     const { resources: named, ...rest } = parsed;
     const input: SignaturePrepareInput = { ...rest };
@@ -261,10 +273,10 @@ export async function registerSignatureRoutes(
         signingId: string;
       };
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
+      const permissionFlags = await bitsForLayer(accessCtx, docId, layerName);
       // Its field was checked when the signing was prepared; the signing id
       // goes only to whoever prepared it.
-      const ctx = requireLayerFieldWrite(req, docId, layerName, 'sign', pdfBits, null);
+      const ctx = requireLayerFieldWrite(req, docId, layerName, 'sign', permissionFlags, null);
       const body = parseOrInvalidArg(
         SignatureCompleteBodySchema as unknown as SchemaLike<
           ReturnType<typeof SignatureCompleteBodySchema.parse>
@@ -294,8 +306,8 @@ export async function registerSignatureRoutes(
       signingId: string;
     };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
-    const ctx = requireLayerFieldWrite(req, docId, layerName, 'sign', pdfBits, null);
+    const permissionFlags = await bitsForLayer(accessCtx, docId, layerName);
+    const ctx = requireLayerFieldWrite(req, docId, layerName, 'sign', permissionFlags, null);
     setNoStore(reply);
     return layerService.cancelSignature(ctx, { docId, layerName, signingId });
   });
@@ -312,8 +324,8 @@ export async function registerSignatureRoutes(
     resource: Parameters<typeof requireLayerResource>[3],
   ) => {
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
-    return requireLayerResource(req, docId, layerName, resource, pdfBits);
+    const permissionFlags = await bitsForLayer(accessCtx, docId, layerName);
+    return requireLayerResource(req, docId, layerName, resource, permissionFlags);
   };
 
   app.get('/v1/docs/:docId/layers/:layerName/versions', async (req, reply) => {

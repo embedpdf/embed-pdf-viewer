@@ -15,7 +15,7 @@ function state(overrides: Partial<DocumentSecurityState> = {}): DocumentSecurity
     encryption: { state: 'none', requiresPassword: false, ...(overrides.encryption ?? {}) },
     permissions: {
       known: true,
-      bits: null,
+      flags: null,
       allAllowed: true,
       openedAs: 'none',
       securityHandlerRevision: null,
