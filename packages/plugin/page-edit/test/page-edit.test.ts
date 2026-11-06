@@ -326,7 +326,7 @@ describe('PageEditCapability', () => {
       void pageEdit.insertBlank({ position: { after: toPageRef(10) } });
       expect(ctx.document()!.pages.map((page) => page.ref.objectNumber)).toEqual([10, 101, 20, 30]);
       expect(ctx.getPage(toPageRef(101))!.size).toEqual({ width: 100, height: 200 });
-      expect(ctx.document()!.pendingPages.get(101)).toEqual({ look: 'blank' });
+      expect(ctx.document()!.pendingPages.get(101)).toEqual({ kind: 'blank' });
       expect(ctx.changes.listPending()[0]!.undo).toEqual([
         { type: 'pages.delete', pages: [toPageRef(101)] },
       ]);
@@ -372,7 +372,7 @@ describe('PageEditCapability', () => {
         10, 20, 101, 102, 30,
       ]);
       expect(ctx.getPage(toPageRef(101))!.rotation).toBe(90);
-      expect(ctx.document()!.pendingPages.get(102)).toEqual({ look: 'copy', of: toPageRef(20) });
+      expect(ctx.document()!.pendingPages.get(102)).toEqual({ kind: 'copy', of: toPageRef(20) });
       expect(ctx.changes.listPending()[1]!.undo).toEqual([
         { type: 'pages.delete', pages: [toPageRef(101), toPageRef(102)] },
       ]);
