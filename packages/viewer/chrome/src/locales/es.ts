@@ -503,7 +503,11 @@ export const es: Locale = {
       lineStart: 'Inicio',
       lineEnd: 'Fin',
       empty: 'Elige una herramienta de dibujo o selecciona una anotación para editar su estilo.',
-      selected: 'Seleccionadas: {count}',
+      selected: {
+        one: '{count} seleccionada',
+        many: '{count} seleccionadas',
+        other: '{count} seleccionadas',
+      },
       toolDefaults: 'Valores predeterminados: {tool}',
       defaults: 'Valores predeterminados',
       fontGroups: {
@@ -535,8 +539,7 @@ export const es: Locale = {
       dropHint: 'O suelte archivos aquí',
       adding: 'Agregando…',
       onPage: 'Página {page}',
-      count: '{count} archivo',
-      countPlural: '{count} archivos',
+      count: { one: '{count} archivo', many: '{count} de archivos', other: '{count} archivos' },
     },
     outline: {
       filter: 'Filtrar esquema',
@@ -591,8 +594,11 @@ export const es: Locale = {
       emptyReadOnly: 'Este documento no tiene comentarios.',
       anonymous: 'Desconocido',
       page: 'Página {page}',
-      count: '{count} comentario',
-      countPlural: '{count} comentarios',
+      count: {
+        one: '{count} comentario',
+        many: '{count} de comentarios',
+        other: '{count} comentarios',
+      },
       reply: 'Responder',
       replyPlaceholder: 'Responder…',
       addPlaceholder: 'Añadir un comentario…',
@@ -619,7 +625,11 @@ export const es: Locale = {
       searchWholeWord: 'Palabra completa',
       searchRegex: 'Expresión regular',
       searchSearching: 'Buscando…',
-      searchResults: '{count} resultados encontrados',
+      searchResults: {
+        one: '{count} resultado encontrado',
+        many: '{count} de resultados encontrados',
+        other: '{count} resultados encontrados',
+      },
       searchNoResults: 'Sin resultados',
       searchPrevious: 'Resultado anterior',
       searchNext: 'Resultado siguiente',
@@ -636,9 +646,17 @@ export const es: Locale = {
       redactionText: 'Marca de texto',
       redactionRemove: 'Quitar marca',
       redactConfirmTitle: '¿Aplicar censuras?',
-      redactConfirmBody:
-        'Eliminar permanentemente el contenido bajo {count} marcas de censura. No se puede deshacer.',
-      redactConfirmCollateral: 'También se eliminarán {count} otras anotaciones.',
+      redactConfirmBody: {
+        one: 'Eliminar permanentemente el contenido bajo {count} marca de censura. No se puede deshacer.',
+        many: 'Eliminar permanentemente el contenido bajo {count} de marcas de censura. No se puede deshacer.',
+        other:
+          'Eliminar permanentemente el contenido bajo {count} marcas de censura. No se puede deshacer.',
+      },
+      redactConfirmCollateral: {
+        one: 'También se eliminará {count} otra anotación.',
+        many: 'También se eliminarán {count} de otras anotaciones.',
+        other: 'También se eliminarán {count} otras anotaciones.',
+      },
       redactApply: 'Aplicar',
       redactApplying: 'Aplicando…',
       formatLabel: 'Formato',

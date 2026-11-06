@@ -10,9 +10,7 @@ export function AttachmentsCount() {
   const { files } = useAttachmentState();
   return (
     <span className="text-fg-muted whitespace-nowrap text-xs">
-      {t(files.length === 1 ? 'attachments.count' : 'attachments.countPlural', {
-        params: { count: String(files.length) },
-      })}
+      {t('attachments.count', { params: { count: files.length } })}
     </span>
   );
 }

@@ -504,7 +504,11 @@ export const pt: Locale = {
       lineEnd: 'Fim',
       empty:
         'Escolha uma ferramenta de desenho ou selecione uma anotação para editar o estilo dela.',
-      selected: 'Selecionados: {count}',
+      selected: {
+        one: '{count} selecionada',
+        many: '{count} selecionadas',
+        other: '{count} selecionadas',
+      },
       toolDefaults: 'Padrões de {tool}',
       defaults: 'Padrões',
       fontGroups: {
@@ -536,8 +540,7 @@ export const pt: Locale = {
       dropHint: 'Ou solte arquivos aqui',
       adding: 'Adicionando…',
       onPage: 'Página {page}',
-      count: '{count} arquivo',
-      countPlural: '{count} arquivos',
+      count: { one: '{count} arquivo', many: '{count} de arquivos', other: '{count} arquivos' },
     },
     outline: {
       filter: 'Filtrar marcadores',
@@ -593,8 +596,11 @@ export const pt: Locale = {
       emptyReadOnly: 'Nenhum comentário neste documento.',
       anonymous: 'Desconhecido',
       page: 'Página {page}',
-      count: '{count} comentário',
-      countPlural: '{count} comentários',
+      count: {
+        one: '{count} comentário',
+        many: '{count} de comentários',
+        other: '{count} comentários',
+      },
       reply: 'Responder',
       replyPlaceholder: 'Responder…',
       addPlaceholder: 'Adicionar um comentário…',
@@ -621,7 +627,11 @@ export const pt: Locale = {
       searchWholeWord: 'Palavra inteira',
       searchRegex: 'Expressão regular',
       searchSearching: 'Pesquisando…',
-      searchResults: '{count} resultados encontrados',
+      searchResults: {
+        one: '{count} resultado encontrado',
+        many: '{count} de resultados encontrados',
+        other: '{count} resultados encontrados',
+      },
       searchNoResults: 'Nenhum resultado',
       searchPrevious: 'Resultado anterior',
       searchNext: 'Próximo resultado',
@@ -637,9 +647,17 @@ export const pt: Locale = {
       redactionText: 'Marcação de texto',
       redactionRemove: 'Remover marcação',
       redactConfirmTitle: 'Aplicar tarjas?',
-      redactConfirmBody:
-        'Remover permanentemente o conteúdo sob {count} marcações de tarja. Esta ação não pode ser desfeita.',
-      redactConfirmCollateral: '{count} outras anotações também serão removidas.',
+      redactConfirmBody: {
+        one: 'Remover permanentemente o conteúdo sob {count} marcação de tarja. Esta ação não pode ser desfeita.',
+        many: 'Remover permanentemente o conteúdo sob {count} de marcações de tarja. Esta ação não pode ser desfeita.',
+        other:
+          'Remover permanentemente o conteúdo sob {count} marcações de tarja. Esta ação não pode ser desfeita.',
+      },
+      redactConfirmCollateral: {
+        one: '{count} outra anotação também será removida.',
+        many: '{count} de outras anotações também serão removidas.',
+        other: '{count} outras anotações também serão removidas.',
+      },
       redactApply: 'Aplicar',
       redactApplying: 'Aplicando…',
       formatLabel: 'Formato',

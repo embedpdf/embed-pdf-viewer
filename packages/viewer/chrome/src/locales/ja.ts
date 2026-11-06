@@ -503,7 +503,7 @@ export const ja: Locale = {
       lineStart: '始点',
       lineEnd: '終点',
       empty: 'スタイルを編集するには、描画ツールを選ぶか注釈を選択してください。',
-      selected: '{count} 件を選択中',
+      selected: { other: '{count} 件を選択中' },
       toolDefaults: '{tool}のデフォルト',
       defaults: 'デフォルト',
       fontGroups: {
@@ -535,8 +535,7 @@ export const ja: Locale = {
       dropHint: 'またはここにファイルをドロップ',
       adding: '追加中…',
       onPage: '{page} ページ',
-      count: '{count} 個のファイル',
-      countPlural: '{count} 個のファイル',
+      count: { other: '{count} 個のファイル' },
     },
     outline: {
       filter: 'しおりを絞り込む',
@@ -592,8 +591,7 @@ export const ja: Locale = {
       emptyReadOnly: 'この文書にはコメントがありません。',
       anonymous: '不明',
       page: '{page} ページ',
-      count: 'コメント {count} 件',
-      countPlural: 'コメント {count} 件',
+      count: { other: 'コメント {count} 件' },
       reply: '返信',
       replyPlaceholder: '返信…',
       addPlaceholder: 'コメントを追加…',
@@ -620,7 +618,7 @@ export const ja: Locale = {
       searchWholeWord: '単語単位',
       searchRegex: '正規表現',
       searchSearching: '検索中…',
-      searchResults: '{count} 件の結果が見つかりました',
+      searchResults: { other: '{count} 件の結果が見つかりました' },
       searchNoResults: '結果なし',
       searchPrevious: '前の結果',
       searchNext: '次の結果',
@@ -637,9 +635,11 @@ export const ja: Locale = {
       redactionText: 'テキストのマーク',
       redactionRemove: 'マークを削除',
       redactConfirmTitle: '墨消しを適用しますか？',
-      redactConfirmBody:
-        '{count} 個の墨消しマークの下にあるコンテンツを完全に削除します。この操作は取り消せません。',
-      redactConfirmCollateral: 'ほかに {count} 個の注釈も削除されます。',
+      redactConfirmBody: {
+        other:
+          '{count} 個の墨消しマークの下にあるコンテンツを完全に削除します。この操作は取り消せません。',
+      },
+      redactConfirmCollateral: { other: 'ほかに {count} 個の注釈も削除されます。' },
       redactApply: '適用',
       redactApplying: '適用中…',
       formatLabel: '書式',

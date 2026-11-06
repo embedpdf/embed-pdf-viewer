@@ -506,7 +506,11 @@ export const fr: Locale = {
       lineEnd: 'Fin',
       empty:
         'Choisissez un outil de dessin ou sélectionnez une annotation pour modifier son style.',
-      selected: 'Sélection : {count}',
+      selected: {
+        one: '{count} sélectionnée',
+        many: '{count} sélectionnées',
+        other: '{count} sélectionnées',
+      },
       toolDefaults: 'Valeurs par défaut : {tool}',
       defaults: 'Valeurs par défaut',
       fontGroups: {
@@ -538,8 +542,7 @@ export const fr: Locale = {
       dropHint: 'Ou déposez des fichiers ici',
       adding: 'Ajout…',
       onPage: 'Page {page}',
-      count: '{count} fichier',
-      countPlural: '{count} fichiers',
+      count: { one: '{count} fichier', many: '{count} de fichiers', other: '{count} fichiers' },
     },
     outline: {
       filter: 'Filtrer les signets',
@@ -595,8 +598,11 @@ export const fr: Locale = {
       emptyReadOnly: 'Aucun commentaire dans ce document.',
       anonymous: 'Inconnu',
       page: 'Page {page}',
-      count: '{count} commentaire',
-      countPlural: '{count} commentaires',
+      count: {
+        one: '{count} commentaire',
+        many: '{count} de commentaires',
+        other: '{count} commentaires',
+      },
       reply: 'Répondre',
       replyPlaceholder: 'Répondre…',
       addPlaceholder: 'Ajouter un commentaire…',
@@ -623,7 +629,11 @@ export const fr: Locale = {
       searchWholeWord: 'Mot entier',
       searchRegex: 'Expression régulière',
       searchSearching: 'Recherche en cours…',
-      searchResults: 'Résultats trouvés : {count}',
+      searchResults: {
+        one: '{count} résultat trouvé',
+        many: '{count} de résultats trouvés',
+        other: '{count} résultats trouvés',
+      },
       searchNoResults: 'Aucun résultat',
       searchPrevious: 'Résultat précédent',
       searchNext: 'Résultat suivant',
@@ -640,9 +650,17 @@ export const fr: Locale = {
       redactionText: 'Marque de texte',
       redactionRemove: 'Supprimer la marque',
       redactConfirmTitle: 'Appliquer les biffages ?',
-      redactConfirmBody:
-        'Supprimer définitivement le contenu situé sous les marques de biffage ({count}). Cette opération est irréversible.',
-      redactConfirmCollateral: 'Autres annotations également supprimées : {count}.',
+      redactConfirmBody: {
+        one: 'Supprimer définitivement le contenu situé sous {count} marque de biffage. Cette opération est irréversible.',
+        many: 'Supprimer définitivement le contenu situé sous {count} de marques de biffage. Cette opération est irréversible.',
+        other:
+          'Supprimer définitivement le contenu situé sous {count} marques de biffage. Cette opération est irréversible.',
+      },
+      redactConfirmCollateral: {
+        one: '{count} autre annotation sera également supprimée.',
+        many: '{count} d’autres annotations seront également supprimées.',
+        other: '{count} autres annotations seront également supprimées.',
+      },
       redactApply: 'Appliquer',
       redactApplying: 'Application…',
       formatLabel: 'Format',

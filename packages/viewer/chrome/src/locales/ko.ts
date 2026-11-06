@@ -502,7 +502,7 @@ export const ko: Locale = {
       lineStart: '시작',
       lineEnd: '끝',
       empty: '그리기 도구를 고르거나 주석을 선택하여 스타일을 편집하십시오.',
-      selected: '{count}개 선택됨',
+      selected: { other: '{count}개 선택됨' },
       toolDefaults: '{tool} 기본값',
       defaults: '기본값',
       fontGroups: {
@@ -534,8 +534,7 @@ export const ko: Locale = {
       dropHint: '또는 여기에 파일을 놓으세요',
       adding: '추가 중…',
       onPage: '{page}페이지',
-      count: '파일 {count}개',
-      countPlural: '파일 {count}개',
+      count: { other: '파일 {count}개' },
     },
     outline: {
       filter: '책갈피 필터',
@@ -591,8 +590,7 @@ export const ko: Locale = {
       emptyReadOnly: '이 문서에는 댓글이 없습니다.',
       anonymous: '알 수 없음',
       page: '{page}페이지',
-      count: '댓글 {count}개',
-      countPlural: '댓글 {count}개',
+      count: { other: '댓글 {count}개' },
       reply: '답글',
       replyPlaceholder: '답글…',
       addPlaceholder: '댓글 추가…',
@@ -619,7 +617,7 @@ export const ko: Locale = {
       searchWholeWord: '전체 단어만',
       searchRegex: '정규식',
       searchSearching: '검색 중…',
-      searchResults: '{count}개의 결과를 찾았습니다',
+      searchResults: { other: '{count}개의 결과를 찾았습니다' },
       searchNoResults: '결과 없음',
       searchPrevious: '이전 결과',
       searchNext: '다음 결과',
@@ -636,9 +634,11 @@ export const ko: Locale = {
       redactionText: '텍스트 표시',
       redactionRemove: '표시 제거',
       redactConfirmTitle: '교정을 적용하시겠습니까?',
-      redactConfirmBody:
-        '교정 표시 {count}개 아래의 콘텐츠를 영구적으로 제거합니다. 이 작업은 실행 취소할 수 없습니다.',
-      redactConfirmCollateral: '다른 주석 {count}개도 제거됩니다.',
+      redactConfirmBody: {
+        other:
+          '교정 표시 {count}개 아래의 콘텐츠를 영구적으로 제거합니다. 이 작업은 실행 취소할 수 없습니다.',
+      },
+      redactConfirmCollateral: { other: '다른 주석 {count}개도 제거됩니다.' },
       redactApply: '적용',
       redactApplying: '적용 중…',
       formatLabel: '형식',

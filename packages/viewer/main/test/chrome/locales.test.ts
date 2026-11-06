@@ -1,6 +1,6 @@
 /**
  * The viewer's languages: every pack has exactly the English pack's keys, with the same `{name}`
- * slots in each string; the English pack names the style panel's properties and options as the
+ * slots in each string, and each count's plural forms as its language has them; the English pack names the style panel's properties and options as the
  * annotation kinds do; Arabic and Hebrew read right to left; readers of Traditional Chinese get
  * the Traditional pack, never Simplified; and the app's `strings` change a language, or add one
  * that reads the way its code says. The keys the Translations page names are the English pack's.
@@ -35,6 +35,29 @@ function stringsOf(dictionary: TranslationDictionary, prefix = ''): Map<string, 
 /** The `{name}` slots of a string, sorted. */
 const slotsOf = (text: string): string[] =>
   [...text.matchAll(/\{(\w+)\}/g)].map((match) => match[1]!).sort();
+
+const PLURAL_FORMS = new Set(['zero', 'one', 'two', 'few', 'many', 'other']);
+
+/** Whether a branch is a count's plural forms: only plural form names, `other` among them. */
+const isPlural = (branch: TranslationDictionary): boolean =>
+  'other' in branch && Object.keys(branch).every((key) => PLURAL_FORMS.has(key));
+
+/** Every string of a dictionary by its dotted key, a count's plural forms as one entry. */
+function entriesOf(
+  dictionary: TranslationDictionary,
+  prefix = '',
+): Map<string, string | TranslationDictionary> {
+  const entries = new Map<string, string | TranslationDictionary>();
+  for (const [key, value] of Object.entries(dictionary)) {
+    if (typeof value === 'string' || isPlural(value)) entries.set(`${prefix}${key}`, value);
+    else for (const entry of entriesOf(value, `${prefix}${key}.`)) entries.set(...entry);
+  }
+  return entries;
+}
+
+/** The plural forms a language has, as `Intl.PluralRules` says: `one` and `other` in English. */
+const pluralFormsOf = (code: string): string[] =>
+  [...new Intl.PluralRules(code).resolvedOptions().pluralCategories].sort();
 
 /** The fifteen languages the Translations page lists. */
 const LANGUAGES = [
@@ -72,24 +95,71 @@ describe('the language packs', () => {
   });
 
   it('each have exactly the English keys, with the same slots in every string', async () => {
-    const english = stringsOf(en.translations);
+    const english = entriesOf(en.translations);
     for (const pack of await packs()) {
-      const strings = stringsOf(pack.translations);
-      expect({ code: pack.code, keys: [...strings.keys()].sort() }).toEqual({
-        code: pack.code,
+      const { code } = pack;
+      const entries = entriesOf(pack.translations);
+      expect({ code, keys: [...entries.keys()].sort() }).toEqual({
+        code,
         keys: [...english.keys()].sort(),
       });
-      for (const [key, text] of strings) {
-        expect({ code: pack.code, key, slots: slotsOf(text) }).toEqual({
-          code: pack.code,
+      for (const [key, value] of entries) {
+        const source = english.get(key)!;
+        const kind = (entry: string | TranslationDictionary) =>
+          typeof entry === 'string' ? 'a string' : 'plural forms';
+        expect({ code, key, kind: kind(value) }).toEqual({ code, key, kind: kind(source) });
+        if (typeof value === 'string' && typeof source === 'string') {
+          expect({ code, key, slots: slotsOf(value) }).toEqual({
+            code,
+            key,
+            slots: slotsOf(source),
+          });
+          expect({ code, key, empty: value.trim() === '' }).toEqual({ code, key, empty: false });
+        }
+      }
+    }
+  });
+
+  it("give each count the plural forms of their language, `other` with English's slots", async () => {
+    const english = entriesOf(en.translations);
+    const plurals = [...english].filter(
+      (entry): entry is [string, TranslationDictionary] => typeof entry[1] !== 'string',
+    );
+    expect(plurals.map(([key]) => key).sort()).toEqual([
+      'attachments.count',
+      'comments.count',
+      'demo.redactConfirmBody',
+      'demo.redactConfirmCollateral',
+      'demo.searchResults',
+      'stylePanel.selected',
+    ]);
+    for (const pack of await packs()) {
+      const { code } = pack;
+      const entries = entriesOf(pack.translations);
+      for (const [key, source] of plurals) {
+        const forms = entries.get(key) as Readonly<Record<string, string>>;
+        const slots = slotsOf(source['other'] as string);
+        expect({ code, key, forms: Object.keys(forms).sort() }).toEqual({
+          code,
           key,
-          slots: slotsOf(english.get(key)!),
+          forms: pluralFormsOf(code),
         });
-        expect({ code: pack.code, key, empty: text.trim() === '' }).toEqual({
-          code: pack.code,
-          key,
-          empty: false,
-        });
+        // `other` says the number; a form for one or two may say it in words instead.
+        expect({ code, key, other: slotsOf(forms['other']!) }).toEqual({ code, key, other: slots });
+        for (const [form, text] of Object.entries(forms)) {
+          expect({
+            code,
+            key,
+            form,
+            extra: slotsOf(text).filter((s) => !slots.includes(s)),
+          }).toEqual({ code, key, form, extra: [] });
+          expect({ code, key, form, empty: text.trim() === '' }).toEqual({
+            code,
+            key,
+            form,
+            empty: false,
+          });
+        }
       }
     }
   });
