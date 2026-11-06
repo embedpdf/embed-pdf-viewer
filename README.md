@@ -8,35 +8,105 @@
   <!-- Badges -->
 
 <a href="https://github.com/embedpdf/embed-pdf-viewer/blob/main/LICENSE"><img alt="License: Apache 2.0" src="https://img.shields.io/badge/license-Apache%202.0-blue.svg?style=for-the-badge&labelColor=000000"></a>
-<a href="https://snippet.embedpdf.com/"><img alt="Live demo" src="https://img.shields.io/badge/Try%20the%20Live%20Demo-ff1493.svg?style=for-the-badge&labelColor=000000"></a>
+<a href="https://www.npmjs.com/package/@embedpdf/viewer"><img alt="npm" src="https://img.shields.io/npm/v/@embedpdf/viewer?style=for-the-badge&labelColor=000000"></a>
+<a href="https://www.embedpdf.com/demo"><img alt="Live demo" src="https://img.shields.io/badge/Try%20the%20Live%20Demo-ff1493.svg?style=for-the-badge&labelColor=000000"></a>
 <a href="https://discord.gg/mHHABmmuVU"><img alt="Join our Discord" src="https://img.shields.io/discord/1351694551047475313?logo=discord&style=for-the-badge&labelColor=000000"></a>
 
 </div>
 
-> [!WARNING]
-> **EmbedPDF v3 is under active development and is not yet recommended for production use.** For the current stable release, use the [`v2` branch](https://github.com/embedpdf/embed-pdf-viewer/tree/v2).
+# Open-source PDF viewer for JavaScript
 
-# Open‑Source JavaScript PDF Viewer
+EmbedPDF is a PDF viewer you add to any web app, in plain HTML, React, Vue, Svelte or Angular.
+People read, annotate, fill in, sign and redact PDFs right in the browser, on a PDF engine built
+on PDFium that runs as WebAssembly. Apache-2.0 licensed.
 
-**EmbedPDF** is a framework‑agnostic, Apache‑2.0‑licensed PDF viewer that drops into _any_ JavaScript project. Whether you build with **React, Vue, Svelte, Preact,** or vanilla JS, EmbedPDF delivers a smooth, modern reading experience and a clean developer API.
+- **Docs:** [www.embedpdf.com/docs](https://www.embedpdf.com/docs)
+- **Live demo:** [www.embedpdf.com/demo](https://www.embedpdf.com/demo)
 
----
+## Three ways to use it
 
-## 📚 Documentation
+|                         | What it is                                                                                 | Start here                                                              |
+| :---------------------- | :----------------------------------------------------------------------------------------- | :---------------------------------------------------------------------- |
+| **Viewer**              | A complete viewer, toolbar and panels included: one tag, made yours with plain config      | [Quick start](https://www.embedpdf.com/docs/viewer/vanilla/quick-start) |
+| **Headless components** | The same plugins without the UI, to build your own viewer in React, Vue, Svelte or Angular | [Headless](https://www.embedpdf.com/docs/headless/react)                |
+| **Engine**              | Open, read, change and render PDFs from your own code, in the browser or in Node           | [Engine](https://www.embedpdf.com/docs/engine/quick-start)              |
 
-Full docs, installation guides, API reference, and examples:
+## Quick start
 
-👉 **[https://www.embedpdf.com](https://www.embedpdf.com)**
+In plain HTML, from a CDN:
 
-## 🚀 Live Demo
+```html
+<embedpdf-viewer src="/report.pdf" style="height: 100vh"></embedpdf-viewer>
 
-Try it now — load your own PDF or use the sample:
+<script
+  type="module"
+  src="https://cdn.jsdelivr.net/npm/@embedpdf/viewer@3/dist/embedpdf.js"
+></script>
+```
 
-👉 **[https://app.embedpdf.com](https://app.embedpdf.com)**
+In React:
 
----
+```sh
+npm install @embedpdf/viewer-react
+```
 
-## 💖 Sponsors
+```tsx
+import { PDFViewer } from '@embedpdf/viewer-react';
+
+export function App() {
+  return <PDFViewer src="/report.pdf" style={{ height: '100vh' }} />;
+}
+```
+
+Vue, Svelte and Angular work the same way, with `@embedpdf/viewer-vue`, `@embedpdf/viewer-svelte`
+and `@embedpdf/viewer-angular`. The [Quick start](https://www.embedpdf.com/docs/viewer/vanilla/quick-start)
+then shows how to use your colors, leave features out and add your own buttons.
+
+## Features
+
+Every feature is on from the start, and each one can be turned off:
+
+- **Annotations:** highlight, underline and strike out text; draw; notes, text boxes and callouts;
+  shapes; stamps; comments with replies.
+- **Forms and signatures:** fill in forms and build them; draw, type or upload a signature, sign
+  fields, and check signatures.
+- **Redaction:** mark text and areas, then remove them from the file for good.
+- **Measurement:** distances, perimeters and areas at the drawing's scale.
+- **Pages:** rotate, move, insert, duplicate and delete pages, each step undoable.
+- **Reading:** search, text selection, thumbnails, the outline, attachments, snapshots, printing,
+  downloading, and several documents in tabs.
+- **Any language:** Hebrew and Arabic work with no setup, right to left, and other scripts with a
+  font of your own.
+
+Each feature is a plugin. The headless packages let you take only the ones you need.
+
+## EmbedPDF and CloudPDF
+
+EmbedPDF is made by [CloudPDF](https://www.cloudpdf.com). Both are the same viewer, added to your
+app as a package. What differs is the engine behind it:
+
+|                  | EmbedPDF                                        | CloudPDF                                                 |
+| :--------------- | :---------------------------------------------- | :------------------------------------------------------- |
+| **The engine**   | Local: runs in the browser, as WebAssembly      | Cloud: runs on a CloudPDF server                         |
+| **The PDF**      | Opened on the user's computer                   | Stays on the server; the viewer gets the pages it shows  |
+| **The packages** | `@embedpdf/viewer`, `@embedpdf/viewer-react`, … | `@cloudpdf/viewer`, `@cloudpdf/viewer-react`, …          |
+| **License**      | Open source                                     | Open source, except the server (see [License](#license)) |
+
+Keeping the file on a server is what CloudPDF adds:
+
+- **Access control.** Your backend gives each user a short-lived token for one document, saying
+  what they may do: view, annotate, fill in, sign or download. The server checks every call
+  against it. Someone who may only view never receives the file, only its pages.
+- **Collaboration.** Annotations and comments are saved on the server as people make them, and
+  everyone with the document open sees each other's changes live, with who made them.
+- **Sharing.** Public links that can expire, ask for a passphrase or work only on your sites, with
+  one shared copy for everyone or a copy of their own for each visitor.
+- **Large files.** The first page shows at once, without downloading the whole PDF.
+
+CloudPDF runs hosted, or on your own servers with its Docker image or Helm chart. See the
+[CloudPDF docs](https://www.cloudpdf.com/docs).
+
+## Sponsors
 
 We are grateful for the support of our sponsors!
 
@@ -57,24 +127,41 @@ We are grateful for the support of our sponsors!
   &nbsp;&nbsp;<a href="https://hive.com/?utm_source=embedpdf&utm_campaign=oss" target="_blank"><img src=".github/assets/sponsor-hive.png" alt="Hive" height="64"></a>
 </div>
 
----
+## Contributing
 
-## ✨ Features
+We love contributions! To get started, read our [contributing guide](CONTRIBUTING.md) and jump into
+the [GitHub discussions](https://github.com/embedpdf/embed-pdf-viewer/discussions).
 
-- Annotations (highlight, sticky notes, free text, ink)
-- True redaction (content is actually removed)
-- Search, text selection, zoom, rotation
-- Smooth, virtualized scrolling
-- Pluggable architecture & tree-shakable plugins
+## License
 
-## 🤝 Contributing
+### EmbedPDF: open source
 
-We love contributions! To get started, read our [contributing guide](CONTRIBUTING.md) and jump into the [GitHub discussions](https://github.com/embedpdf/embed-pdf-viewer/discussions).
+EmbedPDF is completely open source, under the [Apache License 2.0](LICENSE): the viewer, the
+engine and every plugin, every `@embedpdf/*` package. Use it, change it and ship it in any app,
+commercial or not. (The handwriting fonts in `@embedpdf/default-signature-fonts` keep their own
+open license, the SIL Open Font License.)
 
-## 📄 License
+### CloudPDF: open source, except the server
 
-Everything in this repository is licensed under the [Apache License, Version 2.0](LICENSE), with one exception: [`cloudpdf/server`](cloudpdf/server) — the self-hostable CloudPDF server — is **Fair Source**, under the [Fair Core License, FCL-1.0-ALv2](cloudpdf/server/LICENSE). Its source may be inspected, copied, and modified for purposes permitted by the FCL. **That does not make the server free to run:** while a release remains under the FCL, running or self-hosting it requires a valid CloudPDF license (a license key for a connected deployment or a signed certificate for an air-gapped deployment). You may not move, change, disable, or circumvent the license-key functionality; enable protected functionality without a valid license; or remove protected functionality. Competing Uses, as defined in the FCL, are also prohibited. Each release automatically becomes Apache-2.0 two years after publication. See [LICENSING.md](LICENSING.md) for the full licensing map, including website content.
+Everything you build with CloudPDF is open source under the Apache License 2.0 too: the viewer
+(`@cloudpdf/viewer` and its framework packages), the engine (`@cloudpdf/engine`) and the SDK
+(`@cloudpdf/sdk`).
 
-## Third-Party Licenses
+The one exception is the server itself, [`cloudpdf/server`](cloudpdf/server). It is the product
+CloudPDF sells, so it is **Fair Source**, under the
+[Fair Core License (FCL-1.0-ALv2)](cloudpdf/server/LICENSE):
+
+- **You can read, copy and change its source** for the purposes the FCL permits.
+- **Running it needs a CloudPDF license:** a license key for a connected server, or a signed
+  certificate for an air-gapped one.
+- **The license check stays in place.** You may not move, change, disable or get around it,
+  turn on protected features without a valid license, or remove protected features.
+- **No competing use**, as the FCL defines it: a product or service that substitutes for CloudPDF
+  or offers the same or substantially similar functionality.
+- **Each release becomes Apache 2.0** two years after it is published.
+
+[LICENSING.md](LICENSING.md) has the full map, including the websites' content and trademarks.
+
+## Third-party licenses
 
 The engine is powered by [EmbedPDF Runtime](https://github.com/embedpdf/runtime), our fork of [PDFium](https://pdfium.googlesource.com/pdfium/), which is licensed under the [Apache License, Version 2.0](https://pdfium.googlesource.com/pdfium/+/refs/heads/main/LICENSE). PDFium is a Google project; EmbedPDF is not affiliated with or endorsed by Google.
