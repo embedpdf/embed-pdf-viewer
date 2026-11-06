@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { decodePdfBits, PDF_BITS } from '../../src/auth/scope';
+import { permissionFlagsOf, PDF_BITS } from '../../src/auth/scope';
 import { checkResourceAccess, DOC_RESOURCES, type DocResourceId } from '../../src/wire/resources';
 import { cdnCoverageForScope } from '../../src/wire/cdn/coverage';
 import {
@@ -10,9 +10,9 @@ import {
   pagePictureOf,
 } from '../../src/wire/renderFamilies';
 
-const NO_BITS = decodePdfBits(null);
-const BIT5 = decodePdfBits(PDF_BITS.COPY);
-const BIT6 = decodePdfBits(PDF_BITS.ANNOTATE_FILL);
+const NO_BITS = permissionFlagsOf(null);
+const BIT5 = permissionFlagsOf(PDF_BITS.COPY);
+const BIT6 = permissionFlagsOf(PDF_BITS.ANNOTATE_FILL);
 
 describe('DOC_RESOURCES — structural invariants', () => {
   it('every entry has matching id and key', () => {
@@ -159,7 +159,7 @@ describe('checkResourceAccess', () => {
     expect(checkResourceAccess('page-render', ['doc.open'], NO_BITS)).toBe(false);
   });
 
-  it('pdf.permissions + bit5 grants page-text and page-geometry', () => {
+  it('pdf.permissions + copy grants page-text and page-geometry', () => {
     expect(checkResourceAccess('page-text', ['pdf.permissions'], BIT5)).toBe(true);
     expect(checkResourceAccess('page-geometry', ['pdf.permissions'], BIT5)).toBe(true);
   });
@@ -190,7 +190,7 @@ describe('checkResourceAccess', () => {
     );
   });
 
-  it('annotations-read granted via pdf.permissions + bit6', () => {
+  it('annotations-read granted via pdf.permissions + modifyAnnotations', () => {
     expect(checkResourceAccess('annotations-read', ['pdf.permissions'], BIT6)).toBe(true);
   });
 });
@@ -587,8 +587,8 @@ describe('cdnCoverageForScope', () => {
     ]);
   });
 
-  it('pdf.permissions + bit5 + bit6 covers manifest, render, text, geometry, annotations (both doc-level and layer-scoped variants)', () => {
-    const bits = decodePdfBits(PDF_BITS.COPY | PDF_BITS.ANNOTATE_FILL);
+  it('pdf.permissions + copy + modifyAnnotations covers manifest, render, text, geometry, annotations (both doc-level and layer-scoped variants)', () => {
+    const bits = permissionFlagsOf(PDF_BITS.COPY | PDF_BITS.ANNOTATE_FILL);
     const coverage = cdnCoverageForScope(['pdf.permissions'], bits, {
       docId: 'doc_1',
       layerName: 'default',

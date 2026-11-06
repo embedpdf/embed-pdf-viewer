@@ -15,7 +15,7 @@ import {
   type AdminDocumentRecord,
   type AdminInitUpload,
 } from '@cloudpdf/contract';
-import { decodePdfBits, type PdfBits } from '@embedpdf/engine-core/runtime';
+import { permissionFlagsOf, type PdfPermissionFlags } from '@embedpdf/engine-core/runtime';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
 import { decodeSortedListCursor, encodeSortedListCursor } from './_cursor';
@@ -275,7 +275,7 @@ export async function registerAdminDocumentsRoutes(
   mount(downloadOp, async (req, reply) => {
     const { tenantId, docId: id } = req.params as { tenantId: string; docId: string };
     const ctx = await requireTenantContentAccess(req, tenantId, 'doc.download', () =>
-      pdfBitsOf(lifecycle, tenantId, id),
+      permissionFlagsOfDocument(lifecycle, tenantId, id),
     );
     const bytes = await lifecycle.download(ctx.tenantId, id);
     return reply
@@ -302,7 +302,7 @@ export async function registerAdminDocumentsRoutes(
   mount(thumbnailOp, async (req, reply) => {
     const { tenantId, docId: id } = req.params as { tenantId: string; docId: string };
     const ctx = await requireTenantContentAccess(req, tenantId, 'doc.render', () =>
-      pdfBitsOf(lifecycle, tenantId, id),
+      permissionFlagsOfDocument(lifecycle, tenantId, id),
     );
     const doc = await lifecycle.get(ctx.tenantId, id);
     if (!storage || doc.thumbnailState !== 'ready' || !doc.thumbnailKey) {
@@ -380,13 +380,13 @@ function parseCommitBody(req: FastifyRequest): AdminDocumentCommitRequest {
 }
 
 /** The document's PDF permission bits, which `pdf.permissions` in a scope expands against. */
-async function pdfBitsOf(
+async function permissionFlagsOfDocument(
   lifecycle: DocumentLifecycleService,
   tenantId: string,
   docId: string,
-): Promise<PdfBits> {
+): Promise<PdfPermissionFlags> {
   const doc = await lifecycle.get(tenantId, docId);
-  return decodePdfBits(doc.security.pdfPermissionsBits ?? null);
+  return permissionFlagsOf(doc.security.pdfPermissionsBits ?? null);
 }
 
 function parseUpdateBody(req: FastifyRequest): AdminDocumentUpdateRequest {

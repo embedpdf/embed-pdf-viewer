@@ -124,8 +124,12 @@ export async function registerMetadataRoutes(
         token: string;
       };
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await service.getEffectivePdfBits(accessCtx, docId, layerName);
-      const ctx = requireLayerResource(req, docId, layerName, half.layerResource, pdfBits);
+      const permissionFlags = await service.getEffectivePermissionFlags(
+        accessCtx,
+        docId,
+        layerName,
+      );
+      const ctx = requireLayerResource(req, docId, layerName, half.layerResource, permissionFlags);
       const requested = parseTokenOrInvalidArg(decodeMetadataToken, token, 'metadataVersion token');
       const body = await readAtPins({
         documentService: service,
@@ -147,8 +151,12 @@ export async function registerMetadataRoutes(
         layerName: string;
       };
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await service.getEffectivePdfBits(accessCtx, docId, layerName);
-      const ctx = requireLayerResource(req, docId, layerName, half.layerResource, pdfBits);
+      const permissionFlags = await service.getEffectivePermissionFlags(
+        accessCtx,
+        docId,
+        layerName,
+      );
+      const ctx = requireLayerResource(req, docId, layerName, half.layerResource, permissionFlags);
       const body = await half.read(ctx, docId, layerName, abortSignalOf(reply));
       setNoStore(reply);
       return body;
@@ -160,8 +168,18 @@ export async function registerMetadataRoutes(
         layerName: string;
       };
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await service.getEffectivePdfBits(accessCtx, docId, layerName);
-      const ctx = requireLayerCapability(req, docId, layerName, 'doc.metadata.modify', pdfBits);
+      const permissionFlags = await service.getEffectivePermissionFlags(
+        accessCtx,
+        docId,
+        layerName,
+      );
+      const ctx = requireLayerCapability(
+        req,
+        docId,
+        layerName,
+        'doc.metadata.modify',
+        permissionFlags,
+      );
       setNoStore(reply);
       return half.write(ctx, { docId, layerName, body: req.body }, abortSignalOf(reply));
     });

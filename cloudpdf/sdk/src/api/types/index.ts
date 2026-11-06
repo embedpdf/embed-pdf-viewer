@@ -161,6 +161,7 @@ export * from "./PdfLinkTarget.js";
 export * from "./PdfLinkTargetWritable.js";
 export * from "./PdfMeasurement.js";
 export * from "./PdfPageActions.js";
+export * from "./PdfPermissionFlags.js";
 export * from "./ResolvedFontRun.js";
 export * from "./RichTextDocument.js";
 export * from "./RichTextDocumentInput.js";

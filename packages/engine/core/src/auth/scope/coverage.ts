@@ -1,6 +1,6 @@
 import { parseScope } from './parser';
 import { expandedCapabilities } from './resolver';
-import type { CollabFilter, DocCapability, ParsedScope, PdfBits } from './types';
+import type { CollabFilter, DocCapability, ParsedScope, PdfPermissionFlags } from './types';
 
 /**
  * What `wanted` would allow that `held` doesn't, in scope words; empty when
@@ -36,7 +36,7 @@ export function scopeNotCovered(
 
   const readsTheFile = [...heldParsed, ...wantedParsed].some((s) => s.kind === 'virtual');
   const beyond = new Set<string>();
-  for (const bits of readsTheFile ? EVERY_PDF_BITS : [NO_PDF_BITS]) {
+  for (const bits of readsTheFile ? EVERY_PERMISSION_FLAGS : [NO_PERMISSION_FLAGS]) {
     const mine = authorityOf(heldParsed, bits);
     const theirs = authorityOf(wantedParsed, bits);
     for (const capability of theirs.capabilities) {
@@ -86,7 +86,7 @@ const WRITES: ReadonlyArray<{
 
 const ALL: CollabFilter = { kind: 'all' };
 
-function authorityOf(parsed: ReadonlyArray<ParsedScope>, bits: PdfBits): Authority {
+function authorityOf(parsed: ReadonlyArray<ParsedScope>, bits: PdfPermissionFlags): Authority {
   const capabilities = expandedCapabilities(parsed, bits);
   const writes = new Map<string, CollabFilter[]>();
   for (const { entity, action, broad } of WRITES) {
@@ -139,25 +139,28 @@ function filterWord(filter: CollabFilter): string {
   }
 }
 
-const NO_PDF_BITS: PdfBits = {
-  bit3: false,
-  bit4: false,
-  bit5: false,
-  bit6: false,
-  bit9: false,
-  bit10: false,
-  bit11: false,
-  bit12: false,
+const NO_PERMISSION_FLAGS: PdfPermissionFlags = {
+  print: false,
+  modifyContents: false,
+  copy: false,
+  modifyAnnotations: false,
+  fillForms: false,
+  copyForAccessibility: false,
+  assemble: false,
+  printHighQuality: false,
 };
 
-/** Every combination of the bits `pdf.permissions` reads (bit 10 gives nothing). */
-const EVERY_PDF_BITS: ReadonlyArray<PdfBits> = Array.from({ length: 1 << 7 }, (_, n) => ({
-  bit3: (n & 1) !== 0,
-  bit4: (n & 2) !== 0,
-  bit5: (n & 4) !== 0,
-  bit6: (n & 8) !== 0,
-  bit9: (n & 16) !== 0,
-  bit10: false,
-  bit11: (n & 32) !== 0,
-  bit12: (n & 64) !== 0,
-}));
+/** Every combination of the flags `pdf.permissions` reads (`copyForAccessibility` gives nothing). */
+const EVERY_PERMISSION_FLAGS: ReadonlyArray<PdfPermissionFlags> = Array.from(
+  { length: 1 << 7 },
+  (_, n) => ({
+    print: (n & 1) !== 0,
+    modifyContents: (n & 2) !== 0,
+    copy: (n & 4) !== 0,
+    modifyAnnotations: (n & 8) !== 0,
+    fillForms: (n & 16) !== 0,
+    copyForAccessibility: false,
+    assemble: (n & 32) !== 0,
+    printHighQuality: (n & 64) !== 0,
+  }),
+);

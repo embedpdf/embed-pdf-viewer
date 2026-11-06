@@ -9423,6 +9423,46 @@
         },
         "additionalProperties": false
       },
+      "PdfPermissionFlags": {
+        "type": "object",
+        "properties": {
+          "print": {
+            "type": "boolean"
+          },
+          "modifyContents": {
+            "type": "boolean"
+          },
+          "copy": {
+            "type": "boolean"
+          },
+          "modifyAnnotations": {
+            "type": "boolean"
+          },
+          "fillForms": {
+            "type": "boolean"
+          },
+          "copyForAccessibility": {
+            "type": "boolean"
+          },
+          "assemble": {
+            "type": "boolean"
+          },
+          "printHighQuality": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "print",
+          "modifyContents",
+          "copy",
+          "modifyAnnotations",
+          "fillForms",
+          "copyForAccessibility",
+          "assemble",
+          "printHighQuality"
+        ],
+        "additionalProperties": false
+      },
       "PdfActionTargetRef": {
         "anyOf": [
           {
@@ -29224,9 +29264,12 @@
               "known": {
                 "type": "boolean"
               },
-              "bits": {
-                "type": "integer",
-                "minimum": 0,
+              "flags": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/PdfPermissionFlags"
+                  }
+                ],
                 "nullable": true
               },
               "allAllowed": {
@@ -29248,7 +29291,7 @@
             },
             "required": [
               "known",
-              "bits",
+              "flags",
               "allAllowed",
               "openedAs",
               "securityHandlerRevision",

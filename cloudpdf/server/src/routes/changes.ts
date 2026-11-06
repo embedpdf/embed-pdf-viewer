@@ -57,9 +57,13 @@ export async function registerChangeRoutes(
   app.post(wireTemplates.layerChanges, async (req, reply) => {
     const { docId, layerName } = req.params as { docId: string; layerName: string };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+    const permissionFlags = await documentService.getEffectivePermissionFlags(
+      accessCtx,
+      docId,
+      layerName,
+    );
     const protection = await documentService.getProtection(accessCtx, docId, layerName);
-    const ctx = requireLayerChangeWrite(req, docId, layerName, pdfBits, protection);
+    const ctx = requireLayerChangeWrite(req, docId, layerName, permissionFlags, protection);
     const envelope = await readMutationEnvelope(req, changeBinaryPolicy);
     const request = parseOrInvalidArg<ChangeRequest>(
       ChangeRequestSchema as unknown as SchemaLike<ChangeRequest>,

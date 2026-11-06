@@ -6,7 +6,7 @@
  *   - whether the route is origin-only or versioned-read
  *
  * Consumed by:
- *   - server route guards via `requireResource(req, docId, id, pdfBits)`
+ *   - server route guards via `requireResource(req, docId, id, permissionFlags)`
  *   - the CDN signer to determine which path prefixes to cover for a token
  *   - documentation generators
  *
@@ -17,7 +17,7 @@
  * doc-access check without requiring any capability.
  */
 
-import type { DocCapability, PdfBits } from '../auth/scope';
+import type { DocCapability, PdfPermissionFlags } from '../auth/scope';
 import { checkAnyCapability, checkCapability } from '../auth/scope';
 import { TEXT_WRITING_CAPABILITIES } from '../fonts/fontList';
 import {
@@ -33,7 +33,7 @@ import {
  * Adding a new resource:
  *   1. Add the id to this union
  *   2. Add a `DOC_RESOURCES` entry
- *   3. Update the route handler to call `requireResource(req, docId, '<id>', pdfBits)`
+ *   3. Update the route handler to call `requireResource(req, docId, '<id>', permissionFlags)`
  *   4. CDN signer automatically considers it
  */
 export type DocResourceId =
@@ -894,16 +894,18 @@ export const DOC_RESOURCES: Readonly<Record<DocResourceId, DocResourceDescriptor
 export function checkResourceAccess(
   resourceId: DocResourceId,
   rawScope: ReadonlyArray<string>,
-  pdfBits: PdfBits,
+  permissionFlags: PdfPermissionFlags,
 ): boolean {
   const r = DOC_RESOURCES[resourceId];
   switch (r.requirement.kind) {
     case 'single':
-      return checkCapability(r.requirement.capability, rawScope, pdfBits);
+      return checkCapability(r.requirement.capability, rawScope, permissionFlags);
     case 'any':
-      return checkAnyCapability(r.requirement.capabilities, rawScope, pdfBits);
+      return checkAnyCapability(r.requirement.capabilities, rawScope, permissionFlags);
     case 'all':
-      return r.requirement.capabilities.every((cap) => checkCapability(cap, rawScope, pdfBits));
+      return r.requirement.capabilities.every((cap) =>
+        checkCapability(cap, rawScope, permissionFlags),
+      );
   }
 }
 

@@ -171,8 +171,12 @@ export async function registerAttachmentRoutes(
       token: string;
     };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-    const ctx = requireLayerResource(req, docId, layerName, 'layer-attachments', pdfBits);
+    const permissionFlags = await documentService.getEffectivePermissionFlags(
+      accessCtx,
+      docId,
+      layerName,
+    );
+    const ctx = requireLayerResource(req, docId, layerName, 'layer-attachments', permissionFlags);
     const requested = parseTokenOrInvalidArg(decodeAttachmentsToken, token, 'attachments token');
     const items = await atAttachmentsVersion(
       documentService,
@@ -197,8 +201,18 @@ export async function registerAttachmentRoutes(
         token: string;
       };
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-      const ctx = requireLayerResource(req, docId, layerName, 'layer-attachment-files', pdfBits);
+      const permissionFlags = await documentService.getEffectivePermissionFlags(
+        accessCtx,
+        docId,
+        layerName,
+      );
+      const ctx = requireLayerResource(
+        req,
+        docId,
+        layerName,
+        'layer-attachment-files',
+        permissionFlags,
+      );
       const requested = parseTokenOrInvalidArg(decodeAttachmentsToken, token, 'attachments token');
       const ref = attachmentRefFromPath(fileKey);
       const file = await fileAtAttachmentsVersion(
@@ -238,8 +252,18 @@ export async function registerAttachmentRoutes(
         token: string;
       };
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-      const ctx = requireLayerResource(req, docId, layerName, 'layer-attachment-files', pdfBits);
+      const permissionFlags = await documentService.getEffectivePermissionFlags(
+        accessCtx,
+        docId,
+        layerName,
+      );
+      const ctx = requireLayerResource(
+        req,
+        docId,
+        layerName,
+        'layer-attachment-files',
+        permissionFlags,
+      );
       const requested = parseTokenOrInvalidArg(decodeAttachmentsToken, token, 'attachments token');
       const pageObjectNumber = resolvePageKeyParam(pageKey);
       // Only durable keys are addressable on this content-addressed leaf:
@@ -274,8 +298,12 @@ export async function registerAttachmentRoutes(
   app.get(wireTemplates.layerAttachments, async (req, reply) => {
     const { docId, layerName } = req.params as { docId: string; layerName: string };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-    const ctx = requireLayerResource(req, docId, layerName, 'layer-attachments', pdfBits);
+    const permissionFlags = await documentService.getEffectivePermissionFlags(
+      accessCtx,
+      docId,
+      layerName,
+    );
+    const ctx = requireLayerResource(req, docId, layerName, 'layer-attachments', permissionFlags);
     const list = await documentService.listAttachments(ctx, docId, layerName, abortSignalOf(reply));
     setNoStore(reply);
     return list;
@@ -288,8 +316,18 @@ export async function registerAttachmentRoutes(
       fileKey: string;
     };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-    const ctx = requireLayerResource(req, docId, layerName, 'layer-attachment-files', pdfBits);
+    const permissionFlags = await documentService.getEffectivePermissionFlags(
+      accessCtx,
+      docId,
+      layerName,
+    );
+    const ctx = requireLayerResource(
+      req,
+      docId,
+      layerName,
+      'layer-attachment-files',
+      permissionFlags,
+    );
     const file = await documentService.readAttachmentFileToTemp(
       ctx,
       docId,
@@ -316,8 +354,12 @@ export async function registerAttachmentRoutes(
     };
     const pageObjectNumber = resolvePageKeyParam(pageKey);
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-    const ctx = requireLayerCapability(req, docId, layerName, 'doc.download', pdfBits);
+    const permissionFlags = await documentService.getEffectivePermissionFlags(
+      accessCtx,
+      docId,
+      layerName,
+    );
+    const ctx = requireLayerCapability(req, docId, layerName, 'doc.download', permissionFlags);
     const file = await documentService.readAnnotationFileToTemp(
       ctx,
       docId,

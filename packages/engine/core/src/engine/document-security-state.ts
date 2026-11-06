@@ -1,10 +1,9 @@
 import type {
   DocumentAccessReason,
   DocumentSecurityState,
-  PdfPermissionAdvisory,
   PdfPermissionInfo,
 } from './DocumentSecurityService';
-import { materializePdfPermissions, type PdfBits } from '../auth/scope';
+import { permissionFlagsOf } from '../auth/scope';
 import type { DocumentSecurityProbeInfo } from '../wire/worker-protocol';
 
 export interface DocumentHeadLike {
@@ -35,51 +34,10 @@ export function permissionInfoFromProbe(info: DocumentSecurityProbeInfo): PdfPer
   if (info.pdfPermissionsBits === null) return null;
   return {
     known: true,
-    bits: info.pdfPermissionsBits,
+    flags: permissionFlagsOf(info.pdfPermissionsBits),
     allAllowed: info.pdfPermissionsAllAllowed,
     openedAs: info.pdfOpenedAs,
     securityHandlerRevision: info.securityHandlerRevision,
-  };
-}
-
-/**
- * Same as {@link permissionInfoFromProbe} but additionally populates
- * `flags` (typed PdfBits view) and `advisory` (capability-shaped
- * booleans for UI badges). Used by routes that have a decoded `PdfBits`
- * in hand — notably `/access`, which always does.
- *
- * Returns `null` for the same reason as the base function — when the
- * PDF hasn't been probed yet so bits are unknown.
- */
-export function permissionInfoWithAdvisory(
-  info: DocumentSecurityProbeInfo,
-  pdfBits: PdfBits,
-): PdfPermissionInfo | null {
-  const base = permissionInfoFromProbe(info);
-  if (!base) return null;
-  return {
-    ...base,
-    flags: pdfBits,
-    advisory: advisoryFromPdfBits(pdfBits),
-  };
-}
-
-/**
- * Translate a {@link PdfBits} view into the capability-shaped
- * {@link PdfPermissionAdvisory}: what `pdf.permissions` grants on a file
- * with these bits.
- */
-export function advisoryFromPdfBits(b: PdfBits): PdfPermissionAdvisory {
-  const granted = new Set(materializePdfPermissions(b));
-  return {
-    canPrint: granted.has('doc.print'),
-    canPrintHigh: granted.has('doc.print.high'),
-    canCopy: granted.has('doc.text.copy'),
-    canAnnotate: granted.has('doc.annotate.modify'),
-    canFillForms: granted.has('doc.forms.fill'),
-    canModifyForms: granted.has('doc.forms.modify'),
-    canModifyPages: granted.has('doc.pages.modify'),
-    canAssemble: granted.has('doc.pages.assemble'),
   };
 }
 
@@ -100,7 +58,7 @@ export function securityStateFromProbe(
     },
     permissions: {
       known: permission?.known ?? false,
-      bits: permission?.bits ?? null,
+      flags: permission?.flags ?? null,
       allAllowed: permission?.allAllowed ?? null,
       openedAs: permission?.openedAs ?? null,
       securityHandlerRevision: permission?.securityHandlerRevision ?? null,

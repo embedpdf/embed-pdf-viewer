@@ -51,6 +51,7 @@ import type { PageTextSnapshot } from '../dto/PageTextSnapshot';
 import { PdfPageActionsSchema } from '../dto/PdfAction.schema';
 import { RichTextDocumentInputSchema, RichTextDocumentSchema } from '../dto/RichText.schema';
 import type { PdfSaveMode } from '../dto/PdfSaveMode';
+import type { PdfPermissionFlags } from '../auth/scope';
 import type { DocumentSecurityState, PdfPermissionInfo } from '../engine/DocumentSecurityService';
 import type { SerializedEngineError } from '../errors/EngineError';
 import { EngineValuesSchema } from './cachedReads';
@@ -259,6 +260,18 @@ export const OpenDocumentResponseSchema = z.object({
 });
 export type OpenDocumentResponse = z.infer<typeof OpenDocumentResponseSchema>;
 
+/** What a PDF's permissions allow, one flag per `/P` bit: `PdfPermissionFlags`. */
+export const PdfPermissionFlagsSchema: z.ZodType<PdfPermissionFlags> = z.object({
+  print: z.boolean(),
+  modifyContents: z.boolean(),
+  copy: z.boolean(),
+  modifyAnnotations: z.boolean(),
+  fillForms: z.boolean(),
+  copyForAccessibility: z.boolean(),
+  assemble: z.boolean(),
+  printHighQuality: z.boolean(),
+});
+
 /**
  * Wire shape of `GET /v1/docs/:docId/head`. Mirrors the server-side
  * `DocumentHead` interface; the schema is the source of truth so
@@ -283,7 +296,7 @@ export const DocumentHeadSchema = z.object({
   }),
   permissions: z.object({
     known: z.boolean(),
-    bits: z.number().int().nonnegative().nullable(),
+    flags: PdfPermissionFlagsSchema.nullable(),
     allAllowed: z.boolean().nullable(),
     openedAs: closed(z.enum(['none', 'user', 'owner'])).nullable(),
     securityHandlerRevision: z.number().int().nullable(),
@@ -350,48 +363,12 @@ export const ObjectNumberReservationResponseSchema = z.object({
   expiresInSeconds: z.number().int().nonnegative(),
 });
 
-/**
- * Typed boolean view of the PDF user-access permission word. Names
- * mirror the `PdfBits` shape in @embedpdf/engine-core/auth/scope; ISO
- * bit numbers (3, 4, 5, 6, 9, 10, 11, 12).
- */
-const PdfBitsObjectSchema = z.object({
-  bit3: z.boolean(),
-  bit4: z.boolean(),
-  bit5: z.boolean(),
-  bit6: z.boolean(),
-  bit9: z.boolean(),
-  bit10: z.boolean(),
-  bit11: z.boolean(),
-  bit12: z.boolean(),
-});
-
-/**
- * Capability-shaped advisory for the client UI. Mirrors
- * `PdfPermissionAdvisory` in @embedpdf/engine-core/runtime; one
- * boolean per UI badge.
- */
-const PdfPermissionAdvisoryObjectSchema = z.object({
-  canPrint: z.boolean(),
-  canPrintHigh: z.boolean(),
-  canCopy: z.boolean(),
-  canAnnotate: z.boolean(),
-  canFillForms: z.boolean(),
-  canModifyForms: z.boolean(),
-  canModifyPages: z.boolean(),
-  canAssemble: z.boolean(),
-});
-
 const PdfPermissionInfoObjectSchema: z.ZodType<PdfPermissionInfo> = z.object({
   known: z.boolean(),
   allAllowed: z.boolean().nullable(),
-  bits: z.number().int().nonnegative().nullable(),
+  flags: PdfPermissionFlagsSchema,
   openedAs: closed(z.enum(['none', 'user', 'owner'])).nullable(),
   securityHandlerRevision: z.number().int().nullable(),
-  // Enriched fields from /access (commit 14). Optional so /head, which
-  // doesn't always populate them, stays valid against this schema too.
-  flags: PdfBitsObjectSchema.optional(),
-  advisory: PdfPermissionAdvisoryObjectSchema.optional(),
 });
 
 const PdfPermissionInfoSchema = PdfPermissionInfoObjectSchema.nullable();
@@ -403,7 +380,7 @@ export const DocumentSecurityStateSchema: z.ZodType<DocumentSecurityState> = z.o
   }),
   permissions: z.object({
     known: z.boolean(),
-    bits: z.number().int().nonnegative().nullable(),
+    flags: PdfPermissionFlagsSchema.nullable(),
     allAllowed: z.boolean().nullable(),
     openedAs: closed(z.enum(['none', 'user', 'owner'])).nullable(),
     securityHandlerRevision: z.number().int().nullable(),
@@ -1180,6 +1157,7 @@ export const DocumentWireComponents = {
   DocumentMetadata: DocumentMetadataSchema,
   MetadataPatch: MetadataPatchSchema,
   Identity: IdentitySchema,
+  PdfPermissionFlags: PdfPermissionFlagsSchema,
 } as const satisfies Record<string, z.ZodTypeAny>;
 
 /** Per-page side-effect envelope every annotation mutation returns. Mirrors `AnnotationListMutationMeta`. */

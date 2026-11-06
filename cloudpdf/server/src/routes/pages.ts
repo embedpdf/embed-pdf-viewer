@@ -194,8 +194,12 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
         token: string;
       };
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-      const ctx = requireLayerResource(req, docId, layerName, 'layer-page-text', pdfBits);
+      const permissionFlags = await documentService.getEffectivePermissionFlags(
+        accessCtx,
+        docId,
+        layerName,
+      );
+      const ctx = requireLayerResource(req, docId, layerName, 'layer-page-text', permissionFlags);
       return readPageText({
         documentService,
         reply,
@@ -214,8 +218,12 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
       pageKey: string;
     };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-    const ctx = requireLayerResource(req, docId, layerName, 'layer-page-text', pdfBits);
+    const permissionFlags = await documentService.getEffectivePermissionFlags(
+      accessCtx,
+      docId,
+      layerName,
+    );
+    const ctx = requireLayerResource(req, docId, layerName, 'layer-page-text', permissionFlags);
     return readPageText({
       documentService,
       reply,
@@ -235,8 +243,18 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
         token: string;
       };
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-      const ctx = requireLayerResource(req, docId, layerName, 'layer-page-geometry', pdfBits);
+      const permissionFlags = await documentService.getEffectivePermissionFlags(
+        accessCtx,
+        docId,
+        layerName,
+      );
+      const ctx = requireLayerResource(
+        req,
+        docId,
+        layerName,
+        'layer-page-geometry',
+        permissionFlags,
+      );
       return readPageGeometry({
         documentService,
         reply,
@@ -255,8 +273,12 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
       pageKey: string;
     };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-    const ctx = requireLayerResource(req, docId, layerName, 'layer-page-geometry', pdfBits);
+    const permissionFlags = await documentService.getEffectivePermissionFlags(
+      accessCtx,
+      docId,
+      layerName,
+    );
+    const ctx = requireLayerResource(req, docId, layerName, 'layer-page-geometry', permissionFlags);
     return readPageGeometry({
       documentService,
       reply,
@@ -279,8 +301,12 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
         pageKey: string;
       };
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-      const ctx = requireLayerResource(req, docId, layerName, spec.layerResource, pdfBits);
+      const permissionFlags = await documentService.getEffectivePermissionFlags(
+        accessCtx,
+        docId,
+        layerName,
+      );
+      const ctx = requireLayerResource(req, docId, layerName, spec.layerResource, permissionFlags);
       return renderPageImage({
         documentService,
         imageEncoder,
@@ -310,7 +336,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
       pageKey: string;
     };
     const access = requireLayerDocAccessOnly(req, docId, layerName);
-    const bits = await documentService.getEffectivePdfBits(access, docId, layerName);
+    const bits = await documentService.getEffectivePermissionFlags(access, docId, layerName);
     const ctx = requireLayerCapability(req, docId, layerName, 'doc.open', bits);
     setNoStore(reply);
     const viewports = await documentService.readPageViewports(
@@ -329,7 +355,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
       pageKey: string;
     };
     const access = requireLayerDocAccessOnly(req, docId, layerName);
-    const bits = await documentService.getEffectivePdfBits(access, docId, layerName);
+    const bits = await documentService.getEffectivePermissionFlags(access, docId, layerName);
     const protection = await documentService.getProtection(access, docId, layerName);
     const ctx = requireLayerCapability(
       req,
@@ -357,14 +383,18 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
       layerName: string;
     };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+    const permissionFlags = await documentService.getEffectivePermissionFlags(
+      accessCtx,
+      docId,
+      layerName,
+    );
     const protection = await documentService.getProtection(accessCtx, docId, layerName);
     const ctx = requireLayerCapability(
       req,
       docId,
       layerName,
       'doc.pages.assemble',
-      pdfBits,
+      permissionFlags,
       protection,
     );
     const body = parseOrInvalidArg<PageNameInput>(
@@ -383,14 +413,18 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
       layerName: string;
     };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+    const permissionFlags = await documentService.getEffectivePermissionFlags(
+      accessCtx,
+      docId,
+      layerName,
+    );
     const protection = await documentService.getProtection(accessCtx, docId, layerName);
     const ctx = requireLayerCapability(
       req,
       docId,
       layerName,
       'doc.pages.assemble',
-      pdfBits,
+      permissionFlags,
       protection,
     );
     const body = parseOrInvalidArg<PageRemoveNameInput>(
@@ -413,7 +447,11 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
       layerName: string;
     };
     const ctx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await documentService.getEffectivePdfBits(ctx, docId, layerName);
+    const permissionFlags = await documentService.getEffectivePermissionFlags(
+      ctx,
+      docId,
+      layerName,
+    );
     const protection = await documentService.getProtection(ctx, docId, layerName);
     const body = parseOrInvalidArg<PageExtractInput>(
       PageExtractInputSchema as unknown as SchemaLike<PageExtractInput>,
@@ -426,7 +464,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
     // `doc.download.flattened`, and paints only what the caller may read.
     // The same check as the local engine's (`resolvePageExtract`).
     const holds = (capability: DocCapability) =>
-      holdsCapability(ctx, capability, pdfBits, protection);
+      holdsCapability(ctx, capability, permissionFlags, protection);
     const flatten = resolvePageExtract(body, {
       download: holds('doc.download'),
       downloadFlattened: holds('doc.download.flattened'),
@@ -450,20 +488,31 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
   app.post('/v1/docs/:docId/layers/:layerName/pages/flatten', async (req, reply) => {
     const { docId, layerName } = req.params as { docId: string; layerName: string };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+    const permissionFlags = await documentService.getEffectivePermissionFlags(
+      accessCtx,
+      docId,
+      layerName,
+    );
     const protection = await documentService.getProtection(accessCtx, docId, layerName);
     const ctx = requireLayerCapability(
       req,
       docId,
       layerName,
       'doc.pages.modify',
-      pdfBits,
+      permissionFlags,
       protection,
     );
     // Flatten deletes page annotations as it paints them, so page-content
     // authority alone is insufficient. This deliberately excludes collab-
     // scoped annotation writers from the bulk page endpoint.
-    requireLayerCapability(req, docId, layerName, 'doc.annotate.modify', pdfBits, protection);
+    requireLayerCapability(
+      req,
+      docId,
+      layerName,
+      'doc.annotate.modify',
+      permissionFlags,
+      protection,
+    );
     const raw = (req.body ?? {}) as { pages?: unknown; usage?: unknown };
     const body = parseOrInvalidArg<PageFlattenInput>(
       PageFlattenInputSchema as unknown as SchemaLike<PageFlattenInput>,
