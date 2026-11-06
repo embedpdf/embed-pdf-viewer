@@ -58,6 +58,8 @@ export interface StartupFontSpec {
   tier?: FallbackTier;
   /** Whether its bytes may go to a browser (the server's `serve`); false by default. */
   serve?: boolean;
+  /** One of the fallback fonts the engine adds on its own; false by default. */
+  builtIn?: boolean;
 }
 
 /**
@@ -98,6 +100,8 @@ export class FontRegistrar {
   >();
   /** Keys in the fallback chain with their tiers, in the order added. */
   private fallbacks: { key: string; tier: FallbackTier }[] = [];
+  /** Keys of the fallback fonts the engine adds on its own, not the app's. */
+  private readonly builtIn = new Set<string>();
 
   constructor(
     private readonly runtime: PdfRuntimeModule,
@@ -135,7 +139,8 @@ export class FontRegistrar {
    * Register a font from its bytes. Copies into the WASM heap, hands the
    * pointer to `EPDFFont_RegisterMemFont64` (which copies the bytes into the
    * native registry), then frees the scratch — so the heap holds exactly one
-   * retained copy per registered font.
+   * retained copy per registered font. A key registers once: registering it
+   * again is a no-op that keeps the first font.
    *
    * Throws `InvalidArg` when the runtime rejects the font (corrupt, no glyphs).
    */
@@ -145,7 +150,9 @@ export class FontRegistrar {
     weight: number,
     italic: number,
     bytes: Uint8Array,
+    builtIn = false,
   ): void {
+    if (this.ids.has(fontKey)) return;
     if (bytes.byteLength === 0) {
       throw new EngineError(EngineErrorCode.InvalidArg, `empty font data: ${fontKey}`);
     }
@@ -163,6 +170,7 @@ export class FontRegistrar {
       this.ids.set(fontKey, id);
       this.identities.set(fontKey, this.readIdentity(id, { familyName, weight, italic }));
       this.programs.set(fontKey, { ...this.readProgram(id), served: true });
+      if (builtIn) this.builtIn.add(fontKey);
     } finally {
       mem.free(ptr);
     }
@@ -173,6 +181,7 @@ export class FontRegistrar {
    * range-reads the file on demand (it is not loaded into the JS heap), and the
    * file-access handle is retained until {@link clear}. Native/node only.
    * `served` says whether its bytes may go to a browser (the server's `serve`).
+   * A key registers once, as in {@link register}.
    *
    * Throws `InvalidArg` when the runtime rejects the font (corrupt, no glyphs).
    */
@@ -183,7 +192,9 @@ export class FontRegistrar {
     italic: number,
     path: string,
     served = false,
+    builtIn = false,
   ): void {
+    if (this.ids.has(fontKey)) return;
     const access = this.runtime.fileAccess.fromNodeFile(path);
     let id = 0;
     try {
@@ -202,6 +213,7 @@ export class FontRegistrar {
     this.ids.set(fontKey, id);
     this.identities.set(fontKey, this.readIdentity(id, { familyName, weight, italic }));
     this.programs.set(fontKey, { ...this.readProgram(id), served });
+    if (builtIn) this.builtIn.add(fontKey);
     this.fileHandles.push(access);
   }
 
@@ -304,6 +316,7 @@ export class FontRegistrar {
         italic,
         spec.path,
         spec.serve ?? false,
+        spec.builtIn ?? false,
       );
       if (spec.fallback) {
         this.addFallback(spec.key, spec.tier);
@@ -350,6 +363,7 @@ export class FontRegistrar {
         format: program.format,
         sha256: program.sha256,
         served: program.served,
+        builtIn: this.builtIn.has(key),
       });
     }
     return facts;
@@ -434,6 +448,7 @@ export class FontRegistrar {
     this.identities.clear();
     this.programs.clear();
     this.fallbacks = [];
+    this.builtIn.clear();
     // Native registry no longer reads through these — release the file handles.
     for (const access of this.fileHandles) {
       access.close();

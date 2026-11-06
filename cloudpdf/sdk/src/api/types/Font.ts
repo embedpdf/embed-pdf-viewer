@@ -5,6 +5,7 @@ import type * as CloudPDF from "../index.js";
 export interface Font {
     name: string;
     source: Font.Source;
+    builtIn: boolean;
     familyName: string;
     weight: number;
     italic: boolean;

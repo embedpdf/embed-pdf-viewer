@@ -476,6 +476,8 @@ interface ResolvedRecipeFont {
   spec: FontSpec;
   fallback: boolean;
   tier: FallbackTier;
+  /** One of the default fallback fonts, not the app's. */
+  builtIn: boolean;
 }
 
 /** Resolve every configured font's bytes (fetching `url` entries) in declared
@@ -494,6 +496,7 @@ async function resolveRecipeFonts(
         spec: await toFontSpec(raw),
         fallback,
         tier: FALLBACK_TIERS.own,
+        builtIn: false,
       })),
     ),
     options.defaultFallbackFonts === false ? [] : loadDefaultFallbackFonts(),
@@ -518,6 +521,7 @@ async function loadDefaultFallbackFonts(): Promise<ResolvedRecipeFont[]> {
       },
       fallback: true,
       tier: FALLBACK_TIERS.builtIn,
+      builtIn: true,
     })),
   );
 }
@@ -538,28 +542,35 @@ async function registerBootFonts(
   fontService: LocalFontService,
   fonts: ResolvedRecipeFont[],
 ): Promise<void> {
-  for (const { spec, fallback, tier } of fonts) {
+  // A key in both `fonts` and `fallbackFonts` is one font: registered once,
+  // then added to the fallback chain where `fallbackFonts` lists it.
+  const sent = new Set<string>();
+  for (const { spec, fallback, tier, builtIn } of fonts) {
     // Seed before the raw send: seeding copies the bytes, and the wire buffer
     // is transferred (neutered) by the worker transport.
-    fontService.seedRegistered(spec, { fallback, tier });
-    const bytes = toStandaloneArrayBuffer(spec.data);
-    const registered = await requestOverTransport(transport, (jobId) =>
-      wirePack(
-        {
-          kind: 'fonts.register',
-          effect: 'runtimeWrite',
-          jobId,
-          fontKey: spec.key,
-          familyName: spec.familyName ?? '',
-          weight: spec.weight ?? 0,
-          italic: spec.italic === undefined ? -1 : spec.italic ? 1 : 0,
-          data: bytes,
-        },
-        [bytes],
-      ),
-    );
-    if (registered.tag === 'fonts.register') {
-      fontService.applyIdentity(spec.key, registered.identity);
+    fontService.seedRegistered(spec, { fallback, tier, builtIn });
+    if (!sent.has(spec.key)) {
+      sent.add(spec.key);
+      const bytes = toStandaloneArrayBuffer(spec.data);
+      const registered = await requestOverTransport(transport, (jobId) =>
+        wirePack(
+          {
+            kind: 'fonts.register',
+            effect: 'runtimeWrite',
+            jobId,
+            fontKey: spec.key,
+            familyName: spec.familyName ?? '',
+            weight: spec.weight ?? 0,
+            italic: spec.italic === undefined ? -1 : spec.italic ? 1 : 0,
+            data: bytes,
+            ...(builtIn ? { builtIn: true } : {}),
+          },
+          [bytes],
+        ),
+      );
+      if (registered.tag === 'fonts.register') {
+        fontService.applyIdentity(spec.key, registered.identity);
+      }
     }
     if (fallback) {
       await requestOverTransport(transport, (jobId) =>

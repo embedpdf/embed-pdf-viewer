@@ -162,6 +162,34 @@ describe('localEngine()', () => {
     await engine.destroy();
   });
 
+  test('a key in both `fonts` and `fallbackFonts` registers once and fills in where `fallbackFonts` lists it', async () => {
+    let worker!: FakeWorker;
+    const engine = localEngine({
+      worker: () => {
+        worker = new FakeWorker();
+        return worker as unknown as Worker;
+      },
+      defaultFallbackFonts: false,
+      fonts: [{ key: 'brand', familyName: 'Roboto', data: roboto }],
+      fallbackFonts: [
+        { key: 'first', familyName: 'Roboto', data: roboto },
+        { key: 'brand', familyName: 'Roboto', data: roboto },
+      ],
+    });
+
+    // Queued behind the boot fonts, so it settles once they have arrived.
+    await engine.fonts.register({ key: 'later', familyName: 'Roboto', data: roboto });
+
+    const keysOf = (kind: 'fonts.register' | 'fonts.addFallback') =>
+      worker.received.flatMap((request) =>
+        request.kind === kind ? [(request as { fontKey: string }).fontKey] : [],
+      );
+    expect(keysOf('fonts.register')).toEqual(['brand', 'first', 'later']);
+    expect(keysOf('fonts.addFallback')).toEqual(['first', 'brand']);
+    expect(engine.fonts.list().map((font) => font.key)).toEqual(['brand', 'first', 'later']);
+    await engine.destroy();
+  });
+
   test('configured fonts reach the worker before any queued user job', async () => {
     let worker!: FakeWorker;
     const engine = localEngine({

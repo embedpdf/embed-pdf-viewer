@@ -48,7 +48,9 @@ CLOUDPDF_FONTS='[
 Your fallback fonts are tried before the ones the server comes with (Noto Sans Hebrew and Noto
 Naskh Arabic). Within each, the font closest to the text's style comes first (a bold one for bold
 text), then the order listed, so put your preferred faces first. A font of yours with the same key
-as one the server comes with replaces it.
+as one the server comes with replaces it. `doc.fonts.list()` marks the ones it comes with
+`builtIn: true`, and the viewer's font picker leaves them out: they fill in characters whichever
+font a box is in. Yours are offered, fallback or not.
 
 ## Sending fonts to browsers
 

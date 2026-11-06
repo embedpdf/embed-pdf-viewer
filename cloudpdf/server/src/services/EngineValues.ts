@@ -46,7 +46,7 @@ const FIELDS: Readonly<Record<CachedReadKind, number>> = {
   outline: 1,
   attachments: 1,
   actions: 1,
-  fonts: 1,
+  fonts: 2,
   search: 1,
   signatures: 1,
   analysis: 1,

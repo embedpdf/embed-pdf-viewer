@@ -204,7 +204,7 @@ FlattenOptions [InterfaceDeclaration] (from packages/engine/core/src/mutation/Pa
 FlattenWriteOptions [InterfaceDeclaration] (from packages/engine/core/src/mutation/WriteOptions.ts): export interface FlattenWriteOptions extends FlattenOptions, WriteOptions{ }
 FoldOptions [InterfaceDeclaration] (from packages/engine/core/src/search/fold.ts): export interface FoldOptions{ keepCase?: boolean; keepMarks?: boolean; dropWhitespace?: boolean; }
 FoldedText [InterfaceDeclaration] (from packages/engine/core/src/search/fold.ts): export interface FoldedText{ folded: string; map: Uint32Array; original: string; }
-Font [InterfaceDeclaration] (from packages/engine/core/src/dto/DocumentFonts.ts): export interface Font{ name: FontName; source: FontSource; familyName: string; weight: number; italic: boolean; postScriptName: string | null; canChoose: boolean; restrictions: FontRestriction[]; programs: FontProgram[]; }
+Font [InterfaceDeclaration] (from packages/engine/core/src/dto/DocumentFonts.ts): export interface Font{ name: FontName; source: FontSource; builtIn: boolean; familyName: string; weight: number; italic: boolean; postScriptName: string | null; canChoose: boolean; restrictions: FontRestriction[]; programs: FontProgram[]; }
 FontEmbeddingPermission [TypeAliasDeclaration] (from packages/engine/core/src/dto/FontSpec.ts): export type FontEmbeddingPermission = 'installable' | 'editable' | 'preview-and-print';
 FontFormat [TypeAliasDeclaration] (from packages/engine/core/src/dto/DocumentFonts.ts): export type FontFormat = 'truetype' | 'opentype' | 'cff' | 'type1' | 'type3';
 FontHandle [InterfaceDeclaration] (from packages/engine/core/src/dto/FontSpec.ts): export interface FontHandle extends FontIdentityInfo{ readonly key: FontKey; }

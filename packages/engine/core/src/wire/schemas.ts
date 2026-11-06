@@ -1897,6 +1897,7 @@ const FontProgramSchema: z.ZodType<FontProgram> = z.object(fontProgramShape);
 const FontSchema: z.ZodType<Font> = z.object({
   name: z.string(),
   source: closed(z.enum(['standard', 'engine', 'document'])),
+  builtIn: z.boolean(),
   familyName: z.string(),
   weight: z.number().int(),
   italic: z.boolean(),

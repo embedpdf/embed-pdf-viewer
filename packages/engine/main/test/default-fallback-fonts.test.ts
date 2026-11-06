@@ -47,18 +47,25 @@ describe('the default fallback fonts', () => {
       'noto-naskh-arabic',
       'noto-naskh-arabic-bold',
     ]);
+    for (const key of list.fallbacks) {
+      expect(list.fonts.find((font) => font.name === key)?.builtIn).toBe(true);
+    }
     expect(list.fonts.find((font) => font.name === 'noto-sans-hebrew')).toMatchObject({
       source: 'engine',
+      builtIn: true,
       familyName: 'Noto Sans Hebrew',
       weight: 400,
     });
 
     // A fallback of the app's own is tried first, though it was added last:
-    // here the bold program, registered as a regular face.
+    // here the bold program, registered as a regular face. It is the app's,
+    // not one the engine comes with.
     const bold = await loadFallbackFont('noto-sans-hebrew-bold');
     await engine.fonts.register({ key: 'mine', familyName: 'Mine', weight: 400, data: bold });
     await engine.fonts.addFallback('mine');
-    expect((await doc.fonts.list()).fallbacks[0]).toBe('mine');
+    const withMine = await doc.fonts.list();
+    expect(withMine.fallbacks[0]).toBe('mine');
+    expect(withMine.fonts.find((font) => font.name === 'mine')?.builtIn).toBe(false);
     const answer = await doc.fonts.resolve({ runs: [{ text: 'שלום', fontFamily: 'helvetica' }] });
     expect(answer.runs[0]!.fallbacks[0]).toBe(sha256(bold));
 

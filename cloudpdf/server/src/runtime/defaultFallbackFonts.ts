@@ -22,5 +22,6 @@ export function defaultFallbackFontSpecs(taken: ReadonlySet<string>): StartupFon
     fallback: true,
     serve: true,
     tier: FALLBACK_TIERS.builtIn,
+    builtIn: true,
   }));
 }

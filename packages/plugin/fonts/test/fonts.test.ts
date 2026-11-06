@@ -39,6 +39,7 @@ const program = (displaySha256: string, over: Partial<FontProgram> = {}): FontPr
 
 const font = (over: Partial<Font> & Pick<Font, 'name' | 'familyName'>): Font => ({
   source: 'document',
+  builtIn: false,
   weight: 400,
   italic: false,
   postScriptName: null,
