@@ -8,7 +8,7 @@ import type { AnnotationRef } from '../identity/AnnotationRef';
  * - **Standard**: the 14 standard PDF fonts, drawn with the engine's built-in
  *   faces on every platform.
  * - **Engine**: fonts the engine has: registered on the local engine, the
- *   server's on the cloud.
+ *   server's on the cloud, and the fallback fonts the engine comes with.
  * - **Document**: fonts the PDF already has.
  *
  * A font is a face (family, weight, italic) backed by programs: the font files
@@ -35,6 +35,12 @@ export interface Font {
   /** What `fontFamily` takes to write with this font. */
   name: FontName;
   source: FontSource;
+  /**
+   * The engine comes with it: the standard fonts, and the fallback fonts it adds
+   * on its own. `false` for a font the app registered (the server's operator
+   * configured, on the cloud) and for the document's.
+   */
+  builtIn: boolean;
   familyName: string;
   /** 100..900. */
   weight: number;

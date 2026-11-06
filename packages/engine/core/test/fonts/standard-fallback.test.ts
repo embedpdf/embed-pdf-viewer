@@ -32,6 +32,7 @@ const facts: FontListFacts = {
       format: 'truetype',
       sha256: hashOf('h'),
       served: true,
+      builtIn: true,
     },
   ],
   fallbacks: ['noto-sans-hebrew'],

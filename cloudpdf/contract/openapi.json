@@ -25941,6 +25941,9 @@
             "type": "string",
             "enum": ["standard", "engine", "document"]
           },
+          "builtIn": {
+            "type": "boolean"
+          },
           "familyName": {
             "type": "string"
           },
@@ -25981,6 +25984,7 @@
         "required": [
           "name",
           "source",
+          "builtIn",
           "familyName",
           "weight",
           "italic",

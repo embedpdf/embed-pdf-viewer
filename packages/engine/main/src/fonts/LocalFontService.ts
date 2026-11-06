@@ -29,6 +29,8 @@ interface RegisteredFont {
    * so we cannot reuse it.
    */
   bytes: ArrayBuffer;
+  /** One of the fallback fonts the engine adds on its own, kept for replay. */
+  builtIn: boolean;
 }
 
 /**
@@ -107,7 +109,14 @@ export class LocalFontService implements FontService {
       // The runtime resolved the identity (inferred family, weight, italic)
       // and the licence: the handle carries what the document will name.
       const handle: FontHandle = { key, ...payload.identity };
-      this.fonts.set(key, { handle, italic, weight, familyName, bytes: replayCopy });
+      this.fonts.set(key, {
+        handle,
+        italic,
+        weight,
+        familyName,
+        bytes: replayCopy,
+        builtIn: false,
+      });
       this.onChange();
       return handle;
     });
@@ -137,7 +146,7 @@ export class LocalFontService implements FontService {
    */
   seedRegistered(
     spec: FontSpec,
-    opts: { fallback?: boolean; tier?: FallbackTier } = {},
+    opts: { fallback?: boolean; tier?: FallbackTier; builtIn?: boolean } = {},
   ): FontHandle {
     const key = spec.key;
     let entry = this.fonts.get(key);
@@ -158,6 +167,7 @@ export class LocalFontService implements FontService {
         weight: spec.weight ?? 0,
         familyName: spec.familyName ?? '',
         bytes: toArrayBuffer(spec.data),
+        builtIn: opts.builtIn ?? false,
       };
       this.fonts.set(key, entry);
     }
@@ -285,6 +295,7 @@ export class LocalFontService implements FontService {
               weight: font.weight,
               italic: font.italic,
               data: copy,
+              ...(font.builtIn ? { builtIn: true } : {}),
             },
             [copy],
           ),

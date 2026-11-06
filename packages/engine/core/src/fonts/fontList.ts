@@ -70,6 +70,8 @@ export interface EngineFontFacts {
   sha256: string;
   /** Whether its bytes may go to a browser (the cloud's `serve`; always on locally). */
   served: boolean;
+  /** One of the fallback fonts the engine adds on its own, not the app's (the operator's). */
+  builtIn: boolean;
 }
 
 /**
@@ -286,6 +288,7 @@ function documentFontOf(font: DocumentFontFacts): Font {
   return {
     name: font.name,
     source: 'document',
+    builtIn: false,
     familyName: font.face.familyName,
     weight: font.face.weight,
     italic: font.face.italic,
@@ -304,6 +307,7 @@ function engineFontOf(font: EngineFontFacts): Font {
   return {
     name: font.key,
     source: 'engine',
+    builtIn: font.builtIn,
     familyName: identity.familyName,
     weight: identity.weight,
     italic: identity.italic,
@@ -328,6 +332,7 @@ function standardFontOf(name: StandardFont, builtIn: BuiltInPrograms): Font {
   return {
     name,
     source: 'standard',
+    builtIn: true,
     familyName: face.family,
     weight: face.weight,
     italic: face.italic,

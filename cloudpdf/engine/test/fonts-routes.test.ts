@@ -153,6 +153,26 @@ describe('the server’s font routes', () => {
     expect((await get(wirePaths.fontProgramFile(kept), writer())).status).toBe(404);
   });
 
+  test('the operator’s fonts are the server’s own, its default fallback fonts are built in', async () => {
+    const current = await manifest();
+    const list = (await (
+      await get(
+        wirePaths.layerFonts(DOC_ID, 'default', {
+          fontsVersion: current.fontsVersion,
+          pin: tokenPinOf('fonts', current.engine),
+        }),
+        writer(),
+      )
+    ).json()) as FontList;
+    const builtIn = (name: string) => list.fonts.find((font) => font.name === name)?.builtIn;
+    // `roboto` fills in characters too (a configured font does by default).
+    expect(list.fallbacks).toContain('roboto');
+    expect(builtIn('roboto')).toBe(false);
+    expect(builtIn('roboto-kept')).toBe(false);
+    expect(builtIn('noto-sans-hebrew')).toBe(true);
+    expect(builtIn('helvetica')).toBe(true);
+  });
+
   test('a program’s bytes are kept by the browser alone, and go to a token that may write text', async () => {
     for (const path of [
       wirePaths.layerFontProgramFile(DOC_ID, 'default', served),

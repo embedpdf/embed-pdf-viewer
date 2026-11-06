@@ -144,6 +144,7 @@ export function runDocumentFontsConformance(
       );
       const helvetica = fontNamed(list.fonts, 'helvetica')!;
       expect(helvetica).toMatchObject({
+        builtIn: true,
         canChoose: true,
         restrictions: [],
         familyName: 'Helvetica',
@@ -151,7 +152,13 @@ export function runDocumentFontsConformance(
       expect(helvetica.programs[0]!.displaySha256).toMatch(HEX_SHA256);
 
       const served = fontNamed(list.fonts, servedFont.key)!;
-      expect(served).toMatchObject({ source: 'engine', canChoose: true, restrictions: [] });
+      // The harness's own font, though a fallback: not one the engine comes with.
+      expect(served).toMatchObject({
+        source: 'engine',
+        builtIn: false,
+        canChoose: true,
+        restrictions: [],
+      });
       expect(served.programs[0]).toMatchObject({
         displaySha256: servedFont.sha256,
         sourceSha256: servedFont.sha256,

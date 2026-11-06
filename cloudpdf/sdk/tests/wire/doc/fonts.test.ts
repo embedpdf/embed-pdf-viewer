@@ -14,6 +14,7 @@ describe("FontsClient", () => {
                 {
                     name: "name",
                     source: "standard",
+                    builtIn: true,
                     familyName: "familyName",
                     weight: 1,
                     italic: true,

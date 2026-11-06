@@ -2281,6 +2281,7 @@ export class WorkerHost {
       req.weight,
       req.italic,
       new Uint8Array(req.data),
+      req.builtIn ?? false,
     );
     return wirePack({
       tag: 'fonts.register',

@@ -40,7 +40,7 @@ for (const font of fonts) {
 | `source`     | The fonts                                                                                     | Their `name`                       |
 | :----------- | :-------------------------------------------------------------------------------------------- | :--------------------------------- |
 | `'standard'` | The 14 standard PDF fonts. They only cover Latin text.                                        | `'helvetica'`, `'times-bold'`, …   |
-| `'engine'`   | The engine's fonts: the ones you [register](#register-a-font) locally, your server's on the cloud. | the `key` they were given          |
+| `'engine'`   | The engine's fonts: the ones you [register](#register-a-font) locally, your server's on the cloud, and the Hebrew and Arabic fallback fonts the engine comes with. | the `key` they were given          |
 | `'document'` | Fonts the PDF already has.                                                                    | its PostScript name, such as `'MinionPro-Regular'`; without one, its family and style, such as `'Inter,Medium'` |
 
 A PDF can hold one font several times: each editor that wrote text in it may have added its own
@@ -56,6 +56,7 @@ font.
 | :--------------- | :------------------------------------------------------------------------------------------- |
 | `name`           | What you pass as `fontFamily`.                                                               |
 | `source`         | `'standard'`, `'engine'` or `'document'`.                                                    |
+| `builtIn`        | Whether the engine comes with it: the standard fonts, and its own fallback fonts. `false` for the fonts you add and the document's. |
 | `familyName`     | The family, such as `'Minion Pro'`.                                                          |
 | `weight`         | `100` to `900`.                                                                              |
 | `italic`         | Whether it's an italic.                                                                      |
@@ -66,7 +67,9 @@ font.
 
 Next to `fonts`, the list has `fallbacks`, the names of the fonts that
 [fill in missing characters](#text-in-any-language) in the order they were added, and
-`lastResort`, the program that draws a box for a character no font has.
+`lastResort`, the program that draws a box for a character no font has. The fallback fonts the
+engine comes with (`builtIn` engine fonts) fill in whichever font a box names, so a font picker can
+leave them out, as the viewer's does.
 
 The list changes when a write adds a font to the document, and, on the local engine, when you
 register fonts. Each change raises the document event `fonts.changed`:

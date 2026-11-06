@@ -1354,6 +1354,8 @@ export interface FontsRegisterWorkerRequest {
   /** `-1` → infer / `0` non-italic / `1` italic. */
   italic: number;
   data: ArrayBuffer;
+  /** One of the fallback fonts the engine adds on its own; absent for the app's. */
+  builtIn?: boolean;
 }
 
 export interface FontsAddFallbackWorkerRequest {
