@@ -1,5 +1,7 @@
 # @embedpdf/engine-runtime-linux-arm64
 
+## 3.0.0
+
 ## 3.0.0-next.23
 
 ## 3.0.0-next.22
