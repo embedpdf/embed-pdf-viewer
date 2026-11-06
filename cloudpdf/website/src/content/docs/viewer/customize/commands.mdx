@@ -44,6 +44,7 @@ Here **Approve** writes to a status line of your app, above the viewer:
 | :-- | :-- |
 | `id` | A unique name. Start yours with your own prefix, such as `acme:`. |
 | `label` | What people see, or `labelKey` for a [translated](translations) label |
+| `labelParams` | The values for its label's `{name}` slots, such as a count: see [A label with a value](#a-label-with-a-value) |
 | `icon` | An icon's name: the viewer's or [your own](#icons) |
 | `shortcut` | A key, such as `'Mod+Shift+S'`, or a list of keys. `Mod` is `Cmd` on a Mac and `Ctrl` elsewhere. |
 | `shortcutInTextFields` | `true`: its shortcut works in a text field in the viewer too, as Find's does |
@@ -97,6 +98,39 @@ can be a constant outside your component and never see an old value. Give it a n
 something changes, as you do with any prop: the viewer sees a new object, not a change inside the
 one it has (`[...done, item]`, not `done.push(item)`). In TypeScript, `ViewerConfig<AppState>` gives
 `appState` its type in every command.
+
+## A label with a value
+
+`labelParams` gives the values for the `{name}` slots in a label, such as how many pages are
+selected:
+
+```js
+{
+  commands: [
+    {
+      id: 'acme:extract',
+      labelKey: 'acme.extract',
+      label: 'Extract {count} pages',
+      icon: 'download',
+      labelParams: ({ get }) => ({ count: get('pageEdit').getSelected().length }),
+      enabled: ({ get }) => get('pageEdit').getSelected().length > 0,
+      run: extract,
+    },
+  ],
+  strings: {
+    en: { 'acme.extract': { one: 'Extract {count} page', other: 'Extract {count} pages' } },
+    nl: { 'acme.extract': { one: '{count} pagina extraheren', other: "{count} pagina's extraheren" } },
+  },
+}
+```
+
+It gets what `enabled` gets, and the viewer asks it again whenever a plugin's state or `appState`
+changes, so the label is always right. A number `count` also picks the plural form: `one` and
+`other`, and the other forms a language has, such as `few` and `many` in Polish. The values go into
+`label`, into the words under `labelKey` in each language, and into a string under the command's
+id. The label shows with them everywhere the command does: its button, a menu, the tooltip, and the
+sentence that says why it isn't allowed. A `labelParams` that throws gives no values, and the slots
+show as they are.
 
 ## Change what a built-in button does
 
