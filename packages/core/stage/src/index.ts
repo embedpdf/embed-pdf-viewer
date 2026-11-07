@@ -641,6 +641,20 @@ function upperBound(arr: number[], value: number): number {
   }
   return lo;
 }
+/**
+ * A layout's `itemOfPage`: the item holding each page, whatever order the groups
+ * come in. A page the layout leaves out gets the nearest item before it by first
+ * page.
+ */
+function itemOfPageFor(items: SceneItem[], pageCount: number): (pageIndex: number) => number {
+  const itemOf = new Int32Array(pageCount).fill(-1);
+  for (const it of items) for (const pi of it.pageIndexes) itemOf[pi] = it.index;
+  const firstPage = items.map((it) => it.pageIndexes[0]);
+  return (pi) => {
+    const index = itemOf[pi] ?? -1; // a page index out of range reads undefined
+    return index >= 0 ? index : clamp(upperBound(firstPage, pi) - 1, 0, items.length - 1);
+  };
+}
 const OVERSCAN = 2;
 
 /**
@@ -847,7 +861,6 @@ export function linearLayout(
     const it = items[posIdx(position)];
     return vertical ? it.y + it.height : it.x + it.width;
   });
-  const firstPage = items.map((it) => it.pageIndexes[0]);
 
   return {
     size,
@@ -868,9 +881,7 @@ export function linearLayout(
       const position = clamp(upperBound(starts, vertical ? pt.y : pt.x) - 1, 0, items.length - 1);
       return items[posIdx(position)];
     },
-    itemOfPage(pi) {
-      return clamp(upperBound(firstPage, pi) - 1, 0, items.length - 1);
-    },
+    itemOfPage: itemOfPageFor(items, pages.length),
   };
 }
 
@@ -973,7 +984,6 @@ export function gridLayout(
   }
 
   const size: Size = { width: columns * stepX - gap, height: Math.max(1, yCursor - gap) };
-  const firstPage = items.map((it) => it.pageIndexes[0]);
 
   return {
     size,
@@ -1001,9 +1011,7 @@ export function gridLayout(
       const row = clamp(upperBound(rowTop, pt.y) - 1, 0, rows - 1);
       return items[clamp(row * columns + colAt(col), 0, itemCount - 1)];
     },
-    itemOfPage(pi) {
-      return clamp(upperBound(firstPage, pi) - 1, 0, itemCount - 1);
-    },
+    itemOfPage: itemOfPageFor(items, pages.length),
   };
 }
 
