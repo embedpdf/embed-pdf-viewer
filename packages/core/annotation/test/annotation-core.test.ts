@@ -45,6 +45,7 @@ import {
   fitStampBox,
 } from '../src/geometry';
 import {
+  expandRect,
   normalizeDeg,
   rectFromPoints,
   rotatedAabb,
@@ -1634,6 +1635,56 @@ describe('annotation-core', () => {
       expect(geometry.inkList[0]).toHaveLength(2);
       expect(geometry.inkList[0][0].y).toBeCloseTo(geometry.inkList[0][1].y);
     }
+  });
+
+  it('the stroke under the pen draws as its points, so nothing drawn moves; lifted, it draws the curves it commits with', () => {
+    const ink = (phase: 'down' | 'move' | 'up', point: Point): Message => ({
+      type: 'createPointer',
+      phase,
+      subtype: 'ink',
+      deferInkCommit: true,
+      in: { page: PAGE, point, shift: false },
+    });
+    const draftItem = (model: Model) =>
+      pageItems(model, PAGE).find((item) => item.source === 'draft')!;
+    // Loops at uneven spacing, as pointer events arrive. Fitted on every move,
+    // curves far behind the pen would shift as the fit's splits move.
+    const pen = Array.from({ length: 90 }, (_, i) => {
+      const t = i * 0.13 + 0.05 * Math.sin(i * 1.7);
+      return { x: 20 + 7 * t - 9 * Math.sin(t), y: 200 + 12 * Math.cos(t) };
+    });
+
+    let model = step(initialModel, ink('down', pen[0]!))[0];
+    expect(scene(draftItem(model)).map((node) => node.kind)).toEqual(['ellipse']); // one point: its dot
+    for (let i = 1; i < pen.length; i++) {
+      model = step(model, ink('move', pen[i]!))[0];
+      const item = draftItem(model);
+      const drawn = pen.slice(0, i + 1);
+      const nodes = scene(item);
+      expect(nodes).toHaveLength(1);
+      expect(nodes[0]).toMatchObject({ kind: 'poly', points: drawn, closed: false });
+      expect(nodes[0]!.paint).toMatchObject({ lineCap: 'round', join: 'round' });
+      expectRectClose(item.box, expandRect(unionRect(drawn), item.style.strokeWidth / 2));
+    }
+
+    model = step(model, ink('up', pen[pen.length - 1]!))[0];
+    const [lifted] = scene(draftItem(model));
+    expect(lifted).toMatchObject({ kind: 'path' });
+    expect(lifted!.paint.join).toBeUndefined();
+
+    // The next stroke draws as its points; the lifted one keeps its curves.
+    const next = pen.slice(0, 12).map((point) => ({ x: point.x, y: point.y + 40 }));
+    model = step(model, ink('down', next[0]!))[0];
+    for (const point of next.slice(1)) model = step(model, ink('move', point))[0];
+    const [first, second] = scene(draftItem(model));
+    expect(first).toEqual(lifted);
+    expect(second).toMatchObject({ kind: 'poly', points: next });
+
+    model = step(model, ink('up', next[next.length - 1]!))[0];
+    model = step(model, { type: 'finishInkDraft' })[0];
+    const committed = scene(pageItems(model, PAGE)[0]!);
+    expect(committed.map((node) => node.kind)).toEqual(['path', 'path']);
+    expect(committed[0]).toMatchObject({ kind: 'path', d: (lifted as { d: string }).d });
   });
 
   it('a selected ink wraps its stroke: the outline expands by the stroke, not tight to the centerline', () => {

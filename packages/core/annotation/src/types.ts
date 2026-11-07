@@ -369,6 +369,8 @@ export type Draft =
       preset?: string;
       page: PageRef;
       strokes: Point[][];
+      /** The pen is down: the last stroke is still being drawn. */
+      drawing?: boolean;
       intent?: InkIntent;
       /** The tool's `/F` seed, captured at down (see the rect draft). */
       flags?: Partial<AnnotationFlags>;

@@ -154,13 +154,14 @@ export function createPointer(
             model.draft.subtype === subtype &&
             model.draft.preset === preset &&
             model.draft.page.objectNumber === input.page.objectNumber
-            ? { ...model.draft, strokes: [...model.draft.strokes, [input.point]] }
+            ? { ...model.draft, strokes: [...model.draft.strokes, [input.point]], drawing: true }
             : {
                 kind: 'create-ink',
                 subtype,
                 preset,
                 page: input.page,
                 strokes: [[input.point]],
+                drawing: true,
                 intent,
                 ...(flags ? { flags } : {}),
               }
@@ -212,13 +213,13 @@ export function createPointer(
     return [model, []];
 
   if (activeDraft.kind === 'create-ink') {
-    let next = model;
-    if (straightenInk && activeDraft.strokes.length) {
-      const strokes = activeDraft.strokes.slice();
+    const strokes = activeDraft.strokes.slice();
+    if (straightenInk && strokes.length) {
       const last = strokes.length - 1;
       strokes[last] = straightenInkStroke(strokes[last], straightenInk);
-      next = { ...model, draft: { ...activeDraft, strokes } };
     }
+    // The pen is up: the stroke draws as the curves it commits with.
+    const next = { ...model, draft: { ...activeDraft, strokes, drawing: false } };
     return deferInkCommit ? [next, []] : finishInkCreate(next);
   }
 
