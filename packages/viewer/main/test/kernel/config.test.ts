@@ -67,8 +67,8 @@ describe('changedConfigKeys', () => {
 });
 
 describe('isLiveConfigKey', () => {
-  it('is true for the five keys a running viewer follows, and nothing else', () => {
-    for (const key of ['src', 'theme', 'locale', 'disable', 'readOnly']) {
+  it('is true for the keys a running viewer follows, and nothing else', () => {
+    for (const key of ['src', 'theme', 'locale', 'features', 'disable', 'readOnly', 'fetch']) {
       expect(isLiveConfigKey(key)).toBe(true);
     }
     for (const key of ['documents', 'commands', 'scope', 'identity', 'notAllowed', 'engine']) {

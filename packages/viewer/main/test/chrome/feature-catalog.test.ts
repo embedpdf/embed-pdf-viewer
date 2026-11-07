@@ -1,8 +1,8 @@
 /**
- * The feature names are API: an app's `disable` list holds them. All features and Turn features
- * off list them; these tests hold both pages to the tree `disable` and `readOnly` read
- * (`FEATURE_PARTS`, `READ_ONLY_FEATURES`), so a feature, a part or what `readOnly` turns off
- * can't change in one place only.
+ * The feature names are API: an app's `features` holds them. All features and Turn features on
+ * and off list them; these tests hold both pages to the tree `features` and `readOnly` read
+ * (`FEATURE_PARTS`, `START_OFF_FEATURES`, `READ_ONLY_FEATURES`), so a feature, a part, what starts
+ * off or what `readOnly` turns off can't change in one place only.
  */
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -10,7 +10,11 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { FEATURE_PARTS, READ_ONLY_FEATURES } from '../../../chrome/src/features';
+import {
+  FEATURE_PARTS,
+  READ_ONLY_FEATURES,
+  START_OFF_FEATURES,
+} from '../../../chrome/src/features';
 
 const pages = resolve(
   dirname(fileURLToPath(import.meta.url)),
@@ -42,20 +46,48 @@ const namesIn = (cell: string): string[] =>
 
 const TREE = FEATURE_PARTS as Readonly<Record<string, readonly string[]>>;
 
+/**
+ * What an "On from the start" cell says starts off: nothing (`yes`), the whole feature (`no`), or
+ * every part but the one it names (`` `.filling` only ``, or `Filling only`).
+ */
+function startsOffPerPage(feature: string, cell: string): string[] {
+  if (cell === 'yes') return [];
+  if (cell === 'no') return [feature];
+  const only = /^`?\.?(\w+)`? only$/i.exec(cell)?.[1]?.toLowerCase();
+  if (only === undefined) throw new Error(`${feature}: "${cell}" says neither yes, no or one part`);
+  return TREE[feature]!.filter((part) => part !== only).map((part) => `${feature}.${part}`);
+}
+
+/** What starts off inside `feature`, as `START_OFF_FEATURES` has it. */
+const startsOff = (feature: string): string[] =>
+  START_OFF_FEATURES.filter((name) => name === feature || name.startsWith(`${feature}.`));
+
 describe('All features', () => {
+  const rows = tableRows('index.mdx', 'Feature');
+
   it('lists every feature of the tree, once, and nothing else', () => {
-    const listed = tableRows('index.mdx', 'Feature').map((row) => namesIn(row[0]!)[0]);
+    const listed = rows.map((row) => namesIn(row[0]!)[0]);
     expect([...listed].sort()).toEqual(Object.keys(TREE).sort());
     expect(new Set(listed).size).toBe(listed.length);
   });
+
+  it('says what starts off as the defaults have it', () => {
+    for (const [name, , onFromTheStart] of rows) {
+      const feature = namesIn(name!)[0]!;
+      expect(startsOffPerPage(feature, onFromTheStart!), feature).toEqual(startsOff(feature));
+    }
+  });
 });
 
-describe('Turn features off', () => {
-  const rows = tableRows('turning-off.mdx', 'Feature').map(([features, parts, readOnly]) => ({
-    features: namesIn(features!),
-    parts: namesIn(parts!),
-    readOnly: readOnly!,
-  }));
+describe('Turn features on and off', () => {
+  const rows = tableRows('turning-off.mdx', 'Feature').map(
+    ([features, parts, onFromTheStart, readOnly]) => ({
+      features: namesIn(features!),
+      parts: namesIn(parts!),
+      onFromTheStart: onFromTheStart!,
+      readOnly: readOnly!,
+    }),
+  );
 
   it('lists every feature of the tree, once, and nothing else', () => {
     const listed = rows.flatMap((row) => row.features);
@@ -67,6 +99,14 @@ describe('Turn features off', () => {
     for (const row of rows) {
       for (const feature of row.features) {
         expect(row.parts, feature).toEqual(TREE[feature]!.map((part) => `.${part}`));
+      }
+    }
+  });
+
+  it('says what starts off as the defaults have it', () => {
+    for (const row of rows) {
+      for (const feature of row.features) {
+        expect(startsOffPerPage(feature, row.onFromTheStart), feature).toEqual(startsOff(feature));
       }
     }
   });

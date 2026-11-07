@@ -12,6 +12,13 @@ import { chromium, type Browser, type Page } from 'playwright-core';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
+/**
+ * `features` with the ones that start off turned on, as page source: the whole viewer, for the
+ * tests that open the Form, Redact or Measure tab, or take a snapshot.
+ */
+export const EVERY_FEATURE =
+  "{ measurement: true, redaction: true, 'forms.building': true, snapshots: true }";
+
 /** The built artifact the tests load. */
 export const dist = resolve(here, '..', '..', 'dist');
 const samplePdf = resolve(here, '../../../../../examples/engine-runtime-demo/public/sample.pdf');

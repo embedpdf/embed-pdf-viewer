@@ -2,7 +2,7 @@
  * `plugins` in the config: a built-in plugin's settings by its name, over the viewer's own; a
  * plugin of your own as its definition, which `viewer.get(name)` finds; a warning for a name the
  * viewer doesn't know; and the annotation plugin's `editable` and the form plugin's `fillable`
- * meeting what `disable` and `readOnly` turn off, so each only takes away.
+ * meeting what `features` and `readOnly` turn off, so each only takes away.
  *
  * Runs against the built snippet (`pnpm build` first).
  */
@@ -14,6 +14,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import {
   dist,
+  EVERY_FEATURE,
   frames,
   launchChromium,
   serveViewer,
@@ -48,7 +49,7 @@ const PAGE = `<!doctype html><html><head><meta charset="utf-8">
   window.element = EmbedPDF.init({
     target: '#viewer',
     src: '/sample.pdf',
-    disable: ['annotations.drawing'],
+    features: { ...${EVERY_FEATURE}, 'annotations.drawing': false },
     plugins: {
       stage: { spread: 'odd' },
       search: { highlight: { color: '#a7f3d0' } },
@@ -69,7 +70,7 @@ const PAGE = `<!doctype html><html><head><meta charset="utf-8">
 /** What a page of this test keeps on `window`. */
 interface PluginsWindow {
   element: HTMLElement & {
-    disable: readonly string[] | undefined;
+    features: Record<string, boolean> | undefined;
     readOnly: boolean | undefined;
     viewer: {
       get(name: string): Record<string, (...args: unknown[]) => unknown>;
@@ -127,7 +128,7 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('plugins in the config',
     expect(settings.tools.at(-1)).toBe('highlight');
   });
 
-  it('adds what the app turns off to what disable turns off', async () => {
+  it('adds what the app turns off to what features turns off', async () => {
     const { commands } = await settingsOn();
     expect(commands.disabledCategories).toEqual(['annotations.drawing']);
     expect(commands.disabledCommands).toEqual(['zoom:in']);
@@ -150,11 +151,18 @@ describe.skipIf(!existsSync(join(dist, 'embedpdf.js')))('plugins in the config',
     );
   });
 
-  it('keeps only what both the app and disable or readOnly allow to be changed by hand', async () => {
+  it('keeps only what both the app and features or readOnly allow to be changed by hand', async () => {
     // Drawing is off, so ink is frozen: of the app's ink and highlight, highlight is left.
     expect(await settingsOn()).toMatchObject({ editable: ['highlight'], fillable: ['text'] });
 
-    await tab.evaluate(() => ((window as unknown as PluginsWindow).element.disable = []));
+    await tab.evaluate(() => {
+      (window as unknown as PluginsWindow).element.features = {
+        measurement: true,
+        redaction: true,
+        'forms.building': true,
+        snapshots: true,
+      };
+    });
     await frames(tab);
     expect(await settingsOn()).toMatchObject({
       editable: ['ink', 'highlight'],

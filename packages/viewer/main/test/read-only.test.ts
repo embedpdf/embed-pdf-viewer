@@ -2,7 +2,7 @@
  * What a turned-off feature leaves in the document stays, frozen: under `readOnly` an annotation
  * is selected but not dragged or deleted, the View only label says why, and the comments panel
  * only reads; turning `readOnly` off while the viewer runs makes it movable again. Under
- * `disable: ['shapes']` a square is frozen and a highlight isn't. A scope that allows no change
+ * `shapes: false` a square is frozen and a highlight isn't. A scope that allows no change
  * shows the label too.
  *
  * Runs against the built snippet (`pnpm build` first).
@@ -22,9 +22,17 @@ import {
   type ViewerHost,
 } from './helpers/viewer-host';
 
+/** Every feature on, the ones that start off too, so what's frozen is what the test turns off. */
+const EVERYTHING = {
+  measurement: true,
+  redaction: true,
+  'forms.building': true,
+  snapshots: true,
+} as const;
+
 const CONFIGS = {
-  'read-only': { readOnly: true },
-  'no-shapes': { disable: ['shapes'] },
+  'read-only': { features: EVERYTHING, readOnly: true },
+  'no-shapes': { features: { ...EVERYTHING, shapes: false } },
   'no-change-allowed': {
     scope: ['doc.open', 'doc.render', 'doc.text.select', 'doc.text.search', 'doc.annotate.read'],
   },
@@ -246,7 +254,7 @@ describe('what a turned-off feature made stays, frozen', () => {
     await tab.close();
   });
 
-  it("under disable: ['shapes'] a square is frozen and a highlight isn't", async () => {
+  it("under shapes: false a square is frozen and a highlight isn't", async () => {
     const tab = await open('no-shapes');
     expect(await viewOnlyLabel(tab)).toBeNull();
     const square = await create(tab, SQUARE);

@@ -38,6 +38,7 @@ const CONFIG = `{
   target: '#viewer',
   src: '/sample.pdf',
   theme: 'light',
+  features: { measurement: true, redaction: true, 'forms.building': true, snapshots: true },
   icons: {
     logo: { paths: ['M4 4h16v16H4z'], fill: true },
     // The built-in download icon, replaced: one path, as a string.

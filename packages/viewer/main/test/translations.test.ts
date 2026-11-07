@@ -110,6 +110,7 @@ const PAGES = {
   }`),
   '/style.html': page(`{
     locale: 'en',
+    features: { 'forms.building': true },
     strings: {
       en: {
         'annotation.style.stroke': 'Line',

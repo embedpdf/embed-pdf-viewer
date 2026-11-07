@@ -15,6 +15,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import {
   dist,
+  EVERY_FEATURE,
   frames,
   launchChromium,
   serveViewer,
@@ -33,7 +34,12 @@ const page = (config: string) => `<!doctype html><html><head><meta charset="utf-
 <div id="viewer"></div>
 <script type="module">
   import EmbedPDF from '/embedpdf.js';
-  window.element = EmbedPDF.init({ target: '#viewer', src: '/sample.pdf', ...${config} });
+  window.element = EmbedPDF.init({
+    target: '#viewer',
+    src: '/sample.pdf',
+    features: ${EVERY_FEATURE},
+    ...${config},
+  });
 </script>
 </body></html>`;
 
@@ -43,7 +49,9 @@ const PAGES = {
   '/view-only.html': page(
     "{ scope: ['doc.open', 'doc.render', 'doc.text.select', 'doc.text.search', 'doc.annotate.read'] }",
   ),
-  '/no-insert.html': page("{ disable: ['stamps', 'attachments', 'signatures'] }"),
+  '/no-insert.html': page(
+    `{ features: { ...${EVERY_FEATURE}, stamps: false, attachments: false, signatures: false } }`,
+  ),
 };
 
 const MODE_BARS = ['annotate', 'shapes', 'insert', 'form', 'redact', 'measure'];

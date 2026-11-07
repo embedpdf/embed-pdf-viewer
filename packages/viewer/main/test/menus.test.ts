@@ -17,6 +17,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import {
   dist,
+  EVERY_FEATURE,
   frames,
   launchChromium,
   serveViewer,
@@ -36,7 +37,12 @@ const page = (box: string, config = '{}') => `<!doctype html><html><head><meta c
 <script type="module">
   import EmbedPDF from '/embedpdf.js';
   window.copied = 0;
-  window.element = EmbedPDF.init({ target: '#viewer', src: '/sample.pdf', ...${config} });
+  window.element = EmbedPDF.init({
+    target: '#viewer',
+    src: '/sample.pdf',
+    features: ${EVERY_FEATURE},
+    ...${config},
+  });
 </script>
 </body></html>`;
 

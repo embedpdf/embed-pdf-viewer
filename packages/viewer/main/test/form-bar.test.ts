@@ -35,7 +35,13 @@ const page = (layout: string) => `<!doctype html><html><head><meta charset="utf-
 <script type="module">
   import EmbedPDF from '/embedpdf.js';
   const bytes = Uint8Array.from(atob('${FORM.toString('base64')}'), (char) => char.charCodeAt(0));
-  window.element = EmbedPDF.init({ target: '#viewer', src: bytes, theme: 'light', ${layout} });
+  window.element = EmbedPDF.init({
+    target: '#viewer',
+    src: bytes,
+    theme: 'light',
+    features: { 'forms.building': true },
+    ${layout}
+  });
 </script>
 </body></html>`;
 
