@@ -30,7 +30,9 @@ state, your CSS:
 ```tsx
 <PDFViewer
   src="/report.pdf"
-  layout={(layout) => layout.add({ custom: 'doc-picker' }, { to: 'main', section: 'start' })}
+  layout={(layout) =>
+    layout.add({ custom: 'doc-picker' }, { to: 'main', section: 'start' })
+  }
 >
   <ToolbarItem id="doc-picker">
     <MyDocPicker />
@@ -62,7 +64,7 @@ done: its listeners stop and its calls refuse.
 (`plugins={{ stage: { spread: 'odd' } }}`), and a plugin of your own by a name
 `viewer.get()` then finds it under.
 
-`src`, `theme`, `locale`, `disable`, `readOnly` and `fetch` follow their props
+`src`, `theme`, `locale`, `features`, `readOnly` and `fetch` follow their props
 while the viewer runs; every other prop is read once, so give the viewer a new `key` to
 start over with a changed one.
 

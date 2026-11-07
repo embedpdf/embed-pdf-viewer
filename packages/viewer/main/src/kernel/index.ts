@@ -118,6 +118,7 @@ export type {
   CommandContext,
   CommandDefinition,
   Feature,
+  Features,
   FloatPosition,
   IconDef,
   IconName,

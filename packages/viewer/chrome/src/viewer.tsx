@@ -14,7 +14,7 @@
  * The engine stays a prop — choosing local-wasm vs cloud is the host's
  * decision, and each delivery wires its own. The chrome — toolbars,
  * translations, theme — renders at t≈0; only the pages wait on the engine.
- * Customization is mount-time, except `theme`, `locale`, `disable`,
+ * Customization is mount-time, except `theme`, `locale`, `features`, `disable`,
  * `readOnly` and `appState`, which follow their props (see {@link FollowProps});
  * changing any other prop on a mounted viewer does not rebuild the workspace.
  */
@@ -69,9 +69,12 @@ import {
   byHandSettingsOf,
   disabledSettingsOf,
   sameByHand,
+  unknownFeaturesOf,
   type ByHandSettings,
   type DisabledSettings,
   type Feature,
+  type FeatureChoices,
+  type Features,
   type ReadOnlyExceptions,
 } from './features';
 import {
@@ -131,14 +134,21 @@ export interface ViewerCustomization<AppState = any> {
    */
   locale?: 'auto' | (string & {});
   /**
-   * What this viewer doesn't have, everywhere at once: features (`'annotations'`), their parts
-   * (`'annotations.highlight'`) and single commands (`'tool:highlight'`: a name with a colon).
+   * What people can do in this viewer, everywhere at once: a feature (`annotations`) or a part
+   * (`'annotations.highlight'`) on or off. One left out keeps its default: everything is on but
+   * `measurement`, `redaction`, `snapshots` and `'forms.building'`. A part wins over its feature.
    * Follows its prop.
+   */
+  features?: Features;
+  /**
+   * What this viewer doesn't have: features, their parts and single commands (`'tool:highlight'`:
+   * a name with a colon). A feature in it counts as `false` under `features`. Follows its prop.
+   * @deprecated Use `features` (`{ forms: false }`), and the layout for a button's place; goes in 4.0.
    */
   disable?: readonly (Feature | (string & {}))[];
   /**
-   * Every feature that changes the document off, or all of them but `except`, on top of
-   * `disable`. Only the interface: plugins keep working for your code. Follows its prop.
+   * Every feature that changes the document off, or all of them but `except`, after `features`:
+   * `readOnly` wins. Only the interface: plugins keep working for your code. Follows its prop.
    */
   readOnly?: boolean | ReadOnlyExceptions;
   /**
@@ -274,20 +284,23 @@ function HandleBridge({
   return null;
 }
 
+/** The unknown feature names already warned about, so each warns once. */
+const warnedFeatures = new Set<string>();
+
 const sameList = (left: readonly string[], right: readonly string[]): boolean =>
   left.length === right.length && left.every((name, index) => name === right[index]);
 
 /**
- * What `disable` and `readOnly` turn off, with what the app's `plugins` settings turn off too:
- * each only takes away.
+ * What `features`, `disable` and `readOnly` turn off, with what the app's `plugins` settings turn
+ * off too, which only take away. `yours` are your commands' categories.
  */
 function turnedOffOf(
-  disable: ViewerCustomization['disable'],
-  readOnly: ViewerCustomization['readOnly'],
+  choices: FeatureChoices,
+  yours: readonly string[],
   settings: PluginsConfigRead['settings'],
 ): { readonly disabled: DisabledSettings; readonly byHand: ByHandSettings } {
-  const disabled = disabledSettingsOf(disable, readOnly);
-  const byHand = byHandSettingsOf(disable, readOnly);
+  const disabled = disabledSettingsOf(choices, yours);
+  const byHand = byHandSettingsOf(choices, yours);
   const union = (viewers: readonly string[], apps: readonly string[] | undefined) =>
     apps?.length ? [...new Set([...viewers, ...apps])] : viewers;
   return {
@@ -295,9 +308,10 @@ function turnedOffOf(
       disabledCategories: union(disabled.disabledCategories, settings.commands?.disabledCategories),
       disabledCommands: union(disabled.disabledCommands, settings.commands?.disabledCommands),
     },
+    // In the app's order: its list, less what the viewer has frozen.
     byHand: {
-      editable: bothAllow(byHand.editable, settings.annotation?.editable ?? true),
-      fillable: bothAllow(byHand.fillable, settings.form?.fillable ?? true),
+      editable: bothAllow(settings.annotation?.editable ?? true, byHand.editable),
+      fillable: bothAllow(settings.form?.fillable ?? true, byHand.fillable),
     },
   };
 }
@@ -311,7 +325,9 @@ function turnedOffOf(
 function FollowProps({
   registered,
   settings,
+  yours,
   locale,
+  features,
   disable,
   readOnly,
   appState,
@@ -323,7 +339,9 @@ function FollowProps({
     readonly appState: unknown;
   };
   settings: PluginsConfigRead['settings'];
+  yours: readonly string[];
   locale: string;
+  features: ViewerCustomization['features'];
   disable: ViewerCustomization['disable'];
   readOnly: ViewerCustomization['readOnly'];
   appState: unknown;
@@ -333,7 +351,7 @@ function FollowProps({
   const applied = useRef(registered);
   // In the render that brought the change, so the plugin has it when the prop's setter returns.
   useLayoutEffect(() => {
-    const { disabled, byHand } = turnedOffOf(disable, readOnly, settings);
+    const { disabled, byHand } = turnedOffOf({ features, disable, readOnly }, yours, settings);
     const previous = applied.current;
     applied.current = { locale, disabled, byHand, appState };
     // Your app's state, which the commands read: a new value, and every button asks again.
@@ -383,6 +401,7 @@ export function FullViewer({
   icons,
   strings,
   locale = 'auto',
+  features,
   disable,
   readOnly,
   scope,
@@ -440,6 +459,8 @@ export function FullViewer({
       { plugins: tokens as PluginTokens, viewer: slot.current },
       { isMac: isMacPlatform() },
     );
+    // The features your commands add, which `features` turns on and off too.
+    const yourCategories = (commands ?? []).flatMap((command) => command.categories ?? []);
 
     return {
       slot,
@@ -463,7 +484,8 @@ export function FullViewer({
       },
       plugins: { ...pluginsRead, problems: [...pluginsRead.problems, ...languageProblems] },
       tokens: tokens as PluginTokens,
-      ...turnedOffOf(disable, readOnly, pluginsRead.settings),
+      yourCategories,
+      ...turnedOffOf({ features, disable, readOnly }, yourCategories, pluginsRead.settings),
       appState,
     };
   });
@@ -483,6 +505,15 @@ export function FullViewer({
   useEffect(() => {
     for (const problem of resolved.plugins.problems) console.warn(`[embedpdf] plugins: ${problem}`);
   }, [resolved]);
+
+  // A misspelled feature quietly changes nothing: each name once, as `features` changes.
+  useEffect(() => {
+    for (const name of unknownFeaturesOf(features, resolved.yourCategories)) {
+      if (warnedFeatures.has(name)) continue;
+      warnedFeatures.add(name);
+      console.warn(`[embedpdf] features: no feature or part is called "${name}"`);
+    }
+  }, [features, resolved]);
 
   // The app's settings for each built-in plugin, from `plugins`.
   const { settings } = resolved.plugins;
@@ -646,7 +677,9 @@ export function FullViewer({
               appState: resolved.appState,
             }}
             settings={settings}
+            yours={resolved.yourCategories}
             locale={localeCodeOf(locale, resolved.i18n.codes, resolved.i18n.fallback)}
+            features={features}
             disable={disable}
             readOnly={readOnly}
             appState={appState}

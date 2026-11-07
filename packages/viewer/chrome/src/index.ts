@@ -51,7 +51,7 @@ export type {
   ViewerPlugins,
   WatchOptions,
 } from './handle';
-export type { Feature, ReadOnlyExceptions } from './features';
+export type { Feature, Features, ReadOnlyExceptions } from './features';
 export type {
   CapabilityToken,
   DocumentInfo,

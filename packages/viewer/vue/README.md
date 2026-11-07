@@ -34,7 +34,8 @@ your CSS:
 import { PDFViewer, ToolbarItem, type Layout } from '@embedpdf/viewer-vue';
 import DocPicker from './DocPicker.vue';
 
-const layout = (layout: Layout) => layout.add({ custom: 'doc-picker' }, { to: 'main', section: 'start' });
+const layout = (layout: Layout) =>
+  layout.add({ custom: 'doc-picker' }, { to: 'main', section: 'start' });
 </script>
 
 <template>
@@ -50,7 +51,10 @@ const layout = (layout: Layout) => layout.add({ custom: 'doc-picker' }, { to: 'm
 ## Driving the viewer
 
 ```vue
-<PDFViewer src="/report.pdf" @ready="(viewer) => viewer.commands.execute('zoom:in')" />
+<PDFViewer
+  src="/report.pdf"
+  @ready="(viewer) => viewer.commands.execute('zoom:in')"
+/>
 ```
 
 `@ready` hands you the `viewer`: each plugin's API by its name
@@ -63,7 +67,7 @@ composables of `@embedpdf/vue` work there too. `@document-change` and
 a panel. When the viewer unmounts, its `viewer` is done: its listeners stop and
 its calls refuse.
 
-`src`, `theme`, `locale`, `disable`, `readOnly` and `fetch` follow their props
+`src`, `theme`, `locale`, `features`, `readOnly` and `fetch` follow their props
 while the viewer runs; every other prop is read once, so give the viewer a new `key` to
 start over with a changed one.
 

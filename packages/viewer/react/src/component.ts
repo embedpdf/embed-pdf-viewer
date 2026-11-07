@@ -37,8 +37,8 @@
  * browser: nothing here, or in the viewer it imports, touches the DOM when
  * imported.
  *
- * `src`, `theme`, `locale`, `disable`, `readOnly` and `fetch` follow their
- * props: the element changes them in place. `onReady`, `onDocumentChange` and
+ * `src`, `theme`, `locale`, `features`, `disable`, `readOnly` and `fetch` follow
+ * their props: the element changes them in place. `onReady`, `onDocumentChange` and
  * `onPanelResize` call the latest prop. Every other prop is read once, when the viewer starts; a later
  * change is ignored (development warns), and a new `key` mounts a new viewer
  * with it.
@@ -110,6 +110,7 @@ const LIVE_PROPS: Readonly<Record<LiveConfigKey, true>> = {
   src: true,
   theme: true,
   locale: true,
+  features: true,
   disable: true,
   readOnly: true,
   fetch: true,
@@ -200,13 +201,14 @@ export function PDFViewer({
   }, []);
 
   // The live props, after every render: the element compares them by value, so an unchanged
-  // one (an inline `disable={['forms']}` too) changes nothing.
+  // one (an inline `features={{ forms: false }}` too) changes nothing.
   useBrowserLayoutEffect(() => {
     const element = ref.current;
     if (!element) return;
     element.src = config.src;
     element.theme = config.theme;
     element.locale = config.locale;
+    element.features = config.features;
     element.disable = config.disable;
     element.readOnly = config.readOnly;
     element.fetch = config.fetch;
